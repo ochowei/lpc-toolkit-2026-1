@@ -1,4 +1,5 @@
 export type {
+  AliasEntry,
   AnimationName,
   BodyType,
   Catalog,

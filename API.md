@@ -91,16 +91,24 @@ interface ItemDefinition {
   [layerKey: `layer_${number}`]: RawLayer | undefined; // layer_1..layer_N
 }
 
+interface AliasEntry {
+  typeName: TypeName;
+  name: string;     // item's `name` with spaces → underscores, or "*" for wildcards
+  variant: string;  // matched variant on the target item, or "*" for wildcards
+}
+
 interface Catalog {
   byItemId:    ReadonlyMap<ItemId, ItemDefinition>;
   byTypeName:  ReadonlyMap<TypeName, readonly ItemDefinition[]>;
   typeNames:   readonly TypeName[];
-  aliases:     ReadonlyMap<TypeName, TypeName>; // e.g. sash → waistband
+  // Outer key: source typeName ("sash"). Inner key: nameAndVariant
+  // ("Waistband_rose") or "*" for type-name-wildcard aliases.
+  aliases:     ReadonlyMap<TypeName, ReadonlyMap<string, AliasEntry>>;
 }
 
 interface Selection {
   typeName: TypeName;
-  name: string;
+  name: string;       // raw item name from the JSON (e.g. "Body Color"), no display suffix
   variant?: string;
   recolor?: string;
 }
@@ -463,6 +471,24 @@ Step 1.3 verified `License` against upstream `LICENSE_CONFIG` directly:
 the list expanded from 9 to **12** values (added `CC-BY 3.0+`, `CC-BY`,
 `OGA-BY 3.0+`). `types.ts` and `API.md` updated; no further reconciliation
 needed before Step 2.
+
+### Step 2.1 follow-ups (2026-05-15)
+
+Implementation of `parseHash` / `serializeHash` / `recolorPixels` surfaced
+six adjustments. All accepted; resolutions below.
+
+| # | Decision |
+| --- | --- |
+| Q1 | `Catalog.aliases` widened to `ReadonlyMap<TypeName, ReadonlyMap<string, AliasEntry>>` (outer key: source typeName; inner key: `name_variant` or `"*"`; value: `{ typeName, name, variant }`). The original `Map<TypeName, TypeName>` could not express the backwards-compat redirects upstream relies on (e.g. `sash=Waistband_rose` → `waistband=Waistband_rose`). `AliasEntry` exported from `index.ts`. |
+| Q2 | `parseHash` sub-item second pass deferred. Upstream's second pass matches skipped entries against `recolors[i].type_name` + `recolors[i].variants`, which only exist after palette-driven normalisation. Core ingests raw `recolors` (`{ material, palettes }`) in Step 2, so entries that depend on recolor-expanded variants surface as `{ reason: 'unknown_item' }` warnings rather than silently-wrong selections. Revisit when palette metadata is wired up. |
+| Q3 | `computeEffectiveLicense` intra-group ranking pushed to Step 2.4. Plan: add `LICENSE_VERSION_RANK: Record<License, number>` to `constants.ts` so within-group ordering is explicit (bare ≤ 3.0 ≤ 3.0+ ≤ 4.0, GPL 2.0 < GPL 3.0). |
+| Q4 | `createCatalog` (Step 2.2) will dedupe by `itemId`; duplicate `(type_name, name)` pairs across different `itemId`s are allowed and not flagged. Duplicate `itemId` → warning, last-write-wins. |
+| Q5 | `Selection.name` stores the raw item name from the JSON (`"Body Color"`), not upstream's display-format suffix (`"Body Color (light)"`). Variant/recolor are already separate fields; display formatting is a UI concern. |
+| Q6 | Added `vitest@^2.1.0` (MIT — compatible with GPL-3.0) as the workspace's test framework. Root script `pnpm test` fans out via `pnpm -r test`; each package owns its own `vitest run`. Tests live in `packages/core/test/`. |
+
+Step 2.1 deliverables: `recolorPixels` (CPU tolerance=1 pixel swap, alpha-0
+skip), `parseHash` / `serializeHash` (with Q2 deferral noted in code), and
+the type widening above. 26 vitest cases pass; `pnpm -r typecheck` clean.
 
 ---
 

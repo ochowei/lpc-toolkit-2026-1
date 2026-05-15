@@ -60,11 +60,17 @@ export interface ItemDefinition {
   readonly [layerKey: `layer_${number}`]: RawLayer | undefined;
 }
 
+export interface AliasEntry {
+  readonly typeName: TypeName;
+  readonly name: string;
+  readonly variant: string;
+}
+
 export interface Catalog {
   readonly byItemId: ReadonlyMap<ItemId, ItemDefinition>;
   readonly byTypeName: ReadonlyMap<TypeName, readonly ItemDefinition[]>;
   readonly typeNames: readonly TypeName[];
-  readonly aliases: ReadonlyMap<TypeName, TypeName>;
+  readonly aliases: ReadonlyMap<TypeName, ReadonlyMap<string, AliasEntry>>;
 }
 
 export interface Selection {
