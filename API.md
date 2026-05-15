@@ -490,6 +490,27 @@ Step 2.1 deliverables: `recolorPixels` (CPU tolerance=1 pixel swap, alpha-0
 skip), `parseHash` / `serializeHash` (with Q2 deferral noted in code), and
 the type widening above. 26 vitest cases pass; `pnpm -r typecheck` clean.
 
+### Step 2.3 follow-ups (2026-05-15)
+
+Implementation of `getSpritePathsForSelections` surfaced eight small
+decisions; all accepted as proposed.
+
+| # | Decision |
+| --- | --- |
+| Q7  | `LayerSpec.path` is a fully-baked PNG path: `spritesheets/${basePath}${defaultAnim}[/${variantFile}].png`. Default anim is `walk` if the item declares it, else `animations[0]`. Mirrors upstream `getLayersToLoad` and makes the output usable for thumbnails / debug / Step 2.4 credits filtering. Step 3 compose will iterate the full `animations` list itself. |
+| Q8  | `getNameWithoutVariant` is **not** lifted. Our `Selection.name` / `Selection.variant` are already separated, so `replace_in_path` lookups use `sel.name.replaceAll(' ', '_')` directly. Upstream's longest-suffix scan only exists because hash params are concatenated. |
+| Q9  | Selection whose `(typeName, name)` does not resolve in `catalog.byItemId` is **skipped silently**, matching upstream's stop-rendering-that-layer behaviour. Surface warnings only when a real consumer needs them. |
+| Q10 | Layer with no `bodyType` path entry is **skipped** (`continue`), matching upstream. Sibling layers and other items are unaffected. |
+| Q11 | If an item's `animations` is missing or empty and `walk` isn't declared, the affected layer is **skipped silently**. Real upstream merges `animations` from `meta_*.json`; we don't, so this is the cheapest safe behaviour until a Step 2.x catalog-merging pass lands. |
+| Q12 | `LayerSpec.customAnimation` is populated verbatim from `layer.custom_animation` whenever present. The custom-only / standard-only filter is driven by `layer_1.custom_animation` (matches upstream `getLayersToLoad`). `exactOptionalPropertyTypes` requires we omit the field entirely on standard layers rather than set it to `undefined`. |
+| Q13 | Output is sorted by `zPos` **ascending across all items**. `Array.prototype.sort` is stable in ES2019+, so insertion order is preserved on `zPos` ties. |
+| Q14 | Empty `selections.items` returns `[]` — no throw, no warning. |
+
+Step 2.3 deliverables: `getSpritePathsForSelections` plus a private
+`replaceInPath` helper (port of upstream `state/path.ts:replaceInPath`
+without the longest-suffix scan). 15 new vitest cases (52 total);
+`pnpm -r typecheck` clean.
+
 ---
 
 ## What I did *not* add (deliberate)
