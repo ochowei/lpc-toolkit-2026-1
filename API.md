@@ -741,6 +741,45 @@ typecheck` and `pnpm -r test` clean; `upstream/` untouched; no new
 dependencies. 4.3 (close hash Q2 — parseHash recolor-variant 2nd pass)
 still pending.
 
+### Step 4.3 follow-ups (2026-05-15)
+
+**Closes the Step 2.1 Q2 deferral.** `parseHash` gained an optional
+third parameter `palettes?: PaletteMetadata`. When supplied,
+`resolveHashParam` matches the hash value against the item's
+palette-expanded recolor variants, so recolor-only items (e.g.
+`body=Body_Color_brown`, `body=Body_Color_lpcr.tan`) now resolve to
+`{ name, recolor }` selections instead of surfacing as `unknown_item`.
+
+| # | Decision |
+| --- | --- |
+| Q2 | The "second pass" the Step 2.1 note described is, in this upstream snapshot, the `recolors[0].variants` match **inside** `resolveHashParamFromHashMatch` (there is no separate skipped-entry loop in `sources/`). 4.3 ports exactly that branch. The variant expansion reuses Step 4.2's single source of truth via the new exported `getRecolorVariants(item, palettes)` (= `collectRecolorEntries` + `normalizeRecolor` → `recolors[0].variants`); no logic duplicated, no drift. |
+| Opt-in | `palettes` is **optional**. Omitted → the no-`palettes` path is byte-identical to pre-4.3 (recolor-only items still defer to `unknown_item`); the 15 original hash cases pass byte-for-byte. Callers (web/cli) that have ingested palettes pass them in to get full resolution. |
+| Precedence | Match order within a name match mirrors upstream exactly: explicit `variants` → palette-expanded recolor variants (which **override** a variant match — later-assignment-wins) → empty-name fallback. So an explicit `name_variant\|recolor` or a bare recolor token resolves to a *recolor* (`matchedVariant` cleared), faithfully replicating `resolveHashParamFromHashMatch`. The empty-name fallback keeps our slightly-stricter `variantToMatch === '' && recolorToMatch === ''` guard (vs upstream's `variantToMatch === ''`) so the existing baseline stays byte-identical; it is unreachable-equivalent in practice. |
+| Multi sub-bind | Upstream's multi-recolor `recolors[i].type_name` sub-binding has no loop in this snapshot and no real upstream item uses `color_N` / `type_name` recolors; `recolors[0]` faithfully covers the single-entry reality. Not a regression vs upstream — there is nothing more to port here. |
+
+Step 4.3 deliverables: `getRecolorVariants` exported from
+`recolor-resolve.ts` (+ `index.ts`), `parseHash(hash, catalog,
+palettes?)` with the recolor-variant branch folded into
+`resolveHashParam`, and `test/hash.test.ts` updates — the stale array
+`recolors` fixture corrected to the `RawRecolors` object form, the Q2
+test renamed to assert the backward-compatible no-`palettes` deferral,
+and 5 new cases (119 total): real body bare-key recolor
+(`Body_Color_brown`), real cross-version key (`Body_Color_lpcr.tan`),
+recolor round-trip, synthetic `name_variant|recolor` → recolor wins
+(upstream precedence), and a plain variant token still resolving to the
+variant. `pnpm -r typecheck` and `pnpm -r test` clean; `upstream/`
+untouched; no new dependencies.
+
+**Step 4 complete.** The deferred palette-JSON / recolor work
+(Step 2.1 Q2, Step 3.2 A2) is fully closed: 4.1 ingestion
+(`createPaletteCatalog`), 4.2 resolution (`makeResolvePalette` feeding
+the unchanged A2 seam), 4.3 hash recolor variants. `composeSelections`
+recolors end-to-end from data with no caller-injected palettes; the
+core compose → extract → recolor pipeline (standard + custom animations)
+is feature-complete. Remaining work is downstream (`packages/web/`,
+`packages/cli/`) and the explicitly out-of-scope WebGL accelerator
+(RESEARCH.md D.3).
+
 ---
 
 ## What I did *not* add (deliberate)

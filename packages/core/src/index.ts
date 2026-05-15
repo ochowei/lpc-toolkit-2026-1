@@ -52,7 +52,7 @@ export type {
   MakeResolvePaletteOptions,
   ResolvePalette,
 } from './recolor-resolve.js';
-export { makeResolvePalette } from './recolor-resolve.js';
+export { getRecolorVariants, makeResolvePalette } from './recolor-resolve.js';
 
 export type { ComposeOptions } from './compose.js';
 export { composeSelections, getSpritePathsForSelections } from './compose.js';

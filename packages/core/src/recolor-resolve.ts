@@ -376,3 +376,22 @@ export function makeResolvePalette(
     };
   };
 }
+
+/**
+ * The first recolor entry's palette-expanded variant names (upstream
+ * `recolors[0].variants`). This is the data `parseHash`'s recolor-variant
+ * pass needs to resolve recolor-only hash values (Step 4.3 / closes the
+ * Step 2.1 Q2 deferral). Returns `[]` when the item has no recolors or
+ * the material is unknown. The single expansion path
+ * (`collectRecolorEntries` + `normalizeRecolor`) is shared with
+ * `makeResolvePalette` — no drift.
+ */
+export function getRecolorVariants(
+  item: ItemDefinition,
+  palettes: PaletteMetadata,
+): readonly string[] {
+  const first = collectRecolorEntries(item.recolors)[0];
+  if (!first) return [];
+  const nr = normalizeRecolor(first, palettes.materials);
+  return nr ? nr.variants : [];
+}
