@@ -22,5 +22,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },
+  "devDependencies": {
+    "@napi-rs/canvas": "^1.0.0"
+  },
   "sideEffects": false
 }

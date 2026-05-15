@@ -531,6 +531,31 @@ Step 2.4 deliverables: `getCredits` (selections → resolved sprite paths
 exported from `constants.ts` / `index.ts`. 16 new vitest cases (68 total);
 `pnpm -r typecheck` clean.
 
+### Step 3.1 follow-ups (2026-05-15)
+
+`recolorImage` implemented and the `CanvasAdapter` contract validated
+against a real Node canvas. Eight decisions; all accepted as proposed.
+
+| # | Decision |
+| --- | --- |
+| Q1 | Test adapter lives at `packages/core/test/helpers/node-canvas-adapter.ts`, not a new `packages/test-utils/` workspace package. A ~50-line helper used by one test file doesn't justify the tooling/project-reference overhead. Step 3.2's compose tests import it via relative path; promote to a package only if web/cli e2e later need it. |
+| Q2 | `@napi-rs/canvas@^1.0.0` added to **`packages/core/devDependencies`** (MIT — GPL-3.0 compatible). Prebuilt binaries (no Cairo / node-gyp / native build). devDep-only, so it never reaches the published bundle and hard rule 4 (core env-agnostic) holds. |
+| Q3 | `recolorImage` does **not** add `createImageData` to `CanvasAdapter`. `ImageDataLike.data` is `readonly` only at the field level; the backing `Uint8ClampedArray` is mutable. So: `getImageData` → `recolorPixels` (non-mutating, fresh buffer) → `imageData.data.set(newPixels)` → `putImageData(imageData, 0, 0)`. Adapter surface stays minimal. |
+| Q4 | Test adapter's `loadImage` is implemented as a rejecting stub (`Promise.reject(Error('…arrives in Step 3.2'))`), not omitted. Keeps the `CanvasAdapter` interface satisfied (no type churn when 3.2 fills it in) and fails loud if a 3.1 test accidentally calls it. Step 3.1 uses synthetic fixtures only. |
+| Q5 | Fixtures are painted via the concrete `@napi-rs/canvas` API (`fillStyle`/`fillRect`), which `Context2DLike` deliberately does not expose. Allowed: the helper is under `test/`, not `core/src/` — the "no canvas lib in core src" rule is unaffected. Helper exports `createNodeCanvasAdapter`, `makeImage(w,h,paint)`, `solidImage(w,h,hex)`. |
+| Q6 | `recolorImage(image: ImageLike, …)` is fed a `Canvas` fixture at runtime (a `Canvas` satisfies `ImageLike`; `Context2DLike.drawImage` accepts `ImageLike \| CanvasLike`). No type change needed. |
+| Q7 | `@napi-rs/canvas`'s `Canvas` / `SKRSContext2D` are a structural superset of `CanvasLike` / `Context2DLike`, so the adapter returns them directly with **no wrapper objects and no casts**. Verified by a standalone strict `tsc` pass over the helper (the workspace `typecheck` only covers `src/**/*`). |
+| Q8 | `recolorImage` is synchronous (image already loaded), matching upstream and the API.md signature. Step 3.2 `composeSelections` will own the async `loadImage` per layer and call `recolorImage` synchronously per layer. |
+
+Step 3.1 deliverables: `recolorImage` (createCanvas → drawImage →
+getImageData → `recolorPixels` → in-place `data.set` → putImageData →
+return canvas) and `test/helpers/node-canvas-adapter.ts` (real
+`@napi-rs/canvas` `CanvasAdapter` + synthetic-image fixtures). 5 new
+vitest cases (73 total): 8×8 red→blue full-canvas swap, alpha=0
+untouched, non-palette untouched, mixed-region selective recolor,
+fresh-canvas / source-not-mutated. `pnpm -r typecheck` and
+`pnpm -r test` clean. WebGL recolor remains deferred (D.3, Step 4+).
+
 ---
 
 ## What I did *not* add (deliberate)
