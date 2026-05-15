@@ -57,6 +57,8 @@ export interface ItemDefinition {
   readonly match_body_color?: boolean;
   readonly preview_row?: number;
   readonly preview_column?: number;
+  readonly aliases?: Readonly<Record<string, string>>;
+  readonly ignore?: boolean;
   readonly [layerKey: `layer_${number}`]: RawLayer | undefined;
 }
 
