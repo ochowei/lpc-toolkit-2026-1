@@ -91,16 +91,24 @@ interface ItemDefinition {
   [layerKey: `layer_${number}`]: RawLayer | undefined; // layer_1..layer_N
 }
 
+interface AliasEntry {
+  typeName: TypeName;
+  name: string;     // item's `name` with spaces → underscores, or "*" for wildcards
+  variant: string;  // matched variant on the target item, or "*" for wildcards
+}
+
 interface Catalog {
   byItemId:    ReadonlyMap<ItemId, ItemDefinition>;
   byTypeName:  ReadonlyMap<TypeName, readonly ItemDefinition[]>;
   typeNames:   readonly TypeName[];
-  aliases:     ReadonlyMap<TypeName, TypeName>; // e.g. sash → waistband
+  // Outer key: source typeName ("sash"). Inner key: nameAndVariant
+  // ("Waistband_rose") or "*" for type-name-wildcard aliases.
+  aliases:     ReadonlyMap<TypeName, ReadonlyMap<string, AliasEntry>>;
 }
 
 interface Selection {
   typeName: TypeName;
-  name: string;
+  name: string;       // raw item name from the JSON (e.g. "Body Color"), no display suffix
   variant?: string;
   recolor?: string;
 }
@@ -463,6 +471,65 @@ Step 1.3 verified `License` against upstream `LICENSE_CONFIG` directly:
 the list expanded from 9 to **12** values (added `CC-BY 3.0+`, `CC-BY`,
 `OGA-BY 3.0+`). `types.ts` and `API.md` updated; no further reconciliation
 needed before Step 2.
+
+### Step 2.1 follow-ups (2026-05-15)
+
+Implementation of `parseHash` / `serializeHash` / `recolorPixels` surfaced
+six adjustments. All accepted; resolutions below.
+
+| # | Decision |
+| --- | --- |
+| Q1 | `Catalog.aliases` widened to `ReadonlyMap<TypeName, ReadonlyMap<string, AliasEntry>>` (outer key: source typeName; inner key: `name_variant` or `"*"`; value: `{ typeName, name, variant }`). The original `Map<TypeName, TypeName>` could not express the backwards-compat redirects upstream relies on (e.g. `sash=Waistband_rose` → `waistband=Waistband_rose`). `AliasEntry` exported from `index.ts`. |
+| Q2 | `parseHash` sub-item second pass deferred. Upstream's second pass matches skipped entries against `recolors[i].type_name` + `recolors[i].variants`, which only exist after palette-driven normalisation. Core ingests raw `recolors` (`{ material, palettes }`) in Step 2, so entries that depend on recolor-expanded variants surface as `{ reason: 'unknown_item' }` warnings rather than silently-wrong selections. Revisit when palette metadata is wired up. |
+| Q3 | `computeEffectiveLicense` intra-group ranking pushed to Step 2.4. Plan: add `LICENSE_VERSION_RANK: Record<License, number>` to `constants.ts` so within-group ordering is explicit (bare ≤ 3.0 ≤ 3.0+ ≤ 4.0, GPL 2.0 < GPL 3.0). |
+| Q4 | `createCatalog` (Step 2.2) will dedupe by `itemId`; duplicate `(type_name, name)` pairs across different `itemId`s are allowed and not flagged. Duplicate `itemId` → warning, last-write-wins. |
+| Q5 | `Selection.name` stores the raw item name from the JSON (`"Body Color"`), not upstream's display-format suffix (`"Body Color (light)"`). Variant/recolor are already separate fields; display formatting is a UI concern. |
+| Q6 | Added `vitest@^2.1.0` (MIT — compatible with GPL-3.0) as the workspace's test framework. Root script `pnpm test` fans out via `pnpm -r test`; each package owns its own `vitest run`. Tests live in `packages/core/test/`. |
+
+Step 2.1 deliverables: `recolorPixels` (CPU tolerance=1 pixel swap, alpha-0
+skip), `parseHash` / `serializeHash` (with Q2 deferral noted in code), and
+the type widening above. 26 vitest cases pass; `pnpm -r typecheck` clean.
+
+### Step 2.3 follow-ups (2026-05-15)
+
+Implementation of `getSpritePathsForSelections` surfaced eight small
+decisions; all accepted as proposed.
+
+| # | Decision |
+| --- | --- |
+| Q7  | `LayerSpec.path` is a fully-baked PNG path: `spritesheets/${basePath}${defaultAnim}[/${variantFile}].png`. Default anim is `walk` if the item declares it, else `animations[0]`. Mirrors upstream `getLayersToLoad` and makes the output usable for thumbnails / debug / Step 2.4 credits filtering. Step 3 compose will iterate the full `animations` list itself. |
+| Q8  | `getNameWithoutVariant` is **not** lifted. Our `Selection.name` / `Selection.variant` are already separated, so `replace_in_path` lookups use `sel.name.replaceAll(' ', '_')` directly. Upstream's longest-suffix scan only exists because hash params are concatenated. |
+| Q9  | Selection whose `(typeName, name)` does not resolve in `catalog.byItemId` is **skipped silently**, matching upstream's stop-rendering-that-layer behaviour. Surface warnings only when a real consumer needs them. |
+| Q10 | Layer with no `bodyType` path entry is **skipped** (`continue`), matching upstream. Sibling layers and other items are unaffected. |
+| Q11 | If an item's `animations` is missing or empty and `walk` isn't declared, the affected layer is **skipped silently**. Real upstream merges `animations` from `meta_*.json`; we don't, so this is the cheapest safe behaviour until a Step 2.x catalog-merging pass lands. |
+| Q12 | `LayerSpec.customAnimation` is populated verbatim from `layer.custom_animation` whenever present. The custom-only / standard-only filter is driven by `layer_1.custom_animation` (matches upstream `getLayersToLoad`). `exactOptionalPropertyTypes` requires we omit the field entirely on standard layers rather than set it to `undefined`. |
+| Q13 | Output is sorted by `zPos` **ascending across all items**. `Array.prototype.sort` is stable in ES2019+, so insertion order is preserved on `zPos` ties. |
+| Q14 | Empty `selections.items` returns `[]` — no throw, no warning. |
+
+Step 2.3 deliverables: `getSpritePathsForSelections` plus a private
+`replaceInPath` helper (port of upstream `state/path.ts:replaceInPath`
+without the longest-suffix scan). 15 new vitest cases (52 total);
+`pnpm -r typecheck` clean.
+
+### Step 2.4 follow-ups (2026-05-15)
+
+`getCredits` and `computeEffectiveLicense` implemented; five small
+decisions resolved.
+
+| # | Decision |
+| --- | --- |
+| A   | Credit-file matching mirrors upstream `utils/credits.ts:72` exactly: `usedPath === credit.file || usedPath.startsWith(credit.file + "/")`. Folder-prefix, case-sensitive. `usedPath` is `LayerSpec.path` with the `spritesheets/` prefix stripped, so the comparison sits in the same namespace as `credit.file` (which is upstream's relative path). |
+| B   | `LICENSE_VERSION_RANK` added to `constants.ts` (intra-group ranks). CC-BY: bare=0, 3.0=1, 3.0+=2, 4.0=3. OGA-BY: 3.0=1, 3.0+=2, 4.0=3. CC-BY-SA: 3.0=1, 4.0=3. GPL: 2.0=2, 3.0=3. CC0: 0. Numbers are only compared inside a single `LicenseGroup` (use `LICENSE_GROUP_OF` first); cross-group ordering is `LICENSE_GROUP_ORDER`. |
+| C   | `computeEffectiveLicense` **throws** on an empty `CreditsManifest.licenses` rather than returning `null` or a fallback. The API.md signature returns `License` (non-nullable) and "license of nothing" has no sensible answer. Callers check `manifest.licenses.length` first when the empty case is reachable. |
+| D   | `getCredits` calls `getSpritePathsForSelections` internally and derives used paths by stripping `spritesheets/` from each `LayerSpec.path`. Avoids duplicating the layer-walk + `replaceInPath` logic. Trade-off: callers using both pay O(items × layers) twice — neither is hot, drift risk is the bigger concern. Used paths are grouped by `itemId` so an item only matches its own credits (a body credit can't be promoted by a hair layer that shares a folder prefix). |
+| E   | `CreditsManifest.entries` is deduped by `credit.file` across all items, ordered by selection iteration then by per-item credit-array order. `licenses` is deduped (insertion order preserved) across all kept entries. |
+
+Step 2.4 deliverables: `getCredits` (selections → resolved sprite paths
+→ prefix-matched credit rows → deduped manifest), `computeEffectiveLicense`
+(highest group per `LICENSE_GROUP_ORDER`, then highest version per
+`LICENSE_VERSION_RANK`), and the new `LICENSE_VERSION_RANK` constant
+exported from `constants.ts` / `index.ts`. 16 new vitest cases (68 total);
+`pnpm -r typecheck` clean.
 
 ---
 

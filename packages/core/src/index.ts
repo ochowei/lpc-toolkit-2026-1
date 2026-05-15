@@ -1,4 +1,5 @@
 export type {
+  AliasEntry,
   AnimationName,
   BodyType,
   Catalog,
@@ -64,6 +65,7 @@ export {
   LICENSE_CONFIG,
   LICENSE_GROUP_OF,
   LICENSE_GROUP_ORDER,
+  LICENSE_VERSION_RANK,
   SHEET_HEIGHT,
   SHEET_WIDTH,
   STANDARD_ANIMATION_FRAMES_PER_ROW,
