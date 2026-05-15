@@ -95,6 +95,27 @@ export const LICENSE_GROUP_OF: Readonly<Record<License, LicenseGroup>> = {
   'GPL 3.0': 'GPL',
 };
 
+/**
+ * Intra-group ranks for `computeEffectiveLicense`. Compared only against
+ * other versions in the same `LicenseGroup` (use `LICENSE_GROUP_OF` first).
+ * Ordering rule (API.md Q3): bare ≤ 3.0 ≤ 3.0+ ≤ 4.0; GPL 2.0 < GPL 3.0.
+ * Higher number wins.
+ */
+export const LICENSE_VERSION_RANK: Readonly<Record<License, number>> = {
+  'CC0': 0,
+  'CC-BY': 0,
+  'CC-BY 3.0': 1,
+  'CC-BY 3.0+': 2,
+  'CC-BY 4.0': 3,
+  'OGA-BY 3.0': 1,
+  'OGA-BY 3.0+': 2,
+  'OGA-BY 4.0': 3,
+  'CC-BY-SA 3.0': 1,
+  'CC-BY-SA 4.0': 3,
+  'GPL 2.0': 2,
+  'GPL 3.0': 3,
+};
+
 export interface AnimationListEntry {
   readonly value: string;
   readonly label: string;

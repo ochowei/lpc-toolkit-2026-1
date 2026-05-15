@@ -511,6 +511,26 @@ Step 2.3 deliverables: `getSpritePathsForSelections` plus a private
 without the longest-suffix scan). 15 new vitest cases (52 total);
 `pnpm -r typecheck` clean.
 
+### Step 2.4 follow-ups (2026-05-15)
+
+`getCredits` and `computeEffectiveLicense` implemented; five small
+decisions resolved.
+
+| # | Decision |
+| --- | --- |
+| A   | Credit-file matching mirrors upstream `utils/credits.ts:72` exactly: `usedPath === credit.file || usedPath.startsWith(credit.file + "/")`. Folder-prefix, case-sensitive. `usedPath` is `LayerSpec.path` with the `spritesheets/` prefix stripped, so the comparison sits in the same namespace as `credit.file` (which is upstream's relative path). |
+| B   | `LICENSE_VERSION_RANK` added to `constants.ts` (intra-group ranks). CC-BY: bare=0, 3.0=1, 3.0+=2, 4.0=3. OGA-BY: 3.0=1, 3.0+=2, 4.0=3. CC-BY-SA: 3.0=1, 4.0=3. GPL: 2.0=2, 3.0=3. CC0: 0. Numbers are only compared inside a single `LicenseGroup` (use `LICENSE_GROUP_OF` first); cross-group ordering is `LICENSE_GROUP_ORDER`. |
+| C   | `computeEffectiveLicense` **throws** on an empty `CreditsManifest.licenses` rather than returning `null` or a fallback. The API.md signature returns `License` (non-nullable) and "license of nothing" has no sensible answer. Callers check `manifest.licenses.length` first when the empty case is reachable. |
+| D   | `getCredits` calls `getSpritePathsForSelections` internally and derives used paths by stripping `spritesheets/` from each `LayerSpec.path`. Avoids duplicating the layer-walk + `replaceInPath` logic. Trade-off: callers using both pay O(items × layers) twice — neither is hot, drift risk is the bigger concern. Used paths are grouped by `itemId` so an item only matches its own credits (a body credit can't be promoted by a hair layer that shares a folder prefix). |
+| E   | `CreditsManifest.entries` is deduped by `credit.file` across all items, ordered by selection iteration then by per-item credit-array order. `licenses` is deduped (insertion order preserved) across all kept entries. |
+
+Step 2.4 deliverables: `getCredits` (selections → resolved sprite paths
+→ prefix-matched credit rows → deduped manifest), `computeEffectiveLicense`
+(highest group per `LICENSE_GROUP_ORDER`, then highest version per
+`LICENSE_VERSION_RANK`), and the new `LICENSE_VERSION_RANK` constant
+exported from `constants.ts` / `index.ts`. 16 new vitest cases (68 total);
+`pnpm -r typecheck` clean.
+
 ---
 
 ## What I did *not* add (deliberate)
