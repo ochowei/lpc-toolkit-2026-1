@@ -13,6 +13,7 @@ export type {
   ItemId,
   LayerSpec,
   License,
+  MultiRecolorConfig,
   PaletteColors,
   PaletteMap,
   PaletteMaterialMeta,
@@ -20,6 +21,7 @@ export type {
   PaletteVersionColors,
   PaletteVersionMeta,
   RawLayer,
+  RawRecolors,
   RecolorConfig,
   Selection,
   Selections,
@@ -45,6 +47,12 @@ export type {
   PaletteLoadWarning,
 } from './palettes.js';
 export { createPaletteCatalog } from './palettes.js';
+
+export type {
+  MakeResolvePaletteOptions,
+  ResolvePalette,
+} from './recolor-resolve.js';
+export { makeResolvePalette } from './recolor-resolve.js';
 
 export type { ComposeOptions } from './compose.js';
 export { composeSelections, getSpritePathsForSelections } from './compose.js';

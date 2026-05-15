@@ -38,17 +38,44 @@ export interface CreditEntry {
   readonly urls: readonly string[];
 }
 
+/**
+ * One recolor entry as it appears in a sheet definition. `material` +
+ * `palettes` (palette-token refs like `ulpc` / `all.lpcr`) are always
+ * present; the rest are optional overrides the raw JSON may carry
+ * (upstream `applyRecolorDefaults` reads them). Step 4.2 normalises this
+ * against `PaletteMetadata`.
+ */
 export interface RecolorConfig {
   readonly material: string;
   readonly palettes: readonly string[];
+  readonly type_name?: TypeName;
+  readonly base?: string;
+  readonly source?: readonly string[];
+  readonly label?: string;
 }
+
+/**
+ * Multi-color form: `color_1` / `color_2` / … each a `RecolorConfig`
+ * (upstream `collectRecolorEntries`). Real upstream data only uses the
+ * single-object form, but the shape is supported for fidelity.
+ */
+export interface MultiRecolorConfig {
+  readonly [colorKey: `color_${number}`]: RecolorConfig | undefined;
+}
+
+/**
+ * Raw `recolors` value — a single `RecolorConfig` **object** or the
+ * `color_N` multi form. (Note: this is an object in the source JSON, not
+ * an array.)
+ */
+export type RawRecolors = RecolorConfig | MultiRecolorConfig;
 
 export interface ItemDefinition {
   readonly name: string;
   readonly type_name: TypeName;
   readonly animations: readonly AnimationName[];
   readonly credits: readonly CreditEntry[];
-  readonly recolors?: readonly RecolorConfig[];
+  readonly recolors?: RawRecolors;
   readonly variants?: readonly string[];
   readonly tags?: readonly string[];
   readonly required_tags?: readonly string[];

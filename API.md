@@ -707,6 +707,40 @@ missing-version-token warn, empty-input. `pnpm -r typecheck` and
 `pnpm -r test` clean; `upstream/` untouched; no new dependencies. 4.2 /
 4.3 still pending.
 
+### Step 4.2 follow-ups (2026-05-15)
+
+Recolor resolution implemented as `makeResolvePalette(catalog,
+palettes, selections, opts?)` → the existing `ComposeOptions.resolvePalette`
+callback (QB). `composeSelections` / `ComposedSheet` are **unchanged** —
+the Step 3.2 A2 seam is the sole integration point. End-to-end recolor
+now works without the caller hand-injecting palettes.
+
+| # | Decision |
+| --- | --- |
+| QC | Confirmed: the normalised per-item recolor view is derived **lazily in the resolver** (`normalizeRecolor` = port of upstream `applyRecolorDefaults` + `expandRecolorPalettes`). `createCatalog` stays palette-agnostic; no catalog-build coupling. |
+| Raw shape | `ItemDefinition.recolors` retyped from `readonly RecolorConfig[]` to `RawRecolors` (a single `RecolorConfig` **object** or the `color_N` `MultiRecolorConfig`). The old array type never matched the source JSON and was **read nowhere** in core, so this is a type-only correction (102 prior tests byte-unchanged). `RecolorConfig` gained the optional `type_name` / `base` / `source` / `label` fields the raw JSON may carry. |
+| Ports | `collectRecolorEntries`, `resolvePaletteToken`, `parseRecolorKey` (QI: `material.version.recolor` / `version.recolor` / bare `recolor`), `getBasePalette` (source ramp = explicit `source`, else `base`, else material `default`.`base`), `getTargetPalette`, `fixMissingRecolor`, `getBodyColor`, `getMultiRecolors` — faithful to upstream `state/palettes.ts` + `scripts/generateSources/item-helper.js`. |
+| subId → type_name | Upstream's UI `subId` (multi-color sub-picker index) has no analogue in our `Selection` (no `subId`). Sub-recolor entries instead bind by `type_name` to the matching selection's `recolor` — semantically exactly upstream's `recolors[typeName]` keying. Real upstream data has zero `color_N` / `type_name` recolors, so this only affects the synthetic multi-color path. |
+| QD | `match_body_color` / body-color propagation ported (`getBodyColor` + the `getMultiRecolors` tail): a `match_body_color` item with no recolor of its own inherits the skin tone chosen on whichever selected item is itself `match_body_color`. The upstream `itemId === "body-body" && variant !== "light"` `needsRecolor` flag is a *render-time hint*, not part of palette resolution — the `match_body_color` port is the faithful recolor mechanism (body.json carries `match_body_color: true`). |
+| Multi → one swap | Multiple recolor entries are flattened into a **single** `PaletteSwap` (source/target concatenated, index-aligned), matching upstream `recolorImageCPU` which flattens all mappings into one per-pixel pass. Each (source,target) pair is truncated to the common length before concat because our `recolorPixels` *throws* on a length mismatch (Step 2.1) whereas upstream's `buildColorMap` silently uses the shorter — same observable result. `PaletteSwap.material` (descriptive only; unused by `recolorPixels`) is the `+`-joined contributing materials. |
+| QH | Unresolvable entry (unknown material / invalid color / missing ramp) → skipped with an optional `onWarn` (warn-and-skip); a layer with no applicable recolor returns `undefined` (the seam's "draw raw" contract). Never throws on bad data. |
+
+Step 4.2 deliverables: `src/recolor-resolve.ts` (`makeResolvePalette` +
+the ported helpers), the `RawRecolors` / `MultiRecolorConfig` type
+correction in `types.ts`, `index.ts` re-exports
+(`makeResolvePalette`, `MakeResolvePaletteOptions`, `ResolvePalette`,
+`RawRecolors`, `MultiRecolorConfig`), and `test/recolor-resolve.test.ts`
+— 12 new cases (114 total): real body skin recolor (ulpc base→target
+ramps), real cross-version key (`lpcr.tan` on a ulpc-default material),
+real `match_body_color` propagation (lizard tail inherits body skin),
+no-recolor → undefined, end-to-end pixel change through
+`composeSelections`, the three `parseRecolorKey` key forms (QI),
+unknown-material / unknown-color warn-skip, no-recolors → undefined, and
+the synthetic `color_N` multi → one concatenated swap. `pnpm -r
+typecheck` and `pnpm -r test` clean; `upstream/` untouched; no new
+dependencies. 4.3 (close hash Q2 — parseHash recolor-variant 2nd pass)
+still pending.
+
 ---
 
 ## What I did *not* add (deliberate)
