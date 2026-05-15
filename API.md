@@ -585,6 +585,33 @@ recolor via `resolvePalette`, swallowed load failure, custom-anim layer
 skipped. `pnpm -r typecheck` and `pnpm -r test` clean. Custom-animation
 compositing and palette-JSON ingestion remain deferred.
 
+### Step 3.3 follow-ups (2026-05-15)
+
+`extractAnimation` implemented. Six decisions; all accepted as proposed.
+
+| # | Decision |
+| --- | --- |
+| Q1 | `name` is a **logical** animation name, looked up in `ANIMATION_CONFIGS` (same namespace as `ComposedSheet.animations` / `composeSelections`'s `options.animations`). |
+| Q2 | `frameCount = config.cycle.length` — the playback-cycle length (one loop, including repeated columns: `walk` → 8, `idle` → 3, `hurt` → 6). Chosen over "distinct frame columns" or "full 13-wide row": `cycle` is upstream's only authoritative play sequence, and it pairs naturally with `directions` (row count) as "steps per loop". |
+| Q3 | Unknown `name` (not in `ANIMATION_CONFIGS`) **throws** (message lists known names), consistent with API.md's non-nullable return and the Step 2.4-C "no sensible answer → throw" precedent. Upstream returns `null`; we don't thread null through this surface. |
+| Q4 | A *known but un-composed* animation returns a valid, fully-transparent crop (no throw). Extract keys purely off `ANIMATION_CONFIGS` and is independent of `sheet.animations`, mirroring upstream `extractAnimationFromCanvas`. Consequence: `watering` (shares the thrust rows: `ANIMATION_CONFIGS.watering.row === thrust`) is extractable even though 3.2 never lists it in `sheet.animations`. |
+| Q5 | `ComposedAnimation.credits` is `sheet.credits` passed through **by reference** — an extracted clip is a sub-region of the same composed character, so attribution is identical. |
+| Q6 | Crop geometry mirrors upstream exactly: `srcY = row*64`, `srcHeight = num*64`, output canvas `832 × srcHeight`, single `drawImage(sheet.canvas, 0, srcY, 832, srcHeight, 0,0, 832, srcHeight)`. Full sheet width — columns are **not** tight-cropped (unused frame columns stay transparent). `extractAnimation` is synchronous (canvas crop only, no I/O). Test helper gains `makeCanvas(w,h,paint): CanvasLike` (symmetric with `makeImage`) for hand-painting a `ComposedSheet.canvas`. |
+
+Step 3.3 deliverables: `extractAnimation` (`ANIMATION_CONFIGS` lookup →
+row-group crop → `ComposedAnimation` with `frameCount`/`directions`/
+passed-through credits) and the `makeCanvas` test helper. 6 new vitest
+cases (85 total): walk crop (832×256, 4 dir, frameCount 8), hurt crop
+(832×64, 1 dir, frameCount 6), transparent crop for un-composed anim,
+credits-by-reference, unknown-name throw, end-to-end on a
+`composeSelections` output. `pnpm -r typecheck` and `pnpm -r test`
+clean.
+
+This closes the originally-scoped Step 3 (3.1 recolor, 3.2 compose,
+3.3 extract). Still deferred: custom-animation compositing (B1) and
+palette-JSON ingestion (Step 2.1 Q2) — both independent follow-ups,
+neither blocks the standard compose→extract pipeline.
+
 ---
 
 ## What I did *not* add (deliberate)

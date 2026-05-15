@@ -57,3 +57,18 @@ export function solidImage(
     ctx.fillRect(0, 0, width, height);
   });
 }
+
+/**
+ * Like `makeImage`, but typed as `CanvasLike` — for tests that need a
+ * hand-painted `ComposedSheet.canvas` (e.g. `extractAnimation`), since
+ * `Context2DLike` deliberately doesn't expose `fillRect`.
+ */
+export function makeCanvas(
+  width: number,
+  height: number,
+  paint: (ctx: SKRSContext2D) => void,
+): CanvasLike {
+  const canvas = createCanvas(width, height);
+  paint(canvas.getContext('2d'));
+  return canvas;
+}
