@@ -3,16 +3,23 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { createCatalog } from '../src/catalog.js';
-import { getSpritePathsForSelections } from '../src/compose.js';
+import { composeSelections, getSpritePathsForSelections } from '../src/compose.js';
+import type { CanvasAdapter, CanvasLike } from '../src/adapters.js';
+import type { PaletteSwap } from '../src/recolor.js';
 import type {
   Catalog,
   FilePath,
   ItemDefinition,
   Selections,
 } from '../src/types.js';
+import {
+  createNodeCanvasAdapter,
+  solidImage,
+} from './helpers/node-canvas-adapter.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const upstreamRoot = path.join(here, '../../../upstream/sheet_definitions');
+const upstreamBase = path.join(here, '../../../upstream');
 
 function loadFixture(relPath: FilePath): ItemDefinition {
   return JSON.parse(
@@ -335,6 +342,263 @@ describe('getSpritePathsForSelections', () => {
       expect(layers[0]?.path).toBe(
         'spritesheets/head/faces/${head}/blush/walk.png',
       );
+    });
+  });
+});
+
+describe('composeSelections', () => {
+  function regionPixels(
+    canvas: CanvasLike,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+  ): Uint8ClampedArray {
+    return canvas.getContext('2d').getImageData(x, y, w, h).data;
+  }
+
+  function hasContent(data: Uint8ClampedArray): boolean {
+    for (let i = 3; i < data.length; i += 4) {
+      if (data[i] !== 0) return true;
+    }
+    return false;
+  }
+
+  function everyPixelEquals(
+    data: Uint8ClampedArray,
+    rgba: readonly [number, number, number, number],
+  ): boolean {
+    for (let i = 0; i < data.length; i += 4) {
+      if (
+        data[i] !== rgba[0] ||
+        data[i + 1] !== rgba[1] ||
+        data[i + 2] !== rgba[2] ||
+        data[i + 3] !== rgba[3]
+      ) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  // ANIMATION_OFFSETS: spellcast=0, walk=8*64=512.
+  const WALK_Y = 512;
+  const SPELLCAST_Y = 0;
+
+  describe('with real upstream spritesheets', () => {
+    const adapter = createNodeCanvasAdapter();
+
+    it('composes a body-only male selection into an 832x3456 sheet', async () => {
+      const catalog = loadCatalog(['body/body.json']);
+      const selections: Selections = {
+        bodyType: 'male',
+        items: { body: { typeName: 'body', name: 'Body Color' } },
+      };
+
+      const sheet = await composeSelections(selections, {
+        catalog,
+        adapter,
+        spritesheetsBaseUrl: upstreamBase,
+      });
+
+      expect(sheet.width).toBe(832);
+      expect(sheet.height).toBe(3456);
+      expect(sheet.canvas.width).toBe(832);
+      expect(sheet.canvas.height).toBe(3456);
+      expect(sheet.credits.entries.length).toBeGreaterThan(0);
+      expect(sheet.layers.map((l) => l.itemId)).toEqual(['body']);
+      // body declares walk/spellcast/hurt → logical names reported.
+      expect(sheet.animations).toContain('walk');
+      expect(sheet.animations).toContain('spellcast');
+      expect(sheet.animations).toContain('hurt');
+      // 'watering' has no ANIMATION_OFFSETS folder (shares thrust row),
+      // so it is never independently composed even though body declares it.
+      expect(sheet.animations).not.toContain('watering');
+      // The walk block is drawn at its vertical offset.
+      expect(
+        hasContent(regionPixels(sheet.canvas, 0, WALK_Y, 832, 256)),
+      ).toBe(true);
+    });
+
+    it('honours the options.animations filter (logical names)', async () => {
+      const catalog = loadCatalog(['body/body.json']);
+      const selections: Selections = {
+        bodyType: 'male',
+        items: { body: { typeName: 'body', name: 'Body Color' } },
+      };
+
+      const sheet = await composeSelections(selections, {
+        catalog,
+        adapter,
+        spritesheetsBaseUrl: upstreamBase,
+        animations: ['walk'],
+      });
+
+      expect(sheet.animations).toEqual(['walk']);
+      expect(hasContent(regionPixels(sheet.canvas, 0, WALK_Y, 832, 256))).toBe(
+        true,
+      );
+      // Spellcast was filtered out → that row group stays transparent.
+      expect(
+        hasContent(regionPixels(sheet.canvas, 0, SPELLCAST_Y, 832, 256)),
+      ).toBe(false);
+    });
+  });
+
+  describe('with a synthetic single-color sprite', () => {
+    function makeCatalog(items: ItemDefinition[]): Catalog {
+      const records: Record<FilePath, ItemDefinition> = {};
+      for (let i = 0; i < items.length; i++) {
+        const name = items[i]!.name.toLowerCase().replaceAll(' ', '_');
+        records[`item_${i}_${name}.json`] = items[i]!;
+      }
+      return createCatalog(records).catalog;
+    }
+
+    const bodyItem: ItemDefinition = {
+      name: 'Test Body',
+      type_name: 'body',
+      animations: ['walk'],
+      credits: [
+        {
+          file: 'test/body',
+          notes: '',
+          authors: ['tester'],
+          licenses: ['CC0'],
+          urls: [],
+        },
+      ],
+      layer_1: { zPos: 10, male: 'test/body/' },
+    };
+
+    function syntheticAdapter(image = solidImage(8, 8, '#ff0000')): {
+      adapter: CanvasAdapter;
+      loadCalls: string[];
+    } {
+      const base = createNodeCanvasAdapter();
+      const loadCalls: string[] = [];
+      return {
+        loadCalls,
+        adapter: {
+          createCanvas: base.createCanvas,
+          loadImage(p: string) {
+            loadCalls.push(p);
+            return Promise.resolve(image);
+          },
+        },
+      };
+    }
+
+    const selections: Selections = {
+      bodyType: 'male',
+      items: { body: { typeName: 'body', name: 'Test Body' } },
+    };
+
+    it('draws the raw sprite at the walk offset when no palette resolver', async () => {
+      const { adapter, loadCalls } = syntheticAdapter();
+      const progress: Array<[number, number]> = [];
+
+      const sheet = await composeSelections(selections, {
+        catalog: makeCatalog([bodyItem]),
+        adapter,
+        spritesheetsBaseUrl: '',
+        onProgress: (loaded, total) => progress.push([loaded, total]),
+      });
+
+      // Only 'walk' is supported → exactly one image load.
+      expect(loadCalls).toEqual(['spritesheets/test/body/walk.png']);
+      expect(progress).toEqual([[1, 1]]);
+      expect(sheet.animations).toEqual(['walk']);
+      expect(
+        everyPixelEquals(regionPixels(sheet.canvas, 0, WALK_Y, 8, 8), [
+          255, 0, 0, 255,
+        ]),
+      ).toBe(true);
+    });
+
+    it('applies recolor via options.resolvePalette before drawing (A2)', async () => {
+      const { adapter } = syntheticAdapter();
+      const swap: PaletteSwap = {
+        material: 'body',
+        source: ['#ff0000'],
+        target: ['#0000ff'],
+      };
+
+      const sheet = await composeSelections(selections, {
+        catalog: makeCatalog([bodyItem]),
+        adapter,
+        spritesheetsBaseUrl: '',
+        resolvePalette: (sel, item) => {
+          expect(sel.name).toBe('Test Body');
+          expect(item.type_name).toBe('body');
+          return swap;
+        },
+      });
+
+      expect(
+        everyPixelEquals(regionPixels(sheet.canvas, 0, WALK_Y, 8, 8), [
+          0, 0, 255, 255,
+        ]),
+      ).toBe(true);
+    });
+
+    it('swallows per-image load failures and still returns a sheet', async () => {
+      const base = createNodeCanvasAdapter();
+      const adapter: CanvasAdapter = {
+        createCanvas: base.createCanvas,
+        loadImage: () => Promise.reject(new Error('404')),
+      };
+
+      const sheet = await composeSelections(selections, {
+        catalog: makeCatalog([bodyItem]),
+        adapter,
+        spritesheetsBaseUrl: '',
+      });
+
+      expect(sheet.width).toBe(832);
+      expect(sheet.height).toBe(3456);
+      expect(sheet.animations).toEqual([]);
+      expect(
+        hasContent(regionPixels(sheet.canvas, 0, WALK_Y, 8, 8)),
+      ).toBe(false);
+      // Credits are still resolved from the catalog, not the pixels.
+      expect(sheet.credits.entries.map((e) => e.file)).toEqual(['test/body']);
+    });
+
+    it('skips custom-animation layers from the standard sheet (B1)', async () => {
+      const wheels: ItemDefinition = {
+        name: 'Wheelchair',
+        type_name: 'wheels',
+        animations: ['walk'],
+        credits: [],
+        variants: ['wood'],
+        layer_1: {
+          zPos: 50,
+          custom_animation: 'wheelchair',
+          male: 'wheels/wheelchair/',
+        },
+      };
+      const { adapter, loadCalls } = syntheticAdapter();
+
+      const sheet = await composeSelections(
+        {
+          bodyType: 'male',
+          items: {
+            wheels: { typeName: 'wheels', name: 'Wheelchair', variant: 'wood' },
+          },
+        },
+        {
+          catalog: makeCatalog([wheels]),
+          adapter,
+          spritesheetsBaseUrl: '',
+        },
+      );
+
+      // No standard-sheet draw for a custom-animation-only item.
+      expect(loadCalls).toEqual([]);
+      expect(sheet.animations).toEqual([]);
+      expect(sheet.width).toBe(832);
+      expect(sheet.height).toBe(3456);
     });
   });
 });

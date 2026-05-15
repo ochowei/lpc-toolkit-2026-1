@@ -556,6 +556,35 @@ untouched, non-palette untouched, mixed-region selective recolor,
 fresh-canvas / source-not-mutated. `pnpm -r typecheck` and
 `pnpm -r test` clean. WebGL recolor remains deferred (D.3, Step 4+).
 
+### Step 3.2 follow-ups (2026-05-15)
+
+`composeSelections` implemented (standard 832×3456 master sheet). Nine
+decisions; all accepted as proposed.
+
+| # | Decision |
+| --- | --- |
+| A2 | Recolor in compose is driven by an injected resolver. Core has no palette color data (`RecolorConfig` is palette *names*; palette-JSON ingestion deferred — Step 2.1 Q2), so `ComposeOptions` gains `resolvePalette?: (selection, item) => PaletteSwap \| undefined`. compose calls `recolorImage` only when it yields a swap. Same DI philosophy as `CanvasAdapter` / `createCatalog` records; keeps core palette-agnostic and unblocks recolor without palette ingestion. When omitted, sprites are drawn raw. |
+| B1 | Custom-animation compositing (wheelchair / `tool_rod` / …) is **out of scope for 3.2**. Porting `upstream/custom-animations.ts` (572 lines) + `drawFramesToCustomAnimation` + variable-height canvas + the extracted-frames pass roughly doubles the surface. 3.2 composes only the standard sheet; layers whose `layer_1.custom_animation` is set are skipped (upstream routes them separately anyway and they never land on the 0..3456 standard sheet). Tracked as a follow-up step. |
+| C1 | Extracted a shared internal `resolveLayers(selections, catalog)` (selection → layer walk → bodyType filter → custom-anim filter → `replaceInPath`). `getSpritePathsForSelections` is now a thin default-anim view over it; `composeSelections` iterates `ANIMATION_OFFSETS` per resolved layer. One source of truth for the layer walk — no drift. All 15 Step 2.3 cases stay green byte-for-byte. |
+| D | Per-animation path uses the `ANIMATION_OFFSETS` folder key directly (`spritesheets/${basePath}${folder}${variantTail}.png`), matching upstream `getSpritePath` (whose folder→logical remap is a no-op because `ANIMATION_OFFSETS` keys aren't `ANIMATIONS[].value`s). Folder support gate mirrors `runRenderCharacter`: `combat_idle`←`combat`, `backslash`←`1h_slash`/`1h_backslash`, `halfslash`←`1h_halfslash`, else direct. |
+| D' | `options.animations` (input filter) and `ComposedSheet.animations` (output) both use **logical** names (the `ANIMATIONS[].value` / hash namespace). Input logical→folder via `folderName ?? value`; output is the declared logical names whose folder was actually drawn (one-to-many: `backslash` → `1h_slash` and/or `1h_backslash`). `watering` has no `ANIMATION_OFFSETS` folder (shares the thrust row) so it is never independently composed even when declared — verified by test. |
+| E | Per-image load failure is swallowed (that layer isn't drawn), matching upstream `loadImagesInParallel`. `composeSelections` rejects only on a hard failure. `spritesheetsBaseUrl` + `LayerSpec`-style path (with `spritesheets/` prefix) are single-slash joined and handed to `adapter.loadImage`, which interprets URL vs filesystem path. |
+| F | `onProgress(loaded, total)`: `total` = planned image-load count (surviving layer × supported/filtered folder); `loaded` increments once per settled load (success **or** failure) and fires after each. |
+| G | The Step 3.1 test adapter's `loadImage` stub is now real, backed by `@napi-rs/canvas`'s `loadImage` (accepts a filesystem path). Compose tests point `spritesheetsBaseUrl` at the read-only `upstream/` checkout (reading spritesheets is their intended use; submodule untouched). |
+| H | `ComposedSheet` is always `832 × 3456` (B1 — no custom-anim height). `.layers` reuses `getSpritePathsForSelections` (the documented default-anim representative, API.md `compose.ts`); `.credits` reuses `getCredits` (Step 2.4). Fresh adapter canvas is transparent, so no `clearRect` (upstream clears only because it reuses a persistent offscreen canvas). |
+
+Step 3.2 deliverables: `composeSelections` (resolveLayers → per-folder
+draw items → stable zPos sort → parallel load w/ swallowed failures →
+optional `recolorImage` → draw at `ANIMATION_OFFSETS` y-offset →
+`ComposedSheet` with credits/layers/animations), the `resolveLayers`
+refactor (C1), the new `ComposeOptions.resolvePalette` seam, and the
+now-real test adapter `loadImage`. 6 new vitest cases (79 total): real
+upstream body compose (dims/credits/animations/walk-region), logical
+`animations` filter, synthetic raw draw + `onProgress`, synthetic
+recolor via `resolvePalette`, swallowed load failure, custom-anim layer
+skipped. `pnpm -r typecheck` and `pnpm -r test` clean. Custom-animation
+compositing and palette-JSON ingestion remain deferred.
+
 ---
 
 ## What I did *not* add (deliberate)

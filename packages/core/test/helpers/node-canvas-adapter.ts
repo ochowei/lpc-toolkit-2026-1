@@ -1,4 +1,8 @@
-import { createCanvas, type SKRSContext2D } from '@napi-rs/canvas';
+import {
+  createCanvas,
+  loadImage as napiLoadImage,
+  type SKRSContext2D,
+} from '@napi-rs/canvas';
 import type { CanvasAdapter, CanvasLike, ImageLike } from '../../src/adapters.js';
 
 /**
@@ -17,14 +21,11 @@ export function createNodeCanvasAdapter(): CanvasAdapter {
       return createCanvas(width, height);
     },
     loadImage(path: string): Promise<ImageLike> {
-      void path;
-      // Synthetic fixtures are enough for Step 3.1 (recolor). Real
-      // file-backed loading is wired up in Step 3.2 (compose).
-      return Promise.reject(
-        new Error(
-          'node-canvas-adapter.loadImage: not wired for Step 3.1; arrives in Step 3.2',
-        ),
-      );
+      // Step 3.2: real file-backed loading. `@napi-rs/canvas` accepts a
+      // filesystem path (or URL / Buffer); compose passes
+      // `joinUrl(spritesheetsBaseUrl, layerPath)`, so tests point
+      // `spritesheetsBaseUrl` at the read-only `upstream/` checkout.
+      return napiLoadImage(path);
     },
   };
 }
