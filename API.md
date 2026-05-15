@@ -48,7 +48,12 @@ type ItemId        = string;   // unique key in Catalog.byItemId
 type BodyType      = string;   // 'male', 'female', 'muscular', …
 type AnimationName = string;   // 'walk', 'idle', 'wheelchair', …
 type FilePath      = string;
-type License       = string;   // 'CC0', 'CC-BY 4.0', 'GPL 3.0', …
+type License =
+  | 'CC0'
+  | 'CC-BY 3.0'    | 'CC-BY 4.0'
+  | 'CC-BY-SA 3.0' | 'CC-BY-SA 4.0'
+  | 'OGA-BY 3.0'   | 'OGA-BY 4.0'
+  | 'GPL 2.0'      | 'GPL 3.0';
 
 interface RawLayer {
   zPos: number;
@@ -112,7 +117,7 @@ interface CreditsManifest {
 }
 
 interface ComposedSheet {
-  canvas: unknown;          // CanvasLike — see adapters.ts (TODO: refine)
+  canvas: CanvasLike;       // from adapters.ts
   width: number; height: number;
   selections: Selections;
   credits: CreditsManifest;
@@ -121,7 +126,7 @@ interface ComposedSheet {
 }
 
 interface ComposedAnimation {
-  canvas: unknown;          // CanvasLike (TODO: refine)
+  canvas: CanvasLike;
   width: number; height: number;
   animation: AnimationName;
   frameCount: number;
@@ -138,15 +143,15 @@ interface ComposedAnimation {
 - Tagged-template index signature `[layerKey: \`layer_${number}\`]` keeps
   `layer_1`..`layer_9` strongly typed without enumerating each one
   individually.
-- `BodyType`, `AnimationName`, `License` are aliases of `string` rather
-  than literal unions, so adding a new body type or animation upstream
-  doesn't require a core code change. The trade-off is no autocomplete /
-  exhaustiveness for these — flagged as O.4 below.
+- `BodyType` and `AnimationName` are aliases of `string` so the data
+  layer (sheet definitions JSON) can add new body types / animations
+  without a core code change. `License` is a **closed literal union**
+  because the upstream `LICENSE_CONFIG` is hand-curated and we want
+  exhaustiveness when computing effective licenses (resolved O.4).
 - `ComposedSheet.credits` is **on the result type**, not a separate fetch:
   per hard rule 5 ("credits 跟著合成走"), the caller cannot forget them.
-- `ComposedSheet.canvas` is typed `unknown` (with a TODO) because typing
-  it as `CanvasLike` from `adapters.ts` creates an awkward cross-file
-  coupling for what is essentially an opaque handle. See O.2 below.
+- `ComposedSheet.canvas` is typed `CanvasLike` (resolved O.2) — `types.ts`
+  imports from `adapters.ts`. One-way dependency, no cycle.
 
 ---
 
@@ -326,61 +331,27 @@ single-row animations while everything else is 4-row.
 
 ---
 
-## Open questions for review
+## Resolved decisions (2026-05-15)
 
-**O.1 — Should `composeSelections` return `Promise<Result<…>>` instead of `Promise<ComposedSheet>`?**
-Currently it rejects on error. Result-wrapped would be more consistent
-with D.2 and avoid try/catch at call sites, at the cost of one indirection.
-My weak preference is the current shape — Promise rejection is idiomatic
-for I/O errors and we don't have many "semantic" error cases in compose.
-Confirm or flip?
+All open questions O.1–O.8 from the original draft were accepted as
+proposed. Summary:
 
-**O.2 — `canvas: unknown` on `ComposedSheet` / `ComposedAnimation`.**
-Should it be `CanvasLike` (cross-module dep from `types.ts` →
-`adapters.ts`) or stay `unknown` so callers cast to their concrete type?
-I lean `CanvasLike`; if you agree I'll thread the dep.
+| # | Decision |
+| --- | --- |
+| O.1 | `composeSelections` returns `Promise<ComposedSheet>` (rejects on error). `Result` is not threaded through the headline async API. |
+| O.2 | `ComposedSheet.canvas` and `ComposedAnimation.canvas` are typed `CanvasLike`. `types.ts` imports from `adapters.ts`. |
+| O.3 | `computeEffectiveLicense` will hard-code a small license-compatibility matrix in core (`CC0 < CC-BY < CC-BY-SA < GPL`). Implementation in Step 1.3+. |
+| O.4 | `BodyType` and `AnimationName` stay `string` (open data); `License` is a closed literal union (9 values from RESEARCH.md §4). |
+| O.5 | `parseHash` returns `ParseHashResult` (`{ selections, warnings, unknownKeys }`), not `Selections`. |
+| O.6 | `Selection` does not carry `itemId`. Resolution via `catalog` lookup on demand. |
+| O.7 | `spritesheetsBaseUrl` lives on `ComposeOptions`, not inside `CanvasAdapter`. |
+| O.8 | Recolor API (`recolorImage(image, recolorSpec)`) queued for Step 1.3 alongside the rest of the recolor pipeline stubs. |
 
-**O.3 — License compatibility matrix.**
-`computeEffectiveLicense` needs a definition of "most restrictive
-compatible license". Options:
-(a) Hard-code a small matrix in core (CC0 < CC-BY < CC-BY-SA < GPL).
-(b) Caller supplies the matrix as a parameter.
-(c) Return the multiset and let the caller format it (drop the function).
-My pick: (a). Confirm?
-
-**O.4 — `BodyType` / `AnimationName` / `License` as `string` vs literal unions.**
-Currently aliases of `string` (no autocomplete, no exhaustiveness).
-Trade-off: harder to evolve via JSON-only additions if we make them unions.
-Recommend keeping `string` for `BodyType`/`AnimationName` (open data) and
-making `License` a literal union (closed list per `state/constants.ts`).
-OK?
-
-**O.5 — `parseHash` returns `ParseHashResult` not `Selections`.**
-This deviates from your stated signature. Reason: hash parsing has
-expected partial failure (old bookmarks pointing at items that have been
-renamed). Returning warnings keeps the API honest. Revert if you want a
-strict `Selections` return.
-
-**O.6 — `Selection` does not carry `itemId`.**
-We can re-derive `itemId` via `catalog.byTypeName` lookups whenever
-needed. Including it makes `Selection` non-serializable without a
-catalog and risks getting stale. Keeping it out feels right; confirm?
-
-**O.7 — `spritesheetsBaseUrl` on `ComposeOptions` vs. inside `CanvasAdapter`.**
-Currently on `ComposeOptions`. Alternative: bake into `loadImage` (the
-adapter knows the base). Slight preference for the current shape because
-it keeps the adapter generic. Confirm?
-
-**O.8 — Recolor pipeline shape.**
-Decision D.3 says CPU recolor lives in core for v1. I have **not** added
-an API for it in this round (no `recolorImage(...)` or
-`applyPaletteToLayer(...)` yet) because I want to confirm the rest of the
-surface first. Likely shape:
-```ts
-function recolorImage(image: ImageLike, recolor: RecolorSpec): ImageLike;
-```
-…where `RecolorSpec` resolves a `material → palette` swap against the
-item's `recolors[]`. Add it in Step 1.3 once the rest is locked.
+The exact `License` strings were taken from RESEARCH.md §4; they must be
+double-checked against `upstream/sources/state/constants.ts` →
+`LICENSE_CONFIG` once the submodule is re-initialised for Step 2 (the
+upstream lift). If the canonical list differs, this is the single line in
+`types.ts` to update.
 
 ---
 

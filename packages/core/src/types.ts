@@ -1,3 +1,5 @@
+import type { CanvasLike } from './adapters.js';
+
 export type TypeName = string;
 
 export type ItemId = string;
@@ -8,7 +10,16 @@ export type AnimationName = string;
 
 export type FilePath = string;
 
-export type License = string;
+export type License =
+  | 'CC0'
+  | 'CC-BY 3.0'
+  | 'CC-BY 4.0'
+  | 'CC-BY-SA 3.0'
+  | 'CC-BY-SA 4.0'
+  | 'OGA-BY 3.0'
+  | 'OGA-BY 4.0'
+  | 'GPL 2.0'
+  | 'GPL 3.0';
 
 export interface RawLayer {
   readonly zPos: number;
@@ -79,7 +90,7 @@ export interface CreditsManifest {
 }
 
 export interface ComposedSheet {
-  readonly canvas: unknown;
+  readonly canvas: CanvasLike;
   readonly width: number;
   readonly height: number;
   readonly selections: Selections;
@@ -89,7 +100,7 @@ export interface ComposedSheet {
 }
 
 export interface ComposedAnimation {
-  readonly canvas: unknown;
+  readonly canvas: CanvasLike;
   readonly width: number;
   readonly height: number;
   readonly animation: AnimationName;
