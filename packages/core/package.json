@@ -1,0 +1,25 @@
+{
+  "name": "@lpc-toolkit/core",
+  "version": "0.0.0",
+  "description": "Environment-agnostic composition logic for LPC character sprites. No DOM, no fs — canvas and image loading are injected by the caller.",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "sideEffects": false
+}
