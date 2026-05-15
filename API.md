@@ -612,6 +612,54 @@ This closes the originally-scoped Step 3 (3.1 recolor, 3.2 compose,
 palette-JSON ingestion (Step 2.1 Q2) — both independent follow-ups,
 neither blocks the standard compose→extract pipeline.
 
+### Step 3.4 follow-ups (2026-05-15)
+
+Custom-animation compositing implemented — this **closes the B1
+deferral** from Step 3.2. `composeSelections` no longer skips custom
+layers; it composes each custom-animation block (wheelchair / `tool_rod`
+/ …) below the standard sheet, mirroring upstream `runRenderCharacter`.
+Pre-approved questions Q1–Q7 and follow-on N1–N7; all accepted as
+proposed.
+
+| # | Decision |
+| --- | --- |
+| Q1 | Custom-animation **data** lifted to a new leaf module `packages/core/src/custom-animations.ts` (`animationRowsLayout`, `CustomAnimationDefinition`, `customAnimations`, `customAnimationSize`, `customAnimationBase`), re-exported from `index.ts`. Same precedent as `constants.ts`. *Data* is verbatim; the two helper *functions* are a faithful port — see N1. |
+| Q2 | `composeSelections` returns a **variable-size** canvas: `height = 3456 + Σ(block heights)`, `width = max(832, max block width)`. `ComposedSheet.width/height` were already `number` — no type change. This **revisits Step 3.2 decision H** ("always 832×3456"): H now holds only for selections with no custom-animation layers (a standard-only sheet is still byte-for-byte 832×3456, so all Step 3.2/3.3 tests stay green). |
+| Q3 | `ComposedSheet` gains an optional `customAnimations?: ReadonlyMap<string, CustomAnimationRegion>` (`{ offsetY; frameSize; rows; cols }`). `extractAnimation` looks up `ANIMATION_CONFIGS` **first**, then this sheet's custom blocks; a name in neither throws. This **refines (does not overturn) Step 3.3 Q3**: unknown-name-throws still holds — the known set is just widened by the sheet's own custom blocks. Custom `ComposedAnimation` semantics: `directions = rows` (= `frames.length`; all 13 known custom defs have 4 → the `1 \| 4` type holds), `frameCount = cols` (= `frames[0].length`, frames per direction), `width = cols·frameSize`, `height = rows·frameSize`, `credits` by reference (consistent with Step 3.3 Q5). |
+| Q4 | `options.resolvePalette` (Step 3.2 A2 seam) is applied to **both** custom-sprite layers and re-laid base-anim frames, matching upstream running `getImageToDraw` in both branches. |
+| Q5 | Re-laid frames' source is the **already-loaded standard per-anim PNG** whose `ANIMATION_OFFSETS` folder equals `customAnimationBase(def)` (e.g. wheelchair → `sit`), reused — not reloaded. Verified: `body/bodies/male/sit.png` is 192×256 (≤256) → `drawFramesToCustomAnimation`'s single-animation **direction-map** branch (`n/w/s/e → rows 0/1/2/3`), never `animationRowsLayout`. |
+| Q6 | Multiple custom blocks are ordered by `Set` insertion = `resolveLayers` encounter order (selection iteration → layer number). Offsets accrue in that order from `y=3456`. Deterministic, matches upstream `addedCustomAnimations`. |
+| Q7 | Tests as proposed plus the N-driven additions (see Deliverables). |
+| N1 | `customAnimationSize` / `customAnimationBase` are a **faithful port, not byte-verbatim**: upstream's `frames[0][0]` indexing fails under our `noUncheckedIndexedAccess`, so they use strict-safe access (and `customAnimationBase` throws on a frame-less def). Identical observable behaviour on the verbatim literal data. Import extensions adapted to `.js`; `FRAME_SIZE` sourced from our `constants.ts`. Same treatment philosophy as the `constants.ts` lift. |
+| N2 | `drawFrameToFrame` / `drawFramesToCustomAnimation` ported to a **core-internal** module `packages/core/src/custom-frames.ts`, typed against `Context2DLike` / `ImageLike \| CanvasLike` only (hard rule 4). **Not** re-exported from `index.ts` — it is a `composeSelections` implementation detail, kept separate from the pure-data `custom-animations.ts` (data vs. logic split). |
+| N3 | `ComposedSheet.customAnimations` is **omitted entirely** (not an empty map) when the selection has no custom layers (`exactOptionalPropertyTypes`), so a standard-only sheet's shape is unchanged ("standard ↔ custom must not pollute each other"). New exported type `CustomAnimationRegion`. |
+| N4 | `extractAnimation` on a custom block is a **tight crop** (`cols·frameSize × rows·frameSize` at `(0, offsetY)`), unlike a standard animation's full-832-width crop. The block is laid out tightly at compose time, so a tight crop is its natural extent (no letterboxing). |
+| N5 | Re-laid base-anim frames come from the same (`options.animations`-filtered) standard draw list as the standard sheet. If the base anim is filtered out or undeclared, the block simply has no body frames — faithfully mirroring upstream, which pulls from the same `itemsToDraw`. The default (no filter) composes `sit`, so the common case works. |
+| N6 | A custom layer with **no variant** is skipped (not drawn as `${basePath}.png`), matching `getSpritePathsForSelections` (Step 2.3 Q12) so `ComposedSheet.layers` stays the single source of truth and "listed" ≡ "drawn". All real custom items (wheelchair, `tool_rod`, …) declare variants. |
+| N7 | A `custom_animation` string with no entry in the lifted `customAnimations` table is skipped (no block added; its custom-sprite layers are not drawn), matching upstream `if (!customAnimDef) continue`. |
+
+`onProgress` (Step 3.2 F) extended: `total` now includes custom-sprite
+loads (the only *new* I/O — re-laid frames reuse already-counted
+standard loads); `loaded` still increments once per settled load. A
+standard-only selection is unaffected (custom count 0).
+
+Step 3.4 deliverables: `custom-animations.ts` (verbatim data + faithful
+helper port, N1), core-internal `custom-frames.ts` (N2), the
+`CustomAnimationRegion` type + optional `ComposedSheet.customAnimations`
+(Q3/N3), `composeSelections` custom-block compositing (variable canvas,
+custom-sprite + re-laid base-anim frames, `zPos`-ordered, `resolvePalette`
+on both — Q2/Q4/Q5/Q6), and `extractAnimation` custom-block lookup
+(Q3/N4). The Step 3.2 "skips custom layers (B1)" test was **repurposed**
+to assert the now-correct composited behaviour (the other 84 baseline
+cases are byte-for-byte unchanged). 6 new cases (91 total): synthetic
+direction-map / `zPos` landing, `resolvePalette` on custom-sprite +
+re-laid frames, real-upstream wheelchair-below-body (dims / metadata /
+block content / sit re-lay proven by with-vs-without diff), custom
+tight-crop extract (rows/cols semantics, credits-by-ref), standard
+extract still works on a variable-size sheet, and unknown-name still
+throws (refined known set). `pnpm -r typecheck` and `pnpm -r test`
+clean; `upstream/` untouched; no new dependencies.
+
 ---
 
 ## What I did *not* add (deliberate)

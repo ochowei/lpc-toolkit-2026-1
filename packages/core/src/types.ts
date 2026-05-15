@@ -100,6 +100,19 @@ export interface CreditsManifest {
   readonly licenses: readonly License[];
 }
 
+/**
+ * Where a custom-animation block lives inside a (variable-height)
+ * `ComposedSheet.canvas` and how it is laid out (API.md Step 3.4 Q3 / N3).
+ * `extractAnimation` uses this to crop a custom block when `name` is not a
+ * standard `ANIMATION_CONFIGS` entry.
+ */
+export interface CustomAnimationRegion {
+  readonly offsetY: number;
+  readonly frameSize: number;
+  readonly rows: number;
+  readonly cols: number;
+}
+
 export interface ComposedSheet {
   readonly canvas: CanvasLike;
   readonly width: number;
@@ -108,6 +121,13 @@ export interface ComposedSheet {
   readonly credits: CreditsManifest;
   readonly layers: readonly LayerSpec[];
   readonly animations: readonly AnimationName[];
+  /**
+   * Custom-animation blocks composed below the standard 832×3456 sheet,
+   * keyed by custom-animation name (e.g. `wheelchair`). Omitted entirely
+   * when the selection has no custom-animation layers, so a standard-only
+   * sheet's shape is unchanged (N3). Order is encounter order (Q6).
+   */
+  readonly customAnimations?: ReadonlyMap<string, CustomAnimationRegion>;
 }
 
 export interface ComposedAnimation {

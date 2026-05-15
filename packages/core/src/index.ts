@@ -7,6 +7,7 @@ export type {
   ComposedSheet,
   CreditEntry,
   CreditsManifest,
+  CustomAnimationRegion,
   FilePath,
   ItemDefinition,
   ItemId,
@@ -43,6 +44,17 @@ export { parseHash, serializeHash } from './hash.js';
 
 export type { ExtractAnimationOptions } from './animation.js';
 export { extractAnimation } from './animation.js';
+
+export type {
+  AnimationRowsLayout,
+  CustomAnimationDefinition,
+} from './custom-animations.js';
+export {
+  animationRowsLayout,
+  customAnimationBase,
+  customAnimations,
+  customAnimationSize,
+} from './custom-animations.js';
 
 export type {
   AnimationConfig,
