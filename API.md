@@ -48,11 +48,13 @@ type ItemId        = string;   // unique key in Catalog.byItemId
 type BodyType      = string;   // 'male', 'female', 'muscular', …
 type AnimationName = string;   // 'walk', 'idle', 'wheelchair', …
 type FilePath      = string;
-type License =
-  | 'CC0'
-  | 'CC-BY 3.0'    | 'CC-BY 4.0'
+type License =                            // 12 values, verbatim from
+  | 'CC0'                                 // upstream LICENSE_CONFIG
+  | 'CC-BY'        | 'CC-BY 3.0'
+  | 'CC-BY 3.0+'   | 'CC-BY 4.0'
   | 'CC-BY-SA 3.0' | 'CC-BY-SA 4.0'
-  | 'OGA-BY 3.0'   | 'OGA-BY 4.0'
+  | 'OGA-BY 3.0'   | 'OGA-BY 3.0+'
+  | 'OGA-BY 4.0'
   | 'GPL 2.0'      | 'GPL 3.0';
 
 interface RawLayer {
@@ -68,7 +70,10 @@ interface CreditEntry {
   urls: readonly string[];
 }
 
-interface RecolorConfig { material: string; palettes: unknown /* TODO */ }
+interface RecolorConfig {
+  material: string;                // e.g. 'body'
+  palettes: readonly string[];     // palette name IDs, e.g. ['ulpc', 'lpcr']
+}
 
 interface ItemDefinition {
   name: string;
@@ -331,6 +336,113 @@ single-row animations while everything else is 4-row.
 
 ---
 
+## `constants.ts` 🟢
+
+Pure data lifted verbatim from `upstream/sources/state/constants.ts`. No
+logic, no transformation.
+
+```ts
+const FRAME_SIZE = 64;
+const COMPACT_FRAME_SIZE = 32;
+const STANDARD_ANIMATION_FRAMES_PER_ROW = 13;
+const SHEET_WIDTH  = 832;   // 13 × FRAME_SIZE
+const SHEET_HEIGHT = 3456;
+
+const BODY_TYPES  = ['male','female','teen','child','muscular','pregnant'] as const;
+const DIRECTIONS  = ['up','left','down','right'] as const;
+
+interface LicenseGroupConfig {
+  key: string; label: string;
+  versions: readonly License[];
+  url: string; urlLabel?: string;
+}
+const LICENSE_CONFIG: readonly LicenseGroupConfig[];           // 5 groups
+const LICENSE_GROUP_ORDER = ['CC0','CC-BY','OGA-BY','CC-BY-SA','GPL'] as const;
+type LicenseGroup = (typeof LICENSE_GROUP_ORDER)[number];
+const LICENSE_GROUP_OF: Readonly<Record<License, LicenseGroup>>; // version → group
+
+interface AnimationListEntry {
+  value: string; label: string;
+  folderName?: string;   // when on-disk folder ≠ value (e.g. 'combat' → 'combat_idle')
+  noExport?: boolean;
+}
+const ANIMATIONS: readonly AnimationListEntry[];               // 17 entries
+const ANIMATION_DEFAULTS: readonly string[];                   // 7 default anims
+
+const ANIMATION_OFFSETS = { spellcast: 0, thrust: 256, … } as const; // 15 folder keys
+type AnimationFolderName = keyof typeof ANIMATION_OFFSETS;
+
+interface AnimationConfig { row: number; num: 1 | 4; cycle: readonly number[] }
+const ANIMATION_CONFIGS: Readonly<Record<string, AnimationConfig>>; // 17 logical names
+```
+
+**Rationale.**
+- Data, not logic — kept in a leaf module so anything in core can import
+  it without circular risk.
+- `LICENSE_GROUP_ORDER` + `LICENSE_GROUP_OF` are the data
+  `computeEffectiveLicense` needs (resolves O.3 data half; the function
+  body still throws until Step 2).
+- Two parallel indexes for animations — `ANIMATION_OFFSETS` keyed by
+  **folder name** (where the PNG lives on disk), `ANIMATION_CONFIGS`
+  keyed by **logical value** (`combat`, `1h_slash`, `1h_backslash`,
+  `1h_halfslash`, `watering` all share folders). Preserving this duality
+  faithfully avoids translation bugs.
+- `BODY_TYPES` is exported as a tuple plus a `StandardBodyType` union —
+  callers that want autocomplete can use the union; the `BodyType` type
+  alias in `types.ts` stays open (`string`) so JSON-driven additions don't
+  require a code change.
+
+**Open: license ordering.** I placed `OGA-BY` between `CC-BY` and
+`CC-BY-SA`. OGA-BY is conceptually similar to CC-BY (attribution, no
+share-alike); whether it should rank below or equal to CC-BY-SA is a
+judgement call. Will revisit when implementing `computeEffectiveLicense`.
+
+---
+
+## `recolor.ts` 🟡
+
+Stub-level (resolves O.8). Implementation in Step 2 per decision D.3 (CPU
+recolor in core).
+
+```ts
+type ColorHex = string;
+type Palette  = readonly ColorHex[];
+
+interface PaletteSwap {
+  material: string;     // identifies which material on the sprite is being swapped
+  source:   Palette;    // colors present in the source PNG
+  target:   Palette;    // colors to substitute in
+}
+
+interface RecolorOptions { adapter: CanvasAdapter; }
+
+function recolorImage(
+  image:   ImageLike,
+  swap:    PaletteSwap,
+  options: RecolorOptions
+): CanvasLike;
+
+function recolorPixels(
+  pixels: Uint8ClampedArray,
+  swap:   PaletteSwap
+): Uint8ClampedArray;
+```
+
+**Rationale.**
+- `PaletteSwap` is the "applied" form of the swap — `source`/`target`
+  arrays must be the same length and aligned by index. Looking up "which
+  named palette resolves to which color array" is the caller's job
+  (palette resolution depends on data not yet ingested — see RESEARCH.md
+  D.3).
+- Two entry points: `recolorImage` is the convenience path (loads image →
+  recolor → returns a canvas). `recolorPixels` is the pure inner loop —
+  no canvas, no adapter, fully testable. Compose pipeline will call
+  `recolorPixels`; CLI / web one-shots will call `recolorImage`.
+- `ColorHex` is `string` (not a literal) because we don't yet validate
+  hex format at the type level. Will tighten if we add a validator.
+
+---
+
 ## Resolved decisions (2026-05-15)
 
 All open questions O.1–O.8 from the original draft were accepted as
@@ -340,18 +452,17 @@ proposed. Summary:
 | --- | --- |
 | O.1 | `composeSelections` returns `Promise<ComposedSheet>` (rejects on error). `Result` is not threaded through the headline async API. |
 | O.2 | `ComposedSheet.canvas` and `ComposedAnimation.canvas` are typed `CanvasLike`. `types.ts` imports from `adapters.ts`. |
-| O.3 | `computeEffectiveLicense` will hard-code a small license-compatibility matrix in core (`CC0 < CC-BY < CC-BY-SA < GPL`). Implementation in Step 1.3+. |
-| O.4 | `BodyType` and `AnimationName` stay `string` (open data); `License` is a closed literal union (9 values from RESEARCH.md §4). |
+| O.3 | License ranking data shipped in `constants.ts` (`LICENSE_GROUP_ORDER`, `LICENSE_GROUP_OF`). Function body in `credits.ts` still throws — implementation in Step 2. |
+| O.4 | `BodyType` and `AnimationName` stay `string` (open data); `License` is a closed literal union (12 values verified against upstream `LICENSE_CONFIG`). |
 | O.5 | `parseHash` returns `ParseHashResult` (`{ selections, warnings, unknownKeys }`), not `Selections`. |
 | O.6 | `Selection` does not carry `itemId`. Resolution via `catalog` lookup on demand. |
 | O.7 | `spritesheetsBaseUrl` lives on `ComposeOptions`, not inside `CanvasAdapter`. |
-| O.8 | Recolor API (`recolorImage(image, recolorSpec)`) queued for Step 1.3 alongside the rest of the recolor pipeline stubs. |
+| O.8 | Recolor API stubs added in `recolor.ts` (`PaletteSwap`, `recolorImage`, `recolorPixels`). Bodies still throw. |
 
-The exact `License` strings were taken from RESEARCH.md §4; they must be
-double-checked against `upstream/sources/state/constants.ts` →
-`LICENSE_CONFIG` once the submodule is re-initialised for Step 2 (the
-upstream lift). If the canonical list differs, this is the single line in
-`types.ts` to update.
+Step 1.3 verified `License` against upstream `LICENSE_CONFIG` directly:
+the list expanded from 9 to **12** values (added `CC-BY 3.0+`, `CC-BY`,
+`OGA-BY 3.0+`). `types.ts` and `API.md` updated; no further reconciliation
+needed before Step 2.
 
 ---
 

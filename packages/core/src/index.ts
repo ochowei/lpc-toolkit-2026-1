@@ -42,3 +42,37 @@ export { parseHash, serializeHash } from './hash.js';
 
 export type { ExtractAnimationOptions } from './animation.js';
 export { extractAnimation } from './animation.js';
+
+export type {
+  AnimationConfig,
+  AnimationFolderName,
+  AnimationListEntry,
+  Direction,
+  LicenseGroup,
+  LicenseGroupConfig,
+  StandardBodyType,
+} from './constants.js';
+export {
+  ANIMATIONS,
+  ANIMATION_CONFIGS,
+  ANIMATION_DEFAULTS,
+  ANIMATION_OFFSETS,
+  BODY_TYPES,
+  COMPACT_FRAME_SIZE,
+  DIRECTIONS,
+  FRAME_SIZE,
+  LICENSE_CONFIG,
+  LICENSE_GROUP_OF,
+  LICENSE_GROUP_ORDER,
+  SHEET_HEIGHT,
+  SHEET_WIDTH,
+  STANDARD_ANIMATION_FRAMES_PER_ROW,
+} from './constants.js';
+
+export type {
+  ColorHex,
+  Palette,
+  PaletteSwap,
+  RecolorOptions,
+} from './recolor.js';
+export { recolorImage, recolorPixels } from './recolor.js';

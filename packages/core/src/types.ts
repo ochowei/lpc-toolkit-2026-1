@@ -12,11 +12,14 @@ export type FilePath = string;
 
 export type License =
   | 'CC0'
+  | 'CC-BY'
   | 'CC-BY 3.0'
+  | 'CC-BY 3.0+'
   | 'CC-BY 4.0'
   | 'CC-BY-SA 3.0'
   | 'CC-BY-SA 4.0'
   | 'OGA-BY 3.0'
+  | 'OGA-BY 3.0+'
   | 'OGA-BY 4.0'
   | 'GPL 2.0'
   | 'GPL 3.0';
@@ -37,7 +40,7 @@ export interface CreditEntry {
 
 export interface RecolorConfig {
   readonly material: string;
-  readonly palettes: unknown;
+  readonly palettes: readonly string[];
 }
 
 export interface ItemDefinition {
