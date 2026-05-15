@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+
+# Editor / OS noise
+.vscode/
+.idea/
+*.swp
+
+# Env files
+.env
+.env.local
+.env.*.local
