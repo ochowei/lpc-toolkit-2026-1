@@ -408,6 +408,42 @@ Specifically discarded:
 7. **`tylerlong/liberated-pixel-cup` license** — page did not show one. If
    we want to vendor anything from it (we probably do not), we must check.
 
+### Decisions (2026-05-15)
+
+Resolutions to questions D.1–D.4 above. Items D.5–D.7 remain open and will
+be revisited as they arise.
+
+**D.1 / D.4 Catalog ingestion → hybrid, core stays source-agnostic.**
+Core accepts a `Record<path, ItemDefinition>` and builds its own indexes
+(`byTypeName`, `byItemId`, alias map) at module load. Web feeds it via
+`import.meta.glob('../../upstream/sheet_definitions/**/*.json',
+{ eager: true })`; CLI feeds it via a small `fs.readdirSync(..., {
+recursive: true })` walker. No self-authored Vite plugins; no dynamic
+chunk loading. Trade-off: all JSON in memory at startup (~ a few hundred
+KB; acceptable).
+
+**D.3 Palette recolor → CPU recolor in core for v1; WebGL deferred.**
+CPU recolor is pure `Uint8ClampedArray` pixel replacement — no canvas
+required, lives in core, works in both Node and browser. Upstream
+measures ~ 190–230 ms per sheet on CPU, acceptable for v1. A WebGL
+accelerator can be added later as an optional adapter inside
+`packages/web/` (environment-specific optimisations live outside core).
+
+**D.2 (neverthrow) → roll a ~20-line in-house `Result<T, E>`.**
+We only use `ok` / `err` / `isOk` / `isErr` / `unwrapOr` — the rest of
+`neverthrow`'s surface (`andThen`, `mapErr`, `match`, etc.) is not
+needed. Implementation as a discriminated union
+`{ ok: true, value } | { ok: false, error }` keeps core dependency-free
+and easy to read. Search-replace work during the upstream lift is
+contained.
+
+**D.bonus zPos → use the JSON `zPos` field; ignore the generated CSV.**
+The runtime path (`getZPos` → catalog → `layer.zPos`) never reads the
+CSV; the `scripts/zPositioning/` CSV is a dev-tooling validation
+artefact for upstream maintainers. If any item JSON turns out to be
+missing `zPos` and only the CSV has it, revisit — risk looks low based
+on the four sampled JSON files.
+
 ## Section E — What to borrow / avoid from `tylerlong/liberated-pixel-cup`
 
 **Borrow / take as inspiration**
@@ -443,19 +479,15 @@ Specifically discarded:
 
 ---
 
-## Suggested next concrete steps (for discussion before coding)
+## Suggested next concrete steps
 
-1. Sketch the `packages/core/` public surface based on Sections A and B —
-   roughly `composeSelections(selections, opts)`,
+D.1–D.4 resolved (see "Decisions" inside Section D). Remaining:
+
+1. Sketch the `packages/core/` public surface based on Sections A and B
+   and the D-decisions — roughly `composeSelections(selections, opts)`,
    `getSpritePathsForSelections(...)`, `getCredits(selections)`,
-   `parseHash(string)` / `serializeHash(selections)`, plus the canvas
-   adapter interface (`createCanvas`, `loadImage`).
-2. Decide on the catalog ingestion shape (D.1, D.4): are we shipping a
-   built-time-generated JSON manifest, or reading `sheet_definitions/`
-   live? The latter is simpler if we are bundling assets with the web app
-   anyway.
-3. Decide v1 scope for palette recolor (D.3).
-4. Decide whether to depend on `neverthrow` in core or roll a tiny Result
-   ourselves.
-
-No code, no `packages/`, no `pnpm install` until these are answered.
+   `parseHash(string)` / `serializeHash(selections)`, the canvas adapter
+   interface (`createCanvas`, `loadImage`), and the catalog-ingestion
+   entry point (`createCatalog(records: Record<path, ItemDefinition>)`).
+2. Once the API is reviewed, scaffold the pnpm workspace and start
+   porting the pure logic from Section A.
