@@ -19,10 +19,19 @@ export function recolorImage(
   swap: PaletteSwap,
   options: RecolorOptions,
 ): CanvasLike {
-  void image;
-  void swap;
-  void options;
-  throw new Error('not implemented');
+  const { adapter } = options;
+  const { width, height } = image;
+  const canvas = adapter.createCanvas(width, height);
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(image, 0, 0);
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const newPixels = recolorPixels(imageData.data, swap);
+  // `imageData.data` is `readonly` only at the field level — the backing
+  // buffer is still mutable. `recolorPixels` is non-mutating (returns a
+  // fresh buffer), so copy it back in place and put the same object.
+  imageData.data.set(newPixels);
+  ctx.putImageData(imageData, 0, 0);
+  return canvas;
 }
 
 interface Rgb {

@@ -531,6 +531,87 @@ Step 2.4 deliverables: `getCredits` (selections → resolved sprite paths
 exported from `constants.ts` / `index.ts`. 16 new vitest cases (68 total);
 `pnpm -r typecheck` clean.
 
+### Step 3.1 follow-ups (2026-05-15)
+
+`recolorImage` implemented and the `CanvasAdapter` contract validated
+against a real Node canvas. Eight decisions; all accepted as proposed.
+
+| # | Decision |
+| --- | --- |
+| Q1 | Test adapter lives at `packages/core/test/helpers/node-canvas-adapter.ts`, not a new `packages/test-utils/` workspace package. A ~50-line helper used by one test file doesn't justify the tooling/project-reference overhead. Step 3.2's compose tests import it via relative path; promote to a package only if web/cli e2e later need it. |
+| Q2 | `@napi-rs/canvas@^1.0.0` added to **`packages/core/devDependencies`** (MIT — GPL-3.0 compatible). Prebuilt binaries (no Cairo / node-gyp / native build). devDep-only, so it never reaches the published bundle and hard rule 4 (core env-agnostic) holds. |
+| Q3 | `recolorImage` does **not** add `createImageData` to `CanvasAdapter`. `ImageDataLike.data` is `readonly` only at the field level; the backing `Uint8ClampedArray` is mutable. So: `getImageData` → `recolorPixels` (non-mutating, fresh buffer) → `imageData.data.set(newPixels)` → `putImageData(imageData, 0, 0)`. Adapter surface stays minimal. |
+| Q4 | Test adapter's `loadImage` is implemented as a rejecting stub (`Promise.reject(Error('…arrives in Step 3.2'))`), not omitted. Keeps the `CanvasAdapter` interface satisfied (no type churn when 3.2 fills it in) and fails loud if a 3.1 test accidentally calls it. Step 3.1 uses synthetic fixtures only. |
+| Q5 | Fixtures are painted via the concrete `@napi-rs/canvas` API (`fillStyle`/`fillRect`), which `Context2DLike` deliberately does not expose. Allowed: the helper is under `test/`, not `core/src/` — the "no canvas lib in core src" rule is unaffected. Helper exports `createNodeCanvasAdapter`, `makeImage(w,h,paint)`, `solidImage(w,h,hex)`. |
+| Q6 | `recolorImage(image: ImageLike, …)` is fed a `Canvas` fixture at runtime (a `Canvas` satisfies `ImageLike`; `Context2DLike.drawImage` accepts `ImageLike \| CanvasLike`). No type change needed. |
+| Q7 | `@napi-rs/canvas`'s `Canvas` / `SKRSContext2D` are a structural superset of `CanvasLike` / `Context2DLike`, so the adapter returns them directly with **no wrapper objects and no casts**. Verified by a standalone strict `tsc` pass over the helper (the workspace `typecheck` only covers `src/**/*`). |
+| Q8 | `recolorImage` is synchronous (image already loaded), matching upstream and the API.md signature. Step 3.2 `composeSelections` will own the async `loadImage` per layer and call `recolorImage` synchronously per layer. |
+
+Step 3.1 deliverables: `recolorImage` (createCanvas → drawImage →
+getImageData → `recolorPixels` → in-place `data.set` → putImageData →
+return canvas) and `test/helpers/node-canvas-adapter.ts` (real
+`@napi-rs/canvas` `CanvasAdapter` + synthetic-image fixtures). 5 new
+vitest cases (73 total): 8×8 red→blue full-canvas swap, alpha=0
+untouched, non-palette untouched, mixed-region selective recolor,
+fresh-canvas / source-not-mutated. `pnpm -r typecheck` and
+`pnpm -r test` clean. WebGL recolor remains deferred (D.3, Step 4+).
+
+### Step 3.2 follow-ups (2026-05-15)
+
+`composeSelections` implemented (standard 832×3456 master sheet). Nine
+decisions; all accepted as proposed.
+
+| # | Decision |
+| --- | --- |
+| A2 | Recolor in compose is driven by an injected resolver. Core has no palette color data (`RecolorConfig` is palette *names*; palette-JSON ingestion deferred — Step 2.1 Q2), so `ComposeOptions` gains `resolvePalette?: (selection, item) => PaletteSwap \| undefined`. compose calls `recolorImage` only when it yields a swap. Same DI philosophy as `CanvasAdapter` / `createCatalog` records; keeps core palette-agnostic and unblocks recolor without palette ingestion. When omitted, sprites are drawn raw. |
+| B1 | Custom-animation compositing (wheelchair / `tool_rod` / …) is **out of scope for 3.2**. Porting `upstream/custom-animations.ts` (572 lines) + `drawFramesToCustomAnimation` + variable-height canvas + the extracted-frames pass roughly doubles the surface. 3.2 composes only the standard sheet; layers whose `layer_1.custom_animation` is set are skipped (upstream routes them separately anyway and they never land on the 0..3456 standard sheet). Tracked as a follow-up step. |
+| C1 | Extracted a shared internal `resolveLayers(selections, catalog)` (selection → layer walk → bodyType filter → custom-anim filter → `replaceInPath`). `getSpritePathsForSelections` is now a thin default-anim view over it; `composeSelections` iterates `ANIMATION_OFFSETS` per resolved layer. One source of truth for the layer walk — no drift. All 15 Step 2.3 cases stay green byte-for-byte. |
+| D | Per-animation path uses the `ANIMATION_OFFSETS` folder key directly (`spritesheets/${basePath}${folder}${variantTail}.png`), matching upstream `getSpritePath` (whose folder→logical remap is a no-op because `ANIMATION_OFFSETS` keys aren't `ANIMATIONS[].value`s). Folder support gate mirrors `runRenderCharacter`: `combat_idle`←`combat`, `backslash`←`1h_slash`/`1h_backslash`, `halfslash`←`1h_halfslash`, else direct. |
+| D' | `options.animations` (input filter) and `ComposedSheet.animations` (output) both use **logical** names (the `ANIMATIONS[].value` / hash namespace). Input logical→folder via `folderName ?? value`; output is the declared logical names whose folder was actually drawn (one-to-many: `backslash` → `1h_slash` and/or `1h_backslash`). `watering` has no `ANIMATION_OFFSETS` folder (shares the thrust row) so it is never independently composed even when declared — verified by test. |
+| E | Per-image load failure is swallowed (that layer isn't drawn), matching upstream `loadImagesInParallel`. `composeSelections` rejects only on a hard failure. `spritesheetsBaseUrl` + `LayerSpec`-style path (with `spritesheets/` prefix) are single-slash joined and handed to `adapter.loadImage`, which interprets URL vs filesystem path. |
+| F | `onProgress(loaded, total)`: `total` = planned image-load count (surviving layer × supported/filtered folder); `loaded` increments once per settled load (success **or** failure) and fires after each. |
+| G | The Step 3.1 test adapter's `loadImage` stub is now real, backed by `@napi-rs/canvas`'s `loadImage` (accepts a filesystem path). Compose tests point `spritesheetsBaseUrl` at the read-only `upstream/` checkout (reading spritesheets is their intended use; submodule untouched). |
+| H | `ComposedSheet` is always `832 × 3456` (B1 — no custom-anim height). `.layers` reuses `getSpritePathsForSelections` (the documented default-anim representative, API.md `compose.ts`); `.credits` reuses `getCredits` (Step 2.4). Fresh adapter canvas is transparent, so no `clearRect` (upstream clears only because it reuses a persistent offscreen canvas). |
+
+Step 3.2 deliverables: `composeSelections` (resolveLayers → per-folder
+draw items → stable zPos sort → parallel load w/ swallowed failures →
+optional `recolorImage` → draw at `ANIMATION_OFFSETS` y-offset →
+`ComposedSheet` with credits/layers/animations), the `resolveLayers`
+refactor (C1), the new `ComposeOptions.resolvePalette` seam, and the
+now-real test adapter `loadImage`. 6 new vitest cases (79 total): real
+upstream body compose (dims/credits/animations/walk-region), logical
+`animations` filter, synthetic raw draw + `onProgress`, synthetic
+recolor via `resolvePalette`, swallowed load failure, custom-anim layer
+skipped. `pnpm -r typecheck` and `pnpm -r test` clean. Custom-animation
+compositing and palette-JSON ingestion remain deferred.
+
+### Step 3.3 follow-ups (2026-05-15)
+
+`extractAnimation` implemented. Six decisions; all accepted as proposed.
+
+| # | Decision |
+| --- | --- |
+| Q1 | `name` is a **logical** animation name, looked up in `ANIMATION_CONFIGS` (same namespace as `ComposedSheet.animations` / `composeSelections`'s `options.animations`). |
+| Q2 | `frameCount = config.cycle.length` — the playback-cycle length (one loop, including repeated columns: `walk` → 8, `idle` → 3, `hurt` → 6). Chosen over "distinct frame columns" or "full 13-wide row": `cycle` is upstream's only authoritative play sequence, and it pairs naturally with `directions` (row count) as "steps per loop". |
+| Q3 | Unknown `name` (not in `ANIMATION_CONFIGS`) **throws** (message lists known names), consistent with API.md's non-nullable return and the Step 2.4-C "no sensible answer → throw" precedent. Upstream returns `null`; we don't thread null through this surface. |
+| Q4 | A *known but un-composed* animation returns a valid, fully-transparent crop (no throw). Extract keys purely off `ANIMATION_CONFIGS` and is independent of `sheet.animations`, mirroring upstream `extractAnimationFromCanvas`. Consequence: `watering` (shares the thrust rows: `ANIMATION_CONFIGS.watering.row === thrust`) is extractable even though 3.2 never lists it in `sheet.animations`. |
+| Q5 | `ComposedAnimation.credits` is `sheet.credits` passed through **by reference** — an extracted clip is a sub-region of the same composed character, so attribution is identical. |
+| Q6 | Crop geometry mirrors upstream exactly: `srcY = row*64`, `srcHeight = num*64`, output canvas `832 × srcHeight`, single `drawImage(sheet.canvas, 0, srcY, 832, srcHeight, 0,0, 832, srcHeight)`. Full sheet width — columns are **not** tight-cropped (unused frame columns stay transparent). `extractAnimation` is synchronous (canvas crop only, no I/O). Test helper gains `makeCanvas(w,h,paint): CanvasLike` (symmetric with `makeImage`) for hand-painting a `ComposedSheet.canvas`. |
+
+Step 3.3 deliverables: `extractAnimation` (`ANIMATION_CONFIGS` lookup →
+row-group crop → `ComposedAnimation` with `frameCount`/`directions`/
+passed-through credits) and the `makeCanvas` test helper. 6 new vitest
+cases (85 total): walk crop (832×256, 4 dir, frameCount 8), hurt crop
+(832×64, 1 dir, frameCount 6), transparent crop for un-composed anim,
+credits-by-reference, unknown-name throw, end-to-end on a
+`composeSelections` output. `pnpm -r typecheck` and `pnpm -r test`
+clean.
+
+This closes the originally-scoped Step 3 (3.1 recolor, 3.2 compose,
+3.3 extract). Still deferred: custom-animation compositing (B1) and
+palette-JSON ingestion (Step 2.1 Q2) — both independent follow-ups,
+neither blocks the standard compose→extract pipeline.
+
 ---
 
 ## What I did *not* add (deliberate)
