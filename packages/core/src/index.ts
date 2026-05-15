@@ -13,6 +13,12 @@ export type {
   ItemId,
   LayerSpec,
   License,
+  PaletteColors,
+  PaletteMap,
+  PaletteMaterialMeta,
+  PaletteMetadata,
+  PaletteVersionColors,
+  PaletteVersionMeta,
   RawLayer,
   RecolorConfig,
   Selection,
@@ -33,6 +39,12 @@ export { ok, err, isOk, isErr, unwrapOr } from './result.js';
 
 export type { CatalogLoadWarning, CreateCatalogResult } from './catalog.js';
 export { createCatalog } from './catalog.js';
+
+export type {
+  CreatePaletteCatalogResult,
+  PaletteLoadWarning,
+} from './palettes.js';
+export { createPaletteCatalog } from './palettes.js';
 
 export type { ComposeOptions } from './compose.js';
 export { composeSelections, getSpritePathsForSelections } from './compose.js';

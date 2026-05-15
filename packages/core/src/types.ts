@@ -75,6 +75,47 @@ export interface Catalog {
   readonly aliases: ReadonlyMap<TypeName, ReadonlyMap<string, AliasEntry>>;
 }
 
+/** Ordered list of hex color strings (one palette "ramp"). */
+export type PaletteColors = readonly string[];
+
+/** A version's recolor name (e.g. `ivory`, `tan`) → its color ramp. */
+export type PaletteVersionColors = Readonly<Record<string, PaletteColors>>;
+
+/** A material's version id (e.g. `ulpc`, `lpcr`) → its recolor ramps. */
+export type PaletteMap = Readonly<Record<string, PaletteVersionColors>>;
+
+/**
+ * One palette material (e.g. `body`, `metal`). `palettes` is always
+ * present; the descriptive / default fields come from `meta_<material>.json`
+ * and are optional because a material can be created from a data file that
+ * arrives before its meta (order-independent merge, mirroring upstream
+ * `scripts/generateSources/palettes.js`).
+ */
+export interface PaletteMaterialMeta {
+  readonly palettes: PaletteMap;
+  readonly type?: 'material';
+  readonly label?: string;
+  readonly desc?: string;
+  readonly default?: string; // default version id
+  readonly base?: string; // default recolor id (the source ramp)
+}
+
+/** One palette version (e.g. `ulpc`), from `meta_<version>.json`. */
+export interface PaletteVersionMeta {
+  readonly type?: 'version';
+  readonly label?: string;
+  readonly desc?: string;
+}
+
+/**
+ * Ingested `palette_definitions/**` — the parallel of `Catalog` for
+ * palette color data. Built by `createPaletteCatalog` (Step 4.1).
+ */
+export interface PaletteMetadata {
+  readonly materials: Readonly<Record<string, PaletteMaterialMeta>>;
+  readonly versions: Readonly<Record<string, PaletteVersionMeta>>;
+}
+
 export interface Selection {
   readonly typeName: TypeName;
   readonly name: string;

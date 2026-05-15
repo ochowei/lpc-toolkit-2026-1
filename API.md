@@ -660,6 +660,53 @@ extract still works on a variable-size sheet, and unknown-name still
 throws (refined known set). `pnpm -r typecheck` and `pnpm -r test`
 clean; `upstream/` untouched; no new dependencies.
 
+### Step 4 plan + Step 4.1 follow-ups (2026-05-15)
+
+Palette-JSON ingestion / recolor resolution (the long-deferred Step 2.1
+Q2 / Step 3.2 A2 piece) is split into three sub-steps; pre-approved
+direction (QA–QI) below.
+
+| # | Decision |
+| --- | --- |
+| QE | **Phased**: 4.1 palette ingestion (this step) → 4.2 recolor resolution (`parseRecolorKey` / base+target palette / `getMultiRecolors` / `fixMissingRecolor` / `match_body_color` + `body-body`) shipped as a `makeResolvePalette(catalog, palettes)` factory → 4.3 close hash Q2 (parseHash recolor-variant 2nd pass using palette-expanded variants). Each independently typechecked / tested. |
+| QA | Palette ingestion is a **separate** `createPaletteCatalog(records)` (not folded into `createCatalog`) — palettes are a distinct data source; keeps `createCatalog` palette-agnostic. Mirrors the D.1 DI contract (`{ result, warnings }`, source-agnostic `Record<path, json>`). |
+| QB | Integration point (4.2) will be a `makeResolvePalette` **factory** returning the existing `ComposeOptions.resolvePalette` callback — `composeSelections` / `ComposedSheet` shapes do **not** change; the Step 3.2 A2 seam is the only touch point. |
+| QC | The normalised per-item recolor view (upstream `ItemLite.recolors` with `variants` / `base` / `source` / `default` / `matchBodyColor`) will be derived **lazily in the 4.2 resolver**, not at catalog-build time, so `createCatalog` stays palette-agnostic. |
+| QD | `match_body_color` / the `body-body` special case lands in 4.2 (required for `getMultiRecolors` correctness on common accessories). |
+| QF | `getPaletteOptions` / UI palette-picker data is **out of scope** (a `packages/web/` concern). |
+| QG | WebGL recolor stays deferred per RESEARCH.md D.3 (CPU recolor in core for v1). |
+| QH | Unknown / malformed material / version / recolor → **warn-and-skip** (mirrors `createCatalog` / `parseHash` warnings and upstream's `unwrapOr(null)` + `console.error`), never throws on bad data. |
+| QI | `Selection.recolor` parsing (4.2) will faithfully port `parseRecolorKey`: accepts `material.version.recolor`, `version.recolor`, and bare `recolor`. |
+
+**`palettes.ts` (Step 4.1).** `createPaletteCatalog(records)` is a
+faithful port of upstream `scripts/generateSources/palettes.js`
+(`parsePalette` / `loadPaletteMetadata`): material / version are derived
+from the **filename** (not the directory) — `meta_<name>.json` is a
+material (`type:'material'`) or version (`type:'version'`) entry,
+`<material>_<version>.json` fills `materials[material].palettes[version]`.
+The merge is order-independent (a data file may precede its `meta_`).
+New `types.ts` data types: `PaletteColors`, `PaletteVersionColors`,
+`PaletteMap`, `PaletteMaterialMeta`, `PaletteVersionMeta`,
+`PaletteMetadata` (faithful to upstream `state/catalog.ts`, but the
+material descriptive fields are optional to support the order-independent
+merge). `palettes` is always present; `type`/`label`/`desc`/`default`/
+`base` are set only when seen (`exactOptionalPropertyTypes`). Result
+shape `{ palettes, warnings }` mirrors `createCatalog`; empty input →
+empty metadata, no throw (matches the actual `createCatalog`, not the
+API.md aspirational "throw on empty" text). Exported from `index.ts`
+(`createPaletteCatalog`, `CreatePaletteCatalogResult`,
+`PaletteLoadWarning`, + the six data types).
+
+Step 4.1 deliverables: `src/palettes.ts`, the palette data types in
+`types.ts`, `index.ts` re-exports, and `test/palettes.test.ts` — 11 new
+cases (102 total): real `upstream/palette_definitions` ingest (6
+materials / 2 versions / material+version meta / material→version→recolor
+ramp, zero warnings), order-independent merge, basename-not-directory
+derivation, non-object warn-skip, malformed-recolor drop-with-warning,
+missing-version-token warn, empty-input. `pnpm -r typecheck` and
+`pnpm -r test` clean; `upstream/` untouched; no new dependencies. 4.2 /
+4.3 still pending.
+
 ---
 
 ## What I did *not* add (deliberate)
