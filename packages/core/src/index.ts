@@ -27,9 +27,6 @@ export type {
   ImageLike,
 } from './adapters.js';
 
-export type { Result } from './result.js';
-export { ok, err, isOk, isErr, unwrapOr } from './result.js';
-
 export type { CatalogLoadWarning, CreateCatalogResult } from './catalog.js';
 export { createCatalog } from './catalog.js';
 
