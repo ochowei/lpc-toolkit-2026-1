@@ -44,7 +44,7 @@ function parseQueryString(s: string): Array<readonly [string, string]> {
     const rawVal = pair.slice(eq + 1);
     if (!rawKey || !rawVal) continue;
     try {
-      const key = decodeURIComponent(rawKey.replace(/^\?/, ''));
+      const key = decodeURIComponent(rawKey);
       const val = decodeURIComponent(rawVal);
       out.push([key, val] as const);
     } catch {
@@ -147,7 +147,7 @@ export function parseHash(hash: string, catalog: Catalog): ParseHashResult {
   const items: Record<TypeName, Selection> = {};
   let bodyType: BodyType = DEFAULT_BODY_TYPE;
 
-  for (let [key, value] of params) {
+  for (const [key, value] of params) {
     if (key === 'bodyType' || key === 'sex') {
       bodyType = value;
       continue;
