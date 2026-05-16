@@ -194,4 +194,86 @@ describe('extractAnimation', () => {
       ).toBe(false);
     });
   });
+
+  describe('custom-animation extraction (Step 3.4 Q3)', () => {
+    function makeCatalog(items: ItemDefinition[]) {
+      const records: Record<FilePath, ItemDefinition> = {};
+      for (let i = 0; i < items.length; i++) {
+        records[`item_${i}.json`] = items[i]!;
+      }
+      return createCatalog(records).catalog;
+    }
+
+    const wheelchairItem: ItemDefinition = {
+      name: 'Wheelchair',
+      type_name: 'wc',
+      animations: ['wheelchair'],
+      credits: [],
+      variants: ['v'],
+      layer_1: { zPos: 0, custom_animation: 'wheelchair', male: 'wc/' },
+    };
+
+    async function composeWheelchair(): Promise<ComposedSheet> {
+      const orange = makeCanvas(128, 256, (ctx) => {
+        ctx.fillStyle = '#ffa500';
+        ctx.fillRect(0, 0, 128, 256);
+      });
+      const wcAdapter: CanvasAdapter = {
+        createCanvas: createNodeCanvasAdapter().createCanvas,
+        loadImage: () => Promise.resolve(orange),
+      };
+      return composeSelections(
+        {
+          bodyType: 'male',
+          items: { wc: { typeName: 'wc', name: 'Wheelchair', variant: 'v' } },
+        },
+        {
+          catalog: makeCatalog([wheelchairItem]),
+          adapter: wcAdapter,
+          spritesheetsBaseUrl: '',
+        },
+      );
+    }
+
+    it('tight-crops a custom block (cols×rows·frameSize) with rows=directions, cols=frameCount', async () => {
+      const sheet = await composeWheelchair();
+      const anim = extractAnimation(sheet, 'wheelchair', { adapter });
+
+      expect(anim.width).toBe(128); // cols 2 × 64
+      expect(anim.height).toBe(256); // rows 4 × 64
+      expect(anim.canvas.width).toBe(128);
+      expect(anim.canvas.height).toBe(256);
+      expect(anim.animation).toBe('wheelchair');
+      expect(anim.directions).toBe(4); // rows
+      expect(anim.frameCount).toBe(2); // cols
+      expect(anim.credits).toBe(sheet.credits); // by reference (3.3 Q5)
+      expect(
+        everyPixelEquals(regionPixels(anim.canvas, 0, 0, 128, 256), [
+          255, 165, 0, 255,
+        ]),
+      ).toBe(true);
+    });
+
+    it('still extracts standard animations from the same sheet', async () => {
+      const sheet = await composeWheelchair();
+      // No body → walk row group is a valid, transparent 832×256 crop.
+      const walk = extractAnimation(sheet, 'walk', { adapter });
+      expect(walk.width).toBe(832);
+      expect(walk.height).toBe(256);
+      expect(hasContent(regionPixels(walk.canvas, 0, 0, 832, 256))).toBe(
+        false,
+      );
+    });
+
+    it('throws for a name in neither configs nor this sheet (refines 3.3 Q3)', async () => {
+      const sheet = await composeWheelchair();
+      expect(() => extractAnimation(sheet, 'tool_rod', { adapter })).toThrow(
+        /unknown animation "tool_rod"/,
+      );
+      // The error lists this sheet's custom blocks among the known names.
+      expect(() => extractAnimation(sheet, 'nope', { adapter })).toThrow(
+        /wheelchair/,
+      );
+    });
+  });
 });

@@ -1,8 +1,10 @@
+import { getRecolorVariants } from './recolor-resolve.js';
 import type {
   AliasEntry,
   BodyType,
   Catalog,
   ItemDefinition,
+  PaletteMetadata,
   Selection,
   Selections,
   TypeName,
@@ -62,16 +64,23 @@ interface ResolveResult {
 
 /**
  * Port of upstream `resolveHashParamFromHashMatch` in
- * `state/resolve-hash-param.ts`, restricted to fields available on the raw
- * `ItemDefinition`. Recolor-variant matching is reduced to the subset that
- * the raw JSON shape exposes (none, currently — see Q2 deferral); items
- * whose hash value relies on palette-expanded recolor variants will fail
- * to match here and surface as `unknown_item` warnings.
+ * `state/resolve-hash-param.ts`. Match precedence within a name match
+ * mirrors upstream exactly: explicit `variants` first, then (when
+ * `palettes` is supplied) the first recolor entry's palette-expanded
+ * variants — which **override** a variant match, faithfully replicating
+ * upstream's later-assignment-wins (so an explicit `name_v|recolor` or a
+ * bare recolor token resolves to a recolor, not a variant) — then the
+ * empty-name fallback.
+ *
+ * `palettes` closes the Step 2.1 Q2 deferral: without it, recolor-only
+ * items still fall through to `unknown_item` (backward-compatible). The
+ * no-`palettes` path is byte-identical to the previous behaviour.
  */
 function resolveHashParam(
   typeName: TypeName,
   nameAndVariant: string,
   catalog: Catalog,
+  palettes: PaletteMetadata | undefined,
 ): ResolveResult {
   const items = catalog.byTypeName.get(typeName) ?? [];
   const parts = nameAndVariant.split('_');
@@ -86,24 +95,46 @@ function resolveHashParam(
       const metaName = item.name.replaceAll(' ', '_').toLowerCase();
       if (metaName !== nameToMatch) continue;
 
+      let foundItem: ItemDefinition | null = null;
+      let matchedVariant = '';
+      let matchedRecolor = '';
+
       if (item.variants && item.variants.length > 0) {
         for (const variant of item.variants) {
           if (variant.toLowerCase() === variantToMatch) {
-            return {
-              foundItem: item,
-              matchedVariant: variant,
-              matchedRecolor: '',
-            };
+            foundItem = item;
+            matchedVariant = variant;
+            matchedRecolor = '';
+            break;
           }
         }
       }
-      // NOTE: upstream also matches recolor-expanded variants here. Our
-      // catalog stores raw recolors (`{ material, palettes }`), so we cannot
-      // match palette-derived variants without ingesting palette metadata.
-      // Deferred (Q2): these hash entries surface as `unknown_item` warnings.
 
-      if (variantToMatch === '' && recolorToMatch === '') {
-        return { foundItem: item, matchedVariant: '', matchedRecolor: '' };
+      if (palettes) {
+        const recolorVariants = getRecolorVariants(item, palettes);
+        for (const variant of recolorVariants) {
+          const vl = variant.toLowerCase();
+          if (
+            (recolorToMatch !== '' && vl === recolorToMatch) ||
+            (recolorToMatch === '' && vl === variantToMatch)
+          ) {
+            // Later assignment wins (upstream): recolor overrides variant.
+            foundItem = item;
+            matchedVariant = '';
+            matchedRecolor = variant;
+            break;
+          }
+        }
+      }
+
+      if (!foundItem && variantToMatch === '' && recolorToMatch === '') {
+        foundItem = item;
+        matchedVariant = '';
+        matchedRecolor = '';
+      }
+
+      if (foundItem) {
+        return { foundItem, matchedVariant, matchedRecolor };
       }
     }
   }
@@ -138,7 +169,11 @@ function lookupAlias(
   return byKey.get(nameAndVariant) ?? byKey.get('*');
 }
 
-export function parseHash(hash: string, catalog: Catalog): ParseHashResult {
+export function parseHash(
+  hash: string,
+  catalog: Catalog,
+  palettes?: PaletteMetadata,
+): ParseHashResult {
   const raw = stripHashPrefix(hash);
   const params = parseQueryString(raw);
 
@@ -176,6 +211,7 @@ export function parseHash(hash: string, catalog: Catalog): ParseHashResult {
       typeName,
       nameAndVariant,
       catalog,
+      palettes,
     );
     if (!foundItem) {
       warnings.push({ key, value, reason: 'unknown_item' });
@@ -190,10 +226,13 @@ export function parseHash(hash: string, catalog: Catalog): ParseHashResult {
     );
   }
 
-  // NOTE (Q2): upstream has a second pass that splits skipped entries on
-  // "_" and matches against `recolors[i].type_name` + `recolors[i].variants`.
-  // Those fields only exist after palette-driven recolor normalization,
-  // which is deferred. Skipped entries stay in `warnings` for now.
+  // Q2 (Step 4.3): the recolor-variant match is now folded into
+  // `resolveHashParam` (gated on `palettes`), using `getRecolorVariants`
+  // (= upstream `recolors[0].variants`, palette-expanded). The upstream
+  // multi-recolor `recolors[i].type_name` sub-binding has no loop in this
+  // upstream snapshot and no real data uses it; `recolors[0]` faithfully
+  // covers the single-entry case. Without `palettes`, recolor-only items
+  // still surface as `unknown_item` (backward-compatible).
 
   return {
     selections: { bodyType, items },

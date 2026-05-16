@@ -14,6 +14,7 @@ import type {
 } from '../src/types.js';
 import {
   createNodeCanvasAdapter,
+  makeCanvas,
   solidImage,
 } from './helpers/node-canvas-adapter.js';
 
@@ -565,11 +566,14 @@ describe('composeSelections', () => {
       expect(sheet.credits.entries.map((e) => e.file)).toEqual(['test/body']);
     });
 
-    it('skips custom-animation layers from the standard sheet (B1)', async () => {
+    it('composes a custom-only item into a block below the standard sheet (B1 closed)', async () => {
+      // Previously asserted the B1 deferral (custom layers skipped). Step
+      // 3.4 closes B1: the wheelchair block is now composed below 3456 and
+      // the standard region stays untouched (no pollution).
       const wheels: ItemDefinition = {
         name: 'Wheelchair',
         type_name: 'wheels',
-        animations: ['walk'],
+        animations: ['wheelchair'],
         credits: [],
         variants: ['wood'],
         layer_1: {
@@ -578,7 +582,10 @@ describe('composeSelections', () => {
           male: 'wheels/wheelchair/',
         },
       };
-      const { adapter, loadCalls } = syntheticAdapter();
+      // wheelchair def: frameSize 64, 4 rows × 2 cols → 128×256 block.
+      const { adapter, loadCalls } = syntheticAdapter(
+        solidImage(128, 256, '#ff00ff'),
+      );
 
       const sheet = await composeSelections(
         {
@@ -594,11 +601,248 @@ describe('composeSelections', () => {
         },
       );
 
-      // No standard-sheet draw for a custom-animation-only item.
-      expect(loadCalls).toEqual([]);
+      // The custom-sprite PNG is loaded via its direct (no-anim) path.
+      expect(loadCalls).toEqual(['spritesheets/wheels/wheelchair/wood.png']);
+      // Custom names are a separate axis — not standard `animations`.
       expect(sheet.animations).toEqual([]);
+      // Variable-size canvas: 832 × (3456 + 256).
       expect(sheet.width).toBe(832);
-      expect(sheet.height).toBe(3456);
+      expect(sheet.height).toBe(3712);
+      expect(sheet.canvas.width).toBe(832);
+      expect(sheet.canvas.height).toBe(3712);
+      // Geometry exposed for extractAnimation (Q3).
+      expect(sheet.customAnimations?.get('wheelchair')).toEqual({
+        offsetY: 3456,
+        frameSize: 64,
+        rows: 4,
+        cols: 2,
+      });
+      // Block has content; standard region is untouched (no pollution).
+      expect(
+        hasContent(regionPixels(sheet.canvas, 0, 3456, 128, 256)),
+      ).toBe(true);
+      expect(
+        hasContent(regionPixels(sheet.canvas, 0, 0, 832, 3456)),
+      ).toBe(false);
+    });
+  });
+
+  describe('custom-animation compositing (Step 3.4)', () => {
+    function makeCatalog(items: ItemDefinition[]): Catalog {
+      const records: Record<FilePath, ItemDefinition> = {};
+      for (let i = 0; i < items.length; i++) {
+        const name = items[i]!.name.toLowerCase().replaceAll(' ', '_');
+        records[`item_${i}_${name}.json`] = items[i]!;
+      }
+      return createCatalog(records).catalog;
+    }
+
+    // Returns a distinct image per requested path (custom sprite vs. the
+    // standard base-anim PNG), so we can assert exact pixel landing.
+    function byPathAdapter(
+      images: Readonly<Record<string, CanvasLike>>,
+    ): CanvasAdapter {
+      const base = createNodeCanvasAdapter();
+      return {
+        createCanvas: base.createCanvas,
+        loadImage(p: string) {
+          for (const [suffix, img] of Object.entries(images)) {
+            if (p.endsWith(suffix)) return Promise.resolve(img);
+          }
+          return Promise.reject(new Error(`no fixture for ${p}`));
+        },
+      };
+    }
+
+    const wheelchairItem: ItemDefinition = {
+      name: 'Wheelchair',
+      type_name: 'wc',
+      animations: ['wheelchair'],
+      credits: [],
+      variants: ['v'],
+      layer_1: { zPos: 0, custom_animation: 'wheelchair', male: 'wc/' },
+    };
+
+    // Body declares only 'sit' → exactly one standard load. wheelchair's
+    // base anim is 'sit' (customAnimationBase: frames[0][0]="sit-n,2").
+    const sitBody: ItemDefinition = {
+      name: 'Body',
+      type_name: 'body',
+      animations: ['sit'],
+      credits: [],
+      layer_1: { zPos: 10, male: 'bd/' },
+    };
+
+    const bothSelections: Selections = {
+      bodyType: 'male',
+      items: {
+        wc: { typeName: 'wc', name: 'Wheelchair', variant: 'v' },
+        body: { typeName: 'body', name: 'Body' },
+      },
+    };
+
+    // sit.png-shaped fixture (192×256, single-animation → direction-map
+    // branch, Q5). Column 2 (x 128..192) carries the colors the wheelchair
+    // def samples ("sit-{n,w,s,e},2"); the 'e' row is left transparent so
+    // the wheelchair sprite shows through it (proves draw order / zPos).
+    function sitSource(): CanvasLike {
+      return makeCanvas(192, 256, (ctx) => {
+        ctx.fillStyle = '#ff0000'; // n  → src row 0
+        ctx.fillRect(128, 0, 64, 64);
+        ctx.fillStyle = '#00ff00'; // w  → src row 1
+        ctx.fillRect(128, 64, 64, 64);
+        ctx.fillStyle = '#0000ff'; // s  → src row 2
+        ctx.fillRect(128, 128, 64, 64);
+        // e (src row 3, y 192..256) intentionally left transparent.
+      });
+    }
+
+    it('re-lays the base-anim frames into the block via the direction map (Q5)', async () => {
+      const adapter = byPathAdapter({
+        'wc/v.png': makeCanvas(128, 256, (ctx) => {
+          ctx.fillStyle = '#ffff00'; // wheelchair sprite (behind, zPos 0)
+          ctx.fillRect(0, 0, 128, 256);
+        }),
+        'bd/sit.png': sitSource(),
+      });
+
+      const sheet = await composeSelections(bothSelections, {
+        catalog: makeCatalog([wheelchairItem, sitBody]),
+        adapter,
+        spritesheetsBaseUrl: '',
+      });
+
+      expect(sheet.height).toBe(3712);
+      // Each src column-2 cell is copied to BOTH j=0 and j=1 dest columns
+      // (wheelchair frames are ["sit-x,2","sit-x,2"]); destY = 64*i+3456.
+      const at = (x: number, y: number) =>
+        regionPixels(sheet.canvas, x, y, 1, 1);
+      // i=0 (n) → red, both frame columns.
+      expect(everyPixelEquals(at(10, 3456 + 10), [255, 0, 0, 255])).toBe(true);
+      expect(everyPixelEquals(at(74, 3456 + 10), [255, 0, 0, 255])).toBe(true);
+      // i=1 (w) → green.
+      expect(everyPixelEquals(at(10, 3520 + 10), [0, 255, 0, 255])).toBe(true);
+      // i=2 (s) → blue.
+      expect(everyPixelEquals(at(10, 3584 + 10), [0, 0, 255, 255])).toBe(true);
+      // i=3 (e) → sit frame transparent there, so the wheelchair sprite
+      // (drawn first, zPos 0) shows through: proves custom_sprite landing
+      // at (0, offsetY) AND zPos draw order.
+      expect(everyPixelEquals(at(10, 3648 + 10), [255, 255, 0, 255])).toBe(
+        true,
+      );
+    });
+
+    it('applies resolvePalette to custom_sprite and extracted_frames (Q4)', async () => {
+      const adapter = byPathAdapter({
+        'wc/v.png': makeCanvas(128, 256, (ctx) => {
+          ctx.fillStyle = '#ff00ff';
+          ctx.fillRect(0, 0, 128, 256);
+        }),
+        'bd/sit.png': sitSource(),
+      });
+
+      const sheet = await composeSelections(bothSelections, {
+        catalog: makeCatalog([wheelchairItem, sitBody]),
+        adapter,
+        spritesheetsBaseUrl: '',
+        resolvePalette: (_sel, item) => {
+          if (item.type_name === 'wc') {
+            return { material: 'wc', source: ['#ff00ff'], target: ['#00ffff'] };
+          }
+          return { material: 'body', source: ['#ff0000'], target: ['#ff00ff'] };
+        },
+      });
+
+      const at = (x: number, y: number) =>
+        regionPixels(sheet.canvas, x, y, 1, 1);
+      // extracted_frames recolored: sit 'n' red → magenta.
+      expect(everyPixelEquals(at(10, 3456 + 10), [255, 0, 255, 255])).toBe(
+        true,
+      );
+      // custom_sprite recolored: visible through the transparent 'e' row,
+      // wheelchair magenta → cyan.
+      expect(everyPixelEquals(at(10, 3648 + 10), [0, 255, 255, 255])).toBe(
+        true,
+      );
+    });
+  });
+
+  describe('custom-animation compositing with real upstream spritesheets', () => {
+    const adapter = createNodeCanvasAdapter();
+
+    it('composes the wheelchair block below a real body and re-lays its sit frames', async () => {
+      const catalog = loadCatalog(['body/body.json', 'body/wheelchair.json']);
+      const withBody: Selections = {
+        bodyType: 'male',
+        items: {
+          body: { typeName: 'body', name: 'Body Color' },
+          wheelchair: {
+            typeName: 'wheelchair',
+            name: 'Wheelchair',
+            variant: 'black',
+          },
+        },
+      };
+
+      const sheet = await composeSelections(withBody, {
+        catalog,
+        adapter,
+        spritesheetsBaseUrl: upstreamBase,
+      });
+
+      // Variable canvas: 832 × (3456 + wheelchair block 256).
+      expect(sheet.width).toBe(832);
+      expect(sheet.height).toBe(3712);
+      expect(sheet.canvas.height).toBe(3712);
+      expect(sheet.customAnimations?.get('wheelchair')).toEqual({
+        offsetY: 3456,
+        frameSize: 64,
+        rows: 4,
+        cols: 2,
+      });
+      // The wheelchair block has non-transparent pixels.
+      expect(
+        hasContent(regionPixels(sheet.canvas, 0, 3456, 128, 256)),
+      ).toBe(true);
+      // Standard sheet still composed (no pollution either way): the body
+      // declares walk, so its walk block is present.
+      expect(sheet.animations).toContain('walk');
+      expect(
+        hasContent(regionPixels(sheet.canvas, 0, WALK_Y, 832, 256)),
+      ).toBe(true);
+
+      // The body's sit frames are re-laid into the block: composing the
+      // wheelchair WITHOUT the body yields a different (sparser) block.
+      const wheelOnly = await composeSelections(
+        {
+          bodyType: 'male',
+          items: {
+            wheelchair: {
+              typeName: 'wheelchair',
+              name: 'Wheelchair',
+              variant: 'black',
+            },
+          },
+        },
+        { catalog, adapter, spritesheetsBaseUrl: upstreamBase },
+      );
+
+      const blockWith = regionPixels(sheet.canvas, 0, 3456, 128, 256);
+      const blockWithout = regionPixels(
+        wheelOnly.canvas,
+        0,
+        3456,
+        128,
+        256,
+      );
+      let differs = false;
+      for (let i = 0; i < blockWith.length; i++) {
+        if (blockWith[i] !== blockWithout[i]) {
+          differs = true;
+          break;
+        }
+      }
+      expect(differs).toBe(true);
     });
   });
 });

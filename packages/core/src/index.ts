@@ -7,12 +7,21 @@ export type {
   ComposedSheet,
   CreditEntry,
   CreditsManifest,
+  CustomAnimationRegion,
   FilePath,
   ItemDefinition,
   ItemId,
   LayerSpec,
   License,
+  MultiRecolorConfig,
+  PaletteColors,
+  PaletteMap,
+  PaletteMaterialMeta,
+  PaletteMetadata,
+  PaletteVersionColors,
+  PaletteVersionMeta,
   RawLayer,
+  RawRecolors,
   RecolorConfig,
   Selection,
   Selections,
@@ -33,6 +42,18 @@ export { ok, err, isOk, isErr, unwrapOr } from './result.js';
 export type { CatalogLoadWarning, CreateCatalogResult } from './catalog.js';
 export { createCatalog } from './catalog.js';
 
+export type {
+  CreatePaletteCatalogResult,
+  PaletteLoadWarning,
+} from './palettes.js';
+export { createPaletteCatalog } from './palettes.js';
+
+export type {
+  MakeResolvePaletteOptions,
+  ResolvePalette,
+} from './recolor-resolve.js';
+export { getRecolorVariants, makeResolvePalette } from './recolor-resolve.js';
+
 export type { ComposeOptions } from './compose.js';
 export { composeSelections, getSpritePathsForSelections } from './compose.js';
 
@@ -43,6 +64,17 @@ export { parseHash, serializeHash } from './hash.js';
 
 export type { ExtractAnimationOptions } from './animation.js';
 export { extractAnimation } from './animation.js';
+
+export type {
+  AnimationRowsLayout,
+  CustomAnimationDefinition,
+} from './custom-animations.js';
+export {
+  animationRowsLayout,
+  customAnimationBase,
+  customAnimations,
+  customAnimationSize,
+} from './custom-animations.js';
 
 export type {
   AnimationConfig,

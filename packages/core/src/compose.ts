@@ -1,11 +1,18 @@
-import type { CanvasAdapter } from './adapters.js';
+import type { CanvasAdapter, CanvasLike, ImageLike } from './adapters.js';
 import { ANIMATIONS, ANIMATION_OFFSETS, SHEET_HEIGHT, SHEET_WIDTH } from './constants.js';
 import { getCredits } from './credits.js';
+import {
+  customAnimationBase,
+  customAnimations,
+  type CustomAnimationDefinition,
+} from './custom-animations.js';
+import { drawFramesToCustomAnimation } from './custom-frames.js';
 import { recolorImage, type PaletteSwap } from './recolor.js';
 import type {
   AnimationName,
   Catalog,
   ComposedSheet,
+  CustomAnimationRegion,
   ItemDefinition,
   ItemId,
   LayerSpec,
@@ -250,15 +257,47 @@ interface DrawItem {
   readonly item: ItemDefinition;
 }
 
+/** A custom-animation sprite layer (e.g. the wheelchair body PNG). */
+interface CustomLayerEntry {
+  readonly customAnim: string;
+  readonly path: string;
+  readonly zPos: number;
+  readonly selection: Selection;
+  readonly item: ItemDefinition;
+}
+
+/** A laid-out custom-animation block below the standard sheet. */
+interface CustomRegionInternal {
+  readonly def: CustomAnimationDefinition;
+  readonly offsetY: number;
+  readonly frameSize: number;
+  readonly rows: number;
+  readonly cols: number;
+  readonly height: number;
+  readonly width: number;
+}
+
+type Sprite = ImageLike | CanvasLike;
+
 /**
- * Compose the selected character into a single 832×3456 master sheet.
+ * Compose the selected character into a master sheet.
  *
- * For every surviving standard layer (custom-animation layers are routed
- * separately upstream and are out of scope here — B1), each supported
- * `ANIMATION_OFFSETS` folder is drawn at its vertical offset, in global
- * `zPos` order (stable on ties, matching upstream draw order). If
- * `options.resolvePalette` yields a swap for a layer's selection, the
- * loaded sprite is recolored via `recolorImage` before being drawn.
+ * For every surviving standard layer, each supported `ANIMATION_OFFSETS`
+ * folder is drawn at its vertical offset, in global `zPos` order (stable
+ * on ties, matching upstream draw order). If `options.resolvePalette`
+ * yields a swap for a layer's selection, the loaded sprite is recolored
+ * via `recolorImage` before being drawn.
+ *
+ * Custom-animation layers (wheelchair / `tool_rod` / …) are composed into
+ * variable-height blocks **below** the standard 832×3456 region, mirroring
+ * upstream `runRenderCharacter` (API.md Step 3.4). The canvas is therefore
+ * `max(832, …) × (3456 + Σ block heights)` — a standard-only selection is
+ * still exactly 832×3456 (Step 3.2 H revisited). Within each block the
+ * custom-sprite PNG is drawn directly at `(0, offsetY)`; the custom
+ * animation's base-animation frames (e.g. body `sit` → wheelchair) are
+ * re-laid via `drawFramesToCustomAnimation`; both honour `resolvePalette`
+ * (Q4) and are drawn in `zPos` order. `ComposedSheet.customAnimations`
+ * exposes each block's geometry for `extractAnimation` (Q3).
  *
  * Per-image load failures are swallowed (that layer simply isn't drawn),
  * mirroring upstream `loadImagesInParallel`. Rejects only on a hard
@@ -281,13 +320,32 @@ export async function composeSelections(
   const resolved = resolveLayers(selections, catalog);
 
   const drawItems: DrawItem[] = [];
-  for (const layer of resolved) {
-    if (layer.customAnimation) continue; // B1: standard sheet only.
+  // Custom-animation sprite layers + their encounter-order set (Q6).
+  const customLayers: CustomLayerEntry[] = [];
+  const addedCustomAnimations = new Set<string>();
 
+  for (const layer of resolved) {
     const selection = selections.items[layer.typeName];
     if (!selection) continue;
 
     const variantFile = layer.variant ? variantToFilename(layer.variant) : '';
+
+    if (layer.customAnimation) {
+      // Direct path, no anim segment (C1). No-variant custom layers are
+      // skipped, mirroring `getSpritePathsForSelections` so `.layers`
+      // stays the single source of truth (N6).
+      if (!variantFile) continue;
+      customLayers.push({
+        customAnim: layer.customAnimation,
+        path: `spritesheets/${layer.basePath}${variantFile}.png`,
+        zPos: layer.zPos,
+        selection,
+        item: layer.item,
+      });
+      addedCustomAnimations.add(layer.customAnimation);
+      continue;
+    }
+
     const tail = variantFile ? `/${variantFile}` : '';
 
     for (const [folder, yPos] of Object.entries(ANIMATION_OFFSETS)) {
@@ -305,29 +363,62 @@ export async function composeSelections(
     }
   }
 
+  // Lay out custom-animation blocks below the standard sheet (Q2). Unknown
+  // names (no def in the lifted table) are skipped (N7).
+  const customRegions = new Map<string, CustomRegionInternal>();
+  let totalWidth: number = SHEET_WIDTH;
+  let currentY = SHEET_HEIGHT;
+  for (const name of addedCustomAnimations) {
+    const def = customAnimations[name];
+    if (!def) continue;
+    const rows = def.frames.length;
+    const cols = def.frames[0]?.length ?? 0;
+    const frameSize = def.frameSize;
+    const height = frameSize * rows;
+    const width = frameSize * cols;
+    customRegions.set(name, {
+      def,
+      offsetY: currentY,
+      frameSize,
+      rows,
+      cols,
+      height,
+      width,
+    });
+    currentY += height;
+    totalWidth = Math.max(totalWidth, width);
+  }
+  const totalHeight = currentY;
+
   // Stable sort by zPos: lower drawn first (behind). Push order (selection
   // → layer → ANIMATION_OFFSETS) is preserved on ties, matching upstream.
   drawItems.sort((a, b) => a.zPos - b.zPos);
 
   let loaded = 0;
-  const total = drawItems.length;
+  const total = drawItems.length + customLayers.length;
+  const onSettle = (): void => {
+    loaded++;
+    options.onProgress?.(loaded, total);
+  };
+
   const settled = await Promise.all(
-    drawItems.map(async (d) => {
-      try {
-        const img = await adapter.loadImage(
-          joinUrl(spritesheetsBaseUrl, d.path),
-        );
-        return { d, img };
-      } catch {
-        return { d, img: null };
-      } finally {
-        loaded++;
-        options.onProgress?.(loaded, total);
-      }
-    }),
+    drawItems.map(
+      async (d): Promise<{ d: DrawItem; img: Sprite | null }> => {
+        try {
+          const img = await adapter.loadImage(
+            joinUrl(spritesheetsBaseUrl, d.path),
+          );
+          return { d, img };
+        } catch {
+          return { d, img: null };
+        } finally {
+          onSettle();
+        }
+      },
+    ),
   );
 
-  const canvas = adapter.createCanvas(SHEET_WIDTH, SHEET_HEIGHT);
+  const canvas = adapter.createCanvas(totalWidth, totalHeight);
   const ctx = canvas.getContext('2d');
 
   const drawnFolders = new Set<string>();
@@ -339,10 +430,81 @@ export async function composeSelections(
     drawnFolders.add(d.folder);
   }
 
+  // Custom-animation blocks. Load every custom-sprite PNG in parallel
+  // (these are the only *new* loads — extracted base-anim frames reuse the
+  // already-loaded standard sprites, Q5), then per block draw custom
+  // sprites + re-laid base-anim frames in `zPos` order.
+  if (customRegions.size > 0) {
+    const loadedCustom = await Promise.all(
+      customLayers.map(
+        async (c): Promise<{ c: CustomLayerEntry; img: Sprite | null }> => {
+          try {
+            const img = await adapter.loadImage(
+              joinUrl(spritesheetsBaseUrl, c.path),
+            );
+            return { c, img };
+          } catch {
+            return { c, img: null };
+          } finally {
+            onSettle();
+          }
+        },
+      ),
+    );
+
+    interface AreaItem {
+      readonly zPos: number;
+      readonly draw: () => void;
+    }
+
+    for (const [name, region] of customRegions) {
+      const baseAnim = customAnimationBase(region.def);
+      const areaItems: AreaItem[] = [];
+
+      // 1. Custom-sprite layers (wheelchair background / foreground).
+      for (const { c, img } of loadedCustom) {
+        if (c.customAnim !== name || !img) continue;
+        const swap = options.resolvePalette?.(c.selection, c.item);
+        const sprite = swap ? recolorImage(img, swap, { adapter }) : img;
+        areaItems.push({
+          zPos: c.zPos,
+          draw: () => ctx.drawImage(sprite, 0, region.offsetY),
+        });
+      }
+
+      // 2. Standard items whose folder is this block's base animation
+      // (e.g. body `sit` → wheelchair) get re-laid into the block. Source
+      // is the already-loaded standard sprite (Q5); if the base anim was
+      // filtered out / undeclared there simply are none (N5).
+      for (const { d, img } of settled) {
+        if (d.folder !== baseAnim || !img) continue;
+        const swap = options.resolvePalette?.(d.selection, d.item);
+        const sprite = swap ? recolorImage(img, swap, { adapter }) : img;
+        areaItems.push({
+          zPos: d.zPos,
+          draw: () =>
+            drawFramesToCustomAnimation(
+              ctx,
+              region.def,
+              region.offsetY,
+              sprite,
+            ),
+        });
+      }
+
+      // Stable sort by zPos (push order preserved on ties), matching
+      // upstream's custom-area draw order.
+      areaItems.sort((a, b) => a.zPos - b.zPos);
+      for (const item of areaItems) item.draw();
+    }
+  }
+
   // Output animations: logical names (input/UI namespace, symmetric with
   // `options.animations`) whose folder was actually drawn and that a
   // composed item declares. Folder→logical is one-to-many (`backslash` ←
   // `1h_slash` / `1h_backslash`), so report every matching declared name.
+  // Custom-animation names are a separate axis (`customAnimations` map),
+  // not standard `sheet.animations`.
   const declaredLogical = new Set<AnimationName>();
   for (const layer of resolved) {
     if (layer.customAnimation) continue;
@@ -353,13 +515,26 @@ export async function composeSelections(
       drawnFolders.has(a.folderName ?? a.value) && declaredLogical.has(a.value),
   ).map((a) => a.value);
 
+  const customAnimationsMeta = new Map<string, CustomAnimationRegion>();
+  for (const [name, region] of customRegions) {
+    customAnimationsMeta.set(name, {
+      offsetY: region.offsetY,
+      frameSize: region.frameSize,
+      rows: region.rows,
+      cols: region.cols,
+    });
+  }
+
   return {
     canvas,
-    width: SHEET_WIDTH,
-    height: SHEET_HEIGHT,
+    width: totalWidth,
+    height: totalHeight,
     selections,
     credits: getCredits(selections, catalog),
     layers: getSpritePathsForSelections(selections, catalog),
     animations: composedAnimations,
+    ...(customAnimationsMeta.size > 0
+      ? { customAnimations: customAnimationsMeta }
+      : {}),
   };
 }

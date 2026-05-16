@@ -1,11 +1,50 @@
+import { readFileSync, readdirSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { parseHash, serializeHash } from '../src/hash.js';
+import { createCatalog } from '../src/catalog.js';
+import { createPaletteCatalog } from '../src/palettes.js';
 import type {
   AliasEntry,
   Catalog,
+  FilePath,
   ItemDefinition,
+  PaletteMetadata,
   TypeName,
 } from '../src/types.js';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const upstreamBase = path.join(here, '../../../upstream');
+
+function realPalettes(): PaletteMetadata {
+  const records: Record<FilePath, unknown> = {};
+  const root = path.join(upstreamBase, 'palette_definitions');
+  const walk = (dir: string, rel: string): void => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const abs = path.join(dir, e.name);
+      const r = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) walk(abs, r);
+      else if (e.name.endsWith('.json'))
+        records[`palette_definitions/${r}`] = JSON.parse(
+          readFileSync(abs, 'utf8'),
+        );
+    }
+  };
+  walk(root, '');
+  return createPaletteCatalog(records).palettes;
+}
+
+function realBodyCatalog(): Catalog {
+  return createCatalog({
+    'body/body.json': JSON.parse(
+      readFileSync(
+        path.join(upstreamBase, 'sheet_definitions/body/body.json'),
+        'utf8',
+      ),
+    ) as ItemDefinition,
+  }).catalog;
+}
 
 function makeCatalog(items: readonly ItemDefinition[], aliases: ReadonlyMap<TypeName, ReadonlyMap<string, AliasEntry>> = new Map()): Catalog {
   const byItemId = new Map<string, ItemDefinition>();
@@ -49,13 +88,14 @@ const neutral: ItemDefinition = {
   variants: ['light', 'dark'],
 };
 
-// Item that relies on recolors (no explicit `variants`) — Q2 deferral.
+// Item that relies on recolors (no explicit `variants`). Raw `recolors`
+// is an object (RawRecolors), not an array.
 const bodyColor: ItemDefinition = {
   name: 'Body Color',
   type_name: 'body',
   animations: ['walk'],
   credits: [],
-  recolors: [{ material: 'body', palettes: ['ulpc'] }],
+  recolors: { material: 'body', palettes: ['ulpc'] },
 };
 
 describe('parseHash', () => {
@@ -131,7 +171,7 @@ describe('parseHash', () => {
     ]);
   });
 
-  it('defers recolor-variant-only items to unknown_item (Q2)', () => {
+  it('without palettes, recolor-variant items still defer to unknown_item (Q2 backward-compat)', () => {
     const cat = makeCatalog([bodyColor]);
     const r = parseHash('#body=Body_color_light', cat);
     expect(r.warnings).toEqual([
@@ -191,6 +231,80 @@ describe('parseHash', () => {
     const cat = makeCatalog([]);
     expect(parseHash('#bodyType=female', cat).selections.bodyType).toBe('female');
     expect(parseHash('#sex=teen', cat).selections.bodyType).toBe('teen');
+  });
+});
+
+describe('parseHash with palettes (Step 4.3 — Q2 closed)', () => {
+  it('resolves a real body recolor-variant hash value (bare ulpc key)', () => {
+    const cat = realBodyCatalog();
+    const r = parseHash('#body=Body_Color_brown', cat, realPalettes());
+    expect(r.warnings).toEqual([]);
+    expect(r.unknownKeys).toEqual([]);
+    expect(r.selections.items['body']).toEqual({
+      typeName: 'body',
+      name: 'Body Color',
+      recolor: 'brown',
+    });
+  });
+
+  it('resolves a cross-version recolor key (lpcr.tan on a ulpc-default material)', () => {
+    const cat = realBodyCatalog();
+    const r = parseHash('#body=Body_Color_lpcr.tan', cat, realPalettes());
+    expect(r.warnings).toEqual([]);
+    expect(r.selections.items['body']).toEqual({
+      typeName: 'body',
+      name: 'Body Color',
+      recolor: 'lpcr.tan',
+    });
+  });
+
+  it('round-trips a recolor selection', () => {
+    const cat = realBodyCatalog();
+    const palettes = realPalettes();
+    const original = 'sex=male&body=Body_Color_brown';
+    const parsed = parseHash(`#${original}`, cat, palettes);
+    expect(serializeHash(parsed.selections)).toBe(original);
+    const again = parseHash(`#${serializeHash(parsed.selections)}`, cat, palettes);
+    expect(serializeHash(again.selections)).toBe(original);
+  });
+
+  // Synthetic: an item with BOTH explicit variants and recolors.
+  const palettes = createPaletteCatalog({
+    'cloth/meta_cloth.json': { type: 'material', default: 'v1', base: 'c0' },
+    'cloth/cloth_v1.json': {
+      c0: ['#000000'],
+      crimson: ['#dc143c'],
+    },
+  }).palettes;
+  const tunic: ItemDefinition = {
+    name: 'Tunic',
+    type_name: 'torso',
+    animations: ['walk'],
+    credits: [],
+    variants: ['red', 'blue'],
+    recolors: { material: 'cloth', palettes: ['v1'] },
+  };
+  const tunicCat = makeCatalog([tunic]);
+
+  it('an explicit name_variant|recolor resolves to the recolor (upstream precedence)', () => {
+    const r = parseHash('#torso=Tunic_red|crimson', tunicCat, palettes);
+    expect(r.warnings).toEqual([]);
+    // Upstream's later-assignment-wins: the recolor overrides the variant.
+    expect(r.selections.items['torso']).toEqual({
+      typeName: 'torso',
+      name: 'Tunic',
+      recolor: 'crimson',
+    });
+  });
+
+  it('a plain variant token still resolves to the variant when it is not a recolor', () => {
+    const r = parseHash('#torso=Tunic_red', tunicCat, palettes);
+    expect(r.warnings).toEqual([]);
+    expect(r.selections.items['torso']).toEqual({
+      typeName: 'torso',
+      name: 'Tunic',
+      variant: 'red',
+    });
   });
 });
 
