@@ -923,6 +923,17 @@ reads the guarded `layer.animations`. Done as a standalone, core-TDD'd commit
 (making it optional / normalizing at catalog ingestion) is explicitly OUT of
 scope — minimal `?? []` only. **Task 7 depends on this.**
 
+> **Recorded follow-up (NOT this slice).** Code review confirmed `?? []` at
+> `compose.ts:156` is the complete fix (sole unguarded `item.animations`
+> read; `resolveLayers` is the single chokepoint). The underlying defect
+> remains: `ItemDefinition.animations` is typed non-optional but ~84 real
+> items omit it, so any *future* core code reading `item.animations`
+> directly would reintroduce the crash uncaught. Preferred long-term fix
+> for a future `@lpc-toolkit/core` task: normalize missing `animations` →
+> `[]` once at `createCatalog` ingestion so the non-optional type becomes
+> true (alternative: make the field optional). Tracked here so the
+> architectural debt is not lost.
+
 **Files:**
 - Create: `packages/core/test/compose-missing-animations.test.ts`
 - Modify: `packages/core/src/compose.ts` (one line)
