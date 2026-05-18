@@ -846,6 +846,13 @@ function supportsBodyType(item: ItemDefinition, bt: BodyType): boolean {
  * Derive a known-good starting outfit from the live catalog (spec deviation
  * 4). Body type = first BODY_TYPES value some body item supports. shownTypeNames
  * = the preferred types present in the catalog; the body type is always shown.
+ *
+ * Deterministic only w.r.t. catalog order: it first-matches over
+ * `byTypeName` arrays, whose order follows the `records` insertion order
+ * passed to `createCatalog`. Callers that must agree (the copy script and
+ * the app) MUST build `records` in the same order — sort by the
+ * sheet_definitions-relative key. Otherwise the bundled asset subset can
+ * diverge from what the app composes.
  */
 export function pickInitialSelections(catalog: Catalog): {
   state: SliceState;
@@ -1029,15 +1036,27 @@ function walkJson(dir: string, base = dir): Record<FilePath, ItemDefinition> {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) Object.assign(out, walkJson(full, base));
     else if (entry.name.endsWith('.json')) {
-      out[path.relative(base, full)] = JSON.parse(
-        readFileSync(full, 'utf8'),
-      ) as ItemDefinition;
+      // Forward-slash key, comparable to Vite import.meta.glob keys.
+      const key = path.relative(base, full).split(path.sep).join('/');
+      out[key] = JSON.parse(readFileSync(full, 'utf8')) as ItemDefinition;
     }
   }
   return out;
 }
 
-const { catalog } = createCatalog(walkJson(sheetDefsDir));
+// DETERMINISM CONTRACT (do not remove): pickInitialSelections is
+// deterministic only w.r.t. catalog order, which follows records insertion
+// order (createCatalog pushes byTypeName arrays in Object.entries order).
+// The app builds records from Vite import.meta.glob (keys returned sorted);
+// readdirSync order is filesystem/CI-dependent. Sorting by the shared
+// sheet_definitions-relative key makes BOTH call sites pick the IDENTICAL
+// outfit, so the bundled asset subset always matches what the app composes.
+const records = Object.fromEntries(
+  Object.entries(walkJson(sheetDefsDir)).sort(([a], [b]) =>
+    a < b ? -1 : a > b ? 1 : 0,
+  ),
+);
+const { catalog } = createCatalog(records);
 const { state, shownTypeNames } = pickInitialSelections(catalog);
 
 const dirs = new Set<string>();
@@ -1464,12 +1483,23 @@ function walkJson(dir: string, base = dir): Record<FilePath, ItemDefinition> {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, e.name);
     if (e.isDirectory()) Object.assign(out, walkJson(full, base));
-    else if (e.name.endsWith('.json'))
-      out[path.relative(base, full)] = JSON.parse(
-        readFileSync(full, 'utf8'),
-      ) as ItemDefinition;
+    else if (e.name.endsWith('.json')) {
+      const key = path.relative(base, full).split(path.sep).join('/');
+      out[key] = JSON.parse(readFileSync(full, 'utf8')) as ItemDefinition;
+    }
   }
   return out;
+}
+
+// Mirrors copy-spritesheets.ts: sort records by key so the catalog order
+// (hence pickInitialSelections) is filesystem/CI-independent and matches
+// the app's Vite-sorted-glob order.
+function sortedRecords(
+  recs: Record<FilePath, ItemDefinition>,
+): Record<FilePath, ItemDefinition> {
+  return Object.fromEntries(
+    Object.entries(recs).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+  );
 }
 
 // Node adapter: napi-rs canvas + filesystem loadImage from public/.
@@ -1488,9 +1518,26 @@ function nodeAdapter(): CanvasAdapter {
 const haveUpstream = existsSync(sheetDefsDir);
 const haveSprites = existsSync(publicSprites);
 
+describe.runIf(haveUpstream)('pickInitialSelections determinism', () => {
+  it('is identical regardless of record order (copy-script vs app parity)', () => {
+    const recs = walkJson(sheetDefsDir);
+    const forward = createCatalog(sortedRecords(recs)).catalog;
+    const reversed = createCatalog(
+      sortedRecords(
+        Object.fromEntries(Object.entries(recs).reverse()),
+      ),
+    ).catalog;
+    // Same sort applied to differently-ordered inputs => identical pick.
+    // This locks the contract the copy script (Task 7) depends on.
+    expect(pickInitialSelections(forward).state).toEqual(
+      pickInitialSelections(reversed).state,
+    );
+  });
+});
+
 describe.runIf(haveUpstream && haveSprites)('core pipeline (real assets)', () => {
   it('composes, extracts, and attributes the initial outfit', async () => {
-    const { catalog } = createCatalog(walkJson(sheetDefsDir));
+    const { catalog } = createCatalog(sortedRecords(walkJson(sheetDefsDir)));
     const { state } = pickInitialSelections(catalog);
     const selections = toSelections(state);
 
