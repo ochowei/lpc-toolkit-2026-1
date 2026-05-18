@@ -634,6 +634,8 @@ export function recordsToCatalog(
  * fix instruction (spec §5).
  */
 export function loadCatalogFromUpstream(): Catalog {
+  // '**/*.json' also matches meta_*.json; createCatalog skips those
+  // internally (isMetaFile), so they never become items or warnings.
   const mods = import.meta.glob<ItemDefinition>(
     '../../../../upstream/sheet_definitions/**/*.json',
     { eager: true, import: 'default' },
