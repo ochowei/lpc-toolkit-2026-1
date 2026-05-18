@@ -316,7 +316,7 @@ Source of truth: `reference/LPC-Tool-Web_UI/styles.css` (read it; this task tran
 /* Map tokens into the Tailwind v4 theme so utilities like `bg-app`,
    `text-text`, `border-border`, `font-sans` resolve to the tokens. */
 @theme inline {
-  --color-bg-app: var(--bg-app);
+  --color-app: var(--bg-app);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-surface-3: var(--surface-3);
@@ -1599,7 +1599,7 @@ export function SliceHarness({
   const failed = result.status === 'error';
 
   return (
-    <div className="flex h-screen flex-col bg-bg-app text-text">
+    <div className="flex h-screen flex-col bg-app text-text">
       <header className="flex items-center gap-3 border-b border-border px-4 py-2">
         <span className="font-bold">
           LPC<span className="text-text-mute">·Toolkit</span>
