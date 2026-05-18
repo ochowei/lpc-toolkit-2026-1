@@ -153,7 +153,7 @@ function resolveLayers(
         item,
         basePath,
         zPos: layer.zPos,
-        animations: item.animations,
+        animations: item.animations ?? [],
         ...(sel.variant ? { variant: sel.variant } : {}),
         ...(layer.custom_animation
           ? { customAnimation: layer.custom_animation }
