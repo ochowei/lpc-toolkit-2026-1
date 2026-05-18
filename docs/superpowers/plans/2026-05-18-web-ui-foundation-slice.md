@@ -2026,10 +2026,46 @@ export default function App() {
 Run: `pnpm --filter @lpc-toolkit/core build && pnpm --filter @lpc-toolkit/web typecheck && pnpm --filter @lpc-toolkit/web build`
 Expected: no type errors; `vite build` succeeds.
 
-- [ ] **Step 5: Manual smoke test**
+- [ ] **Step 5a: Automatable serve check (closes the browser URL/static path)**
 
-Run: `pnpm --filter @lpc-toolkit/web copy-sprites && pnpm --filter @lpc-toolkit/web dev`
-Open the printed localhost URL. Expected: an animated character on a checkerboard; changing a layer/anim/direction updates it live; the right panel lists credits + an effective license; toggling theme swaps palettes. Stop the dev server when satisfied.
+The Node integration test (Task 11) exercises the core pipeline + Node
+adapter but NOT the browser adapter's `fetch`/`createImageBitmap`/`drawImage`
+nor the Vite static-serving of `public/spritesheets/`. This step verifies
+the served HTTP surface the browser adapter depends on, headlessly:
+
+```bash
+pnpm --filter @lpc-toolkit/web copy-sprites
+pnpm --filter @lpc-toolkit/web build
+pnpm --filter @lpc-toolkit/web exec vite preview --port 4317 &   # background
+# wait for the server, then:
+curl -fsS http://localhost:4317/ -o /dev/null            # index.html → 200
+# pick any real copied PNG and confirm it serves at the URL the
+# browser adapter will resolve (spritesheets/<...>):
+REL=$(cd packages/web/public/spritesheets && find . -name '*.png' | head -1 | sed 's|^\./||')
+curl -fsS "http://localhost:4317/spritesheets/$REL" -o /dev/null  # PNG → 200
+# kill the preview server
+```
+Expected: both `curl -fsS` calls exit 0 (HTTP 200). This proves the
+production bundle builds, the SPA is served, and `resolveSpriteUrl`'s target
+(`/spritesheets/<basePath>...png`) is actually served — the exact URL the
+browser `loadImage` will `fetch`. Then stop the preview server.
+
+- [ ] **Step 5b: Human visual confirmation (irreducibly manual — REQUIRED)**
+
+The browser-only surface — `createImageBitmap` decode + `ctx.drawImage` of
+an `ImageBitmap` + the RAF loop painting a real `<canvas>` — cannot be
+verified headlessly without a browser-automation dependency (out of scope).
+A human must confirm it:
+
+Run: `pnpm --filter @lpc-toolkit/web dev`, open the printed localhost URL.
+Expected: an animated character on a checkerboard; changing a
+layer/anim/direction updates it live (anim change is instant — no full
+reload, per the Task 9 fix); the right panel lists credits + an effective
+license; toggling theme swaps palettes. Stop the dev server when satisfied.
+
+The executing agent CANNOT perform Step 5b; it must run 5a, then explicitly
+hand Step 5b to the user as the one DoD item requiring their eyes (spec §7
+"verified locally only").
 
 - [ ] **Step 6: Flip the README status row**
 
