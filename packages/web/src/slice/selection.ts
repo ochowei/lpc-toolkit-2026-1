@@ -78,6 +78,13 @@ function supportsBodyType(item: ItemDefinition, bt: BodyType): boolean {
  * Derive a known-good starting outfit from the live catalog (spec deviation
  * 4). Body type = first BODY_TYPES value some body item supports. shownTypeNames
  * = the preferred types present in the catalog; the body type is always shown.
+ *
+ * Deterministic only w.r.t. catalog order: it first-matches over
+ * `byTypeName` arrays, whose order follows the `records` insertion order
+ * passed to `createCatalog`. Callers that must agree (the copy script and
+ * the app) MUST build `records` in the same order — sort by the
+ * sheet_definitions-relative key. Otherwise the bundled asset subset can
+ * diverge from what the app composes.
  */
 export function pickInitialSelections(catalog: Catalog): {
   state: SliceState;
