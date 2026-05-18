@@ -1270,6 +1270,14 @@ describe('frameRect', () => {
       frameRect(cfg, 4, 'up', 0),
     );
   });
+
+  it('maps 4-dir up/right to rows 0 and 3', () => {
+    // Locks the per-direction row contract Task 10 blits on; pins the
+    // 'up'-row-0 vs directions=1-row-0 numeric coincidence.
+    const w = ANIMATION_CONFIGS['walk']!;
+    expect(frameRect(w, 4, 'up', 0).sy).toBe(0);
+    expect(frameRect(w, 4, 'right', 0).sy).toBe(3 * 64);
+  });
 });
 ```
 
@@ -1298,6 +1306,8 @@ export interface FrameRect {
  * Source rectangle (within an extracted ComposedAnimation canvas) for one
  * playback frame. Column = cycle[frameIndex % cycle.length]; row = direction
  * index, clamped to row 0 when the animation has a single directional row.
+ * Caller must pass `frameIndex >= 0`; negative values fall through to
+ * column 0 (JS `%` is sign-preserving).
  */
 export function frameRect(
   config: AnimationConfig,
@@ -1314,7 +1324,7 @@ export function frameRect(
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `pnpm --filter @lpc-toolkit/web exec vitest run test/frame-rect.test.ts`
-Expected: PASS (3 tests).
+Expected: PASS (4 tests).
 
 - [ ] **Step 5: Commit**
 
