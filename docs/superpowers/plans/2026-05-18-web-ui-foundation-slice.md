@@ -1763,6 +1763,7 @@ git commit -m "test(web): Node integration test over real catalog + assets"
 import { useMemo, useRef } from 'react';
 import {
   ANIMATION_CONFIGS,
+  BODY_TYPES,
   type Catalog,
   type Direction,
 } from '@lpc-toolkit/core';
@@ -1834,7 +1835,11 @@ export function SliceHarness({
                 dispatch({ type: 'set_body_type', bodyType: e.target.value })
               }
             >
-              <option value={state.bodyType}>{state.bodyType}</option>
+              {BODY_TYPES.map((bt) => (
+                <option key={bt} value={bt}>
+                  {bt}
+                </option>
+              ))}
             </select>
           </label>
 
@@ -2116,6 +2121,14 @@ git commit -m "feat(web): slice harness UI; wire foundation slice end-to-end"
 >    state and key options by it, removing the latent duplicate-key /
 >    name-ambiguity risk. (Originates in the Task 6 name-keyed `Selection`
 >    API, not Task 12.)
+> 3. **README prose coherence.** Task 12 Step 6 flips only the status-table
+>    row (now "Foundation slice"), but narrative/reference prose elsewhere
+>    in `README.md` (the intro line, the layout block, and the "Web UI
+>    design reference" section, ~lines 4/40/152/156/211) still says
+>    `packages/web/` is "planned"/"not been built yet" — internally
+>    contradicting the table. Minor (the authoritative at-a-glance status
+>    table is correct); sub-project 2 rewrites that whole section anyway.
+>    Deferred there rather than expand this slice's surgical scope.
 
 ---
 
