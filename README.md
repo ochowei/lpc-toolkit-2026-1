@@ -17,7 +17,7 @@ CLI can share one engine.
 | Package             | State        | What it is                                          |
 | ------------------- | ------------ | --------------------------------------------------- |
 | `packages/core/`    | **Working**  | Pure TypeScript composition logic (catalog, compose, recolor, hash, credits) |
-| `packages/web/`     | _Planned_    | React 18 + Vite + Tailwind + shadcn/ui browser UI   |
+| `packages/web/`     | _Planned_    | React 18 + Vite + Tailwind + shadcn/ui browser UI — design spec'd, see [Web UI design reference](#web-ui-design-reference) |
 | `packages/cli/`     | _Planned_    | Node CLI                                             |
 
 The core composition pipeline is implemented and tested with Vitest. The web
@@ -147,11 +147,68 @@ Exported from `@lpc-toolkit/core` (see `API.md` for full signatures):
   (3456), `ANIMATIONS`, `ANIMATION_OFFSETS`, `LICENSE_CONFIG`, … plus the
   shared `types.ts` definitions (`Selections`, `ComposedSheet`, etc.)
 
+## Web UI design reference
+
+`packages/web/` has not been built yet, but its UI is fully designed. The
+design lives in [`reference/LPC-Tool-Web_UI/`](reference/LPC-Tool-Web_UI) as a
+self-contained, build-free React prototype (Babel-standalone in the browser,
+mock fixtures, inline styles). It is **reference material only** — the real
+`packages/web/` will be React 18 + Vite + Tailwind + shadcn/ui consuming
+`@lpc-toolkit/core`, not a port of this prototype's code.
+
+### Previewing it
+
+Open `reference/LPC-Tool-Web_UI/index.html` in a browser (no install, no build
+step). It renders a "design canvas" of artboards: desktop (dark + light),
+mobile, required states, design tokens, and the component inventory.
+
+### Layout
+
+Desktop is a top bar over a fixed three-region grid; mobile collapses the
+three regions into four bottom tabs with the preview kept as the priority.
+
+| Region | Desktop | Contents |
+| ------ | ------- | -------- |
+| **Left** | `320px` | Body-type grid (6 types) · search (`⌘K`) · category accordion · item grid with pixel thumbnails · inline variant chips + recolor ramp swatches |
+| **Center** | `1fr` | Checkerboard preview canvas (`image-rendering: pixelated`) · animation tabs (12 animations) · 3×3 N/S/E/W direction pad · zoom stepper (1×/2×/4×/8×) · playback transport (play/pause, frame scrubber, FPS) |
+| **Right** | `340px` | **Attribution** panel (mandatory, never hidden) — effective-license hero card ("strictest wins") + per-layer credit rows · **Export** panel — 832×3456 PNG, current strip, animated GIF, share link |
+| **Mobile** | — | Bottom tabs: Preview · Layers · Credits · Export |
+
+Attribution being a permanent, prominent region is a direct expression of the
+mandatory-attribution hard rule, not a UI afterthought.
+
+### Required states
+
+The design specs four non-happy-path states: catalog loading (skeleton +
+progress), empty character (body only, with a coachmark), search with no
+matches, and a layer that failed to load (inline error chip + retry/pick-another
+callout, preview falls back to the next layer).
+
+### Design tokens
+
+Tokens are CSS custom properties that flip wholesale between `.lpc.dark` (the
+default, for pixel work) and `.lpc.light`. Accent hues are defined in `oklch`
+for stable lightness across themes.
+
+- **Type** — Space Grotesk (UI) + JetBrains Mono (numbers, code, badges); scale `10 → 32px`
+- **Spacing** — `2 4 8 12 16 20 24 32 40`; radii `3 5 8 12`; focus ring always visible, 2px `--accent` at offset 2
+- **License palettes** — distinct color families per license: GPL, CC-BY, CC-BY-SA, OGA-BY, CC0 (license strictness order, strictest first: `GPL 3.0` > `CC-BY-SA 3.0` > `CC-BY 3.0` / `OGA-BY 3.0` > `CC0`)
+
+### Component inventory
+
+The design enumerates ~32 function components in 6 groups — App shell, Picker
+(left), Preview (center), Attribution & export (right), Mobile, and Feedback —
+each annotated with key props/states and the shadcn/ui primitive it composes
+onto (Button, Input, Accordion, Tabs, Slider, Badge, Skeleton, Sheet, Toast,
+…). See the "Component inventory" artboard for the full handoff table.
+
 ## Documentation
 
 - `CLAUDE.md` — project rules and conventions (authoritative)
 - `API.md` — full `@lpc-toolkit/core` public API surface
 - `RESEARCH.md` — read-only reconnaissance of the upstream LPC project
+- `reference/LPC-Tool-Web_UI/` — Claude-designed web UI prototype and design
+  spec for the planned `packages/web/` (see above)
 
 ## License
 
