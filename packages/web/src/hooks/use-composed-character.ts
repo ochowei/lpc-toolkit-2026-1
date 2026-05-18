@@ -20,10 +20,24 @@ export interface ComposedResult {
 const adapter = createBrowserCanvasAdapter();
 
 /**
- * Re-composes whenever the selection-relevant slice of state changes.
- * `spritesheetsBaseUrl` is '' (core already prefixes `spritesheets/`); the
- * browser adapter resolves the rest against document.baseURI. A monotonic
- * request id discards stale async results (spec §2).
+ * The animation to show: the requested one if it was composed, else the
+ * first composed standard animation, else 'walk' (always a valid
+ * `ANIMATION_CONFIGS` key — `extractAnimation` returns a transparent crop
+ * for a known-but-uncomposed animation, never throws).
+ */
+function resolveAnim(sheet: ComposedSheet, anim: string): string {
+  return sheet.animations.includes(anim)
+    ? anim
+    : (sheet.animations[0] ?? 'walk');
+}
+
+/**
+ * Re-composes only when the *selection* (bodyType + items) changes — anim is
+ * not a selection (spec §2), so switching animation re-extracts cheaply off
+ * the already-composed master sheet (Effect 2), never a refetch. A monotonic
+ * request id discards stale async results. `spritesheetsBaseUrl` is '' (core
+ * already prefixes `spritesheets/`); the browser adapter resolves the rest
+ * against document.baseURI.
  */
 export function useComposedCharacter(
   catalog: Catalog,
@@ -37,11 +51,11 @@ export function useComposedCharacter(
     error: null,
   });
   const reqIdRef = useRef(0);
-  const key = JSON.stringify({
-    b: state.bodyType,
-    s: state.selections,
-    a: state.anim,
-  });
+  const sheetRef = useRef<ComposedSheet | null>(null);
+  const animRef = useRef(state.anim);
+  animRef.current = state.anim;
+
+  const key = JSON.stringify({ b: state.bodyType, s: state.selections });
 
   useEffect(() => {
     const reqId = ++reqIdRef.current;
@@ -62,10 +76,12 @@ export function useComposedCharacter(
     })
       .then((sheet) => {
         if (reqId !== reqIdRef.current) return;
-        const animName = sheet.animations.includes(state.anim)
-          ? state.anim
-          : (sheet.animations[0] ?? 'walk');
-        const animation = extractAnimation(sheet, animName, { adapter });
+        sheetRef.current = sheet;
+        const animation = extractAnimation(
+          sheet,
+          resolveAnim(sheet, animRef.current),
+          { adapter },
+        );
         setResult({
           status: 'ready',
           progress: 1,
@@ -76,6 +92,7 @@ export function useComposedCharacter(
       })
       .catch((e: unknown) => {
         if (reqId !== reqIdRef.current) return;
+        sheetRef.current = null;
         setResult({
           status: 'error',
           progress: 1,
@@ -84,20 +101,22 @@ export function useComposedCharacter(
           error: e instanceof Error ? e.message : String(e),
         });
       });
-    // key encodes the selection-relevant state.
+    // key encodes the selection-relevant state (anim handled by Effect 2).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalog, key]);
 
-  // Re-extract when only the chosen animation changes and a sheet exists.
+  // Anim change: cheap re-extract off the current sheet (no recompose).
   useEffect(() => {
-    setResult((r) => {
-      if (r.status !== 'ready' || !r.sheet) return r;
-      const name = r.sheet.animations.includes(state.anim)
-        ? state.anim
-        : (r.sheet.animations[0] ?? 'walk');
-      return { ...r, animation: extractAnimation(r.sheet, name, { adapter }) };
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const sheet = sheetRef.current;
+    if (!sheet) return;
+    const animation = extractAnimation(
+      sheet,
+      resolveAnim(sheet, state.anim),
+      { adapter },
+    );
+    setResult((r) =>
+      r.status === 'ready' && r.sheet === sheet ? { ...r, animation } : r,
+    );
   }, [state.anim]);
 
   return result;
