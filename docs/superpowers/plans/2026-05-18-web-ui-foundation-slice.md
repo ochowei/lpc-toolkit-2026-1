@@ -907,12 +907,123 @@ git commit -m "feat(web): slice state, reducer, initial picker, toSelections bri
 
 ---
 
+## Task 6.5: Core — guard missing `item.animations`
+
+**Why this exists (added during execution):** core's `ItemDefinition.animations`
+is typed `readonly AnimationName[]` (non-optional, `types.ts:76`), but **84
+real `upstream/` items omit the `animations` key** (incl. 51 torso, 15 body,
+2 hair, 2 legs — squarely inside the slice's shown categories). `resolveLayers`
+(`compose.ts:156`) copies `item.animations` straight through; downstream
+`layer.animations.includes('walk')` then throws `TypeError: Cannot read
+properties of undefined`. This crashes the copy script (Task 7), the
+integration test (Task 11), AND the app (Task 12) — the whole slice. The fix
+is the single unguarded `item.animations` read in core src; everything else
+reads the guarded `layer.animations`. Done as a standalone, core-TDD'd commit
+(not commingled into a web task). Type-level remodeling of `animations`
+(making it optional / normalizing at catalog ingestion) is explicitly OUT of
+scope — minimal `?? []` only. **Task 7 depends on this.**
+
+**Files:**
+- Create: `packages/core/test/compose-missing-animations.test.ts`
+- Modify: `packages/core/src/compose.ts` (one line)
+
+Work in `packages/core`. core uses NodeNext: test files import from
+`../src/<module>.js` (the `.js` specifier is required even for `.ts`
+sources). Run core tests with `pnpm --filter @lpc-toolkit/core test`.
+
+- [ ] **Step 1: Write the failing test `packages/core/test/compose-missing-animations.test.ts`**
+
+```ts
+import { describe, expect, it } from 'vitest';
+import { createCatalog } from '../src/catalog.js';
+import { getSpritePathsForSelections } from '../src/compose.js';
+import type { ItemDefinition, Selections } from '../src/types.js';
+
+// Real upstream data has 84 items with NO `animations` key, violating the
+// non-optional ItemDefinition.animations type. resolveLayers must not crash.
+const noAnims = {
+  name: 'No Anim Body',
+  type_name: 'body',
+  credits: [],
+  layer_1: { zPos: 10, male: 'body/bodies/male/' },
+} as unknown as ItemDefinition;
+
+describe('resolveLayers with an item missing `animations`', () => {
+  it('does not throw and yields no path for that layer', () => {
+    const { catalog } = createCatalog({ 'no_anim.json': noAnims });
+    const selections: Selections = {
+      bodyType: 'male',
+      items: { body: { typeName: 'body', name: 'No Anim Body' } },
+    };
+    expect(() =>
+      getSpritePathsForSelections(selections, catalog),
+    ).not.toThrow();
+    expect(getSpritePathsForSelections(selections, catalog)).toEqual([]);
+  });
+});
+```
+
+- [ ] **Step 2: Run it, verify it FAILS with the real bug**
+
+Run: `pnpm --filter @lpc-toolkit/core exec vitest run test/compose-missing-animations.test.ts`
+Expected: FAIL — `TypeError: Cannot read properties of undefined (reading 'includes')` (the unguarded `item.animations`).
+
+- [ ] **Step 3: Apply the one-line fix in `packages/core/src/compose.ts`**
+
+In `resolveLayers`, change the line (currently ~`compose.ts:156`):
+
+```ts
+        animations: item.animations,
+```
+
+to:
+
+```ts
+        animations: item.animations ?? [],
+```
+
+Change nothing else.
+
+- [ ] **Step 4: Run the new test — verify it PASSES**
+
+Run: `pnpm --filter @lpc-toolkit/core exec vitest run test/compose-missing-animations.test.ts`
+Expected: PASS (1 test). (With `animations: []`, `getSpritePathsForSelections`
+computes `defaultAnim = undefined` and `continue`s, yielding `[]`.)
+
+- [ ] **Step 5: Full core suite must stay green (no regression)**
+
+Run: `pnpm --filter @lpc-toolkit/core test`
+Expected: all green (≥119 tests + the new one).
+
+- [ ] **Step 6: Typecheck core**
+
+Run: `pnpm --filter @lpc-toolkit/core typecheck`
+Expected: exit 0.
+
+- [ ] **Step 7: Commit (core only)**
+
+```bash
+git add packages/core/src/compose.ts packages/core/test/compose-missing-animations.test.ts
+git commit -m "fix(core): guard items missing the optional-in-practice animations key"
+```
+
+Append, after a blank line, the trailer `Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>`.
+
+---
+
 ## Task 7: Sprite-dir collector + copy script
+
+**Depends on Task 6.5** (the copy script + later tasks crash on the ~84
+no-`animations` items without it).
 
 **Files:**
 - Create: `packages/web/src/slice/sprite-dirs.ts`
 - Create: `packages/web/scripts/copy-spritesheets.ts`
 - Test: `packages/web/test/sprite-dirs.test.ts`
+- Modify (accepted Task 1 gap): `packages/web/package.json` (+`@types/node`
+  devDep, MIT) and `packages/web/tsconfig.json` (`types: ["vite/client",
+  "node"]`) — `scripts/` is in tsconfig `include` and uses `node:*`, so the
+  script cannot typecheck without Node types. `pnpm-lock.yaml` updates.
 
 - [ ] **Step 1: Write the failing test `packages/web/test/sprite-dirs.test.ts`**
 
