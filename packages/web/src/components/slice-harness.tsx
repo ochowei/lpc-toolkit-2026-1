@@ -1,6 +1,7 @@
 import { useMemo, useRef } from 'react';
 import {
   ANIMATION_CONFIGS,
+  BODY_TYPES,
   computeEffectiveLicense,
   type Catalog,
   type Direction,
@@ -73,7 +74,11 @@ export function SliceHarness({
                 dispatch({ type: 'set_body_type', bodyType: e.target.value })
               }
             >
-              <option value={state.bodyType}>{state.bodyType}</option>
+              {BODY_TYPES.map((bt) => (
+                <option key={bt} value={bt}>
+                  {bt}
+                </option>
+              ))}
             </select>
           </label>
 
