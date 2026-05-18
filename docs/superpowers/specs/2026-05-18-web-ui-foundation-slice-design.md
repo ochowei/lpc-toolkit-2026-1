@@ -38,9 +38,9 @@ license display.
   script copies only the spritesheet PNGs referenced by the slice's chosen
   layers from `upstream/spritesheets/` into `packages/web/public/spritesheets/`
   (Vite static dir). `sheet_definitions` are read at build time via
-  `import.meta.glob`. `spritesheetsBaseUrl = '/spritesheets'`. This models the
-  real deploy boundary; the copy script is the seed of the deferred full-asset
-  strategy sub-project.
+  `import.meta.glob`. `spritesheetsBaseUrl = ''` (Correction 1). This models
+  the real deploy boundary; the copy script is the seed of the deferred
+  full-asset strategy sub-project.
 - **Verification depth:** core pipeline + attribution. Recolor
   (`createPaletteCatalog` / `makeResolvePalette`) and URL hash
   (`parseHash` / `serializeHash`) are deferred.
@@ -48,6 +48,42 @@ license display.
   minimal UI. Sub-project 2 builds directly on this foundation.
 - **Stack:** React 18 + Vite + TypeScript (strict) + Tailwind CSS +
   shadcn/ui + pnpm. Mandated by `CLAUDE.md`; not re-litigated.
+
+## Corrections (synced from implementation plan, 2026-05-18)
+
+Discovered while reading core source for the plan and approved by the user.
+These override any conflicting wording elsewhere in this spec:
+
+1. **`spritesheetsBaseUrl = ''`**, not `'/spritesheets'`. Core itself
+   prepends `spritesheets/` to every layer path (`compose.ts:198`,
+   `credits.ts:18`); a non-empty base would double the prefix. PNGs are
+   copied to `public/spritesheets/`, served at `/spritesheets/...`; the
+   browser adapter resolves the relative path against `document.baseURI`.
+2. **`Direction` = `'up' | 'left' | 'down' | 'right'`** (core
+   `constants.ts`); slice default is `'down'`. The spec's `'S'` was
+   prototype shorthand.
+3. **Animation playback reads `ANIMATION_CONFIGS[name].cycle`** (exported
+   by core) for column order and `ComposedAnimation.directions` for row
+   count; `ComposedAnimation` does not expose `cycle`.
+4. **Initial preset is data-driven**, not a hardcoded multi-license outfit:
+   `pickInitialSelections(catalog)` derives a known-good outfit from the
+   live catalog (submodule contents are unknown at plan time). The
+   "strictest-license-wins" goal is verified as a *property* (effective
+   license ∈ manifest licenses; manifest non-empty), not a hardcoded
+   license. The slice state's per-category value is the item's
+   `ItemDefinition.name` (what core's `Selection` requires), not an itemId.
+5. **Bounded asset copy:** the copy script bundles the initial outfit
+   across all `BODY_TYPES` (body-type selector is live) plus every item of
+   the shown type-names at the default body type (layer selectors are
+   live). Combinations not bundled 404 → core swallows the load → the
+   slice shows a per-layer "failed to load" marker (§5).
+6. **Added dependencies** beyond the mandated stack, both MIT,
+   GPL-3.0-compatible: `@napi-rs/canvas` (Node integration-test adapter,
+   already a core devDep) and `tsx` (runs the TypeScript copy script).
+   shadcn/ui's footprint (`clsx`, `tailwind-merge`,
+   `class-variance-authority`, `@radix-ui/react-slot`) and Tailwind v4
+   (`@tailwindcss/vite`, no `tailwind.config.ts`/`postcss.config.js`) are
+   part of the mandated stack.
 
 ## Prerequisite
 
@@ -60,28 +96,29 @@ This is a setup prerequisite, not part of the deliverable.
 ```
 packages/web/
   package.json          @lpc-toolkit/web; depends on @lpc-toolkit/core (workspace:*)
-  vite.config.ts        React plugin; build outDir=dist
-  tailwind.config.ts    design tokens wired into theme.extend
-  postcss.config.js
-  tsconfig.json         extends tsconfig.base.json; strict
+  vite.config.ts        React + @tailwindcss/vite (Tailwind v4, no config files)
+  vitest.config.ts      node env; test/**/*.test.ts
+  tsconfig.json         extends tsconfig.base.json; strict; DOM lib; react-jsx
   index.html
   scripts/
-    copy-spritesheets.mjs   copies the PNG subset for slice layers into public/
+    copy-spritesheets.ts   copies the PNG subset (run via tsx)
   public/
     spritesheets/...        (copy-script output; gitignored)
   src/
     main.tsx
-    index.css             @tailwind layers + design-token CSS variables
-                          (ported from reference/LPC-Tool-Web_UI/styles.css)
-    adapter/
-      browser-canvas-adapter.ts   implements core CanvasAdapter
-    catalog/
-      load-catalog.ts       import.meta.glob sheet_definitions -> createCatalog
-    state/
-      editor-state.ts       minimal reducer + toSelections bridge
-    components/
-      slice-harness.tsx     minimal UI: layer selects + canvas + credits
     App.tsx
+    index.css             Tailwind import + design tokens
+                          (ported from reference/LPC-Tool-Web_UI/styles.css)
+    lib/cn.ts
+    components/ui/button.tsx       vendored shadcn-style Button
+    components/slice-harness.tsx   minimal UI: selects + canvas + credits
+    adapter/browser-canvas-adapter.ts   core CanvasAdapter + resolveSpriteUrl
+    catalog/load-catalog.ts             import.meta.glob -> createCatalog
+    slice/selection.ts    SliceState, reducer, pickInitialSelections, toSelections
+    slice/sprite-dirs.ts  dirsForSelections/posixDirname (shared with copy script)
+    slice/frame-rect.ts   frameRect(config, dir, frame) math
+    hooks/use-composed-character.ts   state -> compose -> extract (stale-guarded)
+    hooks/use-animation-player.ts     RAF draw loop
 ```
 
 - `@lpc-toolkit/core` consumed as `workspace:*`. pnpm only — no npm/yarn/bun.
@@ -89,11 +126,11 @@ packages/web/
 - Tailwind theme ported from `reference/LPC-Tool-Web_UI/styles.css` design
   tokens: dark/light themes, spacing scale, radii, type scale, license badge
   colors (`--lic-*`).
-- No non-essential dependencies beyond core + the mandated stack. shadcn/ui is
-  initialized but used minimally in the slice.
-- The file tree above is indicative, not exhaustive: shadcn/ui init also
-  generates `components.json` and a `src/lib/utils.ts` (`cn` helper); those are
-  expected and not called out individually.
+- No non-essential dependencies beyond core + the mandated stack. shadcn/ui
+  is used via vendored components (`lib/cn.ts` + `components/ui/button.tsx`),
+  minimally, to verify shadcn + Tailwind v4 + design tokens coexist. No
+  `npx shadcn init`/`components.json` — its components are copy-paste by
+  design.
 
 ## §2 — Core integration data flow
 
@@ -109,8 +146,8 @@ packages/web/
    - `loadImage(path)` → `fetch(path)` → `blob()` → `createImageBitmap(blob)`.
      The result structurally satisfies `ImageLike`; `drawImage` accepts
      `ImageBitmap`.
-   - `spritesheetsBaseUrl = '/spritesheets'`; `loadImage` joins the catalog's
-     relative path onto this base.
+   - `spritesheetsBaseUrl = ''` (Correction 1); `loadImage` resolves core's
+     already-`spritesheets/`-prefixed path against `document.baseURI`.
 
 **Interaction (per selection change):**
 
@@ -138,23 +175,25 @@ sub-project 2). Minimal state only:
 
 ```ts
 interface SliceState {
-  bodyType: BodyType;                    // core type
-  selections: Record<TypeName, ItemId>;  // chosen item per category
-  anim: AnimationName;                   // default 'walk'
-  dir: Direction;                        // default 'S'
-  playing: boolean;                      // default true
+  bodyType: BodyType;                     // core type
+  selections: Record<TypeName, string>;   // typeName -> ItemDefinition.name
+  anim: AnimationName;                    // default 'walk'
+  dir: Direction;                         // default 'down' (Correction 2)
+  playing: boolean;                       // default true
 }
 ```
 
-- Reducer actions only: `set_body_type`, `pick(typeName, itemId)`,
+- Reducer actions only: `set_body_type`, `pick(typeName, name)`,
   `clear(typeName)`, `set_anim`, `set_dir`, `toggle_play`. No
   zoom/fps/variant/recolor.
 - **Bridge:** a pure function `toSelections(state): Selections` converts the
-  shape above into core's `Selections` type. This is the only coupling point
-  between slice and core; it lives in its own file and is unit-tested.
-- Initial state: a fixed, known-good preset (body + a few layers) chosen to
-  span multiple licenses so `computeEffectiveLicense` visibly resolves
-  "strictest wins" (e.g. include a CC-BY layer and a GPL layer).
+  shape above into core's `Selections` type (each item is
+  `{ typeName, name }`, no variant). This is the only coupling point between
+  slice and core; it lives in its own file and is unit-tested.
+- Initial state: data-driven via `pickInitialSelections(catalog)`
+  (Correction 4) — a known-good body + first available item per shown
+  type-name. `computeEffectiveLicense` is exercised and asserted as a
+  property, not against a hardcoded license.
 - Layer set is deliberately small (~5–8 categories, e.g. body / head / hair /
   torso / legs / feet plus one clearly non-CC0-licensed layer): enough for the
   copy script to derive the PNG subset and to demonstrate multi-layer
@@ -200,14 +239,15 @@ scrubber, export, or mobile (sub-projects 2/3/4).
 
 ## §6 — Testing (Vitest, workspace standard)
 
-- **Unit:** `toSelections` bridge (state → core `Selections` mapping).
-- **Unit:** `browserCanvasAdapter` pure logic (base-url + relative-path
-  joining); canvas/Image stubbed or via jsdom.
-- **Integration (happy path):** fixed preset state → `toSelections` →
-  `composeSelections` (adapter backed by `@napi-rs/canvas` or a stub fed
-  fixture PNGs) → assert `ComposedSheet` dimensions, `extractAnimation`
-  output, `getCredits` contains expected authors, `computeEffectiveLicense`
-  returns the strictest license.
+- **Unit:** `toSelections` bridge, `pickInitialSelections`, `cn`,
+  `resolveSpriteUrl`, `recordsToCatalog`, `dirsForSelections`/`posixDirname`,
+  `frameRect` — all pure, node env (no jsdom; DOM-only adapter methods are
+  verified in the running app).
+- **Integration (Node):** data-driven preset → `toSelections` →
+  `composeSelections` (adapter backed by `@napi-rs/canvas`, `loadImage`
+  reading the copied `public/spritesheets/`) → assert `ComposedSheet`
+  dimensions, `extractAnimation` output, `getCredits` non-empty, and
+  `computeEffectiveLicense(credits)` ∈ `credits.licenses` (Correction 4).
 - No pixel-level testing of the RAF animation loop (high cost, low value).
 - Success gate: `pnpm -r typecheck`, `pnpm -r test`, `pnpm -r build` all green.
 
@@ -218,7 +258,8 @@ scrubber, export, or mobile (sub-projects 2/3/4).
 1. `pnpm --filter @lpc-toolkit/web dev` starts; the page shows an animated
    character composed from real LPC sprites.
 2. Changing layer / body type / animation / direction updates the preview
-   live.
+   live (within the bundled asset subset — Correction 5; unbundled
+   combinations show a per-layer "failed to load" marker).
 3. The credits list and effective-license badge correctly reflect the current
    selection (hard rule 3).
 4. `pnpm -r typecheck && pnpm -r test && pnpm -r build` all green.
