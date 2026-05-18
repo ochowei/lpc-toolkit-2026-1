@@ -2096,6 +2096,27 @@ git add packages/web/src/components/slice-harness.tsx packages/web/src/App.tsx R
 git commit -m "feat(web): slice harness UI; wire foundation slice end-to-end"
 ```
 
+> **Recorded follow-ups (NOT this slice — surfaced by Task 12 review).**
+> 1. **Full-page error boundary (spec §5 presentation gap).** `App` calls
+>    `loadCatalogFromUpstream()`/`pickInitialSelections()` in a `useMemo`
+>    during render; on an uninitialised submodule or all-invalid catalog
+>    these throw with no error boundary → blank page + console error, not
+>    the styled "full-page error message" spec §5 envisions. Unreachable in
+>    the documented, locally-verified config (submodule is a hard
+>    prerequisite; the data path is proven by the Task 11 Node integration
+>    test + Step 5a serve-check), so it is correctly out of scope for this
+>    de-risking slice. Sub-project 2 (the real shell) should add a
+>    ~15-line token-styled `ErrorBoundary` (or `try/catch` in `main.tsx`)
+>    rendering `error.message` to fully satisfy §5.
+> 2. **Key the real picker by `itemId`, not `name`.** core dedups items by
+>    file-path `itemId`, but the slice's selection model + UI key on the
+>    display `name` (`key={it.name}`, `selections[tn]=name`). Empirically
+>    safe today (0 duplicate display-names across all 104 upstream types),
+>    but sub-project 2's real left panel should carry `itemId` in selection
+>    state and key options by it, removing the latent duplicate-key /
+>    name-ambiguity risk. (Originates in the Task 6 name-keyed `Selection`
+>    API, not Task 12.)
+
 ---
 
 ## Self-review (completed by plan author)
