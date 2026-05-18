@@ -1,0 +1,166 @@
+/* LPC Toolkit — design tokens */
+
+:root {
+  /* Type */
+  --font-sans: 'Space Grotesk', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+
+  /* Spacing scale */
+  --s-0: 2px;
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-10: 40px;
+
+  /* Radii */
+  --r-1: 3px;
+  --r-2: 5px;
+  --r-3: 8px;
+  --r-4: 12px;
+
+  /* Type scale */
+  --t-10: 10px;
+  --t-11: 11px;
+  --t-12: 12px;
+  --t-13: 13px;
+  --t-14: 14px;
+  --t-16: 16px;
+  --t-20: 20px;
+  --t-24: 24px;
+  --t-32: 32px;
+}
+
+/* --- Dark theme (default for pixel work) --- */
+.lpc.dark {
+  --bg-deep: #0a0c11;
+  --bg-app: #10131a;
+  --surface: #171b24;
+  --surface-2: #1e2330;
+  --surface-3: #262c3b;
+  --border: #2a3142;
+  --border-strong: #3b4258;
+  --text: #e6eaf3;
+  --text-2: #aab2c4;
+  --text-mute: #717a92;
+  --text-dim: #4d556a;
+  --accent: oklch(82% 0.18 130);     /* CRT phosphor lime */
+  --accent-ink: #0a0c11;
+  --accent-2: oklch(80% 0.15 70);    /* retro amber */
+  --danger: oklch(72% 0.18 25);
+  --success: oklch(80% 0.16 150);
+  --info: oklch(78% 0.13 230);
+
+  /* License badge colors */
+  --lic-gpl-bg: #3a1f1a;     --lic-gpl-fg: #ff8b6a;
+  --lic-ccby-bg: #1c2b3a;    --lic-ccby-fg: #6cc1ff;
+  --lic-ccbysa-bg: #2f2a18;  --lic-ccbysa-fg: #e8c75a;
+  --lic-ogaby-bg: #2a1f3a;   --lic-ogaby-fg: #b890ff;
+
+  --checker-a: #1a1f2a;
+  --checker-b: #232938;
+}
+
+/* --- Light theme --- */
+.lpc.light {
+  --bg-deep: #ebe6da;
+  --bg-app: #f4f0e6;
+  --surface: #fbf8ef;
+  --surface-2: #ffffff;
+  --surface-3: #f0ecdf;
+  --border: #d9d2bf;
+  --border-strong: #b8af97;
+  --text: #1a1d24;
+  --text-2: #4a4c54;
+  --text-mute: #6e6a5b;
+  --text-dim: #9a9485;
+  --accent: oklch(58% 0.17 130);
+  --accent-ink: #ffffff;
+  --accent-2: oklch(60% 0.16 60);
+  --danger: oklch(55% 0.18 25);
+  --success: oklch(55% 0.16 150);
+  --info: oklch(55% 0.13 230);
+
+  --lic-gpl-bg: #fbe2d6;     --lic-gpl-fg: #8c2b13;
+  --lic-ccby-bg: #d6e7fb;    --lic-ccby-fg: #1b4f87;
+  --lic-ccbysa-bg: #faf0c6;  --lic-ccbysa-fg: #6e5500;
+  --lic-ogaby-bg: #ece0fa;   --lic-ogaby-fg: #5b2a93;
+
+  --checker-a: #e8e2d2;
+  --checker-b: #d6cfba;
+}
+
+/* --- Base --- */
+* { box-sizing: border-box; }
+
+.lpc {
+  font-family: var(--font-sans);
+  font-size: var(--t-14);
+  color: var(--text);
+  background: var(--bg-app);
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.005em;
+}
+
+.lpc.dark { color-scheme: dark; }
+.lpc.light { color-scheme: light; }
+
+.lpc button,
+.lpc input,
+.lpc select,
+.lpc textarea {
+  font: inherit;
+  color: inherit;
+}
+
+.lpc canvas {
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+}
+
+/* Scrollbars inside lpc surfaces */
+.lpc .scroll {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.lpc .scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+.lpc .scroll::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+}
+.lpc .scroll::-webkit-scrollbar-track { background: transparent; }
+
+/* Focus rings */
+.lpc :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-2);
+}
+
+/* Mono numbers */
+.lpc .mono { font-family: var(--font-mono); font-feature-settings: 'tnum'; }
+
+/* Common utilities */
+.lpc .ttu { text-transform: uppercase; letter-spacing: 0.08em; }
+.lpc .muted { color: var(--text-mute); }
+.lpc .dim { color: var(--text-dim); }
+.lpc .row { display: flex; align-items: center; }
+.lpc .col { display: flex; flex-direction: column; }
+
+/* Checkerboard transparency bg */
+.lpc .checker {
+  background-image:
+    linear-gradient(45deg, var(--checker-a) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--checker-a) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--checker-a) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--checker-a) 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  background-color: var(--checker-b);
+}
