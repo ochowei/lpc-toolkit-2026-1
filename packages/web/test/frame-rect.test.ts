@@ -21,4 +21,12 @@ describe('frameRect', () => {
       frameRect(cfg, 4, 'up', 0),
     );
   });
+
+  it('maps 4-dir up/right to rows 0 and 3', () => {
+    // Locks the per-direction row contract Task 10 blits on; pins the
+    // 'up'-row-0 vs directions=1-row-0 numeric coincidence.
+    const w = ANIMATION_CONFIGS['walk']!;
+    expect(frameRect(w, 4, 'up', 0).sy).toBe(0);
+    expect(frameRect(w, 4, 'right', 0).sy).toBe(3 * 64);
+  });
 });

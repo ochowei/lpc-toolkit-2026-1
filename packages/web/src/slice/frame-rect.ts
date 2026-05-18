@@ -15,6 +15,8 @@ export interface FrameRect {
  * Source rectangle (within an extracted ComposedAnimation canvas) for one
  * playback frame. Column = cycle[frameIndex % cycle.length]; row = direction
  * index, clamped to row 0 when the animation has a single directional row.
+ * Caller must pass `frameIndex >= 0`; negative values fall through to
+ * column 0 (JS `%` is sign-preserving).
  */
 export function frameRect(
   config: AnimationConfig,
