@@ -48,7 +48,7 @@
 /* Map tokens into the Tailwind v4 theme so utilities like `bg-app`,
    `text-text`, `border-border`, `font-sans` resolve to the tokens. */
 @theme inline {
-  --color-bg-app: var(--bg-app);
+  --color-app: var(--bg-app);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-surface-3: var(--surface-3);
