@@ -1,6 +1,6 @@
 {
   "framework": "vite",
-  "buildCommand": "pnpm --filter @lpc-toolkit/core build && pnpm build",
+  "buildCommand": "pnpm build",
   "outputDirectory": "dist",
   "rewrites": [
     {
