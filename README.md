@@ -17,7 +17,7 @@ CLI can share one engine.
 | Package             | State        | What it is                                          |
 | ------------------- | ------------ | --------------------------------------------------- |
 | `packages/core/`    | **Working**  | Pure TypeScript composition logic (catalog, compose, recolor, hash, credits) |
-| `packages/web/`     | _Planned_    | React 18 + Vite + Tailwind + shadcn/ui browser UI — design spec'd, see [Web UI design reference](#web-ui-design-reference) |
+| `packages/web/`     | _Foundation slice_ | React 18 + Vite + Tailwind v4 + shadcn-style UI; core integration verified locally. See `docs/superpowers/specs/2026-05-18-web-ui-foundation-slice-design.md`. |
 | `packages/cli/`     | _Planned_    | Node CLI                                             |
 
 The core composition pipeline is implemented and tested with Vitest. The web
