@@ -2,7 +2,12 @@ import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { parseHash, serializeHash } from '../src/hash.js';
+import {
+  decodeSelectionToken,
+  encodeSelectionToken,
+  parseHash,
+  serializeHash,
+} from '../src/hash.js';
 import { createCatalog } from '../src/catalog.js';
 import { createPaletteCatalog } from '../src/palettes.js';
 import type {
@@ -358,5 +363,55 @@ describe('parseHash ↔ serializeHash round-trip', () => {
     // Idempotent: re-parse, re-serialize gives the same string.
     const parsedAgain = parseHash(`#${re}`, cat);
     expect(serializeHash(parsedAgain.selections)).toBe(original);
+  });
+});
+
+describe('selection tokens', () => {
+  it('round-trips selections through a versioned reversible token', () => {
+    const cat = makeCatalog([sandals, humanMale]);
+    const selections = {
+      bodyType: 'male',
+      items: {
+        shoes: { typeName: 'shoes', name: 'Sandals', variant: 'blue' },
+        head: { typeName: 'head', name: 'Human male', variant: 'light' },
+      },
+    };
+
+    const token = encodeSelectionToken(selections);
+    const decoded = decodeSelectionToken(token, cat);
+
+    expect(token.startsWith('v1.')).toBe(true);
+    expect(decoded.warnings).toEqual([]);
+    expect(decoded.selections).toEqual(selections);
+  });
+
+  it('rejects unsupported token versions', () => {
+    const cat = makeCatalog([sandals]);
+    expect(() => decodeSelectionToken('v2.abc', cat)).toThrow(
+      'Unsupported selection token version',
+    );
+  });
+
+  it('rejects malformed token payloads', () => {
+    const cat = makeCatalog([sandals]);
+    expect(() => decodeSelectionToken('v1.a', cat)).toThrow(
+      'Malformed selection token',
+    );
+  });
+
+  it('surfaces parser warnings from the decoded payload', () => {
+    const cat = makeCatalog([sandals]);
+    const token = encodeSelectionToken({
+      bodyType: 'male',
+      items: {
+        shoes: { typeName: 'shoes', name: 'Notashoe' },
+      },
+    });
+
+    const decoded = decodeSelectionToken(token, cat);
+
+    expect(decoded.warnings).toEqual([
+      { key: 'shoes', value: 'Notashoe', reason: 'unknown_item' },
+    ]);
   });
 });

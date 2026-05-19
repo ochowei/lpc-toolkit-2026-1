@@ -60,7 +60,12 @@ export { composeSelections, getSpritePathsForSelections } from './compose.js';
 export { getCredits, computeEffectiveLicense } from './credits.js';
 
 export type { HashWarning, ParseHashResult } from './hash.js';
-export { parseHash, serializeHash } from './hash.js';
+export {
+  decodeSelectionToken,
+  encodeSelectionToken,
+  parseHash,
+  serializeHash,
+} from './hash.js';
 
 export type { ExtractAnimationOptions } from './animation.js';
 export { extractAnimation } from './animation.js';

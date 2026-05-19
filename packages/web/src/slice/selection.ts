@@ -22,6 +22,7 @@ export type SliceAction =
   | { type: 'set_body_type'; bodyType: BodyType }
   | { type: 'pick'; typeName: TypeName; name: string }
   | { type: 'clear'; typeName: TypeName }
+  | { type: 'apply_selections'; selections: Selections }
   | { type: 'set_anim'; anim: AnimationName }
   | { type: 'set_dir'; dir: Direction }
   | { type: 'toggle_play' };
@@ -39,6 +40,17 @@ export function sliceReducer(s: SliceState, a: SliceAction): SliceState {
       const next = { ...s.selections };
       delete next[a.typeName];
       return { ...s, selections: next };
+    }
+    case 'apply_selections': {
+      const selections: Record<TypeName, string> = {};
+      for (const [typeName, item] of Object.entries(a.selections.items)) {
+        selections[typeName] = item.name;
+      }
+      return {
+        ...s,
+        bodyType: a.selections.bodyType,
+        selections,
+      };
     }
     case 'set_anim':
       return { ...s, anim: a.anim };
