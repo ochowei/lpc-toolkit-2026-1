@@ -5,14 +5,21 @@ import {
   computeEffectiveLicense,
   decodeSelectionToken,
   encodeSelectionToken,
+  LICENSE_CONFIG,
   type Catalog,
   type Direction,
+  type License,
 } from '@lpc-toolkit/core';
 import {
   toSelections,
   type SliceState,
   type SliceAction,
 } from '../slice/selection';
+import {
+  itemMatchesLicenseFilter,
+  licenseExceedsFilter,
+  type LicenseFilter,
+} from '../slice/license-filter';
 import { useComposedCharacter } from '../hooks/use-composed-character';
 import { useAnimationPlayer } from '../hooks/use-animation-player';
 import { Button } from './ui/button';
@@ -26,6 +33,9 @@ const DIR_LABELS: Record<Direction, TranslationKey> = {
   right: 'direction.right',
 };
 const ZOOM = 4;
+const LICENSE_OPTIONS: readonly License[] = LICENSE_CONFIG.flatMap(
+  (group) => group.versions,
+);
 
 export function SliceHarness({
   catalog,
@@ -49,6 +59,7 @@ export function SliceHarness({
   onToggleLocale: () => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [licenseFilter, setLicenseFilter] = useState<LicenseFilter>(null);
   const [tokenInput, setTokenInput] = useState('');
   const [tokenStatus, setTokenStatus] = useState<string | null>(null);
   const [tokenError, setTokenError] = useState<string | null>(null);
@@ -74,6 +85,16 @@ export function SliceHarness({
     () => encodeSelectionToken(toSelections(state)),
     [state],
   );
+  const effectiveLicense = useMemo(
+    () =>
+      result.sheet && result.sheet.credits.licenses.length > 0
+        ? computeEffectiveLicense(result.sheet.credits)
+        : null,
+    [result.sheet],
+  );
+  const effectiveLicenseExceedsFilter =
+    effectiveLicense !== null &&
+    licenseExceedsFilter(effectiveLicense, licenseFilter);
 
   async function copyToken(): Promise<void> {
     try {
@@ -127,6 +148,28 @@ export function SliceHarness({
         <aside className="scroll border-r border-border p-3 space-y-3">
           <label className="block text-xs">
             <span className="text-text-mute uppercase">
+              {t('picker.licenseFilter')}
+            </span>
+            <select
+              className="mt-1 w-full bg-surface-2 border border-border rounded p-1"
+              value={licenseFilter ?? ''}
+              onChange={(e) =>
+                setLicenseFilter(
+                  e.target.value === '' ? null : (e.target.value as License),
+                )
+              }
+            >
+              <option value="">{t('picker.allLicenses')}</option>
+              {LICENSE_OPTIONS.map((license) => (
+                <option key={license} value={license}>
+                  {license}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block text-xs">
+            <span className="text-text-mute uppercase">
               {t('picker.bodyType')}
             </span>
             <select
@@ -146,12 +189,24 @@ export function SliceHarness({
 
           {shownTypeNames.map((tn) => {
             const items = catalog.byTypeName.get(tn) ?? [];
+            const selectedName = state.selections[tn]?.name ?? '';
+            const filteredItems = items.filter((it) =>
+              itemMatchesLicenseFilter(it, licenseFilter),
+            );
+            const selectedItem = selectedName
+              ? items.find((it) => it.name === selectedName)
+              : undefined;
+            const shownItems =
+              selectedItem &&
+              !filteredItems.some((it) => it.name === selectedItem.name)
+                ? [...filteredItems, selectedItem]
+                : filteredItems;
             return (
               <label key={tn} className="block text-xs">
                 <span className="text-text-mute uppercase">{tn}</span>
                 <select
                   className="mt-1 w-full bg-surface-2 border border-border rounded p-1"
-                  value={state.selections[tn]?.name ?? ''}
+                  value={selectedName}
                   onChange={(e) => {
                     const name = e.target.value;
                     if (!name) {
@@ -170,9 +225,14 @@ export function SliceHarness({
                   }}
                 >
                   <option value="">— {t('picker.none')} —</option>
-                  {items.map((it) => (
+                  {shownItems.map((it) => (
                     <option key={it.name} value={it.name}>
                       {it.name}
+                      {licenseFilter &&
+                      selectedName === it.name &&
+                      !itemMatchesLicenseFilter(it, licenseFilter)
+                        ? ` (${t('picker.current')})`
+                        : ''}
                     </option>
                   ))}
                 </select>
@@ -289,14 +349,18 @@ export function SliceHarness({
               — {t('attribution.required')}
             </span>
           </h2>
-          {result.sheet && result.sheet.credits.licenses.length > 0 && (
+          {effectiveLicense && (
             <div className="mt-2 rounded border border-border p-2 text-xs">
               <span className="text-text-mute">
                 {t('attribution.effectiveLicense')}{' '}
               </span>
-              <span className="font-bold">
-                {computeEffectiveLicense(result.sheet.credits)}
-              </span>
+              <span className="font-bold">{effectiveLicense}</span>
+              {effectiveLicenseExceedsFilter && licenseFilter && (
+                <div className="mt-2 text-danger">
+                  {t('attribution.licenseExceeded')} {effectiveLicense} &gt;{' '}
+                  {licenseFilter}
+                </div>
+              )}
             </div>
           )}
           <ul className="mt-2 space-y-2">
