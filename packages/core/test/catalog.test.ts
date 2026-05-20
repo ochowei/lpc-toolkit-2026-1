@@ -139,6 +139,23 @@ describe('createCatalog with synthetic records', () => {
     expect(Array.from(catalog.byItemId.keys())).toEqual(['bar']);
   });
 
+  it('preserves the sheet definition source path on ingested items', () => {
+    const { catalog, warnings } = createCatalog({
+      'headwear/hats/magic/hat_magic_large.json': {
+        name: 'Large Magic Hat',
+        type_name: 'hat',
+        animations: ['walk'],
+        credits: [],
+        layer_1: { zPos: 10, male: 'head/hat/magic/large/' },
+      } as unknown as ItemDefinition,
+    });
+
+    expect(warnings).toEqual([]);
+    expect(catalog.byItemId.get('hat_magic_large')?.sourcePath).toBe(
+      'headwear/hats/magic/hat_magic_large.json',
+    );
+  });
+
   it('warns on duplicate itemId and applies last-write-wins', () => {
     const first = mkItem({ name: 'First' });
     const second = mkItem({ name: 'Second' });
@@ -151,8 +168,13 @@ describe('createCatalog with synthetic records', () => {
     expect(warnings).toHaveLength(1);
     expect(warnings[0]!.path).toBe('b/foo.json');
     expect(warnings[0]!.message).toMatch(/duplicate itemId "foo"/);
-    expect(catalog.byItemId.get('foo')).toBe(second);
-    expect(catalog.byTypeName.get('shoes')).toEqual([second]);
+    expect(catalog.byItemId.get('foo')).toEqual({
+      ...second,
+      sourcePath: 'b/foo.json',
+    });
+    expect(catalog.byTypeName.get('shoes')).toEqual([
+      { ...second, sourcePath: 'b/foo.json' },
+    ]);
   });
 
   it('keeps items with same (type_name, name) but different itemIds', () => {

@@ -73,6 +73,7 @@ export type RawRecolors = RecolorConfig | MultiRecolorConfig;
 export interface ItemDefinition {
   readonly name: string;
   readonly type_name: TypeName;
+  readonly sourcePath?: FilePath;
   readonly animations: readonly AnimationName[];
   readonly credits: readonly CreditEntry[];
   readonly recolors?: RawRecolors;

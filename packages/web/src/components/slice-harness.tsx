@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState } from 'react';
+import { useDeferredValue, useMemo, useRef, useState } from 'react';
+import type React from 'react';
 import {
   ANIMATION_CONFIGS,
   BODY_TYPES,
@@ -8,6 +9,7 @@ import {
   LICENSE_CONFIG,
   type Catalog,
   type Direction,
+  type ItemDefinition,
   type License,
 } from '@lpc-toolkit/core';
 import {
@@ -20,10 +22,17 @@ import {
   licenseExceedsFilter,
   type LicenseFilter,
 } from '../slice/license-filter';
+import {
+  buildCatalogTree,
+  itemSupportsBodyType,
+  type CatalogTreeItem,
+  type CatalogTreeNode,
+} from '../slice/catalog-tree';
 import { useComposedCharacter } from '../hooks/use-composed-character';
 import { useAnimationPlayer } from '../hooks/use-animation-player';
 import { Button } from './ui/button';
 import type { Locale, TranslationKey, Translator } from '../i18n';
+import type { AssetSource } from '../adapter/asset-source';
 
 const DIRS: Direction[] = ['up', 'left', 'down', 'right'];
 const DIR_LABELS: Record<Direction, TranslationKey> = {
@@ -31,6 +40,11 @@ const DIR_LABELS: Record<Direction, TranslationKey> = {
   left: 'direction.left',
   down: 'direction.down',
   right: 'direction.right',
+};
+const ASSET_SOURCE_LABELS: Record<AssetSource, TranslationKey> = {
+  auto: 'assetSource.auto',
+  local: 'assetSource.local',
+  upstream: 'assetSource.upstream',
 };
 const ZOOM = 4;
 const LICENSE_OPTIONS: readonly License[] = LICENSE_CONFIG.flatMap(
@@ -44,7 +58,9 @@ export function SliceHarness({
   dispatch,
   theme,
   locale,
+  assetSource,
   t,
+  onAssetSourceChange,
   onToggleTheme,
   onToggleLocale,
 }: {
@@ -54,7 +70,9 @@ export function SliceHarness({
   dispatch: (a: SliceAction) => void;
   theme: 'dark' | 'light';
   locale: Locale;
+  assetSource: AssetSource;
   t: Translator;
+  onAssetSourceChange: (source: AssetSource) => void;
   onToggleTheme: () => void;
   onToggleLocale: () => void;
 }) {
@@ -63,7 +81,19 @@ export function SliceHarness({
   const [tokenInput, setTokenInput] = useState('');
   const [tokenStatus, setTokenStatus] = useState<string | null>(null);
   const [tokenError, setTokenError] = useState<string | null>(null);
-  const result = useComposedCharacter(catalog, state);
+  const [assetSearch, setAssetSearch] = useState('');
+  const catalogTree = useMemo(() => buildCatalogTree(catalog), [catalog]);
+  const itemByTypeAndName = useMemo(() => {
+    const map = new Map<string, ItemDefinition>();
+    for (const [typeName, items] of catalog.byTypeName.entries()) {
+      for (const item of items) {
+        map.set(`${typeName}:${item.name}`, item);
+      }
+    }
+    return map;
+  }, [catalog]);
+  const deferredAssetSearch = useDeferredValue(assetSearch);
+  const result = useComposedCharacter(catalog, state, assetSource);
   useAnimationPlayer(
     canvasRef,
     result.animation,
@@ -125,6 +155,108 @@ export function SliceHarness({
     }
   }
 
+  function pickTreeItem(item: CatalogTreeItem): void {
+    const def = itemByTypeAndName.get(`${item.typeName}:${item.name}`);
+    dispatch({
+      type: 'pick',
+      typeName: item.typeName,
+      name: item.name,
+      ...(def?.variants?.[0] ? { variant: def.variants[0] } : {}),
+    });
+  }
+
+  function treeItemMatches(item: CatalogTreeItem, query: string): boolean {
+    const q = query.trim().toLowerCase();
+    if (q === '') return true;
+    return (
+      item.name.toLowerCase().includes(q) ||
+      item.typeName.toLowerCase().includes(q)
+    );
+  }
+
+  function nodeHasMatches(node: CatalogTreeNode, query: string): boolean {
+    return (
+      node.items.some((item) => treeItemMatches(item, query)) ||
+      Object.values(node.children).some((child) => nodeHasMatches(child, query))
+    );
+  }
+
+  function renderTreeNode(node: CatalogTreeNode, depth = 0): React.ReactNode {
+    const query = deferredAssetSearch.trim();
+    if (query && !nodeHasMatches(node, query)) return null;
+
+    const entries = Object.values(node.children);
+    const visibleItems = node.items.filter((item) =>
+      treeItemMatches(item, query),
+    );
+    const showHeader = node.name !== 'root';
+
+    return (
+      <div key={node.name} className={depth > 0 ? 'ml-3' : undefined}>
+        {showHeader && (
+          <details className="group" open={query !== '' || depth < 1}>
+            <summary className="cursor-pointer py-1 text-xs font-semibold text-text-mute hover:text-text">
+              {node.name}
+            </summary>
+            <div className="space-y-1">
+              {entries.map((child) => renderTreeNode(child, depth + 1))}
+              {visibleItems.map((item) => {
+                const def = itemByTypeAndName.get(
+                  `${item.typeName}:${item.name}`,
+                );
+                const compatible = def
+                  ? itemSupportsBodyType(def, state.bodyType)
+                  : false;
+                const selected =
+                  state.selections[item.typeName]?.name === item.name;
+                return (
+                  <button
+                    key={`${item.typeName}:${item.name}`}
+                    type="button"
+                    disabled={!compatible}
+                    title={
+                      !compatible
+                        ? t('picker.incompatibleBodyType')
+                        : item.typeName
+                    }
+                    className={`block w-full rounded px-2 py-1 text-left text-xs ${
+                      selected
+                        ? 'bg-accent text-accent-contrast'
+                        : compatible
+                          ? 'text-text hover:bg-surface-2'
+                          : 'text-text-dim opacity-60'
+                    }`}
+                    onClick={() => pickTreeItem(item)}
+                  >
+                    <span>{item.name}</span>
+                    <span className="ml-1 text-[10px] text-text-dim">
+                      {item.typeName}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </details>
+        )}
+        {!showHeader && (
+          <div className="space-y-1">
+            {entries.map((child) => renderTreeNode(child, depth + 1))}
+            {visibleItems.map((item) => (
+              <button
+                key={`${item.typeName}:${item.name}`}
+                type="button"
+                className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-surface-2"
+                onClick={() => pickTreeItem(item)}
+              >
+                {item.name}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen flex-col bg-app text-text">
       <header className="flex items-center gap-3 border-b border-border px-4 py-2">
@@ -146,6 +278,32 @@ export function SliceHarness({
       <div className="grid min-h-0 flex-1 grid-cols-[260px_1fr_300px]">
         {/* Left: pickers */}
         <aside className="scroll border-r border-border p-3 space-y-3">
+          <section className="space-y-1 border-b border-border pb-3 text-xs">
+            <div className="text-text-mute uppercase">
+              {t('assetSource.title')}
+            </div>
+            <div className="grid grid-cols-3 gap-1">
+              {(['auto', 'local', 'upstream'] as const).map((source) => (
+                <Button
+                  key={source}
+                  size="sm"
+                  variant={assetSource === source ? 'primary' : 'ghost'}
+                  aria-pressed={assetSource === source}
+                  onClick={() => onAssetSourceChange(source)}
+                >
+                  {t(ASSET_SOURCE_LABELS[source])}
+                </Button>
+              ))}
+            </div>
+            <p className="text-[11px] text-text-dim">
+              {assetSource === 'auto'
+                ? t('assetSource.autoHelp')
+                : assetSource === 'local'
+                  ? t('assetSource.localHelp')
+                  : t('assetSource.upstreamHelp')}
+            </p>
+          </section>
+
           <label className="block text-xs">
             <span className="text-text-mute uppercase">
               {t('picker.licenseFilter')}
@@ -187,58 +345,76 @@ export function SliceHarness({
             </select>
           </label>
 
-          {shownTypeNames.map((tn) => {
-            const items = catalog.byTypeName.get(tn) ?? [];
-            const selectedName = state.selections[tn]?.name ?? '';
-            const filteredItems = items.filter((it) =>
-              itemMatchesLicenseFilter(it, licenseFilter),
-            );
-            const selectedItem = selectedName
-              ? items.find((it) => it.name === selectedName)
-              : undefined;
-            const shownItems =
-              selectedItem &&
-              !filteredItems.some((it) => it.name === selectedItem.name)
-                ? [...filteredItems, selectedItem]
-                : filteredItems;
-            return (
-              <label key={tn} className="block text-xs">
-                <span className="text-text-mute uppercase">{tn}</span>
-                <select
-                  className="mt-1 w-full bg-surface-2 border border-border rounded p-1"
-                  value={selectedName}
-                  onChange={(e) => {
-                    const name = e.target.value;
-                    if (!name) {
-                      dispatch({ type: 'clear', typeName: tn });
-                      return;
-                    }
-                    const item = items.find((it) => it.name === name);
-                    dispatch({
-                      type: 'pick',
-                      typeName: tn,
-                      name,
-                      ...(item?.variants?.[0]
-                        ? { variant: item.variants[0] }
-                        : {}),
-                    });
-                  }}
-                >
-                  <option value="">— {t('picker.none')} —</option>
-                  {shownItems.map((it) => (
-                    <option key={it.name} value={it.name}>
-                      {it.name}
-                      {licenseFilter &&
-                      selectedName === it.name &&
-                      !itemMatchesLicenseFilter(it, licenseFilter)
-                        ? ` (${t('picker.current')})`
-                        : ''}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            );
-          })}
+          <section className="space-y-3 border-b border-border pb-3">
+            <h2 className="text-xs font-bold uppercase">
+              {t('picker.common')}
+            </h2>
+            {shownTypeNames.map((tn) => {
+              const items = catalog.byTypeName.get(tn) ?? [];
+              const selectedName = state.selections[tn]?.name ?? '';
+              const filteredItems = items.filter((it) =>
+                itemMatchesLicenseFilter(it, licenseFilter),
+              );
+              const selectedItem = selectedName
+                ? items.find((it) => it.name === selectedName)
+                : undefined;
+              const shownItems =
+                selectedItem &&
+                !filteredItems.some((it) => it.name === selectedItem.name)
+                  ? [...filteredItems, selectedItem]
+                  : filteredItems;
+              return (
+                <label key={tn} className="block text-xs">
+                  <span className="text-text-mute uppercase">{tn}</span>
+                  <select
+                    className="mt-1 w-full bg-surface-2 border border-border rounded p-1"
+                    value={selectedName}
+                    onChange={(e) => {
+                      const name = e.target.value;
+                      if (!name) {
+                        dispatch({ type: 'clear', typeName: tn });
+                        return;
+                      }
+                      const item = items.find((it) => it.name === name);
+                      dispatch({
+                        type: 'pick',
+                        typeName: tn,
+                        name,
+                        ...(item?.variants?.[0]
+                          ? { variant: item.variants[0] }
+                          : {}),
+                      });
+                    }}
+                  >
+                    <option value="">— {t('picker.none')} —</option>
+                    {shownItems.map((it) => (
+                      <option key={it.name} value={it.name}>
+                        {it.name}
+                        {licenseFilter &&
+                        selectedName === it.name &&
+                        !itemMatchesLicenseFilter(it, licenseFilter)
+                          ? ` (${t('picker.current')})`
+                          : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              );
+            })}
+          </section>
+
+          <section className="space-y-2">
+            <h2 className="text-xs font-bold uppercase">
+              {t('picker.advanced')}
+            </h2>
+            <input
+              className="w-full rounded border border-border bg-surface-2 p-1 text-xs"
+              value={assetSearch}
+              placeholder={t('picker.searchAssets')}
+              onChange={(e) => setAssetSearch(e.target.value)}
+            />
+            <div className="space-y-1">{renderTreeNode(catalogTree)}</div>
+          </section>
         </aside>
 
         {/* Center: preview */}

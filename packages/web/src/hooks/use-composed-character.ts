@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   composeSelections,
   extractAnimation,
@@ -7,6 +7,7 @@ import {
   type ComposedSheet,
 } from '@lpc-toolkit/core';
 import { createBrowserCanvasAdapter } from '../adapter/browser-canvas-adapter';
+import type { AssetSource } from '../adapter/asset-source';
 import { toSelections, type SliceState } from '../slice/selection';
 
 export interface ComposedResult {
@@ -16,8 +17,6 @@ export interface ComposedResult {
   readonly animation: ComposedAnimation | null;
   readonly error: string | null;
 }
-
-const adapter = createBrowserCanvasAdapter();
 
 /**
  * The animation to show: the requested one if it was composed, else the
@@ -42,7 +41,12 @@ function resolveAnim(sheet: ComposedSheet, anim: string): string {
 export function useComposedCharacter(
   catalog: Catalog,
   state: SliceState,
+  assetSource: AssetSource,
 ): ComposedResult {
+  const adapter = useMemo(
+    () => createBrowserCanvasAdapter(assetSource),
+    [assetSource],
+  );
   const [result, setResult] = useState<ComposedResult>({
     status: 'idle',
     progress: 0,
@@ -103,7 +107,7 @@ export function useComposedCharacter(
       });
     // key encodes the selection-relevant state (anim handled by Effect 2).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [catalog, key]);
+  }, [adapter, catalog, key]);
 
   // Anim change: cheap re-extract off the current sheet (no recompose).
   useEffect(() => {
@@ -117,7 +121,7 @@ export function useComposedCharacter(
     setResult((r) =>
       r.status === 'ready' && r.sheet === sheet ? { ...r, animation } : r,
     );
-  }, [state.anim]);
+  }, [adapter, state.anim]);
 
   return result;
 }

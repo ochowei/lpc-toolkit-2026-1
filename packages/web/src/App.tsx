@@ -10,10 +10,12 @@ import {
   createTranslator,
   type Locale,
 } from './i18n';
+import type { AssetSource } from './adapter/asset-source';
 
 export default function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE);
+  const [assetSource, setAssetSource] = useState<AssetSource>('auto');
 
   const init = useMemo(() => {
     const catalog = loadCatalogFromUpstream();
@@ -34,7 +36,9 @@ export default function App() {
       dispatch={dispatch}
       theme={theme}
       locale={locale}
+      assetSource={assetSource}
       t={t}
+      onAssetSourceChange={setAssetSource}
       onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
       onToggleLocale={() =>
         setLocale((current) => (current === 'en' ? 'zh-TW' : 'en'))
