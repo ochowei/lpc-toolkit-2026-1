@@ -166,6 +166,7 @@ export function SliceHarness({
                   key={source}
                   size="sm"
                   variant={assetSource === source ? 'primary' : 'ghost'}
+                  aria-pressed={assetSource === source}
                   onClick={() => onAssetSourceChange(source)}
                 >
                   {t(ASSET_SOURCE_LABELS[source])}
