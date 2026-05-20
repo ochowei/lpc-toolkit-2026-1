@@ -380,6 +380,16 @@ export function SliceHarness({
               </li>
             ))}
           </ul>
+          <p className="mt-3 border-t border-border pt-3 text-xs text-text-mute">
+            <a
+              className="underline decoration-border underline-offset-2 hover:text-text"
+              href="https://liberatedpixelcup.github.io/Universal-LPC-Spritesheet-Character-Generator/"
+              target="_blank"
+              rel="noreferrer"
+            >
+              {t('source.project')}
+            </a>
+          </p>
         </aside>
       </div>
     </div>

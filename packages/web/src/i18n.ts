@@ -1,6 +1,8 @@
 export const TRANSLATIONS = {
   en: {
     'app.subtitle': 'foundation slice',
+    'source.project':
+      'Based on Universal LPC Spritesheet Character Generator',
     'theme.light': 'Light',
     'theme.dark': 'Dark',
     'language.toChinese': '中文',
@@ -37,6 +39,8 @@ export const TRANSLATIONS = {
   },
   'zh-TW': {
     'app.subtitle': '基礎切片',
+    'source.project':
+      '本專案源自 Universal LPC Spritesheet Character Generator',
     'theme.light': '淺色',
     'theme.dark': '深色',
     'language.toChinese': '中文',
