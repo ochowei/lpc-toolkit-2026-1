@@ -19,3 +19,6 @@ packages/web/public/spritesheets/
 
 # Superpowers brainstorming companion artifacts
 .superpowers/
+
+# Local implementation worktrees
+.worktrees/
