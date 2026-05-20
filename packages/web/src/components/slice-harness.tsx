@@ -151,16 +151,23 @@ export function SliceHarness({
                 <span className="text-text-mute uppercase">{tn}</span>
                 <select
                   className="mt-1 w-full bg-surface-2 border border-border rounded p-1"
-                  value={state.selections[tn] ?? ''}
-                  onChange={(e) =>
-                    e.target.value
-                      ? dispatch({
-                          type: 'pick',
-                          typeName: tn,
-                          name: e.target.value,
-                        })
-                      : dispatch({ type: 'clear', typeName: tn })
-                  }
+                  value={state.selections[tn]?.name ?? ''}
+                  onChange={(e) => {
+                    const name = e.target.value;
+                    if (!name) {
+                      dispatch({ type: 'clear', typeName: tn });
+                      return;
+                    }
+                    const item = items.find((it) => it.name === name);
+                    dispatch({
+                      type: 'pick',
+                      typeName: tn,
+                      name,
+                      ...(item?.variants?.[0]
+                        ? { variant: item.variants[0] }
+                        : {}),
+                    });
+                  }}
                 >
                   <option value="">— {t('picker.none')} —</option>
                   {items.map((it) => (

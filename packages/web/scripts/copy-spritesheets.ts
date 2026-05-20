@@ -18,7 +18,11 @@ import {
   type ItemDefinition,
   type Selections,
 } from '@lpc-toolkit/core';
-import { pickInitialSelections, toSelections } from '../src/slice/selection';
+import {
+  pickInitialSelections,
+  selectionForItem,
+  toSelections,
+} from '../src/slice/selection';
 import { dirsForSelections } from '../src/slice/sprite-dirs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -70,7 +74,7 @@ for (const tn of shownTypeNames) {
   for (const item of catalog.byTypeName.get(tn) ?? []) {
     const sel: Selections = {
       bodyType: state.bodyType,
-      items: { [tn]: { typeName: tn, name: item.name } },
+      items: { [tn]: selectionForItem(tn, item) },
     };
     for (const d of dirsForSelections(catalog, sel)) dirs.add(d);
   }

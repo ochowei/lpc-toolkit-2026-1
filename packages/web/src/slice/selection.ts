@@ -5,14 +5,14 @@ import {
   type Catalog,
   type Direction,
   type ItemDefinition,
+  type Selection,
   type Selections,
   type TypeName,
 } from '@lpc-toolkit/core';
 
 export interface SliceState {
   readonly bodyType: BodyType;
-  /** typeName -> ItemDefinition.name (raw name, what core's Selection wants). */
-  readonly selections: Readonly<Record<TypeName, string>>;
+  readonly selections: Readonly<Record<TypeName, Selection>>;
   readonly anim: AnimationName;
   readonly dir: Direction;
   readonly playing: boolean;
@@ -20,7 +20,13 @@ export interface SliceState {
 
 export type SliceAction =
   | { type: 'set_body_type'; bodyType: BodyType }
-  | { type: 'pick'; typeName: TypeName; name: string }
+  | {
+      type: 'pick';
+      typeName: TypeName;
+      name: string;
+      variant?: string;
+      recolor?: string;
+    }
   | { type: 'clear'; typeName: TypeName }
   | { type: 'apply_selections'; selections: Selections }
   | { type: 'set_anim'; anim: AnimationName }
@@ -34,7 +40,15 @@ export function sliceReducer(s: SliceState, a: SliceAction): SliceState {
     case 'pick':
       return {
         ...s,
-        selections: { ...s.selections, [a.typeName]: a.name },
+        selections: {
+          ...s.selections,
+          [a.typeName]: {
+            typeName: a.typeName,
+            name: a.name,
+            ...(a.variant ? { variant: a.variant } : {}),
+            ...(a.recolor ? { recolor: a.recolor } : {}),
+          },
+        },
       };
     case 'clear': {
       const next = { ...s.selections };
@@ -42,9 +56,9 @@ export function sliceReducer(s: SliceState, a: SliceAction): SliceState {
       return { ...s, selections: next };
     }
     case 'apply_selections': {
-      const selections: Record<TypeName, string> = {};
+      const selections: Record<TypeName, Selection> = {};
       for (const [typeName, item] of Object.entries(a.selections.items)) {
-        selections[typeName] = item.name;
+        selections[typeName] = item;
       }
       return {
         ...s,
@@ -63,13 +77,24 @@ export function sliceReducer(s: SliceState, a: SliceAction): SliceState {
   }
 }
 
-/** Core's Selection requires `name` to equal ItemDefinition.name; no variant. */
+/** Core's Selection requires `name` to equal ItemDefinition.name. */
 export function toSelections(state: SliceState): Selections {
-  const items: Record<TypeName, { typeName: TypeName; name: string }> = {};
-  for (const [typeName, name] of Object.entries(state.selections)) {
-    if (name) items[typeName] = { typeName, name };
+  const items: Record<TypeName, Selection> = {};
+  for (const [typeName, selection] of Object.entries(state.selections)) {
+    if (selection.name) items[typeName] = selection;
   }
   return { bodyType: state.bodyType, items };
+}
+
+export function selectionForItem(
+  typeName: TypeName,
+  item: ItemDefinition,
+): Selection {
+  return {
+    typeName,
+    name: item.name,
+    ...(item.variants?.[0] ? { variant: item.variants[0] } : {}),
+  };
 }
 
 const PREFERRED: readonly TypeName[] = [
@@ -104,30 +129,32 @@ export function pickInitialSelections(catalog: Catalog): {
 } {
   const bodies = catalog.byTypeName.get('body') ?? [];
   let bodyType: BodyType | undefined;
-  let bodyName: string | undefined;
+  let bodyItem: ItemDefinition | undefined;
   for (const bt of BODY_TYPES) {
     const item = bodies.find((i) => supportsBodyType(i, bt));
     if (item) {
       bodyType = bt;
-      bodyName = item.name;
+      bodyItem = item;
       break;
     }
   }
-  if (!bodyType || !bodyName) {
+  if (!bodyType || !bodyItem) {
     throw new Error(
       'pickInitialSelections: no "body" item supports any standard body type',
     );
   }
 
   const shownTypeNames: TypeName[] = ['body'];
-  const selections: Record<TypeName, string> = { body: bodyName };
+  const selections: Record<TypeName, Selection> = {
+    body: selectionForItem('body', bodyItem),
+  };
   for (const tn of PREFERRED) {
     if (tn === 'body') continue;
     const items = catalog.byTypeName.get(tn);
     if (!items || items.length === 0) continue;
     shownTypeNames.push(tn);
     const first = items.find((i) => supportsBodyType(i, bodyType!));
-    if (first) selections[tn] = first.name;
+    if (first) selections[tn] = selectionForItem(tn, first);
   }
 
   return {

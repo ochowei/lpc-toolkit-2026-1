@@ -31,8 +31,14 @@ describe('pickInitialSelections', () => {
   it('picks a body + first item of each available preferred type', () => {
     const { state, shownTypeNames } = pickInitialSelections(catalog);
     expect(state.bodyType).toBe('male');
-    expect(state.selections['body']).toBe('Body A');
-    expect(state.selections['hair']).toBe('Hair A');
+    expect(state.selections['body']).toEqual({
+      typeName: 'body',
+      name: 'Body A',
+    });
+    expect(state.selections['hair']).toEqual({
+      typeName: 'hair',
+      name: 'Hair A',
+    });
     expect(shownTypeNames).toContain('body');
     expect(shownTypeNames).toContain('hair');
     expect(state.anim).toBe('walk');
@@ -44,7 +50,10 @@ describe('toSelections', () => {
   it('maps state to core Selections using ItemDefinition.name, no variant', () => {
     const state: SliceState = {
       bodyType: 'male',
-      selections: { body: 'Body A', hair: 'Hair A' },
+      selections: {
+        body: { typeName: 'body', name: 'Body A' },
+        hair: { typeName: 'hair', name: 'Hair A' },
+      },
       anim: 'walk',
       dir: 'down',
       playing: true,
@@ -60,13 +69,16 @@ describe('sliceReducer', () => {
   it('pick sets, clear removes', () => {
     const s0: SliceState = {
       bodyType: 'male',
-      selections: { body: 'Body A' },
+      selections: { body: { typeName: 'body', name: 'Body A' } },
       anim: 'walk',
       dir: 'down',
       playing: true,
     };
     const s1 = sliceReducer(s0, { type: 'pick', typeName: 'hair', name: 'Hair B' });
-    expect(s1.selections['hair']).toBe('Hair B');
+    expect(s1.selections['hair']).toEqual({
+      typeName: 'hair',
+      name: 'Hair B',
+    });
     const s2 = sliceReducer(s1, { type: 'clear', typeName: 'hair' });
     expect('hair' in s2.selections).toBe(false);
   });
@@ -74,7 +86,10 @@ describe('sliceReducer', () => {
   it('applies decoded selections without resetting preview controls', () => {
     const s0: SliceState = {
       bodyType: 'male',
-      selections: { body: 'Body A', hair: 'Hair A' },
+      selections: {
+        body: { typeName: 'body', name: 'Body A' },
+        hair: { typeName: 'hair', name: 'Hair A' },
+      },
       anim: 'slash',
       dir: 'left',
       playing: false,
@@ -93,10 +108,39 @@ describe('sliceReducer', () => {
 
     expect(s1).toEqual({
       bodyType: 'female',
-      selections: { body: 'Body B', hair: 'Hair B' },
+      selections: {
+        body: { typeName: 'body', name: 'Body B' },
+        hair: { typeName: 'hair', name: 'Hair B', variant: 'blue' },
+      },
       anim: 'slash',
       dir: 'left',
       playing: false,
+    });
+  });
+
+  it('preserves decoded selection variants for sprite path composition', () => {
+    const s0: SliceState = {
+      bodyType: 'male',
+      selections: { body: { typeName: 'body', name: 'Body A' } },
+      anim: 'walk',
+      dir: 'down',
+      playing: true,
+    };
+
+    const s1 = sliceReducer(s0, {
+      type: 'apply_selections',
+      selections: {
+        bodyType: 'male',
+        items: {
+          body: { typeName: 'body', name: 'Skeleton', variant: 'skeleton' },
+        },
+      },
+    });
+
+    expect(toSelections(s1).items['body']).toEqual({
+      typeName: 'body',
+      name: 'Skeleton',
+      variant: 'skeleton',
     });
   });
 });
