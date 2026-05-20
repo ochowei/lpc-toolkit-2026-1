@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { ItemDefinition } from '@lpc-toolkit/core';
-import { recordsToCatalog } from '../src/catalog/load-catalog';
+import {
+  normalizeUpstreamKey,
+  recordsToCatalog,
+} from '../src/catalog/load-catalog';
 
 const item: ItemDefinition = {
   name: 'Plain',
@@ -17,5 +20,19 @@ describe('recordsToCatalog', () => {
     });
     expect(catalog.byTypeName.get('hair')?.[0]?.name).toBe('Plain');
     expect(warnings).toEqual([]);
+  });
+});
+
+describe('normalizeUpstreamKey', () => {
+  it('strips the vite glob prefix preceding upstream/sheet_definitions/', () => {
+    expect(
+      normalizeUpstreamKey(
+        '../../../../upstream/sheet_definitions/headwear/hats/magic/hat_magic_large.json',
+      ),
+    ).toBe('headwear/hats/magic/hat_magic_large.json');
+  });
+
+  it('returns the path unchanged when the upstream prefix is absent', () => {
+    expect(normalizeUpstreamKey('headwear/hat.json')).toBe('headwear/hat.json');
   });
 });

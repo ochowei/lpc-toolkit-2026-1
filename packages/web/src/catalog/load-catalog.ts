@@ -12,6 +12,16 @@ export function recordsToCatalog(
   return createCatalog(records);
 }
 
+const UPSTREAM_PREFIX = 'upstream/sheet_definitions/';
+
+// Vite's `import.meta.glob` keys are relative to this file
+// (e.g. `../../../../upstream/sheet_definitions/headwear/...`). Strip that
+// leading noise so `sourcePath` reflects the path inside the upstream root.
+export function normalizeUpstreamKey(key: string): string {
+  const idx = key.lastIndexOf(UPSTREAM_PREFIX);
+  return idx >= 0 ? key.slice(idx + UPSTREAM_PREFIX.length) : key;
+}
+
 /**
  * Build the catalog from the read-only `upstream/` submodule. The glob is
  * static and relative: from packages/web/src/catalog/ the repo root is four
@@ -27,7 +37,9 @@ export function loadCatalogFromUpstream(): Catalog {
     { eager: true, import: 'default' },
   );
   const records: Record<FilePath, ItemDefinition> = {};
-  for (const [key, def] of Object.entries(mods)) records[key] = def;
+  for (const [key, def] of Object.entries(mods)) {
+    records[normalizeUpstreamKey(key)] = def;
+  }
 
   if (Object.keys(records).length === 0) {
     throw new Error(
