@@ -1,5 +1,11 @@
 import type { CanvasAdapter, CanvasLike, ImageLike } from './adapters.js';
-import { ANIMATIONS, ANIMATION_OFFSETS, SHEET_HEIGHT, SHEET_WIDTH } from './constants.js';
+import {
+  ANIMATIONS,
+  ANIMATION_DEFAULTS,
+  ANIMATION_OFFSETS,
+  SHEET_HEIGHT,
+  SHEET_WIDTH,
+} from './constants.js';
 import { getCredits } from './credits.js';
 import {
   customAnimationBase,
@@ -153,7 +159,7 @@ function resolveLayers(
         item,
         basePath,
         zPos: layer.zPos,
-        animations: item.animations ?? [],
+        animations: item.animations ?? ANIMATION_DEFAULTS,
         ...(sel.variant ? { variant: sel.variant } : {}),
         ...(layer.custom_animation
           ? { customAnimation: layer.custom_animation }
