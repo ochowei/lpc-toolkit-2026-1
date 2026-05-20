@@ -28,6 +28,9 @@ export interface ParseHashResult {
 }
 
 const DEFAULT_BODY_TYPE: BodyType = 'male';
+const SELECTION_TOKEN_PREFIX = 'v1.';
+const BASE64URL_ALPHABET =
+  'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 
 function stripHashPrefix(hash: string): string {
   let s = hash;
@@ -254,4 +257,68 @@ export function serializeHash(selections: Selections): string {
     parts.push(`${encodeURIComponent(typeName)}=${encodeURIComponent(value)}`);
   }
   return parts.join('&');
+}
+
+function encodeBase64UrlAscii(s: string): string {
+  let out = '';
+  for (let i = 0; i < s.length; i += 3) {
+    const b1 = s.charCodeAt(i);
+    const b2 = i + 1 < s.length ? s.charCodeAt(i + 1) : 0;
+    const b3 = i + 2 < s.length ? s.charCodeAt(i + 2) : 0;
+    if (b1 > 0x7f || b2 > 0x7f || b3 > 0x7f) {
+      throw new Error('Selection token payload must be ASCII');
+    }
+
+    const n = (b1 << 16) | (b2 << 8) | b3;
+    out += BASE64URL_ALPHABET[(n >> 18) & 63];
+    out += BASE64URL_ALPHABET[(n >> 12) & 63];
+    if (i + 1 < s.length) out += BASE64URL_ALPHABET[(n >> 6) & 63];
+    if (i + 2 < s.length) out += BASE64URL_ALPHABET[n & 63];
+  }
+  return out;
+}
+
+function decodeBase64UrlAscii(s: string): string {
+  if (s.length === 0 || s.length % 4 === 1) {
+    throw new Error('Malformed selection token');
+  }
+
+  const bytes: number[] = [];
+  let buffer = 0;
+  let bits = 0;
+  for (const ch of s) {
+    const value = BASE64URL_ALPHABET.indexOf(ch);
+    if (value < 0) throw new Error('Malformed selection token');
+    buffer = (buffer << 6) | value;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      bytes.push((buffer >> bits) & 0xff);
+    }
+  }
+
+  for (const byte of bytes) {
+    if (byte > 0x7f) throw new Error('Malformed selection token');
+  }
+  return String.fromCharCode(...bytes);
+}
+
+export function encodeSelectionToken(selections: Selections): string {
+  return `${SELECTION_TOKEN_PREFIX}${encodeBase64UrlAscii(
+    serializeHash(selections),
+  )}`;
+}
+
+export function decodeSelectionToken(
+  token: string,
+  catalog: Catalog,
+  palettes?: PaletteMetadata,
+): ParseHashResult {
+  const trimmed = token.trim();
+  if (!trimmed.startsWith(SELECTION_TOKEN_PREFIX)) {
+    throw new Error('Unsupported selection token version');
+  }
+  const hash = decodeBase64UrlAscii(trimmed.slice(SELECTION_TOKEN_PREFIX.length));
+  if (!hash.includes('=')) throw new Error('Malformed selection token');
+  return parseHash(hash, catalog, palettes);
 }

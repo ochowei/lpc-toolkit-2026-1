@@ -70,4 +70,33 @@ describe('sliceReducer', () => {
     const s2 = sliceReducer(s1, { type: 'clear', typeName: 'hair' });
     expect('hair' in s2.selections).toBe(false);
   });
+
+  it('applies decoded selections without resetting preview controls', () => {
+    const s0: SliceState = {
+      bodyType: 'male',
+      selections: { body: 'Body A', hair: 'Hair A' },
+      anim: 'slash',
+      dir: 'left',
+      playing: false,
+    };
+
+    const s1 = sliceReducer(s0, {
+      type: 'apply_selections',
+      selections: {
+        bodyType: 'female',
+        items: {
+          body: { typeName: 'body', name: 'Body B' },
+          hair: { typeName: 'hair', name: 'Hair B', variant: 'blue' },
+        },
+      },
+    });
+
+    expect(s1).toEqual({
+      bodyType: 'female',
+      selections: { body: 'Body B', hair: 'Hair B' },
+      anim: 'slash',
+      dir: 'left',
+      playing: false,
+    });
+  });
 });

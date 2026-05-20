@@ -1,12 +1,18 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   ANIMATION_CONFIGS,
   BODY_TYPES,
   computeEffectiveLicense,
+  decodeSelectionToken,
+  encodeSelectionToken,
   type Catalog,
   type Direction,
 } from '@lpc-toolkit/core';
-import type { SliceState, SliceAction } from '../slice/selection';
+import {
+  toSelections,
+  type SliceState,
+  type SliceAction,
+} from '../slice/selection';
 import { useComposedCharacter } from '../hooks/use-composed-character';
 import { useAnimationPlayer } from '../hooks/use-animation-player';
 import { Button } from './ui/button';
@@ -43,6 +49,9 @@ export function SliceHarness({
   onToggleLocale: () => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [tokenInput, setTokenInput] = useState('');
+  const [tokenStatus, setTokenStatus] = useState<string | null>(null);
+  const [tokenError, setTokenError] = useState<string | null>(null);
   const result = useComposedCharacter(catalog, state);
   useAnimationPlayer(
     canvasRef,
@@ -61,6 +70,39 @@ export function SliceHarness({
   );
 
   const failed = result.status === 'error';
+  const currentToken = useMemo(
+    () => encodeSelectionToken(toSelections(state)),
+    [state],
+  );
+
+  async function copyToken(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(currentToken);
+      setTokenError(null);
+      setTokenStatus(t('token.copied'));
+    } catch {
+      setTokenStatus(null);
+      setTokenError(t('token.copyFailed'));
+    }
+  }
+
+  function applyToken(): void {
+    try {
+      const decoded = decodeSelectionToken(tokenInput, catalog);
+      if (decoded.warnings.length > 0) {
+        setTokenStatus(null);
+        setTokenError(t('token.unresolved'));
+        return;
+      }
+      dispatch({ type: 'apply_selections', selections: decoded.selections });
+      setTokenInput('');
+      setTokenError(null);
+      setTokenStatus(t('token.applied'));
+    } catch {
+      setTokenStatus(null);
+      setTokenError(t('token.invalid'));
+    }
+  }
 
   return (
     <div className="flex h-screen flex-col bg-app text-text">
@@ -182,8 +224,57 @@ export function SliceHarness({
           </div>
         </main>
 
-        {/* Right: attribution */}
+        {/* Right: token + attribution */}
         <aside className="scroll border-l border-border p-3">
+          <section className="border-b border-border pb-3">
+            <h2 className="text-xs font-bold uppercase">
+              {t('token.title')}
+            </h2>
+            <label className="mt-2 block text-xs">
+              <span className="text-text-mute uppercase">
+                {t('token.current')}
+              </span>
+              <textarea
+                className="mt-1 h-20 w-full resize-none rounded border border-border bg-surface-2 p-2 font-mono text-[11px]"
+                readOnly
+                value={currentToken}
+              />
+            </label>
+            <Button size="sm" variant="ghost" onClick={copyToken}>
+              {t('token.copy')}
+            </Button>
+            <label className="mt-3 block text-xs">
+              <span className="text-text-mute uppercase">
+                {t('token.input')}
+              </span>
+              <textarea
+                className="mt-1 h-20 w-full resize-none rounded border border-border bg-surface-2 p-2 font-mono text-[11px]"
+                value={tokenInput}
+                onChange={(e) => {
+                  setTokenInput(e.target.value);
+                  setTokenError(null);
+                  setTokenStatus(null);
+                }}
+              />
+            </label>
+            <Button
+              size="sm"
+              disabled={tokenInput.trim() === ''}
+              onClick={applyToken}
+            >
+              {t('token.apply')}
+            </Button>
+            {(tokenStatus || tokenError) && (
+              <div
+                className={`mt-2 text-xs ${
+                  tokenError ? 'text-danger' : 'text-text-mute'
+                }`}
+              >
+                {tokenError ?? tokenStatus}
+              </div>
+            )}
+          </section>
+
           <h2 className="text-xs font-bold uppercase">
             {t('attribution.title')}
             <span className="text-text-mute">
