@@ -36,5 +36,10 @@ describe('i18n', () => {
     expect(zh('assetSource.title')).toBe('圖片來源');
     expect(zh('assetSource.auto')).toBe('自動');
     expect(zh('assetSource.upstream')).toBe('上游');
+
+    expect(en('picker.common')).toBe('Common');
+    expect(en('picker.advanced')).toBe('Advanced: all upstream assets');
+    expect(en('picker.searchAssets')).toBe('Search all assets');
+    expect(zh('picker.advanced')).toBe('進階：所有上游素材');
   });
 });
