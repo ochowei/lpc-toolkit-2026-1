@@ -24,6 +24,7 @@ import { useComposedCharacter } from '../hooks/use-composed-character';
 import { useAnimationPlayer } from '../hooks/use-animation-player';
 import { Button } from './ui/button';
 import type { Locale, TranslationKey, Translator } from '../i18n';
+import type { AssetSource } from '../adapter/asset-source';
 
 const DIRS: Direction[] = ['up', 'left', 'down', 'right'];
 const DIR_LABELS: Record<Direction, TranslationKey> = {
@@ -31,6 +32,11 @@ const DIR_LABELS: Record<Direction, TranslationKey> = {
   left: 'direction.left',
   down: 'direction.down',
   right: 'direction.right',
+};
+const ASSET_SOURCE_LABELS: Record<AssetSource, TranslationKey> = {
+  auto: 'assetSource.auto',
+  local: 'assetSource.local',
+  upstream: 'assetSource.upstream',
 };
 const ZOOM = 4;
 const LICENSE_OPTIONS: readonly License[] = LICENSE_CONFIG.flatMap(
@@ -44,7 +50,9 @@ export function SliceHarness({
   dispatch,
   theme,
   locale,
+  assetSource,
   t,
+  onAssetSourceChange,
   onToggleTheme,
   onToggleLocale,
 }: {
@@ -54,7 +62,9 @@ export function SliceHarness({
   dispatch: (a: SliceAction) => void;
   theme: 'dark' | 'light';
   locale: Locale;
+  assetSource: AssetSource;
   t: Translator;
+  onAssetSourceChange: (source: AssetSource) => void;
   onToggleTheme: () => void;
   onToggleLocale: () => void;
 }) {
@@ -63,7 +73,7 @@ export function SliceHarness({
   const [tokenInput, setTokenInput] = useState('');
   const [tokenStatus, setTokenStatus] = useState<string | null>(null);
   const [tokenError, setTokenError] = useState<string | null>(null);
-  const result = useComposedCharacter(catalog, state);
+  const result = useComposedCharacter(catalog, state, assetSource);
   useAnimationPlayer(
     canvasRef,
     result.animation,
@@ -146,6 +156,31 @@ export function SliceHarness({
       <div className="grid min-h-0 flex-1 grid-cols-[260px_1fr_300px]">
         {/* Left: pickers */}
         <aside className="scroll border-r border-border p-3 space-y-3">
+          <section className="space-y-1 border-b border-border pb-3 text-xs">
+            <div className="text-text-mute uppercase">
+              {t('assetSource.title')}
+            </div>
+            <div className="grid grid-cols-3 gap-1">
+              {(['auto', 'local', 'upstream'] as const).map((source) => (
+                <Button
+                  key={source}
+                  size="sm"
+                  variant={assetSource === source ? 'primary' : 'ghost'}
+                  onClick={() => onAssetSourceChange(source)}
+                >
+                  {t(ASSET_SOURCE_LABELS[source])}
+                </Button>
+              ))}
+            </div>
+            <p className="text-[11px] text-text-dim">
+              {assetSource === 'auto'
+                ? t('assetSource.autoHelp')
+                : assetSource === 'local'
+                  ? t('assetSource.localHelp')
+                  : t('assetSource.upstreamHelp')}
+            </p>
+          </section>
+
           <label className="block text-xs">
             <span className="text-text-mute uppercase">
               {t('picker.licenseFilter')}

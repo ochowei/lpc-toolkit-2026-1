@@ -27,8 +27,11 @@ describe('i18n', () => {
     expect(en('controls.play')).toBe('Play');
     expect(en('direction.left')).toBe('Left');
     expect(en('language.toChinese')).toBe('中文');
+    expect(en('assetSource.title')).toBe('Sprite source');
+    expect(en('assetSource.auto')).toBe('Auto');
     expect(zh('controls.play')).toBe('播放');
     expect(zh('direction.left')).toBe('左');
     expect(zh('language.toEnglish')).toBe('English');
+    expect(zh('assetSource.upstream')).toBe('上游');
   });
 });
