@@ -17,6 +17,7 @@ describe('i18n', () => {
 
     expect(chineseKeys).toEqual(englishKeys);
     expect(englishKeys).toContain('app.subtitle' satisfies TranslationKey);
+    expect(englishKeys).toContain('source.project');
   });
 
   it('translates representative labels', () => {
