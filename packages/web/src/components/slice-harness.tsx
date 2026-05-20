@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useDeferredValue, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import {
   ANIMATION_CONFIGS,
@@ -9,6 +9,7 @@ import {
   LICENSE_CONFIG,
   type Catalog,
   type Direction,
+  type ItemDefinition,
   type License,
 } from '@lpc-toolkit/core';
 import {
@@ -82,6 +83,16 @@ export function SliceHarness({
   const [tokenError, setTokenError] = useState<string | null>(null);
   const [assetSearch, setAssetSearch] = useState('');
   const catalogTree = useMemo(() => buildCatalogTree(catalog), [catalog]);
+  const itemByTypeAndName = useMemo(() => {
+    const map = new Map<string, ItemDefinition>();
+    for (const [typeName, items] of catalog.byTypeName.entries()) {
+      for (const item of items) {
+        map.set(`${typeName}:${item.name}`, item);
+      }
+    }
+    return map;
+  }, [catalog]);
+  const deferredAssetSearch = useDeferredValue(assetSearch);
   const result = useComposedCharacter(catalog, state, assetSource);
   useAnimationPlayer(
     canvasRef,
@@ -145,8 +156,7 @@ export function SliceHarness({
   }
 
   function pickTreeItem(item: CatalogTreeItem): void {
-    const items = catalog.byTypeName.get(item.typeName) ?? [];
-    const def = items.find((it) => it.name === item.name);
+    const def = itemByTypeAndName.get(`${item.typeName}:${item.name}`);
     dispatch({
       type: 'pick',
       typeName: item.typeName,
@@ -172,7 +182,7 @@ export function SliceHarness({
   }
 
   function renderTreeNode(node: CatalogTreeNode, depth = 0): React.ReactNode {
-    const query = assetSearch.trim();
+    const query = deferredAssetSearch.trim();
     if (query && !nodeHasMatches(node, query)) return null;
 
     const entries = Object.values(node.children);
@@ -191,8 +201,8 @@ export function SliceHarness({
             <div className="space-y-1">
               {entries.map((child) => renderTreeNode(child, depth + 1))}
               {visibleItems.map((item) => {
-                const def = (catalog.byTypeName.get(item.typeName) ?? []).find(
-                  (it) => it.name === item.name,
+                const def = itemByTypeAndName.get(
+                  `${item.typeName}:${item.name}`,
                 );
                 const compatible = def
                   ? itemSupportsBodyType(def, state.bodyType)
