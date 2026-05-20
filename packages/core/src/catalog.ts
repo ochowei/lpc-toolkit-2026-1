@@ -200,17 +200,19 @@ export function createCatalog(
       }
     }
 
-    byItemId.set(itemId, def);
+    const item: ItemDefinition = { ...def, sourcePath: filePath };
+
+    byItemId.set(itemId, item);
     itemIdSource.set(itemId, filePath);
 
-    const typeList = byTypeName.get(def.type_name);
+    const typeList = byTypeName.get(item.type_name);
     if (typeList) {
-      typeList.push(def);
+      typeList.push(item);
     } else {
-      byTypeName.set(def.type_name, [def]);
+      byTypeName.set(item.type_name, [item]);
     }
 
-    processItemAliases(def, aliasMap, warnings, filePath);
+    processItemAliases(item, aliasMap, warnings, filePath);
   }
 
   // Freeze the inner alias maps to match the `ReadonlyMap` shape of the
