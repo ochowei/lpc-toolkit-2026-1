@@ -1,5 +1,4 @@
 import {
-  BODY_TYPES,
   type AnimationName,
   type BodyType,
   type Catalog,
@@ -97,68 +96,86 @@ export function selectionForItem(
   };
 }
 
-const PREFERRED: readonly TypeName[] = [
+/**
+ * itemId (filename minus `.json`) of each default the upstream generator
+ * pre-selects on first load. Keyed by the `type_name` field each item
+ * declares so the lookup result can be assigned straight into selections.
+ *
+ * Source: upstream `selectDefaults()` at
+ * `upstream/sources/state/state.ts:161`.
+ */
+const DEFAULT_ITEM_IDS = {
+  body: 'body',
+  head: 'heads_human_male',
+  expression: 'face_neutral',
+} as const;
+
+const DEFAULT_RECOLOR = 'light';
+
+const DEFAULT_BODY_TYPE: BodyType = 'male';
+
+/**
+ * Common-picker order. `expression` is slotted next to its visual
+ * neighbours (head/hair); the other entries preserve the previous flat
+ * head-to-toe order. Types with no defaults (hair/eyes/torso/legs/feet)
+ * render as empty selectors the user can pick into. A type-name is
+ * included only if the catalog has at least one item of that type, so
+ * pared-down test catalogs still work.
+ */
+const COMMON_TYPE_ORDER: readonly TypeName[] = [
   'body',
   'head',
   'hair',
+  'expression',
   'eyes',
   'torso',
   'legs',
   'feet',
 ];
 
-function supportsBodyType(item: ItemDefinition, bt: BodyType): boolean {
-  return typeof item.layer_1?.[bt] === 'string';
-}
-
 /**
- * Derive a known-good starting outfit from the live catalog (spec deviation
- * 4). Body type = first BODY_TYPES value some body item supports. shownTypeNames
- * = the preferred types present in the catalog; the body type is always shown.
+ * Build the initial outfit matching the upstream generator's defaults:
+ * male body + `heads_human_male` + `face_neutral`, all with the `light`
+ * recolor. Items are looked up by stable itemId (the JSON filename), so
+ * the result is independent of catalog insertion order.
  *
- * Deterministic only w.r.t. catalog order: it first-matches over
- * `byTypeName` arrays, whose order follows the `records` insertion order
- * passed to `createCatalog`. Callers that must agree (the copy script and
- * the app) MUST build `records` in the same order — sort by the
- * sheet_definitions-relative key. Otherwise the bundled asset subset can
- * diverge from what the app composes.
+ * Throws if any of the three required items is missing from the catalog
+ * — that means a real bundling bug, not a runtime fallback case.
  */
 export function pickInitialSelections(catalog: Catalog): {
   state: SliceState;
   shownTypeNames: TypeName[];
 } {
-  const bodies = catalog.byTypeName.get('body') ?? [];
-  let bodyType: BodyType | undefined;
-  let bodyItem: ItemDefinition | undefined;
-  for (const bt of BODY_TYPES) {
-    const item = bodies.find((i) => supportsBodyType(i, bt));
-    if (item) {
-      bodyType = bt;
-      bodyItem = item;
-      break;
+  const selections: Record<TypeName, Selection> = {};
+  for (const [typeName, itemId] of Object.entries(DEFAULT_ITEM_IDS) as [
+    TypeName,
+    string,
+  ][]) {
+    const item = catalog.byItemId.get(itemId);
+    if (!item) {
+      throw new Error(
+        `pickInitialSelections: missing required default item "${itemId}" in catalog`,
+      );
     }
-  }
-  if (!bodyType || !bodyItem) {
-    throw new Error(
-      'pickInitialSelections: no "body" item supports any standard body type',
-    );
+    selections[typeName] = {
+      typeName,
+      name: item.name,
+      recolor: DEFAULT_RECOLOR,
+    };
   }
 
-  const shownTypeNames: TypeName[] = ['body'];
-  const selections: Record<TypeName, Selection> = {
-    body: selectionForItem('body', bodyItem),
-  };
-  for (const tn of PREFERRED) {
-    if (tn === 'body') continue;
-    const items = catalog.byTypeName.get(tn);
-    if (!items || items.length === 0) continue;
-    shownTypeNames.push(tn);
-    const first = items.find((i) => supportsBodyType(i, bodyType!));
-    if (first) selections[tn] = selectionForItem(tn, first);
-  }
+  const shownTypeNames = COMMON_TYPE_ORDER.filter(
+    (tn) => (catalog.byTypeName.get(tn) ?? []).length > 0,
+  );
 
   return {
-    state: { bodyType, selections, anim: 'walk', dir: 'down', playing: true },
+    state: {
+      bodyType: DEFAULT_BODY_TYPE,
+      selections,
+      anim: 'walk',
+      dir: 'down',
+      playing: true,
+    },
     shownTypeNames,
   };
 }

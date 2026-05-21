@@ -21,28 +21,87 @@ function defn(
   } as unknown as ItemDefinition;
 }
 
-const { catalog } = createCatalog({
-  'body_a.json': defn('Body A', 'body'),
-  'hair_a.json': defn('Hair A', 'hair'),
-  'hair_b.json': defn('Hair B', 'hair'),
-});
+function makeFullCatalog() {
+  return createCatalog({
+    'body.json': defn('Body Color', 'body'),
+    'heads_human_male.json': defn('Human Male', 'head'),
+    'face_neutral.json': defn('Neutral', 'expression'),
+    'hair_a.json': defn('Hair A', 'hair'),
+  }).catalog;
+}
 
 describe('pickInitialSelections', () => {
-  it('picks a body + first item of each available preferred type', () => {
-    const { state, shownTypeNames } = pickInitialSelections(catalog);
+  it('selects body + heads_human_male + face_neutral with light recolor', () => {
+    const { state } = pickInitialSelections(makeFullCatalog());
     expect(state.bodyType).toBe('male');
     expect(state.selections['body']).toEqual({
       typeName: 'body',
-      name: 'Body A',
+      name: 'Body Color',
+      recolor: 'light',
     });
-    expect(state.selections['hair']).toEqual({
-      typeName: 'hair',
-      name: 'Hair A',
+    expect(state.selections['head']).toEqual({
+      typeName: 'head',
+      name: 'Human Male',
+      recolor: 'light',
     });
-    expect(shownTypeNames).toContain('body');
-    expect(shownTypeNames).toContain('hair');
+    expect(state.selections['expression']).toEqual({
+      typeName: 'expression',
+      name: 'Neutral',
+      recolor: 'light',
+    });
     expect(state.anim).toBe('walk');
     expect(state.dir).toBe('down');
+    expect(state.playing).toBe(true);
+  });
+
+  it('does not pre-select hair / eyes / torso / legs / feet', () => {
+    const { state } = pickInitialSelections(makeFullCatalog());
+    expect(state.selections['hair']).toBeUndefined();
+    expect(state.selections['eyes']).toBeUndefined();
+    expect(state.selections['torso']).toBeUndefined();
+    expect(state.selections['legs']).toBeUndefined();
+    expect(state.selections['feet']).toBeUndefined();
+  });
+
+  it('exposes body / head / hair / expression in shownTypeNames so the Common picker shows them', () => {
+    const { shownTypeNames } = pickInitialSelections(makeFullCatalog());
+    expect(shownTypeNames).toContain('body');
+    expect(shownTypeNames).toContain('head');
+    expect(shownTypeNames).toContain('expression');
+    expect(shownTypeNames).toContain('hair');
+    // Order: defaults first, then the remaining "common" types in the
+    // declared order.
+    expect(shownTypeNames.indexOf('body')).toBeLessThan(
+      shownTypeNames.indexOf('head'),
+    );
+    expect(shownTypeNames.indexOf('head')).toBeLessThan(
+      shownTypeNames.indexOf('hair'),
+    );
+    expect(shownTypeNames.indexOf('hair')).toBeLessThan(
+      shownTypeNames.indexOf('expression'),
+    );
+  });
+
+  it('omits common types whose catalog lookup is empty', () => {
+    const { catalog } = createCatalog({
+      'body.json': defn('Body Color', 'body'),
+      'heads_human_male.json': defn('Human Male', 'head'),
+      'face_neutral.json': defn('Neutral', 'expression'),
+    });
+    const { shownTypeNames } = pickInitialSelections(catalog);
+    expect(shownTypeNames).not.toContain('hair');
+    expect(shownTypeNames).not.toContain('legs');
+  });
+
+  it('throws when a required default itemId is missing from the catalog', () => {
+    const { catalog } = createCatalog({
+      'body.json': defn('Body Color', 'body'),
+      'face_neutral.json': defn('Neutral', 'expression'),
+      // heads_human_male intentionally absent
+    });
+    expect(() => pickInitialSelections(catalog)).toThrowError(
+      /heads_human_male/,
+    );
   });
 });
 
