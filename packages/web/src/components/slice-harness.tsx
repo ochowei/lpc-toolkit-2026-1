@@ -50,6 +50,7 @@ const ZOOM = 4;
 const LICENSE_OPTIONS: readonly License[] = LICENSE_CONFIG.flatMap(
   (group) => group.versions,
 );
+const RESET_SCOPE_DEFAULTS = { outfit: true, view: false, filters: false };
 
 export function SliceHarness({
   catalog,
@@ -592,25 +593,27 @@ function ResetMenu({
   onResetSearch: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [scopes, setScopes] = useState({
-    outfit: true,
-    view: false,
-    filters: false,
-  });
+  const [scopes, setScopes] = useState(RESET_SCOPE_DEFAULTS);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   const close = () => {
     setOpen(false);
-    setScopes({ outfit: true, view: false, filters: false });
+    setScopes(RESET_SCOPE_DEFAULTS);
   };
 
   useEffect(() => {
     if (!open) return;
     const onDocMouseDown = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) close();
+      if (!rootRef.current?.contains(e.target as Node)) {
+        setOpen(false);
+        setScopes(RESET_SCOPE_DEFAULTS);
+      }
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close();
+      if (e.key === 'Escape') {
+        setOpen(false);
+        setScopes(RESET_SCOPE_DEFAULTS);
+      }
     };
     document.addEventListener('mousedown', onDocMouseDown);
     document.addEventListener('keydown', onKey);
@@ -622,12 +625,14 @@ function ResetMenu({
 
   const anySelected = scopes.outfit || scopes.view || scopes.filters;
 
-  const confirm = () => {
+  const applyReset = () => {
     if (scopes.filters) {
       onResetLicenseFilter();
       onResetSearch();
     }
-    onReset({ outfit: scopes.outfit, view: scopes.view });
+    if (scopes.outfit || scopes.view) {
+      onReset({ outfit: scopes.outfit, view: scopes.view });
+    }
     close();
   };
 
@@ -651,9 +656,6 @@ function ResetMenu({
           aria-label={t('reset.menuTitle')}
           className="absolute right-0 z-10 mt-1 w-56 rounded-md border border-border bg-surface-2 p-2 shadow-lg"
         >
-          <div className="px-1 pb-1 text-[11px] uppercase text-text-mute">
-            {t('reset.menuTitle')}
-          </div>
           {(
             [
               ['outfit', 'reset.scope.outfit'],
@@ -686,7 +688,7 @@ function ResetMenu({
               size="sm"
               variant="primary"
               disabled={!anySelected}
-              onClick={confirm}
+              onClick={applyReset}
             >
               {t('reset.confirm')}
             </Button>
