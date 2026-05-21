@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import {
   ANIMATION_CONFIGS,
@@ -61,6 +61,7 @@ export function SliceHarness({
   assetSource,
   t,
   onAssetSourceChange,
+  onReset,
   onToggleTheme,
   onToggleLocale,
 }: {
@@ -73,6 +74,7 @@ export function SliceHarness({
   assetSource: AssetSource;
   t: Translator;
   onAssetSourceChange: (source: AssetSource) => void;
+  onReset: (scopes: { outfit: boolean; view: boolean }) => void;
   onToggleTheme: () => void;
   onToggleLocale: () => void;
 }) {
@@ -265,6 +267,12 @@ export function SliceHarness({
         </span>
         <span className="text-text-dim text-xs">{t('app.subtitle')}</span>
         <div className="flex-1" />
+        <ResetMenu
+          t={t}
+          onReset={onReset}
+          onResetLicenseFilter={() => setLicenseFilter(null)}
+          onResetSearch={() => setAssetSearch('')}
+        />
         <Button size="sm" variant="ghost" onClick={onToggleLocale}>
           {locale === 'en'
             ? t('language.toChinese')
@@ -568,6 +576,123 @@ export function SliceHarness({
           </p>
         </aside>
       </div>
+    </div>
+  );
+}
+
+function ResetMenu({
+  t,
+  onReset,
+  onResetLicenseFilter,
+  onResetSearch,
+}: {
+  t: Translator;
+  onReset: (scopes: { outfit: boolean; view: boolean }) => void;
+  onResetLicenseFilter: () => void;
+  onResetSearch: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [scopes, setScopes] = useState({
+    outfit: true,
+    view: false,
+    filters: false,
+  });
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  const close = () => {
+    setOpen(false);
+    setScopes({ outfit: true, view: false, filters: false });
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocMouseDown = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) close();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close();
+    };
+    document.addEventListener('mousedown', onDocMouseDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDocMouseDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const anySelected = scopes.outfit || scopes.view || scopes.filters;
+
+  const confirm = () => {
+    if (scopes.filters) {
+      onResetLicenseFilter();
+      onResetSearch();
+    }
+    onReset({ outfit: scopes.outfit, view: scopes.view });
+    close();
+  };
+
+  const toggle = (key: 'outfit' | 'view' | 'filters') =>
+    setScopes((s) => ({ ...s, [key]: !s[key] }));
+
+  return (
+    <div ref={rootRef} className="relative">
+      <Button
+        size="sm"
+        variant="ghost"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        {t('reset.button')}
+      </Button>
+      {open && (
+        <div
+          role="menu"
+          aria-label={t('reset.menuTitle')}
+          className="absolute right-0 z-10 mt-1 w-56 rounded-md border border-border bg-surface-2 p-2 shadow-lg"
+        >
+          <div className="px-1 pb-1 text-[11px] uppercase text-text-mute">
+            {t('reset.menuTitle')}
+          </div>
+          {(
+            [
+              ['outfit', 'reset.scope.outfit'],
+              ['view', 'reset.scope.view'],
+              ['filters', 'reset.scope.filters'],
+            ] as const
+          ).map(([key, labelKey]) => (
+            <button
+              key={key}
+              type="button"
+              role="menuitemcheckbox"
+              aria-checked={scopes[key]}
+              onClick={() => toggle(key)}
+              className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-surface-3"
+            >
+              <span
+                aria-hidden
+                className="inline-block h-3 w-3 rounded border border-border text-center leading-3"
+              >
+                {scopes[key] ? '✓' : ''}
+              </span>
+              {t(labelKey)}
+            </button>
+          ))}
+          <div className="mt-2 flex justify-end gap-1">
+            <Button size="sm" variant="ghost" onClick={close}>
+              {t('reset.cancel')}
+            </Button>
+            <Button
+              size="sm"
+              variant="primary"
+              disabled={!anySelected}
+              onClick={confirm}
+            >
+              {t('reset.confirm')}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
