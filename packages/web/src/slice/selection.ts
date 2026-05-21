@@ -28,6 +28,11 @@ export type SliceAction =
     }
   | { type: 'clear'; typeName: TypeName }
   | { type: 'apply_selections'; selections: Selections }
+  | {
+      type: 'reset';
+      scopes: { outfit: boolean; view: boolean };
+      init: SliceState;
+    }
   | { type: 'set_anim'; anim: AnimationName }
   | { type: 'set_dir'; dir: Direction }
   | { type: 'toggle_play' };
@@ -64,6 +69,25 @@ export function sliceReducer(s: SliceState, a: SliceAction): SliceState {
         bodyType: a.selections.bodyType,
         selections,
       };
+    }
+    case 'reset': {
+      let next = s;
+      if (a.scopes.outfit) {
+        next = {
+          ...next,
+          bodyType: a.init.bodyType,
+          selections: a.init.selections,
+        };
+      }
+      if (a.scopes.view) {
+        next = {
+          ...next,
+          anim: a.init.anim,
+          dir: a.init.dir,
+          playing: a.init.playing,
+        };
+      }
+      return next;
     }
     case 'set_anim':
       return { ...s, anim: a.anim };

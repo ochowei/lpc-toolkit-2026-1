@@ -203,3 +203,72 @@ describe('sliceReducer', () => {
     });
   });
 });
+
+describe('sliceReducer reset', () => {
+  const init: SliceState = {
+    bodyType: 'male',
+    selections: {
+      body: { typeName: 'body', name: 'Body Color', recolor: 'light' },
+      head: { typeName: 'head', name: 'Human Male', recolor: 'light' },
+      expression: { typeName: 'expression', name: 'Neutral', recolor: 'light' },
+    },
+    anim: 'walk',
+    dir: 'down',
+    playing: true,
+  };
+
+  const mutated: SliceState = {
+    bodyType: 'female',
+    selections: {
+      body: { typeName: 'body', name: 'Body Color', recolor: 'light' },
+      hair: { typeName: 'hair', name: 'Hair A' },
+    },
+    anim: 'slash',
+    dir: 'left',
+    playing: false,
+  };
+
+  it('outfit-only reset restores bodyType + selections, leaves view untouched', () => {
+    const s = sliceReducer(mutated, {
+      type: 'reset',
+      scopes: { outfit: true, view: false },
+      init,
+    });
+    expect(s.bodyType).toBe(init.bodyType);
+    expect(s.selections).toEqual(init.selections);
+    expect(s.anim).toBe(mutated.anim);
+    expect(s.dir).toBe(mutated.dir);
+    expect(s.playing).toBe(mutated.playing);
+  });
+
+  it('view-only reset restores anim/dir/playing, leaves outfit untouched', () => {
+    const s = sliceReducer(mutated, {
+      type: 'reset',
+      scopes: { outfit: false, view: true },
+      init,
+    });
+    expect(s.bodyType).toBe(mutated.bodyType);
+    expect(s.selections).toEqual(mutated.selections);
+    expect(s.anim).toBe(init.anim);
+    expect(s.dir).toBe(init.dir);
+    expect(s.playing).toBe(init.playing);
+  });
+
+  it('outfit + view reset restores all four fields', () => {
+    const s = sliceReducer(mutated, {
+      type: 'reset',
+      scopes: { outfit: true, view: true },
+      init,
+    });
+    expect(s).toEqual(init);
+  });
+
+  it('reset with no scopes is a no-op', () => {
+    const s = sliceReducer(mutated, {
+      type: 'reset',
+      scopes: { outfit: false, view: false },
+      init,
+    });
+    expect(s).toEqual(mutated);
+  });
+});
