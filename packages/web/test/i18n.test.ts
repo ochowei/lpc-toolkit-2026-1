@@ -42,4 +42,25 @@ describe('i18n', () => {
     expect(en('picker.searchAssets')).toBe('Search all assets');
     expect(zh('picker.advanced')).toBe('進階：所有上游素材');
   });
+
+  it('translates reset menu labels', () => {
+    const en = createTranslator('en');
+    const zh = createTranslator('zh-TW');
+
+    expect(en('reset.button')).toBe('Reset');
+    expect(en('reset.menuTitle')).toBe('What to reset');
+    expect(en('reset.scope.outfit')).toBe('Outfit');
+    expect(en('reset.scope.view')).toBe('View');
+    expect(en('reset.scope.filters')).toBe('Filters');
+    expect(en('reset.confirm')).toBe('Reset selected');
+    expect(en('reset.cancel')).toBe('Cancel');
+
+    expect(zh('reset.button')).toBe('重置');
+    expect(zh('reset.menuTitle')).toBe('要重置的項目');
+    expect(zh('reset.scope.outfit')).toBe('服裝');
+    expect(zh('reset.scope.view')).toBe('檢視');
+    expect(zh('reset.scope.filters')).toBe('篩選');
+    expect(zh('reset.confirm')).toBe('重置選取項目');
+    expect(zh('reset.cancel')).toBe('取消');
+  });
 });

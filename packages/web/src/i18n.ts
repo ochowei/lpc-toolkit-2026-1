@@ -49,6 +49,13 @@ export const TRANSLATIONS = {
     'token.copyFailed': 'Copy failed.',
     'token.invalid': 'Invalid token.',
     'token.unresolved': 'Token contains unavailable parts.',
+    'reset.button': 'Reset',
+    'reset.menuTitle': 'What to reset',
+    'reset.scope.outfit': 'Outfit',
+    'reset.scope.view': 'View',
+    'reset.scope.filters': 'Filters',
+    'reset.confirm': 'Reset selected',
+    'reset.cancel': 'Cancel',
   },
   'zh-TW': {
     'app.subtitle': '基礎切片',
@@ -97,6 +104,13 @@ export const TRANSLATIONS = {
     'token.copyFailed': '複製失敗。',
     'token.invalid': 'token 無效。',
     'token.unresolved': 'token 包含目前不可用的部件。',
+    'reset.button': '重置',
+    'reset.menuTitle': '要重置的項目',
+    'reset.scope.outfit': '服裝',
+    'reset.scope.view': '檢視',
+    'reset.scope.filters': '篩選',
+    'reset.confirm': '重置選取項目',
+    'reset.cancel': '取消',
   },
 } as const;
 
