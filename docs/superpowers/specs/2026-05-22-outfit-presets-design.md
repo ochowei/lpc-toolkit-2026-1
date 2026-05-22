@@ -82,10 +82,12 @@ export interface Preset {
 export const PRESETS: readonly Preset[] = [ /* 6 組 */ ];
 
 // 套用預設時會被清空的服裝／裝備分類（curated 常數）。
-// 必須涵蓋所有預設用到的 type_name。
+// 必須涵蓋 common picker 的服裝欄位（torso/legs/feet）與所有預設用到的
+// type_name。
 export const CLOTHING_TYPES: ReadonlySet<TypeName> = new Set([
+  'torso', 'legs', 'feet',          // common-picker 服裝欄位
   'clothes', 'overalls', 'apron', 'armour', 'chainmail',
-  'legs', 'shoes', 'feet', 'cape', 'hat', 'weapon',
+  'shoes', 'cape', 'hat', 'weapon',
   'weapon_magic_crystal', 'shield', 'quiver',
 ]);
 ```
