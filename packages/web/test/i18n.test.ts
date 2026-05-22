@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_LOCALE,
   TRANSLATIONS,
+  createLabelTranslator,
   createTranslator,
   type TranslationKey,
 } from '../src/i18n';
+import { ITEM_NAME_LABELS_ZH } from '../src/i18n-item-names';
 
 describe('i18n', () => {
   it('defaults to English', () => {
@@ -62,5 +64,43 @@ describe('i18n', () => {
     expect(zh('reset.scope.filters')).toBe('篩選');
     expect(zh('reset.confirm')).toBe('重置選取項目');
     expect(zh('reset.cancel')).toBe('取消');
+  });
+});
+
+describe('label translator', () => {
+  it('returns raw values for English', () => {
+    const en = createLabelTranslator('en');
+    expect(en.category('body')).toBe('body');
+    expect(en.bodyType('male')).toBe('male');
+    expect(en.anim('walk')).toBe('walk');
+    expect(en.itemName('Plate armor')).toBe('Plate armor');
+  });
+
+  it('translates category, body type and animation labels for Chinese', () => {
+    const zh = createLabelTranslator('zh-TW');
+    expect(zh.category('body')).toBe('身體');
+    expect(zh.category('expression')).toBe('表情');
+    expect(zh.bodyType('male')).toBe('男性');
+    expect(zh.anim('walk')).toBe('行走');
+  });
+
+  it('falls back to the raw value for unknown keys', () => {
+    const zh = createLabelTranslator('zh-TW');
+    expect(zh.category('__nope__')).toBe('__nope__');
+    expect(zh.itemName('__nope__')).toBe('__nope__');
+  });
+
+  it('translates a known asset name for Chinese', () => {
+    const zh = createLabelTranslator('zh-TW');
+    const translated = Object.entries(ITEM_NAME_LABELS_ZH).find(
+      ([key, value]) => key !== value,
+    );
+    expect(translated).toBeDefined();
+    const [name, label] = translated!;
+    expect(zh.itemName(name)).toBe(label);
+  });
+
+  it('has a non-trivial asset-name dictionary', () => {
+    expect(Object.keys(ITEM_NAME_LABELS_ZH).length).toBeGreaterThan(100);
   });
 });
