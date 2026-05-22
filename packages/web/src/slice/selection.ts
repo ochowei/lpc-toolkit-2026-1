@@ -8,6 +8,7 @@ import {
   type Selections,
   type TypeName,
 } from '@lpc-toolkit/core';
+import type { CatalogTreeItem } from './catalog-tree';
 
 export interface SliceState {
   readonly bodyType: BodyType;
@@ -210,6 +211,28 @@ export function pickInitialSelections(catalog: Catalog): {
  * head-to-toe order, then any remaining types alphabetically by
  * `typeName`. Entries with an empty `name` are dropped.
  */
+/**
+ * The `SliceAction` an advanced-tree click should dispatch. Clicking the
+ * item already selected for its type toggles it off (`clear`); any other
+ * click selects it (`pick`), replacing whatever was selected for that
+ * type.
+ */
+export function treeItemAction(
+  selections: Readonly<Record<TypeName, Selection>>,
+  item: CatalogTreeItem,
+  def: ItemDefinition | undefined,
+): SliceAction {
+  if (selections[item.typeName]?.name === item.name) {
+    return { type: 'clear', typeName: item.typeName };
+  }
+  return {
+    type: 'pick',
+    typeName: item.typeName,
+    name: item.name,
+    ...(def?.variants?.[0] ? { variant: def.variants[0] } : {}),
+  };
+}
+
 export function orderedSelectionEntries(
   selections: Readonly<Record<TypeName, Selection>>,
 ): [TypeName, Selection][] {

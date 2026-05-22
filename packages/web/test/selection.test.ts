@@ -5,6 +5,7 @@ import {
   pickInitialSelections,
   sliceReducer,
   toSelections,
+  treeItemAction,
   type SliceState,
 } from '../src/slice/selection';
 
@@ -302,5 +303,51 @@ describe('orderedSelectionEntries', () => {
 
   it('returns an empty array for empty selections', () => {
     expect(orderedSelectionEntries({})).toEqual([]);
+  });
+});
+
+describe('treeItemAction', () => {
+  const item = { id: 'sword_a', name: 'Sword', typeName: 'weapon' };
+
+  it('returns a pick action when the item is not selected', () => {
+    const action = treeItemAction({}, item, undefined);
+    expect(action).toEqual({
+      type: 'pick',
+      typeName: 'weapon',
+      name: 'Sword',
+    });
+  });
+
+  it('includes the first variant when the definition has variants', () => {
+    const def = { variants: ['steel', 'iron'] } as unknown as ItemDefinition;
+    const action = treeItemAction({}, item, def);
+    expect(action).toEqual({
+      type: 'pick',
+      typeName: 'weapon',
+      name: 'Sword',
+      variant: 'steel',
+    });
+  });
+
+  it('returns a clear action when the item is the current selection', () => {
+    const action = treeItemAction(
+      { weapon: { typeName: 'weapon', name: 'Sword' } },
+      item,
+      undefined,
+    );
+    expect(action).toEqual({ type: 'clear', typeName: 'weapon' });
+  });
+
+  it('returns a pick action when a different item of the same type is selected', () => {
+    const action = treeItemAction(
+      { weapon: { typeName: 'weapon', name: 'Axe' } },
+      item,
+      undefined,
+    );
+    expect(action).toEqual({
+      type: 'pick',
+      typeName: 'weapon',
+      name: 'Sword',
+    });
   });
 });
