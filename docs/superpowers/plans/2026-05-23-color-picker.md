@@ -560,7 +560,7 @@ export function ColorPicker({
                 aria-pressed={opt.value === selection?.variant}
                 className={`rounded border border-border px-1.5 py-0.5 text-[11px] ${
                   opt.value === selection?.variant
-                    ? 'bg-accent text-accent-contrast'
+                    ? 'bg-accent text-accent-ink'
                     : 'bg-surface-2 text-text'
                 }`}
                 onClick={() => onSelect({ variant: opt.value })}
@@ -922,7 +922,7 @@ In `renderTreeNode`, the header branch maps `visibleItems` to a `<button>`. Repl
                       }
                       className={`block w-full rounded px-2 py-1 text-left text-xs ${
                         selected
-                          ? 'bg-accent text-accent-contrast'
+                          ? 'bg-accent text-accent-ink'
                           : compatible
                             ? 'text-text hover:bg-surface-2'
                             : 'text-text-dim opacity-60'
