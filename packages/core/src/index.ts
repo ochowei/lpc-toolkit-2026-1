@@ -50,9 +50,14 @@ export { createPaletteCatalog } from './palettes.js';
 
 export type {
   MakeResolvePaletteOptions,
+  RecolorSwatch,
   ResolvePalette,
 } from './recolor-resolve.js';
-export { getRecolorVariants, makeResolvePalette } from './recolor-resolve.js';
+export {
+  getRecolorSwatches,
+  getRecolorVariants,
+  makeResolvePalette,
+} from './recolor-resolve.js';
 
 export type { ComposeOptions } from './compose.js';
 export { composeSelections, getSpritePathsForSelections } from './compose.js';

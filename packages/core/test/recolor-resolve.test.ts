@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { createCatalog } from '../src/catalog.js';
 import { createPaletteCatalog } from '../src/palettes.js';
-import { makeResolvePalette } from '../src/recolor-resolve.js';
+import { getRecolorSwatches, makeResolvePalette } from '../src/recolor-resolve.js';
 import { composeSelections } from '../src/compose.js';
 import type { CanvasLike } from '../src/adapters.js';
 import type {
@@ -317,5 +317,54 @@ describe('makeResolvePalette', () => {
         '#0000cc',
       ]);
     });
+  });
+});
+
+describe('getRecolorSwatches', () => {
+  it('returns each recolor name with its resolved color ramp', () => {
+    const palettes = createPaletteCatalog({
+      'm/meta_m.json': { type: 'material', default: 'v1', base: 'c0' },
+      'm/m_v1.json': {
+        c0: ['#000000', '#111111'],
+        red: ['#ff0000', '#ee0000'],
+      },
+    }).palettes;
+    const item: ItemDefinition = {
+      name: 'Thing',
+      type_name: 't',
+      animations: ['walk'],
+      credits: [],
+      recolors: { material: 'm', palettes: ['v1'] },
+      layer_1: { zPos: 1, male: 't/' },
+    };
+    expect(getRecolorSwatches(item, palettes)).toEqual([
+      { recolor: 'c0', colors: ['#000000', '#111111'] },
+      { recolor: 'red', colors: ['#ff0000', '#ee0000'] },
+    ]);
+  });
+
+  it('returns an empty array for an item with no recolors', () => {
+    const palettes = createPaletteCatalog({}).palettes;
+    const plain: ItemDefinition = {
+      name: 'Plain',
+      type_name: 't',
+      animations: ['walk'],
+      credits: [],
+      layer_1: { zPos: 1, male: 't/' },
+    };
+    expect(getRecolorSwatches(plain, palettes)).toEqual([]);
+  });
+
+  it('returns an empty array for an item with an unknown material', () => {
+    const palettes = createPaletteCatalog({}).palettes;
+    const item: ItemDefinition = {
+      name: 'Ghost',
+      type_name: 't',
+      animations: ['walk'],
+      credits: [],
+      recolors: { material: 'nonexistent', palettes: ['v1'] },
+      layer_1: { zPos: 1, male: 't/' },
+    };
+    expect(getRecolorSwatches(item, palettes)).toEqual([]);
   });
 });
