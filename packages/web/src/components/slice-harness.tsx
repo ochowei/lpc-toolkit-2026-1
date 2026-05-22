@@ -14,6 +14,7 @@ import {
 } from '@lpc-toolkit/core';
 import {
   toSelections,
+  treeItemAction,
   type SliceState,
   type SliceAction,
 } from '../slice/selection';
@@ -188,12 +189,7 @@ export function SliceHarness({
 
   function pickTreeItem(item: CatalogTreeItem): void {
     const def = itemByTypeAndName.get(`${item.typeName}:${item.name}`);
-    dispatch({
-      type: 'pick',
-      typeName: item.typeName,
-      name: item.name,
-      ...(def?.variants?.[0] ? { variant: def.variants[0] } : {}),
-    });
+    dispatch(treeItemAction(state.selections, item, def));
   }
 
   function treeItemMatches(item: CatalogTreeItem, query: string): boolean {
@@ -250,7 +246,9 @@ export function SliceHarness({
                     title={
                       !compatible
                         ? t('picker.incompatibleBodyType')
-                        : tl.category(item.typeName)
+                        : selected
+                          ? t('picker.clickToRemove')
+                          : tl.category(item.typeName)
                     }
                     className={`block w-full rounded px-2 py-1 text-left text-xs ${
                       selected
