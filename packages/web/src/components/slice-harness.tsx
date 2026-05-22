@@ -31,7 +31,7 @@ import {
 import { useComposedCharacter } from '../hooks/use-composed-character';
 import { useAnimationPlayer } from '../hooks/use-animation-player';
 import { Button } from './ui/button';
-import type { Locale, TranslationKey, Translator } from '../i18n';
+import type { Locale, TranslationKey, Translator, LabelTranslator } from '../i18n';
 import type { AssetSource } from '../adapter/asset-source';
 
 const DIRS: Direction[] = ['up', 'left', 'down', 'right'];
@@ -61,6 +61,7 @@ export function SliceHarness({
   locale,
   assetSource,
   t,
+  tl,
   onAssetSourceChange,
   onReset,
   onToggleTheme,
@@ -74,6 +75,7 @@ export function SliceHarness({
   locale: Locale;
   assetSource: AssetSource;
   t: Translator;
+  tl: LabelTranslator;
   onAssetSourceChange: (source: AssetSource) => void;
   onReset: (scopes: { outfit: boolean; view: boolean }) => void;
   onToggleTheme: () => void;
@@ -199,7 +201,7 @@ export function SliceHarness({
         {showHeader && (
           <details className="group" open={query !== '' || depth < 1}>
             <summary className="cursor-pointer py-1 text-xs font-semibold text-text-mute hover:text-text">
-              {node.name}
+              {tl.category(node.name)}
             </summary>
             <div className="space-y-1">
               {entries.map((child) => renderTreeNode(child, depth + 1))}
@@ -220,7 +222,7 @@ export function SliceHarness({
                     title={
                       !compatible
                         ? t('picker.incompatibleBodyType')
-                        : item.typeName
+                        : tl.category(item.typeName)
                     }
                     className={`block w-full rounded px-2 py-1 text-left text-xs ${
                       selected
@@ -231,9 +233,9 @@ export function SliceHarness({
                     }`}
                     onClick={() => pickTreeItem(item)}
                   >
-                    <span>{item.name}</span>
+                    <span>{tl.itemName(item.name)}</span>
                     <span className="ml-1 text-[10px] text-text-dim">
-                      {item.typeName}
+                      {tl.category(item.typeName)}
                     </span>
                   </button>
                 );
@@ -251,7 +253,7 @@ export function SliceHarness({
                 className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-surface-2"
                 onClick={() => pickTreeItem(item)}
               >
-                {item.name}
+                {tl.itemName(item.name)}
               </button>
             ))}
           </div>
@@ -348,7 +350,7 @@ export function SliceHarness({
             >
               {BODY_TYPES.map((bt) => (
                 <option key={bt} value={bt}>
-                  {bt}
+                  {tl.bodyType(bt)}
                 </option>
               ))}
             </select>
@@ -374,7 +376,9 @@ export function SliceHarness({
                   : filteredItems;
               return (
                 <label key={tn} className="block text-xs">
-                  <span className="text-text-mute uppercase">{tn}</span>
+                  <span className="text-text-mute uppercase">
+                    {tl.category(tn)}
+                  </span>
                   <select
                     className="mt-1 w-full bg-surface-2 border border-border rounded p-1"
                     value={selectedName}
@@ -398,7 +402,7 @@ export function SliceHarness({
                     <option value="">— {t('picker.none')} —</option>
                     {shownItems.map((it) => (
                       <option key={it.name} value={it.name}>
-                        {it.name}
+                        {tl.itemName(it.name)}
                         {licenseFilter &&
                         selectedName === it.name &&
                         !itemMatchesLicenseFilter(it, licenseFilter)
@@ -438,7 +442,7 @@ export function SliceHarness({
             >
               {animNames.map((a) => (
                 <option key={a} value={a}>
-                  {a}
+                  {tl.anim(a)}
                 </option>
               ))}
             </select>

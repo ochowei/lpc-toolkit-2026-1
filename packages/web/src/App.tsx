@@ -7,6 +7,7 @@ import {
 import { SliceHarness } from './components/slice-harness';
 import {
   DEFAULT_LOCALE,
+  createLabelTranslator,
   createTranslator,
   type Locale,
 } from './i18n';
@@ -23,6 +24,7 @@ export default function App() {
     return { catalog, state, shownTypeNames };
   }, []);
   const t = useMemo(() => createTranslator(locale), [locale]);
+  const tl = useMemo(() => createLabelTranslator(locale), [locale]);
 
   const [state, dispatch] = useReducer(sliceReducer, init.state);
 
@@ -42,6 +44,7 @@ export default function App() {
       locale={locale}
       assetSource={assetSource}
       t={t}
+      tl={tl}
       onAssetSourceChange={setAssetSource}
       onReset={handleReset}
       onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
