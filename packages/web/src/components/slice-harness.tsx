@@ -28,6 +28,8 @@ import {
   type CatalogTreeItem,
   type CatalogTreeNode,
 } from '../slice/catalog-tree';
+import { PRESETS, type Preset } from '../presets';
+import { computePresetSelection } from '../presets-apply';
 import { useComposedCharacter } from '../hooks/use-composed-character';
 import { useAnimationPlayer } from '../hooks/use-animation-player';
 import { Button } from './ui/button';
@@ -86,6 +88,7 @@ export function SliceHarness({
   const [tokenInput, setTokenInput] = useState('');
   const [tokenStatus, setTokenStatus] = useState<string | null>(null);
   const [tokenError, setTokenError] = useState<string | null>(null);
+  const [presetStatus, setPresetStatus] = useState<string | null>(null);
   const [assetSearch, setAssetSearch] = useState('');
   const catalogTree = useMemo(() => buildCatalogTree(catalog), [catalog]);
   const itemByTypeAndName = useMemo(() => {
@@ -157,6 +160,28 @@ export function SliceHarness({
     } catch {
       setTokenStatus(null);
       setTokenError(t('token.invalid'));
+    }
+  }
+
+  function applyPreset(preset: Preset): void {
+    const { selections, skipped } = computePresetSelection(
+      preset,
+      state.selections,
+      state.bodyType,
+      catalog,
+    );
+    dispatch({
+      type: 'apply_selections',
+      selections: { bodyType: state.bodyType, items: selections },
+    });
+    const label = t(preset.labelKey);
+    if (skipped.length === 0) {
+      setPresetStatus(`${t('preset.applied')} ${label}`);
+    } else {
+      const names = skipped.map((it) => tl.itemName(it.name)).join(', ');
+      setPresetStatus(
+        `${t('preset.applied')} ${label} (${t('preset.skipped')}: ${names})`,
+      );
     }
   }
 
@@ -357,6 +382,27 @@ export function SliceHarness({
               ))}
             </select>
           </label>
+
+          <section className="space-y-2 border-b border-border pb-3">
+            <h2 className="text-xs font-bold uppercase">
+              {t('preset.title')}
+            </h2>
+            <div className="flex flex-wrap gap-1">
+              {PRESETS.map((preset) => (
+                <Button
+                  key={preset.id}
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => applyPreset(preset)}
+                >
+                  {preset.emoji} {t(preset.labelKey)}
+                </Button>
+              ))}
+            </div>
+            {presetStatus && (
+              <div className="text-xs text-text-mute">{presetStatus}</div>
+            )}
+          </section>
 
           <section className="space-y-3 border-b border-border pb-3">
             <h2 className="text-xs font-bold uppercase">
