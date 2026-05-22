@@ -50,6 +50,22 @@ describe('PRESETS data', () => {
       expect(Object.keys(TRANSLATIONS.en)).toContain(preset.labelKey);
     }
   });
+
+  it('every preset is a complete outfit (torso + legs + feet)', () => {
+    // A preset must dress the whole character: applying it clears all
+    // clothing, so a missing layer leaves the body bare there.
+    const TORSO = new Set(['clothes', 'armour', 'chainmail']);
+    const LEGS = new Set(['legs', 'overalls']);
+    const FEET = new Set(['feet', 'shoes']);
+    for (const preset of PRESETS) {
+      const types = new Set(preset.items.map((i) => i.typeName));
+      const covers = (group: Set<string>) =>
+        [...types].some((t) => group.has(t));
+      expect(covers(TORSO), `${preset.id}: no torso item`).toBe(true);
+      expect(covers(LEGS), `${preset.id}: no legs item`).toBe(true);
+      expect(covers(FEET), `${preset.id}: no feet item`).toBe(true);
+    }
+  });
 });
 
 describe.runIf(haveUpstream)('PRESETS catalog validation', () => {

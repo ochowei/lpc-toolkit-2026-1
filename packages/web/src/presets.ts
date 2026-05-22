@@ -68,7 +68,11 @@ export const PRESETS: readonly Preset[] = [
     emoji: '🔮',
     items: [
       { typeName: 'clothes', name: 'Longsleeve' },
+      { typeName: 'legs', name: 'Pants' },
+      { typeName: 'shoes', name: 'Basic Shoes', variant: 'black' },
+      { typeName: 'cape', name: 'Solid', variant: 'purple' },
       { typeName: 'hat', name: 'Wizard Hat Base', variant: 'purple' },
+      { typeName: 'weapon', name: 'Gnarled staff', variant: 'dark' },
       { typeName: 'weapon_magic_crystal', name: 'Crystal', variant: 'purple' },
     ],
   },
@@ -78,6 +82,8 @@ export const PRESETS: readonly Preset[] = [
     emoji: '⚔️',
     items: [
       { typeName: 'armour', name: 'Plate' },
+      { typeName: 'legs', name: 'Armour' },
+      { typeName: 'shoes', name: 'Armour', variant: 'steel' },
       { typeName: 'hat', name: 'Kettle helm' },
       { typeName: 'weapon', name: 'Longsword', variant: 'longsword' },
       { typeName: 'shield', name: 'Round Shield', variant: 'silver' },
@@ -89,7 +95,8 @@ export const PRESETS: readonly Preset[] = [
     emoji: '🏹',
     items: [
       { typeName: 'armour', name: 'Leather' },
-      { typeName: 'cape', name: 'Solid', variant: 'forest' },
+      { typeName: 'legs', name: 'Pants' },
+      { typeName: 'shoes', name: 'Basic Boots', variant: 'brown' },
       { typeName: 'hat', name: 'Hood' },
       { typeName: 'weapon', name: 'Normal', variant: 'dark' },
       { typeName: 'quiver', name: 'Quiver', variant: 'quiver' },
@@ -117,6 +124,7 @@ export const PRESETS: readonly Preset[] = [
     items: [
       { typeName: 'chainmail', name: 'Chainmail' },
       { typeName: 'legs', name: 'Pants' },
+      { typeName: 'shoes', name: 'Basic Boots', variant: 'black' },
       { typeName: 'hat', name: 'Hood' },
     ],
   },
