@@ -83,6 +83,19 @@ describe('i18n', () => {
       expect(Object.keys(TRANSLATIONS['zh-TW'])).toContain(key);
     }
   });
+
+  it('includes selected-items keys in both locales', () => {
+    const keys = [
+      'selected.title',
+      'selected.empty',
+      'selected.remove',
+      'picker.clickToRemove',
+    ];
+    for (const key of keys) {
+      expect(Object.keys(TRANSLATIONS.en)).toContain(key);
+      expect(Object.keys(TRANSLATIONS['zh-TW'])).toContain(key);
+    }
+  });
 });
 
 describe('label translator', () => {

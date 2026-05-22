@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { createCatalog, type ItemDefinition } from '@lpc-toolkit/core';
 import {
+  orderedSelectionEntries,
   pickInitialSelections,
   sliceReducer,
   toSelections,
+  treeItemAction,
   type SliceState,
 } from '../src/slice/selection';
 
@@ -270,5 +272,82 @@ describe('sliceReducer reset', () => {
       init,
     });
     expect(s).toEqual(mutated);
+  });
+});
+
+describe('orderedSelectionEntries', () => {
+  it('orders common types head-to-toe, ahead of non-common types', () => {
+    const entries = orderedSelectionEntries({
+      weapon: { typeName: 'weapon', name: 'Sword' },
+      hair: { typeName: 'hair', name: 'Hair A' },
+      body: { typeName: 'body', name: 'Body A' },
+    });
+    expect(entries.map(([tn]) => tn)).toEqual(['body', 'hair', 'weapon']);
+  });
+
+  it('sorts non-common types alphabetically by typeName', () => {
+    const entries = orderedSelectionEntries({
+      wings: { typeName: 'wings', name: 'Wings A' },
+      cape: { typeName: 'cape', name: 'Cape A' },
+    });
+    expect(entries.map(([tn]) => tn)).toEqual(['cape', 'wings']);
+  });
+
+  it('drops entries with an empty name', () => {
+    const entries = orderedSelectionEntries({
+      body: { typeName: 'body', name: 'Body A' },
+      hair: { typeName: 'hair', name: '' },
+    });
+    expect(entries.map(([tn]) => tn)).toEqual(['body']);
+  });
+
+  it('returns an empty array for empty selections', () => {
+    expect(orderedSelectionEntries({})).toEqual([]);
+  });
+});
+
+describe('treeItemAction', () => {
+  const item = { id: 'sword_a', name: 'Sword', typeName: 'weapon' };
+
+  it('returns a pick action when the item is not selected', () => {
+    const action = treeItemAction({}, item, undefined);
+    expect(action).toEqual({
+      type: 'pick',
+      typeName: 'weapon',
+      name: 'Sword',
+    });
+  });
+
+  it('includes the first variant when the definition has variants', () => {
+    const def = { variants: ['steel', 'iron'] } as unknown as ItemDefinition;
+    const action = treeItemAction({}, item, def);
+    expect(action).toEqual({
+      type: 'pick',
+      typeName: 'weapon',
+      name: 'Sword',
+      variant: 'steel',
+    });
+  });
+
+  it('returns a clear action when the item is the current selection', () => {
+    const action = treeItemAction(
+      { weapon: { typeName: 'weapon', name: 'Sword' } },
+      item,
+      undefined,
+    );
+    expect(action).toEqual({ type: 'clear', typeName: 'weapon' });
+  });
+
+  it('returns a pick action when a different item of the same type is selected', () => {
+    const action = treeItemAction(
+      { weapon: { typeName: 'weapon', name: 'Axe' } },
+      item,
+      undefined,
+    );
+    expect(action).toEqual({
+      type: 'pick',
+      typeName: 'weapon',
+      name: 'Sword',
+    });
   });
 });
