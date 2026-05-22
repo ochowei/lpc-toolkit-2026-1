@@ -31,6 +31,8 @@ import {
 } from '../slice/catalog-tree';
 import { PRESETS, type Preset } from '../presets';
 import { computePresetSelection } from '../presets-apply';
+import { pickDefaults } from '../slice/color-options';
+import { ColorPicker } from './color-picker';
 import { useComposedCharacter } from '../hooks/use-composed-character';
 import { useAnimationPlayer } from '../hooks/use-animation-player';
 import { Button } from './ui/button';
@@ -194,7 +196,7 @@ export function SliceHarness({
       type: 'pick',
       typeName: item.typeName,
       name: item.name,
-      ...(def?.variants?.[0] ? { variant: def.variants[0] } : {}),
+      ...pickDefaults(def, palettes),
     });
   }
 
@@ -245,29 +247,48 @@ export function SliceHarness({
                 const selected =
                   state.selections[item.typeName]?.name === item.name;
                 return (
-                  <button
-                    key={`${item.typeName}:${item.name}`}
-                    type="button"
-                    disabled={!compatible}
-                    title={
-                      !compatible
-                        ? t('picker.incompatibleBodyType')
-                        : tl.category(item.typeName)
-                    }
-                    className={`block w-full rounded px-2 py-1 text-left text-xs ${
-                      selected
-                        ? 'bg-accent text-accent-contrast'
-                        : compatible
-                          ? 'text-text hover:bg-surface-2'
-                          : 'text-text-dim opacity-60'
-                    }`}
-                    onClick={() => pickTreeItem(item)}
-                  >
-                    <span>{tl.itemName(item.name)}</span>
-                    <span className="ml-1 text-[10px] text-text-dim">
-                      {tl.category(item.typeName)}
-                    </span>
-                  </button>
+                  <div key={`${item.typeName}:${item.name}`}>
+                    <button
+                      type="button"
+                      disabled={!compatible}
+                      title={
+                        !compatible
+                          ? t('picker.incompatibleBodyType')
+                          : tl.category(item.typeName)
+                      }
+                      className={`block w-full rounded px-2 py-1 text-left text-xs ${
+                        selected
+                          ? 'bg-accent text-accent-ink'
+                          : compatible
+                            ? 'text-text hover:bg-surface-2'
+                            : 'text-text-dim opacity-60'
+                      }`}
+                      onClick={() => pickTreeItem(item)}
+                    >
+                      <span>{tl.itemName(item.name)}</span>
+                      <span className="ml-1 text-[10px] text-text-dim">
+                        {tl.category(item.typeName)}
+                      </span>
+                    </button>
+                    {selected && def && (
+                      <div className="ml-2 mt-1">
+                        <ColorPicker
+                          item={def}
+                          selection={state.selections[item.typeName]}
+                          palettes={palettes}
+                          colorLabel={t('picker.color')}
+                          onSelect={(change) =>
+                            dispatch({
+                              type: 'pick',
+                              typeName: item.typeName,
+                              name: item.name,
+                              ...change,
+                            })
+                          }
+                        />
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>
@@ -276,6 +297,8 @@ export function SliceHarness({
         {!showHeader && (
           <div className="space-y-1">
             {entries.map((child) => renderTreeNode(child, depth + 1))}
+            {/* Root-level items: buildCatalogTree always nests items under a
+                category, so this list is normally empty — no color picker needed. */}
             {visibleItems.map((item) => (
               <button
                 key={`${item.typeName}:${item.name}`}
@@ -426,43 +449,59 @@ export function SliceHarness({
                   ? [...filteredItems, selectedItem]
                   : filteredItems;
               return (
-                <label key={tn} className="block text-xs">
-                  <span className="text-text-mute uppercase">
-                    {tl.category(tn)}
-                  </span>
-                  <select
-                    className="mt-1 w-full bg-surface-2 border border-border rounded p-1"
-                    value={selectedName}
-                    onChange={(e) => {
-                      const name = e.target.value;
-                      if (!name) {
-                        dispatch({ type: 'clear', typeName: tn });
-                        return;
+                <div key={tn} className="space-y-1">
+                  <label className="block text-xs">
+                    <span className="text-text-mute uppercase">
+                      {tl.category(tn)}
+                    </span>
+                    <select
+                      className="mt-1 w-full bg-surface-2 border border-border rounded p-1"
+                      value={selectedName}
+                      onChange={(e) => {
+                        const name = e.target.value;
+                        if (!name) {
+                          dispatch({ type: 'clear', typeName: tn });
+                          return;
+                        }
+                        const item = items.find((it) => it.name === name);
+                        dispatch({
+                          type: 'pick',
+                          typeName: tn,
+                          name,
+                          ...pickDefaults(item, palettes),
+                        });
+                      }}
+                    >
+                      <option value="">— {t('picker.none')} —</option>
+                      {shownItems.map((it) => (
+                        <option key={it.name} value={it.name}>
+                          {tl.itemName(it.name)}
+                          {licenseFilter &&
+                          selectedName === it.name &&
+                          !itemMatchesLicenseFilter(it, licenseFilter)
+                            ? ` (${t('picker.current')})`
+                            : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {selectedItem && (
+                    <ColorPicker
+                      item={selectedItem}
+                      selection={state.selections[tn]}
+                      palettes={palettes}
+                      colorLabel={t('picker.color')}
+                      onSelect={(change) =>
+                        dispatch({
+                          type: 'pick',
+                          typeName: tn,
+                          name: selectedItem.name,
+                          ...change,
+                        })
                       }
-                      const item = items.find((it) => it.name === name);
-                      dispatch({
-                        type: 'pick',
-                        typeName: tn,
-                        name,
-                        ...(item?.variants?.[0]
-                          ? { variant: item.variants[0] }
-                          : {}),
-                      });
-                    }}
-                  >
-                    <option value="">— {t('picker.none')} —</option>
-                    {shownItems.map((it) => (
-                      <option key={it.name} value={it.name}>
-                        {tl.itemName(it.name)}
-                        {licenseFilter &&
-                        selectedName === it.name &&
-                        !itemMatchesLicenseFilter(it, licenseFilter)
-                          ? ` (${t('picker.current')})`
-                          : ''}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    />
+                  )}
+                </div>
               );
             })}
           </section>
