@@ -11,6 +11,7 @@ import {
   type Direction,
   type ItemDefinition,
   type License,
+  type PaletteMetadata,
 } from '@lpc-toolkit/core';
 import {
   toSelections,
@@ -56,6 +57,7 @@ const RESET_SCOPE_DEFAULTS = { outfit: true, view: false, filters: false };
 
 export function SliceHarness({
   catalog,
+  palettes,
   shownTypeNames,
   state,
   dispatch,
@@ -70,6 +72,7 @@ export function SliceHarness({
   onToggleLocale,
 }: {
   catalog: Catalog;
+  palettes: PaletteMetadata;
   shownTypeNames: string[];
   state: SliceState;
   dispatch: (a: SliceAction) => void;
@@ -101,7 +104,7 @@ export function SliceHarness({
     return map;
   }, [catalog]);
   const deferredAssetSearch = useDeferredValue(assetSearch);
-  const result = useComposedCharacter(catalog, state, assetSource);
+  const result = useComposedCharacter(catalog, palettes, state, assetSource);
   useAnimationPlayer(
     canvasRef,
     result.animation,
