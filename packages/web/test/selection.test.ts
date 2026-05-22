@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createCatalog, type ItemDefinition } from '@lpc-toolkit/core';
 import {
+  orderedSelectionEntries,
   pickInitialSelections,
   sliceReducer,
   toSelections,
@@ -270,5 +271,36 @@ describe('sliceReducer reset', () => {
       init,
     });
     expect(s).toEqual(mutated);
+  });
+});
+
+describe('orderedSelectionEntries', () => {
+  it('orders common types head-to-toe, ahead of non-common types', () => {
+    const entries = orderedSelectionEntries({
+      weapon: { typeName: 'weapon', name: 'Sword' },
+      hair: { typeName: 'hair', name: 'Hair A' },
+      body: { typeName: 'body', name: 'Body A' },
+    });
+    expect(entries.map(([tn]) => tn)).toEqual(['body', 'hair', 'weapon']);
+  });
+
+  it('sorts non-common types alphabetically by typeName', () => {
+    const entries = orderedSelectionEntries({
+      wings: { typeName: 'wings', name: 'Wings A' },
+      cape: { typeName: 'cape', name: 'Cape A' },
+    });
+    expect(entries.map(([tn]) => tn)).toEqual(['cape', 'wings']);
+  });
+
+  it('drops entries with an empty name', () => {
+    const entries = orderedSelectionEntries({
+      body: { typeName: 'body', name: 'Body A' },
+      hair: { typeName: 'hair', name: '' },
+    });
+    expect(entries.map(([tn]) => tn)).toEqual(['body']);
+  });
+
+  it('returns an empty array for empty selections', () => {
+    expect(orderedSelectionEntries({})).toEqual([]);
   });
 });
