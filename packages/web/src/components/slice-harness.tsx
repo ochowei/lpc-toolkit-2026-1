@@ -268,12 +268,6 @@ export function SliceHarness({
         </span>
         <span className="text-text-dim text-xs">{t('app.subtitle')}</span>
         <div className="flex-1" />
-        <ResetMenu
-          t={t}
-          onReset={onReset}
-          onResetLicenseFilter={() => setLicenseFilter(null)}
-          onResetSearch={() => setAssetSearch('')}
-        />
         <Button size="sm" variant="ghost" onClick={onToggleLocale}>
           {locale === 'en'
             ? t('language.toChinese')
@@ -287,6 +281,12 @@ export function SliceHarness({
       <div className="grid min-h-0 flex-1 grid-cols-[260px_1fr_300px]">
         {/* Left: pickers */}
         <aside className="scroll border-r border-border p-3 space-y-3">
+          <ResetMenu
+            t={t}
+            onReset={onReset}
+            onResetLicenseFilter={() => setLicenseFilter(null)}
+            onResetSearch={() => setAssetSearch('')}
+          />
           <section className="space-y-1 border-b border-border pb-3 text-xs">
             <div className="text-text-mute uppercase">
               {t('assetSource.title')}
