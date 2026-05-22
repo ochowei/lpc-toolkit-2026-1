@@ -175,7 +175,9 @@ export function SliceHarness({
     if (q === '') return true;
     return (
       item.name.toLowerCase().includes(q) ||
-      item.typeName.toLowerCase().includes(q)
+      item.typeName.toLowerCase().includes(q) ||
+      tl.itemName(item.name).toLowerCase().includes(q) ||
+      tl.category(item.typeName).toLowerCase().includes(q)
     );
   }
 
