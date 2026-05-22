@@ -206,12 +206,6 @@ export function pickInitialSelections(catalog: Catalog): {
 }
 
 /**
- * The selections as `[typeName, Selection]` pairs in the order the
- * "Selected items" panel renders them: common types first in their
- * head-to-toe order, then any remaining types alphabetically by
- * `typeName`. Entries with an empty `name` are dropped.
- */
-/**
  * The `SliceAction` an advanced-tree click should dispatch. Clicking the
  * item already selected for its type toggles it off (`clear`); any other
  * click selects it (`pick`), replacing whatever was selected for that
@@ -233,6 +227,12 @@ export function treeItemAction(
   };
 }
 
+/**
+ * The selections as `[typeName, Selection]` pairs in the order the
+ * "Selected items" panel renders them: common types first in their
+ * head-to-toe order, then any remaining types alphabetically by
+ * `typeName`. Entries with an empty `name` are dropped.
+ */
 export function orderedSelectionEntries(
   selections: Readonly<Record<TypeName, Selection>>,
 ): [TypeName, Selection][] {
