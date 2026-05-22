@@ -65,6 +65,24 @@ describe('i18n', () => {
     expect(zh('reset.confirm')).toBe('重置選取項目');
     expect(zh('reset.cancel')).toBe('取消');
   });
+
+  it('includes outfit preset keys in both locales', () => {
+    const presetKeys = [
+      'preset.title',
+      'preset.farmer',
+      'preset.mage',
+      'preset.knight',
+      'preset.ranger',
+      'preset.noble',
+      'preset.rogue',
+      'preset.applied',
+      'preset.skipped',
+    ];
+    for (const key of presetKeys) {
+      expect(Object.keys(TRANSLATIONS.en)).toContain(key);
+      expect(Object.keys(TRANSLATIONS['zh-TW'])).toContain(key);
+    }
+  });
 });
 
 describe('label translator', () => {
