@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "copy-sprites": "tsx scripts/copy-spritesheets.ts",
+    "gen-i18n": "tsx scripts/gen-i18n-data.ts",
     "pretest": "tsx scripts/copy-spritesheets.ts",
     "test": "vitest run"
   },

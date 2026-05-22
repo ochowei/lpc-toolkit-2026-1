@@ -5,9 +5,11 @@
  * Reads the read-only upstream/ submodule; upstream/ is never written.
  * Re-running is merge-safe: existing translations are preserved and any new
  * asset names are appended with an identity value, so this also serves as a
- * maintenance check when upstream adds assets.
+ * maintenance check when upstream adds assets. Note: if upstream renames an
+ * asset, its old translation is dropped and the new name appears untranslated
+ * — watch the `untranslated` count after an upstream bump.
  *
- * Run: pnpm --filter @lpc-toolkit/web exec tsx scripts/gen-i18n-data.ts
+ * Run: pnpm --filter @lpc-toolkit/web gen-i18n
  */
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';

@@ -87,7 +87,15 @@ describe('label translator', () => {
   it('falls back to the raw value for unknown keys', () => {
     const zh = createLabelTranslator('zh-TW');
     expect(zh.category('__nope__')).toBe('__nope__');
+    expect(zh.bodyType('__nope__')).toBe('__nope__');
+    expect(zh.anim('__nope__')).toBe('__nope__');
     expect(zh.itemName('__nope__')).toBe('__nope__');
+  });
+
+  it('normalises category key case', () => {
+    const zh = createLabelTranslator('zh-TW');
+    expect(zh.category('Body')).toBe('身體');
+    expect(zh.category('EXPRESSION')).toBe('表情');
   });
 
   it('translates a known asset name for Chinese', () => {
