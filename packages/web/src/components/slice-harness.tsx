@@ -33,6 +33,7 @@ import { computePresetSelection } from '../presets-apply';
 import { useComposedCharacter } from '../hooks/use-composed-character';
 import { useAnimationPlayer } from '../hooks/use-animation-player';
 import { Button } from './ui/button';
+import { SelectedItemsPanel } from './selected-items-panel';
 import type { Locale, TranslationKey, Translator, LabelTranslator } from '../i18n';
 import type { AssetSource } from '../adapter/asset-source';
 
@@ -530,6 +531,12 @@ export function SliceHarness({
 
         {/* Right: token + attribution */}
         <aside className="scroll border-l border-border p-3">
+          <SelectedItemsPanel
+            selections={state.selections}
+            dispatch={dispatch}
+            t={t}
+            tl={tl}
+          />
           <section className="border-b border-border pb-3">
             <h2 className="text-xs font-bold uppercase">
               {t('token.title')}
