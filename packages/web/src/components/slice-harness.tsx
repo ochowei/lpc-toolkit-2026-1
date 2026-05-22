@@ -651,35 +651,36 @@ function ResetMenu({
         {t('reset.button')}
       </Button>
       {open && (
-        <div
-          role="menu"
-          aria-label={t('reset.menuTitle')}
-          className="absolute right-0 z-10 mt-1 w-56 rounded-md border border-border bg-surface-2 p-2 shadow-lg"
-        >
-          {(
-            [
-              ['outfit', 'reset.scope.outfit'],
-              ['view', 'reset.scope.view'],
-              ['filters', 'reset.scope.filters'],
-            ] as const
-          ).map(([key, labelKey]) => (
-            <button
-              key={key}
-              type="button"
-              role="menuitemcheckbox"
-              aria-checked={scopes[key]}
-              onClick={() => toggle(key)}
-              className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-surface-3"
-            >
-              <span
-                aria-hidden
-                className="inline-block h-3 w-3 rounded border border-border text-center leading-3"
+        <div className="absolute left-0 z-10 mt-1 w-56 rounded-md border border-border bg-surface-2 p-2 shadow-lg">
+          <div className="px-1 pb-1 text-[11px] uppercase text-text-mute">
+            {t('reset.menuTitle')}
+          </div>
+          <div role="menu" aria-label={t('reset.menuTitle')}>
+            {(
+              [
+                ['outfit', 'reset.scope.outfit'],
+                ['view', 'reset.scope.view'],
+                ['filters', 'reset.scope.filters'],
+              ] as const
+            ).map(([key, labelKey]) => (
+              <button
+                key={key}
+                type="button"
+                role="menuitemcheckbox"
+                aria-checked={scopes[key]}
+                onClick={() => toggle(key)}
+                className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-surface-3"
               >
-                {scopes[key] ? '✓' : ''}
-              </span>
-              {t(labelKey)}
-            </button>
-          ))}
+                <span
+                  aria-hidden
+                  className="inline-block h-3 w-3 rounded border border-border text-center leading-3"
+                >
+                  {scopes[key] ? '✓' : ''}
+                </span>
+                {t(labelKey)}
+              </button>
+            ))}
+          </div>
           <div className="mt-2 flex justify-end gap-1">
             <Button size="sm" variant="ghost" onClick={close}>
               {t('reset.cancel')}
