@@ -22,7 +22,12 @@ export type ColorOptions =
   | { readonly mode: 'variants'; readonly options: readonly VariantColorOption[] }
   | { readonly mode: 'none' };
 
-/** "fur_black" -> "Fur black"; "lpcr.tan" -> "Tan". */
+/**
+ * Display label for a color key: "fur_black" -> "Fur black"; "lpcr.tan" ->
+ * "Tan". The material/version prefix is intentionally dropped for brevity,
+ * so two cross-version keys with the same bare name would render the same
+ * label — harmless, since the option's `value` keeps the full prefixed key.
+ */
 function humanize(raw: string): string {
   const tail = raw.includes('.') ? raw.slice(raw.lastIndexOf('.') + 1) : raw;
   const spaced = tail.replace(/_/g, ' ');

@@ -118,8 +118,10 @@ Mode is determined by the item (mutually exclusive):
   `getRecolorSwatches(item, palettes)`. Each swatch is a single solid
   square using a representative entry from the ramp (a fixed mid-ramp
   index, chosen for visibility); the recolor name shows as a hover
-  tooltip. The active recolor is highlighted; if `selection.recolor` is
-  unset, the material's `base` recolor is treated as active.
+  tooltip. The swatch matching `selection.recolor` is highlighted; a
+  selected recolors item always carries a `recolor` — `pickDefaults` sets
+  one on pick and `pickInitialSelections` seeds the defaults — so there is
+  no unset case to fall back from.
 - **variants item** — a wrapping row of text chips, one per
   `item.variants` entry, label = variant name capitalized with `_`
   replaced by space. The active variant is highlighted.
