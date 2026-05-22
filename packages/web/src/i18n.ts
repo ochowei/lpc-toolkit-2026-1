@@ -27,6 +27,7 @@ export const TRANSLATIONS = {
     'picker.advanced': 'Advanced: all upstream assets',
     'picker.searchAssets': 'Search all assets',
     'picker.incompatibleBodyType': 'Not available for current body type',
+    'picker.clickToRemove': 'Click again to remove',
     'direction.up': 'Up',
     'direction.left': 'Left',
     'direction.down': 'Down',
@@ -67,6 +68,9 @@ export const TRANSLATIONS = {
     'preset.rogue': 'Rogue',
     'preset.applied': 'Applied',
     'preset.skipped': 'skipped',
+    'selected.title': 'Selected items',
+    'selected.empty': 'No items selected',
+    'selected.remove': 'Remove',
   },
   'zh-TW': {
     'app.subtitle': '基礎切片',
@@ -92,6 +96,7 @@ export const TRANSLATIONS = {
     'picker.advanced': '進階：所有上游素材',
     'picker.searchAssets': '搜尋所有素材',
     'picker.incompatibleBodyType': '不支援目前身形',
+    'picker.clickToRemove': '再點一次可取消',
     'direction.up': '上',
     'direction.left': '左',
     'direction.down': '下',
@@ -131,6 +136,9 @@ export const TRANSLATIONS = {
     'preset.rogue': '盜賊',
     'preset.applied': '已套用',
     'preset.skipped': '已略過',
+    'selected.title': '已選素材',
+    'selected.empty': '目前未選取任何素材',
+    'selected.remove': '移除',
   },
 } as const;
 
