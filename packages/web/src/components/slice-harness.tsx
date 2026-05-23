@@ -16,6 +16,8 @@ import {
 import {
   toSelections,
   treeItemAction,
+  MIN_ZOOM,
+  MAX_ZOOM,
   type SliceState,
   type SliceAction,
 } from '../slice/selection';
@@ -557,6 +559,48 @@ export function SliceHarness({
             >
               {state.playing ? t('controls.pause') : t('controls.play')}
             </Button>
+            <div className="ml-2 flex items-center gap-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={state.zoom <= MIN_ZOOM}
+                aria-label={t('controls.zoomOut')}
+                onClick={() =>
+                  dispatch({ type: 'set_zoom', zoom: state.zoom - 1 })
+                }
+              >
+                −
+              </Button>
+              <span className="text-text-mute w-8 text-center text-xs tabular-nums">
+                {state.zoom}×
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={state.zoom >= MAX_ZOOM}
+                aria-label={t('controls.zoomIn')}
+                onClick={() =>
+                  dispatch({ type: 'set_zoom', zoom: state.zoom + 1 })
+                }
+              >
+                +
+              </Button>
+              <input
+                type="range"
+                min={MIN_ZOOM}
+                max={MAX_ZOOM}
+                step={1}
+                value={state.zoom}
+                aria-label={t('controls.zoom')}
+                onChange={(e) =>
+                  dispatch({
+                    type: 'set_zoom',
+                    zoom: Number(e.target.value),
+                  })
+                }
+                className="w-24"
+              />
+            </div>
             <div className="flex-1" />
             <span className="text-text-dim text-xs">
               {result.status === 'loading'
