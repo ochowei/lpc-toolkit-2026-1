@@ -92,6 +92,7 @@ export function SliceHarness({
   onToggleLocale: () => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const previewRef = useRef<HTMLDivElement | null>(null);
   const [licenseFilter, setLicenseFilter] = useState<LicenseFilter>(null);
   const [tokenInput, setTokenInput] = useState('');
   const [tokenStatus, setTokenStatus] = useState<string | null>(null);
@@ -117,6 +118,18 @@ export function SliceHarness({
     state.playing,
     state.zoom,
   );
+  useEffect(() => {
+    const el = previewRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      const delta = e.deltaY < 0 ? +1 : -1;
+      dispatch({ type: 'set_zoom', zoom: state.zoom + delta });
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [dispatch, state.zoom]);
 
   const animNames = useMemo(
     () =>
@@ -608,7 +621,10 @@ export function SliceHarness({
                 : result.status}
             </span>
           </div>
-          <div className="checker flex flex-1 items-center justify-center">
+          <div
+            ref={previewRef}
+            className="checker flex flex-1 items-center justify-center"
+          >
             {failed ? (
               <div className="text-danger text-sm">{result.error}</div>
             ) : (
