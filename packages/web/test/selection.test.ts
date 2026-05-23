@@ -126,6 +126,21 @@ describe('toSelections', () => {
     expect(sel.items['hair']).toEqual({ typeName: 'hair', name: 'Hair A' });
     expect('variant' in sel.items['body']!).toBe(false);
   });
+
+  it('does not surface zoom (view state, not part of selection token)', () => {
+    const state: SliceState = {
+      bodyType: 'male',
+      selections: {
+        body: { typeName: 'body', name: 'Body A' },
+      },
+      anim: 'walk',
+      dir: 'down',
+      playing: true,
+      zoom: 7,
+    };
+    const sel = toSelections(state);
+    expect('zoom' in sel).toBe(false);
+  });
 });
 
 describe('sliceReducer', () => {

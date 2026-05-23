@@ -93,6 +93,10 @@ export function SliceHarness({
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
+  const zoomRef = useRef(state.zoom);
+  useEffect(() => {
+    zoomRef.current = state.zoom;
+  }, [state.zoom]);
   const [licenseFilter, setLicenseFilter] = useState<LicenseFilter>(null);
   const [tokenInput, setTokenInput] = useState('');
   const [tokenStatus, setTokenStatus] = useState<string | null>(null);
@@ -125,11 +129,11 @@ export function SliceHarness({
       if (!(e.ctrlKey || e.metaKey)) return;
       e.preventDefault();
       const delta = e.deltaY < 0 ? +1 : -1;
-      dispatch({ type: 'set_zoom', zoom: state.zoom + delta });
+      dispatch({ type: 'set_zoom', zoom: zoomRef.current + delta });
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
-  }, [dispatch, state.zoom]);
+  }, [dispatch]);
 
   const animNames = useMemo(
     () =>
@@ -605,6 +609,7 @@ export function SliceHarness({
                 step={1}
                 value={state.zoom}
                 aria-label={t('controls.zoom')}
+                aria-valuetext={`${state.zoom}×`}
                 onChange={(e) =>
                   dispatch({
                     type: 'set_zoom',
