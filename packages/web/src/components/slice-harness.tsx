@@ -53,7 +53,6 @@ const ASSET_SOURCE_LABELS: Record<AssetSource, TranslationKey> = {
   local: 'assetSource.local',
   upstream: 'assetSource.upstream',
 };
-const ZOOM = 4;
 const LICENSE_OPTIONS: readonly License[] = LICENSE_CONFIG.flatMap(
   (group) => group.versions,
 );
@@ -114,7 +113,7 @@ export function SliceHarness({
     result.animation,
     state.dir,
     state.playing,
-    ZOOM,
+    state.zoom,
   );
 
   const animNames = useMemo(
