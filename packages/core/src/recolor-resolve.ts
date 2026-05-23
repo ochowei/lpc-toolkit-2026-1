@@ -395,3 +395,35 @@ export function getRecolorVariants(
   const nr = normalizeRecolor(first, palettes.materials);
   return nr ? nr.variants : [];
 }
+
+/** One recolor option plus the hex ramp behind it — what a swatch UI draws. */
+export interface RecolorSwatch {
+  readonly recolor: string;
+  readonly colors: readonly string[];
+}
+
+/**
+ * The first recolor entry's palette-expanded variants paired with their
+ * resolved color ramps. Shares the expansion path with `getRecolorVariants`
+ * (`collectRecolorEntries` + `normalizeRecolor`); each variant's ramp is
+ * resolved through `getTargetPalette`. Returns `[]` when the item has no
+ * recolors or the material is unknown. Lets a UI draw real color swatches
+ * without re-implementing core's recolor-key resolution. Like
+ * `getRecolorVariants`, only the first recolor entry is exposed —
+ * multi-material items show their primary material's swatches.
+ */
+export function getRecolorSwatches(
+  item: ItemDefinition,
+  palettes: PaletteMetadata,
+): readonly RecolorSwatch[] {
+  const first = collectRecolorEntries(item.recolors)[0];
+  if (!first) return [];
+  const nr = normalizeRecolor(first, palettes.materials);
+  if (!nr) return [];
+  const out: RecolorSwatch[] = [];
+  for (const recolor of nr.variants) {
+    const colors = getTargetPalette(nr.material, recolor, palettes.materials);
+    if (colors && colors.length > 0) out.push({ recolor, colors });
+  }
+  return out;
+}

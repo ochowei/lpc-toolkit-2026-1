@@ -2,9 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   composeSelections,
   extractAnimation,
+  makeResolvePalette,
   type Catalog,
   type ComposedAnimation,
   type ComposedSheet,
+  type PaletteMetadata,
 } from '@lpc-toolkit/core';
 import { createBrowserCanvasAdapter } from '../adapter/browser-canvas-adapter';
 import type { AssetSource } from '../adapter/asset-source';
@@ -40,6 +42,7 @@ function resolveAnim(sheet: ComposedSheet, anim: string): string {
  */
 export function useComposedCharacter(
   catalog: Catalog,
+  palettes: PaletteMetadata,
   state: SliceState,
   assetSource: AssetSource,
 ): ComposedResult {
@@ -70,6 +73,7 @@ export function useComposedCharacter(
       catalog,
       adapter,
       spritesheetsBaseUrl: '',
+      resolvePalette: makeResolvePalette(catalog, palettes, selections),
       onProgress: (loaded, total) => {
         if (reqId !== reqIdRef.current) return;
         setResult((r) => ({
@@ -107,7 +111,7 @@ export function useComposedCharacter(
       });
     // key encodes the selection-relevant state (anim handled by Effect 2).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adapter, catalog, key]);
+  }, [adapter, catalog, palettes, key]);
 
   // Anim change: cheap re-extract off the current sheet (no recompose).
   useEffect(() => {

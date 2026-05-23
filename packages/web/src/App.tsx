@@ -1,5 +1,6 @@
 import { useMemo, useReducer, useState } from 'react';
 import { loadCatalogFromUpstream } from './catalog/load-catalog';
+import { loadPalettesFromUpstream } from './catalog/load-palettes';
 import {
   pickInitialSelections,
   sliceReducer,
@@ -20,8 +21,9 @@ export default function App() {
 
   const init = useMemo(() => {
     const catalog = loadCatalogFromUpstream();
+    const palettes = loadPalettesFromUpstream();
     const { state, shownTypeNames } = pickInitialSelections(catalog);
-    return { catalog, state, shownTypeNames };
+    return { catalog, palettes, state, shownTypeNames };
   }, []);
   const t = useMemo(() => createTranslator(locale), [locale]);
   const tl = useMemo(() => createLabelTranslator(locale), [locale]);
@@ -37,6 +39,7 @@ export default function App() {
   return (
     <SliceHarness
       catalog={init.catalog}
+      palettes={init.palettes}
       shownTypeNames={init.shownTypeNames}
       state={state}
       dispatch={dispatch}
