@@ -15,6 +15,7 @@ import {
 } from '@lpc-toolkit/core';
 import {
   toSelections,
+  treeItemAction,
   type SliceState,
   type SliceAction,
 } from '../slice/selection';
@@ -36,6 +37,7 @@ import { ColorPicker } from './color-picker';
 import { useComposedCharacter } from '../hooks/use-composed-character';
 import { useAnimationPlayer } from '../hooks/use-animation-player';
 import { Button } from './ui/button';
+import { SelectedItemsPanel } from './selected-items-panel';
 import type { Locale, TranslationKey, Translator, LabelTranslator } from '../i18n';
 import type { AssetSource } from '../adapter/asset-source';
 
@@ -192,12 +194,12 @@ export function SliceHarness({
 
   function pickTreeItem(item: CatalogTreeItem): void {
     const def = itemByTypeAndName.get(`${item.typeName}:${item.name}`);
-    dispatch({
-      type: 'pick',
-      typeName: item.typeName,
-      name: item.name,
-      ...pickDefaults(def, palettes),
-    });
+    const action = treeItemAction(state.selections, item, def);
+    dispatch(
+      action.type === 'pick'
+        ? { ...action, ...pickDefaults(def, palettes) }
+        : action,
+    );
   }
 
   function treeItemMatches(item: CatalogTreeItem, query: string): boolean {
@@ -254,7 +256,9 @@ export function SliceHarness({
                       title={
                         !compatible
                           ? t('picker.incompatibleBodyType')
-                          : tl.category(item.typeName)
+                          : selected
+                            ? t('picker.clickToRemove')
+                            : tl.category(item.typeName)
                       }
                       className={`block w-full rounded px-2 py-1 text-left text-xs ${
                         selected
@@ -572,6 +576,12 @@ export function SliceHarness({
 
         {/* Right: token + attribution */}
         <aside className="scroll border-l border-border p-3">
+          <SelectedItemsPanel
+            selections={state.selections}
+            dispatch={dispatch}
+            t={t}
+            tl={tl}
+          />
           <section className="border-b border-border pb-3">
             <h2 className="text-xs font-bold uppercase">
               {t('token.title')}

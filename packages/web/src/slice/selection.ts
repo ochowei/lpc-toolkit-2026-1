@@ -8,6 +8,7 @@ import {
   type Selections,
   type TypeName,
 } from '@lpc-toolkit/core';
+import type { CatalogTreeItem } from './catalog-tree';
 
 export interface SliceState {
   readonly bodyType: BodyType;
@@ -146,7 +147,7 @@ const DEFAULT_BODY_TYPE: BodyType = 'male';
  * included only if the catalog has at least one item of that type, so
  * pared-down test catalogs still work.
  */
-const COMMON_TYPE_ORDER: readonly TypeName[] = [
+export const COMMON_TYPE_ORDER: readonly TypeName[] = [
   'body',
   'head',
   'hair',
@@ -202,4 +203,48 @@ export function pickInitialSelections(catalog: Catalog): {
     },
     shownTypeNames,
   };
+}
+
+/**
+ * The `SliceAction` an advanced-tree click should dispatch. Clicking the
+ * item already selected for its type toggles it off (`clear`); any other
+ * click selects it (`pick`), replacing whatever was selected for that
+ * type.
+ */
+export function treeItemAction(
+  selections: Readonly<Record<TypeName, Selection>>,
+  item: CatalogTreeItem,
+  def: ItemDefinition | undefined,
+): SliceAction {
+  if (selections[item.typeName]?.name === item.name) {
+    return { type: 'clear', typeName: item.typeName };
+  }
+  return {
+    type: 'pick',
+    typeName: item.typeName,
+    name: item.name,
+    ...(def?.variants?.[0] ? { variant: def.variants[0] } : {}),
+  };
+}
+
+/**
+ * The selections as `[typeName, Selection]` pairs in the order the
+ * "Selected items" panel renders them: common types first in their
+ * head-to-toe order, then any remaining types alphabetically by
+ * `typeName`. Entries with an empty `name` are dropped.
+ */
+export function orderedSelectionEntries(
+  selections: Readonly<Record<TypeName, Selection>>,
+): [TypeName, Selection][] {
+  const entries = Object.entries(selections).filter(
+    ([, sel]) => sel.name,
+  ) as [TypeName, Selection][];
+  const rank = (tn: TypeName): number => {
+    const i = COMMON_TYPE_ORDER.indexOf(tn);
+    return i === -1 ? COMMON_TYPE_ORDER.length : i;
+  };
+  return entries.sort(([a], [b]) => {
+    const diff = rank(a) - rank(b);
+    return diff !== 0 ? diff : a.localeCompare(b);
+  });
 }
