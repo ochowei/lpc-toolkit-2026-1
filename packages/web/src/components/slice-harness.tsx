@@ -16,6 +16,8 @@ import {
 import {
   toSelections,
   treeItemAction,
+  MIN_ZOOM,
+  MAX_ZOOM,
   type SliceState,
   type SliceAction,
 } from '../slice/selection';
@@ -53,7 +55,6 @@ const ASSET_SOURCE_LABELS: Record<AssetSource, TranslationKey> = {
   local: 'assetSource.local',
   upstream: 'assetSource.upstream',
 };
-const ZOOM = 4;
 const LICENSE_OPTIONS: readonly License[] = LICENSE_CONFIG.flatMap(
   (group) => group.versions,
 );
@@ -91,6 +92,11 @@ export function SliceHarness({
   onToggleLocale: () => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const previewRef = useRef<HTMLDivElement | null>(null);
+  const zoomRef = useRef(state.zoom);
+  useEffect(() => {
+    zoomRef.current = state.zoom;
+  }, [state.zoom]);
   const [licenseFilter, setLicenseFilter] = useState<LicenseFilter>(null);
   const [tokenInput, setTokenInput] = useState('');
   const [tokenStatus, setTokenStatus] = useState<string | null>(null);
@@ -114,8 +120,20 @@ export function SliceHarness({
     result.animation,
     state.dir,
     state.playing,
-    ZOOM,
+    state.zoom,
   );
+  useEffect(() => {
+    const el = previewRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      const delta = e.deltaY < 0 ? +1 : -1;
+      dispatch({ type: 'set_zoom', zoom: zoomRef.current + delta });
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [dispatch]);
 
   const animNames = useMemo(
     () =>
@@ -558,6 +576,49 @@ export function SliceHarness({
             >
               {state.playing ? t('controls.pause') : t('controls.play')}
             </Button>
+            <div className="ml-2 flex items-center gap-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={state.zoom <= MIN_ZOOM}
+                aria-label={t('controls.zoomOut')}
+                onClick={() =>
+                  dispatch({ type: 'set_zoom', zoom: state.zoom - 1 })
+                }
+              >
+                −
+              </Button>
+              <span className="text-text-mute w-8 text-center text-xs tabular-nums">
+                {state.zoom}×
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={state.zoom >= MAX_ZOOM}
+                aria-label={t('controls.zoomIn')}
+                onClick={() =>
+                  dispatch({ type: 'set_zoom', zoom: state.zoom + 1 })
+                }
+              >
+                +
+              </Button>
+              <input
+                type="range"
+                min={MIN_ZOOM}
+                max={MAX_ZOOM}
+                step={1}
+                value={state.zoom}
+                aria-label={t('controls.zoom')}
+                aria-valuetext={`${state.zoom}×`}
+                onChange={(e) =>
+                  dispatch({
+                    type: 'set_zoom',
+                    zoom: Number(e.target.value),
+                  })
+                }
+                className="w-24"
+              />
+            </div>
             <div className="flex-1" />
             <span className="text-text-dim text-xs">
               {result.status === 'loading'
@@ -565,7 +626,10 @@ export function SliceHarness({
                 : result.status}
             </span>
           </div>
-          <div className="checker flex flex-1 items-center justify-center">
+          <div
+            ref={previewRef}
+            className="checker flex flex-1 items-center justify-center"
+          >
             {failed ? (
               <div className="text-danger text-sm">{result.error}</div>
             ) : (
