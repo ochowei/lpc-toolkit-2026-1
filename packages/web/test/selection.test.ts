@@ -54,6 +54,7 @@ describe('pickInitialSelections', () => {
     expect(state.anim).toBe('walk');
     expect(state.dir).toBe('down');
     expect(state.playing).toBe(true);
+    expect(state.zoom).toBe(4);
   });
 
   it('does not pre-select hair / eyes / torso / legs / feet', () => {
@@ -118,6 +119,7 @@ describe('toSelections', () => {
       anim: 'walk',
       dir: 'down',
       playing: true,
+      zoom: 4,
     };
     const sel = toSelections(state);
     expect(sel.bodyType).toBe('male');
@@ -134,6 +136,7 @@ describe('sliceReducer', () => {
       anim: 'walk',
       dir: 'down',
       playing: true,
+      zoom: 4,
     };
     const s1 = sliceReducer(s0, { type: 'pick', typeName: 'hair', name: 'Hair B' });
     expect(s1.selections['hair']).toEqual({
@@ -154,6 +157,7 @@ describe('sliceReducer', () => {
       anim: 'slash',
       dir: 'left',
       playing: false,
+      zoom: 4,
     };
 
     const s1 = sliceReducer(s0, {
@@ -176,6 +180,7 @@ describe('sliceReducer', () => {
       anim: 'slash',
       dir: 'left',
       playing: false,
+      zoom: 4,
     });
   });
 
@@ -186,6 +191,7 @@ describe('sliceReducer', () => {
       anim: 'walk',
       dir: 'down',
       playing: true,
+      zoom: 4,
     };
 
     const s1 = sliceReducer(s0, {
@@ -217,6 +223,7 @@ describe('sliceReducer reset', () => {
     anim: 'walk',
     dir: 'down',
     playing: true,
+    zoom: 4,
   };
 
   const mutated: SliceState = {
@@ -228,6 +235,7 @@ describe('sliceReducer reset', () => {
     anim: 'slash',
     dir: 'left',
     playing: false,
+    zoom: 2,
   };
 
   it('outfit-only reset restores bodyType + selections, leaves view untouched', () => {
@@ -241,6 +249,7 @@ describe('sliceReducer reset', () => {
     expect(s.anim).toBe(mutated.anim);
     expect(s.dir).toBe(mutated.dir);
     expect(s.playing).toBe(mutated.playing);
+    expect(s.zoom).toBe(mutated.zoom);
   });
 
   it('view-only reset restores anim/dir/playing, leaves outfit untouched', () => {
@@ -254,6 +263,7 @@ describe('sliceReducer reset', () => {
     expect(s.anim).toBe(init.anim);
     expect(s.dir).toBe(init.dir);
     expect(s.playing).toBe(init.playing);
+    expect(s.zoom).toBe(init.zoom);
   });
 
   it('outfit + view reset restores all four fields', () => {
@@ -263,6 +273,7 @@ describe('sliceReducer reset', () => {
       init,
     });
     expect(s).toEqual(init);
+    expect(s.zoom).toBe(init.zoom);
   });
 
   it('reset with no scopes is a no-op', () => {
@@ -349,5 +360,38 @@ describe('treeItemAction', () => {
       typeName: 'weapon',
       name: 'Sword',
     });
+  });
+});
+
+describe('sliceReducer set_zoom', () => {
+  const base: SliceState = {
+    bodyType: 'male',
+    selections: { body: { typeName: 'body', name: 'Body A' } },
+    anim: 'walk',
+    dir: 'down',
+    playing: true,
+    zoom: 4,
+  };
+
+  it('clamps zoom to MIN_ZOOM lower bound', () => {
+    const s = sliceReducer(base, { type: 'set_zoom', zoom: 0 });
+    expect(s.zoom).toBe(1);
+  });
+
+  it('clamps zoom to MAX_ZOOM upper bound', () => {
+    const s = sliceReducer(base, { type: 'set_zoom', zoom: 12 });
+    expect(s.zoom).toBe(8);
+  });
+
+  it('rounds non-integer zoom to nearest integer (defensive)', () => {
+    const s = sliceReducer(base, { type: 'set_zoom', zoom: 3.6 });
+    expect(s.zoom).toBe(4);
+    const s2 = sliceReducer(base, { type: 'set_zoom', zoom: 3.4 });
+    expect(s2.zoom).toBe(3);
+  });
+
+  it('accepts in-range integer unchanged', () => {
+    const s = sliceReducer(base, { type: 'set_zoom', zoom: 6 });
+    expect(s.zoom).toBe(6);
   });
 });

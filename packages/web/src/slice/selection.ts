@@ -10,12 +10,24 @@ import {
 } from '@lpc-toolkit/core';
 import type { CatalogTreeItem } from './catalog-tree';
 
+export const MIN_ZOOM = 1;
+export const MAX_ZOOM = 8;
+export const DEFAULT_ZOOM = 4;
+
+function clampZoom(z: number): number {
+  const r = Math.round(z);
+  if (r < MIN_ZOOM) return MIN_ZOOM;
+  if (r > MAX_ZOOM) return MAX_ZOOM;
+  return r;
+}
+
 export interface SliceState {
   readonly bodyType: BodyType;
   readonly selections: Readonly<Record<TypeName, Selection>>;
   readonly anim: AnimationName;
   readonly dir: Direction;
   readonly playing: boolean;
+  readonly zoom: number;
 }
 
 export type SliceAction =
@@ -36,7 +48,8 @@ export type SliceAction =
     }
   | { type: 'set_anim'; anim: AnimationName }
   | { type: 'set_dir'; dir: Direction }
-  | { type: 'toggle_play' };
+  | { type: 'toggle_play' }
+  | { type: 'set_zoom'; zoom: number };
 
 export function sliceReducer(s: SliceState, a: SliceAction): SliceState {
   switch (a.type) {
@@ -86,6 +99,7 @@ export function sliceReducer(s: SliceState, a: SliceAction): SliceState {
           anim: a.init.anim,
           dir: a.init.dir,
           playing: a.init.playing,
+          zoom: a.init.zoom,
         };
       }
       return next;
@@ -96,6 +110,8 @@ export function sliceReducer(s: SliceState, a: SliceAction): SliceState {
       return { ...s, dir: a.dir };
     case 'toggle_play':
       return { ...s, playing: !s.playing };
+    case 'set_zoom':
+      return { ...s, zoom: clampZoom(a.zoom) };
     default:
       return s;
   }
@@ -200,6 +216,7 @@ export function pickInitialSelections(catalog: Catalog): {
       anim: 'walk',
       dir: 'down',
       playing: true,
+      zoom: DEFAULT_ZOOM,
     },
     shownTypeNames,
   };
