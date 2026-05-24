@@ -10,6 +10,7 @@ import { StackPanel } from './stack-panel';
 import { BodyTypePopover } from './popovers/body-type-popover';
 import { TokenPopover } from './popovers/token-popover';
 import { ResetMenuPopover } from './popovers/reset-menu-popover';
+import { AttributionPopover } from './popovers/attribution-popover';
 
 export interface LayerStackHarnessProps {
   catalog: Catalog;
@@ -99,6 +100,15 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
             }
             setStatus({ kind: 'info', text: 'Reset ✓' });
           }}
+        />
+        <AttributionPopover
+          open={popover === 'attribution'}
+          setOpen={(v) => setPopover(v ? 'attribution' : null)}
+          catalog={props.catalog}
+          state={props.state}
+          licenseFilter={licenseFilter}
+          t={props.t}
+          tl={props.tl}
         />
       </TopBar>
       <div className="grid min-h-0 flex-1 grid-cols-[340px_1fr]">
