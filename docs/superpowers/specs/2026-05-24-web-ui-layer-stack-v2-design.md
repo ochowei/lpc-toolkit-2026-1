@@ -92,14 +92,15 @@ packages/web/src/
 
 ### 元件職責邊界
 
-- **`harness.tsx`**：top-level；持 reducer / locale / theme / assetSource，
-  把它們分發給左右欄與彈窗。
+- **`harness.tsx`**：top-level；接 App.tsx 傳入的 reducer state/dispatch、
+  locale、theme、assetSource，並持以下本地 UI state：`popover`、`status`、
+  `licenseFilter`。分發給左右欄與彈窗。
 - **`top-bar.tsx`**：純呈現 + popovers trigger；不持業務 state。
 - **`stack-panel.tsx`**：根據 `state.selections` 計算 active / inactive
-  分類；管理 `expanded`、`adding`、`settingsOpen` 等 UI-only state。
+  分類；持本地 UI state `expanded`、`adding`、`settingsOpen`。
 - **`layer-row.tsx`**：單一分類列；展開時內嵌 swap grid + InlineStyleBlock。
-- **`popovers/*`**：每個彈窗自管 open/close 與內部 input；對外只暴露
-  trigger 與 onAction。
+- **`popovers/*`**：每個彈窗自管內部 input；open/close 由 `harness` 的
+  `popover` 變數控制（單值單開）。對外暴露 trigger 與 onAction。
 
 ## 頂列（Top Bar）
 
@@ -161,15 +162,22 @@ filter / Asset source（收左欄底部）。
 init.state)`、`useState` 持 theme/locale/assetSource。這層不動，只是改在
 最後渲染時依 `?ui=v2` 切換 root component。
 
-### LayerStackHarness 本地 UI state
+### 本地 UI state 擁有者
+
+`harness.tsx`：
+
+```ts
+const [popover, setPopover] = useState<null | 'bodyType' | 'token' | 'reset' | 'attribution'>(null);
+const [status, setStatus] = useState<{ kind: 'info' | 'warn' | 'error'; text: string } | null>(null);
+const [licenseFilter, setLicenseFilter] = useState<LicenseFilter>(null);
+```
+
+`stack-panel.tsx`：
 
 ```ts
 const [expanded, setExpanded] = useState<string | null>(initialExpandedCategory);
 const [adding, setAdding] = useState(false);
-const [popover, setPopover] = useState<null | 'bodyType' | 'token' | 'reset' | 'attribution'>(null);
 const [settingsOpen, setSettingsOpen] = useState(false);
-const [status, setStatus] = useState<{ kind: 'info' | 'warn' | 'error'; text: string } | null>(null);
-const [licenseFilter, setLicenseFilter] = useState<LicenseFilter>(null);
 ```
 
 `licenseFilter` 為本地 state（非 reducer），與現版 `slice-harness.tsx`
@@ -184,7 +192,9 @@ const [licenseFilter, setLicenseFilter] = useState<LicenseFilter>(null);
 所有變動走現有 reducer actions：
 - 換 item / 變 variant / 變色 → 現有 `slice/selection.ts` actions
 - 套用 preset → `computePresetSelection` 計算選擇 + dispatch
-- Scoped reset → `dispatch({ type: 'reset', scopes, init })`
+- Scoped reset → reducer 對應的 outfit / view scope 走
+  `dispatch({ type: 'reset', scopes, init })`；勾選 Filters 時，**額外**
+  在 harness 內 `setLicenseFilter(null)`（reducer 不知道 license filter）。
 - Direction / animation / zoom → 現有 actions
 
 ### 「不相容 preset 套用」流程
