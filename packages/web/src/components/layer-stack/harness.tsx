@@ -2,6 +2,7 @@ import type { Catalog, PaletteMetadata } from '@lpc-toolkit/core';
 import type { SliceState, SliceAction } from '../../slice/selection';
 import type { Locale, Translator, LabelTranslator } from '../../i18n';
 import type { AssetSource } from '../../adapter/asset-source';
+import { TopBar } from './top-bar';
 
 export interface LayerStackHarnessProps {
   catalog: Catalog;
@@ -20,11 +21,28 @@ export interface LayerStackHarnessProps {
   onToggleLocale: () => void;
 }
 
-export function LayerStackHarness(_props: LayerStackHarnessProps) {
+export function LayerStackHarness(props: LayerStackHarnessProps) {
+  const { t, theme, locale, onToggleTheme, onToggleLocale } = props;
+
   return (
-    <div className="lpc dark p-6 text-text">
-      <h1 className="text-lg font-semibold">Layer Stack v2 (placeholder)</h1>
-      <p className="text-text-mute text-sm">Wired in. Implementation lands in later tasks.</p>
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-app text-text">
+      <TopBar
+        t={t}
+        theme={theme}
+        locale={locale}
+        onToggleTheme={onToggleTheme}
+        onToggleLocale={onToggleLocale}
+      />
+      <div className="grid min-h-0 flex-1 grid-cols-[340px_1fr]">
+        <aside className="border-r border-border bg-surface">
+          {/* StackPanel — Task 7 */}
+          <div className="p-4 text-xs text-text-mute">stack-panel placeholder</div>
+        </aside>
+        <main className="bg-app">
+          {/* PreviewPane — Task 6 */}
+          <div className="p-4 text-xs text-text-mute">preview-pane placeholder</div>
+        </main>
+      </div>
     </div>
   );
 }
