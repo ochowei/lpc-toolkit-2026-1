@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Catalog, PaletteMetadata } from '@lpc-toolkit/core';
 import type { SliceState, SliceAction } from '../../slice/selection';
 import type { Locale, Translator, LabelTranslator } from '../../i18n';
@@ -28,8 +28,26 @@ export interface LayerStackHarnessProps {
 export function LayerStackHarness(props: LayerStackHarnessProps) {
   const { t, theme, locale, onToggleTheme, onToggleLocale } = props;
   const [licenseFilter] = useState<LicenseFilter>(null); // setLicenseFilter wires in Task 17
+  const [status, setStatus] = useState<{ kind: 'info' | 'warn' | 'error'; text: string } | null>(null);
 
-  const handlePresetApplied = (_name: string, _n: number, _types: string[]) => {};
+  useEffect(() => {
+    if (!status) return;
+    const id = setTimeout(() => setStatus(null), 4000);
+    return () => clearTimeout(id);
+  }, [status]);
+
+  const handlePresetApplied = (name: string, skippedCount: number, skippedTypes: string[]) => {
+    if (skippedCount === 0) {
+      setStatus({ kind: 'info', text: `${props.t('preset.applied')} ${name}` });
+    } else {
+      const names = skippedTypes.map((tn) => props.tl.category(tn)).join(', ');
+      const msg = props
+        .t('preset.applied.skipped')
+        .replace('{name}', name)
+        .replace('{names}', names);
+      setStatus({ kind: 'warn', text: msg });
+    }
+  };
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-app text-text">
@@ -52,6 +70,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
             t={props.t}
             tl={props.tl}
             onPresetApplied={handlePresetApplied}
+            status={status}
           />
         </aside>
         <main className="bg-app">

@@ -6,6 +6,7 @@ import { type LicenseFilter } from '../../slice/license-filter';
 import { LayerRow } from './layer-row';
 import { AddLayer } from './add-layer';
 import { PresetChips } from './preset-chips';
+import { StatusToast } from './status-toast';
 
 interface Props {
   catalog: Catalog;
@@ -17,6 +18,7 @@ interface Props {
   t: Translator;
   tl: LabelTranslator;
   onPresetApplied: (name: string, skippedCount: number, skippedTypes: string[]) => void;
+  status: { kind: 'info' | 'warn' | 'error'; text: string } | null;
 }
 
 export function StackPanel({
@@ -29,6 +31,7 @@ export function StackPanel({
   t,
   tl,
   onPresetApplied,
+  status,
 }: Props) {
   const [expanded, setExpanded] = useState<TypeName | null>(null);
   const [adding, setAdding] = useState(false);
@@ -58,7 +61,7 @@ export function StackPanel({
         onApplied={onPresetApplied}
       />
 
-      {/* Task 12: <StatusToast /> */}
+      <StatusToast status={status} />
 
       <div className="flex items-center gap-2 px-3 pt-3 pb-1">
         <span className="text-[10px] font-semibold uppercase tracking-wide text-text">
