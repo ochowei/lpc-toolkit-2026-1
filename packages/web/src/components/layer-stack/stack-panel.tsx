@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Catalog, TypeName } from '@lpc-toolkit/core';
 import type { SliceState, SliceAction } from '../../slice/selection';
 import type { Translator, LabelTranslator } from '../../i18n';
+import { LayerRow } from './layer-row';
 
 interface Props {
   catalog: Catalog;
@@ -13,15 +14,15 @@ interface Props {
 }
 
 export function StackPanel({
-  catalog: _catalog,
+  catalog,
   state,
-  dispatch: _dispatch,
+  dispatch,
   shownTypeNames,
   t,
   tl,
 }: Props) {
   const [expanded, setExpanded] = useState<TypeName | null>(null);
-  const [adding, setAdding] = useState(false);
+  const [_adding, setAdding] = useState(false);
 
   const active = useMemo(
     () => shownTypeNames.filter((tn) => state.selections[tn] != null),
@@ -62,9 +63,16 @@ export function StackPanel({
           <div className="px-2 py-3 text-[11px] text-text-mute">No layers yet.</div>
         ) : (
           active.map((tn) => (
-            <div key={tn} className="px-2 py-1 text-[12px]">
-              {tl.category(tn) || tn}
-            </div>
+            <LayerRow
+              key={tn}
+              typeName={tn}
+              catalog={catalog}
+              state={state}
+              dispatch={dispatch}
+              tl={tl}
+              expanded={expanded === tn}
+              onToggle={() => setExpanded(expanded === tn ? null : tn)}
+            />
           ))
         )}
 
@@ -86,8 +94,6 @@ export function StackPanel({
         {t('filters.title')} (placeholder)
       </div>
 
-      {/* Use the state stubs so TS doesn't complain about unused */}
-      <span className="hidden" data-expanded={String(expanded)} data-adding={String(adding)} />
     </div>
   );
 }
