@@ -8,6 +8,7 @@ import { TopBar } from './top-bar';
 import { PreviewPane } from './preview-pane';
 import { StackPanel } from './stack-panel';
 import { BodyTypePopover } from './popovers/body-type-popover';
+import { TokenPopover } from './popovers/token-popover';
 
 export interface LayerStackHarnessProps {
   catalog: Catalog;
@@ -74,6 +75,15 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
               text: `Incompatible: ${names.join(', ')}.`,
             });
           }}
+        />
+        <TokenPopover
+          open={popover === 'token'}
+          setOpen={(v) => setPopover(v ? 'token' : null)}
+          state={props.state}
+          dispatch={props.dispatch}
+          catalog={props.catalog}
+          t={props.t}
+          onStatus={(text) => setStatus({ kind: 'info', text })}
         />
       </TopBar>
       <div className="grid min-h-0 flex-1 grid-cols-[340px_1fr]">
