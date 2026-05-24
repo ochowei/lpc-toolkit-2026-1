@@ -5,6 +5,7 @@ import type { Translator, LabelTranslator } from '../../i18n';
 import { type LicenseFilter } from '../../slice/license-filter';
 import { LayerRow } from './layer-row';
 import { AddLayer } from './add-layer';
+import { PresetChips } from './preset-chips';
 
 interface Props {
   catalog: Catalog;
@@ -15,6 +16,7 @@ interface Props {
   licenseFilter: LicenseFilter;
   t: Translator;
   tl: LabelTranslator;
+  onPresetApplied: (name: string, skippedCount: number, skippedTypes: string[]) => void;
 }
 
 export function StackPanel({
@@ -26,6 +28,7 @@ export function StackPanel({
   licenseFilter,
   t,
   tl,
+  onPresetApplied,
 }: Props) {
   const [expanded, setExpanded] = useState<TypeName | null>(null);
   const [adding, setAdding] = useState(false);
@@ -47,10 +50,13 @@ export function StackPanel({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* Task 11: <PresetChips /> */}
-      <div className="border-b border-border bg-app px-3 py-2 text-[10px] uppercase tracking-wide text-text-mute">
-        Presets (placeholder)
-      </div>
+      <PresetChips
+        catalog={catalog}
+        state={state}
+        dispatch={dispatch}
+        t={t}
+        onApplied={onPresetApplied}
+      />
 
       {/* Task 12: <StatusToast /> */}
 

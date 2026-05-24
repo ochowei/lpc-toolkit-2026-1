@@ -29,6 +29,8 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   const { t, theme, locale, onToggleTheme, onToggleLocale } = props;
   const [licenseFilter] = useState<LicenseFilter>(null); // setLicenseFilter wires in Task 17
 
+  const handlePresetApplied = (_name: string, _n: number, _types: string[]) => {};
+
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-app text-text">
       <TopBar
@@ -49,6 +51,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
             licenseFilter={licenseFilter}
             t={props.t}
             tl={props.tl}
+            onPresetApplied={handlePresetApplied}
           />
         </aside>
         <main className="bg-app">
