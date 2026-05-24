@@ -4,6 +4,7 @@ import type { Locale, Translator, LabelTranslator } from '../../i18n';
 import type { AssetSource } from '../../adapter/asset-source';
 import { TopBar } from './top-bar';
 import { PreviewPane } from './preview-pane';
+import { StackPanel } from './stack-panel';
 
 export interface LayerStackHarnessProps {
   catalog: Catalog;
@@ -36,8 +37,14 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
       />
       <div className="grid min-h-0 flex-1 grid-cols-[340px_1fr]">
         <aside className="border-r border-border bg-surface">
-          {/* StackPanel — Task 7 */}
-          <div className="p-4 text-xs text-text-mute">stack-panel placeholder</div>
+          <StackPanel
+            catalog={props.catalog}
+            state={props.state}
+            dispatch={props.dispatch}
+            shownTypeNames={props.shownTypeNames}
+            t={props.t}
+            tl={props.tl}
+          />
         </aside>
         <main className="bg-app">
           <PreviewPane
