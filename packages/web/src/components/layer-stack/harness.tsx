@@ -7,6 +7,7 @@ import type { LicenseFilter } from '../../slice/license-filter';
 import { TopBar } from './top-bar';
 import { PreviewPane } from './preview-pane';
 import { StackPanel } from './stack-panel';
+import { BodyTypePopover } from './popovers/body-type-popover';
 
 export interface LayerStackHarnessProps {
   catalog: Catalog;
@@ -29,6 +30,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   const { t, theme, locale, onToggleTheme, onToggleLocale } = props;
   const [licenseFilter] = useState<LicenseFilter>(null); // setLicenseFilter wires in Task 17
   const [status, setStatus] = useState<{ kind: 'info' | 'warn' | 'error'; text: string } | null>(null);
+  const [popover, setPopover] = useState<null | 'bodyType' | 'token' | 'reset' | 'attribution'>(null);
 
   useEffect(() => {
     if (!status) return;
@@ -57,7 +59,23 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
         locale={locale}
         onToggleTheme={onToggleTheme}
         onToggleLocale={onToggleLocale}
-      />
+      >
+        <BodyTypePopover
+          open={popover === 'bodyType'}
+          setOpen={(v) => setPopover(v ? 'bodyType' : null)}
+          state={props.state}
+          dispatch={props.dispatch}
+          catalog={props.catalog}
+          t={props.t}
+          tl={props.tl}
+          onIncompatibilityWarning={(names) => {
+            setStatus({
+              kind: 'warn',
+              text: `Incompatible: ${names.join(', ')}.`,
+            });
+          }}
+        />
+      </TopBar>
       <div className="grid min-h-0 flex-1 grid-cols-[340px_1fr]">
         <aside className="border-r border-border bg-surface">
           <StackPanel
