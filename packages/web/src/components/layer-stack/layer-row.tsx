@@ -1,18 +1,23 @@
-import type { Catalog, ItemDefinition, TypeName } from '@lpc-toolkit/core';
+import type { Catalog, ItemDefinition, PaletteMetadata, TypeName } from '@lpc-toolkit/core';
 import type { SliceState, SliceAction } from '../../slice/selection';
 import type { LabelTranslator } from '../../i18n';
+import { itemSupportsBodyType } from '../../slice/catalog-tree';
+import { itemMatchesLicenseFilter, type LicenseFilter } from '../../slice/license-filter';
+import { ColorPicker } from '../color-picker';
 
 interface Props {
   typeName: TypeName;
   catalog: Catalog;
+  palettes: PaletteMetadata;
   state: SliceState;
   dispatch: (a: SliceAction) => void;
   tl: LabelTranslator;
+  licenseFilter: LicenseFilter;
   expanded: boolean;
   onToggle: () => void;
 }
 
-export function LayerRow({ typeName, catalog, state, dispatch, tl, expanded, onToggle }: Props) {
+export function LayerRow({ typeName, catalog, palettes, state, dispatch, tl, licenseFilter, expanded, onToggle }: Props) {
   const selection = state.selections[typeName];
   if (!selection) return null;
 
@@ -62,12 +67,64 @@ export function LayerRow({ typeName, catalog, state, dispatch, tl, expanded, onT
         <span className="text-[10px] text-text-mute">{expanded ? '▾' : '▸'}</span>
       </button>
 
-      {expanded && (
-        <div className="px-2 pb-2">
-          {/* Swap grid + ColorPicker — Task 9 */}
-          <div className="text-[10px] text-text-mute">Expanded content lands in Task 9.</div>
-        </div>
-      )}
+      {expanded && item && (() => {
+        const items = catalog.byTypeName.get(typeName) ?? [];
+        return (
+          <div className="px-2 pb-2">
+            <div className="mb-1 text-[10px] uppercase tracking-wide text-text-mute">
+              Swap {typeName}
+            </div>
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(56px,1fr))] gap-1">
+              {items.map((it) => {
+                const supports = itemSupportsBodyType(it, state.bodyType);
+                const exceeds = !itemMatchesLicenseFilter(it, licenseFilter);
+                const isSelected = it.name === item.name;
+                return (
+                  <button
+                    key={it.name}
+                    type="button"
+                    disabled={!supports}
+                    title={
+                      !supports ? 'incompatible body type' :
+                      exceeds ? `exceeds license filter ${licenseFilter ?? ''}` :
+                      it.name
+                    }
+                    onClick={() => dispatch({ type: 'pick', typeName, name: it.name })}
+                    className={[
+                      'relative flex flex-col items-center gap-1 rounded-md border p-1 text-[10px]',
+                      isSelected ? 'border-accent bg-accent/10 text-text' : 'border-border bg-surface-2 text-text-2',
+                      !supports ? 'opacity-30 cursor-not-allowed' : '',
+                      exceeds && supports ? 'opacity-60' : '',
+                    ].filter(Boolean).join(' ')}
+                  >
+                    <div className="h-7 w-7 rounded bg-surface" aria-hidden />
+                    <span className="max-w-full truncate">{it.name}</span>
+                    {exceeds && supports && (
+                      <span className="absolute -top-1 -right-1 inline-flex h-3 w-3 items-center justify-center rounded-full bg-danger text-[8px] text-white" aria-label="exceeds license filter">!</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-2 rounded-md border border-border bg-surface-2 p-2">
+              <ColorPicker
+                item={item}
+                selection={selection}
+                palettes={palettes}
+                colorLabel="Style"
+                onSelect={(change) => {
+                  if ('variant' in change) {
+                    dispatch({ type: 'pick', typeName, name: item.name, variant: change.variant });
+                  } else {
+                    dispatch({ type: 'pick', typeName, name: item.name, recolor: change.recolor });
+                  }
+                }}
+              />
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

@@ -1,23 +1,28 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Catalog, TypeName } from '@lpc-toolkit/core';
+import type { Catalog, PaletteMetadata, TypeName } from '@lpc-toolkit/core';
 import type { SliceState, SliceAction } from '../../slice/selection';
 import type { Translator, LabelTranslator } from '../../i18n';
+import { type LicenseFilter } from '../../slice/license-filter';
 import { LayerRow } from './layer-row';
 
 interface Props {
   catalog: Catalog;
+  palettes: PaletteMetadata;
   state: SliceState;
   dispatch: (a: SliceAction) => void;
   shownTypeNames: string[];
+  licenseFilter: LicenseFilter;
   t: Translator;
   tl: LabelTranslator;
 }
 
 export function StackPanel({
   catalog,
+  palettes,
   state,
   dispatch,
   shownTypeNames,
+  licenseFilter,
   t,
   tl,
 }: Props) {
@@ -67,9 +72,11 @@ export function StackPanel({
               key={tn}
               typeName={tn}
               catalog={catalog}
+              palettes={palettes}
               state={state}
               dispatch={dispatch}
               tl={tl}
+              licenseFilter={licenseFilter}
               expanded={expanded === tn}
               onToggle={() => setExpanded(expanded === tn ? null : tn)}
             />
