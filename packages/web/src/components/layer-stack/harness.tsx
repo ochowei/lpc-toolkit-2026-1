@@ -3,6 +3,7 @@ import type { SliceState, SliceAction } from '../../slice/selection';
 import type { Locale, Translator, LabelTranslator } from '../../i18n';
 import type { AssetSource } from '../../adapter/asset-source';
 import { TopBar } from './top-bar';
+import { PreviewPane } from './preview-pane';
 
 export interface LayerStackHarnessProps {
   catalog: Catalog;
@@ -39,8 +40,13 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
           <div className="p-4 text-xs text-text-mute">stack-panel placeholder</div>
         </aside>
         <main className="bg-app">
-          {/* PreviewPane — Task 6 */}
-          <div className="p-4 text-xs text-text-mute">preview-pane placeholder</div>
+          <PreviewPane
+            catalog={props.catalog}
+            palettes={props.palettes}
+            state={props.state}
+            dispatch={props.dispatch}
+            assetSource={props.assetSource}
+          />
         </main>
       </div>
     </div>
