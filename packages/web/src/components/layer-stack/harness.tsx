@@ -9,6 +9,7 @@ import { PreviewPane } from './preview-pane';
 import { StackPanel } from './stack-panel';
 import { BodyTypePopover } from './popovers/body-type-popover';
 import { TokenPopover } from './popovers/token-popover';
+import { ResetMenuPopover } from './popovers/reset-menu-popover';
 
 export interface LayerStackHarnessProps {
   catalog: Catalog;
@@ -29,7 +30,7 @@ export interface LayerStackHarnessProps {
 
 export function LayerStackHarness(props: LayerStackHarnessProps) {
   const { t, theme, locale, onToggleTheme, onToggleLocale } = props;
-  const [licenseFilter] = useState<LicenseFilter>(null); // setLicenseFilter wires in Task 17
+  const [licenseFilter, setLicenseFilter] = useState<LicenseFilter>(null);
   const [status, setStatus] = useState<{ kind: 'info' | 'warn' | 'error'; text: string } | null>(null);
   const [popover, setPopover] = useState<null | 'bodyType' | 'token' | 'reset' | 'attribution'>(null);
 
@@ -84,6 +85,20 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
           catalog={props.catalog}
           t={props.t}
           onStatus={(text) => setStatus({ kind: 'info', text })}
+        />
+        <ResetMenuPopover
+          open={popover === 'reset'}
+          setOpen={(v) => setPopover(v ? 'reset' : null)}
+          t={props.t}
+          onReset={({ outfit, view, filters }) => {
+            if (outfit || view) {
+              props.onReset({ outfit, view });
+            }
+            if (filters) {
+              setLicenseFilter(null);
+            }
+            setStatus({ kind: 'info', text: 'Reset ✓' });
+          }}
         />
       </TopBar>
       <div className="grid min-h-0 flex-1 grid-cols-[340px_1fr]">
