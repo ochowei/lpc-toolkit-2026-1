@@ -120,6 +120,9 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
             dispatch={props.dispatch}
             shownTypeNames={props.shownTypeNames}
             licenseFilter={licenseFilter}
+            setLicenseFilter={setLicenseFilter}
+            assetSource={props.assetSource}
+            setAssetSource={props.onAssetSourceChange}
             t={props.t}
             tl={props.tl}
             onPresetApplied={handlePresetApplied}

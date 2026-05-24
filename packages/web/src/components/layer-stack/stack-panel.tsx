@@ -3,10 +3,12 @@ import type { Catalog, PaletteMetadata, TypeName } from '@lpc-toolkit/core';
 import type { SliceState, SliceAction } from '../../slice/selection';
 import type { Translator, LabelTranslator } from '../../i18n';
 import { type LicenseFilter } from '../../slice/license-filter';
+import type { AssetSource } from '../../adapter/asset-source';
 import { LayerRow } from './layer-row';
 import { AddLayer } from './add-layer';
 import { PresetChips } from './preset-chips';
 import { StatusToast } from './status-toast';
+import { SettingsCollapsible } from './settings-collapsible';
 
 interface Props {
   catalog: Catalog;
@@ -15,6 +17,9 @@ interface Props {
   dispatch: (a: SliceAction) => void;
   shownTypeNames: string[];
   licenseFilter: LicenseFilter;
+  setLicenseFilter: (v: LicenseFilter) => void;
+  assetSource: AssetSource;
+  setAssetSource: (v: AssetSource) => void;
   t: Translator;
   tl: LabelTranslator;
   onPresetApplied: (name: string, skippedCount: number, skippedTypes: string[]) => void;
@@ -28,6 +33,9 @@ export function StackPanel({
   dispatch,
   shownTypeNames,
   licenseFilter,
+  setLicenseFilter,
+  assetSource,
+  setAssetSource,
   t,
   tl,
   onPresetApplied,
@@ -106,10 +114,13 @@ export function StackPanel({
         />
       </div>
 
-      {/* Task 17: <SettingsCollapsible /> */}
-      <div className="border-t border-border bg-app px-3 py-2 text-[10px] uppercase tracking-wide text-text-mute">
-        {t('filters.title')} (placeholder)
-      </div>
+      <SettingsCollapsible
+        t={t}
+        licenseFilter={licenseFilter}
+        setLicenseFilter={setLicenseFilter}
+        assetSource={assetSource}
+        setAssetSource={setAssetSource}
+      />
 
     </div>
   );
