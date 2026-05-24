@@ -45,7 +45,7 @@ export function PresetChips({ catalog, state, dispatch, t, onApplied }: Props) {
             >
               <span>{preset.emoji}</span>
               <span>{label}</span>
-              {willSkip > 0 && <span className="text-warning">⚠</span>}
+              {willSkip > 0 && <span className="text-danger">⚠</span>}
             </button>
           );
         })}
