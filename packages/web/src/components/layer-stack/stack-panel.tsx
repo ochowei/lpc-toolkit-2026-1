@@ -4,6 +4,7 @@ import type { SliceState, SliceAction } from '../../slice/selection';
 import type { Translator, LabelTranslator } from '../../i18n';
 import { type LicenseFilter } from '../../slice/license-filter';
 import { LayerRow } from './layer-row';
+import { AddLayer } from './add-layer';
 
 interface Props {
   catalog: Catalog;
@@ -27,7 +28,7 @@ export function StackPanel({
   tl,
 }: Props) {
   const [expanded, setExpanded] = useState<TypeName | null>(null);
-  const [_adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState(false);
 
   const active = useMemo(
     () => shownTypeNames.filter((tn) => state.selections[tn] != null),
@@ -84,16 +85,16 @@ export function StackPanel({
         )}
 
         {/* Task 10: AddLayer */}
-        <button
-          onClick={() => setAdding((a) => !a)}
-          className="mt-2 mb-2 flex w-full items-center gap-2 rounded-md border border-dashed border-border px-3 py-2 text-[12px] text-text-mute hover:bg-surface-2"
-        >
-          <span>＋</span>
-          <span>{t('add.button')}</span>
-          <span className="ml-auto font-mono text-[10px]">
-            {inactive.length} {t('add.available')}
-          </span>
-        </button>
+        <AddLayer
+          catalog={catalog}
+          dispatch={dispatch}
+          inactive={inactive}
+          t={t}
+          tl={tl}
+          adding={adding}
+          setAdding={setAdding}
+          onAdded={(tn) => setExpanded(tn)}
+        />
       </div>
 
       {/* Task 17: <SettingsCollapsible /> */}
