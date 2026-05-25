@@ -1,9 +1,11 @@
 import type { Catalog, ItemDefinition, PaletteMetadata, TypeName } from '@lpc-toolkit/core';
-import type { SliceState, SliceAction } from '../../slice/selection';
+import { pickActionForItem, type SliceState, type SliceAction } from '../../slice/selection';
 import type { LabelTranslator } from '../../i18n';
 import { itemSupportsBodyType } from '../../slice/catalog-tree';
 import { itemMatchesLicenseFilter, type LicenseFilter } from '../../slice/license-filter';
 import { ColorPicker } from '../color-picker';
+import { ItemThumbnail } from './item-thumbnail';
+import type { AssetSource } from '../../adapter/asset-source';
 
 interface Props {
   typeName: TypeName;
@@ -13,11 +15,12 @@ interface Props {
   dispatch: (a: SliceAction) => void;
   tl: LabelTranslator;
   licenseFilter: LicenseFilter;
+  assetSource: AssetSource;
   expanded: boolean;
   onToggle: () => void;
 }
 
-export function LayerRow({ typeName, catalog, palettes, state, dispatch, tl, licenseFilter, expanded, onToggle }: Props) {
+export function LayerRow({ typeName, catalog, palettes, state, dispatch, tl, licenseFilter, assetSource, expanded, onToggle }: Props) {
   const selection = state.selections[typeName];
   if (!selection) return null;
 
@@ -36,7 +39,21 @@ export function LayerRow({ typeName, catalog, palettes, state, dispatch, tl, lic
         onClick={onToggle}
         className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-surface-2"
       >
-        <div className="h-7 w-7 shrink-0 rounded bg-surface-2" aria-hidden />
+        {item ? (
+          <ItemThumbnail
+            typeName={typeName}
+            name={item.name}
+            size={28}
+            bodyType={state.bodyType}
+            catalog={catalog}
+            palettes={palettes}
+            assetSource={assetSource}
+            {...(selection.variant !== undefined ? { variant: selection.variant } : {})}
+            {...(selection.recolor !== undefined ? { recolor: selection.recolor } : {})}
+          />
+        ) : (
+          <div className="h-7 w-7 shrink-0 rounded bg-surface-2" aria-hidden />
+        )}
         <div className="min-w-0 flex-1">
           <div className="truncate text-[12px] font-semibold text-text">
             {item ? tl.itemName(item.name) : selection.name}
@@ -89,7 +106,7 @@ export function LayerRow({ typeName, catalog, palettes, state, dispatch, tl, lic
                       exceeds ? `exceeds license filter ${licenseFilter ?? ''}` :
                       it.name
                     }
-                    onClick={() => dispatch({ type: 'pick', typeName, name: it.name })}
+                    onClick={() => dispatch(pickActionForItem(typeName, it))}
                     className={[
                       'relative flex flex-col items-center gap-1 rounded-md border p-1 text-[10px]',
                       isSelected ? 'border-accent bg-accent/10 text-text' : 'border-border bg-surface-2 text-text-2',
@@ -97,7 +114,15 @@ export function LayerRow({ typeName, catalog, palettes, state, dispatch, tl, lic
                       exceeds && supports ? 'opacity-60' : '',
                     ].filter(Boolean).join(' ')}
                   >
-                    <div className="h-7 w-7 rounded bg-surface" aria-hidden />
+                    <ItemThumbnail
+                      typeName={typeName}
+                      name={it.name}
+                      size={24}
+                      bodyType={state.bodyType}
+                      catalog={catalog}
+                      palettes={palettes}
+                      assetSource={assetSource}
+                    />
                     <span className="max-w-full truncate">{it.name}</span>
                     {exceeds && supports && (
                       <span className="absolute -top-1 -right-1 inline-flex h-3 w-3 items-center justify-center rounded-full bg-danger text-[8px] text-white" aria-label="exceeds license filter">!</span>

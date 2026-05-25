@@ -24,6 +24,9 @@ interface Props {
   tl: LabelTranslator;
   onPresetApplied: (name: string, skippedCount: number, skippedTypes: string[]) => void;
   status: { kind: 'info' | 'warn' | 'error'; text: string } | null;
+  onOpenPalette: () => void;
+  expanded: TypeName | null;
+  setExpanded: (v: TypeName | null) => void;
 }
 
 export function StackPanel({
@@ -40,8 +43,10 @@ export function StackPanel({
   tl,
   onPresetApplied,
   status,
+  onOpenPalette,
+  expanded,
+  setExpanded,
 }: Props) {
-  const [expanded, setExpanded] = useState<TypeName | null>(null);
   const [adding, setAdding] = useState(false);
 
   const active = useMemo(
@@ -57,7 +62,7 @@ export function StackPanel({
   // type that no longer has a selection. Reset to null when that happens.
   useEffect(() => {
     if (expanded && !active.includes(expanded)) setExpanded(null);
-  }, [expanded, active]);
+  }, [expanded, active, setExpanded]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -95,6 +100,7 @@ export function StackPanel({
               dispatch={dispatch}
               tl={tl}
               licenseFilter={licenseFilter}
+              assetSource={assetSource}
               expanded={expanded === tn}
               onToggle={() => setExpanded(expanded === tn ? null : tn)}
             />
@@ -106,11 +112,13 @@ export function StackPanel({
           catalog={catalog}
           dispatch={dispatch}
           inactive={inactive}
+          bodyType={state.bodyType}
           t={t}
           tl={tl}
           adding={adding}
           setAdding={setAdding}
           onAdded={(tn) => setExpanded(tn)}
+          onOpenPalette={onOpenPalette}
         />
       </div>
 

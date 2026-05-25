@@ -138,6 +138,26 @@ export function selectionForItem(
 }
 
 /**
+ * Build the `SliceAction.pick` for selecting `item` under `typeName`.
+ * Auto-sets the first declared variant so items whose sprites live under
+ * a variant-named filename (e.g. `body/bodies/zombie/walk/zombie.png`)
+ * render correctly. Items with no variants get no `variant` field — the
+ * compose pipeline then loads the flat `walk.png` and recolor handles
+ * any per-pixel color.
+ */
+export function pickActionForItem(
+  typeName: TypeName,
+  item: ItemDefinition,
+): SliceAction {
+  return {
+    type: 'pick',
+    typeName,
+    name: item.name,
+    ...(item.variants?.[0] ? { variant: item.variants[0] } : {}),
+  };
+}
+
+/**
  * itemId (filename minus `.json`) of each default the upstream generator
  * pre-selects on first load. Keyed by the `type_name` field each item
  * declares so the lookup result can be assigned straight into selections.
