@@ -127,6 +127,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
             tl={props.tl}
             onPresetApplied={handlePresetApplied}
             status={status}
+            onOpenPalette={() => {}}
           />
         </aside>
         <main className="min-h-0 overflow-hidden bg-app">

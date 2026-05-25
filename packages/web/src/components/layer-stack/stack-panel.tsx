@@ -24,6 +24,7 @@ interface Props {
   tl: LabelTranslator;
   onPresetApplied: (name: string, skippedCount: number, skippedTypes: string[]) => void;
   status: { kind: 'info' | 'warn' | 'error'; text: string } | null;
+  onOpenPalette: () => void;
 }
 
 export function StackPanel({
@@ -40,6 +41,7 @@ export function StackPanel({
   tl,
   onPresetApplied,
   status,
+  onOpenPalette,
 }: Props) {
   const [expanded, setExpanded] = useState<TypeName | null>(null);
   const [adding, setAdding] = useState(false);
@@ -107,11 +109,13 @@ export function StackPanel({
           catalog={catalog}
           dispatch={dispatch}
           inactive={inactive}
+          bodyType={state.bodyType}
           t={t}
           tl={tl}
           adding={adding}
           setAdding={setAdding}
           onAdded={(tn) => setExpanded(tn)}
+          onOpenPalette={onOpenPalette}
         />
       </div>
 
