@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Catalog, PaletteMetadata } from '@lpc-toolkit/core';
+import type { Catalog, PaletteMetadata, TypeName } from '@lpc-toolkit/core';
 import type { SliceState, SliceAction } from '../../slice/selection';
 import type { Locale, Translator, LabelTranslator } from '../../i18n';
 import type { AssetSource } from '../../adapter/asset-source';
@@ -11,6 +11,8 @@ import { BodyTypePopover } from './popovers/body-type-popover';
 import { TokenPopover } from './popovers/token-popover';
 import { ResetMenuPopover } from './popovers/reset-menu-popover';
 import { AttributionPopover } from './popovers/attribution-popover';
+import { PaletteTrigger } from './palette-trigger';
+import { AdvancedPalette } from './advanced-palette';
 
 export interface LayerStackHarnessProps {
   catalog: Catalog;
@@ -34,12 +36,26 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   const [licenseFilter, setLicenseFilter] = useState<LicenseFilter>(null);
   const [status, setStatus] = useState<{ kind: 'info' | 'warn' | 'error'; text: string } | null>(null);
   const [popover, setPopover] = useState<null | 'bodyType' | 'token' | 'reset' | 'attribution'>(null);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [expanded, setExpanded] = useState<TypeName | null>(null);
 
   useEffect(() => {
     if (!status) return;
     const id = setTimeout(() => setStatus(null), 4000);
     return () => clearTimeout(id);
   }, [status]);
+
+  // Global ⌘K / Ctrl+K toggles the advanced palette.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
 
   const handlePresetApplied = (name: string, skippedCount: number, skippedTypes: string[]) => {
     if (skippedCount === 0) {
@@ -110,8 +126,9 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
           t={props.t}
           tl={props.tl}
         />
+        <PaletteTrigger onOpen={() => setPaletteOpen(true)} t={t} />
       </TopBar>
-      <div className="grid min-h-0 flex-1 grid-cols-[340px_1fr]">
+      <div className="relative grid min-h-0 flex-1 grid-cols-[340px_1fr]">
         <aside className="min-h-0 overflow-hidden border-r border-border bg-surface">
           <StackPanel
             catalog={props.catalog}
@@ -127,7 +144,9 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
             tl={props.tl}
             onPresetApplied={handlePresetApplied}
             status={status}
-            onOpenPalette={() => {}}
+            expanded={expanded}
+            setExpanded={setExpanded}
+            onOpenPalette={() => setPaletteOpen(true)}
           />
         </aside>
         <main className="min-h-0 overflow-hidden bg-app">
@@ -139,6 +158,23 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
             assetSource={props.assetSource}
           />
         </main>
+        <AdvancedPalette
+          open={paletteOpen}
+          onClose={() => setPaletteOpen(false)}
+          onPicked={(tn) => {
+            setPaletteOpen(false);
+            setExpanded(tn);
+          }}
+          state={props.state}
+          dispatch={props.dispatch}
+          catalog={props.catalog}
+          palettes={props.palettes}
+          assetSource={props.assetSource}
+          shownTypeNames={props.shownTypeNames}
+          licenseFilter={licenseFilter}
+          t={t}
+          tl={props.tl}
+        />
       </div>
     </div>
   );

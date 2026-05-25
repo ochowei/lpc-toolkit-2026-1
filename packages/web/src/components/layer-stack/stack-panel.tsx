@@ -25,6 +25,8 @@ interface Props {
   onPresetApplied: (name: string, skippedCount: number, skippedTypes: string[]) => void;
   status: { kind: 'info' | 'warn' | 'error'; text: string } | null;
   onOpenPalette: () => void;
+  expanded: TypeName | null;
+  setExpanded: (v: TypeName | null) => void;
 }
 
 export function StackPanel({
@@ -42,8 +44,9 @@ export function StackPanel({
   onPresetApplied,
   status,
   onOpenPalette,
+  expanded,
+  setExpanded,
 }: Props) {
-  const [expanded, setExpanded] = useState<TypeName | null>(null);
   const [adding, setAdding] = useState(false);
 
   const active = useMemo(
