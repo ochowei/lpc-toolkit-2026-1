@@ -175,6 +175,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
             dispatch={props.dispatch}
             assetSource={props.assetSource}
             reloadCounter={reloadCounter}
+            t={t}
           />
         </main>
         <AdvancedPalette

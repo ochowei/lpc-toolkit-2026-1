@@ -6,6 +6,8 @@ import { type SliceAction, type SliceState } from '../../slice/selection';
 import type { AssetSource } from '../../adapter/asset-source';
 import type { Catalog, PaletteMetadata } from '@lpc-toolkit/core';
 import { Button } from '../ui/button';
+import { pickRandomOutfit } from '../../slice/random-outfit';
+import type { Translator } from '../../i18n';
 
 const DIR_LABEL: Record<Direction, string> = { up: '↑', left: '←', down: '↓', right: '→' };
 const DIR_SHORT: Record<Direction, 'N' | 'S' | 'E' | 'W'> = {
@@ -19,9 +21,10 @@ interface Props {
   dispatch: (a: SliceAction) => void;
   assetSource: AssetSource;
   reloadCounter: number;
+  t: Translator;
 }
 
-export function PreviewPane({ catalog, palettes, state, dispatch, assetSource, reloadCounter }: Props) {
+export function PreviewPane({ catalog, palettes, state, dispatch, assetSource, reloadCounter, t }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const zoomRef = useRef(state.zoom);
@@ -105,6 +108,17 @@ export function PreviewPane({ catalog, palettes, state, dispatch, assetSource, r
           f{String(currentFrame + 1).padStart(2, '0')}/
           {String(totalFrames).padStart(2, '0')} · {fps}fps
         </span>
+        <button
+          type="button"
+          onClick={() => dispatch({
+            type: 'apply_selections',
+            selections: pickRandomOutfit({ catalog, bodyType: state.bodyType }),
+          })}
+          title={t('randomize.title')}
+          className="rounded px-2 py-1 text-text-mute hover:bg-surface-2"
+        >
+          🎲
+        </button>
       </div>
     </div>
   );
