@@ -95,6 +95,7 @@ export function StackPanel({
               dispatch={dispatch}
               tl={tl}
               licenseFilter={licenseFilter}
+              assetSource={assetSource}
               expanded={expanded === tn}
               onToggle={() => setExpanded(expanded === tn ? null : tn)}
             />
