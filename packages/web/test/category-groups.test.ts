@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { CATEGORY_GROUPS, groupForType, type GroupId } from '../src/slice/category-groups';
 
 describe('CATEGORY_GROUPS', () => {
-  it('has the five canonical super-groups', () => {
+  it('has the seven canonical super-groups in display order', () => {
     const ids = CATEGORY_GROUPS.map((g) => g.id);
-    expect(ids).toEqual(['body', 'face', 'clothing', 'accessories', 'weapons']);
+    expect(ids).toEqual([
+      'body', 'face', 'clothing', 'accessories', 'weapons', 'fx', 'fantasy',
+    ]);
   });
 
   it('every group has a non-empty typeNames list', () => {
@@ -38,11 +40,35 @@ describe('groupForType', () => {
     expect(groupForType('expression')).toBe('face');
   });
 
-  it('returns clothing for torso/legs/feet/etc.', () => {
-    expect(groupForType('torso')).toBe('clothing');
+  it('returns clothing for legs / clothes / jacket / shoes_toe / etc.', () => {
     expect(groupForType('legs')).toBe('clothing');
-    expect(groupForType('feet')).toBe('clothing');
     expect(groupForType('clothes')).toBe('clothing');
+    expect(groupForType('jacket')).toBe('clothing');
+    expect(groupForType('shoes_toe')).toBe('clothing');
+    expect(groupForType('hat_trim')).toBe('clothing');
+  });
+
+  it('returns fx for wound / shadow / prosthesis / wheelchair', () => {
+    expect(groupForType('wound_arm')).toBe('fx');
+    expect(groupForType('shadow')).toBe('fx');
+    expect(groupForType('wrinkles')).toBe('fx');
+    expect(groupForType('prosthesis_hand')).toBe('fx');
+    expect(groupForType('wheelchair')).toBe('fx');
+  });
+
+  it('returns fantasy for wings / horns / tail / fins / furry_ears', () => {
+    expect(groupForType('wings')).toBe('fantasy');
+    expect(groupForType('horns')).toBe('fantasy');
+    expect(groupForType('tail')).toBe('fantasy');
+    expect(groupForType('fins')).toBe('fantasy');
+    expect(groupForType('furry_ears')).toBe('fantasy');
+  });
+
+  it('returns null for the four removed dead keys', () => {
+    expect(groupForType('facial' as never)).toBeNull();
+    expect(groupForType('torso' as never)).toBeNull();
+    expect(groupForType('hands' as never)).toBeNull();
+    expect(groupForType('feet' as never)).toBeNull();
   });
 
   it('returns accessories for cape/belt/etc.', () => {

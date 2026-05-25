@@ -1,7 +1,14 @@
 import type { TranslationKey } from '../i18n';
 import type { TypeName } from '@lpc-toolkit/core';
 
-export type GroupId = 'body' | 'face' | 'clothing' | 'accessories' | 'weapons';
+export type GroupId =
+  | 'body'
+  | 'face'
+  | 'clothing'
+  | 'accessories'
+  | 'weapons'
+  | 'fx'
+  | 'fantasy';
 
 export interface CategoryGroup {
   readonly id: GroupId;
@@ -9,13 +16,9 @@ export interface CategoryGroup {
   readonly typeNames: readonly TypeName[];
 }
 
-/**
- * 5 super-groups consolidating the LPC catalog's many `type_name` values
- * into a smaller taxonomy for AddLayer + AdvancedPalette grouping.
- *
- * TypeNames not listed here return `null` from `groupForType` and are
- * hidden from grouped UI (AddLayer). They remain reachable via ⌘K search.
- */
+// TODO(2026-05-25): removed dead keys `facial` / `torso` / `hands` /
+// `feet` (no matching catalog `type_name`). Coverage test in
+// category-groups.test.ts will fail if either direction breaks.
 export const CATEGORY_GROUPS: readonly CategoryGroup[] = [
   {
     id: 'body',
@@ -26,18 +29,29 @@ export const CATEGORY_GROUPS: readonly CategoryGroup[] = [
     id: 'face',
     labelKey: 'group.face' as TranslationKey,
     typeNames: [
-      'hair', 'hair_tie', 'beard', 'facial', 'expression', 'expression_crying',
+      'hair', 'hair_tie', 'beard', 'expression', 'expression_crying',
       'bandana', 'bandana_overlay', 'earrings', 'earring_left', 'earring_right',
+      'ponytail', 'updo', 'mustache',
+      'hairextl', 'hairextr', 'hairtie', 'hairtie_rune',
+      'facial_eyes', 'facial_left', 'facial_left_trim',
+      'facial_mask', 'facial_right', 'facial_right_trim',
+      'visor',
     ],
   },
   {
     id: 'clothing',
     labelKey: 'group.clothing' as TranslationKey,
     typeNames: [
-      'torso', 'shoulders', 'arms', 'wrists', 'hands', 'legs', 'feet',
-      'neck', 'clothes', 'dress', 'dress_sleeves', 'dress_sleeves_trim',
-      'dress_trim', 'shoes', 'overalls', 'apron', 'armour', 'chainmail',
-      'bracers', 'bauldron', 'hat', 'hat_secondary', 'hat_accessory_secondary',
+      'shoulders', 'arms', 'wrists', 'legs', 'clothes',
+      'dress', 'dress_sleeves', 'dress_sleeves_trim', 'dress_trim',
+      'shoes', 'overalls', 'apron', 'armour', 'chainmail',
+      'bracers', 'bauldron', 'hat', 'hat_secondary',
+      'hat_accessory_secondary', 'neck',
+      'jacket', 'jacket_collar', 'jacket_pockets', 'jacket_trim',
+      'sleeves', 'socks', 'vest',
+      'hat_accessory', 'hat_buckle', 'hat_overlay', 'hat_trim',
+      'headcover', 'headcover_rune',
+      'shoes_toe',
     ],
   },
   {
@@ -46,12 +60,34 @@ export const CATEGORY_GROUPS: readonly CategoryGroup[] = [
     typeNames: [
       'cape', 'cape_trim', 'belt', 'backpack', 'backpack_straps', 'quiver',
       'charm', 'accessory', 'buckles', 'leather_armor_belt', 'bandages', 'cargo',
+      'gloves', 'necklace', 'ring', 'sash', 'sash_tie',
     ],
   },
   {
     id: 'weapons',
     labelKey: 'group.weapons' as TranslationKey,
-    typeNames: ['weapon', 'weapon_magic_crystal', 'shield', 'ammo'],
+    typeNames: [
+      'weapon', 'weapon_magic_crystal', 'shield', 'ammo',
+      'shield_paint', 'shield_pattern', 'shield_trim',
+    ],
+  },
+  {
+    id: 'fx',
+    labelKey: 'group.fx' as TranslationKey,
+    typeNames: [
+      'wound_arm', 'wound_brain', 'wound_eye_left', 'wound_eye_right',
+      'wound_mouth', 'wound_ribs',
+      'shadow', 'wrinkles',
+      'prosthesis_hand', 'prosthesis_leg', 'wheelchair',
+    ],
+  },
+  {
+    id: 'fantasy',
+    labelKey: 'group.fantasy' as TranslationKey,
+    typeNames: [
+      'horns', 'wings', 'wings_dots', 'wings_edge',
+      'fins', 'furry_ears', 'furry_ears_skin', 'tail',
+    ],
   },
 ];
 
