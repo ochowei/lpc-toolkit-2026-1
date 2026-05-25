@@ -96,6 +96,25 @@ describe('pickInitialSelections', () => {
     expect(shownTypeNames).not.toContain('legs');
   });
 
+  it('includes non-COMMON types from CATEGORY_GROUPS when catalog has them', () => {
+    const { catalog } = createCatalog({
+      'body.json': defn('Body Color', 'body'),
+      'heads_human_male.json': defn('Human Male', 'head'),
+      'face_neutral.json': defn('Neutral', 'expression'),
+      'weapon/sword.json': defn('Sword', 'weapon'),
+      'shield/heater.json': defn('Heater', 'shield'),
+      'wings/feather.json': defn('Feather Wings', 'wings'),
+    });
+    const { shownTypeNames } = pickInitialSelections(catalog);
+    expect(shownTypeNames).toContain('weapon');
+    expect(shownTypeNames).toContain('shield');
+    expect(shownTypeNames).toContain('wings');
+    // COMMON priority preserved: body still appears before weapon
+    expect(shownTypeNames.indexOf('body')).toBeLessThan(
+      shownTypeNames.indexOf('weapon'),
+    );
+  });
+
   it('throws when a required default itemId is missing from the catalog', () => {
     const { catalog } = createCatalog({
       'body.json': defn('Body Color', 'body'),

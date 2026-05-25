@@ -9,6 +9,7 @@ import {
   type TypeName,
 } from '@lpc-toolkit/core';
 import type { CatalogTreeItem } from './catalog-tree';
+import { CATEGORY_GROUPS } from './category-groups';
 
 export const MIN_ZOOM = 1;
 export const MAX_ZOOM = 8;
@@ -225,9 +226,21 @@ export function pickInitialSelections(catalog: Catalog): {
     };
   }
 
-  const shownTypeNames = COMMON_TYPE_ORDER.filter(
-    (tn) => (catalog.byTypeName.get(tn) ?? []).length > 0,
-  );
+  // Show every catalog type the user can theoretically pick. COMMON_TYPE_ORDER
+  // goes first to preserve the head-to-toe display order in the active-layer
+  // list; remaining types follow in CATEGORY_GROUPS declaration order so they
+  // appear under the right super-group in AddLayer / AdvancedPalette.
+  const seen = new Set<TypeName>();
+  const shownTypeNames: TypeName[] = [];
+  for (const tn of [
+    ...COMMON_TYPE_ORDER,
+    ...CATEGORY_GROUPS.flatMap((g) => g.typeNames),
+  ]) {
+    if (seen.has(tn)) continue;
+    if ((catalog.byTypeName.get(tn) ?? []).length === 0) continue;
+    seen.add(tn);
+    shownTypeNames.push(tn);
+  }
 
   return {
     state: {
