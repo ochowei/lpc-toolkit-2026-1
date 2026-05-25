@@ -112,7 +112,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
         />
       </TopBar>
       <div className="grid min-h-0 flex-1 grid-cols-[340px_1fr]">
-        <aside className="border-r border-border bg-surface">
+        <aside className="min-h-0 overflow-hidden border-r border-border bg-surface">
           <StackPanel
             catalog={props.catalog}
             palettes={props.palettes}
@@ -129,7 +129,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
             status={status}
           />
         </aside>
-        <main className="bg-app">
+        <main className="min-h-0 overflow-hidden bg-app">
           <PreviewPane
             catalog={props.catalog}
             palettes={props.palettes}

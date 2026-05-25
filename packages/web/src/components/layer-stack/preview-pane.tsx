@@ -45,7 +45,7 @@ export function PreviewPane({ catalog, palettes, state, dispatch, assetSource }:
     <div ref={previewRef} className="relative flex h-full min-h-0 flex-col">
       <div className="relative flex-1 overflow-hidden">
         <div className="flex h-full items-center justify-center">
-          <canvas ref={canvasRef} className="image-render-pixel" />
+          <canvas ref={canvasRef} className="image-render-pixel max-h-full max-w-full" />
         </div>
         <div className="absolute top-3 right-3 flex gap-1">
           <Button size="sm" variant="default"
