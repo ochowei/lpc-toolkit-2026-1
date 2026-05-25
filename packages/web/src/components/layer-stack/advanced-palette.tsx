@@ -39,9 +39,13 @@ export function AdvancedPalette({
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-focus input when opening
+  // Auto-focus input when opening; clear query when closing so a stale
+  // search from the previous session doesn't surprise the user on reopen.
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setQuery('');
+      return;
+    }
     const id = setTimeout(() => inputRef.current?.focus(), 30);
     return () => clearTimeout(id);
   }, [open]);
