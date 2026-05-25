@@ -4,7 +4,7 @@ import type {
   PaletteMetadata,
   TypeName,
 } from '@lpc-toolkit/core';
-import type { SliceState, SliceAction } from '../../slice/selection';
+import { pickActionForItem, type SliceState, type SliceAction } from '../../slice/selection';
 import type { AssetSource } from '../../adapter/asset-source';
 import type { LabelTranslator, Translator } from '../../i18n';
 import {
@@ -122,7 +122,7 @@ export function AdvancedPalette({
                   title={!supports ? t('palette.incompatible') : item.name}
                   onClick={() => {
                     if (!supports) return;
-                    dispatch({ type: 'pick', typeName, name: item.name });
+                    dispatch(pickActionForItem(typeName, item));
                     onPicked(typeName);
                   }}
                   className={[

@@ -1,5 +1,5 @@
 import type { BodyType, Catalog, TypeName } from '@lpc-toolkit/core';
-import type { SliceAction } from '../../slice/selection';
+import { pickActionForItem, type SliceAction } from '../../slice/selection';
 import type { LabelTranslator, Translator } from '../../i18n';
 import { itemSupportsBodyType } from '../../slice/catalog-tree';
 import { CATEGORY_GROUPS } from '../../slice/category-groups';
@@ -90,7 +90,7 @@ export function AddLayer({
                   title={disabled ? t('palette.incompatible') : tl.category(tn)}
                   onClick={() => {
                     if (!firstCompatible) return;
-                    dispatch({ type: 'pick', typeName: tn, name: firstCompatible.name });
+                    dispatch(pickActionForItem(tn, firstCompatible));
                     setAdding(false);
                     onAdded(tn);
                   }}

@@ -1,5 +1,5 @@
 import type { Catalog, ItemDefinition, PaletteMetadata, TypeName } from '@lpc-toolkit/core';
-import type { SliceState, SliceAction } from '../../slice/selection';
+import { pickActionForItem, type SliceState, type SliceAction } from '../../slice/selection';
 import type { LabelTranslator } from '../../i18n';
 import { itemSupportsBodyType } from '../../slice/catalog-tree';
 import { itemMatchesLicenseFilter, type LicenseFilter } from '../../slice/license-filter';
@@ -106,7 +106,7 @@ export function LayerRow({ typeName, catalog, palettes, state, dispatch, tl, lic
                       exceeds ? `exceeds license filter ${licenseFilter ?? ''}` :
                       it.name
                     }
-                    onClick={() => dispatch({ type: 'pick', typeName, name: it.name })}
+                    onClick={() => dispatch(pickActionForItem(typeName, it))}
                     className={[
                       'relative flex flex-col items-center gap-1 rounded-md border p-1 text-[10px]',
                       isSelected ? 'border-accent bg-accent/10 text-text' : 'border-border bg-surface-2 text-text-2',
