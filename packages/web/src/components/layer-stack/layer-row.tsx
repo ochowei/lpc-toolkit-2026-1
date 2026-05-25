@@ -1,4 +1,5 @@
 import type { Catalog, ItemDefinition, PaletteMetadata, TypeName } from '@lpc-toolkit/core';
+import { getRecolorSwatches } from '@lpc-toolkit/core';
 import { pickActionForItem, type SliceState, type SliceAction } from '../../slice/selection';
 import type { LabelTranslator } from '../../i18n';
 import { itemSupportsBodyType } from '../../slice/catalog-tree';
@@ -58,9 +59,35 @@ export function LayerRow({ typeName, catalog, palettes, state, dispatch, tl, lic
           <div className="truncate text-[12px] font-semibold text-text">
             {item ? tl.itemName(item.name) : selection.name}
           </div>
-          <div className="text-[10px] uppercase tracking-wide text-text-mute">
-            {tl.category(typeName)}
-            {selection.variant ? ` · ${selection.variant}` : ''}
+          <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-text-mute">
+            <span>{tl.category(typeName)}</span>
+            {selection.variant && (
+              <>
+                <span>·</span>
+                <span>{selection.variant}</span>
+              </>
+            )}
+            {selection.recolor && item && (() => {
+              const swatches =
+                getRecolorSwatches(item, palettes).find(
+                  (s) => s.recolor === selection.recolor,
+                )?.colors ?? [];
+              if (swatches.length === 0) return null;
+              return (
+                <>
+                  <span>·</span>
+                  <span className="inline-flex gap-px">
+                    {swatches.map((c, i) => (
+                      <span
+                        key={i}
+                        className="h-1 w-1 rounded-sm"
+                        style={{ backgroundColor: c }}
+                      />
+                    ))}
+                  </span>
+                </>
+              );
+            })()}
           </div>
         </div>
         <span
