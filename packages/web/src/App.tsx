@@ -13,7 +13,7 @@ import {
   type Locale,
 } from './i18n';
 import type { AssetSource } from './adapter/asset-source';
-import { shouldUseV2 } from './lib/should-use-v2';
+import { shouldUseV1 } from './lib/should-use-v1';
 import { LayerStackHarness } from './components/layer-stack/harness';
 
 export default function App() {
@@ -38,11 +38,11 @@ export default function App() {
 
   document.documentElement.className = `lpc ${theme}`;
 
-  const useV2 = shouldUseV2(window.location.search);
+  const useV1 = shouldUseV1(window.location.search);
 
-  if (useV2) {
+  if (useV1) {
     return (
-      <LayerStackHarness
+      <SliceHarness
         catalog={init.catalog}
         palettes={init.palettes}
         shownTypeNames={init.shownTypeNames}
@@ -64,7 +64,7 @@ export default function App() {
   }
 
   return (
-    <SliceHarness
+    <LayerStackHarness
       catalog={init.catalog}
       palettes={init.palettes}
       shownTypeNames={init.shownTypeNames}

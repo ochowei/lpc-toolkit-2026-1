@@ -28,6 +28,14 @@ export function TopBar({
         </span>
         <span className="font-mono text-[9px] text-text-dim">
           {t('app.subtitle')}
+          {' · '}
+          <a
+            href="?ui=v1"
+            className="underline-offset-2 hover:text-text-mute hover:underline"
+            title="legacy UI (v1)"
+          >
+            v1
+          </a>
         </span>
       </div>
       {children /* slots for BodyType pill, popovers, attribution */}
