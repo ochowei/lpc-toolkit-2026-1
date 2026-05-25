@@ -178,7 +178,7 @@ const DEFAULT_BODY_TYPE: BodyType = 'male';
 /**
  * Common-picker order. `expression` is slotted next to its visual
  * neighbours (head/hair); the other entries preserve the previous flat
- * head-to-toe order. Types with no defaults (hair/eyes/torso/legs/feet)
+ * head-to-toe order. Types with no defaults (hair/eyes/clothes/legs/shoes)
  * render as empty selectors the user can pick into. A type-name is
  * included only if the catalog has at least one item of that type, so
  * pared-down test catalogs still work.
@@ -189,9 +189,9 @@ export const COMMON_TYPE_ORDER: readonly TypeName[] = [
   'hair',
   'expression',
   'eyes',
-  'torso',
+  'clothes',
   'legs',
-  'feet',
+  'shoes',
 ];
 
 /**

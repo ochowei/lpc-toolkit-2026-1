@@ -57,13 +57,13 @@ describe('pickInitialSelections', () => {
     expect(state.zoom).toBe(4);
   });
 
-  it('does not pre-select hair / eyes / torso / legs / feet', () => {
+  it('does not pre-select hair / eyes / clothes / legs / shoes', () => {
     const { state } = pickInitialSelections(makeFullCatalog());
     expect(state.selections['hair']).toBeUndefined();
     expect(state.selections['eyes']).toBeUndefined();
-    expect(state.selections['torso']).toBeUndefined();
+    expect(state.selections['clothes']).toBeUndefined();
     expect(state.selections['legs']).toBeUndefined();
-    expect(state.selections['feet']).toBeUndefined();
+    expect(state.selections['shoes']).toBeUndefined();
   });
 
   it('exposes body / head / hair / expression in shownTypeNames so the Common picker shows them', () => {
