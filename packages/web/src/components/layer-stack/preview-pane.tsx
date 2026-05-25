@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { ANIMATION_CONFIGS, type Direction } from '@lpc-toolkit/core';
 import { useComposedCharacter } from '../../hooks/use-composed-character';
 import { useAnimationPlayer } from '../../hooks/use-animation-player';
-import { MIN_ZOOM, MAX_ZOOM, type SliceAction, type SliceState } from '../../slice/selection';
+import { type SliceAction, type SliceState } from '../../slice/selection';
 import type { AssetSource } from '../../adapter/asset-source';
 import type { Catalog, PaletteMetadata } from '@lpc-toolkit/core';
 import { Button } from '../ui/button';
@@ -56,18 +56,22 @@ export function PreviewPane({ catalog, palettes, state, dispatch, assetSource, r
         <div className="absolute top-3 left-3 z-10 rounded bg-black/40 px-2 py-0.5 font-mono text-[10px] text-text-2 backdrop-blur-md">
           {state.anim} · {DIR_SHORT[state.dir]} · {state.zoom}× · f{String(currentFrame + 1).padStart(2, '0')}
         </div>
-        <div className="absolute top-3 right-3 flex gap-1">
-          <Button size="sm" variant="default"
-            disabled={state.zoom <= MIN_ZOOM}
-            onClick={() => dispatch({ type: 'set_zoom', zoom: state.zoom - 1 })}
-            aria-label="zoom out">−</Button>
-          <span className="rounded-md border border-border bg-surface px-2 py-1 font-mono text-[11px] text-text-mute">
-            {state.zoom * 100}%
-          </span>
-          <Button size="sm" variant="default"
-            disabled={state.zoom >= MAX_ZOOM}
-            onClick={() => dispatch({ type: 'set_zoom', zoom: state.zoom + 1 })}
-            aria-label="zoom in">+</Button>
+        <div className="absolute top-3 right-3 z-10 flex gap-0.5 rounded bg-black/40 p-0.5 backdrop-blur-md">
+          {[1, 2, 4, 8].map((z) => (
+            <button
+              key={z}
+              type="button"
+              onClick={() => dispatch({ type: 'set_zoom', zoom: z })}
+              className={[
+                'rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold',
+                state.zoom === z
+                  ? 'bg-accent text-accent-ink'
+                  : 'text-text-2 hover:bg-white/10',
+              ].join(' ')}
+            >
+              {z}×
+            </button>
+          ))}
         </div>
       </div>
 
