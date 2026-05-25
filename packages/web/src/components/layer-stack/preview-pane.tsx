@@ -22,9 +22,10 @@ interface Props {
   assetSource: AssetSource;
   reloadCounter: number;
   t: Translator;
+  onComposeStatus: (status: { progress: number; loading: boolean }) => void;
 }
 
-export function PreviewPane({ catalog, palettes, state, dispatch, assetSource, reloadCounter, t }: Props) {
+export function PreviewPane({ catalog, palettes, state, dispatch, assetSource, reloadCounter, t, onComposeStatus }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const zoomRef = useRef(state.zoom);
@@ -33,6 +34,12 @@ export function PreviewPane({ catalog, palettes, state, dispatch, assetSource, r
   }, [state.zoom]);
 
   const result = useComposedCharacter(catalog, palettes, state, assetSource, reloadCounter);
+  useEffect(() => {
+    onComposeStatus({
+      progress: result.progress,
+      loading: result.status === 'loading',
+    });
+  }, [result.progress, result.status, onComposeStatus]);
   const { currentFrame, totalFrames, fps } = useAnimationPlayer(
     canvasRef, result.animation, state.dir, state.playing, state.zoom,
   );
