@@ -27,7 +27,9 @@ export function PreviewPane({ catalog, palettes, state, dispatch, assetSource, r
   }, [state.zoom]);
 
   const result = useComposedCharacter(catalog, palettes, state, assetSource, reloadCounter);
-  useAnimationPlayer(canvasRef, result.animation, state.dir, state.playing, state.zoom);
+  const { currentFrame: _currentFrame, totalFrames: _totalFrames, fps: _fps } = useAnimationPlayer(
+    canvasRef, result.animation, state.dir, state.playing, state.zoom,
+  );
 
   useEffect(() => {
     const el = previewRef.current;
