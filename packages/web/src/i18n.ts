@@ -98,6 +98,8 @@ export const TRANSLATIONS = {
     'group.clothing': 'Clothing',
     'group.accessories': 'Accessories',
     'group.weapons': 'Weapons',
+    'reload.title': 'Reload assets',
+    'reload.done': 'Reloaded.',
   },
   'zh-TW': {
     'app.subtitle': '基礎切片',
@@ -193,6 +195,8 @@ export const TRANSLATIONS = {
     'group.clothing': '服裝',
     'group.accessories': '配件',
     'group.weapons': '武器',
+    'reload.title': '重新載入素材',
+    'reload.done': '已重新載入。',
   },
 } as const;
 

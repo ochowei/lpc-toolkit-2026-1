@@ -13,6 +13,8 @@ import { ResetMenuPopover } from './popovers/reset-menu-popover';
 import { AttributionPopover } from './popovers/attribution-popover';
 import { PaletteTrigger } from './palette-trigger';
 import { AdvancedPalette } from './advanced-palette';
+import { cacheClear } from '../../hooks/thumbnail-cache';
+import { Button } from '../ui/button';
 
 export interface LayerStackHarnessProps {
   catalog: Catalog;
@@ -38,6 +40,13 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   const [popover, setPopover] = useState<null | 'bodyType' | 'token' | 'reset' | 'attribution'>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [expanded, setExpanded] = useState<TypeName | null>(null);
+  const [reloadCounter, setReloadCounter] = useState(0);
+
+  const handleForceReload = () => {
+    cacheClear();
+    setReloadCounter((c) => c + 1);
+    setStatus({ kind: 'info', text: t('reload.done') });
+  };
 
   useEffect(() => {
     if (!status) return;
@@ -127,6 +136,15 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
           tl={props.tl}
         />
         <PaletteTrigger onOpen={() => setPaletteOpen(true)} t={t} />
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={handleForceReload}
+          title={t('reload.title')}
+          aria-label={t('reload.title')}
+        >
+          ↻
+        </Button>
       </TopBar>
       <div className="relative grid min-h-0 flex-1 grid-cols-[340px_1fr]">
         <aside className="min-h-0 overflow-hidden border-r border-border bg-surface">
@@ -156,6 +174,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
             state={props.state}
             dispatch={props.dispatch}
             assetSource={props.assetSource}
+            reloadCounter={reloadCounter}
           />
         </main>
         <AdvancedPalette

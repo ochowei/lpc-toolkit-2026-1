@@ -45,6 +45,7 @@ export function useComposedCharacter(
   palettes: PaletteMetadata,
   state: SliceState,
   assetSource: AssetSource,
+  reloadCounter: number = 0,
 ): ComposedResult {
   const adapter = useMemo(
     () => createBrowserCanvasAdapter(assetSource),
@@ -62,7 +63,7 @@ export function useComposedCharacter(
   const animRef = useRef(state.anim);
   animRef.current = state.anim;
 
-  const key = JSON.stringify({ b: state.bodyType, s: state.selections });
+  const key = JSON.stringify({ b: state.bodyType, s: state.selections, r: reloadCounter });
 
   useEffect(() => {
     const reqId = ++reqIdRef.current;

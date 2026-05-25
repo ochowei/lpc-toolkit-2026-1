@@ -15,9 +15,10 @@ interface Props {
   state: SliceState;
   dispatch: (a: SliceAction) => void;
   assetSource: AssetSource;
+  reloadCounter: number;
 }
 
-export function PreviewPane({ catalog, palettes, state, dispatch, assetSource }: Props) {
+export function PreviewPane({ catalog, palettes, state, dispatch, assetSource, reloadCounter }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const zoomRef = useRef(state.zoom);
@@ -25,7 +26,7 @@ export function PreviewPane({ catalog, palettes, state, dispatch, assetSource }:
     zoomRef.current = state.zoom;
   }, [state.zoom]);
 
-  const result = useComposedCharacter(catalog, palettes, state, assetSource);
+  const result = useComposedCharacter(catalog, palettes, state, assetSource, reloadCounter);
   useAnimationPlayer(canvasRef, result.animation, state.dir, state.playing, state.zoom);
 
   useEffect(() => {
