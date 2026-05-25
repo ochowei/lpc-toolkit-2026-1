@@ -100,6 +100,7 @@ export const TRANSLATIONS = {
     'group.weapons': 'Weapons',
     'reload.title': 'Reload assets',
     'reload.done': 'Reloaded.',
+    'randomize.title': 'Randomize outfit',
   },
   'zh-TW': {
     'app.subtitle': '基礎切片',
@@ -197,6 +198,7 @@ export const TRANSLATIONS = {
     'group.weapons': '武器',
     'reload.title': '重新載入素材',
     'reload.done': '已重新載入。',
+    'randomize.title': '隨機生成',
   },
 } as const;
 
