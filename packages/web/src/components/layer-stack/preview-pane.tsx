@@ -2,12 +2,17 @@ import { useEffect, useRef } from 'react';
 import { ANIMATION_CONFIGS, type Direction } from '@lpc-toolkit/core';
 import { useComposedCharacter } from '../../hooks/use-composed-character';
 import { useAnimationPlayer } from '../../hooks/use-animation-player';
-import { MIN_ZOOM, MAX_ZOOM, type SliceAction, type SliceState } from '../../slice/selection';
+import { type SliceAction, type SliceState } from '../../slice/selection';
 import type { AssetSource } from '../../adapter/asset-source';
 import type { Catalog, PaletteMetadata } from '@lpc-toolkit/core';
 import { Button } from '../ui/button';
+import { pickRandomOutfit } from '../../slice/random-outfit';
+import type { Translator } from '../../i18n';
 
 const DIR_LABEL: Record<Direction, string> = { up: '↑', left: '←', down: '↓', right: '→' };
+const DIR_SHORT: Record<Direction, 'N' | 'S' | 'E' | 'W'> = {
+  up: 'N', down: 'S', left: 'W', right: 'E',
+};
 
 interface Props {
   catalog: Catalog;
@@ -16,9 +21,11 @@ interface Props {
   dispatch: (a: SliceAction) => void;
   assetSource: AssetSource;
   reloadCounter: number;
+  t: Translator;
+  onComposeStatus: (status: { progress: number; loading: boolean }) => void;
 }
 
-export function PreviewPane({ catalog, palettes, state, dispatch, assetSource, reloadCounter }: Props) {
+export function PreviewPane({ catalog, palettes, state, dispatch, assetSource, reloadCounter, t, onComposeStatus }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const zoomRef = useRef(state.zoom);
@@ -27,7 +34,15 @@ export function PreviewPane({ catalog, palettes, state, dispatch, assetSource, r
   }, [state.zoom]);
 
   const result = useComposedCharacter(catalog, palettes, state, assetSource, reloadCounter);
-  useAnimationPlayer(canvasRef, result.animation, state.dir, state.playing, state.zoom);
+  useEffect(() => {
+    onComposeStatus({
+      progress: result.progress,
+      loading: result.status === 'loading',
+    });
+  }, [result.progress, result.status, onComposeStatus]);
+  const { currentFrame, totalFrames, fps } = useAnimationPlayer(
+    canvasRef, result.animation, state.dir, state.playing, state.zoom,
+  );
 
   useEffect(() => {
     const el = previewRef.current;
@@ -48,18 +63,25 @@ export function PreviewPane({ catalog, palettes, state, dispatch, assetSource, r
         <div className="flex h-full items-center justify-center">
           <canvas ref={canvasRef} className="image-render-pixel max-h-full max-w-full" />
         </div>
-        <div className="absolute top-3 right-3 flex gap-1">
-          <Button size="sm" variant="default"
-            disabled={state.zoom <= MIN_ZOOM}
-            onClick={() => dispatch({ type: 'set_zoom', zoom: state.zoom - 1 })}
-            aria-label="zoom out">−</Button>
-          <span className="rounded-md border border-border bg-surface px-2 py-1 font-mono text-[11px] text-text-mute">
-            {state.zoom * 100}%
-          </span>
-          <Button size="sm" variant="default"
-            disabled={state.zoom >= MAX_ZOOM}
-            onClick={() => dispatch({ type: 'set_zoom', zoom: state.zoom + 1 })}
-            aria-label="zoom in">+</Button>
+        <div className="absolute top-3 left-3 z-10 rounded bg-black/40 px-2 py-0.5 font-mono text-[10px] text-text-2 backdrop-blur-md">
+          {state.anim} · {DIR_SHORT[state.dir]} · {state.zoom}× · f{String(currentFrame + 1).padStart(2, '0')}
+        </div>
+        <div className="absolute top-3 right-3 z-10 flex gap-0.5 rounded bg-black/40 p-0.5 backdrop-blur-md">
+          {[1, 2, 4, 8].map((z) => (
+            <button
+              key={z}
+              type="button"
+              onClick={() => dispatch({ type: 'set_zoom', zoom: z })}
+              className={[
+                'rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold',
+                state.zoom === z
+                  ? 'bg-accent text-accent-ink'
+                  : 'text-text-2 hover:bg-white/10',
+              ].join(' ')}
+            >
+              {z}×
+            </button>
+          ))}
         </div>
       </div>
 
@@ -89,15 +111,21 @@ export function PreviewPane({ catalog, palettes, state, dispatch, assetSource, r
           {state.playing ? '⏸' : '▶'}
         </Button>
 
-        {result.status === 'loading' && (
-          <span className="ml-auto inline-flex items-center gap-1 font-mono text-[10px] text-text-mute">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
-            Loading {Math.round(result.progress * 100)}%
-          </span>
-        )}
-        {result.status !== 'loading' && (
-          <span className="ml-auto font-mono text-[10px] text-text-mute">zoom {state.zoom}×</span>
-        )}
+        <span className="ml-auto font-mono text-[10px] text-text-mute">
+          f{String(currentFrame + 1).padStart(2, '0')}/
+          {String(totalFrames).padStart(2, '0')} · {fps}fps
+        </span>
+        <button
+          type="button"
+          onClick={() => dispatch({
+            type: 'apply_selections',
+            selections: pickRandomOutfit({ catalog, bodyType: state.bodyType }),
+          })}
+          title={t('randomize.title')}
+          className="rounded px-2 py-1 text-text-mute hover:bg-surface-2"
+        >
+          🎲
+        </button>
       </div>
     </div>
   );

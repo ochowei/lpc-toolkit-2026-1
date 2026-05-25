@@ -25,6 +25,11 @@ export function SettingsCollapsible({ t, licenseFilter, setLicenseFilter, assetS
         className="flex w-full items-center gap-2 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-text-mute hover:bg-surface-2"
       >
         <span>{t('filters.title')}</span>
+        {licenseFilter && (
+          <span className="rounded-full border border-accent/40 bg-accent/15 px-2 py-0.5 text-[9px] font-normal normal-case text-accent">
+            ≤ {licenseFilter}
+          </span>
+        )}
         <span className="ml-auto">{open ? '▾' : '▸'}</span>
       </button>
       {open && (

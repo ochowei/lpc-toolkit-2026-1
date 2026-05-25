@@ -41,6 +41,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [expanded, setExpanded] = useState<TypeName | null>(null);
   const [reloadCounter, setReloadCounter] = useState(0);
+  const [loadingProgress, setLoadingProgress] = useState<number | null>(null);
 
   const handleForceReload = () => {
     cacheClear();
@@ -85,6 +86,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
         t={t}
         theme={theme}
         locale={locale}
+        loadingProgress={loadingProgress}
         onToggleTheme={onToggleTheme}
         onToggleLocale={onToggleLocale}
       >
@@ -175,6 +177,10 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
             dispatch={props.dispatch}
             assetSource={props.assetSource}
             reloadCounter={reloadCounter}
+            t={t}
+            onComposeStatus={({ progress, loading }) =>
+              setLoadingProgress(loading ? progress : null)
+            }
           />
         </main>
         <AdvancedPalette
