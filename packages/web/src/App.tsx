@@ -13,6 +13,8 @@ import {
   type Locale,
 } from './i18n';
 import type { AssetSource } from './adapter/asset-source';
+import { shouldUseV2 } from './lib/should-use-v2';
+import { LayerStackHarness } from './components/layer-stack/harness';
 
 export default function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -35,6 +37,31 @@ export default function App() {
   };
 
   document.documentElement.className = `lpc ${theme}`;
+
+  const useV2 = shouldUseV2(window.location.search);
+
+  if (useV2) {
+    return (
+      <LayerStackHarness
+        catalog={init.catalog}
+        palettes={init.palettes}
+        shownTypeNames={init.shownTypeNames}
+        state={state}
+        dispatch={dispatch}
+        theme={theme}
+        locale={locale}
+        assetSource={assetSource}
+        t={t}
+        tl={tl}
+        onAssetSourceChange={setAssetSource}
+        onReset={handleReset}
+        onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+        onToggleLocale={() =>
+          setLocale((current) => (current === 'en' ? 'zh-TW' : 'en'))
+        }
+      />
+    );
+  }
 
   return (
     <SliceHarness
