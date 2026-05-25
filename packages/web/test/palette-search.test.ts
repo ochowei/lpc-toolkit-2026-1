@@ -71,7 +71,8 @@ describe('filterAndRankPaletteItems', () => {
     const r = filterAndRankPaletteItems({
       catalog: c2, bodyType: 'male', query: '', shownTypeNames: ['hair'],
     });
-    expect(r[0].item.name).toBe('Curly');           // compatible first
-    expect(r[1].item.name).toBe('FemaleHair');      // incompatible after
+    expect(r).toHaveLength(2);
+    expect(r[0]?.item.name).toBe('Curly');          // compatible first
+    expect(r[1]?.item.name).toBe('FemaleHair');     // incompatible after
   });
 });
