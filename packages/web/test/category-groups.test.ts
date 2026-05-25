@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { readdirSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { CATEGORY_GROUPS, groupForType, type GroupId } from '../src/slice/category-groups';
 
 describe('CATEGORY_GROUPS', () => {
@@ -85,5 +88,49 @@ describe('groupForType', () => {
 
   it('returns null for unrecognized TypeName', () => {
     expect(groupForType('completely_made_up_type_xyz')).toBeNull();
+  });
+});
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(here, '../../..');
+const sheetDefsDir = path.join(repoRoot, 'upstream/sheet_definitions');
+
+function readCatalogTypeNames(): Set<string> {
+  const out = new Set<string>();
+  const walk = (dir: string): void => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) {
+        walk(full);
+      } else if (e.name.endsWith('.json')) {
+        const data = JSON.parse(readFileSync(full, 'utf8')) as { type_name?: string };
+        if (typeof data.type_name === 'string') out.add(data.type_name);
+      }
+    }
+  };
+  walk(sheetDefsDir);
+  return out;
+}
+
+describe('CATEGORY_GROUPS coverage vs upstream catalog', () => {
+  const catalogTypeNames = readCatalogTypeNames();
+  const groupedTypeNames = new Set<string>(
+    CATEGORY_GROUPS.flatMap((g) => g.typeNames),
+  );
+
+  it('every catalog type_name belongs to exactly one group', () => {
+    const missing = [...catalogTypeNames].filter((tn) => !groupedTypeNames.has(tn)).sort();
+    expect(
+      missing,
+      `${missing.length} catalog type_name(s) not in any CATEGORY_GROUP: ${missing.join(', ')}`,
+    ).toEqual([]);
+  });
+
+  it('every group typeName exists in the catalog (no dead keys)', () => {
+    const dead = [...groupedTypeNames].filter((tn) => !catalogTypeNames.has(tn)).sort();
+    expect(
+      dead,
+      `${dead.length} CATEGORY_GROUPS entries with no matching catalog type_name: ${dead.join(', ')}`,
+    ).toEqual([]);
   });
 });

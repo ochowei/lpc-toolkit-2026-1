@@ -17,8 +17,9 @@ export interface CategoryGroup {
 }
 
 // TODO(2026-05-25): removed dead keys `facial` / `torso` / `hands` /
-// `feet` (no matching catalog `type_name`). Coverage test in
-// category-groups.test.ts will fail if either direction breaks.
+// `feet` / `hair_tie` / `hat_secondary` / `hat_accessory_secondary` /
+// `leather_armor_belt` (no matching catalog `type_name`). Coverage
+// test in category-groups.test.ts will fail if either direction breaks.
 export const CATEGORY_GROUPS: readonly CategoryGroup[] = [
   {
     id: 'body',
@@ -29,7 +30,7 @@ export const CATEGORY_GROUPS: readonly CategoryGroup[] = [
     id: 'face',
     labelKey: 'group.face' as TranslationKey,
     typeNames: [
-      'hair', 'hair_tie', 'beard', 'expression', 'expression_crying',
+      'hair', 'beard', 'expression', 'expression_crying',
       'bandana', 'bandana_overlay', 'earrings', 'earring_left', 'earring_right',
       'ponytail', 'updo', 'mustache',
       'hairextl', 'hairextr', 'hairtie', 'hairtie_rune',
@@ -45,8 +46,7 @@ export const CATEGORY_GROUPS: readonly CategoryGroup[] = [
       'shoulders', 'arms', 'wrists', 'legs', 'clothes',
       'dress', 'dress_sleeves', 'dress_sleeves_trim', 'dress_trim',
       'shoes', 'overalls', 'apron', 'armour', 'chainmail',
-      'bracers', 'bauldron', 'hat', 'hat_secondary',
-      'hat_accessory_secondary', 'neck',
+      'bracers', 'bauldron', 'hat', 'neck',
       'jacket', 'jacket_collar', 'jacket_pockets', 'jacket_trim',
       'sleeves', 'socks', 'vest',
       'hat_accessory', 'hat_buckle', 'hat_overlay', 'hat_trim',
@@ -59,7 +59,7 @@ export const CATEGORY_GROUPS: readonly CategoryGroup[] = [
     labelKey: 'group.accessories' as TranslationKey,
     typeNames: [
       'cape', 'cape_trim', 'belt', 'backpack', 'backpack_straps', 'quiver',
-      'charm', 'accessory', 'buckles', 'leather_armor_belt', 'bandages', 'cargo',
+      'charm', 'accessory', 'buckles', 'bandages', 'cargo',
       'gloves', 'necklace', 'ring', 'sash', 'sash_tie',
     ],
   },
