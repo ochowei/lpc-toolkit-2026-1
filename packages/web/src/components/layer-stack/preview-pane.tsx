@@ -8,6 +8,9 @@ import type { Catalog, PaletteMetadata } from '@lpc-toolkit/core';
 import { Button } from '../ui/button';
 
 const DIR_LABEL: Record<Direction, string> = { up: '↑', left: '←', down: '↓', right: '→' };
+const DIR_SHORT: Record<Direction, 'N' | 'S' | 'E' | 'W'> = {
+  up: 'N', down: 'S', left: 'W', right: 'E',
+};
 
 interface Props {
   catalog: Catalog;
@@ -27,7 +30,7 @@ export function PreviewPane({ catalog, palettes, state, dispatch, assetSource, r
   }, [state.zoom]);
 
   const result = useComposedCharacter(catalog, palettes, state, assetSource, reloadCounter);
-  const { currentFrame: _currentFrame, totalFrames: _totalFrames, fps: _fps } = useAnimationPlayer(
+  const { currentFrame, totalFrames, fps } = useAnimationPlayer(
     canvasRef, result.animation, state.dir, state.playing, state.zoom,
   );
 
@@ -49,6 +52,9 @@ export function PreviewPane({ catalog, palettes, state, dispatch, assetSource, r
       <div className="relative flex-1 overflow-hidden">
         <div className="flex h-full items-center justify-center">
           <canvas ref={canvasRef} className="image-render-pixel max-h-full max-w-full" />
+        </div>
+        <div className="absolute top-3 left-3 z-10 rounded bg-black/40 px-2 py-0.5 font-mono text-[10px] text-text-2 backdrop-blur-md">
+          {state.anim} · {DIR_SHORT[state.dir]} · {state.zoom}× · f{String(currentFrame + 1).padStart(2, '0')}
         </div>
         <div className="absolute top-3 right-3 flex gap-1">
           <Button size="sm" variant="default"
@@ -91,15 +97,10 @@ export function PreviewPane({ catalog, palettes, state, dispatch, assetSource, r
           {state.playing ? '⏸' : '▶'}
         </Button>
 
-        {result.status === 'loading' && (
-          <span className="ml-auto inline-flex items-center gap-1 font-mono text-[10px] text-text-mute">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
-            Loading {Math.round(result.progress * 100)}%
-          </span>
-        )}
-        {result.status !== 'loading' && (
-          <span className="ml-auto font-mono text-[10px] text-text-mute">zoom {state.zoom}×</span>
-        )}
+        <span className="ml-auto font-mono text-[10px] text-text-mute">
+          f{String(currentFrame + 1).padStart(2, '0')}/
+          {String(totalFrames).padStart(2, '0')} · {fps}fps
+        </span>
       </div>
     </div>
   );
