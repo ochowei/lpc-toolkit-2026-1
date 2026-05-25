@@ -57,13 +57,13 @@ describe('pickInitialSelections', () => {
     expect(state.zoom).toBe(4);
   });
 
-  it('does not pre-select hair / eyes / torso / legs / feet', () => {
+  it('does not pre-select hair / eyes / clothes / legs / shoes', () => {
     const { state } = pickInitialSelections(makeFullCatalog());
     expect(state.selections['hair']).toBeUndefined();
     expect(state.selections['eyes']).toBeUndefined();
-    expect(state.selections['torso']).toBeUndefined();
+    expect(state.selections['clothes']).toBeUndefined();
     expect(state.selections['legs']).toBeUndefined();
-    expect(state.selections['feet']).toBeUndefined();
+    expect(state.selections['shoes']).toBeUndefined();
   });
 
   it('exposes body / head / hair / expression in shownTypeNames so the Common picker shows them', () => {
@@ -94,6 +94,25 @@ describe('pickInitialSelections', () => {
     const { shownTypeNames } = pickInitialSelections(catalog);
     expect(shownTypeNames).not.toContain('hair');
     expect(shownTypeNames).not.toContain('legs');
+  });
+
+  it('includes non-COMMON types from CATEGORY_GROUPS when catalog has them', () => {
+    const { catalog } = createCatalog({
+      'body.json': defn('Body Color', 'body'),
+      'heads_human_male.json': defn('Human Male', 'head'),
+      'face_neutral.json': defn('Neutral', 'expression'),
+      'weapon/sword.json': defn('Sword', 'weapon'),
+      'shield/heater.json': defn('Heater', 'shield'),
+      'wings/feather.json': defn('Feather Wings', 'wings'),
+    });
+    const { shownTypeNames } = pickInitialSelections(catalog);
+    expect(shownTypeNames).toContain('weapon');
+    expect(shownTypeNames).toContain('shield');
+    expect(shownTypeNames).toContain('wings');
+    // COMMON priority preserved: body still appears before weapon
+    expect(shownTypeNames.indexOf('body')).toBeLessThan(
+      shownTypeNames.indexOf('weapon'),
+    );
   });
 
   it('throws when a required default itemId is missing from the catalog', () => {

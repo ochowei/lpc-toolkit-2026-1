@@ -9,6 +9,7 @@ import {
   type TypeName,
 } from '@lpc-toolkit/core';
 import type { CatalogTreeItem } from './catalog-tree';
+import { CATEGORY_GROUPS } from './category-groups';
 
 export const MIN_ZOOM = 1;
 export const MAX_ZOOM = 8;
@@ -178,7 +179,7 @@ const DEFAULT_BODY_TYPE: BodyType = 'male';
 /**
  * Common-picker order. `expression` is slotted next to its visual
  * neighbours (head/hair); the other entries preserve the previous flat
- * head-to-toe order. Types with no defaults (hair/eyes/torso/legs/feet)
+ * head-to-toe order. Types with no defaults (hair/eyes/clothes/legs/shoes)
  * render as empty selectors the user can pick into. A type-name is
  * included only if the catalog has at least one item of that type, so
  * pared-down test catalogs still work.
@@ -189,9 +190,9 @@ export const COMMON_TYPE_ORDER: readonly TypeName[] = [
   'hair',
   'expression',
   'eyes',
-  'torso',
+  'clothes',
   'legs',
-  'feet',
+  'shoes',
 ];
 
 /**
@@ -225,9 +226,21 @@ export function pickInitialSelections(catalog: Catalog): {
     };
   }
 
-  const shownTypeNames = COMMON_TYPE_ORDER.filter(
-    (tn) => (catalog.byTypeName.get(tn) ?? []).length > 0,
-  );
+  // Show every catalog type the user can theoretically pick. COMMON_TYPE_ORDER
+  // goes first to preserve the head-to-toe display order in the active-layer
+  // list; remaining types follow in CATEGORY_GROUPS declaration order so they
+  // appear under the right super-group in AddLayer / AdvancedPalette.
+  const seen = new Set<TypeName>();
+  const shownTypeNames: TypeName[] = [];
+  for (const tn of [
+    ...COMMON_TYPE_ORDER,
+    ...CATEGORY_GROUPS.flatMap((g) => g.typeNames),
+  ]) {
+    if (seen.has(tn)) continue;
+    if ((catalog.byTypeName.get(tn) ?? []).length === 0) continue;
+    seen.add(tn);
+    shownTypeNames.push(tn);
+  }
 
   return {
     state: {
