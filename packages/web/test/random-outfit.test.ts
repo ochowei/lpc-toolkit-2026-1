@@ -83,4 +83,65 @@ describe('pickRandomOutfit', () => {
     });
     expect(a).toEqual(b);
   });
+
+  describe('excludeGroups', () => {
+    const fxItem = makeItem('Bleeding', 'wound_arm');
+    const shadowItem = makeItem('Shadow', 'shadow');
+    const wingsItem = makeItem('Wings', 'wings');
+    const { catalog: cWithFx } = createCatalog({
+      'body/light.json': makeItem('Light', 'body'),
+      'head/round.json': makeItem('Round', 'head'),
+      'eyes/blue.json': makeItem('Blue', 'eyes'),
+      'wound_arm/bleed.json': fxItem,
+      'shadow/dark.json': shadowItem,
+      'wings/feather.json': wingsItem,
+    });
+
+    it('default excludeGroups (["fx"]) never includes wound/shadow items', () => {
+      for (let i = 0; i < 200; i++) {
+        const sel = pickRandomOutfit({
+          catalog: cWithFx,
+          bodyType: 'male',
+          rng: () => Math.random(),
+          optionalProb: 1.0,
+        });
+        expect(sel.items['wound_arm']).toBeUndefined();
+        expect(sel.items['shadow']).toBeUndefined();
+      }
+    });
+
+    it('default excludeGroups still allows fantasy group items', () => {
+      const sel = pickRandomOutfit({
+        catalog: cWithFx,
+        bodyType: 'male',
+        rng: () => 0.5,
+        optionalProb: 1.0,
+      });
+      expect(sel.items['wings']).toBeDefined();
+    });
+
+    it('excludeGroups: [] re-enables fx items', () => {
+      const sel = pickRandomOutfit({
+        catalog: cWithFx,
+        bodyType: 'male',
+        rng: () => 0.5,
+        optionalProb: 1.0,
+        excludeGroups: [],
+      });
+      expect(sel.items['wound_arm']).toBeDefined();
+      expect(sel.items['shadow']).toBeDefined();
+    });
+
+    it('custom excludeGroups overrides the default', () => {
+      const sel = pickRandomOutfit({
+        catalog: cWithFx,
+        bodyType: 'male',
+        rng: () => 0.5,
+        optionalProb: 1.0,
+        excludeGroups: ['weapons'],
+      });
+      expect(sel.items['wound_arm']).toBeDefined();
+      expect(sel.items['wings']).toBeDefined();
+    });
+  });
 });
