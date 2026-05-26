@@ -24,6 +24,16 @@ describe('nextActiveIndex', () => {
   it('returns -1 when results are empty', () => {
     expect(nextActiveIndex(0, 'ArrowDown', 0)).toBe(-1);
   });
+
+  it('clamps stale curr above range on ArrowUp (curr > resultsLen)', () => {
+    // results shrunk from 10 to 3; curr is stale at 8 → clamp to 2, then ArrowUp → 1
+    expect(nextActiveIndex(8, 'ArrowUp', 3)).toBe(1);
+  });
+
+  it('clamps stale curr above range on ArrowDown (curr > resultsLen)', () => {
+    // stale curr=8, results=3 → clamp to 2, ArrowDown stays at 2 (already at end)
+    expect(nextActiveIndex(8, 'ArrowDown', 3)).toBe(2);
+  });
 });
 
 describe('pickIndexForEnter', () => {
@@ -41,5 +51,9 @@ describe('pickIndexForEnter', () => {
 
   it('returns null when results are empty (active = 0)', () => {
     expect(pickIndexForEnter(0, 0)).toBeNull();
+  });
+
+  it('treats stale active (>= resultsLen) as no selection and picks first row', () => {
+    expect(pickIndexForEnter(7, 3)).toBe(0);
   });
 });
