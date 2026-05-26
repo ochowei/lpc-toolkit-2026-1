@@ -6,7 +6,7 @@ import {
   STANDARD_ANIMATION_FRAMES_PER_ROW,
   type Direction,
 } from './constants.js';
-import type { AnimationName, ComposedSheet } from './types.js';
+import type { AnimationName, ComposedSheet, CustomAnimationRegion } from './types.js';
 
 export interface ExtractFramesOptions {
   readonly adapter: CanvasAdapter;
@@ -48,15 +48,26 @@ export function extractAnimationFrames(
 ): ReadonlyMap<Direction, readonly FrameSlice[]> {
   const skipEmpty = options.skipEmpty ?? true;
   const config = ANIMATION_CONFIGS[name];
-  if (!config) {
-    throw new Error(`extractAnimationFrames: unknown animation "${name}"`);
+  if (config) {
+    return extractStandard(sheet, config.row, config.num, options.adapter, skipEmpty);
   }
+  const region = sheet.customAnimations?.get(name);
+  if (region) {
+    return extractCustom(sheet, region, options.adapter, skipEmpty);
+  }
+  throw new Error(`extractAnimationFrames: unknown animation "${name}"`);
+}
 
-  const { row, num } = config;
+function extractStandard(
+  sheet: ComposedSheet,
+  row: number,
+  num: 1 | 4,
+  adapter: CanvasAdapter,
+  skipEmpty: boolean,
+): ReadonlyMap<Direction, readonly FrameSlice[]> {
   const frameSize = FRAME_SIZE;
   const framesPerRow = STANDARD_ANIMATION_FRAMES_PER_ROW;
   const sourceCtx = sheet.canvas.getContext('2d');
-
   const out = new Map<Direction, FrameSlice[]>();
 
   for (let dirIndex = 0; dirIndex < num; dirIndex++) {
@@ -78,27 +89,75 @@ export function extractAnimationFrames(
       ) {
         continue;
       }
-      const frameCanvas = options.adapter.createCanvas(frameSize, frameSize);
-      const frameCtx = frameCanvas.getContext('2d');
-      frameCtx.drawImage(
-        sheet.canvas,
-        sourceX,
-        sourceY,
-        frameSize,
-        frameSize,
-        0,
-        0,
-        frameSize,
-        frameSize,
+      slices.push(
+        sliceFrame(sheet, adapter, sourceX, sourceY, frameSize, frameIndex + 1, direction),
       );
-      slices.push({
-        canvas: frameCanvas,
-        frameNumber: frameIndex + 1,
-        direction,
-      });
     }
     out.set(direction, slices);
   }
-
   return out;
+}
+
+function extractCustom(
+  sheet: ComposedSheet,
+  region: CustomAnimationRegion,
+  adapter: CanvasAdapter,
+  skipEmpty: boolean,
+): ReadonlyMap<Direction, readonly FrameSlice[]> {
+  const { offsetY, frameSize, rows, cols } = region;
+  const sourceCtx = sheet.canvas.getContext('2d');
+  const out = new Map<Direction, FrameSlice[]>();
+  const directionsToEmit = Math.min(rows, DIRECTIONS.length);
+
+  for (let dirIndex = 0; dirIndex < directionsToEmit; dirIndex++) {
+    const direction = DIRECTIONS[dirIndex]!;
+    const sourceY = offsetY + dirIndex * frameSize;
+    const rowData = sourceCtx.getImageData(
+      0,
+      sourceY,
+      sheet.width,
+      frameSize,
+    );
+
+    const slices: FrameSlice[] = [];
+    for (let frameIndex = 0; frameIndex < cols; frameIndex++) {
+      const sourceX = frameIndex * frameSize;
+      if (
+        skipEmpty &&
+        !rowHasContent(rowData.data, rowData.width, sourceX, frameSize, frameSize)
+      ) {
+        continue;
+      }
+      slices.push(
+        sliceFrame(sheet, adapter, sourceX, sourceY, frameSize, frameIndex + 1, direction),
+      );
+    }
+    out.set(direction, slices);
+  }
+  return out;
+}
+
+function sliceFrame(
+  sheet: ComposedSheet,
+  adapter: CanvasAdapter,
+  sourceX: number,
+  sourceY: number,
+  frameSize: number,
+  frameNumber: number,
+  direction: Direction,
+): FrameSlice {
+  const frameCanvas = adapter.createCanvas(frameSize, frameSize);
+  const frameCtx = frameCanvas.getContext('2d');
+  frameCtx.drawImage(
+    sheet.canvas,
+    sourceX,
+    sourceY,
+    frameSize,
+    frameSize,
+    0,
+    0,
+    frameSize,
+    frameSize,
+  );
+  return { canvas: frameCanvas, frameNumber, direction };
 }

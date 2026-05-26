@@ -94,3 +94,57 @@ describe('extractAnimationFrames — standard', () => {
     ).toThrow(/unknown animation/);
   });
 });
+
+describe('extractAnimationFrames — custom', () => {
+  function customSheet(rows: number, cols: number, frameSize: number): ComposedSheet {
+    const sheetH = 3456 + rows * frameSize;
+    const canvas = makeCanvas(832, sheetH, (ctx) => {
+      ctx.fillStyle = '#0000ff';
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          ctx.fillRect(c * frameSize, 3456 + r * frameSize, frameSize, frameSize);
+        }
+      }
+    });
+    return {
+      canvas,
+      width: 832,
+      height: sheetH,
+      selections: { bodyType: 'male', items: {} },
+      credits: EMPTY_CREDITS,
+      layers: [],
+      animations: [],
+      customAnimations: new Map([
+        ['wheelchair', { offsetY: 3456, frameSize, rows, cols }],
+      ]),
+    };
+  }
+
+  it('returns 4 directions when region.rows === 4', () => {
+    const sheet = customSheet(4, 8, 64);
+    const frames = extractAnimationFrames(sheet, 'wheelchair', { adapter });
+    expect([...frames.keys()]).toEqual(['up', 'left', 'down', 'right']);
+    expect(frames.get('right')!).toHaveLength(8);
+  });
+
+  it('returns only "up" when region.rows === 1', () => {
+    const sheet = customSheet(1, 5, 64);
+    const frames = extractAnimationFrames(sheet, 'wheelchair', { adapter });
+    expect([...frames.keys()]).toEqual(['up']);
+    expect(frames.get('up')!).toHaveLength(5);
+  });
+
+  it('returns first `rows` DIRECTIONS for rows=2', () => {
+    const sheet = customSheet(2, 3, 64);
+    const frames = extractAnimationFrames(sheet, 'wheelchair', { adapter });
+    expect([...frames.keys()]).toEqual(['up', 'left']);
+  });
+
+  it('uses region.frameSize for frame canvas size (non-64)', () => {
+    const sheet = customSheet(4, 2, 128);
+    const frames = extractAnimationFrames(sheet, 'wheelchair', { adapter });
+    const first = frames.get('up')![0]!.canvas;
+    expect(first.width).toBe(128);
+    expect(first.height).toBe(128);
+  });
+});
