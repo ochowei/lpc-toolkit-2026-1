@@ -112,10 +112,15 @@ function extractCustom(
   for (let dirIndex = 0; dirIndex < directionsToEmit; dirIndex++) {
     const direction = DIRECTIONS[dirIndex]!;
     const sourceY = offsetY + dirIndex * frameSize;
+    // Custom regions are usually narrower than sheet.width (cols * frameSize
+    // ≤ sheet.width). Restrict the ImageData read to the block's actual width
+    // to match the sibling `animation.ts` cropping pattern and avoid scanning
+    // transparent pixels beyond the region.
+    const regionWidth = cols * frameSize;
     const rowData = sourceCtx.getImageData(
       0,
       sourceY,
-      sheet.width,
+      regionWidth,
       frameSize,
     );
 

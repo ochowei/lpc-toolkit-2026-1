@@ -147,4 +147,38 @@ describe('extractAnimationFrames — custom', () => {
     expect(first.width).toBe(128);
     expect(first.height).toBe(128);
   });
+
+  it('drops empty frames in custom path when skipEmpty is true (default)', () => {
+    // 4×4 region. Only column 0 and column 2 painted in each direction row;
+    // columns 1 and 3 are fully transparent.
+    const rows = 4, cols = 4, frameSize = 64;
+    const sheetH = 3456 + rows * frameSize;
+    const canvas = makeCanvas(832, sheetH, (ctx) => {
+      ctx.fillStyle = '#0000ff';
+      for (let r = 0; r < rows; r++) {
+        ctx.fillRect(0 * frameSize, 3456 + r * frameSize, frameSize, frameSize);
+        ctx.fillRect(2 * frameSize, 3456 + r * frameSize, frameSize, frameSize);
+      }
+    });
+    const sheet: ComposedSheet = {
+      canvas,
+      width: 832,
+      height: sheetH,
+      selections: { bodyType: 'male', items: {} },
+      credits: EMPTY_CREDITS,
+      layers: [],
+      animations: [],
+      customAnimations: new Map([
+        ['wheelchair', { offsetY: 3456, frameSize, rows, cols }],
+      ]),
+    };
+    const frames = extractAnimationFrames(sheet, 'wheelchair', { adapter });
+    expect(frames.get('up')!.map((f) => f.frameNumber)).toEqual([1, 3]);
+
+    const all = extractAnimationFrames(sheet, 'wheelchair', {
+      adapter,
+      skipEmpty: false,
+    });
+    expect(all.get('up')!).toHaveLength(4);
+  });
 });
