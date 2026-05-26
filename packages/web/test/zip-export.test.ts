@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeAll, afterAll } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   zipExportTimestamp,
   zipName,
@@ -55,37 +55,6 @@ describe('itemFileName', () => {
   });
 });
 
-// Stub document.createElement('a') so downloadBlob doesn't blow up under node
-// (download is a side effect; we capture the blob via spy on URL.createObjectURL).
-beforeAll(() => {
-  vi.stubGlobal('document', {
-    createElement: (tag: string) => {
-      if (tag !== 'a' && tag !== 'canvas') {
-        throw new Error(`unexpected createElement: ${tag}`);
-      }
-      if (tag === 'canvas') return createCanvas(1, 1);
-      // anchor stub
-      return {
-        href: '',
-        download: '',
-        style: {},
-        click: () => {},
-      };
-    },
-    body: {
-      appendChild: () => {},
-      removeChild: () => {},
-    },
-  });
-  vi.stubGlobal('URL', {
-    createObjectURL: () => 'blob:stub',
-    revokeObjectURL: () => {},
-  });
-});
-
-afterAll(() => {
-  vi.unstubAllGlobals();
-});
 
 const EMPTY_CREDITS: CreditsManifest = {
   entries: [],
@@ -145,6 +114,50 @@ describe('exportByAnimationZip (F4)', () => {
       'standard/walk.png',
     ]);
     const pngBytes = await zip.file('standard/walk.png')!.async('uint8array');
+    expect(pngBytes.length).toBeGreaterThan(0);
+  });
+
+  it('produces custom/<name>.png entries for sheet.customAnimations', async () => {
+    // Compose a sheet with a 1-direction × 3-frame wheelchair-style custom block
+    // immediately below the standard sheet (offsetY=3456, rows=1, cols=3, frameSize=64).
+    const baseCanvas = createCanvas(832, 3456 + 64);
+    const ctx2 = baseCanvas.getContext('2d');
+    ctx2.fillStyle = '#00ff00';
+    ctx2.fillRect(0, 3456, 3 * 64, 64);
+    const sheet: ComposedSheet = {
+      canvas: baseCanvas as unknown as import('@lpc-toolkit/core').CanvasLike,
+      width: 832,
+      height: 3456 + 64,
+      selections: { bodyType: 'male', items: {} },
+      credits: EMPTY_CREDITS,
+      layers: [],
+      animations: [],
+      customAnimations: new Map([
+        ['wheelchair', { offsetY: 3456, frameSize: 64, rows: 1, cols: 3 }],
+      ]),
+    };
+    const ctx: ExportContext = {
+      sheet,
+      selections: sheet.selections,
+      catalog: {
+        byItemId: new Map(),
+        byTypeName: new Map(),
+        typeNames: [],
+        aliases: new Map(),
+      },
+      anim: 'walk',
+      composeSingleItem: async () => sheet,
+      adapter: makeAdapter(),
+      onProgress: () => {},
+    };
+    const blob = await exportByAnimationZip(ctx);
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    expect(Object.keys(zip.files).sort()).toEqual([
+      'credits/credits.csv',
+      'credits/credits.txt',
+      'custom/wheelchair.png',
+    ]);
+    const pngBytes = await zip.file('custom/wheelchair.png')!.async('uint8array');
     expect(pngBytes.length).toBeGreaterThan(0);
   });
 });

@@ -24,6 +24,12 @@ export interface ExportContext {
   readonly sheet: ComposedSheet;
   readonly selections: Selections;
   readonly catalog: Catalog;
+  /**
+   * The UI-selected animation. Used by `writeCredits` only as a fallback
+   * when `sheet.credits.resolvedPaths` is empty (it's populated in normal
+   * production flow, so this is rarely consulted). Other exports may also
+   * use it for the credits.txt filename column.
+   */
   readonly anim: string;
   readonly composeSingleItem: (s: Selections) => Promise<ComposedSheet>;
   readonly adapter: CanvasAdapter;
@@ -66,6 +72,12 @@ export function itemFileName(input: ItemFileNameInput): string {
   return `${padded} ${safe}.png`;
 }
 
+// ComposedSheet.canvas / extractAnimation return CanvasLike (the minimal
+// env-agnostic interface from @lpc-toolkit/core). Both the browser adapter
+// and @napi-rs/canvas (used in tests) provide a .toBlob method on their
+// canvas implementation, so the `as unknown as HTMLCanvasElement` cast at
+// call sites is safe in both environments. Don't switch to .toBuffer —
+// that would break the browser path.
 function encodePng(canvas: HTMLCanvasElement): Promise<ArrayBuffer> {
   return new Promise((resolve, reject) => {
     canvas.toBlob(
