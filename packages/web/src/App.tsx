@@ -1,4 +1,5 @@
 import { useMemo, useReducer, useState } from 'react';
+import type { HashWarning } from '@lpc-toolkit/core';
 import { loadCatalogFromUpstream } from './catalog/load-catalog';
 import { loadPalettesFromUpstream } from './catalog/load-palettes';
 import {
@@ -15,7 +16,6 @@ import {
 import type { AssetSource } from './adapter/asset-source';
 import { shouldUseV1 } from './lib/should-use-v1';
 import { LayerStackHarness } from './components/layer-stack/harness';
-import type { HashWarning } from '@lpc-toolkit/core';
 import {
   bootstrapStateFromHash,
   readWindowHash,
