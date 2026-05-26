@@ -130,9 +130,17 @@ export function useUrlHashSync(args: {
 }): void {
   const isFirstWriteRef = useRef(true);
   const stateRef = useRef(args.state);
+  const onStatusRef = useRef(args.onStatus);
+  const tRef = useRef(args.t);
   useEffect(() => {
     stateRef.current = args.state;
   }, [args.state]);
+  useEffect(() => {
+    onStatusRef.current = args.onStatus;
+  }, [args.onStatus]);
+  useEffect(() => {
+    tRef.current = args.t;
+  }, [args.t]);
 
   // Write effect: state → hash.
   useEffect(() => {
@@ -164,12 +172,12 @@ export function useUrlHashSync(args: {
       if (!action.shouldApply || action.selections === null) return;
       args.dispatch({ type: 'apply_selections', selections: action.selections });
       if (action.warnings.length > 0) {
-        args.onStatus(
-          args.t('hashSync.skipped').replace('{n}', String(action.warnings.length)),
+        onStatusRef.current(
+          tRef.current('hashSync.skipped').replace('{n}', String(action.warnings.length)),
         );
       }
     };
     window.addEventListener('hashchange', handler);
     return () => window.removeEventListener('hashchange', handler);
-  }, [args.catalog, args.palettes, args.dispatch, args.t, args.onStatus]);
+  }, [args.catalog, args.palettes, args.dispatch]);
 }
