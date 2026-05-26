@@ -144,4 +144,17 @@ describe('computeHashChangeAction', () => {
     expect(result.shouldApply).toBe(true);
     expect(result.warnings.length).toBe(1);
   });
+
+  it('returns selections with empty items when all hash keys are unknown', () => {
+    const result = computeHashChangeAction({
+      rawHash: 'fictional_xyz=foo',
+      currentState: defaults,
+      catalog,
+      palettes,
+    });
+    expect(result.shouldApply).toBe(true);
+    expect(result.selections).not.toBe(null);
+    expect(Object.keys(result.selections?.items ?? {}).length).toBe(0);
+    expect(result.warnings.length).toBe(1);
+  });
 });

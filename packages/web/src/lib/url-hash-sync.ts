@@ -150,6 +150,7 @@ export function useUrlHashSync(args: {
       nextHash,
       isFirstWrite: isFirstWriteRef.current,
     });
+    isFirstWriteRef.current = false;
     if (action === null) return;
     const target = '#' + nextHash;
     if (action === 'replace') {
@@ -157,7 +158,6 @@ export function useUrlHashSync(args: {
     } else {
       window.history.pushState(null, '', target);
     }
-    isFirstWriteRef.current = false;
   }, [args.state.bodyType, args.state.selections]);
 
   // Listen for external hash changes (back/forward, manual edit).
@@ -170,10 +170,39 @@ export function useUrlHashSync(args: {
         palettes: args.palettes,
       });
       if (!action.shouldApply || action.selections === null) return;
+
+      // If nothing resolved, don't wipe the current outfit; just normalize
+      // the URL back to the current canonical form so junk doesn't linger.
+      if (Object.keys(action.selections.items).length === 0) {
+        const canonical = serializeHash(toSelections(stateRef.current));
+        if (canonical !== readWindowHash()) {
+          window.history.replaceState(null, '', '#' + canonical);
+        }
+        if (action.warnings.length > 0) {
+          onStatusRef.current(
+            tRef.current('hashSync.skipped').replace(
+              '{n}',
+              String(action.warnings.length),
+            ),
+          );
+        }
+        return;
+      }
+
+      // Normalize the URL to canonical form before dispatching, so the
+      // subsequent write effect is a no-op (no extra pushState entry for
+      // non-canonical incoming URLs).
+      const canonical = serializeHash(action.selections);
+      if (canonical !== readWindowHash()) {
+        window.history.replaceState(null, '', '#' + canonical);
+      }
       args.dispatch({ type: 'apply_selections', selections: action.selections });
       if (action.warnings.length > 0) {
         onStatusRef.current(
-          tRef.current('hashSync.skipped').replace('{n}', String(action.warnings.length)),
+          tRef.current('hashSync.skipped').replace(
+            '{n}',
+            String(action.warnings.length),
+          ),
         );
       }
     };
