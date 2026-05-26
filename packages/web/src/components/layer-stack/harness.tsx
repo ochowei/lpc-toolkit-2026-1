@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { Catalog, PaletteMetadata, TypeName } from '@lpc-toolkit/core';
+import type { Catalog, HashWarning, PaletteMetadata, TypeName } from '@lpc-toolkit/core';
+import { useUrlHashSync } from '../../lib/url-hash-sync';
 import type { SliceState, SliceAction } from '../../slice/selection';
 import type { Locale, Translator, LabelTranslator } from '../../i18n';
 import type { AssetSource } from '../../adapter/asset-source';
@@ -22,6 +23,7 @@ export interface LayerStackHarnessProps {
   catalog: Catalog;
   palettes: PaletteMetadata;
   shownTypeNames: string[];
+  initialHashWarnings: readonly HashWarning[];
   state: SliceState;
   dispatch: (a: SliceAction) => void;
   theme: 'dark' | 'light';
@@ -76,6 +78,28 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
+  useUrlHashSync({
+    state: props.state,
+    dispatch: props.dispatch,
+    catalog: props.catalog,
+    palettes: props.palettes,
+    t,
+    onStatus: (text) => setStatus({ kind: 'info', text }),
+  });
+
+  useEffect(() => {
+    if (props.initialHashWarnings.length === 0) return;
+    setStatus({
+      kind: 'warn',
+      text: t('hashSync.skipped').replace(
+        '{n}',
+        String(props.initialHashWarnings.length),
+      ),
+    });
+    // Run once on mount only:
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handlePresetApplied = (name: string, skippedCount: number, skippedTypes: string[]) => {

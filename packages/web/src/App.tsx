@@ -15,6 +15,11 @@ import {
 import type { AssetSource } from './adapter/asset-source';
 import { shouldUseV1 } from './lib/should-use-v1';
 import { LayerStackHarness } from './components/layer-stack/harness';
+import type { HashWarning } from '@lpc-toolkit/core';
+import {
+  bootstrapStateFromHash,
+  readWindowHash,
+} from './lib/url-hash-sync';
 
 export default function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -24,8 +29,23 @@ export default function App() {
   const init = useMemo(() => {
     const catalog = loadCatalogFromUpstream();
     const palettes = loadPalettesFromUpstream();
-    const { state, shownTypeNames } = pickInitialSelections(catalog);
-    return { catalog, palettes, state, shownTypeNames };
+    const defaults = pickInitialSelections(catalog);
+    const useV1 = shouldUseV1(window.location.search);
+    const boot = useV1
+      ? { state: defaults.state, warnings: [] as readonly HashWarning[] }
+      : bootstrapStateFromHash({
+          rawHash: readWindowHash(),
+          catalog,
+          palettes,
+          defaults: defaults.state,
+        });
+    return {
+      catalog,
+      palettes,
+      state: boot.state,
+      warnings: boot.warnings,
+      shownTypeNames: defaults.shownTypeNames,
+    };
   }, []);
   const t = useMemo(() => createTranslator(locale), [locale]);
   const tl = useMemo(() => createLabelTranslator(locale), [locale]);
@@ -38,9 +58,7 @@ export default function App() {
 
   document.documentElement.className = `lpc ${theme}`;
 
-  const useV1 = shouldUseV1(window.location.search);
-
-  if (useV1) {
+  if (shouldUseV1(window.location.search)) {
     return (
       <SliceHarness
         catalog={init.catalog}
@@ -68,6 +86,7 @@ export default function App() {
       catalog={init.catalog}
       palettes={init.palettes}
       shownTypeNames={init.shownTypeNames}
+      initialHashWarnings={init.warnings}
       state={state}
       dispatch={dispatch}
       theme={theme}
