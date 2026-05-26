@@ -1,9 +1,18 @@
+import {
+  creditsToCsv,
+  creditsToTxt,
+  extractAnimation,
+} from '@lpc-toolkit/core';
 import type {
   Catalog,
   CanvasAdapter,
   ComposedSheet,
   Selections,
 } from '@lpc-toolkit/core';
+// Type-only import — erased at compile time, so the actual jszip module
+// is still lazily loaded via `await import('jszip')` below.
+import type JSZipModule from 'jszip';
+type JSZipInstance = InstanceType<typeof JSZipModule>;
 
 export type ZipExportKind =
   | 'byAnimation'
@@ -55,4 +64,81 @@ export function itemFileName(input: ItemFileNameInput): string {
   const safe = raw.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
   const padded = String(input.zPos).padStart(3, '0');
   return `${padded} ${safe}.png`;
+}
+
+function encodePng(canvas: HTMLCanvasElement): Promise<ArrayBuffer> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (b) =>
+        b
+          ? resolve(b.arrayBuffer())
+          : reject(new Error('toBlob returned null')),
+      'image/png',
+    );
+  });
+}
+
+function writeCredits(
+  zip: JSZipInstance,
+  sheet: ComposedSheet,
+  anim: string,
+): void {
+  const opts = { createFolders: false };
+  zip.file('credits/credits.txt', creditsToTxt(sheet.credits, anim), opts);
+  zip.file('credits/credits.csv', creditsToCsv(sheet.credits, anim), opts);
+}
+
+// jszip's `generateAsync` onUpdate callback gives `{ percent: 0..100 }`.
+// Map encode-stage progress to 0–0.5 and generate-stage to 0.5–1.0.
+function reportEncode(
+  ctx: ExportContext,
+  done: number,
+  total: number,
+): void {
+  if (total > 0) ctx.onProgress((done / total) * 0.5);
+}
+
+function reportGenerate(ctx: ExportContext, percent: number): void {
+  ctx.onProgress(0.5 + (percent / 100) * 0.5);
+}
+
+export async function exportByAnimationZip(ctx: ExportContext): Promise<Blob> {
+  const { default: JSZip } = await import('jszip');
+  const zip = new JSZip();
+  const { sheet } = ctx;
+
+  const standardAnims = sheet.animations;
+  const customAnims = sheet.customAnimations
+    ? [...sheet.customAnimations.keys()]
+    : [];
+  const total = standardAnims.length + customAnims.length;
+  let done = 0;
+
+  const fileOpts = { createFolders: false };
+
+  for (const anim of standardAnims) {
+    const animCanvas = extractAnimation(sheet, anim, { adapter: ctx.adapter });
+    const buf = await encodePng(
+      animCanvas.canvas as unknown as HTMLCanvasElement,
+    );
+    zip.file(`standard/${anim}.png`, buf, fileOpts);
+    done += 1;
+    reportEncode(ctx, done, total);
+  }
+  for (const name of customAnims) {
+    const animCanvas = extractAnimation(sheet, name, { adapter: ctx.adapter });
+    const buf = await encodePng(
+      animCanvas.canvas as unknown as HTMLCanvasElement,
+    );
+    zip.file(`custom/${name}.png`, buf, fileOpts);
+    done += 1;
+    reportEncode(ctx, done, total);
+  }
+
+  writeCredits(zip, sheet, ctx.anim);
+
+  return zip.generateAsync(
+    { type: 'blob' },
+    (meta) => reportGenerate(ctx, meta.percent),
+  );
 }

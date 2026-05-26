@@ -1,9 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi, beforeAll, afterAll } from 'vitest';
 import {
   zipExportTimestamp,
   zipName,
   itemFileName,
+  exportByAnimationZip,
+  type ExportContext,
 } from '../src/lib/zip-export';
+import { createCanvas } from '@napi-rs/canvas';
+import JSZip from 'jszip';
+import type { ComposedSheet, CreditsManifest } from '@lpc-toolkit/core';
 
 describe('zipExportTimestamp', () => {
   it('matches the upstream yyyy-MM-ddTHH-mm-ss pattern', () => {
@@ -47,5 +52,99 @@ describe('itemFileName', () => {
         variant: 'blonde',
       }),
     ).toBe('007 hair_messy_blonde.png');
+  });
+});
+
+// Stub document.createElement('a') so downloadBlob doesn't blow up under node
+// (download is a side effect; we capture the blob via spy on URL.createObjectURL).
+beforeAll(() => {
+  vi.stubGlobal('document', {
+    createElement: (tag: string) => {
+      if (tag !== 'a' && tag !== 'canvas') {
+        throw new Error(`unexpected createElement: ${tag}`);
+      }
+      if (tag === 'canvas') return createCanvas(1, 1);
+      // anchor stub
+      return {
+        href: '',
+        download: '',
+        style: {},
+        click: () => {},
+      };
+    },
+    body: {
+      appendChild: () => {},
+      removeChild: () => {},
+    },
+  });
+  vi.stubGlobal('URL', {
+    createObjectURL: () => 'blob:stub',
+    revokeObjectURL: () => {},
+  });
+});
+
+afterAll(() => {
+  vi.unstubAllGlobals();
+});
+
+const EMPTY_CREDITS: CreditsManifest = {
+  entries: [],
+  resolvedPaths: [],
+  licenses: [],
+};
+
+function makeAdapter() {
+  return {
+    createCanvas: (w: number, h: number) =>
+      createCanvas(w, h) as unknown as import('@lpc-toolkit/core').CanvasLike,
+    loadImage: async () => {
+      throw new Error('not used in this test');
+    },
+  };
+}
+
+function makeWalkSheet(): ComposedSheet {
+  // Paint walk row group only (row 8 → y 512, h 256).
+  const canvas = createCanvas(832, 3456);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ff0000';
+  ctx.fillRect(0, 512, 832, 256);
+  return {
+    canvas: canvas as unknown as import('@lpc-toolkit/core').CanvasLike,
+    width: 832,
+    height: 3456,
+    selections: { bodyType: 'male', items: {} },
+    credits: EMPTY_CREDITS,
+    layers: [],
+    animations: ['walk'],
+  };
+}
+
+describe('exportByAnimationZip (F4)', () => {
+  it('produces a ZIP containing standard/<anim>.png and credits/credits.txt+csv', async () => {
+    const sheet = makeWalkSheet();
+    const ctx: ExportContext = {
+      sheet,
+      selections: sheet.selections,
+      catalog: {
+        byItemId: new Map(),
+        byTypeName: new Map(),
+        typeNames: [],
+        aliases: new Map(),
+      },
+      anim: 'walk',
+      composeSingleItem: async () => sheet,
+      adapter: makeAdapter(),
+      onProgress: () => {},
+    };
+    const blob = await exportByAnimationZip(ctx);
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    expect(Object.keys(zip.files).sort()).toEqual([
+      'credits/credits.csv',
+      'credits/credits.txt',
+      'standard/walk.png',
+    ]);
+    const pngBytes = await zip.file('standard/walk.png')!.async('uint8array');
+    expect(pngBytes.length).toBeGreaterThan(0);
   });
 });
