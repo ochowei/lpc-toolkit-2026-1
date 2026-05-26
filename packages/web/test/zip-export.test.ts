@@ -6,6 +6,7 @@ import {
   exportByAnimationZip,
   exportByItemZip,
   exportByAnimItemZip,
+  exportByFrameZip,
   type ExportContext,
 } from '../src/lib/zip-export';
 import { createCanvas } from '@napi-rs/canvas';
@@ -310,6 +311,36 @@ describe('exportByAnimItemZip (F6)', () => {
     const zip = await JSZip.loadAsync(await blob.arrayBuffer());
     const keys = Object.keys(zip.files).sort();
     expect(keys).toContain('custom/wheelchair/050 male_light.png');
+    expect(keys).toContain('credits/credits.txt');
+    expect(keys).toContain('credits/credits.csv');
+  });
+});
+
+describe('exportByFrameZip (F7)', () => {
+  it('produces standard/<anim>/<dir>/<frame#>.png entries', async () => {
+    const sheet = makeWalkSheet();
+    const ctx: ExportContext = {
+      sheet,
+      selections: sheet.selections,
+      catalog: {
+        byItemId: new Map(),
+        byTypeName: new Map(),
+        typeNames: [],
+        aliases: new Map(),
+      },
+      anim: 'walk',
+      composeSingleItem: async () => sheet,
+      adapter: makeAdapter(),
+      onProgress: () => {},
+    };
+    const blob = await exportByFrameZip(ctx);
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const keys = Object.keys(zip.files);
+    // walk row group y=512..768, painted full 832×256, so all 13 cols × 4 dirs.
+    expect(keys.filter((k) => k.startsWith('standard/walk/'))).toHaveLength(
+      4 * 13,
+    );
+    expect(keys).toContain('standard/walk/down/3.png');
     expect(keys).toContain('credits/credits.txt');
     expect(keys).toContain('credits/credits.csv');
   });

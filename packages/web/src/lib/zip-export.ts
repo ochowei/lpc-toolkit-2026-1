@@ -2,6 +2,7 @@ import {
   creditsToCsv,
   creditsToTxt,
   extractAnimation,
+  extractAnimationFrames,
 } from '@lpc-toolkit/core';
 import type {
   Catalog,
@@ -309,6 +310,84 @@ export async function exportByItemZip(ctx: ExportContext): Promise<Blob> {
     }
     done += 1;
     reportEncode(ctx, done, total);
+  }
+
+  writeCredits(zip, ctx.sheet, ctx.anim);
+
+  return zip.generateAsync(
+    { type: 'blob' },
+    (meta) => reportGenerate(ctx, meta.percent),
+  );
+}
+
+const yieldToUi = (): Promise<void> => new Promise((r) => setTimeout(r, 0));
+
+export async function exportByFrameZip(ctx: ExportContext): Promise<Blob> {
+  const { default: JSZip } = await import('jszip');
+  const zip = new JSZip();
+
+  const standardAnims = ctx.sheet.animations;
+  const customAnims = ctx.sheet.customAnimations
+    ? [...ctx.sheet.customAnimations.keys()]
+    : [];
+
+  type Task = {
+    folder: 'standard' | 'custom';
+    animName: string;
+    direction: string;
+    frameNumber: number;
+    canvas: import('@lpc-toolkit/core').CanvasLike;
+  };
+  const tasks: Task[] = [];
+
+  for (const animName of standardAnims) {
+    const byDir = extractAnimationFrames(ctx.sheet, animName, {
+      adapter: ctx.adapter,
+      skipEmpty: true,
+    });
+    for (const [direction, frames] of byDir) {
+      for (const frame of frames) {
+        tasks.push({
+          folder: 'standard',
+          animName,
+          direction,
+          frameNumber: frame.frameNumber,
+          canvas: frame.canvas,
+        });
+      }
+    }
+  }
+  for (const animName of customAnims) {
+    const byDir = extractAnimationFrames(ctx.sheet, animName, {
+      adapter: ctx.adapter,
+      skipEmpty: true,
+    });
+    for (const [direction, frames] of byDir) {
+      for (const frame of frames) {
+        tasks.push({
+          folder: 'custom',
+          animName,
+          direction,
+          frameNumber: frame.frameNumber,
+          canvas: frame.canvas,
+        });
+      }
+    }
+  }
+
+  const total = tasks.length;
+  for (let i = 0; i < tasks.length; i++) {
+    const t = tasks[i]!;
+    const buf = await encodePng(
+      t.canvas as unknown as HTMLCanvasElement,
+    );
+    zip.file(
+      `${t.folder}/${t.animName}/${t.direction}/${t.frameNumber}.png`,
+      buf,
+      { createFolders: false },
+    );
+    reportEncode(ctx, i + 1, total);
+    if ((i + 1) % 32 === 0) await yieldToUi();
   }
 
   writeCredits(zip, ctx.sheet, ctx.anim);
