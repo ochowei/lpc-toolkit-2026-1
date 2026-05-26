@@ -19,16 +19,23 @@ export interface FrameSlice {
   readonly direction: Direction;
 }
 
+/**
+ * Scan one frame's column-slice of pre-fetched row `ImageData` for any non-
+ * transparent pixel. `rowStride` is the ImageData's actual row width (i.e.
+ * `rowData.width`), which equals the second `getImageData` argument the
+ * caller used — usually `sheet.width`, but Task 3's custom-animation path
+ * may pass a narrower stride.
+ */
 function rowHasContent(
   data: Uint8ClampedArray,
-  imageWidth: number,
+  rowStride: number,
   startX: number,
   frameWidth: number,
   frameHeight: number,
 ): boolean {
   for (let y = 0; y < frameHeight; y++) {
-    for (let x = startX; x < startX + frameWidth && x < imageWidth; x++) {
-      if (data[(y * imageWidth + x) * 4 + 3]! > 0) return true;
+    for (let x = startX; x < startX + frameWidth && x < rowStride; x++) {
+      if (data[(y * rowStride + x) * 4 + 3]! > 0) return true;
     }
   }
   return false;
@@ -67,7 +74,7 @@ export function extractAnimationFrames(
       const sourceX = frameIndex * frameSize;
       if (
         skipEmpty &&
-        !rowHasContent(rowData.data, sheet.width, sourceX, frameSize, frameSize)
+        !rowHasContent(rowData.data, rowData.width, sourceX, frameSize, frameSize)
       ) {
         continue;
       }
