@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import {
   decodeSelectionToken,
   encodeSelectionToken,
+  serializeHash,
   type Catalog,
 } from '@lpc-toolkit/core';
 import { Button } from '../../ui/button';
@@ -49,6 +50,17 @@ export function TokenPopover({ open, setOpen, state, dispatch, catalog, t, onSta
               onStatus(`${t('token.copy')} ✓`);
             }}>
               {t('token.copy')}
+            </Button>
+            <Button
+              size="sm"
+              onClick={async () => {
+                const hash = serializeHash(toSelections(state));
+                const url = `${window.location.origin}${window.location.pathname}#${hash}`;
+                await navigator.clipboard.writeText(url);
+                onStatus(`${t('token.copyLink')} ✓`);
+              }}
+            >
+              {t('token.copyLink')}
             </Button>
           </div>
 
