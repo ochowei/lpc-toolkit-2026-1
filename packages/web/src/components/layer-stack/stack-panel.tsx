@@ -103,6 +103,7 @@ export function StackPanel({
               state={state}
               dispatch={dispatch}
               tl={tl}
+              t={t}
               licenseFilter={licenseFilter}
               assetSource={assetSource}
               expanded={expanded === tn}

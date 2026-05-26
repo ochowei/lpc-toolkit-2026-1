@@ -7,6 +7,9 @@ import {
   decodeSelectionToken,
   encodeSelectionToken,
   LICENSE_CONFIG,
+  LICENSE_GROUP_OF,
+  LICENSE_GROUP_ORDER,
+  LICENSE_VERSION_RANK,
   type Catalog,
   type Direction,
   type ItemDefinition,
@@ -21,11 +24,6 @@ import {
   type SliceState,
   type SliceAction,
 } from '../slice/selection';
-import {
-  itemMatchesLicenseFilter,
-  licenseExceedsFilter,
-  type LicenseFilter,
-} from '../slice/license-filter';
 import {
   buildCatalogTree,
   itemSupportsBodyType,
@@ -42,6 +40,30 @@ import { Button } from './ui/button';
 import { SelectedItemsPanel } from './selected-items-panel';
 import type { Locale, TranslationKey, Translator, LabelTranslator } from '../i18n';
 import type { AssetSource } from '../adapter/asset-source';
+
+// --- v1 legacy license filter (frozen; v2 lives in slice/license-filter.ts) ---
+type LegacyLicenseFilter = License | null;
+
+function legacyItemMatchesLicenseFilter(
+  item: ItemDefinition,
+  filter: LegacyLicenseFilter,
+): boolean {
+  if (!filter) return true;
+  return item.credits.some((credit) => credit.licenses.includes(filter));
+}
+
+function legacyLicenseExceedsFilter(
+  effective: License,
+  filter: LegacyLicenseFilter,
+): boolean {
+  if (!filter) return false;
+  const eGroup = LICENSE_GROUP_OF[effective];
+  const fGroup = LICENSE_GROUP_OF[filter];
+  const eGroupRank = LICENSE_GROUP_ORDER.indexOf(eGroup);
+  const fGroupRank = LICENSE_GROUP_ORDER.indexOf(fGroup);
+  if (eGroupRank !== fGroupRank) return eGroupRank > fGroupRank;
+  return LICENSE_VERSION_RANK[effective] > LICENSE_VERSION_RANK[filter];
+}
 
 const DIRS: Direction[] = ['up', 'left', 'down', 'right'];
 const DIR_LABELS: Record<Direction, TranslationKey> = {
@@ -97,7 +119,7 @@ export function SliceHarness({
   useEffect(() => {
     zoomRef.current = state.zoom;
   }, [state.zoom]);
-  const [licenseFilter, setLicenseFilter] = useState<LicenseFilter>(null);
+  const [licenseFilter, setLicenseFilter] = useState<LegacyLicenseFilter>(null);
   const [tokenInput, setTokenInput] = useState('');
   const [tokenStatus, setTokenStatus] = useState<string | null>(null);
   const [tokenError, setTokenError] = useState<string | null>(null);
@@ -157,7 +179,7 @@ export function SliceHarness({
   );
   const effectiveLicenseExceedsFilter =
     effectiveLicense !== null &&
-    licenseExceedsFilter(effectiveLicense, licenseFilter);
+    legacyLicenseExceedsFilter(effectiveLicense, licenseFilter);
 
   async function copyToken(): Promise<void> {
     try {
@@ -460,7 +482,7 @@ export function SliceHarness({
               const items = catalog.byTypeName.get(tn) ?? [];
               const selectedName = state.selections[tn]?.name ?? '';
               const filteredItems = items.filter((it) =>
-                itemMatchesLicenseFilter(it, licenseFilter),
+                legacyItemMatchesLicenseFilter(it, licenseFilter),
               );
               const selectedItem = selectedName
                 ? items.find((it) => it.name === selectedName)
@@ -500,7 +522,7 @@ export function SliceHarness({
                           {tl.itemName(it.name)}
                           {licenseFilter &&
                           selectedName === it.name &&
-                          !itemMatchesLicenseFilter(it, licenseFilter)
+                          !legacyItemMatchesLicenseFilter(it, licenseFilter)
                             ? ` (${t('picker.current')})`
                             : ''}
                         </option>
