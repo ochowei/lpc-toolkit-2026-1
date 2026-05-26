@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { ANIMATION_CONFIGS, type Direction } from '@lpc-toolkit/core';
-import { useComposedCharacter } from '../../hooks/use-composed-character';
+import type { ComposedResult } from '../../hooks/use-composed-character';
 import { useAnimationPlayer } from '../../hooks/use-animation-player';
 import {
   MAX_ZOOM,
@@ -8,8 +8,7 @@ import {
   type SliceAction,
   type SliceState,
 } from '../../slice/selection';
-import type { AssetSource } from '../../adapter/asset-source';
-import type { Catalog, PaletteMetadata } from '@lpc-toolkit/core';
+import type { Catalog } from '@lpc-toolkit/core';
 import { Button } from '../ui/button';
 import { pickRandomOutfit } from '../../slice/random-outfit';
 import type { Translator } from '../../i18n';
@@ -21,16 +20,13 @@ const DIR_SHORT: Record<Direction, 'N' | 'S' | 'E' | 'W'> = {
 
 interface Props {
   catalog: Catalog;
-  palettes: PaletteMetadata;
   state: SliceState;
   dispatch: (a: SliceAction) => void;
-  assetSource: AssetSource;
-  reloadCounter: number;
   t: Translator;
-  onComposeStatus: (status: { progress: number; loading: boolean }) => void;
+  result: ComposedResult;
 }
 
-export function PreviewPane({ catalog, palettes, state, dispatch, assetSource, reloadCounter, t, onComposeStatus }: Props) {
+export function PreviewPane({ catalog, state, dispatch, t, result }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const zoomRef = useRef(state.zoom);
@@ -38,13 +34,6 @@ export function PreviewPane({ catalog, palettes, state, dispatch, assetSource, r
     zoomRef.current = state.zoom;
   }, [state.zoom]);
 
-  const result = useComposedCharacter(catalog, palettes, state, assetSource, reloadCounter);
-  useEffect(() => {
-    onComposeStatus({
-      progress: result.progress,
-      loading: result.status === 'loading',
-    });
-  }, [result.progress, result.status, onComposeStatus]);
   const { currentFrame, totalFrames, fps } = useAnimationPlayer(
     canvasRef, result.animation, state.dir, state.playing, state.zoom,
   );

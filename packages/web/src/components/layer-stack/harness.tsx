@@ -14,6 +14,7 @@ import { AttributionPopover } from './popovers/attribution-popover';
 import { PaletteTrigger } from './palette-trigger';
 import { AdvancedPalette } from './advanced-palette';
 import { cacheClear } from '../../hooks/thumbnail-cache';
+import { useComposedCharacter } from '../../hooks/use-composed-character';
 import { Button } from '../ui/button';
 
 export interface LayerStackHarnessProps {
@@ -41,7 +42,16 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [expanded, setExpanded] = useState<TypeName | null>(null);
   const [reloadCounter, setReloadCounter] = useState(0);
-  const [loadingProgress, setLoadingProgress] = useState<number | null>(null);
+
+  const composeResult = useComposedCharacter(
+    props.catalog,
+    props.palettes,
+    props.state,
+    props.assetSource,
+    reloadCounter,
+  );
+  const loadingProgress =
+    composeResult.status === 'loading' ? composeResult.progress : null;
 
   const handleForceReload = () => {
     cacheClear();
@@ -172,15 +182,10 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
         <main className="min-h-0 overflow-hidden bg-app">
           <PreviewPane
             catalog={props.catalog}
-            palettes={props.palettes}
             state={props.state}
             dispatch={props.dispatch}
-            assetSource={props.assetSource}
-            reloadCounter={reloadCounter}
             t={t}
-            onComposeStatus={({ progress, loading }) =>
-              setLoadingProgress(loading ? progress : null)
-            }
+            result={composeResult}
           />
         </main>
         <AdvancedPalette
