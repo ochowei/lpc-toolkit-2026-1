@@ -4,6 +4,7 @@ import {
   makeResolvePalette,
   type Catalog,
   type HashWarning,
+  type LicenseGroup,
   type PaletteMetadata,
   type Selections,
   type TypeName,
@@ -17,7 +18,6 @@ import { useUrlHashSync } from '../../lib/url-hash-sync';
 import type { SliceState, SliceAction } from '../../slice/selection';
 import type { Locale, Translator, LabelTranslator } from '../../i18n';
 import type { AssetSource } from '../../adapter/asset-source';
-import type { LicenseGroup } from '@lpc-toolkit/core';
 import {
   ALL_LICENSE_GROUPS,
   incompatibleTypeNamesFor,
