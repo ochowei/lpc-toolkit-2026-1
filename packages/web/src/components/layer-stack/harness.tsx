@@ -33,6 +33,7 @@ import { useComposedCharacter } from '../../hooks/use-composed-character';
 import { Button } from '../ui/button';
 import { createBrowserCanvasAdapter } from '../../adapter/browser-canvas-adapter';
 import { toSelections } from '../../slice/selection';
+import type { ZipExportKind } from '../../lib/zip-export';
 
 export interface LayerStackHarnessProps {
   catalog: Catalog;
@@ -67,7 +68,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   const [splitterRatio, setSplitterRatio] = useState(0.5);
 
   const [zipRunning, setZipRunning] = useState<null | {
-    kind: 'byAnimation' | 'byItem' | 'byAnimItem' | 'byFrame';
+    kind: ZipExportKind;
     progress: number;
   }>(null);
 
