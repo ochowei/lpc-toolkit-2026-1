@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Catalog, PaletteMetadata, TypeName } from '@lpc-toolkit/core';
+import type { Catalog, LicenseGroup, PaletteMetadata, TypeName } from '@lpc-toolkit/core';
 import type { SliceState, SliceAction } from '../../slice/selection';
 import type { Translator, LabelTranslator } from '../../i18n';
 import { type LicenseFilter } from '../../slice/license-filter';
@@ -17,7 +17,9 @@ interface Props {
   dispatch: (a: SliceAction) => void;
   shownTypeNames: string[];
   licenseFilter: LicenseFilter;
-  setLicenseFilter: (v: LicenseFilter) => void;
+  toggleLicenseGroup: (group: LicenseGroup) => void;
+  incompatibleCount: number;
+  removeIncompatibleSelections: () => void;
   assetSource: AssetSource;
   setAssetSource: (v: AssetSource) => void;
   t: Translator;
@@ -36,7 +38,9 @@ export function StackPanel({
   dispatch,
   shownTypeNames,
   licenseFilter,
-  setLicenseFilter,
+  toggleLicenseGroup,
+  incompatibleCount,
+  removeIncompatibleSelections,
   assetSource,
   setAssetSource,
   t,
@@ -99,6 +103,7 @@ export function StackPanel({
               state={state}
               dispatch={dispatch}
               tl={tl}
+              t={t}
               licenseFilter={licenseFilter}
               assetSource={assetSource}
               expanded={expanded === tn}
@@ -125,7 +130,9 @@ export function StackPanel({
       <SettingsCollapsible
         t={t}
         licenseFilter={licenseFilter}
-        setLicenseFilter={setLicenseFilter}
+        toggleLicenseGroup={toggleLicenseGroup}
+        incompatibleCount={incompatibleCount}
+        removeIncompatibleSelections={removeIncompatibleSelections}
         assetSource={assetSource}
         setAssetSource={setAssetSource}
       />

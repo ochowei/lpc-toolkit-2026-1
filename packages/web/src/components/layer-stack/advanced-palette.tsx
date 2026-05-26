@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type {
-  Catalog,
-  PaletteMetadata,
-  TypeName,
+import {
+  LICENSE_GROUP_ORDER,
+  type Catalog,
+  type PaletteMetadata,
+  type TypeName,
 } from '@lpc-toolkit/core';
 import { pickActionForItem, type SliceState, type SliceAction } from '../../slice/selection';
 import type { AssetSource } from '../../adapter/asset-source';
 import type { LabelTranslator, Translator } from '../../i18n';
 import {
   itemMatchesLicenseFilter,
-  licenseExceedsFilter,
   type LicenseFilter,
 } from '../../slice/license-filter';
 import { filterAndRankPaletteItems } from './palette-search';
@@ -91,9 +91,9 @@ export function AdvancedPalette({
             placeholder={t('palette.placeholder')}
             className="flex-1 bg-transparent text-sm text-text outline-none"
           />
-          {licenseFilter && (
+          {licenseFilter.size < LICENSE_GROUP_ORDER.length && (
             <span className="rounded bg-accent/15 px-2 py-0.5 font-mono text-[10px] text-accent">
-              ≤ {licenseFilter}
+              {t('palette.licenseGroupsBadge').replace('{n}', String(licenseFilter.size))}
             </span>
           )}
           <span className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-text-dim">
@@ -112,8 +112,6 @@ export function AdvancedPalette({
               const exceeded = !matchesFilter;
               const active = state.selections[typeName]?.name === item.name;
               const itemLicense = item.credits[0]?.licenses[0];
-              const isExceededByLicense =
-                exceeded && itemLicense && licenseExceedsFilter(itemLicense, licenseFilter);
               return (
                 <button
                   key={`${typeName}:${item.name}`}
@@ -158,7 +156,7 @@ export function AdvancedPalette({
                       {itemLicense && <> · {itemLicense}</>}
                     </div>
                   </div>
-                  {isExceededByLicense && <span className="text-danger">⚠</span>}
+                  {exceeded && <span className="text-danger">⚠</span>}
                   {active && <span className="text-accent">✓</span>}
                 </button>
               );

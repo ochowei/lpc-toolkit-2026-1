@@ -1,35 +1,43 @@
 import {
   LICENSE_GROUP_OF,
   LICENSE_GROUP_ORDER,
-  LICENSE_VERSION_RANK,
+  type Catalog,
   type ItemDefinition,
-  type License,
+  type LicenseGroup,
+  type TypeName,
 } from '@lpc-toolkit/core';
+import type { SliceState } from './selection';
 
-export type LicenseFilter = License | null;
+export type LicenseFilter = ReadonlySet<LicenseGroup>;
+
+export const ALL_LICENSE_GROUPS: LicenseFilter = new Set(LICENSE_GROUP_ORDER);
 
 export function itemMatchesLicenseFilter(
   item: ItemDefinition,
-  filter: LicenseFilter,
+  enabledGroups: LicenseFilter,
 ): boolean {
-  if (!filter) return true;
-  return item.credits.some((credit) => credit.licenses.includes(filter));
+  if (item.credits.length === 0) return true;
+  if (enabledGroups.size === 0) return false;
+  return item.credits.some((credit) =>
+    credit.licenses.some((license) =>
+      enabledGroups.has(LICENSE_GROUP_OF[license]),
+    ),
+  );
 }
 
-export function licenseExceedsFilter(
-  effective: License,
-  filter: LicenseFilter,
-): boolean {
-  if (!filter) return false;
-
-  const effectiveGroup = LICENSE_GROUP_OF[effective];
-  const filterGroup = LICENSE_GROUP_OF[filter];
-  const effectiveGroupRank = LICENSE_GROUP_ORDER.indexOf(effectiveGroup);
-  const filterGroupRank = LICENSE_GROUP_ORDER.indexOf(filterGroup);
-
-  if (effectiveGroupRank !== filterGroupRank) {
-    return effectiveGroupRank > filterGroupRank;
+export function incompatibleTypeNamesFor(
+  state: SliceState,
+  catalog: Catalog,
+  enabledGroups: LicenseFilter,
+): TypeName[] {
+  const out: TypeName[] = [];
+  for (const [tn, sel] of Object.entries(state.selections)) {
+    const item = (catalog.byTypeName.get(tn) ?? []).find(
+      (d) => d.name === sel.name,
+    );
+    if (item && !itemMatchesLicenseFilter(item, enabledGroups)) {
+      out.push(tn);
+    }
   }
-
-  return LICENSE_VERSION_RANK[effective] > LICENSE_VERSION_RANK[filter];
+  return out;
 }

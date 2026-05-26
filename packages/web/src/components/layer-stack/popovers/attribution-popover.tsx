@@ -7,7 +7,10 @@ import {
 } from '@lpc-toolkit/core';
 import { Button } from '../../ui/button';
 import { usePopover } from './use-popover';
-import { licenseExceedsFilter, type LicenseFilter } from '../../../slice/license-filter';
+import {
+  itemMatchesLicenseFilter,
+  type LicenseFilter,
+} from '../../../slice/license-filter';
 import type { SliceState } from '../../../slice/selection';
 import type { LabelTranslator, Translator } from '../../../i18n';
 
@@ -26,7 +29,7 @@ interface Row {
   item: ItemDefinition;
   effective: License;
   authors: string[];
-  exceeds: boolean;
+  incompatible: boolean;
 }
 
 export function AttributionPopover({ open, setOpen, catalog, state, licenseFilter, t, tl }: Props) {
@@ -64,12 +67,18 @@ export function AttributionPopover({ open, setOpen, catalog, state, licenseFilte
 
       const manifest = { entries: item.credits, licenses: allLicenses, resolvedPaths: [] };
       const effective = computeEffectiveLicense(manifest);
-      out.push({ typeName: tn, item, effective, authors: allAuthors, exceeds: licenseExceedsFilter(effective, licenseFilter) });
+      out.push({
+        typeName: tn,
+        item,
+        effective,
+        authors: allAuthors,
+        incompatible: !itemMatchesLicenseFilter(item, licenseFilter),
+      });
     }
     return out;
   }, [catalog, state.selections, licenseFilter]);
 
-  const exceedsAny = rows.some((r) => r.exceeds);
+  const incompatibleAny = rows.some((r) => r.incompatible);
   const sourceCount = new Set(rows.map((r) => `${r.authors.join(',')}|${r.effective}`)).size;
 
   return (
@@ -77,11 +86,11 @@ export function AttributionPopover({ open, setOpen, catalog, state, licenseFilte
       <Button
         ref={anchorRef}
         size="sm"
-        variant={exceedsAny ? 'primary' : 'default'}
-        className={exceedsAny ? 'border-danger text-danger' : ''}
+        variant={incompatibleAny ? 'primary' : 'default'}
+        className={incompatibleAny ? 'border-danger text-danger' : ''}
         onClick={() => setOpen(!open)}
       >
-        {exceedsAny ? '⚠ ' : '© '}{t('attribution.title')} · {sourceCount}
+        {incompatibleAny ? '⚠ ' : '© '}{t('attribution.title')} · {sourceCount}
       </Button>
       {open && pos && (
         <div
@@ -99,13 +108,13 @@ export function AttributionPopover({ open, setOpen, catalog, state, licenseFilte
             {rows.map((r) => (
               <li
                 key={r.typeName}
-                className={`rounded border border-border bg-surface-2 px-2 py-1 ${r.exceeds ? 'border-danger text-danger' : ''}`}
+                className={`rounded border border-border bg-surface-2 px-2 py-1 ${r.incompatible ? 'border-danger text-danger' : ''}`}
               >
                 <div className="font-semibold">{tl.category(r.typeName)}</div>
                 <div className="font-mono text-[10px] text-text-mute">
                   {r.item.name} · {r.authors.join(', ') || '?'} · {r.effective}
                 </div>
-                {r.exceeds && <div className="text-[10px]">{t('attribution.exceededShort')}</div>}
+                {r.incompatible && <div className="text-[10px]">{t('attribution.incompatibleShort')}</div>}
               </li>
             ))}
           </ul>

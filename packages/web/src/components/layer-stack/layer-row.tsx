@@ -1,7 +1,7 @@
 import type { Catalog, ItemDefinition, PaletteMetadata, TypeName } from '@lpc-toolkit/core';
 import { getRecolorSwatches } from '@lpc-toolkit/core';
 import { pickActionForItem, type SliceState, type SliceAction } from '../../slice/selection';
-import type { LabelTranslator } from '../../i18n';
+import type { LabelTranslator, Translator } from '../../i18n';
 import { itemSupportsBodyType } from '../../slice/catalog-tree';
 import { itemMatchesLicenseFilter, type LicenseFilter } from '../../slice/license-filter';
 import { ColorPicker } from '../color-picker';
@@ -15,13 +15,14 @@ interface Props {
   state: SliceState;
   dispatch: (a: SliceAction) => void;
   tl: LabelTranslator;
+  t: Translator;
   licenseFilter: LicenseFilter;
   assetSource: AssetSource;
   expanded: boolean;
   onToggle: () => void;
 }
 
-export function LayerRow({ typeName, catalog, palettes, state, dispatch, tl, licenseFilter, assetSource, expanded, onToggle }: Props) {
+export function LayerRow({ typeName, catalog, palettes, state, dispatch, tl, t, licenseFilter, assetSource, expanded, onToggle }: Props) {
   const selection = state.selections[typeName];
   if (!selection) return null;
 
@@ -130,7 +131,7 @@ export function LayerRow({ typeName, catalog, palettes, state, dispatch, tl, lic
                     disabled={!supports}
                     title={
                       !supports ? 'incompatible body type' :
-                      exceeds ? `exceeds license filter ${licenseFilter ?? ''}` :
+                      exceeds ? t('layer.licenseIncompatibleTooltip') :
                       it.name
                     }
                     onClick={() => dispatch(pickActionForItem(typeName, it))}
@@ -152,7 +153,7 @@ export function LayerRow({ typeName, catalog, palettes, state, dispatch, tl, lic
                     />
                     <span className="max-w-full truncate">{it.name}</span>
                     {exceeds && supports && (
-                      <span className="absolute -top-1 -right-1 inline-flex h-3 w-3 items-center justify-center rounded-full bg-danger text-[8px] text-white" aria-label="exceeds license filter">!</span>
+                      <span className="absolute -top-1 -right-1 inline-flex h-3 w-3 items-center justify-center rounded-full bg-danger text-[8px] text-white" aria-label={t('layer.licenseIncompatibleTooltip')}>!</span>
                     )}
                   </button>
                 );
