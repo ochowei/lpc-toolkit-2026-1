@@ -63,6 +63,7 @@ export type { ComposeOptions } from './compose.js';
 export { composeSelections, getSpritePathsForSelections } from './compose.js';
 
 export { getCredits, computeEffectiveLicense } from './credits.js';
+export { creditsToTxt, creditsToCsv } from './credits-format.js';
 
 export type { HashWarning, ParseHashResult } from './hash.js';
 export {
