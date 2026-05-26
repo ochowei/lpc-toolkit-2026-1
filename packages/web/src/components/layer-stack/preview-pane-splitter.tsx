@@ -23,7 +23,6 @@ export function PreviewPaneSplitter({
   onChange,
 }: PreviewPaneSplitterProps) {
   const draggingRef = useRef(false);
-  const handleRef = useRef<HTMLDivElement | null>(null);
 
   // Stash latest container metrics so the document-level pointermove
   // listener (attached once when drag starts) sees fresh values without
@@ -77,7 +76,6 @@ export function PreviewPaneSplitter({
 
   return (
     <div
-      ref={handleRef}
       role="separator"
       aria-orientation="horizontal"
       onPointerDown={onDown}
