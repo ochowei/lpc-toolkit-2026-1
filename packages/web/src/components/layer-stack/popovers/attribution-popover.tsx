@@ -109,6 +109,16 @@ export function AttributionPopover({ open, setOpen, catalog, state, licenseFilte
               </li>
             ))}
           </ul>
+          <p className="mt-3 border-t border-border pt-2 text-[10px] text-text-mute">
+            <a
+              className="underline decoration-border underline-offset-2 hover:text-text"
+              href="https://liberatedpixelcup.github.io/Universal-LPC-Spritesheet-Character-Generator/"
+              target="_blank"
+              rel="noreferrer"
+            >
+              {t('source.project')}
+            </a>
+          </p>
         </div>
       )}
     </>

@@ -2,7 +2,12 @@ import { useEffect, useRef } from 'react';
 import { ANIMATION_CONFIGS, type Direction } from '@lpc-toolkit/core';
 import { useComposedCharacter } from '../../hooks/use-composed-character';
 import { useAnimationPlayer } from '../../hooks/use-animation-player';
-import { type SliceAction, type SliceState } from '../../slice/selection';
+import {
+  MAX_ZOOM,
+  MIN_ZOOM,
+  type SliceAction,
+  type SliceState,
+} from '../../slice/selection';
 import type { AssetSource } from '../../adapter/asset-source';
 import type { Catalog, PaletteMetadata } from '@lpc-toolkit/core';
 import { Button } from '../ui/button';
@@ -66,7 +71,18 @@ export function PreviewPane({ catalog, palettes, state, dispatch, assetSource, r
         <div className="absolute top-3 left-3 z-10 rounded bg-black/40 px-2 py-0.5 font-mono text-[10px] text-text-2 backdrop-blur-md">
           {state.anim} · {DIR_SHORT[state.dir]} · {state.zoom}× · f{String(currentFrame + 1).padStart(2, '0')}
         </div>
-        <div className="absolute top-3 right-3 z-10 flex gap-0.5 rounded bg-black/40 p-0.5 backdrop-blur-md">
+        <div className="absolute top-3 right-3 z-10 flex items-center gap-0.5 rounded bg-black/40 p-0.5 backdrop-blur-md">
+          <button
+            type="button"
+            disabled={state.zoom <= MIN_ZOOM}
+            aria-label={t('controls.zoomOut')}
+            onClick={() =>
+              dispatch({ type: 'set_zoom', zoom: state.zoom - 1 })
+            }
+            className="rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold text-text-2 hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-transparent"
+          >
+            −
+          </button>
           {[1, 2, 4, 8].map((z) => (
             <button
               key={z}
@@ -82,6 +98,17 @@ export function PreviewPane({ catalog, palettes, state, dispatch, assetSource, r
               {z}×
             </button>
           ))}
+          <button
+            type="button"
+            disabled={state.zoom >= MAX_ZOOM}
+            aria-label={t('controls.zoomIn')}
+            onClick={() =>
+              dispatch({ type: 'set_zoom', zoom: state.zoom + 1 })
+            }
+            className="rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold text-text-2 hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-transparent"
+          >
+            +
+          </button>
         </div>
       </div>
 
