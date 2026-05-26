@@ -39,6 +39,7 @@ describe('bootstrapStateFromHash', () => {
     expect(result.state.anim).toBe(defaults.anim);
     expect(result.state.dir).toBe(defaults.dir);
     expect(result.state.zoom).toBe(defaults.zoom);
+    expect(result.state.playing).toBe(defaults.playing);
     expect(result.warnings).toEqual([]);
   });
 
