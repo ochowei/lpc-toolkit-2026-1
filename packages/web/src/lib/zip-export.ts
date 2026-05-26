@@ -218,7 +218,8 @@ export async function exportByAnimItemZip(ctx: ExportContext): Promise<Blob> {
     : [];
 
   // Estimate total = (anims) × (items) for progress.
-  const totalSlots = (standardAnims.length + customAnims.length) * metas.size;
+  const itemCount = Object.keys(ctx.selections.items).length;
+  const totalSlots = (standardAnims.length + customAnims.length) * itemCount;
   let done = 0;
 
   const writeAnim = async (

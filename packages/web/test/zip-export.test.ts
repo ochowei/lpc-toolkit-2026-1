@@ -236,6 +236,7 @@ describe('exportByAnimItemZip (F6)', () => {
     const keys = Object.keys(zip.files).sort();
     expect(keys).toContain('standard/walk/050 male_light.png');
     expect(keys).toContain('credits/credits.txt');
+    expect(keys).toContain('credits/credits.csv');
   });
 
   it('skips an item for an anim it does not declare', async () => {
@@ -266,5 +267,50 @@ describe('exportByAnimItemZip (F6)', () => {
     const keys = Object.keys(zip.files);
     expect(keys).toContain('standard/walk/050 male_light.png');
     expect(keys.some((k) => k.startsWith('standard/slash/'))).toBe(false);
+  });
+
+  it('writes custom/<name>/<item>.png entries when sheet has customAnimations', async () => {
+    // Sheet with a 1×3 custom-anim block at offsetY=3456.
+    const baseCanvas = createCanvas(832, 3456 + 64);
+    const ctx2 = baseCanvas.getContext('2d');
+    ctx2.fillStyle = '#00ff00';
+    ctx2.fillRect(0, 3456, 3 * 64, 64);
+    const sheet: ComposedSheet = {
+      canvas: baseCanvas as unknown as import('@lpc-toolkit/core').CanvasLike,
+      width: 832,
+      height: 3456 + 64,
+      selections: { bodyType: 'male', items: {} },
+      credits: EMPTY_CREDITS,
+      layers: [],
+      animations: [],
+      customAnimations: new Map([
+        ['wheelchair', { offsetY: 3456, frameSize: 64, rows: 1, cols: 3 }],
+      ]),
+    };
+    const selections = {
+      bodyType: 'male',
+      items: { body: { typeName: 'body', name: 'male light' } },
+    };
+    const itemDef = makeItem(50);
+    const exportCtx: ExportContext = {
+      sheet,
+      selections,
+      catalog: {
+        byItemId: new Map([['body/male_light', itemDef]]),
+        byTypeName: new Map([['body', [itemDef]]]),
+        typeNames: ['body'],
+        aliases: new Map(),
+      },
+      anim: 'walk',
+      composeSingleItem: async () => sheet,
+      adapter: makeAdapter(),
+      onProgress: () => {},
+    };
+    const blob = await exportByAnimItemZip(exportCtx);
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const keys = Object.keys(zip.files).sort();
+    expect(keys).toContain('custom/wheelchair/050 male_light.png');
+    expect(keys).toContain('credits/credits.txt');
+    expect(keys).toContain('credits/credits.csv');
   });
 });
