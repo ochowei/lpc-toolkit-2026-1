@@ -76,6 +76,9 @@ export {
 export type { ExtractAnimationOptions } from './animation.js';
 export { extractAnimation } from './animation.js';
 
+export { extractAnimationFrames } from './frames.js';
+export type { ExtractFramesOptions, FrameSlice } from './frames.js';
+
 export type {
   AnimationRowsLayout,
   CustomAnimationDefinition,

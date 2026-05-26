@@ -1,5 +1,13 @@
-import { useEffect, useState } from 'react';
-import type { Catalog, HashWarning, PaletteMetadata, TypeName } from '@lpc-toolkit/core';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  composeSelections,
+  makeResolvePalette,
+  type Catalog,
+  type HashWarning,
+  type PaletteMetadata,
+  type Selections,
+  type TypeName,
+} from '@lpc-toolkit/core';
 import type {
   FullSheetUiState,
   FullSheetUiActions,
@@ -23,6 +31,9 @@ import { AdvancedPalette } from './advanced-palette';
 import { cacheClear } from '../../hooks/thumbnail-cache';
 import { useComposedCharacter } from '../../hooks/use-composed-character';
 import { Button } from '../ui/button';
+import { createBrowserCanvasAdapter } from '../../adapter/browser-canvas-adapter';
+import { toSelections } from '../../slice/selection';
+import type { ZipExportKind } from '../../lib/zip-export';
 
 export interface LayerStackHarnessProps {
   catalog: Catalog;
@@ -55,6 +66,28 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   const [fullSheetMask, setFullSheetMask] = useState(false);
   const [fullSheetZoom, setFullSheetZoom] = useState<FullSheetZoom>('fit');
   const [splitterRatio, setSplitterRatio] = useState(0.5);
+
+  const [zipRunning, setZipRunning] = useState<null | {
+    kind: ZipExportKind;
+    progress: number;
+  }>(null);
+
+  const composeSingleItem = useCallback(
+    async (singleSelections: Selections) => {
+      const adapter = createBrowserCanvasAdapter(props.assetSource);
+      return composeSelections(singleSelections, {
+        catalog: props.catalog,
+        adapter,
+        spritesheetsBaseUrl: '',
+        resolvePalette: makeResolvePalette(
+          props.catalog,
+          props.palettes,
+          singleSelections,
+        ),
+      });
+    },
+    [props.catalog, props.palettes, props.assetSource],
+  );
 
   const fullSheet: FullSheetUiState = {
     open: fullSheetOpen,
@@ -202,6 +235,12 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
           setOpen={(v) => setPopover(v ? 'download' : null)}
           result={composeResult}
           anim={props.state.anim}
+          selections={toSelections(props.state)}
+          catalog={props.catalog}
+          assetSource={props.assetSource}
+          composeSingleItem={composeSingleItem}
+          zipRunning={zipRunning}
+          setZipRunning={setZipRunning}
           t={props.t}
           onStatus={(s) => setStatus(s)}
         />
