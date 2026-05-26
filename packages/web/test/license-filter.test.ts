@@ -16,15 +16,16 @@ import type { SliceState } from '../src/slice/selection';
 function item(
   name: string,
   licenses: ItemDefinition['credits'][number]['licenses'],
+  typeName: TypeName = 'hair',
 ): ItemDefinition {
   return {
     name,
-    type_name: 'hair',
+    type_name: typeName,
     animations: ['walk'],
     credits: [
-      { file: `hair/${name}`, notes: '', authors: ['Artist'], licenses, urls: [] },
+      { file: `${typeName}/${name}`, notes: '', authors: ['Artist'], licenses, urls: [] },
     ],
-    layer_1: { zPos: 10, male: `hair/${name}/` },
+    layer_1: { zPos: 10, male: `${typeName}/${name}/` },
   } as ItemDefinition;
 }
 
@@ -149,5 +150,18 @@ describe('incompatibleTypeNamesFor', () => {
       hair: { name: 'missing', typeName: 'hair' },
     });
     expect(incompatibleTypeNamesFor(state, catalog, ONLY_CC0)).toEqual([]);
+  });
+
+  it('collects all incompatible type names when multiple selections fail', () => {
+    const gplHair = item('gpl_hair', ['GPL 3.0']);
+    const gplClothes = item('gpl_clothes', ['GPL 3.0'], 'clothes');
+    const catalog = makeCatalog([gplHair, gplClothes]);
+    const state = makeState({
+      hair: { name: 'gpl_hair', typeName: 'hair' },
+      clothes: { name: 'gpl_clothes', typeName: 'clothes' },
+    });
+    const result = incompatibleTypeNamesFor(state, catalog, ONLY_CC0);
+    expect(result).toHaveLength(2);
+    expect(result).toEqual(expect.arrayContaining(['hair', 'clothes']));
   });
 });
