@@ -119,6 +119,7 @@ export function DownloadPopover({
       );
       downloadBlob(blob, filename);
       onStatus({ kind: 'info', text: t('download.done') });
+      setOpen(false);
     } catch (err) {
       console.error('ZIP export failed:', err);
       onStatus({ kind: 'error', text: t('download.failed') });
