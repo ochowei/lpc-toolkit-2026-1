@@ -71,7 +71,10 @@ export function SidebarSearch({
   );
   const shown = results.slice(0, RESULT_LIMIT);
 
-  const showDropdown = deferredQuery.trim().length > 0 && isFocused;
+  // Use `query` (not `deferredQuery`) so the dropdown opens/closes in lockstep
+  // with what the user typed. Filtering results stays deferred via the useMemo
+  // on `deferredQuery`, which keeps typing responsive on large catalogs.
+  const showDropdown = query.trim().length > 0 && isFocused;
 
   useEffect(() => {
     if (!showDropdown) return;
@@ -159,6 +162,9 @@ export function SidebarSearch({
         </span>
       </div>
 
+      {/* Simplified pattern: native <button> rows for results, no
+          role=listbox/option ARIA yet. Keyboard nav via the input's
+          onKeyDown handler. Revisit if a11y feedback warrants. */}
       {showDropdown && (
         <div
           className="absolute left-2 right-2 top-full z-30 mt-1 max-h-[50vh] overflow-hidden rounded-md border border-border bg-surface shadow-lg"
