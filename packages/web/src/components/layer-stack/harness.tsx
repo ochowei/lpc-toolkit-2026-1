@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   composeSelections,
   makeResolvePalette,
@@ -31,8 +31,6 @@ import { TokenPopover } from './popovers/token-popover';
 import { ResetMenuPopover } from './popovers/reset-menu-popover';
 import { AttributionPopover } from './popovers/attribution-popover';
 import { DownloadPopover } from './popovers/download-popover';
-import { PaletteTrigger } from './palette-trigger';
-import { AdvancedPalette } from './advanced-palette';
 import { cacheClear } from '../../hooks/thumbnail-cache';
 import { useComposedCharacter } from '../../hooks/use-composed-character';
 import { Button } from '../ui/button';
@@ -63,7 +61,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   const [licenseFilter, setLicenseFilter] = useState<LicenseFilter>(ALL_LICENSE_GROUPS);
   const [status, setStatus] = useState<{ kind: 'info' | 'warn' | 'error'; text: string } | null>(null);
   const [popover, setPopover] = useState<null | 'bodyType' | 'token' | 'reset' | 'attribution' | 'download'>(null);
-  const [paletteOpen, setPaletteOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [expanded, setExpanded] = useState<TypeName | null>(null);
   const [reloadCounter, setReloadCounter] = useState(0);
   const [fullSheetOpen, setFullSheetOpen] = useState(false);
@@ -157,12 +155,13 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     return () => clearTimeout(id);
   }, [status]);
 
-  // Global ⌘K / Ctrl+K toggles the advanced palette.
+  // Global ⌘K / Ctrl+K focuses the sidebar search input (selects existing text if any).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        setPaletteOpen((o) => !o);
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
       }
     };
     document.addEventListener('keydown', onKey);
@@ -275,7 +274,6 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
           t={props.t}
           onStatus={(s) => setStatus(s)}
         />
-        <PaletteTrigger onOpen={() => setPaletteOpen(true)} t={t} />
         <Button
           size="sm"
           variant="ghost"
@@ -306,7 +304,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
             status={status}
             expanded={expanded}
             setExpanded={setExpanded}
-            onOpenPalette={() => setPaletteOpen(true)}
+            searchInputRef={searchInputRef}
           />
         </aside>
         <main className="min-h-0 overflow-hidden bg-app">
@@ -320,23 +318,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
             fullSheetActions={fullSheetActions}
           />
         </main>
-        <AdvancedPalette
-          open={paletteOpen}
-          onClose={() => setPaletteOpen(false)}
-          onPicked={(tn) => {
-            setPaletteOpen(false);
-            setExpanded(tn);
-          }}
-          state={props.state}
-          dispatch={props.dispatch}
-          catalog={props.catalog}
-          palettes={props.palettes}
-          assetSource={props.assetSource}
-          shownTypeNames={props.shownTypeNames}
-          licenseFilter={licenseFilter}
-          t={t}
-          tl={props.tl}
-        />
+
       </div>
     </div>
   );
