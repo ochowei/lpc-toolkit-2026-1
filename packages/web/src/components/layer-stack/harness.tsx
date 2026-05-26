@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   composeSelections,
   makeResolvePalette,
@@ -17,7 +17,12 @@ import { useUrlHashSync } from '../../lib/url-hash-sync';
 import type { SliceState, SliceAction } from '../../slice/selection';
 import type { Locale, Translator, LabelTranslator } from '../../i18n';
 import type { AssetSource } from '../../adapter/asset-source';
-import type { LicenseFilter } from '../../slice/license-filter';
+import type { LicenseGroup } from '@lpc-toolkit/core';
+import {
+  ALL_LICENSE_GROUPS,
+  incompatibleTypeNamesFor,
+  type LicenseFilter,
+} from '../../slice/license-filter';
 import { TopBar } from './top-bar';
 import { PreviewPane } from './preview-pane';
 import { StackPanel } from './stack-panel';
@@ -55,7 +60,7 @@ export interface LayerStackHarnessProps {
 
 export function LayerStackHarness(props: LayerStackHarnessProps) {
   const { t, theme, locale, onToggleTheme, onToggleLocale } = props;
-  const [licenseFilter, setLicenseFilter] = useState<LicenseFilter>(null);
+  const [licenseFilter, setLicenseFilter] = useState<LicenseFilter>(ALL_LICENSE_GROUPS);
   const [status, setStatus] = useState<{ kind: 'info' | 'warn' | 'error'; text: string } | null>(null);
   const [popover, setPopover] = useState<null | 'bodyType' | 'token' | 'reset' | 'attribution' | 'download'>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -71,6 +76,32 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     kind: ZipExportKind;
     progress: number;
   }>(null);
+
+  const toggleLicenseGroup = useCallback((group: LicenseGroup) => {
+    setLicenseFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(group)) next.delete(group);
+      else next.add(group);
+      return next;
+    });
+  }, []);
+
+  const incompatibleTypeNames = useMemo(
+    () => incompatibleTypeNamesFor(props.state, props.catalog, licenseFilter),
+    [props.state, props.catalog, licenseFilter],
+  );
+  const incompatibleCount = incompatibleTypeNames.length;
+
+  const removeIncompatibleSelections = useCallback(() => {
+    if (incompatibleTypeNames.length === 0) return;
+    for (const tn of incompatibleTypeNames) {
+      props.dispatch({ type: 'clear', typeName: tn });
+    }
+    setStatus({
+      kind: 'info',
+      text: t('licenseFilter.removed').replace('{n}', String(incompatibleTypeNames.length)),
+    });
+  }, [incompatibleTypeNames, props.dispatch, t]);
 
   const composeSingleItem = useCallback(
     async (singleSelections: Selections) => {
@@ -216,7 +247,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
               props.onReset({ outfit, view });
             }
             if (filters) {
-              setLicenseFilter(null);
+              setLicenseFilter(ALL_LICENSE_GROUPS);
             }
             setStatus({ kind: 'info', text: 'Reset ✓' });
           }}
@@ -264,7 +295,9 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
             dispatch={props.dispatch}
             shownTypeNames={props.shownTypeNames}
             licenseFilter={licenseFilter}
-            setLicenseFilter={setLicenseFilter}
+            toggleLicenseGroup={toggleLicenseGroup}
+            incompatibleCount={incompatibleCount}
+            removeIncompatibleSelections={removeIncompatibleSelections}
             assetSource={props.assetSource}
             setAssetSource={props.onAssetSourceChange}
             t={props.t}
