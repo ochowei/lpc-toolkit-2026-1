@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Catalog, HashWarning, PaletteMetadata, TypeName } from '@lpc-toolkit/core';
+import type { FullSheetUiState, FullSheetUiActions } from './preview-pane';
+import type { FullSheetZoom } from './full-spritesheet-preview';
 import { useUrlHashSync } from '../../lib/url-hash-sync';
 import type { SliceState, SliceAction } from '../../slice/selection';
 import type { Locale, Translator, LabelTranslator } from '../../i18n';
@@ -45,6 +47,26 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [expanded, setExpanded] = useState<TypeName | null>(null);
   const [reloadCounter, setReloadCounter] = useState(0);
+  const [fullSheetOpen, setFullSheetOpen] = useState(false);
+  const [fullSheetGrid, setFullSheetGrid] = useState(false);
+  const [fullSheetMask, setFullSheetMask] = useState(false);
+  const [fullSheetZoom, setFullSheetZoom] = useState<FullSheetZoom>('fit');
+  const [splitterRatio, setSplitterRatio] = useState(0.5);
+
+  const fullSheet: FullSheetUiState = {
+    open: fullSheetOpen,
+    grid: fullSheetGrid,
+    mask: fullSheetMask,
+    zoom: fullSheetZoom,
+    splitterRatio,
+  };
+  const fullSheetActions: FullSheetUiActions = {
+    setOpen: setFullSheetOpen,
+    setGrid: setFullSheetGrid,
+    setMask: setFullSheetMask,
+    setZoom: setFullSheetZoom,
+    setSplitterRatio,
+  };
 
   const composeResult = useComposedCharacter(
     props.catalog,
@@ -219,6 +241,8 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
             dispatch={props.dispatch}
             t={t}
             result={composeResult}
+            fullSheet={fullSheet}
+            fullSheetActions={fullSheetActions}
           />
         </main>
         <AdvancedPalette
