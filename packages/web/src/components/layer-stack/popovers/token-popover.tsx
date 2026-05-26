@@ -46,8 +46,12 @@ export function TokenPopover({ open, setOpen, state, dispatch, catalog, t, onSta
           />
           <div className="mb-2 flex gap-1">
             <Button size="sm" onClick={async () => {
-              await navigator.clipboard.writeText(token);
-              onStatus(`${t('token.copy')} ✓`);
+              try {
+                await navigator.clipboard.writeText(token);
+                onStatus(`${t('token.copy')} ✓`);
+              } catch {
+                onStatus(t('token.copyFailed'));
+              }
             }}>
               {t('token.copy')}
             </Button>
@@ -56,8 +60,12 @@ export function TokenPopover({ open, setOpen, state, dispatch, catalog, t, onSta
               onClick={async () => {
                 const hash = serializeHash(toSelections(state));
                 const url = `${window.location.origin}${window.location.pathname}#${hash}`;
-                await navigator.clipboard.writeText(url);
-                onStatus(`${t('token.copyLink')} ✓`);
+                try {
+                  await navigator.clipboard.writeText(url);
+                  onStatus(`${t('token.copyLink')} ✓`);
+                } catch {
+                  onStatus(t('token.copyFailed'));
+                }
               }}
             >
               {t('token.copyLink')}
