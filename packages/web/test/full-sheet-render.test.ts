@@ -30,6 +30,9 @@ beforeAll(() => {
   vi.stubGlobal('document', {
     createElement: (tag: string) => {
       if (tag !== 'canvas') throw new Error(`unexpected createElement: ${tag}`);
+      // 1×1 is a placeholder — renderFullSheet immediately overwrites
+      // .width / .height on the returned canvas (napi-rs supports resize
+      // by property assignment).
       return createCanvas(1, 1) as unknown as HTMLCanvasElement;
     },
   });
@@ -78,8 +81,9 @@ describe('applyTransparencyMaskToCanvas', () => {
 
     applyTransparencyMaskToCanvas(ctx, 2, 1);
 
-    // RGB may be normalized to 0 by canvas implementations when alpha=0
-    // (premultiplied alpha); alpha is the load-bearing assertion.
+    // napi-rs normalises RGB to 0 on fully-transparent pixels (premultiplied
+    // alpha); real browsers preserve the RGB bytes. The load-bearing
+    // invariant — that alpha goes to 0 — holds in both environments.
     expect(pixelAt(canvas, 0, 0)[3]).toBe(0);
     expect(pixelAt(canvas, 1, 0)).toEqual([255, 0, 0, 255]);
   });
