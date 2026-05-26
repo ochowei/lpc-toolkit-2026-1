@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { creditsToTxt } from '../src/credits-format.js';
+import { creditsToCsv, creditsToTxt } from '../src/credits-format.js';
 import type { CreditsManifest } from '../src/types.js';
 
 const SAMPLE: CreditsManifest = {
@@ -55,5 +55,31 @@ describe('creditsToTxt', () => {
       'walk',
     );
     expect(out).toBe('');
+  });
+});
+
+describe('creditsToCsv', () => {
+  it('matches upstream creditsToCsv format byte-for-byte', () => {
+    const out = creditsToCsv(SAMPLE, 'walk');
+    const expected =
+      'filename,notes,authors,licenses,urls\n' +
+      '"body/bodies/male/walk.png","","Alice, Bob","CC-BY-SA 3.0, GPL 3.0","https://example.com/a"\n' +
+      '"head/faces/male/blush/walk.png","sample notes","Carol","CC0","https://example.com/b, https://example.com/c"\n';
+    expect(out).toBe(expected);
+  });
+
+  it('falls back to entry.file + /<anim>.png when resolvedPaths is empty', () => {
+    const manifest: CreditsManifest = { ...SAMPLE, resolvedPaths: [] };
+    const out = creditsToCsv(manifest, 'walk');
+    expect(out).toContain('"body/bodies/male/walk.png"');
+    expect(out).toContain('"head/faces/walk.png"');
+  });
+
+  it('returns header-only for empty manifest', () => {
+    const out = creditsToCsv(
+      { entries: [], resolvedPaths: [], licenses: [] },
+      'walk',
+    );
+    expect(out).toBe('filename,notes,authors,licenses,urls\n');
   });
 });

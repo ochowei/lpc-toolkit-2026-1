@@ -41,3 +41,27 @@ export function creditsToTxt(
   });
   return out;
 }
+
+/**
+ * Serialize a CreditsManifest to the same CSV layout upstream produces
+ * (`upstream/sources/utils/credits.ts:creditsToCsv`). Byte-identical when
+ * `manifest.resolvedPaths` is populated. Note: upstream does NOT escape
+ * embedded double-quotes — this matches that behaviour exactly so byte
+ * equality holds. Author/license/URL strings in upstream data don't
+ * contain `"` so the lack of escaping is not a practical problem.
+ */
+export function creditsToCsv(
+  manifest: CreditsManifest,
+  anim: string,
+): string {
+  let out = 'filename,notes,authors,licenses,urls\n';
+  manifest.entries.forEach((credit, i) => {
+    const fileName = filenameFor(manifest, i, anim);
+    const authors = credit.authors.join(', ');
+    const licenses = credit.licenses.join(', ');
+    const urls = credit.urls.join(', ');
+    const notes = credit.notes || '';
+    out += `"${fileName}","${notes}","${authors}","${licenses}","${urls}"\n`;
+  });
+  return out;
+}
