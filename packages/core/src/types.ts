@@ -166,6 +166,15 @@ export interface LayerSpec {
 
 export interface CreditsManifest {
   readonly entries: readonly CreditEntry[];
+  /**
+   * Parallel to `entries`: the actual PNG path that triggered each credit
+   * to be included (upstream calls this `lastUsedPath`). Used by the
+   * `credits-format` exporters to write the full filename column. Empty
+   * array is valid for callers that synthesize a manifest without going
+   * through `getCredits` (e.g. AttributionPopover) — exporters fall back
+   * to `entry.file + '/' + anim + '.png'` in that case.
+   */
+  readonly resolvedPaths: readonly string[];
   readonly licenses: readonly License[];
 }
 

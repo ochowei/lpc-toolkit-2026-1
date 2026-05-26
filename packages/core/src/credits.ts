@@ -31,22 +31,22 @@ function stripSpritesheetsPrefix(path: string): string {
 /**
  * Upstream prefix-match rule (`utils/credits.ts:72`): the credit row's
  * `file` field is a folder prefix, the layer's `usedPath` is the full PNG
- * path. A credit is "used" if any used path equals the credit file or
- * descends from it.
+ * path. Returns the matched used path (first hit wins, same as upstream),
+ * or null if no used path matches.
  */
-function isCreditUsed(
+function matchCreditUsedPath(
   creditFile: string,
   usedPaths: readonly string[],
-): boolean {
+): string | null {
   for (const usedPath of usedPaths) {
     if (
       usedPath === creditFile ||
       usedPath.startsWith(creditFile + '/')
     ) {
-      return true;
+      return usedPath;
     }
   }
-  return false;
+  return null;
 }
 
 /**
@@ -100,6 +100,7 @@ export function getCredits(
   }
 
   const entries: CreditEntry[] = [];
+  const resolvedPaths: string[] = [];
   const licenses: License[] = [];
   const seenFiles = new Set<string>();
   const seenLicenses = new Set<License>();
@@ -113,10 +114,12 @@ export function getCredits(
 
     for (const credit of found.item.credits) {
       if (seenFiles.has(credit.file)) continue;
-      if (!isCreditUsed(credit.file, usedPaths)) continue;
+      const matched = matchCreditUsedPath(credit.file, usedPaths);
+      if (matched === null) continue;
 
       seenFiles.add(credit.file);
       entries.push(credit);
+      resolvedPaths.push(matched);
       for (const license of credit.licenses) {
         if (seenLicenses.has(license)) continue;
         seenLicenses.add(license);
@@ -125,7 +128,7 @@ export function getCredits(
     }
   }
 
-  return { entries, licenses };
+  return { entries, resolvedPaths, licenses };
 }
 
 /**

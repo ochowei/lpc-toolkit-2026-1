@@ -66,6 +66,7 @@ describe('extractAnimation', () => {
         urls: [],
       },
     ],
+    resolvedPaths: [],
     licenses: ['CC0'],
   };
 

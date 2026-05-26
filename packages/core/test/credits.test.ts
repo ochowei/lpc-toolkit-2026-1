@@ -48,6 +48,26 @@ describe('getCredits with real upstream JSON', () => {
     expect(files).not.toContain('body/bodies/child');
   });
 
+  it('returns resolvedPaths matching entry order, pointing to actual PNG paths', () => {
+    const catalog = loadCatalog(['body/body.json']);
+    const selections: Selections = {
+      bodyType: 'male',
+      items: { body: { typeName: 'body', name: 'Body Color' } },
+    };
+
+    const manifest = getCredits(selections, catalog);
+
+    expect(manifest.resolvedPaths.length).toBe(manifest.entries.length);
+
+    const bodyIdx = manifest.entries.findIndex(
+      (e) => e.file === 'body/bodies/male',
+    );
+    expect(bodyIdx).toBeGreaterThanOrEqual(0);
+    expect(manifest.resolvedPaths[bodyIdx]).toMatch(
+      /^body\/bodies\/male\/[a-z0-9_]+\.png$/,
+    );
+  });
+
   it('returns the female credit row when bodyType=female', () => {
     const catalog = loadCatalog(['body/body.json']);
     const selections: Selections = {
@@ -229,6 +249,7 @@ describe('computeEffectiveLicense', () => {
     expect(
       computeEffectiveLicense({
         entries: [],
+        resolvedPaths: [],
         licenses: ['CC0', 'CC-BY 4.0', 'GPL 2.0'],
       }),
     ).toBe('GPL 2.0');
@@ -238,6 +259,7 @@ describe('computeEffectiveLicense', () => {
     expect(
       computeEffectiveLicense({
         entries: [],
+        resolvedPaths: [],
         licenses: ['GPL 2.0', 'GPL 3.0'],
       }),
     ).toBe('GPL 3.0');
@@ -247,6 +269,7 @@ describe('computeEffectiveLicense', () => {
     expect(
       computeEffectiveLicense({
         entries: [],
+        resolvedPaths: [],
         licenses: ['CC-BY 4.0', 'OGA-BY 4.0', 'CC-BY-SA 3.0'],
       }),
     ).toBe('CC-BY-SA 3.0');
@@ -256,12 +279,14 @@ describe('computeEffectiveLicense', () => {
     expect(
       computeEffectiveLicense({
         entries: [],
+        resolvedPaths: [],
         licenses: ['CC-BY', 'CC-BY 3.0', 'CC-BY 3.0+'],
       }),
     ).toBe('CC-BY 3.0+');
     expect(
       computeEffectiveLicense({
         entries: [],
+        resolvedPaths: [],
         licenses: ['CC-BY', 'CC-BY 3.0', 'CC-BY 3.0+', 'CC-BY 4.0'],
       }),
     ).toBe('CC-BY 4.0');
@@ -271,12 +296,14 @@ describe('computeEffectiveLicense', () => {
     expect(
       computeEffectiveLicense({
         entries: [],
+        resolvedPaths: [],
         licenses: ['OGA-BY 3.0', 'OGA-BY 3.0+'],
       }),
     ).toBe('OGA-BY 3.0+');
     expect(
       computeEffectiveLicense({
         entries: [],
+        resolvedPaths: [],
         licenses: ['OGA-BY 3.0', 'OGA-BY 3.0+', 'OGA-BY 4.0'],
       }),
     ).toBe('OGA-BY 4.0');
@@ -284,13 +311,13 @@ describe('computeEffectiveLicense', () => {
 
   it('returns the only license when there is exactly one', () => {
     expect(
-      computeEffectiveLicense({ entries: [], licenses: ['CC0'] }),
+      computeEffectiveLicense({ entries: [], resolvedPaths: [], licenses: ['CC0'] }),
     ).toBe('CC0');
   });
 
   it('throws on empty licenses', () => {
     expect(() =>
-      computeEffectiveLicense({ entries: [], licenses: [] }),
+      computeEffectiveLicense({ entries: [], resolvedPaths: [], licenses: [] }),
     ).toThrow(/empty CreditsManifest/);
   });
 
