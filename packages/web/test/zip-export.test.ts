@@ -5,6 +5,7 @@ import {
   itemFileName,
   exportByAnimationZip,
   exportByItemZip,
+  exportByAnimItemZip,
   type ExportContext,
 } from '../src/lib/zip-export';
 import { createCanvas } from '@napi-rs/canvas';
@@ -205,5 +206,65 @@ describe('exportByItemZip (F5)', () => {
     const itemKey = keys.find((k) => k.startsWith('items/'))!;
     const pngBytes = await zip.file(itemKey)!.async('uint8array');
     expect(pngBytes.length).toBeGreaterThan(0);
+  });
+});
+
+describe('exportByAnimItemZip (F6)', () => {
+  it('nests item PNGs under standard/<anim>/ folders', async () => {
+    const sheet = makeWalkSheet();
+    const selections = {
+      bodyType: 'male',
+      items: { body: { typeName: 'body', name: 'male light' } },
+    };
+    const itemDef = makeItem(50);
+    const ctx: ExportContext = {
+      sheet,
+      selections,
+      catalog: {
+        byItemId: new Map([['body/male_light', itemDef]]),
+        byTypeName: new Map([['body', [itemDef]]]),
+        typeNames: ['body'],
+        aliases: new Map(),
+      },
+      anim: 'walk',
+      composeSingleItem: async () => sheet,
+      adapter: makeAdapter(),
+      onProgress: () => {},
+    };
+    const blob = await exportByAnimItemZip(ctx);
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const keys = Object.keys(zip.files).sort();
+    expect(keys).toContain('standard/walk/050 male_light.png');
+    expect(keys).toContain('credits/credits.txt');
+  });
+
+  it('skips an item for an anim it does not declare', async () => {
+    const sheet = makeWalkSheet();
+    // Override sheet.animations to include slash even though the item only declares walk.
+    const sheet2: ComposedSheet = { ...sheet, animations: ['walk', 'slash'] };
+    const selections = {
+      bodyType: 'male',
+      items: { body: { typeName: 'body', name: 'male light' } },
+    };
+    const itemDef = makeItem(50);  // itemDef.animations = ['walk'] from makeItem
+    const ctx: ExportContext = {
+      sheet: sheet2,
+      selections,
+      catalog: {
+        byItemId: new Map([['body/male_light', itemDef]]),
+        byTypeName: new Map([['body', [itemDef]]]),
+        typeNames: ['body'],
+        aliases: new Map(),
+      },
+      anim: 'walk',
+      composeSingleItem: async () => sheet2,
+      adapter: makeAdapter(),
+      onProgress: () => {},
+    };
+    const blob = await exportByAnimItemZip(ctx);
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const keys = Object.keys(zip.files);
+    expect(keys).toContain('standard/walk/050 male_light.png');
+    expect(keys.some((k) => k.startsWith('standard/slash/'))).toBe(false);
   });
 });

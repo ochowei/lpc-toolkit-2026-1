@@ -193,6 +193,89 @@ function buildSingleSelections(
   };
 }
 
+export async function exportByAnimItemZip(ctx: ExportContext): Promise<Blob> {
+  const { default: JSZip } = await import('jszip');
+  const zip = new JSZip();
+
+  // Cache per-item sheets so each item is composed exactly once.
+  const itemSheets = new Map<string, ComposedSheet>();
+  const metas = lookupItemMetas(ctx);
+
+  for (const [typeName, sel] of Object.entries(ctx.selections.items)) {
+    try {
+      const itemSheet = await ctx.composeSingleItem(
+        buildSingleSelections(ctx.selections, typeName, sel),
+      );
+      itemSheets.set(typeName, itemSheet);
+    } catch (err) {
+      console.warn(`exportByAnimItemZip: skipping ${typeName}/${sel.name}:`, err);
+    }
+  }
+
+  const standardAnims = ctx.sheet.animations;
+  const customAnims = ctx.sheet.customAnimations
+    ? [...ctx.sheet.customAnimations.keys()]
+    : [];
+
+  // Estimate total = (anims) × (items) for progress.
+  const totalSlots = (standardAnims.length + customAnims.length) * metas.size;
+  let done = 0;
+
+  const writeAnim = async (
+    folder: 'standard' | 'custom',
+    animName: string,
+  ): Promise<void> => {
+    for (const [typeName] of Object.entries(ctx.selections.items)) {
+      const itemSheet = itemSheets.get(typeName);
+      if (!itemSheet) {
+        done += 1;
+        continue;
+      }
+      const meta = metas.get(typeName);
+      if (!meta) {
+        done += 1;
+        continue;
+      }
+      // Filter by item declaration (catalog), not itemSheet.animations.
+      const itemDef = ctx.catalog.byItemId.get(meta.itemId);
+      const declaredAnims = itemDef?.animations ?? [];
+      const supports =
+        folder === 'standard'
+          ? declaredAnims.includes(animName)
+          : itemSheet.customAnimations?.has(animName) ?? false;
+      if (!supports) {
+        done += 1;
+        continue;
+      }
+      const animCanvas = extractAnimation(itemSheet, animName, {
+        adapter: ctx.adapter,
+      });
+      const filename = itemFileName({
+        name: meta.name,
+        zPos: meta.zPos,
+        itemId: meta.itemId,
+        ...(meta.variant ? { variant: meta.variant } : {}),
+      });
+      const buf = await encodePng(
+        animCanvas.canvas as unknown as HTMLCanvasElement,
+      );
+      zip.file(`${folder}/${animName}/${filename}`, buf, { createFolders: false });
+      done += 1;
+      reportEncode(ctx, done, totalSlots);
+    }
+  };
+
+  for (const anim of standardAnims) await writeAnim('standard', anim);
+  for (const anim of customAnims) await writeAnim('custom', anim);
+
+  writeCredits(zip, ctx.sheet, ctx.anim);
+
+  return zip.generateAsync(
+    { type: 'blob' },
+    (meta) => reportGenerate(ctx, meta.percent),
+  );
+}
+
 export async function exportByItemZip(ctx: ExportContext): Promise<Blob> {
   const { default: JSZip } = await import('jszip');
   const zip = new JSZip();
