@@ -112,7 +112,7 @@ export function FullSpritesheetPreview({
       </header>
 
       <div className="min-h-0 flex-1 overflow-auto bg-app">
-        {status === 'loading' && !sheet && (
+        {status === 'loading' && (
           <div className="flex h-full items-center justify-center text-xs text-text-mute">
             {t('fullSheet.loading')}
           </div>
@@ -122,7 +122,7 @@ export function FullSpritesheetPreview({
             {t('fullSheet.error')}
           </div>
         )}
-        {sheet && (
+        {status !== 'loading' && status !== 'error' && sheet && (
           <canvas
             ref={canvasRef}
             style={canvasStyle}
