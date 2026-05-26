@@ -59,18 +59,20 @@ export function SettingsCollapsible({
               </span>
             </div>
             <ul className="flex flex-col gap-1">
-              {LICENSE_CONFIG.map((group) => {
-                const checked = licenseFilter.has(group.key as LicenseGroup);
+              {LICENSE_GROUP_ORDER.map((groupKey) => {
+                const group = LICENSE_CONFIG.find((g) => g.key === groupKey);
+                if (!group) return null;
+                const checked = licenseFilter.has(groupKey);
                 const linkLabel = group.urlLabel
                   ? `${t('licenseFilter.showLicense')} ${group.urlLabel}`
                   : t('licenseFilter.showLicense');
                 return (
-                  <li key={group.key} className="flex items-center gap-2">
+                  <li key={groupKey} className="flex items-center gap-2">
                     <label className="flex flex-1 items-center gap-2 text-[11px] text-text cursor-pointer">
                       <input
                         type="checkbox"
                         checked={checked}
-                        onChange={() => toggleLicenseGroup(group.key as LicenseGroup)}
+                        onChange={() => toggleLicenseGroup(groupKey)}
                         className="h-3 w-3 accent-accent"
                       />
                       <span className="font-mono">{group.label}</span>
@@ -79,6 +81,7 @@ export function SettingsCollapsible({
                       href={group.url}
                       target="_blank"
                       rel="noopener noreferrer"
+                      aria-label={linkLabel}
                       className="text-[10px] text-text-mute underline decoration-border underline-offset-2 hover:text-text"
                     >
                       ({linkLabel})
