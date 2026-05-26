@@ -268,14 +268,14 @@ React 18 在事件 handler 內的多次 `dispatch` 自動 batch,單次 re-render
 **Reset 行為**
 
 ```ts
-// harness.tsx 第 219 行(現有 reset 邏輯內)
+// harness.tsx 第 219 行(ResetMenuPopover onReset 的 `filters` 分支內)
 // 舊:setLicenseFilter(null);
 // 新:setLicenseFilter(ALL_GROUPS);
 ```
 
-掛在現有 `view` scope reset 路徑(`onReset({ outfit, view: true })` 觸發時
-重設)。**`outfit`-only reset 不動 license filter** — filter 是視圖狀態,
-不是 outfit 狀態,語意對齊 v2 既有的 reset scope 區分。
+`ResetMenuPopover` 有 3 個獨立勾選 scope:`outfit` / `view` / `filters`。
+License filter 對應 `filters` scope(現有),只換值不換 scope name。**`outfit`
+或 `view` 單獨重設不動 license filter** — 與既有設計一致。
 
 **透傳路徑**
 
@@ -399,8 +399,8 @@ const [licenseFilter, setLicenseFilter] = useState<LegacyLicenseFilter>(null);
 - 初始 `licenseFilter.size === 5`
 - 取消勾 GPL → 任何 GPL-only item 進入 incompatible 計數
 - 點 Remove → 對應 selections 從 `state.selections` 移除
-- Reset(view scope)→ filter 回 5/5
-- Reset(outfit only)→ filter 不動
+- Reset(filters scope)→ filter 回 5/5
+- Reset(outfit-only / view-only)→ filter 不動
 - `AttributionPopover` 觸發鈕在 `incompatibleCount > 0` 時切到 danger style
 
 **目標**
@@ -455,7 +455,7 @@ const [licenseFilter, setLicenseFilter] = useState<LegacyLicenseFilter>(null);
 | credits 為空語意翻轉(false→true)影響既有測試 | §5 測試明確列出此 case;snapshot 跑出來會抓到 |
 | `licenseExceedsFilter` 刪除後 v1 編譯失敗 | §4 已規劃 v1 inline 舊型別,task 5 順手處理 |
 | Settings UI 高度擠 | 緊湊 row(11px font / 4-6px gap),5 行不超過原 select + asset source 總高 |
-| Reset (view) 把 filter 重設,使用者覺得 reset 把 filter 也清了 | 沿用 view-scope 既有「session 還原」語意,UX 一致比 surprise 來得值 |
+| Reset 把 filter 重設,使用者覺得 reset 把 filter 也清了 | 沿用既有 `filters` scope 區分,使用者可主動取消勾選 filters 框只 reset outfit / view |
 
 ## 驗收
 
@@ -470,7 +470,7 @@ const [licenseFilter, setLicenseFilter] = useState<LegacyLicenseFilter>(null);
 - [ ] `AttributionPopover` 觸發鈕 + 列表 row 用新 incompatibility 判定
 - [ ] `LayerRow` tooltip 用新 i18n key,不再內插 license 名稱
 - [ ] `AdvancedPalette` header 用新 `{n}/5` badge
-- [ ] Reset(view)歸回 ALL_GROUPS;reset(outfit-only)filter 不動
+- [ ] Reset(filters)歸回 ALL_GROUPS;reset(outfit-only / view-only)filter 不動
 - [ ] v1 path(`slice-harness.tsx`)行為完全不變
 - [ ] i18n.ts en + zh-TW 兩 locale 都同步加入新 key
 - [ ] web tests +8~12 個,178 + core 全綠基準維持
