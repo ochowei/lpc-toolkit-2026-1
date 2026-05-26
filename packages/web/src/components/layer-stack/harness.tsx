@@ -11,9 +11,11 @@ import { BodyTypePopover } from './popovers/body-type-popover';
 import { TokenPopover } from './popovers/token-popover';
 import { ResetMenuPopover } from './popovers/reset-menu-popover';
 import { AttributionPopover } from './popovers/attribution-popover';
+import { DownloadPopover } from './popovers/download-popover';
 import { PaletteTrigger } from './palette-trigger';
 import { AdvancedPalette } from './advanced-palette';
 import { cacheClear } from '../../hooks/thumbnail-cache';
+import { useComposedCharacter } from '../../hooks/use-composed-character';
 import { Button } from '../ui/button';
 
 export interface LayerStackHarnessProps {
@@ -37,11 +39,20 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   const { t, theme, locale, onToggleTheme, onToggleLocale } = props;
   const [licenseFilter, setLicenseFilter] = useState<LicenseFilter>(null);
   const [status, setStatus] = useState<{ kind: 'info' | 'warn' | 'error'; text: string } | null>(null);
-  const [popover, setPopover] = useState<null | 'bodyType' | 'token' | 'reset' | 'attribution'>(null);
+  const [popover, setPopover] = useState<null | 'bodyType' | 'token' | 'reset' | 'attribution' | 'download'>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [expanded, setExpanded] = useState<TypeName | null>(null);
   const [reloadCounter, setReloadCounter] = useState(0);
-  const [loadingProgress, setLoadingProgress] = useState<number | null>(null);
+
+  const composeResult = useComposedCharacter(
+    props.catalog,
+    props.palettes,
+    props.state,
+    props.assetSource,
+    reloadCounter,
+  );
+  const loadingProgress =
+    composeResult.status === 'loading' ? composeResult.progress : null;
 
   const handleForceReload = () => {
     cacheClear();
@@ -137,6 +148,14 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
           t={props.t}
           tl={props.tl}
         />
+        <DownloadPopover
+          open={popover === 'download'}
+          setOpen={(v) => setPopover(v ? 'download' : null)}
+          result={composeResult}
+          anim={props.state.anim}
+          t={props.t}
+          onStatus={(s) => setStatus(s)}
+        />
         <PaletteTrigger onOpen={() => setPaletteOpen(true)} t={t} />
         <Button
           size="sm"
@@ -172,15 +191,10 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
         <main className="min-h-0 overflow-hidden bg-app">
           <PreviewPane
             catalog={props.catalog}
-            palettes={props.palettes}
             state={props.state}
             dispatch={props.dispatch}
-            assetSource={props.assetSource}
-            reloadCounter={reloadCounter}
             t={t}
-            onComposeStatus={({ progress, loading }) =>
-              setLoadingProgress(loading ? progress : null)
-            }
+            result={composeResult}
           />
         </main>
         <AdvancedPalette

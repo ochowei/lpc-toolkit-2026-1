@@ -62,7 +62,7 @@ export function AttributionPopover({ open, setOpen, catalog, state, licenseFilte
       // Skip items with no license info
       if (allLicenses.length === 0) continue;
 
-      const manifest = { entries: item.credits, licenses: allLicenses };
+      const manifest = { entries: item.credits, licenses: allLicenses, resolvedPaths: [] };
       const effective = computeEffectiveLicense(manifest);
       out.push({ typeName: tn, item, effective, authors: allAuthors, exceeds: licenseExceedsFilter(effective, licenseFilter) });
     }
