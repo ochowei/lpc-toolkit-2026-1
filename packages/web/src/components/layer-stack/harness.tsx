@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import type { Catalog, HashWarning, PaletteMetadata, TypeName } from '@lpc-toolkit/core';
-import type { FullSheetUiState, FullSheetUiActions } from './preview-pane';
-import type { FullSheetZoom } from './full-spritesheet-preview';
+import type {
+  FullSheetUiState,
+  FullSheetUiActions,
+  FullSheetZoom,
+} from './preview-pane';
 import { useUrlHashSync } from '../../lib/url-hash-sync';
 import type { SliceState, SliceAction } from '../../slice/selection';
 import type { Locale, Translator, LabelTranslator } from '../../i18n';

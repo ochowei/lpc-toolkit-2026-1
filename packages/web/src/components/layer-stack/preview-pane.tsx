@@ -16,6 +16,7 @@ import {
   FullSpritesheetPreview,
   type FullSheetZoom,
 } from './full-spritesheet-preview';
+export type { FullSheetZoom } from './full-spritesheet-preview';
 import { PreviewPaneSplitter } from './preview-pane-splitter';
 
 const DIR_LABEL: Record<Direction, string> = { up: '↑', left: '←', down: '↓', right: '→' };
@@ -85,7 +86,9 @@ export function PreviewPane({
 
   // Splitter needs absolute viewport y + height of the *split container*
   // (the region under the action bar). Measure on layout and on resize.
-  const [splitMetrics, setSplitMetrics] = useState({ top: 0, height: 0 });
+  const [splitMetrics, setSplitMetrics] = useState<
+    { top: number; height: number } | null
+  >(null);
   useLayoutEffect(() => {
     if (!fullSheet.open) return;
     const el = splitContainerRef.current;
@@ -101,6 +104,7 @@ export function PreviewPane({
     return () => {
       ro.disconnect();
       window.removeEventListener('resize', update);
+      setSplitMetrics(null);
     };
   }, [fullSheet.open]);
 
@@ -216,7 +220,7 @@ export function PreviewPane({
           </div>
         </div>
 
-        {fullSheet.open && (
+        {fullSheet.open && splitMetrics && (
           <>
             <PreviewPaneSplitter
               containerTop={splitMetrics.top}
