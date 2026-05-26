@@ -150,7 +150,7 @@ export const TRANSLATIONS = {
     'assetSource.localHelp': '只使用此 app 內打包的圖片。',
     'assetSource.upstreamHelp': '從上游 GitHub Pages 專案載入圖片。',
     'picker.licenseFilter': '授權篩選',
-    'picker.allLicenses': '全部授權',
+    'picker.allLicenses': '所有授權',
     'picker.current': '目前選取',
     'picker.bodyType': '身體類型',
     'picker.none': '無',
