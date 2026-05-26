@@ -12,7 +12,7 @@ interface Props {
   name: string;
   variant?: string;
   recolor?: string;
-  size: 24 | 28;
+  size: 20 | 24 | 28;
   bodyType: BodyType;
   catalog: Catalog;
   palettes: PaletteMetadata;
