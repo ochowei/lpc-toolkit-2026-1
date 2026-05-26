@@ -154,3 +154,83 @@ export async function exportByAnimationZip(ctx: ExportContext): Promise<Blob> {
     (meta) => reportGenerate(ctx, meta.percent),
   );
 }
+
+interface ItemMeta {
+  readonly itemId: string;
+  readonly name: string;
+  readonly variant?: string;
+  readonly zPos: number;
+}
+
+// Map<typeName, ItemMeta> so callers can resolve by typeName cleanly even
+// when two selected items share a name across different typeNames.
+function lookupItemMetas(ctx: ExportContext): ReadonlyMap<string, ItemMeta> {
+  const out = new Map<string, ItemMeta>();
+  for (const [typeName, sel] of Object.entries(ctx.selections.items)) {
+    for (const [itemId, item] of ctx.catalog.byItemId) {
+      if (item.type_name !== typeName || item.name !== sel.name) continue;
+      const zPos = item.layer_1?.zPos ?? 100;
+      out.set(typeName, {
+        itemId,
+        name: sel.name,
+        ...(sel.variant ? { variant: sel.variant } : {}),
+        zPos,
+      });
+      break;
+    }
+  }
+  return out;
+}
+
+function buildSingleSelections(
+  base: Selections,
+  typeName: string,
+  sel: Selections['items'][string],
+): Selections {
+  return {
+    bodyType: base.bodyType,
+    items: { [typeName]: sel },
+  };
+}
+
+export async function exportByItemZip(ctx: ExportContext): Promise<Blob> {
+  const { default: JSZip } = await import('jszip');
+  const zip = new JSZip();
+
+  const metas = lookupItemMetas(ctx);
+  const total = metas.size;
+  let done = 0;
+
+  const fileOpts = { createFolders: false };
+
+  for (const [typeName, sel] of Object.entries(ctx.selections.items)) {
+    const meta = metas.get(typeName);
+    if (!meta) continue;
+    try {
+      const itemSheet = await ctx.composeSingleItem(
+        buildSingleSelections(ctx.selections, typeName, sel),
+      );
+      const filename = itemFileName({
+        name: meta.name,
+        zPos: meta.zPos,
+        itemId: meta.itemId,
+        ...(meta.variant ? { variant: meta.variant } : {}),
+      });
+      const buf = await encodePng(
+        itemSheet.canvas as unknown as HTMLCanvasElement,
+      );
+      zip.file(`items/${filename}`, buf, fileOpts);
+    } catch (err) {
+      console.warn(`exportByItemZip: skipping ${typeName}/${sel.name}:`, err);
+    }
+    done += 1;
+    reportEncode(ctx, done, total);
+  }
+
+  writeCredits(zip, ctx.sheet, ctx.anim);
+
+  return zip.generateAsync(
+    { type: 'blob' },
+    (meta) => reportGenerate(ctx, meta.percent),
+  );
+}

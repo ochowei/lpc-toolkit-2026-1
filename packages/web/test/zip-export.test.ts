@@ -4,11 +4,12 @@ import {
   zipName,
   itemFileName,
   exportByAnimationZip,
+  exportByItemZip,
   type ExportContext,
 } from '../src/lib/zip-export';
 import { createCanvas } from '@napi-rs/canvas';
 import JSZip from 'jszip';
-import type { ComposedSheet, CreditsManifest } from '@lpc-toolkit/core';
+import type { ComposedSheet, CreditsManifest, ItemDefinition } from '@lpc-toolkit/core';
 
 describe('zipExportTimestamp', () => {
   it('matches the upstream yyyy-MM-ddTHH-mm-ss pattern', () => {
@@ -159,5 +160,47 @@ describe('exportByAnimationZip (F4)', () => {
     ]);
     const pngBytes = await zip.file('custom/wheelchair.png')!.async('uint8array');
     expect(pngBytes.length).toBeGreaterThan(0);
+  });
+});
+
+function makeItem(zPos: number): ItemDefinition {
+  return {
+    name: 'male light',
+    type_name: 'body',
+    animations: ['walk'],
+    credits: [],
+    layer_1: { zPos, male: 'body/bodies/male/' },
+  };
+}
+
+describe('exportByItemZip (F5)', () => {
+  it('produces a ZIP with one items/<zPos> <name>.png entry per selected item', async () => {
+    const sheet = makeWalkSheet();
+    const selections = {
+      bodyType: 'male',
+      items: { body: { typeName: 'body', name: 'male light' } },
+    };
+    const itemDef = makeItem(50);
+    const ctx: ExportContext = {
+      sheet,
+      selections,
+      catalog: {
+        byItemId: new Map([['body/male_light', itemDef]]),
+        byTypeName: new Map([['body', [itemDef]]]),
+        typeNames: ['body'],
+        aliases: new Map(),
+      },
+      anim: 'walk',
+      composeSingleItem: async () => sheet,
+      adapter: makeAdapter(),
+      onProgress: () => {},
+    };
+    const blob = await exportByItemZip(ctx);
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const keys = Object.keys(zip.files).sort();
+    expect(keys).toContain('credits/credits.txt');
+    expect(keys).toContain('credits/credits.csv');
+    expect(keys.some((k) => k.startsWith('items/050 '))).toBe(true);
+    expect(keys.find((k) => k.startsWith('items/'))).toBe('items/050 male_light.png');
   });
 });
