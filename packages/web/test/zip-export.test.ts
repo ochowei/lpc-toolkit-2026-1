@@ -202,5 +202,8 @@ describe('exportByItemZip (F5)', () => {
     expect(keys).toContain('credits/credits.csv');
     expect(keys.some((k) => k.startsWith('items/050 '))).toBe(true);
     expect(keys.find((k) => k.startsWith('items/'))).toBe('items/050 male_light.png');
+    const itemKey = keys.find((k) => k.startsWith('items/'))!;
+    const pngBytes = await zip.file(itemKey)!.async('uint8array');
+    expect(pngBytes.length).toBeGreaterThan(0);
   });
 });
