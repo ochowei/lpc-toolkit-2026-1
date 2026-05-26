@@ -5,7 +5,11 @@
     "jsx": "react-jsx",
     "types": ["vite/client", "node"],
     "noEmit": true,
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    "baseUrl": ".",
+    "paths": {
+      "@lpc-toolkit/core": ["../core/src/index.ts"]
+    }
   },
   "include": ["src", "test", "scripts", "vite.config.ts", "vitest.config.ts"],
   "exclude": ["dist", "node_modules"]

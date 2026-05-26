@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
@@ -6,5 +7,13 @@ import tailwindcss from '@tailwindcss/vite';
 // the read-only `upstream/` submodule (two levels up from packages/web).
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      // Read core's source directly so dev/build never sees a stale `dist/`.
+      '@lpc-toolkit/core': fileURLToPath(
+        new URL('../core/src/index.ts', import.meta.url),
+      ),
+    },
+  },
   server: { fs: { allow: ['../..'] } },
 });
