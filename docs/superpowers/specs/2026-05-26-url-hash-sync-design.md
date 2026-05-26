@@ -328,7 +328,8 @@ zh-TW:
 ### 功能
 
 - [ ] 首次開 `localhost:5173`(URL 無 hash):載入預設角色 + 網址列出
-      現 `#sex=male&body=Body_color_light&head=Heads_human_male_light&expression=Face_neutral_light`
+      現 `#sex=male&body=Body_Color_light&head=Human_Male_light&expression=Neutral_light`
+      (item.name 字面值,空格轉底線;`serializeHash` 不做大小寫轉換)
 - [ ] 改一個 layer(例如換 hair) → 網址列 hash 立刻更新
 - [ ] 按瀏覽器上一頁 → 回到改 hair 前的角色
 - [ ] 按瀏覽器下一頁 → 又回到改 hair 後的角色
