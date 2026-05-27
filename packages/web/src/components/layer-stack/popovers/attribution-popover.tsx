@@ -98,7 +98,7 @@ export function AttributionPopover({
 
   const summary = useMemo(
     () => summarizeAttribution(catalog, state, licenseFilter, animationFilter),
-    [catalog, state, licenseFilter, animationFilter],
+    [catalog, state.selections, licenseFilter, animationFilter],
   );
 
   return (
