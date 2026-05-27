@@ -13,6 +13,10 @@ import type {
 // Type-only import — erased at compile time, so the actual jszip module
 // is still lazily loaded via `await import('jszip')` below.
 import type JSZipModule from 'jszip';
+import {
+  customOverlayItemFileName,
+  type CustomOverlay,
+} from './custom-overlay';
 type JSZipInstance = InstanceType<typeof JSZipModule>;
 
 export type ZipExportKind =
@@ -34,6 +38,7 @@ export interface ExportContext {
   readonly anim: string;
   readonly composeSingleItem: (s: Selections) => Promise<ComposedSheet>;
   readonly adapter: CanvasAdapter;
+  readonly customOverlay?: CustomOverlay | null;
   readonly onProgress: (progress: number) => void;
 }
 
@@ -99,6 +104,19 @@ function writeCredits(
   const opts = { createFolders: false };
   zip.file('credits/credits.txt', creditsToTxt(sheet.credits, anim), opts);
   zip.file('credits/credits.csv', creditsToCsv(sheet.credits, anim), opts);
+}
+
+async function encodeCustomOverlay(
+  ctx: ExportContext,
+  customOverlay: CustomOverlay,
+): Promise<ArrayBuffer> {
+  const canvas = ctx.adapter.createCanvas(
+    customOverlay.width,
+    customOverlay.height,
+  );
+  const canvasCtx = canvas.getContext('2d');
+  canvasCtx.drawImage(customOverlay.image, 0, 0);
+  return encodePng(canvas as unknown as HTMLCanvasElement);
 }
 
 // jszip's `generateAsync` onUpdate callback gives `{ percent: 0..100 }`.
@@ -220,7 +238,9 @@ export async function exportByAnimItemZip(ctx: ExportContext): Promise<Blob> {
 
   // Estimate total = (anims) × (items) for progress.
   const itemCount = Object.keys(ctx.selections.items).length;
-  const totalSlots = (standardAnims.length + customAnims.length) * itemCount;
+  const totalSlots =
+    (standardAnims.length + customAnims.length) * itemCount +
+    (ctx.customOverlay ? standardAnims.length : 0);
   let done = 0;
 
   const writeAnim = async (
@@ -268,6 +288,20 @@ export async function exportByAnimItemZip(ctx: ExportContext): Promise<Blob> {
   };
 
   for (const anim of standardAnims) await writeAnim('standard', anim);
+
+  if (ctx.customOverlay) {
+    const filename = customOverlayItemFileName({
+      fileName: ctx.customOverlay.fileName,
+      zPos: ctx.customOverlay.zPos,
+    });
+    const buf = await encodeCustomOverlay(ctx, ctx.customOverlay);
+    for (const anim of standardAnims) {
+      zip.file(`standard/${anim}/${filename}`, buf, { createFolders: false });
+      done += 1;
+      reportEncode(ctx, done, totalSlots);
+    }
+  }
+
   for (const anim of customAnims) await writeAnim('custom', anim);
 
   writeCredits(zip, ctx.sheet, ctx.anim);
@@ -283,7 +317,7 @@ export async function exportByItemZip(ctx: ExportContext): Promise<Blob> {
   const zip = new JSZip();
 
   const metas = lookupItemMetas(ctx);
-  const total = metas.size;
+  const total = metas.size + (ctx.customOverlay ? 1 : 0);
   let done = 0;
 
   const fileOpts = { createFolders: false };
@@ -308,6 +342,20 @@ export async function exportByItemZip(ctx: ExportContext): Promise<Blob> {
     } catch (err) {
       console.warn(`exportByItemZip: skipping ${typeName}/${sel.name}:`, err);
     }
+    done += 1;
+    reportEncode(ctx, done, total);
+  }
+
+  if (ctx.customOverlay) {
+    const filename = customOverlayItemFileName({
+      fileName: ctx.customOverlay.fileName,
+      zPos: ctx.customOverlay.zPos,
+    });
+    zip.file(
+      `items/${filename}`,
+      await encodeCustomOverlay(ctx, ctx.customOverlay),
+      fileOpts,
+    );
     done += 1;
     reportEncode(ctx, done, total);
   }

@@ -21,6 +21,7 @@ import { createBrowserCanvasAdapter } from '../../../adapter/browser-canvas-adap
 import type { AssetSource } from '../../../adapter/asset-source';
 import type { Translator } from '../../../i18n';
 import type { ComposedResult } from '../../../hooks/use-composed-character';
+import type { CustomOverlay } from '../../../lib/custom-overlay';
 
 interface ZipRunning {
   kind: ZipExportKind;
@@ -36,6 +37,7 @@ interface Props {
   catalog: Catalog;
   assetSource: AssetSource;
   composeSingleItem: (s: Selections) => Promise<ComposedSheet>;
+  customOverlay: CustomOverlay | null;
   zipRunning: ZipRunning | null;
   setZipRunning: (r: ZipRunning | null) => void;
   t: Translator;
@@ -51,6 +53,7 @@ export function DownloadPopover({
   catalog,
   assetSource,
   composeSingleItem,
+  customOverlay,
   zipRunning,
   setZipRunning,
   t,
@@ -110,6 +113,7 @@ export function DownloadPopover({
         anim,
         composeSingleItem,
         adapter,
+        customOverlay,
         onProgress: (p) => setZipRunning({ kind, progress: p }),
       });
       const filename = zipName(

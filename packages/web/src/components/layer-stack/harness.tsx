@@ -372,6 +372,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
           catalog={props.catalog}
           assetSource={props.assetSource}
           composeSingleItem={composeSingleItem}
+          customOverlay={customOverlay}
           zipRunning={zipRunning}
           setZipRunning={setZipRunning}
           t={props.t}

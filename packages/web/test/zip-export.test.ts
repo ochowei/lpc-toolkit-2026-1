@@ -12,6 +12,10 @@ import {
 import { createCanvas } from '@napi-rs/canvas';
 import JSZip from 'jszip';
 import type { ComposedSheet, CreditsManifest, ItemDefinition } from '@lpc-toolkit/core';
+import {
+  customOverlayItemFileName,
+  type CustomOverlay,
+} from '../src/lib/custom-overlay';
 
 describe('zipExportTimestamp', () => {
   it('matches the upstream yyyy-MM-ddTHH-mm-ss pattern', () => {
@@ -89,6 +93,21 @@ function makeWalkSheet(): ComposedSheet {
     credits: EMPTY_CREDITS,
     layers: [],
     animations: ['walk'],
+  };
+}
+
+function makeCustomOverlay(): CustomOverlay {
+  const image = createCanvas(832, 3456);
+  const ctx = image.getContext('2d');
+  ctx.fillStyle = '#0000ff';
+  ctx.fillRect(0, 512, 64, 64);
+  return {
+    fileName: 'Cape Test.png',
+    objectUrl: 'blob:test',
+    image: image as unknown as CustomOverlay['image'],
+    width: 832,
+    height: 3456,
+    zPos: 70,
   };
 }
 
@@ -208,6 +227,39 @@ describe('exportByItemZip (F5)', () => {
     const pngBytes = await zip.file(itemKey)!.async('uint8array');
     expect(pngBytes.length).toBeGreaterThan(0);
   });
+
+  it('includes a custom-upload item entry without adding it to credits', async () => {
+    const sheet = makeWalkSheet();
+    const customOverlay = makeCustomOverlay();
+    const ctx: ExportContext = {
+      sheet,
+      selections: { bodyType: 'male', items: {} },
+      catalog: {
+        byItemId: new Map(),
+        byTypeName: new Map(),
+        typeNames: [],
+        aliases: new Map(),
+      },
+      anim: 'walk',
+      composeSingleItem: async () => sheet,
+      adapter: makeAdapter(),
+      customOverlay,
+      onProgress: () => {},
+    };
+
+    const blob = await exportByItemZip(ctx);
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const filename = customOverlayItemFileName({
+      fileName: customOverlay.fileName,
+      zPos: customOverlay.zPos,
+    });
+    const keys = Object.keys(zip.files).sort();
+    expect(keys).toContain(`items/${filename}`);
+
+    const credits = await zip.file('credits/credits.txt')!.async('string');
+    expect(credits).not.toContain('Cape Test');
+    expect(credits).not.toContain('custom-upload');
+  });
 });
 
 describe('exportByAnimItemZip (F6)', () => {
@@ -313,6 +365,57 @@ describe('exportByAnimItemZip (F6)', () => {
     expect(keys).toContain('custom/wheelchair/050 male_light.png');
     expect(keys).toContain('credits/credits.txt');
     expect(keys).toContain('credits/credits.csv');
+  });
+
+  it('includes custom-upload item entries for standard animations only', async () => {
+    const baseCanvas = createCanvas(832, 3456 + 64);
+    const ctx2 = baseCanvas.getContext('2d');
+    ctx2.fillStyle = '#ff0000';
+    ctx2.fillRect(0, 512, 832, 256);
+    ctx2.fillStyle = '#00ff00';
+    ctx2.fillRect(0, 3456, 3 * 64, 64);
+    const sheet: ComposedSheet = {
+      canvas: baseCanvas as unknown as import('@lpc-toolkit/core').CanvasLike,
+      width: 832,
+      height: 3456 + 64,
+      selections: { bodyType: 'male', items: {} },
+      credits: EMPTY_CREDITS,
+      layers: [],
+      animations: ['walk'],
+      customAnimations: new Map([
+        ['wheelchair', { offsetY: 3456, frameSize: 64, rows: 1, cols: 3 }],
+      ]),
+    };
+    const customOverlay = makeCustomOverlay();
+    const exportCtx: ExportContext = {
+      sheet,
+      selections: { bodyType: 'male', items: {} },
+      catalog: {
+        byItemId: new Map(),
+        byTypeName: new Map(),
+        typeNames: [],
+        aliases: new Map(),
+      },
+      anim: 'walk',
+      composeSingleItem: async () => sheet,
+      adapter: makeAdapter(),
+      customOverlay,
+      onProgress: () => {},
+    };
+
+    const blob = await exportByAnimItemZip(exportCtx);
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const filename = customOverlayItemFileName({
+      fileName: customOverlay.fileName,
+      zPos: customOverlay.zPos,
+    });
+    const keys = Object.keys(zip.files).sort();
+    expect(keys).toContain(`standard/walk/${filename}`);
+    expect(keys).not.toContain(`custom/wheelchair/${filename}`);
+
+    const credits = await zip.file('credits/credits.txt')!.async('string');
+    expect(credits).not.toContain('Cape Test');
+    expect(credits).not.toContain('custom-upload');
   });
 });
 
