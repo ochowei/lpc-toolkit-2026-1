@@ -42,7 +42,7 @@ Maps to the noise classes from §1:
 | github.io fallback noise | Force `assetSource='local'` in the test via URL param | `App.tsx` + new helper |
 | localhost connection saturation | Add a concurrency limit (semaphore = 6) to `loadImage` | `browser-canvas-adapter.ts` |
 | Collector 4xx double-count and unreliable net error capture | Replace browser-auto console.error capture for resource failures; route 4xx/5xx via `response`, net errors via `requestfailed` | `console-collector.ts` |
-| Catalog warning | Module-level emit-once guard + tightly scoped exact-match allowlist (root is `upstream/`, a read-only submodule) | `load-catalog.ts` + `console-collector.ts` |
+| Catalog warning | Module-level emit-once guard + tightly scoped catalog allowlist (root is `upstream/`, a read-only submodule) | `load-catalog.ts` + `console-collector.ts` |
 | Sprite-path 4xx/network failures | Skip the `response`/`requestfailed` events for URLs under `/spritesheets/` | `console-collector.ts` |
 
 The catalog warning and the sprite-path 4xx skip are the only allowlist entries; both have explicit, narrow scope and a follow-up to fix the underlying cause. Everything else is removed at the source.
@@ -174,7 +174,10 @@ const APP_CONSOLE_ALLOWLIST = [
     // upstream PR. See docs/superpowers/notes/2026-05-27-e2e-random-smoke-known-noise.md
     // and docs/superpowers/specs/2026-05-28-e2e-noise-cleanup-design.md.
     kind: 'console.warn' as const,
-    textPattern: /^\[catalog\] \d+ load warning\(s\)$/,
+    // Playwright's msg.text() may append Chromium's array preview for the
+    // second console.warn argument, e.g. " [Object, Object]".
+    textPattern:
+      /^\[catalog\] \d+ load warning\(s\)(?: \[Object(?:, Object)*\])?$/,
     locationPattern: /\/catalog\/load-catalog\.ts/,
   },
 ];
@@ -189,7 +192,7 @@ function isSpriteAssetUrl(url: string): boolean {
 }
 ```
 
-Both filters are narrowly anchored. The catalog filter requires exact whole-text shape **and** location. If a future catalog message reads `[catalog] palette X missing`, it does **not** match and the test fails — by design. The sprite-asset filter applies only to **HTTP responses and network failures** for URLs that contain `/spritesheets/`; it does **not** filter `console.error` or `pageerror` — so if app code throws or logs while loading a sprite, the test still fails.
+Both filters are narrowly anchored. The catalog filter requires the exact canonical text shape, allows only Chromium's optional `[Object, Object...]` array-preview suffix from `console.warn(text, warnings)`, and requires the `load-catalog.ts` location. If a future catalog message reads `[catalog] palette X missing`, it does **not** match and the test fails — by design. The sprite-asset filter applies only to **HTTP responses and network failures** for URLs that contain `/spritesheets/`; it does **not** filter `console.error` or `pageerror` — so if app code throws or logs while loading a sprite, the test still fails.
 
 If we ever add new catalog message shapes that are legitimately benign, this allowlist must be extended deliberately, not by widening the regex.
 
@@ -226,7 +229,7 @@ export function loadCatalogFromUpstream(): Catalog {
 | `packages/web/src/App.tsx` | Modify | Use the helper in `useState` initializer |
 | `packages/web/src/adapter/browser-canvas-adapter.ts` | Modify | Add per-adapter semaphore wrapping `fetch()` |
 | `packages/web/src/catalog/load-catalog.ts` | Modify | Module-level emit-once flag |
-| `packages/web/e2e/helpers/console-collector.ts` | Modify | 4-channel architecture, browser-auto filter, exact-match allowlist |
+| `packages/web/e2e/helpers/console-collector.ts` | Modify | 4-channel architecture, browser-auto filter, narrow catalog allowlist |
 | `packages/web/e2e/random-no-console-errors.spec.ts` | Modify | Visit `/?assetSource=local` |
 | `packages/web/test/asset-source-from-url.test.ts` | Create | Unit tests for the helper (valid / invalid / absent) |
 | `packages/web/test/browser-canvas-adapter.test.ts` | Modify | Add concurrency-limit assertion |

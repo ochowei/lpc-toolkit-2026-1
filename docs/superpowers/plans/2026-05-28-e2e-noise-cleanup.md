@@ -687,6 +687,16 @@ describe('isAllowlistedConsoleEntry', () => {
     ).toBe(true);
   });
 
+  it('matches the catalog warning with the Chromium array-preview suffix', () => {
+    expect(
+      isAllowlistedConsoleEntry({
+        kind: 'console.warn',
+        text: '[catalog] 35 load warning(s) [Object, Object, Object, Object, Object]',
+        location: 'http://localhost:5173/src/catalog/load-catalog.ts:50:12',
+      }),
+    ).toBe(true);
+  });
+
   it('rejects the catalog text with extra trailing content', () => {
     expect(
       isAllowlistedConsoleEntry({
@@ -816,8 +826,14 @@ interface ConsoleAllowlistEntry {
 
 const APP_CONSOLE_ALLOWLIST: readonly ConsoleAllowlistEntry[] = [
   {
+    // `msg.text()` from Playwright concatenates the optional array arg of
+    // `console.warn(text, warnings)` into the text as Chromium's preview
+    // serialization, e.g. ` [Object, Object, ...]`. The optional suffix in
+    // the pattern below accommodates that without widening to arbitrary
+    // trailing content.
     kind: 'console.warn',
-    textPattern: /^\[catalog\] \d+ load warning\(s\)$/,
+    textPattern:
+      /^\[catalog\] \d+ load warning\(s\)(?: \[Object(?:, Object)*\])?$/,
     locationPattern: /\/catalog\/load-catalog\.ts/,
   },
 ];
@@ -924,7 +940,7 @@ Run:
 pnpm --filter @lpc-toolkit/web test console-collector-filters
 ```
 
-Expected: all 16 tests pass.
+Expected: all 13 tests pass.
 
 - [ ] **Step 5: Typecheck**
 
