@@ -88,6 +88,7 @@ export function StackPanel({
         assetSource={assetSource}
         shownTypeNames={shownTypeNames}
         licenseFilter={licenseFilter}
+        animationFilter={animationFilter}
         t={t}
         tl={tl}
         onPicked={(tn) => setExpanded(tn)}
@@ -128,6 +129,7 @@ export function StackPanel({
               tl={tl}
               t={t}
               licenseFilter={licenseFilter}
+              animationFilter={animationFilter}
               assetSource={assetSource}
               expanded={expanded === tn}
               onToggle={() => setExpanded(expanded === tn ? null : tn)}

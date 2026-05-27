@@ -11,6 +11,10 @@ import {
   itemMatchesLicenseFilter,
   type LicenseFilter,
 } from '../../../slice/license-filter';
+import {
+  itemMatchesAnimationFilter,
+  type AnimationFilter,
+} from '../../../slice/animation-filter';
 import type { SliceState } from '../../../slice/selection';
 import type { LabelTranslator, Translator } from '../../../i18n';
 
@@ -20,6 +24,7 @@ interface Props {
   catalog: Catalog;
   state: SliceState;
   licenseFilter: LicenseFilter;
+  animationFilter: AnimationFilter;
   t: Translator;
   tl: LabelTranslator;
 }
@@ -29,10 +34,11 @@ interface Row {
   item: ItemDefinition;
   effective: License;
   authors: string[];
-  incompatible: boolean;
+  licenseIncompatible: boolean;
+  animationIncompatible: boolean;
 }
 
-export function AttributionPopover({ open, setOpen, catalog, state, licenseFilter, t, tl }: Props) {
+export function AttributionPopover({ open, setOpen, catalog, state, licenseFilter, animationFilter, t, tl }: Props) {
   const { anchorRef, panelRef, pos } = usePopover(open, () => setOpen(false));
 
   const rows = useMemo<Row[]>(() => {
@@ -72,13 +78,14 @@ export function AttributionPopover({ open, setOpen, catalog, state, licenseFilte
         item,
         effective,
         authors: allAuthors,
-        incompatible: !itemMatchesLicenseFilter(item, licenseFilter),
+        licenseIncompatible: !itemMatchesLicenseFilter(item, licenseFilter),
+        animationIncompatible: !itemMatchesAnimationFilter(item, animationFilter),
       });
     }
     return out;
-  }, [catalog, state.selections, licenseFilter]);
+  }, [catalog, state.selections, licenseFilter, animationFilter]);
 
-  const incompatibleAny = rows.some((r) => r.incompatible);
+  const incompatibleAny = rows.some((r) => r.licenseIncompatible || r.animationIncompatible);
   const sourceCount = new Set(rows.map((r) => `${r.authors.join(',')}|${r.effective}`)).size;
 
   return (
@@ -108,13 +115,14 @@ export function AttributionPopover({ open, setOpen, catalog, state, licenseFilte
             {rows.map((r) => (
               <li
                 key={r.typeName}
-                className={`rounded border border-border bg-surface-2 px-2 py-1 ${r.incompatible ? 'border-danger text-danger' : ''}`}
+                className={`rounded border border-border bg-surface-2 px-2 py-1 ${(r.licenseIncompatible || r.animationIncompatible) ? 'border-danger text-danger' : ''}`}
               >
                 <div className="font-semibold">{tl.category(r.typeName)}</div>
                 <div className="font-mono text-[10px] text-text-mute">
                   {r.item.name} · {r.authors.join(', ') || '?'} · {r.effective}
                 </div>
-                {r.incompatible && <div className="text-[10px]">{t('attribution.licenseIncompatibleShort')}</div>}
+                {r.licenseIncompatible && <div className="text-[10px]">{t('attribution.licenseIncompatibleShort')}</div>}
+                {r.animationIncompatible && <div className="text-[10px]">{t('attribution.animationIncompatibleShort')}</div>}
               </li>
             ))}
           </ul>

@@ -292,6 +292,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
           catalog={props.catalog}
           state={props.state}
           licenseFilter={licenseFilter}
+          animationFilter={animationFilter}
           t={props.t}
           tl={props.tl}
         />

@@ -4,6 +4,7 @@ import { pickActionForItem, type SliceState, type SliceAction } from '../../slic
 import type { LabelTranslator, Translator } from '../../i18n';
 import { itemSupportsBodyType } from '../../slice/catalog-tree';
 import { itemMatchesLicenseFilter, type LicenseFilter } from '../../slice/license-filter';
+import { itemMatchesAnimationFilter, type AnimationFilter } from '../../slice/animation-filter';
 import { ColorPicker } from '../color-picker';
 import { ItemThumbnail } from './item-thumbnail';
 import type { AssetSource } from '../../adapter/asset-source';
@@ -17,12 +18,13 @@ interface Props {
   tl: LabelTranslator;
   t: Translator;
   licenseFilter: LicenseFilter;
+  animationFilter: AnimationFilter;
   assetSource: AssetSource;
   expanded: boolean;
   onToggle: () => void;
 }
 
-export function LayerRow({ typeName, catalog, palettes, state, dispatch, tl, t, licenseFilter, assetSource, expanded, onToggle }: Props) {
+export function LayerRow({ typeName, catalog, palettes, state, dispatch, tl, t, licenseFilter, animationFilter, assetSource, expanded, onToggle }: Props) {
   const selection = state.selections[typeName];
   if (!selection) return null;
 
@@ -122,8 +124,16 @@ export function LayerRow({ typeName, catalog, palettes, state, dispatch, tl, t, 
             <div className="grid grid-cols-[repeat(auto-fill,minmax(56px,1fr))] gap-1">
               {items.map((it) => {
                 const supports = itemSupportsBodyType(it, state.bodyType);
-                const exceeds = !itemMatchesLicenseFilter(it, licenseFilter);
+                const licenseExceeds = !itemMatchesLicenseFilter(it, licenseFilter);
+                const animExceeds = !itemMatchesAnimationFilter(it, animationFilter);
+                const exceeds = licenseExceeds || animExceeds;
                 const isSelected = it.name === item.name;
+                const exceedsTitle =
+                  licenseExceeds && animExceeds
+                    ? t('layer.bothIncompatibleTooltip')
+                    : licenseExceeds
+                      ? t('layer.licenseIncompatibleTooltip')
+                      : t('layer.animationIncompatibleTooltip');
                 return (
                   <button
                     key={it.name}
@@ -131,7 +141,7 @@ export function LayerRow({ typeName, catalog, palettes, state, dispatch, tl, t, 
                     disabled={!supports}
                     title={
                       !supports ? 'incompatible body type' :
-                      exceeds ? t('layer.licenseIncompatibleTooltip') :
+                      exceeds ? exceedsTitle :
                       it.name
                     }
                     onClick={() => dispatch(pickActionForItem(typeName, it))}
@@ -153,7 +163,7 @@ export function LayerRow({ typeName, catalog, palettes, state, dispatch, tl, t, 
                     />
                     <span className="max-w-full truncate">{it.name}</span>
                     {exceeds && supports && (
-                      <span className="absolute -top-1 -right-1 inline-flex h-3 w-3 items-center justify-center rounded-full bg-danger text-[8px] text-white" aria-label={t('layer.licenseIncompatibleTooltip')}>!</span>
+                      <span className="absolute -top-1 -right-1 inline-flex h-3 w-3 items-center justify-center rounded-full bg-danger text-[8px] text-white" aria-label={exceedsTitle}>!</span>
                     )}
                   </button>
                 );

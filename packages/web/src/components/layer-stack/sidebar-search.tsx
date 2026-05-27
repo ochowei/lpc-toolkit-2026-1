@@ -16,6 +16,7 @@ import { pickActionForItem, type SliceState, type SliceAction } from '../../slic
 import type { AssetSource } from '../../adapter/asset-source';
 import type { LabelTranslator, Translator } from '../../i18n';
 import { itemMatchesLicenseFilter, type LicenseFilter } from '../../slice/license-filter';
+import { itemMatchesAnimationFilter, type AnimationFilter } from '../../slice/animation-filter';
 import { filterAndRankPaletteItems, type PaletteResult } from './palette-search';
 import { ItemThumbnail } from './item-thumbnail';
 import {
@@ -33,6 +34,7 @@ interface Props {
   assetSource: AssetSource;
   shownTypeNames: TypeName[];
   licenseFilter: LicenseFilter;
+  animationFilter: AnimationFilter;
   t: Translator;
   tl: LabelTranslator;
   onPicked: (typeName: TypeName) => void;
@@ -47,6 +49,7 @@ export function SidebarSearch({
   assetSource,
   shownTypeNames,
   licenseFilter,
+  animationFilter,
   t,
   tl,
   onPicked,
@@ -176,18 +179,31 @@ export function SidebarSearch({
               </div>
             ) : (
               shown.map((r, i) => {
-                const matchesFilter = itemMatchesLicenseFilter(r.item, licenseFilter);
-                const exceeded = !matchesFilter;
+                const licenseExceeded = !itemMatchesLicenseFilter(r.item, licenseFilter);
+                const animExceeded = !itemMatchesAnimationFilter(r.item, animationFilter);
+                const exceeded = licenseExceeded || animExceeded;
                 const selected = state.selections[r.typeName]?.name === r.item.name;
                 const itemLicense = r.item.credits[0]?.licenses[0];
                 const isActive = i === activeIndex;
+                const exceededTitle =
+                  licenseExceeded && animExceeded
+                    ? t('layer.bothIncompatibleTooltip')
+                    : licenseExceeded
+                      ? t('layer.licenseIncompatibleTooltip')
+                      : t('layer.animationIncompatibleTooltip');
                 return (
                   <button
                     key={`${r.typeName}:${r.item.name}`}
                     ref={isActive ? activeRowRef : undefined}
                     type="button"
                     disabled={!r.supports}
-                    title={!r.supports ? t('palette.incompatible') : r.item.name}
+                    title={
+                      !r.supports
+                        ? t('palette.incompatible')
+                        : exceeded
+                          ? exceededTitle
+                          : r.item.name
+                    }
                     onMouseEnter={() => setActiveIndex(i)}
                     onClick={() => onPick(r)}
                     className={[
