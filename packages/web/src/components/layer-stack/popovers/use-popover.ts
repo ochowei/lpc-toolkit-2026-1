@@ -1,7 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 
-export function usePopover(open: boolean, onClose: () => void) {
-  const anchorRef = useRef<HTMLButtonElement | null>(null);
+export function usePopover(
+  open: boolean,
+  onClose: () => void,
+  externalAnchorRef?: RefObject<HTMLButtonElement>,
+) {
+  const internalAnchorRef = useRef<HTMLButtonElement>(null);
+  const anchorRef = externalAnchorRef ?? internalAnchorRef;
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
 
