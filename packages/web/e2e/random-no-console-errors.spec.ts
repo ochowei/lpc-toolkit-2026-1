@@ -26,7 +26,7 @@ test('clicking random 20 times produces no console errors', async ({ page }) => 
       )
       .join('\n');
     throw new Error(
-      `Captured ${errors.length} console error(s) during 20 random clicks:\n${report}`,
+      `Captured ${errors.length} console error(s) during ${RANDOM_CLICKS} random clicks:\n${report}`,
     );
   }
 });
