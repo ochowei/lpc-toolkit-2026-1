@@ -1,6 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ItemDefinition } from '@lpc-toolkit/core';
 import {
+  __resetCatalogWarningOnceForTests,
+  emitCatalogWarningsOnce,
   normalizeUpstreamKey,
   recordsToCatalog,
 } from '../src/catalog/load-catalog';
@@ -34,5 +36,57 @@ describe('normalizeUpstreamKey', () => {
 
   it('returns the path unchanged when the upstream prefix is absent', () => {
     expect(normalizeUpstreamKey('headwear/hat.json')).toBe('headwear/hat.json');
+  });
+});
+
+describe('emitCatalogWarningsOnce', () => {
+  beforeEach(() => {
+    __resetCatalogWarningOnceForTests();
+  });
+
+  const w = (path: string, message: string) => ({ path, message }) as const;
+
+  it('emits one console.warn with the count and the array when first called', () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warnings = [w('a.json', 'bad x'), w('b.json', 'bad y')] as const;
+
+    emitCatalogWarningsOnce(warnings);
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith('[catalog] 2 load warning(s)', warnings);
+    spy.mockRestore();
+  });
+
+  it('does not emit on subsequent calls within the same module load', () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    emitCatalogWarningsOnce([w('a.json', 'x')] as const);
+    emitCatalogWarningsOnce([w('b.json', 'y')] as const);
+    emitCatalogWarningsOnce([w('c.json', 'z')] as const);
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+  });
+
+  it('does not emit when given an empty warnings list', () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    emitCatalogWarningsOnce([]);
+
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('emits after __resetCatalogWarningOnceForTests is called', () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    emitCatalogWarningsOnce([w('a.json', 'x')] as const);
+    expect(spy).toHaveBeenCalledTimes(1);
+
+    __resetCatalogWarningOnceForTests();
+    emitCatalogWarningsOnce([w('b.json', 'y')] as const);
+
+    expect(spy).toHaveBeenCalledTimes(2);
+    spy.mockRestore();
   });
 });

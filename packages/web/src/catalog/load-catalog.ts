@@ -1,6 +1,7 @@
 import {
   createCatalog,
   type Catalog,
+  type CatalogLoadWarning,
   type CreateCatalogResult,
   type FilePath,
   type ItemDefinition,
@@ -20,6 +21,25 @@ const UPSTREAM_PREFIX = 'upstream/sheet_definitions/';
 export function normalizeUpstreamKey(key: string): string {
   const idx = key.lastIndexOf(UPSTREAM_PREFIX);
   return idx >= 0 ? key.slice(idx + UPSTREAM_PREFIX.length) : key;
+}
+
+// Module-level gate: React StrictMode mounts → unmounts → re-mounts the App
+// in dev, calling `loadCatalogFromUpstream` twice with identical results.
+// Emit upstream data-quality warnings once per session; HMR replacing this
+// module naturally resets the flag.
+let warningsEmitted = false;
+
+export function emitCatalogWarningsOnce(
+  warnings: readonly CatalogLoadWarning[],
+): void {
+  if (warnings.length === 0 || warningsEmitted) return;
+  console.warn(`[catalog] ${warnings.length} load warning(s)`, warnings);
+  warningsEmitted = true;
+}
+
+/** Test-only hook to reset the emit-once gate between specs. */
+export function __resetCatalogWarningOnceForTests(): void {
+  warningsEmitted = false;
 }
 
 /**
@@ -48,9 +68,7 @@ export function loadCatalogFromUpstream(): Catalog {
   }
 
   const { catalog, warnings } = recordsToCatalog(records);
-  if (warnings.length > 0) {
-    console.warn(`[catalog] ${warnings.length} load warning(s)`, warnings);
-  }
+  emitCatalogWarningsOnce(warnings);
   if (catalog.typeNames.length === 0) {
     throw new Error('Catalog is empty after ingest (all records invalid).');
   }
