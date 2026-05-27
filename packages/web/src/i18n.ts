@@ -140,6 +140,19 @@ export const TRANSLATIONS = {
     'layer.animationIncompatibleTooltip': 'Lacks the enabled animations',
     'layer.bothIncompatibleTooltip': 'License & animation filter mismatch',
     'palette.licenseGroupsBadge': '{n}/5 license groups',
+    'advancedTools.title': 'Advanced Tools',
+    'advancedTools.customUpload': 'Custom spritesheet image',
+    'advancedTools.acceptedSize': 'Accepted size: 832x3456',
+    'advancedTools.zPosition': 'Z-position',
+    'advancedTools.layerHints':
+      'Layer order: 0=shadow, 10=body, 70=arms, 110=beard',
+    'advancedTools.clear': 'Clear Custom Image',
+    'advancedTools.userProvidedNotice':
+      'User-provided image is included in image exports but not upstream credits.',
+    'advancedTools.invalidSize':
+      'Custom image must be 832x3456; got {width}x{height}.',
+    'advancedTools.loaded': 'Loaded custom image: {name}',
+    'advancedTools.cleared': 'Cleared custom image',
   },
   'zh-TW': {
     'app.subtitle': '基礎切片',
@@ -277,6 +290,17 @@ export const TRANSLATIONS = {
     'layer.animationIncompatibleTooltip': '不包含啟用的動畫',
     'layer.bothIncompatibleTooltip': '授權與動畫過濾皆不相容',
     'palette.licenseGroupsBadge': '{n}/5 個授權群組',
+    'advancedTools.title': '進階工具',
+    'advancedTools.customUpload': '自訂 spritesheet 圖片',
+    'advancedTools.acceptedSize': '接受尺寸:832x3456',
+    'advancedTools.zPosition': 'Z 位置',
+    'advancedTools.layerHints': '圖層順序:0=陰影,10=身體,70=手臂,110=鬍鬚',
+    'advancedTools.clear': '清除自訂圖片',
+    'advancedTools.userProvidedNotice':
+      '使用者提供的圖片會包含在圖片匯出中,但不會加入上游 credits。',
+    'advancedTools.invalidSize': '自訂圖片必須是 832x3456;目前為 {width}x{height}。',
+    'advancedTools.loaded': '已載入自訂圖片:{name}',
+    'advancedTools.cleared': '已清除自訂圖片',
   },
 } as const;
 
