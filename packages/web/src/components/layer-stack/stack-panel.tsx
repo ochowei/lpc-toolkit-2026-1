@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type RefObject } from 'react';
 import type { Catalog, LicenseGroup, PaletteMetadata, TypeName } from '@lpc-toolkit/core';
 import type { SliceState, SliceAction } from '../../slice/selection';
 import type { Translator, LabelTranslator } from '../../i18n';
@@ -9,6 +9,7 @@ import { AddLayer } from './add-layer';
 import { PresetChips } from './preset-chips';
 import { StatusToast } from './status-toast';
 import { SettingsCollapsible } from './settings-collapsible';
+import { SidebarSearch } from './sidebar-search';
 
 interface Props {
   catalog: Catalog;
@@ -26,7 +27,7 @@ interface Props {
   tl: LabelTranslator;
   onPresetApplied: (name: string, skippedCount: number, skippedTypes: string[]) => void;
   status: { kind: 'info' | 'warn' | 'error'; text: string } | null;
-  onOpenPalette: () => void;
+  searchInputRef: RefObject<HTMLInputElement>;
   expanded: TypeName | null;
   setExpanded: (v: TypeName | null) => void;
 }
@@ -47,7 +48,7 @@ export function StackPanel({
   tl,
   onPresetApplied,
   status,
-  onOpenPalette,
+  searchInputRef,
   expanded,
   setExpanded,
 }: Props) {
@@ -70,6 +71,19 @@ export function StackPanel({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      <SidebarSearch
+        catalog={catalog}
+        palettes={palettes}
+        state={state}
+        dispatch={dispatch}
+        assetSource={assetSource}
+        shownTypeNames={shownTypeNames}
+        licenseFilter={licenseFilter}
+        t={t}
+        tl={tl}
+        onPicked={(tn) => setExpanded(tn)}
+        inputRef={searchInputRef}
+      />
       <PresetChips
         catalog={catalog}
         state={state}
@@ -123,7 +137,6 @@ export function StackPanel({
           adding={adding}
           setAdding={setAdding}
           onAdded={(tn) => setExpanded(tn)}
-          onOpenPalette={onOpenPalette}
         />
       </div>
 
