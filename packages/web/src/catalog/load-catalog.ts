@@ -37,8 +37,13 @@ export function emitCatalogWarningsOnce(
   warningsEmitted = true;
 }
 
-/** Test-only hook to reset the emit-once gate between specs. */
+/**
+ * Test-only hook to reset the emit-once gate between specs. Body is
+ * dead-code-eliminated in production builds (Vite statically replaces
+ * `process.env.NODE_ENV`).
+ */
 export function __resetCatalogWarningOnceForTests(): void {
+  if (process.env.NODE_ENV === 'production') return;
   warningsEmitted = false;
 }
 
