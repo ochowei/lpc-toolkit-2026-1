@@ -1,4 +1,4 @@
-import { SHEET_HEIGHT, SHEET_WIDTH } from '@lpc-toolkit/core';
+import { SHEET_HEIGHT, SHEET_WIDTH, type ImageLike } from '@lpc-toolkit/core';
 
 export const CUSTOM_OVERLAY_WIDTH = SHEET_WIDTH;
 export const CUSTOM_OVERLAY_HEIGHT = SHEET_HEIGHT;
@@ -6,7 +6,7 @@ export const CUSTOM_OVERLAY_HEIGHT = SHEET_HEIGHT;
 export interface CustomOverlay {
   readonly fileName: string;
   readonly objectUrl: string;
-  readonly image: CanvasImageSource;
+  readonly image: ImageLike;
   readonly width: number;
   readonly height: number;
   readonly zPos: number;

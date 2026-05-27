@@ -10,6 +10,7 @@ import {
 } from '@lpc-toolkit/core';
 import { createBrowserCanvasAdapter } from '../adapter/browser-canvas-adapter';
 import type { AssetSource } from '../adapter/asset-source';
+import type { CustomOverlay } from '../lib/custom-overlay';
 import { toSelections, type SliceState } from '../slice/selection';
 
 export interface ComposedResult {
@@ -46,6 +47,7 @@ export function useComposedCharacter(
   state: SliceState,
   assetSource: AssetSource,
   reloadCounter: number = 0,
+  customOverlay: CustomOverlay | null = null,
 ): ComposedResult {
   const adapter = useMemo(
     () => createBrowserCanvasAdapter(assetSource),
@@ -63,7 +65,18 @@ export function useComposedCharacter(
   const animRef = useRef(state.anim);
   animRef.current = state.anim;
 
-  const key = JSON.stringify({ b: state.bodyType, s: state.selections, r: reloadCounter });
+  const key = JSON.stringify({
+    b: state.bodyType,
+    s: state.selections,
+    r: reloadCounter,
+    custom: customOverlay
+      ? {
+          fileName: customOverlay.fileName,
+          objectUrl: customOverlay.objectUrl,
+          zPos: customOverlay.zPos,
+        }
+      : null,
+  });
 
   useEffect(() => {
     const reqId = ++reqIdRef.current;
@@ -75,6 +88,13 @@ export function useComposedCharacter(
       adapter,
       spritesheetsBaseUrl: '',
       resolvePalette: makeResolvePalette(catalog, palettes, selections),
+      ...(customOverlay
+        ? {
+            extraStandardLayers: [
+              { image: customOverlay.image, zPos: customOverlay.zPos },
+            ],
+          }
+        : {}),
       onProgress: (loaded, total) => {
         if (reqId !== reqIdRef.current) return;
         setResult((r) => ({
@@ -110,7 +130,8 @@ export function useComposedCharacter(
           error: e instanceof Error ? e.message : String(e),
         });
       });
-    // key encodes the selection-relevant state (anim handled by Effect 2).
+    // key encodes the selection-relevant state and custom overlay identity
+    // (anim handled by Effect 2).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adapter, catalog, palettes, key]);
 

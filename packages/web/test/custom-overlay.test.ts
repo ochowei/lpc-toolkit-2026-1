@@ -14,7 +14,7 @@ function makeOverlay(zPos = 70): CustomOverlay {
   return {
     fileName: 'Cape Test.png',
     objectUrl: 'blob:test',
-    image: image as unknown as CanvasImageSource,
+    image: image as unknown as CustomOverlay['image'],
     width: CUSTOM_OVERLAY_WIDTH,
     height: CUSTOM_OVERLAY_HEIGHT,
     zPos,
