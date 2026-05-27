@@ -8,7 +8,6 @@ import {
   type SliceAction,
   type SliceState,
 } from '../../slice/selection';
-import type { Catalog } from '@lpc-toolkit/core';
 import { Button } from '../ui/button';
 import type { Translator } from '../../i18n';
 import {
@@ -40,7 +39,6 @@ export interface FullSheetUiActions {
 }
 
 interface Props {
-  catalog: Catalog;
   state: SliceState;
   dispatch: (a: SliceAction) => void;
   t: Translator;
@@ -50,7 +48,6 @@ interface Props {
 }
 
 export function PreviewPane({
-  catalog: _catalog,
   state,
   dispatch,
   t,

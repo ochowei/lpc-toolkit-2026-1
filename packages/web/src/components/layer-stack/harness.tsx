@@ -444,7 +444,6 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
         </aside>
         <main className="min-h-0 overflow-hidden bg-app">
           <PreviewPane
-            catalog={props.catalog}
             state={props.state}
             dispatch={props.dispatch}
             t={t}
