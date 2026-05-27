@@ -19,6 +19,42 @@ export function resolveSpriteUrl(path: string, baseHref: string): string {
   return resolveLocalSpriteUrl(path, baseHref);
 }
 
+// Chromium enforces a per-origin HTTP/1.1 limit of 6 simultaneous connections.
+// In Vite dev (HTTP/1.1) a random-outfit render fires hundreds of `fetch()`
+// calls; without a throttle the excess get `net::ERR_INSUFFICIENT_RESOURCES`.
+// Production runs over HTTP/2 multiplexing where this limit is irrelevant.
+const FETCH_CONCURRENCY = 6;
+
+interface FetchSemaphore {
+  acquire(): Promise<() => void>;
+}
+
+export function createFetchSemaphore(limit: number): FetchSemaphore {
+  let active = 0;
+  const queue: Array<() => void> = [];
+  return {
+    async acquire(): Promise<() => void> {
+      if (active >= limit) {
+        await new Promise<void>((resolve) => queue.push(resolve));
+        // Slot ownership transferred to us by the releaser; active stays the same.
+      } else {
+        active++;
+      }
+      return () => {
+        const next = queue.shift();
+        if (next) {
+          next();
+          // Slot ownership transferred to the next waiter; active stays the same.
+        } else {
+          active--;
+        }
+      };
+    },
+  };
+}
+
+const sharedFetchSemaphore = createFetchSemaphore(FETCH_CONCURRENCY);
+
 export function createBrowserCanvasAdapter(
   source: AssetSource = 'local',
 ): CanvasAdapter {
@@ -34,6 +70,7 @@ export function createBrowserCanvasAdapter(
       const errors: string[] = [];
 
       for (const url of urls) {
+        const release = await sharedFetchSemaphore.acquire();
         try {
           const res = await fetch(url);
           if (!res.ok) {
@@ -45,6 +82,8 @@ export function createBrowserCanvasAdapter(
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           errors.push(`${url}: ${message}`);
+        } finally {
+          release();
         }
       }
 
