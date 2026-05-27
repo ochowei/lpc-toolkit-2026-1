@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, type RefObject } from 'react';
 import {
   computeEffectiveLicense,
   type Catalog,
@@ -17,6 +17,7 @@ import {
 } from '../../../slice/animation-filter';
 import type { SliceState } from '../../../slice/selection';
 import type { LabelTranslator, Translator } from '../../../i18n';
+import { summarizeAttribution } from './attribution-summary';
 
 interface Props {
   open: boolean;
@@ -27,6 +28,8 @@ interface Props {
   animationFilter: AnimationFilter;
   t: Translator;
   tl: LabelTranslator;
+  /** When provided, the popover renders panel-only (no built-in trigger). */
+  anchorRef?: RefObject<HTMLButtonElement>;
 }
 
 interface Row {
@@ -38,8 +41,18 @@ interface Row {
   animationIncompatible: boolean;
 }
 
-export function AttributionPopover({ open, setOpen, catalog, state, licenseFilter, animationFilter, t, tl }: Props) {
-  const { anchorRef, panelRef, pos } = usePopover(open, () => setOpen(false));
+export function AttributionPopover({
+  open,
+  setOpen,
+  catalog,
+  state,
+  licenseFilter,
+  animationFilter,
+  t,
+  tl,
+  anchorRef: externalAnchorRef,
+}: Props) {
+  const { anchorRef, panelRef, pos } = usePopover(open, () => setOpen(false), externalAnchorRef);
 
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
@@ -47,7 +60,6 @@ export function AttributionPopover({ open, setOpen, catalog, state, licenseFilte
       const item = (catalog.byTypeName.get(tn) ?? []).find((d) => d.name === sel.name);
       if (!item) continue;
 
-      // Build a CreditsManifest from the item's credit entries
       const allLicenses: License[] = [];
       const seenLicenses = new Set<License>();
       const allAuthors: string[] = [];
@@ -68,7 +80,6 @@ export function AttributionPopover({ open, setOpen, catalog, state, licenseFilte
         }
       }
 
-      // Skip items with no license info
       if (allLicenses.length === 0) continue;
 
       const manifest = { entries: item.credits, licenses: allLicenses, resolvedPaths: [] };
@@ -85,20 +96,25 @@ export function AttributionPopover({ open, setOpen, catalog, state, licenseFilte
     return out;
   }, [catalog, state.selections, licenseFilter, animationFilter]);
 
-  const incompatibleAny = rows.some((r) => r.licenseIncompatible || r.animationIncompatible);
-  const sourceCount = new Set(rows.map((r) => `${r.authors.join(',')}|${r.effective}`)).size;
+  const summary = useMemo(
+    () => summarizeAttribution(catalog, state, licenseFilter, animationFilter),
+    [catalog, state, licenseFilter, animationFilter],
+  );
 
   return (
     <>
-      <Button
-        ref={anchorRef}
-        size="sm"
-        variant={incompatibleAny ? 'primary' : 'default'}
-        className={incompatibleAny ? 'border-danger text-danger' : ''}
-        onClick={() => setOpen(!open)}
-      >
-        {incompatibleAny ? '⚠ ' : '© '}{t('attribution.title')} · {sourceCount}
-      </Button>
+      {!externalAnchorRef && (
+        <Button
+          ref={anchorRef}
+          size="sm"
+          variant={summary.incompatibleAny ? 'primary' : 'default'}
+          className={summary.incompatibleAny ? 'border-danger text-danger' : ''}
+          onClick={() => setOpen(!open)}
+        >
+          {summary.incompatibleAny ? '⚠ ' : '© '}
+          {t('attribution.title')} · {summary.sourceCount}
+        </Button>
+      )}
       {open && pos && (
         <div
           ref={panelRef}
@@ -115,14 +131,20 @@ export function AttributionPopover({ open, setOpen, catalog, state, licenseFilte
             {rows.map((r) => (
               <li
                 key={r.typeName}
-                className={`rounded border border-border bg-surface-2 px-2 py-1 ${(r.licenseIncompatible || r.animationIncompatible) ? 'border-danger text-danger' : ''}`}
+                className={`rounded border border-border bg-surface-2 px-2 py-1 ${
+                  r.licenseIncompatible || r.animationIncompatible ? 'border-danger text-danger' : ''
+                }`}
               >
                 <div className="font-semibold">{tl.category(r.typeName)}</div>
                 <div className="font-mono text-[10px] text-text-mute">
                   {r.item.name} · {r.authors.join(', ') || '?'} · {r.effective}
                 </div>
-                {r.licenseIncompatible && <div className="text-[10px]">{t('attribution.licenseIncompatibleShort')}</div>}
-                {r.animationIncompatible && <div className="text-[10px]">{t('attribution.animationIncompatibleShort')}</div>}
+                {r.licenseIncompatible && (
+                  <div className="text-[10px]">{t('attribution.licenseIncompatibleShort')}</div>
+                )}
+                {r.animationIncompatible && (
+                  <div className="text-[10px]">{t('attribution.animationIncompatibleShort')}</div>
+                )}
               </li>
             ))}
           </ul>
