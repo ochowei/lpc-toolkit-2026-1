@@ -36,6 +36,8 @@ import { TokenPopover } from './popovers/token-popover';
 import { ResetMenuPopover } from './popovers/reset-menu-popover';
 import { AttributionPopover } from './popovers/attribution-popover';
 import { DownloadPopover } from './popovers/download-popover';
+import { MoreMenuPopover } from './popovers/more-menu-popover';
+import { summarizeAttribution } from './popovers/attribution-summary';
 import { cacheClear } from '../../hooks/thumbnail-cache';
 import { useComposedCharacter } from '../../hooks/use-composed-character';
 import { Button } from '../ui/button';
@@ -73,8 +75,9 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     () => new Set<AnimationName>(),
   );
   const [status, setStatus] = useState<{ kind: 'info' | 'warn' | 'error'; text: string } | null>(null);
-  const [popover, setPopover] = useState<null | 'bodyType' | 'token' | 'reset' | 'attribution' | 'download'>(null);
+  const [popover, setPopover] = useState<null | 'bodyType' | 'token' | 'reset' | 'attribution' | 'download' | 'more'>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const moreMenuAnchorRef = useRef<HTMLButtonElement>(null);
   const [expanded, setExpanded] = useState<TypeName | null>(null);
   const [reloadCounter, setReloadCounter] = useState(0);
   const [fullSheetOpen, setFullSheetOpen] = useState(false);
@@ -141,6 +144,11 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
       text: t('animationFilter.removed').replace('{n}', String(animationIncompatibleTypeNames.length)),
     });
   }, [animationIncompatibleTypeNames, props.dispatch, t]);
+
+  const attributionSummary = useMemo(
+    () => summarizeAttribution(props.catalog, props.state, licenseFilter, animationFilter),
+    [props.catalog, props.state.selections, licenseFilter, animationFilter],
+  );
 
   const composeSingleItem = useCallback(
     async (singleSelections: Selections) => {
@@ -305,11 +313,22 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-app text-text">
       <TopBar
         t={t}
-        theme={theme}
-        locale={locale}
         loadingProgress={loadingProgress}
-        onToggleTheme={onToggleTheme}
-        onToggleLocale={onToggleLocale}
+        rightSlot={
+          <MoreMenuPopover
+            open={popover === 'more'}
+            setOpen={(v) => setPopover(v ? 'more' : null)}
+            t={props.t}
+            locale={locale}
+            theme={theme}
+            attributionCount={attributionSummary.sourceCount}
+            attributionIncompatible={attributionSummary.incompatibleAny}
+            onSelect={(target) => setPopover(target)}
+            onToggleLocale={onToggleLocale}
+            onToggleTheme={onToggleTheme}
+            anchorRefOut={moreMenuAnchorRef}
+          />
+        }
       >
         <BodyTypePopover
           open={popover === 'bodyType'}
@@ -334,6 +353,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
           catalog={props.catalog}
           t={props.t}
           onStatus={(text) => setStatus({ kind: 'info', text })}
+          anchorRef={moreMenuAnchorRef}
         />
         <ResetMenuPopover
           open={popover === 'reset'}
@@ -352,6 +372,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
             }
             setStatus({ kind: 'info', text: 'Reset ✓' });
           }}
+          anchorRef={moreMenuAnchorRef}
         />
         <AttributionPopover
           open={popover === 'attribution'}
@@ -362,6 +383,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
           animationFilter={animationFilter}
           t={props.t}
           tl={props.tl}
+          anchorRef={moreMenuAnchorRef}
         />
         <DownloadPopover
           open={popover === 'download'}

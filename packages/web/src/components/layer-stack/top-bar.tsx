@@ -1,23 +1,16 @@
-import type { PropsWithChildren } from 'react';
-import { Button } from '../ui/button';
+import type { PropsWithChildren, ReactNode } from 'react';
 import type { Translator } from '../../i18n';
 
 interface Props {
   t: Translator;
-  theme: 'dark' | 'light';
-  locale: 'en' | 'zh-TW';
   loadingProgress: number | null;
-  onToggleTheme: () => void;
-  onToggleLocale: () => void;
+  rightSlot?: ReactNode;
 }
 
 export function TopBar({
   t,
-  theme,
-  locale,
   loadingProgress,
-  onToggleTheme,
-  onToggleLocale,
+  rightSlot,
   children,
 }: PropsWithChildren<Props>) {
   return (
@@ -46,12 +39,7 @@ export function TopBar({
           {t('status.loading')} {Math.round(loadingProgress * 100)}%
         </span>
       )}
-      <Button size="sm" variant="ghost" onClick={onToggleLocale}>
-        {locale === 'en' ? '中文' : 'EN'}
-      </Button>
-      <Button size="sm" variant="ghost" onClick={onToggleTheme} aria-label="toggle theme">
-        {theme === 'dark' ? '☀' : '☾'}
-      </Button>
+      {rightSlot}
     </header>
   );
 }
