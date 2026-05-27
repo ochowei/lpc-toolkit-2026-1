@@ -31,6 +31,20 @@ export function readWindowHash(): string {
 }
 
 /**
+ * Serialize `state` to its hash form, but collapse to `''` whenever the
+ * result equals `defaultsHash`. The bootstrap reads empty hash as
+ * "use defaults", so symmetrising the write side keeps the URL clean
+ * when the user is at the default outfit (e.g. after Reset).
+ */
+export function effectiveHash(
+  state: SliceState,
+  defaultsHash: string,
+): string {
+  const s = serializeHash(toSelections(state));
+  return s === defaultsHash ? '' : s;
+}
+
+/**
  * Compute the initial SliceState given the URL hash and the defaults the
  * app would otherwise use. Pure; caller is responsible for reading
  * `window.location.hash`.
@@ -122,6 +136,7 @@ export function computeHashChangeAction(args: {
  */
 export function useUrlHashSync(args: {
   state: SliceState;
+  defaults: SliceState;
   dispatch: (a: SliceAction) => void;
   catalog: Catalog;
   palettes: PaletteMetadata;
@@ -132,6 +147,8 @@ export function useUrlHashSync(args: {
   const stateRef = useRef(args.state);
   const onStatusRef = useRef(args.onStatus);
   const tRef = useRef(args.t);
+  const defaultsHash = serializeHash(toSelections(args.defaults));
+  const defaultsHashRef = useRef(defaultsHash);
   useEffect(() => {
     stateRef.current = args.state;
   }, [args.state]);
@@ -141,10 +158,13 @@ export function useUrlHashSync(args: {
   useEffect(() => {
     tRef.current = args.t;
   }, [args.t]);
+  useEffect(() => {
+    defaultsHashRef.current = defaultsHash;
+  }, [defaultsHash]);
 
   // Write effect: state → hash.
   useEffect(() => {
-    const nextHash = serializeHash(toSelections(args.state));
+    const nextHash = effectiveHash(args.state, defaultsHash);
     const action = computeHashWrite({
       currentHash: readWindowHash(),
       nextHash,
@@ -152,13 +172,16 @@ export function useUrlHashSync(args: {
     });
     isFirstWriteRef.current = false;
     if (action === null) return;
-    const target = '#' + nextHash;
+    const target =
+      nextHash === ''
+        ? window.location.pathname + window.location.search
+        : '#' + nextHash;
     if (action === 'replace') {
       window.history.replaceState(null, '', target);
     } else {
       window.history.pushState(null, '', target);
     }
-  }, [args.state.bodyType, args.state.selections]);
+  }, [args.state.bodyType, args.state.selections, defaultsHash]);
 
   // Listen for external hash changes (back/forward, manual edit).
   useEffect(() => {
@@ -174,9 +197,13 @@ export function useUrlHashSync(args: {
       // If nothing resolved, don't wipe the current outfit; just normalize
       // the URL back to the current canonical form so junk doesn't linger.
       if (Object.keys(action.selections.items).length === 0) {
-        const canonical = serializeHash(toSelections(stateRef.current));
+        const canonical = effectiveHash(stateRef.current, defaultsHashRef.current);
         if (canonical !== readWindowHash()) {
-          window.history.replaceState(null, '', '#' + canonical);
+          const target =
+            canonical === ''
+              ? window.location.pathname + window.location.search
+              : '#' + canonical;
+          window.history.replaceState(null, '', target);
         }
         if (action.warnings.length > 0) {
           onStatusRef.current(

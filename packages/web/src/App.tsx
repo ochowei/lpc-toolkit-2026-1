@@ -43,6 +43,7 @@ export default function App() {
       catalog,
       palettes,
       state: boot.state,
+      defaults: defaults.state,
       warnings: boot.warnings,
       shownTypeNames: defaults.shownTypeNames,
     };
@@ -53,7 +54,7 @@ export default function App() {
   const [state, dispatch] = useReducer(sliceReducer, init.state);
 
   const handleReset = (scopes: { outfit: boolean; view: boolean }) => {
-    dispatch({ type: 'reset', scopes, init: init.state });
+    dispatch({ type: 'reset', scopes, init: init.defaults });
   };
 
   document.documentElement.className = `lpc ${theme}`;
@@ -87,6 +88,7 @@ export default function App() {
       palettes={init.palettes}
       shownTypeNames={init.shownTypeNames}
       initialHashWarnings={init.warnings}
+      defaults={init.defaults}
       state={state}
       dispatch={dispatch}
       theme={theme}

@@ -55,6 +55,7 @@ export interface LayerStackHarnessProps {
   palettes: PaletteMetadata;
   shownTypeNames: string[];
   initialHashWarnings: readonly HashWarning[];
+  defaults: SliceState;
   state: SliceState;
   dispatch: (a: SliceAction) => void;
   theme: 'dark' | 'light';
@@ -276,6 +277,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
 
   useUrlHashSync({
     state: props.state,
+    defaults: props.defaults,
     dispatch: props.dispatch,
     catalog: props.catalog,
     palettes: props.palettes,

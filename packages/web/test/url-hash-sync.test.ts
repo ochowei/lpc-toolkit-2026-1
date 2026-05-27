@@ -4,6 +4,7 @@ import {
   bootstrapStateFromHash,
   computeHashChangeAction,
   computeHashWrite,
+  effectiveHash,
 } from '../src/lib/url-hash-sync';
 import { loadCatalogFromUpstream } from '../src/catalog/load-catalog';
 import { loadPalettesFromUpstream } from '../src/catalog/load-palettes';
@@ -107,6 +108,25 @@ describe('computeHashWrite', () => {
         isFirstWrite: true,
       }),
     ).toBe(null);
+  });
+});
+
+describe('effectiveHash', () => {
+  it('returns empty string when state matches defaults', () => {
+    expect(effectiveHash(defaults, defaultsHash)).toBe('');
+  });
+
+  it('returns serialized hash when state differs from defaults', () => {
+    const modified = {
+      ...defaults,
+      selections: {
+        ...defaults.selections,
+        body: { typeName: 'body', name: 'Body Color', recolor: 'dark' },
+      },
+    };
+    const result = effectiveHash(modified, defaultsHash);
+    expect(result).not.toBe('');
+    expect(result).toContain('body=');
   });
 });
 
