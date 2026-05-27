@@ -177,4 +177,61 @@ describe('createBrowserCanvasAdapter', () => {
       vi.unstubAllGlobals();
     }
   });
+
+  it('shares the concurrency limit across adapter instances', async () => {
+    let active = 0;
+    let peakActive = 0;
+    const totalRequests = 20;
+    const releaseControllers: Array<() => void> = [];
+
+    const blob = new Blob(['image']);
+    const bitmap = { width: 1, height: 1 };
+    const documentStub = { baseURI: 'http://x/' } satisfies Pick<
+      Document,
+      'baseURI'
+    >;
+
+    const fetchMock = vi.fn<(url: string) => Promise<Response>>().mockImplementation(
+      async () => {
+        active++;
+        if (active > peakActive) peakActive = active;
+        await new Promise<void>((resolve) => releaseControllers.push(resolve));
+        active--;
+        return new Response(blob);
+      },
+    );
+    const createImageBitmapMock = vi
+      .fn<(image: Blob) => Promise<ImageBitmap>>()
+      .mockResolvedValue(bitmap as ImageBitmap);
+
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('createImageBitmap', createImageBitmapMock);
+    vi.stubGlobal('document', documentStub);
+
+    try {
+      const adapters = Array.from({ length: totalRequests }, () =>
+        createBrowserCanvasAdapter('local'),
+      );
+      const pending = adapters.map((adapter, i) =>
+        adapter.loadImage(`spritesheets/img-${i}.png`),
+      );
+      await new Promise<void>((resolve) => setTimeout(resolve, 10));
+
+      expect(peakActive).toBeLessThanOrEqual(6);
+      expect(peakActive).toBeGreaterThan(0);
+      expect(releaseControllers.length).toBeLessThanOrEqual(6);
+
+      while (releaseControllers.length > 0) {
+        const next = releaseControllers.shift();
+        if (next) next();
+        await new Promise<void>((resolve) => setTimeout(resolve, 1));
+      }
+      await Promise.all(pending);
+
+      expect(fetchMock).toHaveBeenCalledTimes(totalRequests);
+      expect(peakActive).toBeLessThanOrEqual(6);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });

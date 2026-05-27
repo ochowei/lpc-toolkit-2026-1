@@ -53,11 +53,11 @@ export function createFetchSemaphore(limit: number): FetchSemaphore {
   };
 }
 
+const sharedFetchSemaphore = createFetchSemaphore(FETCH_CONCURRENCY);
+
 export function createBrowserCanvasAdapter(
   source: AssetSource = 'local',
 ): CanvasAdapter {
-  const semaphore = createFetchSemaphore(FETCH_CONCURRENCY);
-
   return {
     createCanvas(width: number, height: number): CanvasLike {
       const c = document.createElement('canvas');
@@ -70,7 +70,7 @@ export function createBrowserCanvasAdapter(
       const errors: string[] = [];
 
       for (const url of urls) {
-        const release = await semaphore.acquire();
+        const release = await sharedFetchSemaphore.acquire();
         try {
           const res = await fetch(url);
           if (!res.ok) {

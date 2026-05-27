@@ -14,3 +14,10 @@ export function assetSourceFromUrl(search: string): AssetSource | undefined {
     ? (value as AssetSource)
     : undefined;
 }
+
+export function defaultAssetSourceFromUrl(
+  search: string,
+  isDev: boolean,
+): AssetSource {
+  return assetSourceFromUrl(search) ?? (isDev ? 'local' : 'auto');
+}
