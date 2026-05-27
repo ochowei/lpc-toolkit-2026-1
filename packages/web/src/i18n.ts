@@ -153,6 +153,10 @@ export const TRANSLATIONS = {
       'Custom image must be 832x3456; got {width}x{height}.',
     'advancedTools.loaded': 'Loaded custom image: {name}',
     'advancedTools.cleared': 'Cleared custom image',
+    'more.title': 'More',
+    'more.preferences': 'Preferences',
+    'more.language': 'Language',
+    'more.theme': 'Theme',
   },
   'zh-TW': {
     'app.subtitle': '基礎切片',
@@ -301,6 +305,10 @@ export const TRANSLATIONS = {
     'advancedTools.invalidSize': '自訂圖片必須是 832x3456;目前為 {width}x{height}。',
     'advancedTools.loaded': '已載入自訂圖片:{name}',
     'advancedTools.cleared': '已清除自訂圖片',
+    'more.title': '更多',
+    'more.preferences': '偏好',
+    'more.language': '語言',
+    'more.theme': '主題',
   },
 } as const;
 
