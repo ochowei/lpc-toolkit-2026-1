@@ -229,7 +229,7 @@ export function pickInitialSelections(catalog: Catalog): {
   // Show every catalog type the user can theoretically pick. COMMON_TYPE_ORDER
   // goes first to preserve the head-to-toe display order in the active-layer
   // list; remaining types follow in CATEGORY_GROUPS declaration order so they
-  // appear under the right super-group in AddLayer / AdvancedPalette.
+  // appear under the right super-group in AddLayer / SidebarSearch.
   const seen = new Set<TypeName>();
   const shownTypeNames: TypeName[] = [];
   for (const tn of [
