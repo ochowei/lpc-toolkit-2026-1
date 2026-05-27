@@ -113,4 +113,68 @@ describe('createBrowserCanvasAdapter', () => {
       vi.unstubAllGlobals();
     }
   });
+
+  it('keeps the concurrency limit when auto mode falls back through 404s', async () => {
+    let active = 0;
+    let peakActive = 0;
+    const totalRequests = 20;
+    // Parks every upstream fetch until we explicitly release it.
+    const upstreamReleasers: Array<() => void> = [];
+
+    const blob = new Blob(['image']);
+    const bitmap = { width: 1, height: 1 };
+    const documentStub = { baseURI: 'http://x/' } satisfies Pick<
+      Document,
+      'baseURI'
+    >;
+
+    const fetchMock = vi
+      .fn<(url: string) => Promise<Response>>()
+      .mockImplementation(async (url: string) => {
+        active++;
+        if (active > peakActive) peakActive = active;
+        try {
+          if (url.startsWith('http://x/')) {
+            // local: synchronous 404 — forces loadImage to re-acquire for upstream URL
+            return new Response(null, { status: 404 });
+          }
+          // upstream: park until released
+          await new Promise<void>((resolve) => upstreamReleasers.push(resolve));
+          return new Response(blob);
+        } finally {
+          active--;
+        }
+      });
+    const createImageBitmapMock = vi
+      .fn<(image: Blob) => Promise<ImageBitmap>>()
+      .mockResolvedValue(bitmap as ImageBitmap);
+
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('createImageBitmap', createImageBitmapMock);
+    vi.stubGlobal('document', documentStub);
+
+    try {
+      const adapter = createBrowserCanvasAdapter('auto');
+      const pending = Array.from({ length: totalRequests }, (_, i) =>
+        adapter.loadImage(`spritesheets/img-${i}.png`),
+      );
+      await new Promise<void>((resolve) => setTimeout(resolve, 30));
+
+      expect(peakActive).toBeLessThanOrEqual(6);
+      expect(peakActive).toBeGreaterThan(0);
+
+      while (upstreamReleasers.length > 0) {
+        const next = upstreamReleasers.shift();
+        if (next) next();
+        await new Promise<void>((resolve) => setTimeout(resolve, 1));
+      }
+      await Promise.all(pending);
+
+      expect(peakActive).toBeLessThanOrEqual(6);
+      // Each loadImage hit local (404) then upstream (200) → 2 fetches each.
+      expect(fetchMock).toHaveBeenCalledTimes(totalRequests * 2);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });

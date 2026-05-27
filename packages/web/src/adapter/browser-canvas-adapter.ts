@@ -36,12 +36,18 @@ export function createFetchSemaphore(limit: number): FetchSemaphore {
     async acquire(): Promise<() => void> {
       if (active >= limit) {
         await new Promise<void>((resolve) => queue.push(resolve));
+        // Slot ownership transferred to us by the releaser; active stays the same.
+      } else {
+        active++;
       }
-      active++;
       return () => {
-        active--;
         const next = queue.shift();
-        if (next) next();
+        if (next) {
+          next();
+          // Slot ownership transferred to the next waiter; active stays the same.
+        } else {
+          active--;
+        }
       };
     },
   };
