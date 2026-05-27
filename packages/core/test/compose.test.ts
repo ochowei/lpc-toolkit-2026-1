@@ -517,6 +517,35 @@ describe('composeSelections', () => {
       ).toBe(true);
     });
 
+    it('draws extra standard layers according to z-position', async () => {
+      const base = createNodeCanvasAdapter();
+      const extra = makeCanvas(832, 3456, (ctx) => {
+        ctx.fillStyle = '#0000ff';
+        ctx.fillRect(0, WALK_Y, 16, 16);
+      });
+
+      const sheet = await composeSelections(selections, {
+        catalog: makeCatalog([bodyItem]),
+        adapter: {
+          ...base,
+          loadImage: async () => {
+            const img = base.createCanvas(832, 256);
+            const ctx = img.getContext('2d');
+            ctx.fillStyle = '#ff0000';
+            ctx.fillRect(0, 0, 16, 16);
+            return img;
+          },
+        },
+        spritesheetsBaseUrl: '',
+        extraStandardLayers: [{ image: extra, zPos: 20 }],
+      });
+
+      const [r, g, b] = sheet.canvas
+        .getContext('2d')
+        .getImageData(1, WALK_Y + 1, 1, 1).data;
+      expect([r, g, b]).toEqual([0, 0, 255]);
+    });
+
     it('applies recolor via options.resolvePalette before drawing (A2)', async () => {
       const { adapter } = syntheticAdapter();
       const swap: PaletteSwap = {

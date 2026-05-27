@@ -27,12 +27,18 @@ import type {
   TypeName,
 } from './types.js';
 
+export interface ExtraStandardLayer {
+  readonly image: ImageLike;
+  readonly zPos: number;
+}
+
 export interface ComposeOptions {
   readonly catalog: Catalog;
   readonly adapter: CanvasAdapter;
   readonly spritesheetsBaseUrl: string;
   readonly animations?: readonly AnimationName[];
   readonly onProgress?: (loaded: number, total: number) => void;
+  readonly extraStandardLayers?: readonly ExtraStandardLayer[];
   /**
    * Resolves a per-layer `PaletteSwap` for recoloring (A2). Core has no
    * palette color data — `RecolorConfig` carries palette *names* and
@@ -427,8 +433,33 @@ export async function composeSelections(
   const canvas = adapter.createCanvas(totalWidth, totalHeight);
   const ctx = canvas.getContext('2d');
 
+  const standardDrawItems: Array<
+    | {
+        readonly kind: 'catalog';
+        readonly value: { readonly d: DrawItem; readonly img: Sprite | null };
+      }
+    | { readonly kind: 'extra'; readonly value: ExtraStandardLayer }
+  > = [
+    ...settled.map((value) => ({ kind: 'catalog' as const, value })),
+    ...(options.extraStandardLayers ?? []).map((value) => ({
+      kind: 'extra' as const,
+      value,
+    })),
+  ];
+  standardDrawItems.sort((a, b) => {
+    const az = a.kind === 'catalog' ? a.value.d.zPos : a.value.zPos;
+    const bz = b.kind === 'catalog' ? b.value.d.zPos : b.value.zPos;
+    return az - bz;
+  });
+
   const drawnFolders = new Set<string>();
-  for (const { d, img } of settled) {
+  for (const item of standardDrawItems) {
+    if (item.kind === 'extra') {
+      ctx.drawImage(item.value.image, 0, 0);
+      continue;
+    }
+
+    const { d, img } = item.value;
     if (!img) continue;
     const swap = options.resolvePalette?.(d.selection, d.item);
     const sprite = swap ? recolorImage(img, swap, { adapter }) : img;
