@@ -28,7 +28,11 @@ export function ResetMenuPopover({ open, setOpen, t, onReset, anchorRef: externa
       {open && pos && (
         <div
           ref={panelRef}
-          style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 50 }}
+          style={
+            externalAnchorRef
+              ? { position: 'fixed', top: pos.top, right: 12, zIndex: 50 }
+              : { position: 'fixed', top: pos.top, left: pos.left, zIndex: 50 }
+          }
           className="w-56 rounded-md border border-border bg-surface p-3 shadow-lg"
         >
           <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-text-mute">
