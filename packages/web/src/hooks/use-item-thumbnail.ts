@@ -7,7 +7,9 @@ import {
   type BodyType,
   type Catalog,
   type Direction,
+  type ItemDefinition,
   type PaletteMetadata,
+  type Selection,
   type Selections,
   type TypeName,
 } from '@lpc-toolkit/core';
@@ -33,11 +35,52 @@ export interface UseItemThumbnailResult {
   readonly status: 'loading' | 'ready' | 'error';
 }
 
+function findItemDef(
+  catalog: Catalog,
+  typeName: TypeName,
+  name: string,
+): ItemDefinition | undefined {
+  return catalog.byTypeName.get(typeName)?.find((d) => d.name === name);
+}
+
+/**
+ * For items whose layer paths reference `${siblingType}` (e.g. expressions
+ * reference `${head}`), the core `replaceInPath` needs a sibling Selection
+ * in `selections.items[siblingType]` to substitute. The thumbnail call
+ * site only knows about the item itself, so without a synthesized sibling
+ * the URL is shipped with literal `${head}` and 404s.
+ *
+ * Pick the sibling name from `def.replace_in_path[siblingType]`, preferring
+ * an entry whose mapped value equals `bodyType` (keeps the rendered face
+ * on the matching male/female/elderly head). Falls back to the first key.
+ */
+function siblingSelectionsFor(
+  def: ItemDefinition,
+  bodyType: BodyType,
+): Record<TypeName, Selection> {
+  const map = def.replace_in_path;
+  if (!map) return {};
+  const out: Record<TypeName, Selection> = {};
+  for (const [siblingType, mapping] of Object.entries(map)) {
+    const entries = Object.entries(mapping);
+    if (entries.length === 0) continue;
+    const matched = entries.find(([, v]) => v === bodyType);
+    const [siblingKey] = matched ?? entries[0]!;
+    out[siblingType] = {
+      typeName: siblingType,
+      name: siblingKey.replaceAll('_', ' '),
+    };
+  }
+  return out;
+}
+
 /**
  * Renders a single catalog item to a `size×size` offscreen canvas (first
  * frame of `walk` facing south) and caches by item identity. Reuses the
  * project's `composeSelections` pipeline — single-item Selections produce
- * the layer in isolation.
+ * the layer in isolation, except when the item references a sibling
+ * selection via `replace_in_path` (e.g. expression → head), in which case
+ * we synthesize a matching sibling so the path resolves.
  */
 export function useItemThumbnail(args: UseItemThumbnailArgs): UseItemThumbnailResult {
   const key = makeCacheKey({
@@ -68,9 +111,14 @@ export function useItemThumbnail(args: UseItemThumbnailArgs): UseItemThumbnailRe
     setState({ canvas: null, status: 'loading' });
 
     const adapter = createBrowserCanvasAdapter(args.assetSource);
+    const def = findItemDef(args.catalog, args.typeName, args.name);
+    const siblings = def
+      ? siblingSelectionsFor(def, args.bodyType)
+      : {};
     const selections: Selections = {
       bodyType: args.bodyType,
       items: {
+        ...siblings,
         [args.typeName]: {
           typeName: args.typeName,
           name: args.name,
