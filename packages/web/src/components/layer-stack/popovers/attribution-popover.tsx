@@ -114,7 +114,7 @@ export function AttributionPopover({ open, setOpen, catalog, state, licenseFilte
                 <div className="font-mono text-[10px] text-text-mute">
                   {r.item.name} · {r.authors.join(', ') || '?'} · {r.effective}
                 </div>
-                {r.incompatible && <div className="text-[10px]">{t('attribution.incompatibleShort')}</div>}
+                {r.incompatible && <div className="text-[10px]">{t('attribution.licenseIncompatibleShort')}</div>}
               </li>
             ))}
           </ul>
