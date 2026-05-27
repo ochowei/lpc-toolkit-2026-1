@@ -10,7 +10,6 @@ import {
 } from '../../slice/selection';
 import type { Catalog } from '@lpc-toolkit/core';
 import { Button } from '../ui/button';
-import { pickRandomOutfit } from '../../slice/random-outfit';
 import type { Translator } from '../../i18n';
 import {
   FullSpritesheetPreview,
@@ -51,7 +50,7 @@ interface Props {
 }
 
 export function PreviewPane({
-  catalog,
+  catalog: _catalog,
   state,
   dispatch,
   t,
@@ -141,18 +140,6 @@ export function PreviewPane({
           f{String(currentFrame + 1).padStart(2, '0')}/
           {String(totalFrames).padStart(2, '0')} · {fps}fps
         </span>
-        <button
-          type="button"
-          onClick={() => dispatch({
-            type: 'apply_selections',
-            selections: pickRandomOutfit({ catalog, bodyType: state.bodyType }),
-          })}
-          title={t('randomize.title')}
-          className="rounded px-2 py-1 text-text-mute hover:bg-surface-2"
-        >
-          🎲
-        </button>
-
         <Button
           size="sm"
           variant={fullSheet.open ? 'primary' : 'default'}
