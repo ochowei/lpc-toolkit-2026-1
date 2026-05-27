@@ -2,7 +2,7 @@
 
 ## Goal
 
-Replace the horizontal preset chip strip at the top of the sidebar with a compact bar that holds the 🎲 random-outfit button next to a single `🎭 預設套裝 ▼` dropdown. The dropdown reveals the six themed presets in a popover. The 🎲 button is removed from the preview-pane toolbar so randomization and presets live together.
+Replace the horizontal preset chip strip at the top of the sidebar with a compact bar that holds the 🎲 random-outfit button next to a single `預設套裝 ▼` dropdown. The dropdown reveals the six themed presets in a popover. The 🎲 button is removed from the preview-pane toolbar so randomization and presets live together.
 
 ## Motivation
 
@@ -19,7 +19,7 @@ Collapsing the chip strip into a single dropdown and parking the dice next to it
 
 ```
 ┌────────────────────────────────────┐
-│ [🎲]  [🎭 預設套裝 ▼]              │  ← single compact row, no uppercase title
+│ [🎲]  [預設套裝 ▼]              │  ← single compact row, no uppercase title
 └────────────────────────────────────┘
 ```
 
@@ -32,7 +32,7 @@ Collapsing the chip strip into a single dropdown and parking the dice next to it
 The dropdown trigger opens a popover anchored to the trigger button:
 
 ```
-[🎲]  [🎭 預設套裝 ▼]
+[🎲]  [預設套裝 ▼]
               │
               ├─ 🌾 農民
               ├─ 🔮 魔法師
@@ -86,7 +86,7 @@ The dropdown trigger opens a popover anchored to the trigger button:
 ## Testing
 
 - Manual verification in the dev server (the project has no React component test setup):
-  - The sidebar top row shows `[🎲] [🎭 預設套裝 ▼]` with no wrapped chip grid.
+  - The sidebar top row shows `[🎲] [預設套裝 ▼]` with no wrapped chip grid.
   - Clicking the preset trigger opens the popover; clicking outside, pressing `Esc`, or clicking the trigger again closes it.
   - Selecting each of the six presets applies the same outfit as before and surfaces the same `StatusToast` line.
   - For at least one body type (`teen` or `child`) where a preset has skipped slots, the `⚠` marker appears on the affected row with the correct `會略過 N 項` tooltip.
