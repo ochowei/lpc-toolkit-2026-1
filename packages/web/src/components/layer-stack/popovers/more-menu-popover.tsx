@@ -4,7 +4,7 @@ import { usePopover } from './use-popover';
 import { cn } from '../../../lib/cn';
 import type { Locale, Translator } from '../../../i18n';
 
-export type MoreMenuTarget = 'token' | 'reset' | 'attribution';
+export type MoreMenuTarget = 'token' | 'attribution';
 
 interface Props {
   open: boolean;
@@ -69,9 +69,6 @@ export function MoreMenuPopover({
               because ⋯ sits at the navbar's right end and a left-anchored panel could clip. */}
           <MenuItem onClick={() => handlePick('token')}>
             <span>🔗 {t('token.title')}</span>
-          </MenuItem>
-          <MenuItem onClick={() => handlePick('reset')}>
-            <span>↻ {t('reset.button')}</span>
           </MenuItem>
           <MenuItem
             onClick={() => handlePick('attribution')}

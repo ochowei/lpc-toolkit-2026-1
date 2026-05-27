@@ -33,7 +33,6 @@ import { PreviewPane } from './preview-pane';
 import { StackPanel } from './stack-panel';
 import { BodyTypePopover } from './popovers/body-type-popover';
 import { TokenPopover } from './popovers/token-popover';
-import { ResetMenuPopover } from './popovers/reset-menu-popover';
 import { AttributionPopover } from './popovers/attribution-popover';
 import { DownloadPopover } from './popovers/download-popover';
 import { MoreMenuPopover } from './popovers/more-menu-popover';
@@ -76,7 +75,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     () => new Set<AnimationName>(),
   );
   const [status, setStatus] = useState<{ kind: 'info' | 'warn' | 'error'; text: string } | null>(null);
-  const [popover, setPopover] = useState<null | 'bodyType' | 'token' | 'reset' | 'attribution' | 'download' | 'more'>(null);
+  const [popover, setPopover] = useState<null | 'bodyType' | 'token' | 'attribution' | 'download' | 'more'>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const moreMenuAnchorRef = useRef<HTMLButtonElement>(null);
   const [expanded, setExpanded] = useState<TypeName | null>(null);
@@ -298,6 +297,20 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const handleReset = ({ outfit, view, filters }: { outfit: boolean; view: boolean; filters: boolean }) => {
+    if (outfit) {
+      clearCustomOverlay();
+    }
+    if (outfit || view) {
+      props.onReset({ outfit, view });
+    }
+    if (filters) {
+      setLicenseFilter(ALL_LICENSE_GROUPS);
+      setAnimationFilter(new Set<AnimationName>());
+    }
+    setStatus({ kind: 'info', text: 'Reset ✓' });
+  };
+
   const handlePresetApplied = (name: string, skippedCount: number, skippedTypes: string[]) => {
     if (skippedCount === 0) {
       setStatus({ kind: 'info', text: `${props.t('preset.applied')} ${name}` });
@@ -355,25 +368,6 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
           catalog={props.catalog}
           t={props.t}
           onStatus={(text) => setStatus({ kind: 'info', text })}
-          anchorRef={moreMenuAnchorRef}
-        />
-        <ResetMenuPopover
-          open={popover === 'reset'}
-          setOpen={(v) => setPopover(v ? 'reset' : null)}
-          t={props.t}
-          onReset={({ outfit, view, filters }) => {
-            if (outfit) {
-              clearCustomOverlay();
-            }
-            if (outfit || view) {
-              props.onReset({ outfit, view });
-            }
-            if (filters) {
-              setLicenseFilter(ALL_LICENSE_GROUPS);
-              setAnimationFilter(new Set<AnimationName>());
-            }
-            setStatus({ kind: 'info', text: 'Reset ✓' });
-          }}
           anchorRef={moreMenuAnchorRef}
         />
         <AttributionPopover
@@ -438,6 +432,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
             t={props.t}
             tl={props.tl}
             onPresetApplied={handlePresetApplied}
+            onReset={handleReset}
             status={status}
             expanded={expanded}
             setExpanded={setExpanded}
