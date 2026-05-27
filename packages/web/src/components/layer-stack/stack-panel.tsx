@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, type RefObject } from 'react';
-import type { Catalog, LicenseGroup, PaletteMetadata, TypeName } from '@lpc-toolkit/core';
+import type { AnimationName, Catalog, LicenseGroup, PaletteMetadata, TypeName } from '@lpc-toolkit/core';
 import type { SliceState, SliceAction } from '../../slice/selection';
 import type { Translator, LabelTranslator } from '../../i18n';
 import { type LicenseFilter } from '../../slice/license-filter';
+import { type AnimationFilter } from '../../slice/animation-filter';
 import type { AssetSource } from '../../adapter/asset-source';
 import { LayerRow } from './layer-row';
 import { AddLayer } from './add-layer';
@@ -21,6 +22,10 @@ interface Props {
   toggleLicenseGroup: (group: LicenseGroup) => void;
   licenseIncompatibleCount: number;
   removeLicenseIncompatibleSelections: () => void;
+  animationFilter: AnimationFilter;
+  toggleAnimation: (anim: AnimationName) => void;
+  animationIncompatibleCount: number;
+  removeAnimationIncompatibleSelections: () => void;
   assetSource: AssetSource;
   setAssetSource: (v: AssetSource) => void;
   t: Translator;
@@ -42,6 +47,10 @@ export function StackPanel({
   toggleLicenseGroup,
   licenseIncompatibleCount,
   removeLicenseIncompatibleSelections,
+  animationFilter,
+  toggleAnimation,
+  animationIncompatibleCount,
+  removeAnimationIncompatibleSelections,
   assetSource,
   setAssetSource,
   t,
@@ -146,6 +155,10 @@ export function StackPanel({
         toggleLicenseGroup={toggleLicenseGroup}
         licenseIncompatibleCount={licenseIncompatibleCount}
         removeLicenseIncompatibleSelections={removeLicenseIncompatibleSelections}
+        animationFilter={animationFilter}
+        toggleAnimation={toggleAnimation}
+        animationIncompatibleCount={animationIncompatibleCount}
+        removeAnimationIncompatibleSelections={removeAnimationIncompatibleSelections}
         assetSource={assetSource}
         setAssetSource={setAssetSource}
       />

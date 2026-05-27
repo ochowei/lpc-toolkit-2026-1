@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import {
+  ANIMATIONS,
   LICENSE_CONFIG,
   LICENSE_GROUP_ORDER,
+  type AnimationName,
   type LicenseGroup,
 } from '@lpc-toolkit/core';
 import { Button } from '../ui/button';
 import type { LicenseFilter } from '../../slice/license-filter';
+import type { AnimationFilter } from '../../slice/animation-filter';
 import type { AssetSource } from '../../adapter/asset-source';
 import type { Translator } from '../../i18n';
 
@@ -15,11 +18,16 @@ interface Props {
   toggleLicenseGroup: (group: LicenseGroup) => void;
   licenseIncompatibleCount: number;
   removeLicenseIncompatibleSelections: () => void;
+  animationFilter: AnimationFilter;
+  toggleAnimation: (anim: AnimationName) => void;
+  animationIncompatibleCount: number;
+  removeAnimationIncompatibleSelections: () => void;
   assetSource: AssetSource;
   setAssetSource: (v: AssetSource) => void;
 }
 
 const TOTAL_GROUPS = LICENSE_GROUP_ORDER.length;
+const VISIBLE_ANIMATIONS = ANIMATIONS.filter((a) => !a.noExport);
 
 export function SettingsCollapsible({
   t,
@@ -27,12 +35,18 @@ export function SettingsCollapsible({
   toggleLicenseGroup,
   licenseIncompatibleCount,
   removeLicenseIncompatibleSelections,
+  animationFilter,
+  toggleAnimation,
+  animationIncompatibleCount,
+  removeAnimationIncompatibleSelections,
   assetSource,
   setAssetSource,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const enabledCount = licenseFilter.size;
-  const showCountBadge = enabledCount < TOTAL_GROUPS;
+  const enabledLicenseCount = licenseFilter.size;
+  const showLicenseChip = enabledLicenseCount < TOTAL_GROUPS;
+  const enabledAnimCount = animationFilter.size;
+  const showAnimChip = enabledAnimCount > 0;
 
   return (
     <div className="border-t border-border bg-app">
@@ -42,9 +56,14 @@ export function SettingsCollapsible({
         className="flex w-full items-center gap-2 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-text-mute hover:bg-surface-2"
       >
         <span>{t('filters.title')}</span>
-        {showCountBadge && (
+        {showLicenseChip && (
           <span className="rounded-full border border-accent/40 bg-accent/15 px-2 py-0.5 text-[9px] font-normal normal-case text-accent">
-            {enabledCount}/{TOTAL_GROUPS}
+            License {enabledLicenseCount}/{TOTAL_GROUPS}
+          </span>
+        )}
+        {showAnimChip && (
+          <span className="rounded-full border border-accent/40 bg-accent/15 px-2 py-0.5 text-[9px] font-normal normal-case text-accent">
+            Anim {enabledAnimCount}/{VISIBLE_ANIMATIONS.length}
           </span>
         )}
         <span className="ml-auto">{open ? '▾' : '▸'}</span>
@@ -55,7 +74,7 @@ export function SettingsCollapsible({
             <div className="mb-1 flex items-center gap-2 text-[10px] uppercase tracking-wide text-text-mute">
               <span>{t('picker.licenseFilter')}</span>
               <span className="font-normal normal-case text-text-dim">
-                {t('licenseFilter.enabledCount').replace('{n}', String(enabledCount))}
+                {t('licenseFilter.enabledCount').replace('{n}', String(enabledLicenseCount))}
               </span>
             </div>
             <ul className="flex flex-col gap-1">
@@ -104,6 +123,50 @@ export function SettingsCollapsible({
                   className="w-full"
                 >
                   {t('licenseFilter.removeIncompatible').replace('{n}', String(licenseIncompatibleCount))}
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <div className="mb-1 flex items-center gap-2 text-[10px] uppercase tracking-wide text-text-mute">
+              <span>{t('animationFilter.title')}</span>
+              <span className="font-normal normal-case text-text-dim">
+                {t('animationFilter.enabledCount').replace('{n}', String(enabledAnimCount))}
+              </span>
+            </div>
+            <ul className="flex flex-col gap-1">
+              {VISIBLE_ANIMATIONS.map((anim) => {
+                const checked = animationFilter.has(anim.value);
+                return (
+                  <li key={anim.value} className="flex items-center gap-2">
+                    <label className="flex flex-1 items-center gap-2 text-[11px] text-text cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleAnimation(anim.value)}
+                        className="h-3 w-3 accent-accent"
+                      />
+                      <span className="font-mono">{anim.label}</span>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+
+            {animationIncompatibleCount > 0 && (
+              <div className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2">
+                <p className="mb-2 text-[11px] text-amber-500">
+                  ⚠️{' '}
+                  {t('animationFilter.incompatibleNotice').replace('{n}', String(animationIncompatibleCount))}
+                </p>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={removeAnimationIncompatibleSelections}
+                  className="w-full"
+                >
+                  {t('animationFilter.removeIncompatible').replace('{n}', String(animationIncompatibleCount))}
                 </Button>
               </div>
             )}

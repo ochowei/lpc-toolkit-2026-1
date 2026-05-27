@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   composeSelections,
   makeResolvePalette,
+  type AnimationName,
   type Catalog,
   type HashWarning,
   type LicenseGroup,
@@ -23,6 +24,10 @@ import {
   incompatibleTypeNamesFor,
   type LicenseFilter,
 } from '../../slice/license-filter';
+import {
+  incompatibleAnimationTypeNamesFor,
+  type AnimationFilter,
+} from '../../slice/animation-filter';
 import { TopBar } from './top-bar';
 import { PreviewPane } from './preview-pane';
 import { StackPanel } from './stack-panel';
@@ -59,6 +64,9 @@ export interface LayerStackHarnessProps {
 export function LayerStackHarness(props: LayerStackHarnessProps) {
   const { t, theme, locale, onToggleTheme, onToggleLocale } = props;
   const [licenseFilter, setLicenseFilter] = useState<LicenseFilter>(ALL_LICENSE_GROUPS);
+  const [animationFilter, setAnimationFilter] = useState<AnimationFilter>(
+    () => new Set<AnimationName>(),
+  );
   const [status, setStatus] = useState<{ kind: 'info' | 'warn' | 'error'; text: string } | null>(null);
   const [popover, setPopover] = useState<null | 'bodyType' | 'token' | 'reset' | 'attribution' | 'download'>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -84,6 +92,15 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     });
   }, []);
 
+  const toggleAnimation = useCallback((anim: AnimationName) => {
+    setAnimationFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(anim)) next.delete(anim);
+      else next.add(anim);
+      return next;
+    });
+  }, []);
+
   const licenseIncompatibleTypeNames = useMemo(
     () => incompatibleTypeNamesFor(props.state, props.catalog, licenseFilter),
     [props.state, props.catalog, licenseFilter],
@@ -100,6 +117,23 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
       text: t('licenseFilter.removed').replace('{n}', String(licenseIncompatibleTypeNames.length)),
     });
   }, [licenseIncompatibleTypeNames, props.dispatch, t]);
+
+  const animationIncompatibleTypeNames = useMemo(
+    () => incompatibleAnimationTypeNamesFor(props.state, props.catalog, animationFilter),
+    [props.state, props.catalog, animationFilter],
+  );
+  const animationIncompatibleCount = animationIncompatibleTypeNames.length;
+
+  const removeAnimationIncompatibleSelections = useCallback(() => {
+    if (animationIncompatibleTypeNames.length === 0) return;
+    for (const tn of animationIncompatibleTypeNames) {
+      props.dispatch({ type: 'clear', typeName: tn });
+    }
+    setStatus({
+      kind: 'info',
+      text: t('animationFilter.removed').replace('{n}', String(animationIncompatibleTypeNames.length)),
+    });
+  }, [animationIncompatibleTypeNames, props.dispatch, t]);
 
   const composeSingleItem = useCallback(
     async (singleSelections: Selections) => {
@@ -247,6 +281,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
             }
             if (filters) {
               setLicenseFilter(ALL_LICENSE_GROUPS);
+              setAnimationFilter(new Set<AnimationName>());
             }
             setStatus({ kind: 'info', text: 'Reset ✓' });
           }}
@@ -296,6 +331,10 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
             toggleLicenseGroup={toggleLicenseGroup}
             licenseIncompatibleCount={licenseIncompatibleCount}
             removeLicenseIncompatibleSelections={removeLicenseIncompatibleSelections}
+            animationFilter={animationFilter}
+            toggleAnimation={toggleAnimation}
+            animationIncompatibleCount={animationIncompatibleCount}
+            removeAnimationIncompatibleSelections={removeAnimationIncompatibleSelections}
             assetSource={props.assetSource}
             setAssetSource={props.onAssetSourceChange}
             t={props.t}
