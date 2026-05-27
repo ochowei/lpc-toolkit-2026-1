@@ -19,8 +19,8 @@ interface Props {
   shownTypeNames: string[];
   licenseFilter: LicenseFilter;
   toggleLicenseGroup: (group: LicenseGroup) => void;
-  incompatibleCount: number;
-  removeIncompatibleSelections: () => void;
+  licenseIncompatibleCount: number;
+  removeLicenseIncompatibleSelections: () => void;
   assetSource: AssetSource;
   setAssetSource: (v: AssetSource) => void;
   t: Translator;
@@ -40,8 +40,8 @@ export function StackPanel({
   shownTypeNames,
   licenseFilter,
   toggleLicenseGroup,
-  incompatibleCount,
-  removeIncompatibleSelections,
+  licenseIncompatibleCount,
+  removeLicenseIncompatibleSelections,
   assetSource,
   setAssetSource,
   t,
@@ -144,8 +144,8 @@ export function StackPanel({
         t={t}
         licenseFilter={licenseFilter}
         toggleLicenseGroup={toggleLicenseGroup}
-        incompatibleCount={incompatibleCount}
-        removeIncompatibleSelections={removeIncompatibleSelections}
+        licenseIncompatibleCount={licenseIncompatibleCount}
+        removeLicenseIncompatibleSelections={removeLicenseIncompatibleSelections}
         assetSource={assetSource}
         setAssetSource={setAssetSource}
       />

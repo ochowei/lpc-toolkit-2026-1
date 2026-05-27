@@ -13,8 +13,8 @@ interface Props {
   t: Translator;
   licenseFilter: LicenseFilter;
   toggleLicenseGroup: (group: LicenseGroup) => void;
-  incompatibleCount: number;
-  removeIncompatibleSelections: () => void;
+  licenseIncompatibleCount: number;
+  removeLicenseIncompatibleSelections: () => void;
   assetSource: AssetSource;
   setAssetSource: (v: AssetSource) => void;
 }
@@ -25,8 +25,8 @@ export function SettingsCollapsible({
   t,
   licenseFilter,
   toggleLicenseGroup,
-  incompatibleCount,
-  removeIncompatibleSelections,
+  licenseIncompatibleCount,
+  removeLicenseIncompatibleSelections,
   assetSource,
   setAssetSource,
 }: Props) {
@@ -91,19 +91,19 @@ export function SettingsCollapsible({
               })}
             </ul>
 
-            {incompatibleCount > 0 && (
+            {licenseIncompatibleCount > 0 && (
               <div className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2">
                 <p className="mb-2 text-[11px] text-amber-500">
                   ⚠️{' '}
-                  {t('licenseFilter.incompatibleNotice').replace('{n}', String(incompatibleCount))}
+                  {t('licenseFilter.incompatibleNotice').replace('{n}', String(licenseIncompatibleCount))}
                 </p>
                 <Button
                   size="sm"
                   variant="primary"
-                  onClick={removeIncompatibleSelections}
+                  onClick={removeLicenseIncompatibleSelections}
                   className="w-full"
                 >
-                  {t('licenseFilter.removeIncompatible').replace('{n}', String(incompatibleCount))}
+                  {t('licenseFilter.removeIncompatible').replace('{n}', String(licenseIncompatibleCount))}
                 </Button>
               </div>
             )}

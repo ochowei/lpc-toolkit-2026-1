@@ -84,22 +84,22 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     });
   }, []);
 
-  const incompatibleTypeNames = useMemo(
+  const licenseIncompatibleTypeNames = useMemo(
     () => incompatibleTypeNamesFor(props.state, props.catalog, licenseFilter),
     [props.state, props.catalog, licenseFilter],
   );
-  const incompatibleCount = incompatibleTypeNames.length;
+  const licenseIncompatibleCount = licenseIncompatibleTypeNames.length;
 
-  const removeIncompatibleSelections = useCallback(() => {
-    if (incompatibleTypeNames.length === 0) return;
-    for (const tn of incompatibleTypeNames) {
+  const removeLicenseIncompatibleSelections = useCallback(() => {
+    if (licenseIncompatibleTypeNames.length === 0) return;
+    for (const tn of licenseIncompatibleTypeNames) {
       props.dispatch({ type: 'clear', typeName: tn });
     }
     setStatus({
       kind: 'info',
-      text: t('licenseFilter.removed').replace('{n}', String(incompatibleTypeNames.length)),
+      text: t('licenseFilter.removed').replace('{n}', String(licenseIncompatibleTypeNames.length)),
     });
-  }, [incompatibleTypeNames, props.dispatch, t]);
+  }, [licenseIncompatibleTypeNames, props.dispatch, t]);
 
   const composeSingleItem = useCallback(
     async (singleSelections: Selections) => {
@@ -294,8 +294,8 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
             shownTypeNames={props.shownTypeNames}
             licenseFilter={licenseFilter}
             toggleLicenseGroup={toggleLicenseGroup}
-            incompatibleCount={incompatibleCount}
-            removeIncompatibleSelections={removeIncompatibleSelections}
+            licenseIncompatibleCount={licenseIncompatibleCount}
+            removeLicenseIncompatibleSelections={removeLicenseIncompatibleSelections}
             assetSource={props.assetSource}
             setAssetSource={props.onAssetSourceChange}
             t={props.t}
