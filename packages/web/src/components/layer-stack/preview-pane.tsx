@@ -112,17 +112,17 @@ export function PreviewPane({
     <div ref={previewRef} className="relative flex h-full min-h-0 flex-col">
       {/* Action bar — now at the TOP, above the single preview. */}
       <div className="flex items-center gap-3 border-b border-border bg-surface px-3 py-2 text-xs">
-        <div className="grid grid-cols-2 gap-0.5">
+        <div className="flex gap-0.5">
           <Button size="sm" variant={state.dir === 'up' ? 'primary' : 'ghost'}
-            className="col-span-2 w-6 px-0"
+            className="w-6 px-0"
             onClick={() => dispatch({ type: 'set_dir', dir: 'up' })}>{DIR_LABEL.up}</Button>
+          <Button size="sm" variant={state.dir === 'down' ? 'primary' : 'ghost'}
+            className="w-6 px-0"
+            onClick={() => dispatch({ type: 'set_dir', dir: 'down' })}>{DIR_LABEL.down}</Button>
           <Button size="sm" variant={state.dir === 'left' ? 'primary' : 'ghost'}
             className="w-6 px-0" onClick={() => dispatch({ type: 'set_dir', dir: 'left' })}>{DIR_LABEL.left}</Button>
           <Button size="sm" variant={state.dir === 'right' ? 'primary' : 'ghost'}
             className="w-6 px-0" onClick={() => dispatch({ type: 'set_dir', dir: 'right' })}>{DIR_LABEL.right}</Button>
-          <Button size="sm" variant={state.dir === 'down' ? 'primary' : 'ghost'}
-            className="col-span-2 w-6 px-0"
-            onClick={() => dispatch({ type: 'set_dir', dir: 'down' })}>{DIR_LABEL.down}</Button>
         </div>
 
         <select className="rounded-md border border-border bg-surface-2 px-2 py-1"
