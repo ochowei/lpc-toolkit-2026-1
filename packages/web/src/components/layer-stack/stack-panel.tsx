@@ -8,7 +8,7 @@ import type { AssetSource } from '../../adapter/asset-source';
 import type { CustomOverlay } from '../../lib/custom-overlay';
 import { LayerRow } from './layer-row';
 import { AddLayer } from './add-layer';
-import { PresetChips } from './preset-chips';
+import { PresetBar } from './preset-bar';
 import { StatusToast } from './status-toast';
 import { SettingsCollapsible } from './settings-collapsible';
 import { SidebarSearch } from './sidebar-search';
@@ -105,7 +105,7 @@ export function StackPanel({
         onPicked={(tn) => setExpanded(tn)}
         inputRef={searchInputRef}
       />
-      <PresetChips
+      <PresetBar
         catalog={catalog}
         state={state}
         dispatch={dispatch}
