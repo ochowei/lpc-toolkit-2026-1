@@ -4,6 +4,7 @@ import type { SliceState, SliceAction } from '../../../slice/selection';
 import type { Translator } from '../../../i18n';
 import { PRESETS, type Preset } from '../../../presets';
 import { computePresetSelection } from '../../../presets-apply';
+import { cn } from '../../../lib/cn';
 import { usePopover } from './use-popover';
 
 interface Props {
@@ -37,6 +38,7 @@ export function PresetMenuPopover({
       style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 50 }}
       className="w-44 rounded-md border border-border bg-surface p-1 shadow-lg"
       role="menu"
+      aria-label={t('preset.title')}
     >
       {PRESETS.map((preset: Preset) => {
         const preview = computePresetSelection(preset, state.selections, state.bodyType, catalog);
@@ -60,9 +62,10 @@ export function PresetMenuPopover({
               );
               setOpen(false);
             }}
-            className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[12px] hover:bg-surface-2 ${
-              willSkip ? 'opacity-80' : ''
-            }`}
+            className={cn(
+              'flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[12px] hover:bg-surface-2',
+              willSkip && 'opacity-80',
+            )}
           >
             <span>{preset.emoji}</span>
             <span className="flex-1">{label}</span>
