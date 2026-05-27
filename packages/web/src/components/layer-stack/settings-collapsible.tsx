@@ -11,6 +11,7 @@ import type { LicenseFilter } from '../../slice/license-filter';
 import type { AnimationFilter } from '../../slice/animation-filter';
 import type { AssetSource } from '../../adapter/asset-source';
 import type { Translator } from '../../i18n';
+import type { CustomOverlay } from '../../lib/custom-overlay';
 
 interface Props {
   t: Translator;
@@ -24,6 +25,11 @@ interface Props {
   removeAnimationIncompatibleSelections: () => void;
   assetSource: AssetSource;
   setAssetSource: (v: AssetSource) => void;
+  customOverlay: CustomOverlay | null;
+  customOverlayZPos: number;
+  onCustomOverlayUpload: (file: File) => void;
+  onCustomOverlayZPosChange: (raw: string) => void;
+  onClearCustomOverlay: () => void;
 }
 
 const TOTAL_GROUPS = LICENSE_GROUP_ORDER.length;
@@ -41,6 +47,11 @@ export function SettingsCollapsible({
   removeAnimationIncompatibleSelections,
   assetSource,
   setAssetSource,
+  customOverlay,
+  customOverlayZPos,
+  onCustomOverlayUpload,
+  onCustomOverlayZPosChange,
+  onClearCustomOverlay,
 }: Props) {
   const [open, setOpen] = useState(false);
   const enabledLicenseCount = licenseFilter.size;
@@ -188,6 +199,53 @@ export function SettingsCollapsible({
                   {t(`assetSource.${src}` as const)}
                 </Button>
               ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-1 text-[10px] uppercase tracking-wide text-text-mute">
+              {t('advancedTools.title')}
+            </div>
+            <div className="space-y-2">
+              <label className="block text-[11px] text-text">
+                <span className="mb-1 block text-text-mute">
+                  {t('advancedTools.customUpload')}
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.currentTarget.files?.[0];
+                    if (file) onCustomOverlayUpload(file);
+                    e.currentTarget.value = '';
+                  }}
+                  className="block w-full text-[11px] text-text file:mr-2 file:rounded file:border-0 file:bg-surface-2 file:px-2 file:py-1 file:text-[11px] file:text-text"
+                />
+              </label>
+              {customOverlay && (
+                <div className="rounded border border-border bg-surface-2 px-2 py-1 text-[11px] text-text">
+                  {customOverlay.fileName} · {customOverlay.width}x{customOverlay.height}
+                </div>
+              )}
+              <label className="block text-[11px] text-text">
+                <span className="mb-1 block text-text-mute">
+                  {t('advancedTools.zPosition')}
+                </span>
+                <input
+                  type="number"
+                  value={customOverlayZPos}
+                  onChange={(e) => onCustomOverlayZPosChange(e.currentTarget.value)}
+                  className="w-full rounded border border-border bg-app px-2 py-1 text-[11px] text-text"
+                />
+              </label>
+              <p className="text-[10px] text-text-mute">{t('advancedTools.acceptedSize')}</p>
+              <p className="text-[10px] text-text-mute">{t('advancedTools.layerHints')}</p>
+              <p className="text-[10px] text-text-mute">{t('advancedTools.userProvidedNotice')}</p>
+              {customOverlay && (
+                <Button size="sm" variant="ghost" onClick={onClearCustomOverlay} className="w-full">
+                  {t('advancedTools.clear')}
+                </Button>
+              )}
             </div>
           </div>
         </div>

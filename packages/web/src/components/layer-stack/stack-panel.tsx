@@ -5,6 +5,7 @@ import type { Translator, LabelTranslator } from '../../i18n';
 import { type LicenseFilter } from '../../slice/license-filter';
 import { type AnimationFilter } from '../../slice/animation-filter';
 import type { AssetSource } from '../../adapter/asset-source';
+import type { CustomOverlay } from '../../lib/custom-overlay';
 import { LayerRow } from './layer-row';
 import { AddLayer } from './add-layer';
 import { PresetChips } from './preset-chips';
@@ -28,6 +29,11 @@ interface Props {
   removeAnimationIncompatibleSelections: () => void;
   assetSource: AssetSource;
   setAssetSource: (v: AssetSource) => void;
+  customOverlay: CustomOverlay | null;
+  customOverlayZPos: number;
+  onCustomOverlayUpload: (file: File) => void;
+  onCustomOverlayZPosChange: (raw: string) => void;
+  onClearCustomOverlay: () => void;
   t: Translator;
   tl: LabelTranslator;
   onPresetApplied: (name: string, skippedCount: number, skippedTypes: string[]) => void;
@@ -53,6 +59,11 @@ export function StackPanel({
   removeAnimationIncompatibleSelections,
   assetSource,
   setAssetSource,
+  customOverlay,
+  customOverlayZPos,
+  onCustomOverlayUpload,
+  onCustomOverlayZPosChange,
+  onClearCustomOverlay,
   t,
   tl,
   onPresetApplied,
@@ -163,6 +174,11 @@ export function StackPanel({
         removeAnimationIncompatibleSelections={removeAnimationIncompatibleSelections}
         assetSource={assetSource}
         setAssetSource={setAssetSource}
+        customOverlay={customOverlay}
+        customOverlayZPos={customOverlayZPos}
+        onCustomOverlayUpload={onCustomOverlayUpload}
+        onCustomOverlayZPosChange={onCustomOverlayZPosChange}
+        onClearCustomOverlay={onClearCustomOverlay}
       />
 
     </div>

@@ -16,6 +16,11 @@ export type CustomOverlayDimensionResult =
   | { readonly ok: true }
   | { readonly ok: false; readonly width: number; readonly height: number };
 
+export type InvalidCustomOverlayDimensions = Extract<
+  CustomOverlayDimensionResult,
+  { readonly ok: false }
+>;
+
 export function validateCustomOverlayDimensions(
   width: number,
   height: number,
@@ -42,7 +47,7 @@ export function customOverlayItemFileName(input: {
 export async function loadCustomOverlayImage(args: {
   readonly file: File;
   readonly zPos: number;
-}): Promise<CustomOverlay | CustomOverlayDimensionResult> {
+}): Promise<CustomOverlay | InvalidCustomOverlayDimensions> {
   const objectUrl = URL.createObjectURL(args.file);
   const image = new Image();
 

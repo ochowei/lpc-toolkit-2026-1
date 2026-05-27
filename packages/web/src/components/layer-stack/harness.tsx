@@ -42,6 +42,11 @@ import { Button } from '../ui/button';
 import { createBrowserCanvasAdapter } from '../../adapter/browser-canvas-adapter';
 import { toSelections } from '../../slice/selection';
 import type { ZipExportKind } from '../../lib/zip-export';
+import {
+  loadCustomOverlayImage,
+  parseCustomOverlayZPos,
+  type CustomOverlay,
+} from '../../lib/custom-overlay';
 
 export interface LayerStackHarnessProps {
   catalog: Catalog;
@@ -77,6 +82,8 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   const [fullSheetMask, setFullSheetMask] = useState(false);
   const [fullSheetZoom, setFullSheetZoom] = useState<FullSheetZoom>('fit');
   const [splitterRatio, setSplitterRatio] = useState(0.5);
+  const [customOverlay, setCustomOverlay] = useState<CustomOverlay | null>(null);
+  const [customOverlayZPos, setCustomOverlayZPos] = useState(0);
 
   const [zipRunning, setZipRunning] = useState<null | {
     kind: ZipExportKind;
@@ -152,6 +159,53 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     [props.catalog, props.palettes, props.assetSource],
   );
 
+  const clearCustomOverlay = useCallback(() => {
+    setCustomOverlay((prev) => {
+      if (prev) URL.revokeObjectURL(prev.objectUrl);
+      return null;
+    });
+    setCustomOverlayZPos(0);
+    setStatus({ kind: 'info', text: t('advancedTools.cleared') });
+  }, [t]);
+
+  const handleCustomOverlayZPosChange = useCallback((raw: string) => {
+    const zPos = parseCustomOverlayZPos(raw);
+    setCustomOverlayZPos(zPos);
+    setCustomOverlay((prev) => (prev ? { ...prev, zPos } : prev));
+  }, []);
+
+  const handleCustomOverlayUpload = useCallback(
+    async (file: File) => {
+      try {
+        const loaded = await loadCustomOverlayImage({
+          file,
+          zPos: customOverlayZPos,
+        });
+        if ('ok' in loaded) {
+          setStatus({
+            kind: 'error',
+            text: t('advancedTools.invalidSize')
+              .replace('{width}', String(loaded.width))
+              .replace('{height}', String(loaded.height)),
+          });
+          return;
+        }
+        setCustomOverlay((prev) => {
+          if (prev) URL.revokeObjectURL(prev.objectUrl);
+          return loaded;
+        });
+        setStatus({
+          kind: 'info',
+          text: t('advancedTools.loaded').replace('{name}', loaded.fileName),
+        });
+      } catch (error) {
+        console.error('Custom overlay upload failed:', error);
+        setStatus({ kind: 'error', text: t('download.failed') });
+      }
+    },
+    [customOverlayZPos, t],
+  );
+
   const fullSheet: FullSheetUiState = {
     open: fullSheetOpen,
     grid: fullSheetGrid,
@@ -173,6 +227,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     props.state,
     props.assetSource,
     reloadCounter,
+    customOverlay,
   );
   const loadingProgress =
     composeResult.status === 'loading' ? composeResult.progress : null;
@@ -188,6 +243,15 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     const id = setTimeout(() => setStatus(null), 4000);
     return () => clearTimeout(id);
   }, [status]);
+
+  useEffect(() => {
+    return () => {
+      setCustomOverlay((prev) => {
+        if (prev) URL.revokeObjectURL(prev.objectUrl);
+        return null;
+      });
+    };
+  }, []);
 
   // Global ⌘K / Ctrl+K focuses the sidebar search input (selects existing text if any).
   useEffect(() => {
@@ -276,6 +340,9 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
           setOpen={(v) => setPopover(v ? 'reset' : null)}
           t={props.t}
           onReset={({ outfit, view, filters }) => {
+            if (outfit) {
+              clearCustomOverlay();
+            }
             if (outfit || view) {
               props.onReset({ outfit, view });
             }
@@ -338,6 +405,11 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
             removeAnimationIncompatibleSelections={removeAnimationIncompatibleSelections}
             assetSource={props.assetSource}
             setAssetSource={props.onAssetSourceChange}
+            customOverlay={customOverlay}
+            customOverlayZPos={customOverlayZPos}
+            onCustomOverlayUpload={handleCustomOverlayUpload}
+            onCustomOverlayZPosChange={handleCustomOverlayZPosChange}
+            onClearCustomOverlay={clearCustomOverlay}
             t={props.t}
             tl={props.tl}
             onPresetApplied={handlePresetApplied}
