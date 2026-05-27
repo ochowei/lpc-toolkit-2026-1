@@ -319,9 +319,11 @@ describe('getSpritePathsForSelections', () => {
       expect(layers[0]?.path).toBe('spritesheets/multi/a/walk.png');
     });
 
-    it('keeps unresolved ${...} placeholders when the referenced selection is missing', () => {
-      // If selections has no `head`, the ${head} stays as literal text —
-      // matches upstream es6DynamicTemplate fallback.
+    it('skips layers whose ${...} placeholder cannot be resolved', () => {
+      // Safety net: if selections has no `head`, the unresolved ${head}
+      // would become a literal in the URL and guarantee a 404. The layer
+      // is dropped instead. (Upstream's es6DynamicTemplate emits the
+      // literal; we diverge to keep the network quiet.)
       const face: ItemDefinition = {
         name: 'Blush',
         type_name: 'expression',
@@ -340,9 +342,34 @@ describe('getSpritePathsForSelections', () => {
         },
         catalog,
       );
-      expect(layers[0]?.path).toBe(
-        'spritesheets/head/faces/${head}/blush/walk.png',
+      expect(layers).toEqual([]);
+    });
+
+    it('skips layers whose ${X} placeholder has no entry in replace_in_path[X]', () => {
+      // Head IS selected, but its name isn't in the expression's
+      // replace_in_path.head table (non-human heads against a
+      // human-only expression). Layer is dropped, not emitted with the
+      // literal `${head}` left in the URL.
+      const face: ItemDefinition = {
+        name: 'Blush',
+        type_name: 'expression',
+        animations: ['walk'],
+        credits: [],
+        replace_in_path: { head: { Human_Male: 'male' } },
+        layer_1: { zPos: 101, male: 'head/faces/${head}/blush/' },
+      };
+      const catalog = makeCatalog([face]);
+      const layers = getSpritePathsForSelections(
+        {
+          bodyType: 'male',
+          items: {
+            head: { typeName: 'head', name: 'Wolf' },
+            expression: { typeName: 'expression', name: 'Blush' },
+          },
+        },
+        catalog,
       );
+      expect(layers).toEqual([]);
     });
   });
 });

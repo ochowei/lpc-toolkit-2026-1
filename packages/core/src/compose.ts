@@ -82,7 +82,9 @@ function findItem(
  * `replaceInPath` from `state/path.ts`, simplified because our `Selection`
  * already has `name` and `variant` separated (Q8): the lookup key is just
  * `sel.name.replaceAll(' ', '_')`. Placeholders with no replacement are
- * left as-is, matching upstream's `${g}` fallback in `es6DynamicTemplate`.
+ * left as-is, matching upstream's `${g}` fallback in `es6DynamicTemplate`;
+ * the caller (`resolveLayers`) treats unresolved residue as a skip signal
+ * so we don't ship `${head}`-literal URLs to the network.
  */
 function replaceInPath(
   path: string,
@@ -158,6 +160,12 @@ function resolveLayers(
       const basePath = baseRaw.includes('${')
         ? replaceInPath(baseRaw, selections, item)
         : baseRaw;
+
+      // Safety net: if any `${X}` placeholder survived (no sibling
+      // selection, or sibling name absent from `replace_in_path[X]`),
+      // skip the layer instead of emitting a URL containing literal
+      // `${X}` — those guarantee a 404 at fetch time.
+      if (basePath.includes('${')) continue;
 
       out.push({
         itemId,
