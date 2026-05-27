@@ -69,3 +69,12 @@ Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES
    intersection observer / lazy load patterns.
 4. **Upstream data PR** — file the `alias target ... does not match`
    warnings against the LPC upstream catalog files.
+
+---
+
+## Follow-up status (2026-05-28)
+
+Re-measured under live conditions and superseded by a focused cleanup design:
+- **Resolved by:** `docs/superpowers/specs/2026-05-28-e2e-noise-cleanup-design.md` — fixes the four noise classes here at the root (URL-param-driven `assetSource=local` for tests, `fetch()` concurrency throttle, collector listener overhaul, catalog emit-once + exact-match allowlist).
+- **Spun off as separate investigation:** `docs/superpowers/notes/2026-05-28-catalog-sprite-404-investigation.md` — the 1,701 HTTP 404s turned out to be a pre-existing catalog/compose data bug (paths like `…/idle/base.png` don't exist in upstream either), not a copy-script gap. Filtered in e2e via a `/spritesheets/` response skip; root-cause fix tracked separately.
+- **Corrected observation:** "35 warnings × 20 clicks" was a misread. `console.warn(text, array)` is a single emission; the catalog warning fires only twice total (StrictMode double-mount at boot), not per click.
