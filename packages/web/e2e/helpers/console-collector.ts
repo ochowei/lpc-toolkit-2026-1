@@ -44,8 +44,14 @@ interface ConsoleAllowlistEntry {
 
 const APP_CONSOLE_ALLOWLIST: readonly ConsoleAllowlistEntry[] = [
   {
+    // `msg.text()` from Playwright concatenates the optional array arg of
+    // `console.warn(text, warnings)` into the text as Chromium's preview
+    // serialization, e.g. ` [Object, Object, ...]`. The optional suffix in
+    // the pattern below accommodates that without widening to arbitrary
+    // trailing content.
     kind: 'console.warn',
-    textPattern: /^\[catalog\] \d+ load warning\(s\)$/,
+    textPattern:
+      /^\[catalog\] \d+ load warning\(s\)(?: \[Object(?:, Object)*\])?$/,
     locationPattern: /\/catalog\/load-catalog\.ts/,
   },
 ];

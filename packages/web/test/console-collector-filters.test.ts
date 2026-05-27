@@ -56,6 +56,16 @@ describe('isAllowlistedConsoleEntry', () => {
     ).toBe(true);
   });
 
+  it('matches the catalog warning with the Chromium array-preview suffix', () => {
+    expect(
+      isAllowlistedConsoleEntry({
+        kind: 'console.warn',
+        text: '[catalog] 35 load warning(s) [Object, Object, Object, Object, Object]',
+        location: 'http://localhost:5173/src/catalog/load-catalog.ts:50:12',
+      }),
+    ).toBe(true);
+  });
+
   it('rejects the catalog text with extra trailing content', () => {
     expect(
       isAllowlistedConsoleEntry({
