@@ -37,6 +37,7 @@ interface Props {
   t: Translator;
   tl: LabelTranslator;
   onPresetApplied: (name: string, skippedCount: number, skippedTypes: string[]) => void;
+  onReset: (scopes: { outfit: boolean; view: boolean; filters: boolean }) => void;
   status: { kind: 'info' | 'warn' | 'error'; text: string } | null;
   searchInputRef: RefObject<HTMLInputElement>;
   expanded: TypeName | null;
@@ -67,6 +68,7 @@ export function StackPanel({
   t,
   tl,
   onPresetApplied,
+  onReset,
   status,
   searchInputRef,
   expanded,
@@ -111,6 +113,7 @@ export function StackPanel({
         dispatch={dispatch}
         t={t}
         onApplied={onPresetApplied}
+        onReset={onReset}
       />
 
       <StatusToast status={status} />
