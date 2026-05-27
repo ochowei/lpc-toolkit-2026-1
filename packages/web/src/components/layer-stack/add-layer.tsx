@@ -14,37 +14,25 @@ interface Props {
   adding: boolean;
   setAdding: (v: boolean) => void;
   onAdded: (tn: TypeName) => void;
-  onOpenPalette: () => void;
 }
 
 export function AddLayer({
   catalog, dispatch, inactive, bodyType, t, tl,
-  adding, setAdding, onAdded, onOpenPalette,
+  adding, setAdding, onAdded,
 }: Props) {
   if (!adding) {
     return (
-      <div className="mt-2 mb-2 flex gap-1">
-        <button
-          type="button"
-          onClick={() => setAdding(true)}
-          className="flex flex-1 items-center gap-2 rounded-md border border-dashed border-border px-3 py-2 text-[12px] text-text-mute hover:bg-surface-2"
-        >
-          <span>＋</span>
-          <span>{t('add.button')}</span>
-          <span className="ml-auto font-mono text-[10px]">
-            {inactive.length} {t('add.available')}
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={onOpenPalette}
-          title={t('add.search')}
-          className="flex items-center gap-1 rounded-md border border-dashed border-border px-3 py-2 text-[12px] text-text-mute hover:bg-surface-2"
-        >
-          <span>🔍</span>
-          <span className="font-mono text-[10px]">⌘K</span>
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={() => setAdding(true)}
+        className="mt-2 mb-2 flex w-full items-center gap-2 rounded-md border border-dashed border-border px-3 py-2 text-[12px] text-text-mute hover:bg-surface-2"
+      >
+        <span>＋</span>
+        <span>{t('add.button')}</span>
+        <span className="ml-auto font-mono text-[10px]">
+          {inactive.length} {t('add.available')}
+        </span>
+      </button>
     );
   }
 
