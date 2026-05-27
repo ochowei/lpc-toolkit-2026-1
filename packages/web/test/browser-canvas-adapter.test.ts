@@ -56,4 +56,61 @@ describe('createBrowserCanvasAdapter', () => {
       vi.unstubAllGlobals();
     }
   });
+
+  it('limits concurrent fetches to 6 in-flight calls', async () => {
+    let active = 0;
+    let peakActive = 0;
+    const totalRequests = 20;
+    const releaseControllers: Array<() => void> = [];
+
+    const blob = new Blob(['image']);
+    const bitmap = { width: 1, height: 1 };
+    const documentStub = { baseURI: 'http://x/' } satisfies Pick<
+      Document,
+      'baseURI'
+    >;
+
+    const fetchMock = vi.fn<(url: string) => Promise<Response>>().mockImplementation(
+      async () => {
+        active++;
+        if (active > peakActive) peakActive = active;
+        await new Promise<void>((resolve) => releaseControllers.push(resolve));
+        active--;
+        return new Response(blob);
+      },
+    );
+    const createImageBitmapMock = vi
+      .fn<(image: Blob) => Promise<ImageBitmap>>()
+      .mockResolvedValue(bitmap as ImageBitmap);
+
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('createImageBitmap', createImageBitmapMock);
+    vi.stubGlobal('document', documentStub);
+
+    try {
+      const adapter = createBrowserCanvasAdapter('local');
+      const pending = Array.from({ length: totalRequests }, (_, i) =>
+        adapter.loadImage(`spritesheets/img-${i}.png`),
+      );
+      // Give microtasks a chance to schedule.
+      await new Promise<void>((resolve) => setTimeout(resolve, 10));
+
+      expect(peakActive).toBeLessThanOrEqual(6);
+      expect(peakActive).toBeGreaterThan(0);
+      expect(releaseControllers.length).toBeLessThanOrEqual(6);
+
+      // Drain: release all queued fetches one by one.
+      while (releaseControllers.length > 0) {
+        const next = releaseControllers.shift();
+        if (next) next();
+        await new Promise<void>((resolve) => setTimeout(resolve, 1));
+      }
+      await Promise.all(pending);
+
+      expect(fetchMock).toHaveBeenCalledTimes(totalRequests);
+      expect(peakActive).toBeLessThanOrEqual(6);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });
