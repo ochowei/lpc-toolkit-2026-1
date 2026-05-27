@@ -96,25 +96,23 @@ export function AttributionPopover({
     return out;
   }, [catalog, state.selections, licenseFilter, animationFilter]);
 
-  const summary = useMemo(
-    () => summarizeAttribution(catalog, state, licenseFilter, animationFilter),
-    [catalog, state.selections, licenseFilter, animationFilter],
-  );
-
   return (
     <>
-      {!externalAnchorRef && (
-        <Button
-          ref={anchorRef}
-          size="sm"
-          variant={summary.incompatibleAny ? 'primary' : 'default'}
-          className={summary.incompatibleAny ? 'border-danger text-danger' : ''}
-          onClick={() => setOpen(!open)}
-        >
-          {summary.incompatibleAny ? '⚠ ' : '© '}
-          {t('attribution.title')} · {summary.sourceCount}
-        </Button>
-      )}
+      {!externalAnchorRef && (() => {
+        const summary = summarizeAttribution(catalog, state, licenseFilter, animationFilter);
+        return (
+          <Button
+            ref={anchorRef}
+            size="sm"
+            variant={summary.incompatibleAny ? 'primary' : 'default'}
+            className={summary.incompatibleAny ? 'border-danger text-danger' : ''}
+            onClick={() => setOpen(!open)}
+          >
+            {summary.incompatibleAny ? '⚠ ' : '© '}
+            {t('attribution.title')} · {summary.sourceCount}
+          </Button>
+        );
+      })()}
       {open && pos && (
         <div
           ref={panelRef}
