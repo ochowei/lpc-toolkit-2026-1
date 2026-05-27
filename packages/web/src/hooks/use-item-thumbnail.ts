@@ -44,6 +44,22 @@ function findItemDef(
 }
 
 /**
+ * Resolve the variant for a thumbnail Selection. Caller's explicit
+ * `args.variant` wins; otherwise fall back to `def.variants[0]` so items
+ * declaring variants (e.g. Skeleton head whose sprites live at
+ * `head/heads/skeleton/adult/walk/skeleton.png`) render instead of 404ing
+ * on `…/walk.png`. Mirrors the contract `pickActionForItem` and core's
+ * `buildSelection` already use when constructing Selections elsewhere.
+ */
+export function effectiveThumbnailVariant(
+  explicit: string | undefined,
+  def: ItemDefinition | undefined,
+): string | undefined {
+  if (explicit !== undefined) return explicit;
+  return def?.variants?.[0];
+}
+
+/**
  * For items whose layer paths reference `${siblingType}` (e.g. expressions
  * reference `${head}`), the core `replaceInPath` needs a sibling Selection
  * in `selections.items[siblingType]` to substitute. The thumbnail call
@@ -115,6 +131,7 @@ export function useItemThumbnail(args: UseItemThumbnailArgs): UseItemThumbnailRe
     const siblings = def
       ? siblingSelectionsFor(def, args.bodyType)
       : {};
+    const variant = effectiveThumbnailVariant(args.variant, def);
     const selections: Selections = {
       bodyType: args.bodyType,
       items: {
@@ -122,7 +139,7 @@ export function useItemThumbnail(args: UseItemThumbnailArgs): UseItemThumbnailRe
         [args.typeName]: {
           typeName: args.typeName,
           name: args.name,
-          ...(args.variant ? { variant: args.variant } : {}),
+          ...(variant ? { variant } : {}),
           ...(args.recolor ? { recolor: args.recolor } : {}),
         },
       },
