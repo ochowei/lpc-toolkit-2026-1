@@ -3,6 +3,8 @@ import { ITEM_NAME_LABELS_ZH } from './i18n-item-names';
 export const TRANSLATIONS = {
   en: {
     'app.subtitle': 'foundation slice',
+    'topBar.upstreamLink':
+      'Open this character in the upstream Universal LPC Sprite Sheet Character Generator',
     'source.project':
       'Based on Universal LPC Spritesheet Character Generator',
     'theme.light': 'Light',
@@ -160,6 +162,8 @@ export const TRANSLATIONS = {
   },
   'zh-TW': {
     'app.subtitle': '基礎切片',
+    'topBar.upstreamLink':
+      '在原始 Universal LPC Sprite Sheet Character Generator 開啟此角色',
     'source.project':
       '本專案源自 Universal LPC Spritesheet Character Generator',
     'theme.light': '淺色',
