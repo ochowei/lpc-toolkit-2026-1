@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   composeSelections,
   makeResolvePalette,
+  serializeHash,
   type AnimationName,
   type Catalog,
   type HashWarning,
@@ -42,6 +43,7 @@ import { useComposedCharacter } from '../../hooks/use-composed-character';
 import { Button } from '../ui/button';
 import { createBrowserCanvasAdapter } from '../../adapter/browser-canvas-adapter';
 import { toSelections } from '../../slice/selection';
+import { buildUpstreamUrl } from '../../lib/upstream-url';
 import type { ZipExportKind } from '../../lib/zip-export';
 import {
   loadCustomOverlayImage,
@@ -240,6 +242,11 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   const loadingProgress =
     composeResult.status === 'loading' ? composeResult.progress : null;
 
+  const upstreamHref = useMemo(
+    () => buildUpstreamUrl(serializeHash(toSelections(props.state))),
+    [props.state.bodyType, props.state.selections],
+  );
+
   const handleForceReload = () => {
     cacheClear();
     setReloadCounter((c) => c + 1);
@@ -329,6 +336,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
       <TopBar
         t={t}
         loadingProgress={loadingProgress}
+        upstreamHref={upstreamHref}
         rightSlot={
           <MoreMenuPopover
             open={popover === 'more'}

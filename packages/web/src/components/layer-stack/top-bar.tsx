@@ -4,12 +4,14 @@ import type { Translator } from '../../i18n';
 interface Props {
   t: Translator;
   loadingProgress: number | null;
+  upstreamHref: string;
   rightSlot?: ReactNode;
 }
 
 export function TopBar({
   t,
   loadingProgress,
+  upstreamHref,
   rightSlot,
   children,
 }: PropsWithChildren<Props>) {
@@ -23,11 +25,13 @@ export function TopBar({
           {t('app.subtitle')}
           {' · '}
           <a
-            href="?ui=v1"
+            href={upstreamHref}
+            target="_blank"
+            rel="noopener noreferrer"
             className="underline-offset-2 hover:text-text-mute hover:underline"
-            title="legacy UI (v1)"
+            title={t('topBar.upstreamLink')}
           >
-            v1
+            upstream
           </a>
         </span>
       </div>
