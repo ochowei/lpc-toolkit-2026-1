@@ -1,6 +1,7 @@
 import { useRef, type RefObject, type ButtonHTMLAttributes } from 'react';
 import { Button } from '../../ui/button';
 import { usePopover } from './use-popover';
+import { cn } from '../../../lib/cn';
 import type { Locale, Translator } from '../../../i18n';
 
 export type MoreMenuTarget = 'token' | 'reset' | 'attribution';
@@ -51,6 +52,8 @@ export function MoreMenuPopover({
         className={attributionIncompatible ? 'border border-danger text-danger' : ''}
         onClick={() => setOpen(!open)}
         aria-label={t('more.title')}
+        aria-haspopup="menu"
+        aria-expanded={open}
         title={t('more.title')}
       >
         ⋯
@@ -62,6 +65,8 @@ export function MoreMenuPopover({
           className="w-56 rounded-md border border-border bg-surface p-1 text-[12px] shadow-lg"
           role="menu"
         >
+          {/* Right-anchored: panel hugs viewport right edge (12px gutter) instead of pos.left,
+              because ⋯ sits at the navbar's right end and a left-anchored panel could clip. */}
           <MenuItem onClick={() => handlePick('token')}>
             <span>🔗 {t('token.title')}</span>
           </MenuItem>
@@ -114,10 +119,10 @@ function MenuItem({
       type="button"
       role="menuitem"
       onClick={onClick}
-      className={
-        'flex w-full items-center gap-2 rounded px-2 py-1.5 text-left hover:bg-surface-2 ' +
-        (className ?? '')
-      }
+      className={cn(
+        'flex w-full items-center gap-2 rounded px-2 py-1.5 text-left hover:bg-surface-2',
+        className,
+      )}
       {...rest}
     >
       {children}
