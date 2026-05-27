@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type RefObject } from 'react';
 import {
   decodeSelectionToken,
   encodeSelectionToken,
@@ -18,18 +18,31 @@ interface Props {
   catalog: Catalog;
   t: Translator;
   onStatus: (text: string) => void;
+  /** When provided, the popover renders panel-only (no built-in trigger). */
+  anchorRef?: RefObject<HTMLButtonElement>;
 }
 
-export function TokenPopover({ open, setOpen, state, dispatch, catalog, t, onStatus }: Props) {
-  const { anchorRef, panelRef, pos } = usePopover(open, () => setOpen(false));
+export function TokenPopover({
+  open,
+  setOpen,
+  state,
+  dispatch,
+  catalog,
+  t,
+  onStatus,
+  anchorRef: externalAnchorRef,
+}: Props) {
+  const { anchorRef, panelRef, pos } = usePopover(open, () => setOpen(false), externalAnchorRef);
   const token = useMemo(() => encodeSelectionToken(toSelections(state)), [state]);
   const [paste, setPaste] = useState('');
 
   return (
     <>
-      <Button ref={anchorRef} size="sm" variant={open ? 'primary' : 'default'} onClick={() => setOpen(!open)}>
-        🔗 Token
-      </Button>
+      {!externalAnchorRef && (
+        <Button ref={anchorRef} size="sm" variant={open ? 'primary' : 'default'} onClick={() => setOpen(!open)}>
+          🔗 Token
+        </Button>
+      )}
       {open && pos && (
         <div
           ref={panelRef}
@@ -45,14 +58,17 @@ export function TokenPopover({ open, setOpen, state, dispatch, catalog, t, onSta
             className="mb-2 h-16 w-full resize-none rounded border border-border bg-surface-2 p-2 text-[11px] font-mono"
           />
           <div className="mb-2 flex gap-1">
-            <Button size="sm" onClick={async () => {
-              try {
-                await navigator.clipboard.writeText(token);
-                onStatus(`${t('token.copy')} ✓`);
-              } catch {
-                onStatus(t('token.copyFailed'));
-              }
-            }}>
+            <Button
+              size="sm"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(token);
+                  onStatus(`${t('token.copy')} ✓`);
+                } catch {
+                  onStatus(t('token.copyFailed'));
+                }
+              }}
+            >
               {t('token.copy')}
             </Button>
             <Button
