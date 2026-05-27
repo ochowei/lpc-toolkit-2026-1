@@ -11,6 +11,6 @@
       "@lpc-toolkit/core": ["../core/src/index.ts"]
     }
   },
-  "include": ["src", "test", "scripts", "vite.config.ts", "vitest.config.ts"],
+  "include": ["src", "test", "scripts", "e2e", "vite.config.ts", "vitest.config.ts", "playwright.config.ts"],
   "exclude": ["dist", "node_modules"]
 }
