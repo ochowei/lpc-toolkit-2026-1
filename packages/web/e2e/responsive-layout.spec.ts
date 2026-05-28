@@ -49,7 +49,7 @@ test.describe('responsive layout', () => {
 
     const fits = await panel.evaluate((el) => {
       const rect = el.getBoundingClientRect();
-      return rect.left >= 0 && rect.right <= window.innerWidth && rect.bottom <= window.innerHeight;
+      return rect.top >= 0 && rect.left >= 0 && rect.right <= window.innerWidth && rect.bottom <= window.innerHeight;
     });
     expect(fits).toBe(true);
   });
