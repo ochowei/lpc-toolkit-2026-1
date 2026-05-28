@@ -146,7 +146,7 @@ export function DownloadPopover({
       {open && pos && (
         <div
           ref={panelRef}
-          style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 50 }}
+          style={{ position: 'fixed', top: pos.top, right: 12, zIndex: 50 }}
           data-testid="download-popover"
           className="max-h-[calc(100vh-5rem)] w-72 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-md border border-border bg-surface p-3 shadow-lg"
         >
