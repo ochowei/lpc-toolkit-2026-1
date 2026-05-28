@@ -159,6 +159,8 @@ export const TRANSLATIONS = {
     'more.preferences': 'Preferences',
     'more.language': 'Language',
     'more.theme': 'Theme',
+    'mobile.preview': 'Preview',
+    'mobile.layers': 'Layers',
   },
   'zh-TW': {
     'app.subtitle': '基礎切片',
@@ -313,6 +315,8 @@ export const TRANSLATIONS = {
     'more.preferences': '偏好',
     'more.language': '語言',
     'more.theme': '主題',
+    'mobile.preview': '預覽',
+    'mobile.layers': '圖層',
   },
 } as const;
 
