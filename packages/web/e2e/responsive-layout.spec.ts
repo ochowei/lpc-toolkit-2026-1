@@ -10,6 +10,8 @@ test.describe('responsive layout', () => {
     await expect(page.getByRole('navigation', { name: 'Mobile view' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Preview' })).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('canvas')).toBeVisible({ timeout: 30_000 });
+    await page.getByTitle('Reload assets').click();
+    await expect(page.getByRole('status')).toContainText('Reloaded.');
 
     await page.getByRole('button', { name: 'Layers' }).click();
     await expect(page.getByText('Your layers')).toBeVisible();

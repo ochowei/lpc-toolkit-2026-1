@@ -38,6 +38,7 @@ import { AttributionPopover } from './popovers/attribution-popover';
 import { DownloadPopover } from './popovers/download-popover';
 import { MoreMenuPopover } from './popovers/more-menu-popover';
 import { summarizeAttribution } from './popovers/attribution-summary';
+import { StatusToast } from './status-toast';
 import { cacheClear } from '../../hooks/thumbnail-cache';
 import { useComposedCharacter } from '../../hooks/use-composed-character';
 import { useMediaQuery } from '../../hooks/use-media-query';
@@ -364,7 +365,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
       tl={props.tl}
       onPresetApplied={handlePresetApplied}
       onReset={handleReset}
-      status={status}
+      status={isDesktop ? status : null}
       expanded={expanded}
       setExpanded={setExpanded}
       searchInputRef={searchInputRef}
@@ -479,6 +480,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
           <main className="min-h-0 flex-1 overflow-hidden bg-app">
             {mobileView === 'preview' ? previewPane : stackPanel}
           </main>
+          <StatusToast status={status} />
           <MobileBottomNav value={mobileView} onChange={setMobileView} t={props.t} />
         </div>
       )}
