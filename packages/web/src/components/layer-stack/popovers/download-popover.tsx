@@ -28,6 +28,16 @@ interface ZipRunning {
   progress: number;
 }
 
+const DOWNLOAD_POPOVER_WIDTH = 288;
+const VIEWPORT_GUTTER = 12;
+
+function clampDownloadPopoverLeft(left: number): number {
+  if (typeof window === 'undefined') return left;
+
+  const maxLeft = window.innerWidth - DOWNLOAD_POPOVER_WIDTH - VIEWPORT_GUTTER;
+  return Math.max(VIEWPORT_GUTTER, Math.min(left, maxLeft));
+}
+
 interface Props {
   open: boolean;
   setOpen: (v: boolean) => void;
@@ -146,7 +156,12 @@ export function DownloadPopover({
       {open && pos && (
         <div
           ref={panelRef}
-          style={{ position: 'fixed', top: pos.top, right: 12, zIndex: 50 }}
+          style={{
+            position: 'fixed',
+            top: pos.top,
+            left: clampDownloadPopoverLeft(pos.left),
+            zIndex: 50,
+          }}
           data-testid="download-popover"
           className="max-h-[calc(100vh-5rem)] w-72 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-md border border-border bg-surface p-3 shadow-lg"
         >
