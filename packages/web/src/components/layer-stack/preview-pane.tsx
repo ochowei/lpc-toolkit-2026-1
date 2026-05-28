@@ -107,7 +107,7 @@ export function PreviewPane({
   return (
     <div ref={previewRef} className="relative flex h-full min-h-0 flex-col">
       {/* Action bar — now at the TOP, above the single preview. */}
-      <div className="flex items-center gap-3 border-b border-border bg-surface px-3 py-2 text-xs">
+      <div className="flex flex-wrap items-center gap-2 border-b border-border bg-surface px-2 py-2 text-xs sm:gap-3 sm:px-3">
         <div className="flex gap-0.5">
           <Button size="sm" variant={state.dir === 'up' ? 'primary' : 'ghost'}
             className="w-6 px-0"
@@ -133,13 +133,14 @@ export function PreviewPane({
           {state.playing ? '⏸' : '▶'}
         </Button>
 
-        <span className="ml-auto font-mono text-[10px] text-text-mute">
+        <span className="ml-auto whitespace-nowrap font-mono text-[10px] text-text-mute">
           f{String(currentFrame + 1).padStart(2, '0')}/
           {String(totalFrames).padStart(2, '0')} · {fps}fps
         </span>
         <Button
           size="sm"
           variant={fullSheet.open ? 'primary' : 'default'}
+          className="shrink-0"
           onClick={() => fullSheetActions.setOpen(!fullSheet.open)}
           title={t('fullSheet.toggle')}
         >

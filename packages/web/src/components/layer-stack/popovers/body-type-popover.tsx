@@ -33,7 +33,7 @@ export function BodyTypePopover({ open, setOpen, state, dispatch, catalog, t, tl
         <div
           ref={panelRef}
           style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 50 }}
-          className="rounded-md border border-border bg-surface p-2 shadow-lg"
+          className="max-h-[calc(100vh-5rem)] max-w-[calc(100vw-1rem)] overflow-y-auto rounded-md border border-border bg-surface p-2 shadow-lg"
         >
           <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-text-mute">
             {t('bodyType.title')}

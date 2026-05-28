@@ -38,8 +38,10 @@ import { AttributionPopover } from './popovers/attribution-popover';
 import { DownloadPopover } from './popovers/download-popover';
 import { MoreMenuPopover } from './popovers/more-menu-popover';
 import { summarizeAttribution } from './popovers/attribution-summary';
+import { StatusToast } from './status-toast';
 import { cacheClear } from '../../hooks/thumbnail-cache';
 import { useComposedCharacter } from '../../hooks/use-composed-character';
+import { useMediaQuery } from '../../hooks/use-media-query';
 import { Button } from '../ui/button';
 import { createBrowserCanvasAdapter } from '../../adapter/browser-canvas-adapter';
 import { toSelections } from '../../slice/selection';
@@ -50,6 +52,10 @@ import {
   parseCustomOverlayZPos,
   type CustomOverlay,
 } from '../../lib/custom-overlay';
+import {
+  MobileBottomNav,
+  type MobileView,
+} from './mobile-bottom-nav';
 
 export interface LayerStackHarnessProps {
   catalog: Catalog;
@@ -89,6 +95,8 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   const [splitterRatio, setSplitterRatio] = useState(0.5);
   const [customOverlay, setCustomOverlay] = useState<CustomOverlay | null>(null);
   const [customOverlayZPos, setCustomOverlayZPos] = useState(0);
+  const isDesktop = useMediaQuery('(min-width: 768px)');
+  const [mobileView, setMobileView] = useState<MobileView>('preview');
 
   const [zipRunning, setZipRunning] = useState<null | {
     kind: ZipExportKind;
@@ -331,6 +339,50 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     }
   };
 
+  const stackPanel = (
+    <StackPanel
+      catalog={props.catalog}
+      palettes={props.palettes}
+      state={props.state}
+      dispatch={props.dispatch}
+      shownTypeNames={props.shownTypeNames}
+      licenseFilter={licenseFilter}
+      toggleLicenseGroup={toggleLicenseGroup}
+      licenseIncompatibleCount={licenseIncompatibleCount}
+      removeLicenseIncompatibleSelections={removeLicenseIncompatibleSelections}
+      animationFilter={animationFilter}
+      toggleAnimation={toggleAnimation}
+      animationIncompatibleCount={animationIncompatibleCount}
+      removeAnimationIncompatibleSelections={removeAnimationIncompatibleSelections}
+      assetSource={props.assetSource}
+      setAssetSource={props.onAssetSourceChange}
+      customOverlay={customOverlay}
+      customOverlayZPos={customOverlayZPos}
+      onCustomOverlayUpload={handleCustomOverlayUpload}
+      onCustomOverlayZPosChange={handleCustomOverlayZPosChange}
+      onClearCustomOverlay={clearCustomOverlay}
+      t={props.t}
+      tl={props.tl}
+      onPresetApplied={handlePresetApplied}
+      onReset={handleReset}
+      status={isDesktop ? status : null}
+      expanded={expanded}
+      setExpanded={setExpanded}
+      searchInputRef={searchInputRef}
+    />
+  );
+
+  const previewPane = (
+    <PreviewPane
+      state={props.state}
+      dispatch={props.dispatch}
+      t={t}
+      result={composeResult}
+      fullSheet={fullSheet}
+      fullSheetActions={fullSheetActions}
+    />
+  );
+
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-app text-text">
       <TopBar
@@ -414,51 +466,24 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
           ↻
         </Button>
       </TopBar>
-      <div className="relative grid min-h-0 flex-1 grid-cols-[340px_1fr]">
-        <aside className="min-h-0 overflow-hidden border-r border-border bg-surface">
-          <StackPanel
-            catalog={props.catalog}
-            palettes={props.palettes}
-            state={props.state}
-            dispatch={props.dispatch}
-            shownTypeNames={props.shownTypeNames}
-            licenseFilter={licenseFilter}
-            toggleLicenseGroup={toggleLicenseGroup}
-            licenseIncompatibleCount={licenseIncompatibleCount}
-            removeLicenseIncompatibleSelections={removeLicenseIncompatibleSelections}
-            animationFilter={animationFilter}
-            toggleAnimation={toggleAnimation}
-            animationIncompatibleCount={animationIncompatibleCount}
-            removeAnimationIncompatibleSelections={removeAnimationIncompatibleSelections}
-            assetSource={props.assetSource}
-            setAssetSource={props.onAssetSourceChange}
-            customOverlay={customOverlay}
-            customOverlayZPos={customOverlayZPos}
-            onCustomOverlayUpload={handleCustomOverlayUpload}
-            onCustomOverlayZPosChange={handleCustomOverlayZPosChange}
-            onClearCustomOverlay={clearCustomOverlay}
-            t={props.t}
-            tl={props.tl}
-            onPresetApplied={handlePresetApplied}
-            onReset={handleReset}
-            status={status}
-            expanded={expanded}
-            setExpanded={setExpanded}
-            searchInputRef={searchInputRef}
-          />
-        </aside>
-        <main className="min-h-0 overflow-hidden bg-app">
-          <PreviewPane
-            state={props.state}
-            dispatch={props.dispatch}
-            t={t}
-            result={composeResult}
-            fullSheet={fullSheet}
-            fullSheetActions={fullSheetActions}
-          />
-        </main>
-
-      </div>
+      {isDesktop ? (
+        <div className="relative grid min-h-0 flex-1 grid-cols-[340px_1fr]">
+          <aside className="min-h-0 overflow-hidden border-r border-border bg-surface">
+            {stackPanel}
+          </aside>
+          <main className="min-h-0 overflow-hidden bg-app">
+            {previewPane}
+          </main>
+        </div>
+      ) : (
+        <div className="flex min-h-0 flex-1 flex-col">
+          <main className="min-h-0 flex-1 overflow-hidden bg-app">
+            {mobileView === 'preview' ? previewPane : stackPanel}
+          </main>
+          <StatusToast status={status} />
+          <MobileBottomNav value={mobileView} onChange={setMobileView} t={props.t} />
+        </div>
+      )}
     </div>
   );
 }

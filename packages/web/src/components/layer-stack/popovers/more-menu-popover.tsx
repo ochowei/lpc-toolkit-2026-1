@@ -62,7 +62,7 @@ export function MoreMenuPopover({
         <div
           ref={panelRef}
           style={{ position: 'fixed', top: pos.top, right: 12, zIndex: 50 }}
-          className="w-56 rounded-md border border-border bg-surface p-1 text-[12px] shadow-lg"
+          className="max-h-[calc(100vh-5rem)] w-56 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-md border border-border bg-surface p-1 text-[12px] shadow-lg"
           role="menu"
         >
           {/* Right-anchored: panel hugs viewport right edge (12px gutter) instead of pos.left,
