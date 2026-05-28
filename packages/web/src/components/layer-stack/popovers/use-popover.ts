@@ -8,7 +8,12 @@ export function usePopover(
   const internalAnchorRef = useRef<HTMLButtonElement>(null);
   const anchorRef = externalAnchorRef ?? internalAnchorRef;
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const onCloseRef = useRef(onClose);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!open) { setPos(null); return; }
@@ -21,16 +26,16 @@ export function usePopover(
       if (!panelRef.current) return;
       if (panelRef.current.contains(e.target as Node)) return;
       if (anchorRef.current?.contains(e.target as Node)) return;
-      onClose();
+      onCloseRef.current();
     };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onCloseRef.current(); };
     document.addEventListener('mousedown', onDoc);
     document.addEventListener('keydown', onKey);
     return () => {
       document.removeEventListener('mousedown', onDoc);
       document.removeEventListener('keydown', onKey);
     };
-  }, [open, onClose]);
+  }, [anchorRef, open]);
 
   return { anchorRef, panelRef, pos };
 }
