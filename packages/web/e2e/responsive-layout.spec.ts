@@ -25,6 +25,7 @@ test.describe('responsive layout', () => {
   });
 
   test('desktop keeps the two-column editor and hides mobile nav', async ({ page }) => {
+    const errors = attachConsoleCollector(page);
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto('/?assetSource=local');
 
@@ -37,9 +38,11 @@ test.describe('responsive layout', () => {
     const sidebarWidth = await page.locator('aside').first().evaluate((el) => el.getBoundingClientRect().width);
     expect(sidebarWidth).toBeGreaterThanOrEqual(330);
     expect(sidebarWidth).toBeLessThanOrEqual(350);
+    expect(errors).toEqual([]);
   });
 
   test('mobile download popover fits within the viewport', async ({ page }) => {
+    const errors = attachConsoleCollector(page);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/?assetSource=local');
 
@@ -52,5 +55,6 @@ test.describe('responsive layout', () => {
       return rect.top >= 0 && rect.left >= 0 && rect.right <= window.innerWidth && rect.bottom <= window.innerHeight;
     });
     expect(fits).toBe(true);
+    expect(errors).toEqual([]);
   });
 });
