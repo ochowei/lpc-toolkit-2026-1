@@ -51,7 +51,7 @@ export function TokenPopover({
               ? { position: 'fixed', top: pos.top, right: 12, zIndex: 50 }
               : { position: 'fixed', top: pos.top, left: pos.left, zIndex: 50 }
           }
-          className="w-80 rounded-md border border-border bg-surface p-3 shadow-lg"
+          className="max-h-[calc(100vh-5rem)] w-80 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-md border border-border bg-surface p-3 shadow-lg"
         >
           <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-text-mute">
             {t('token.title')}

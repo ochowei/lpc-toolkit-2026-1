@@ -121,7 +121,7 @@ export function AttributionPopover({
               ? { position: 'fixed', top: pos.top, right: 12, zIndex: 50 }
               : { position: 'fixed', top: pos.top, left: pos.left, zIndex: 50 }
           }
-          className="max-h-96 w-96 overflow-y-auto rounded-md border border-border bg-surface p-3 shadow-lg"
+          className="max-h-[calc(100vh-5rem)] w-96 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-md border border-border bg-surface p-3 shadow-lg"
         >
           <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-text-mute">
             {t('attribution.title')}

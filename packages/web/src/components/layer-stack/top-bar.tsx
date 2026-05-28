@@ -16,12 +16,12 @@ export function TopBar({
   children,
 }: PropsWithChildren<Props>) {
   return (
-    <header className="flex items-center gap-2 border-b border-border bg-surface px-3 py-2 text-xs">
-      <div className="mr-1 flex flex-col leading-none">
+    <header className="flex flex-wrap items-center gap-2 border-b border-border bg-surface px-2 py-2 text-xs sm:px-3 md:flex-nowrap">
+      <div className="mr-1 flex min-w-0 flex-col leading-none">
         <span className="text-[13px] font-bold tracking-tight">
           LPC<span className="font-medium text-text-mute">·Toolkit</span>
         </span>
-        <span className="font-mono text-[9px] text-text-dim">
+        <span className="hidden font-mono text-[9px] text-text-dim sm:inline">
           {t('app.subtitle')}
           {' · '}
           <a
@@ -36,7 +36,7 @@ export function TopBar({
         </span>
       </div>
       {children /* slots for BodyType pill, popovers, attribution */}
-      <div className="flex-1" />
+      <div className="min-w-2 flex-1" />
       {loadingProgress != null && loadingProgress < 1 && (
         <span className="inline-flex items-center gap-1 font-mono text-[10px] text-text-dim">
           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />

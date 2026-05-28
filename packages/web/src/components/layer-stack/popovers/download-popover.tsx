@@ -147,7 +147,8 @@ export function DownloadPopover({
         <div
           ref={panelRef}
           style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 50 }}
-          className="w-72 rounded-md border border-border bg-surface p-3 shadow-lg"
+          data-testid="download-popover"
+          className="max-h-[calc(100vh-5rem)] w-72 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-md border border-border bg-surface p-3 shadow-lg"
         >
           <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-text-mute">
             {t('download.title')}
