@@ -11,6 +11,7 @@ import {
   type Selections,
   type TypeName,
 } from '@lpc-toolkit/core';
+import { e2eProbeFromUrl } from '../../lib/e2e-probe-from-url';
 import type {
   FullSheetUiState,
   FullSheetUiActions,
@@ -40,7 +41,10 @@ import { MoreMenuPopover } from './popovers/more-menu-popover';
 import { summarizeAttribution } from './popovers/attribution-summary';
 import { StatusToast } from './status-toast';
 import { cacheClear } from '../../hooks/thumbnail-cache';
-import { useComposedCharacter } from '../../hooks/use-composed-character';
+import {
+  useComposedCharacter,
+  type ComposedResult,
+} from '../../hooks/use-composed-character';
 import { useMediaQuery } from '../../hooks/use-media-query';
 import { Button } from '../ui/button';
 import { createBrowserCanvasAdapter } from '../../adapter/browser-canvas-adapter';
@@ -56,6 +60,29 @@ import {
   MobileBottomNav,
   type MobileView,
 } from './mobile-bottom-nav';
+
+interface LpcE2eProbe {
+  readonly hash: string;
+  readonly bodyType: string;
+  readonly status: ComposedResult['status'];
+  readonly creditsCount: number;
+  readonly layers: readonly {
+    readonly path: string;
+    readonly zPos: number;
+    readonly typeName: string;
+  }[];
+  readonly canvas: {
+    readonly width: number;
+    readonly height: number;
+    readonly dataUrl: string;
+  } | null;
+}
+
+declare global {
+  interface Window {
+    __LPC_E2E__?: LpcE2eProbe;
+  }
+}
 
 export interface LayerStackHarnessProps {
   catalog: Catalog;
@@ -249,11 +276,52 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   );
   const loadingProgress =
     composeResult.status === 'loading' ? composeResult.progress : null;
-
-  const upstreamHref = useMemo(
-    () => buildUpstreamUrl(serializeHash(toSelections(props.state))),
+  const e2eProbeEnabled =
+    typeof window !== 'undefined' && e2eProbeFromUrl(window.location.search);
+  const canonicalHash = useMemo(
+    () => serializeHash(toSelections(props.state)),
     [props.state.bodyType, props.state.selections],
   );
+
+  const upstreamHref = useMemo(
+    () => buildUpstreamUrl(canonicalHash),
+    [canonicalHash],
+  );
+
+  useEffect(() => {
+    if (!e2eProbeEnabled) {
+      delete window.__LPC_E2E__;
+      return;
+    }
+
+    const sheet = composeResult.sheet;
+    window.__LPC_E2E__ = {
+      hash: canonicalHash,
+      bodyType: props.state.bodyType,
+      status: composeResult.status,
+      creditsCount: sheet?.credits.entries.length ?? 0,
+      layers:
+        sheet?.layers.map((layer) => ({
+          path: layer.path,
+          zPos: layer.zPos,
+          typeName: layer.typeName,
+        })) ?? [],
+      canvas:
+        sheet && composeResult.status === 'ready'
+          ? {
+              width: sheet.width,
+              height: sheet.height,
+              dataUrl: (sheet.canvas as unknown as HTMLCanvasElement).toDataURL(),
+            }
+          : null,
+    };
+  }, [
+    canonicalHash,
+    composeResult.status,
+    composeResult.sheet,
+    e2eProbeEnabled,
+    props.state.bodyType,
+  ]);
 
   const handleForceReload = () => {
     cacheClear();
