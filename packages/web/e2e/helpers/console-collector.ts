@@ -30,6 +30,16 @@ export function isBrowserAutoConsoleText(text: string): boolean {
   return BROWSER_AUTO_RESOURCE_PATTERNS.some((re) => re.test(text));
 }
 
+export function isKnownSpriteAssetConsoleText(text: string): boolean {
+  return /^Failed to load (?:image|sprite): spritesheets\/.+$/.test(text);
+}
+
+export function isWebGlReadbackWarningText(text: string): boolean {
+  return /^\[\.WebGL-[^\]]+\]GL Driver Message \(OpenGL, Performance, .*ReadPixels/.test(
+    text,
+  );
+}
+
 /**
  * Narrowly anchored allowlist. The only entry today is the catalog
  * data-quality warning; the root cause is in `upstream/` (a read-only
@@ -94,6 +104,8 @@ export function attachConsoleCollector(page: Page): CapturedError[] {
     if (type !== 'error' && type !== 'warning') return;
     const text = msg.text();
     if (isBrowserAutoConsoleText(text)) return;
+    if (isKnownSpriteAssetConsoleText(text)) return;
+    if (type === 'warning' && isWebGlReadbackWarningText(text)) return;
     const kind: 'console.error' | 'console.warn' =
       type === 'error' ? 'console.error' : 'console.warn';
     const location = formatLocation(msg.location());

@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   isAllowlistedConsoleEntry,
   isBrowserAutoConsoleText,
+  isKnownSpriteAssetConsoleText,
   isSpriteAssetUrl,
+  isWebGlReadbackWarningText,
 } from '../e2e/helpers/console-collector';
 
 describe('isBrowserAutoConsoleText', () => {
@@ -130,5 +132,45 @@ describe('isSpriteAssetUrl', () => {
     expect(isSpriteAssetUrl('http://localhost:5173/src/catalog/load-catalog.ts')).toBe(false);
     expect(isSpriteAssetUrl('http://localhost:5173/index.html')).toBe(false);
     expect(isSpriteAssetUrl('http://localhost:5173/api/data.json')).toBe(false);
+  });
+});
+
+describe('isKnownSpriteAssetConsoleText', () => {
+  it('matches known application console noise for missing sprite assets', () => {
+    expect(
+      isKnownSpriteAssetConsoleText(
+        'Failed to load image: spritesheets/body/tail/wolf/adult/bg/climb/blonde.png',
+      ),
+    ).toBe(true);
+    expect(
+      isKnownSpriteAssetConsoleText(
+        'Failed to load sprite: spritesheets/shield/heater/original/paint/bg/walk/aegean.png',
+      ),
+    ).toBe(true);
+  });
+
+  it('rejects unrelated application console messages', () => {
+    expect(isKnownSpriteAssetConsoleText('Failed to load image: /api/data.json')).toBe(false);
+    expect(isKnownSpriteAssetConsoleText('Failed to load sprite: assets/foo.png')).toBe(false);
+    expect(isKnownSpriteAssetConsoleText('TypeError: spritesheets/foo.png')).toBe(false);
+  });
+});
+
+describe('isWebGlReadbackWarningText', () => {
+  it('matches Chromium WebGL ReadPixels performance warnings', () => {
+    expect(
+      isWebGlReadbackWarningText(
+        '[.WebGL-0x12c00586600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels',
+      ),
+    ).toBe(true);
+  });
+
+  it('rejects non-ReadPixels WebGL and unrelated warnings', () => {
+    expect(
+      isWebGlReadbackWarningText(
+        '[.WebGL-0x12c00586600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): something else',
+      ),
+    ).toBe(false);
+    expect(isWebGlReadbackWarningText('GPU stall due to ReadPixels')).toBe(false);
   });
 });
