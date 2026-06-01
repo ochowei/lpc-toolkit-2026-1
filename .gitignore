@@ -22,6 +22,7 @@ packages/web/public/spritesheets/
 
 # Local implementation worktrees
 .worktrees/
+.antigravity/
 
 # Playwright e2e artifacts
 packages/web/test-results/
