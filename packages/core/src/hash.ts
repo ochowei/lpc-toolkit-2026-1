@@ -10,9 +10,16 @@ import type {
   TypeName,
 } from './types.js';
 
+/**
+ * Types of warnings raised during hash parsing when an asset identifier,
+ * slot category, or color variant cannot be correctly located.
+ */
 export interface HashWarning {
+  /** The slot category key string parsed from the URL parameter. */
   readonly key: string;
+  /** The value string parsed from the URL parameter. */
   readonly value: string;
+  /** The specific reason for the warning. */
   readonly reason:
     | 'unknown_type_name'
     | 'unknown_item'
@@ -21,17 +28,37 @@ export interface HashWarning {
     | 'malformed';
 }
 
+/**
+ * The consolidated result of parsing a serialized state hash.
+ */
 export interface ParseHashResult {
+  /** The successfully resolved, fully populated selections. */
   readonly selections: Selections;
+  /** Detailed warnings raised for unresolvable items, categories, or colors. */
   readonly warnings: readonly HashWarning[];
+  /** Categorized slot names that were present in the hash but not found in the catalog. */
   readonly unknownKeys: readonly TypeName[];
 }
 
+/** The default body archetype applied when sex or bodyType parameters are absent. */
 const DEFAULT_BODY_TYPE: BodyType = 'male';
+
+/** The version header prefix prepended to packed base64url selection tokens. */
 const SELECTION_TOKEN_PREFIX = 'v1.';
+
+/**
+ * Custom URL-safe Base64 alphabet used for token packing/unpacking.
+ * Swaps standard '+' and '/' for '-' and '_' respectively, eliminating padding characters '='.
+ */
 const BASE64URL_ALPHABET =
   'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 
+/**
+ * Strips the leading prefix characters '#' or '?' from a URL hash or search string.
+ * 
+ * @param hash - The raw URL hash or search string.
+ * @returns The cleaned, parameter-only string.
+ */
 function stripHashPrefix(hash: string): string {
   let s = hash;
   if (s.startsWith('#')) s = s.slice(1);
@@ -39,6 +66,12 @@ function stripHashPrefix(hash: string): string {
   return s;
 }
 
+/**
+ * Safely parses a query or hash string into a list of key-value tuples.
+ * 
+ * @param s - The raw query string.
+ * @returns An array of key-value tuples.
+ */
 function parseQueryString(s: string): Array<readonly [string, string]> {
   if (!s) return [];
   const out: Array<readonly [string, string]> = [];
@@ -78,6 +111,25 @@ interface ResolveResult {
  * `palettes` closes the Step 2.1 Q2 deferral: without it, recolor-only
  * items still fall through to `unknown_item` (backward-compatible). The
  * no-`palettes` path is byte-identical to the previous behaviour.
+ * 
+ * Parameter Parsing & Priority Matching Algorithm:
+ * 1. Progressively splits `nameAndVariant` on underscores `_` to separate the core item name
+ *    from its variant/recolor tokens (since item names can contain underscores, we search
+ *    left-to-right from token 1 to the end).
+ * 2. Checks if the candidate item name exists in the catalog under the current `typeName`.
+ * 3. Priority Match 1: If the item defines a list of physical variants, checks if the trailing
+ *    token (split on `|` to separate potential recolors) matches any of these variants.
+ * 4. Priority Match 2: If the item supports recolors, checks if the trailing token (or the recolor part
+ *    after a `|` separator) matches the palette-expanded list of variant swatches.
+ *    - Note: Because "later assignment wins", a recolor match takes precedence and overrides a variant match
+ *      for overlapping names.
+ * 5. Priority Match 3: If no variant or recolor matches, falls back to a bare name match with empty values.
+ * 
+ * @param typeName - The category type name.
+ * @param nameAndVariant - The parameter value (e.g. 'hair_messy1_long' or 'chest_shirt|red').
+ * @param catalog - The compiled asset Catalog.
+ * @param palettes - Optional compiled PaletteMetadata database.
+ * @returns A structure containing the found item, matched variant, and matched recolor.
  */
 function resolveHashParam(
   typeName: TypeName,
@@ -102,6 +154,7 @@ function resolveHashParam(
       let matchedVariant = '';
       let matchedRecolor = '';
 
+      // Match Priority 1: Physical item variants list
       if (item.variants && item.variants.length > 0) {
         for (const variant of item.variants) {
           if (variant.toLowerCase() === variantToMatch) {
@@ -113,6 +166,7 @@ function resolveHashParam(
         }
       }
 
+      // Match Priority 2: Recolor palette expanded variants (overrides variant on overlap)
       if (palettes) {
         const recolorVariants = getRecolorVariants(item, palettes);
         for (const variant of recolorVariants) {
@@ -130,6 +184,7 @@ function resolveHashParam(
         }
       }
 
+      // Match Priority 3: Bare item name fallback
       if (!foundItem && variantToMatch === '' && recolorToMatch === '') {
         foundItem = item;
         matchedVariant = '';
@@ -144,6 +199,15 @@ function resolveHashParam(
   return { foundItem: null, matchedVariant: '', matchedRecolor: '' };
 }
 
+/**
+ * Constructs a Selection record from resolved parse parameters.
+ * 
+ * @param typeName - The category type name.
+ * @param item - The selected ItemDefinition.
+ * @param matchedVariant - The matching variant string.
+ * @param matchedRecolor - The matching recolor string.
+ * @returns A structured selection configuration.
+ */
 function buildSelection(
   typeName: TypeName,
   item: ItemDefinition,
@@ -162,6 +226,14 @@ function buildSelection(
   };
 }
 
+/**
+ * Searches the catalog aliases map to locate redirection definitions for a given key and value.
+ * 
+ * @param aliases - Nested catalog alias maps.
+ * @param typeName - Incoming slot category name.
+ * @param nameAndVariant - Incoming value string.
+ * @returns The matching AliasEntry if found, otherwise `undefined`.
+ */
 function lookupAlias(
   aliases: Catalog['aliases'],
   typeName: TypeName,
@@ -172,6 +244,25 @@ function lookupAlias(
   return byKey.get(nameAndVariant) ?? byKey.get('*');
 }
 
+/**
+ * Parses a serialized URL hash state into structured, validated character `Selections`.
+ * 
+ * Parsing Workflow:
+ * 1. Clean hash prefixes ('#' or '?') and tokenize query parameters.
+ * 2. Parse global parameters like `bodyType` or `sex` (mapped to `selections.bodyType`).
+ * 3. Skip slots explicitly marked as `none`.
+ * 4. Perform alias resolution using the catalog aliases map:
+ *    - Redirect obsolete or short categories (e.g. `torso` alias to `chest`).
+ *    - Expand shortened item/variant tokens.
+ * 5. Locate and validate the target ItemDefinition via `resolveHashParam` which processes
+ *    the names, variants, and palette-expanded recolor swatches.
+ * 6. Record robust warnings for invalid categories, missing items, or unmatched variants.
+ * 
+ * @param hash - The raw URL hash or query string.
+ * @param catalog - The compiled asset Catalog.
+ * @param palettes - Optional compiled PaletteMetadata catalog (enables full recolor parsing).
+ * @returns A ParseHashResult containing resolved selections, warnings, and unrecognized keys.
+ */
 export function parseHash(
   hash: string,
   catalog: Catalog,
@@ -244,6 +335,15 @@ export function parseHash(
   };
 }
 
+/**
+ * Serializes a set of character Selections into a standard URL query string.
+ * Formats spaces as underscores and uses custom delimiter structures to organize
+ * variants and recolors within a parameter value:
+ * - Format: `typeName=itemName_variantName|recolorName`
+ * 
+ * @param selections - The character selections configuration to serialize.
+ * @returns The serialized URL parameter string.
+ */
 export function serializeHash(selections: Selections): string {
   const parts: string[] = [];
   parts.push(`sex=${encodeURIComponent(selections.bodyType)}`);
@@ -259,6 +359,26 @@ export function serializeHash(selections: Selections): string {
   return parts.join('&');
 }
 
+/**
+ * Packs an ASCII string into a URL-safe Base64 token.
+ * 
+ * Bit-Packing Mechanism:
+ * 1. Process the source string in 3-character (3-byte) chunks.
+ * 2. Ensure each byte value belongs to the standard 7-bit ASCII range (<= 0x7F).
+ *    Throws an error if any byte contains non-ASCII characters.
+ * 3. Pack 3 bytes (24 bits total) into a single 24-bit integer accumulator:
+ *    `n = (b1 << 16) | (b2 << 8) | b3`
+ * 4. Extract four 6-bit index values from the accumulator:
+ *    - 1st 6-bit index: `(n >> 18) & 63`
+ *    - 2nd 6-bit index: `(n >> 12) & 63`
+ *    - 3rd 6-bit index (optional): `(n >> 6) & 63`
+ *    - 4th 6-bit index (optional): `n & 63`
+ * 5. Map these indices to characters inside the custom `BASE64URL_ALPHABET` string.
+ * 6. Omits standard Base64 padding characters ('=').
+ * 
+ * @param s - The raw ASCII query string to encode.
+ * @returns The packed URL-safe Base64 string.
+ */
 function encodeBase64UrlAscii(s: string): string {
   let out = '';
   for (let i = 0; i < s.length; i += 3) {
@@ -278,6 +398,25 @@ function encodeBase64UrlAscii(s: string): string {
   return out;
 }
 
+/**
+ * Unpacks a URL-safe Base64 token back to its raw ASCII string.
+ * 
+ * Bit-Unpacking Mechanism:
+ * 1. Validate the length of the Base64 input string (must not be empty, and modulo 4 must not equal 1).
+ * 2. Maintain a bit accumulator (`buffer`) and track the number of accumulated bits (`bits`).
+ * 3. Iterate through each character of the Base64 string:
+ *    - Translate the character to its 6-bit value by locating its index within `BASE64URL_ALPHABET`.
+ *      Throws an error if the character is not present in the alphabet.
+ *    - Shift the 6-bit value into the accumulator: `buffer = (buffer << 6) | value`.
+ *    - Add 6 to the bit count.
+ *    - If 8 or more bits are accumulated, extract the top byte: `(buffer >> (bits - 8)) & 0xFF`,
+ *      decrement the bit count by 8, and push the byte value onto the array.
+ * 4. Verify that all decoded bytes represent valid 7-bit ASCII characters (<= 0x7F).
+ * 5. Reconstruct the raw ASCII string using `String.fromCharCode(...bytes)`.
+ * 
+ * @param s - The packed Base64URL string.
+ * @returns The original ASCII query string.
+ */
 function decodeBase64UrlAscii(s: string): string {
   if (s.length === 0 || s.length % 4 === 1) {
     throw new Error('Malformed selection token');
@@ -303,12 +442,33 @@ function decodeBase64UrlAscii(s: string): string {
   return String.fromCharCode(...bytes);
 }
 
+/**
+ * Compiles a Selections configuration into a compact, shareable, URL-safe Base64 selection token.
+ * Prepends the version prefix `v1.` to ensure future protocol extensibility.
+ * 
+ * @param selections - The character selections configuration.
+ * @returns The formatted packed selection token.
+ */
 export function encodeSelectionToken(selections: Selections): string {
   return `${SELECTION_TOKEN_PREFIX}${encodeBase64UrlAscii(
     serializeHash(selections),
   )}`;
 }
 
+/**
+ * Decodes a shareable selection token back into fully resolved character selections.
+ * 
+ * Decoding Workflow:
+ * 1. Trim whitespace and verify the presence of the `v1.` version prefix header.
+ * 2. Extract and decode the packed Base64 URL-safe ASCII segment.
+ * 3. Validate that the decoded ASCII query string contains key-value parameters ('=').
+ * 4. Delegate to `parseHash` to locate items and assign selections.
+ * 
+ * @param token - The raw packed selection token string.
+ * @param catalog - The compiled asset Catalog.
+ * @param palettes - Optional compiled PaletteMetadata catalog.
+ * @returns The resolved ParseHashResult structure.
+ */
 export function decodeSelectionToken(
   token: string,
   catalog: Catalog,

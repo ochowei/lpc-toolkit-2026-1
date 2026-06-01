@@ -10,11 +10,24 @@ import type {
   TypeName,
 } from './types.js';
 
+/**
+ * Options for configuring the palette resolution process.
+ */
 export interface MakeResolvePaletteOptions {
-  /** Called (warn-and-skip, QH) when a recolor entry can't be resolved. */
+  /** 
+   * Optional callback triggered when a recolor configuration or color option 
+   * cannot be correctly resolved against the palette catalog. 
+   */
   readonly onWarn?: (message: string) => void;
 }
 
+/**
+ * Signature of the function that resolves color maps for a specific selection and item.
+ * 
+ * @param selection - The selection configuration containing the chosen recolor key.
+ * @param item - The item definition containing the graphic layering rules.
+ * @returns A `PaletteSwap` object if a recolor is resolved, otherwise `undefined` to draw raw.
+ */
 export type ResolvePalette = (
   selection: Selection,
   item: ItemDefinition,
@@ -22,12 +35,21 @@ export type ResolvePalette = (
 
 type Materials = PaletteMetadata['materials'];
 
+/**
+ * Cleaned, fully expanded representation of an item's recolor configuration parameters.
+ */
 interface NormalizedRecolor {
+  /** The physical material class identifier (e.g. 'hair', 'cloth', 'metal'). */
   readonly material: string;
+  /** Optional override for the target item category type. */
   readonly typeName: TypeName | null;
+  /** The fallback/default version ID defined in the material's metadata. */
   readonly defaultVersion: string;
+  /** The base color ramp reference string (formatted as 'version.recolor'). */
   readonly base: string;
+  /** Optional array of raw source hex colors present in the uncolored PNG. */
   readonly source: readonly string[] | undefined;
+  /** Complete list of expanded, fully-qualified variant color keys allowed for selection. */
   readonly variants: readonly string[];
 }
 
@@ -37,6 +59,9 @@ interface NormalizedRecolor {
  * present, else the object itself as a single entry. Upstream breaks at
  * the first missing `color_N`, so a gap collapses to the single form —
  * replicated faithfully.
+ * 
+ * @param rc - Raw recolors config from the item definition.
+ * @returns An array of normalized individual RecolorConfigs.
  */
 function collectRecolorEntries(
   rc: ItemDefinition['recolors'],
@@ -53,7 +78,16 @@ function collectRecolorEntries(
   return out;
 }
 
-/** Port of upstream `resolvePaletteToken`. */
+/**
+ * Port of upstream `resolvePaletteToken`.
+ * Resolves a palette token reference (e.g. 'ulpc', 'metal.iron') to its respective
+ * material class and version. If the token lacks a dot separator, it is assumed to represent
+ * a version identifier, and the specified fallback material is used.
+ * 
+ * @param token - The raw palette string token.
+ * @param fallbackMaterial - Default material to inherit if none is specified in the token.
+ * @returns An object containing the resolved material and version name.
+ */
 function resolvePaletteToken(
   token: string,
   fallbackMaterial: string,
@@ -78,6 +112,13 @@ interface RecolorKeyContext {
  * Port of upstream `parseRecolorKey`. Accepts `material.version.recolor`,
  * `version.recolor`, or bare `recolor` (QI), falling back to the context
  * palette's `material` / `default` / `base`.
+ * 
+ * Parses composite key strings into their discrete material, version, and color components.
+ * 
+ * @param recolorKey - The raw, potentially qualified recolor option selected by the user.
+ * @param ctx - Fallback context extracted from the material's metadata.
+ * @param materials - The active materials metadata dictionary.
+ * @returns A tuple of [material, version, recolorKey].
  */
 function parseRecolorKey(
   recolorKey: string | null,
@@ -103,6 +144,13 @@ function parseRecolorKey(
   return [material, version, recolor];
 }
 
+/**
+ * Constructs a fallback context object using the metadata descriptors of a material.
+ * 
+ * @param material - The material identifier.
+ * @param mm - Metadata specifications of the material.
+ * @returns A consolidated `RecolorKeyContext` helper.
+ */
 function materialCtx(
   material: string,
   mm: PaletteMaterialMeta | undefined,
@@ -118,6 +166,13 @@ function materialCtx(
  * Port of upstream `getBasePalette` — the *source* ramp present in the
  * PNG. Explicit `source` wins; otherwise `base` ("version.recolor") or the
  * material's `default`/`base`.
+ * 
+ * Resolves the source/base color ramp colors that represent the original colors
+ * in the template graphic sheet.
+ * 
+ * @param nr - The normalized recolor specification.
+ * @param materials - Active materials metadata catalog.
+ * @returns Read-only array of source hex colors, or null if unresolvable.
  */
 function getBasePalette(
   nr: NormalizedRecolor,
@@ -131,7 +186,16 @@ function getBasePalette(
   return mm.palettes[version]?.[recolor] ?? null;
 }
 
-/** Port of upstream `getTargetPalette` — the chosen recolor's ramp. */
+/**
+ * Port of upstream `getTargetPalette` — the chosen recolor's ramp.
+ * 
+ * Resolves the target color ramp representing the user's selected recolor option.
+ * 
+ * @param material - The primary material class.
+ * @param targetColor - The selected target color key.
+ * @param materials - Active materials metadata catalog.
+ * @returns Read-only array of target hex colors, or null if unresolvable.
+ */
 function getTargetPalette(
   material: string,
   targetColor: string,
@@ -152,6 +216,14 @@ function getTargetPalette(
 /**
  * Port of upstream `applyRecolorDefaults` + `expandRecolorPalettes`.
  * Returns null when the material is unknown (warn-and-skip, QH).
+ * 
+ * Processes a raw `RecolorConfig`, resolving its baseline references and expanding
+ * its declared palette tokens into a single flat Set of fully qualified, selectable
+ * variant color identifier strings.
+ * 
+ * @param entry - The raw recolor configuration object.
+ * @param materials - The active materials metadata catalog.
+ * @returns The populated `NormalizedRecolor` definition, or null if the material class is unknown.
  */
 function normalizeRecolor(
   entry: RecolorConfig,
@@ -195,6 +267,19 @@ function normalizeRecolor(
  * Port of upstream `fixMissingRecolor`: the chosen key as-is if it's a
  * known variant, else match its trailing color against the expanded
  * variants. Returns null when nothing matches.
+ * 
+ * Variant Swatch Matching Algorithm:
+ * 1. Checks if the chosen `recolor` string is an exact match inside the expanded list of variants.
+ * 2. If no exact match is found, extract the bare color identifier name (the last token, e.g., 'blue') using `parseRecolorKey`.
+ * 3. Loop through the expanded list of allowed variants:
+ *    - Tokenize each variant on `.` (e.g. 'metal.iron.blue').
+ *    - If the tokens contain the target bare color string, or the target bare color string is an exact match to the entire variant, return this variant key as the resolved match.
+ * 4. Returns `null` if no matching variant is found.
+ * 
+ * @param recolor - The selected recolor identifier string.
+ * @param nr - The normalized recolor context.
+ * @param materials - The active materials metadata catalog.
+ * @returns The resolved matching variant key, or null if unmatched.
  */
 function fixMissingRecolor(
   recolor: string,
@@ -216,7 +301,14 @@ function fixMissingRecolor(
   return null;
 }
 
-/** Reverse-lookup an `ItemDefinition` by (typeName, raw name). */
+/**
+ * Helper to locate an ItemDefinition by its category type name and raw name.
+ * 
+ * @param catalog - The compiled asset Catalog.
+ * @param typeName - The item category type name.
+ * @param rawName - The human-readable name of the item.
+ * @returns The matching ItemDefinition, or undefined if not found.
+ */
 function findItem(
   catalog: Catalog,
   typeName: TypeName,
@@ -232,6 +324,13 @@ function findItem(
  * Port of upstream `getBodyColor`: the recolor chosen on whichever
  * selected item is itself `match_body_color` (the body skin tone all
  * other body-colored accessories inherit).
+ * 
+ * Crawls through the active selections to retrieve the skin tone chosen for
+ * the character's base body archetype.
+ * 
+ * @param catalog - The compiled asset Catalog.
+ * @param selections - Currently selected items configuration.
+ * @returns The body skin tone recolor string, or null if none is selected.
  */
 function getBodyColor(
   catalog: Catalog,
@@ -251,6 +350,16 @@ function getBodyColor(
  * matching selection's `recolor` (semantically what upstream's
  * `recolors[typeName]` keying expresses). `match_body_color` forces the
  * body color (QD).
+ * 
+ * Maps each sub-category to its chosen color option, resolving multi-material
+ * color overrides and applying body-color synchronization where applicable.
+ * 
+ * @param item - The ItemDefinition being rendered.
+ * @param primarySelection - The main selection object for this specific item.
+ * @param entries - List of recolor configurations for this item's layers.
+ * @param catalog - Compiled asset Catalog.
+ * @param selections - Complete character selections record.
+ * @returns A dictionary mapping slot type names to their selected recolor string keys.
  */
 function getMultiRecolors(
   item: ItemDefinition,
@@ -280,15 +389,26 @@ function getMultiRecolors(
   return recolors;
 }
 
+/**
+ * Aligns and appends corresponding color values from source and target ramps into
+ * two parallel output arrays.
+ * 
+ * Note on Safety:
+ * Upstream's `buildColorMap` iterates min(source,target) implicitly.
+ * However, our canvas engine's `recolorPixels` throws on a source/target length mismatch.
+ * This helper truncates the ramps to their common minimum length, avoiding out-of-bounds mismatches.
+ * 
+ * @param source - The source color ramp array.
+ * @param target - The target color ramp array.
+ * @param outSource - Array accumulating final aligned source hex values.
+ * @param outTarget - Array accumulating final aligned target hex values.
+ */
 function alignedPush(
   source: readonly string[],
   target: readonly string[],
   outSource: string[],
   outTarget: string[],
 ): void {
-  // Upstream `buildColorMap` iterates min(source,target) implicitly
-  // (pairs only where both exist). Our `recolorPixels` *throws* on a
-  // source/target length mismatch, so truncate to the common length.
   const len = Math.min(source.length, target.length);
   for (let i = 0; i < len; i++) {
     const s = source[i];
@@ -311,6 +431,12 @@ function alignedPush(
  * Returns `undefined` for a layer with no applicable recolor (the seam's
  * "draw raw" contract). Unresolvable entries are skipped with an optional
  * `onWarn` (QH); a hard material/palette miss never throws.
+ * 
+ * @param catalog - Compiled asset Catalog.
+ * @param palettes - Compiled PaletteMetadata database.
+ * @param selections - The active user selection configuration.
+ * @param options - Optional configuration including warning callbacks.
+ * @returns The closed-over `ResolvePalette` function.
  */
 export function makeResolvePalette(
   catalog: Catalog,
@@ -385,6 +511,12 @@ export function makeResolvePalette(
  * the material is unknown. The single expansion path
  * (`collectRecolorEntries` + `normalizeRecolor`) is shared with
  * `makeResolvePalette` — no drift.
+ * 
+ * Resolves the global set of variant names allowed for an item based on its primary recolor specification.
+ * 
+ * @param item - The item definition under analysis.
+ * @param palettes - Compiled PaletteMetadata catalog.
+ * @returns Flat array of allowed variant string identifiers.
  */
 export function getRecolorVariants(
   item: ItemDefinition,
@@ -398,7 +530,9 @@ export function getRecolorVariants(
 
 /** One recolor option plus the hex ramp behind it — what a swatch UI draws. */
 export interface RecolorSwatch {
+  /** The fully-qualified recolor identifier. */
   readonly recolor: string;
+  /** Array of hex colors representing the swatched palette ramp. */
   readonly colors: readonly string[];
 }
 
@@ -411,6 +545,10 @@ export interface RecolorSwatch {
  * without re-implementing core's recolor-key resolution. Like
  * `getRecolorVariants`, only the first recolor entry is exposed —
  * multi-material items show their primary material's swatches.
+ * 
+ * @param item - The item definition under analysis.
+ * @param palettes - Compiled PaletteMetadata catalog.
+ * @returns Array of swatches matching variants to their resolved visual ramps.
  */
 export function getRecolorSwatches(
   item: ItemDefinition,
