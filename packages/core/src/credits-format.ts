@@ -1,12 +1,13 @@
 import type { CreditsManifest } from './types.js';
 
 /**
- * Pick the filename column value for entry index `i` of `manifest`. Mirrors
- * upstream `getAllCredits`/`creditsToTxt` (`upstream/sources/utils/credits.ts`)
- * which writes the resolved PNG path (its `lastUsedPath`). When the manifest
- * was synthesized without `resolvedPaths` (e.g. AttributionPopover's case),
- * we fall back to `entry.file + '/' + anim + '.png'` so output is still
- * sensible, just not necessarily byte-identical to upstream.
+ * Resolves the filename column value for entry index `i` of the manifest.
+ * Mirrors upstream `getAllCredits`/`creditsToTxt` (`upstream/sources/utils/credits.ts`)
+ * which writes the resolved PNG path (its `lastUsedPath`).
+ * 
+ * When the manifest was synthesized without `resolvedPaths` (e.g. AttributionPopover's case),
+ * we fall back to `entry.file + '/' + anim + '.png'` so the serialized output is still
+ * sensible and structured, just not necessarily byte-identical to upstream.
  */
 function filenameFor(
   manifest: CreditsManifest,
@@ -19,10 +20,20 @@ function filenameFor(
 }
 
 /**
- * Serialize a CreditsManifest to the same TXT layout upstream produces
- * (`upstream/sources/utils/credits.ts:creditsToTxt`). Byte-identical when
- * `manifest.resolvedPaths` is populated (typical: produced by `getCredits`).
- * `anim` is only used by the filename fallback path.
+ * Serializes a CreditsManifest to the exact human-readable text (TXT) format layout upstream produces
+ * (`upstream/sources/utils/credits.ts:creditsToTxt`).
+ * Byte-identical when `manifest.resolvedPaths` is populated (typical: produced by `getCredits`).
+ * 
+ * TXT Serialization Layout:
+ * - Line 1: The resolved filename (or fallback)
+ * - Optional Line 2: `\t- Note: [note text]`
+ * - Next Lines: `\t- Licenses:\n\t\t- [license 1]\n\t\t- [license 2]` (indented with tabs)
+ * - Next Lines: `\t- Authors:\n\t\t- [author 1]\n\t\t- [author 2]`
+ * - Next Lines: `\t- Links:\n\t\t- [url 1]\n\t\t- [url 2]\n\n`
+ *
+ * @param manifest The CreditsManifest containing the resolved attributions.
+ * @param anim The active logical animation name (only used for filename fallback path).
+ * @returns Serialized human-readable text string.
  */
 export function creditsToTxt(
   manifest: CreditsManifest,
@@ -43,12 +54,21 @@ export function creditsToTxt(
 }
 
 /**
- * Serialize a CreditsManifest to the same CSV layout upstream produces
- * (`upstream/sources/utils/credits.ts:creditsToCsv`). Byte-identical when
- * `manifest.resolvedPaths` is populated. Note: upstream does NOT escape
- * embedded double-quotes — this matches that behaviour exactly so byte
- * equality holds. Author/license/URL strings in upstream data don't
- * contain `"` so the lack of escaping is not a practical problem.
+ * Serializes a CreditsManifest to the exact CSV layout upstream produces
+ * (`upstream/sources/utils/credits.ts:creditsToCsv`).
+ * Byte-identical when `manifest.resolvedPaths` is populated.
+ *
+ * CSV Serialization Layout:
+ * - Header: `filename,notes,authors,licenses,urls`
+ * - Rows: `"filename","notes","authors","licenses","urls"`
+ * 
+ * Note on escaping: Upstream does NOT escape embedded double-quotes — this matches
+ * that behavior exactly so byte-for-byte equality holds. Since author/license/URL strings
+ * in the LPC upstream database do not contain double-quotes, this is safe and does not cause issues.
+ *
+ * @param manifest The CreditsManifest containing the resolved attributions.
+ * @param anim The active logical animation name (only used for filename fallback path).
+ * @returns Serialized CSV table string.
  */
 export function creditsToCsv(
   manifest: CreditsManifest,
