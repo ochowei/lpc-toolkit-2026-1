@@ -24,6 +24,7 @@ interface Props {
   onToggle: () => void;
 }
 
+/** Active layer row with thumbnail, color controls, and compatible replacement items. */
 export function LayerRow({ typeName, catalog, palettes, state, dispatch, tl, t, licenseFilter, animationFilter, assetSource, expanded, onToggle }: Props) {
   const selection = state.selections[typeName];
   if (!selection) return null;

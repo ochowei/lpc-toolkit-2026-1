@@ -1,6 +1,9 @@
+/** Minimum share reserved for either side of the vertical preview splitter. */
 export const SPLITTER_MIN_RATIO = 0.15;
+/** Maximum share allowed for the top pane of the vertical preview splitter. */
 export const SPLITTER_MAX_RATIO = 0.85;
 
+/** Clamp a splitter ratio to its supported interaction range. */
 export function clampRatio(
   ratio: number,
   min: number = SPLITTER_MIN_RATIO,

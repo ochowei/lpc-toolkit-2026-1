@@ -12,6 +12,7 @@ interface Props {
   anchorRef?: RefObject<HTMLButtonElement>;
 }
 
+/** Reset menu that lets users choose outfit, view, and filter scopes independently. */
 export function ResetMenuPopover({ open, setOpen, t, onReset, anchorRef: externalAnchorRef }: Props) {
   const { anchorRef, panelRef, pos } = usePopover(open, () => setOpen(false), externalAnchorRef);
   const [outfit, setOutfit] = useState(true);

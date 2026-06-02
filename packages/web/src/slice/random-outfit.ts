@@ -8,6 +8,7 @@ import type {
 import { itemSupportsBodyType } from './catalog-tree';
 import { CATEGORY_GROUPS, type GroupId } from './category-groups';
 
+/** Inputs for generating a random outfit from the currently loaded catalog. */
 export interface PickRandomOutfitArgs {
   readonly catalog: Catalog;
   readonly bodyType: BodyType;

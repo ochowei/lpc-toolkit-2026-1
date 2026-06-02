@@ -22,6 +22,7 @@ const DIR_SHORT: Record<Direction, 'N' | 'S' | 'E' | 'W'> = {
   up: 'N', down: 'S', left: 'W', right: 'E',
 };
 
+/** UI state owned by the harness for the optional full-sheet preview pane. */
 export interface FullSheetUiState {
   open: boolean;
   grid: boolean;
@@ -30,6 +31,7 @@ export interface FullSheetUiState {
   splitterRatio: number;
 }
 
+/** Setters for the full-sheet preview state passed down from the harness. */
 export interface FullSheetUiActions {
   setOpen: (v: boolean) => void;
   setGrid: (v: boolean) => void;
@@ -47,6 +49,7 @@ interface Props {
   fullSheetActions: FullSheetUiActions;
 }
 
+/** Right-side preview area for animated single-frame playback and full-sheet inspection. */
 export function PreviewPane({
   state,
   dispatch,

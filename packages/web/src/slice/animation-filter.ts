@@ -8,8 +8,10 @@ import {
 } from '@lpc-toolkit/core';
 import type { SliceState } from './selection';
 
+/** Set of animations currently enabled in the Settings filter. Empty means all. */
 export type AnimationFilter = ReadonlySet<AnimationName>;
 
+/** Whether an item can contribute to at least one enabled animation. */
 export function itemMatchesAnimationFilter(
   item: ItemDefinition,
   enabled: AnimationFilter,
@@ -26,6 +28,7 @@ export function itemMatchesAnimationFilter(
   return false;
 }
 
+/** Selected type names that would disappear under the proposed animation filter. */
 export function incompatibleAnimationTypeNamesFor(
   state: SliceState,
   catalog: Catalog,

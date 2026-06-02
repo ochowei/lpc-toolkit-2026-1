@@ -15,6 +15,7 @@ interface Props {
   onReset: (scopes: { outfit: boolean; view: boolean; filters: boolean }) => void;
 }
 
+/** Toolbar for random outfits, curated presets, and reset actions. */
 export function PresetBar({ catalog, state, dispatch, t, onApplied, onReset }: Props) {
   const [presetOpen, setPresetOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);

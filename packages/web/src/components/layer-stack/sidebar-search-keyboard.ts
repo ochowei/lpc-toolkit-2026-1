@@ -1,5 +1,7 @@
+/** Navigation keys handled by the sidebar search result list. */
 export type ArrowKey = 'ArrowUp' | 'ArrowDown';
 
+/** Compute the highlighted result after an ArrowUp/ArrowDown key press. */
 export function nextActiveIndex(
   curr: number,
   key: ArrowKey,
@@ -12,6 +14,7 @@ export function nextActiveIndex(
   return Math.max(c - 1, -1);
 }
 
+/** Resolve Enter to a concrete result index, defaulting to the first row. */
 export function pickIndexForEnter(
   active: number,
   resultsLen: number,

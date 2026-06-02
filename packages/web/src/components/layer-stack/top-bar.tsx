@@ -8,6 +8,7 @@ interface Props {
   rightSlot?: ReactNode;
 }
 
+/** Application header with global controls, progress, and upstream link. */
 export function TopBar({
   t,
   loadingProgress,

@@ -5,11 +5,13 @@ import {
   type Selections,
 } from '@lpc-toolkit/core';
 
+/** POSIX-only dirname helper for upstream spritesheet paths. */
 export function posixDirname(p: string): string {
   const i = p.lastIndexOf('/');
   return i === -1 ? '' : p.slice(0, i);
 }
 
+/** Sprite directories needed to copy/render the currently selected outfit. */
 export function dirsForSelections(
   catalog: Catalog,
   selections: Selections,

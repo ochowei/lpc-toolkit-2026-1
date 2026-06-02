@@ -2,6 +2,7 @@ interface Props {
   status: { kind: 'info' | 'warn' | 'error'; text: string } | null;
 }
 
+/** Compact status message for non-blocking warnings, errors, and progress notes. */
 export function StatusToast({ status }: Props) {
   if (!status) return null;
   const ring =

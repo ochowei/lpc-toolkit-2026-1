@@ -84,6 +84,7 @@ declare global {
   }
 }
 
+/** Top-level web UI dependencies and state passed from App into the layer stack. */
 export interface LayerStackHarnessProps {
   catalog: Catalog;
   palettes: PaletteMetadata;
@@ -103,6 +104,7 @@ export interface LayerStackHarnessProps {
   onToggleLocale: () => void;
 }
 
+/** Coordinates layer state, composition hooks, popovers, filters, and responsive layout. */
 export function LayerStackHarness(props: LayerStackHarnessProps) {
   const { t, theme, locale, onToggleTheme, onToggleLocale } = props;
   const [licenseFilter, setLicenseFilter] = useState<LicenseFilter>(ALL_LICENSE_GROUPS);

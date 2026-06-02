@@ -1,6 +1,7 @@
 import type { TranslationKey } from '../i18n';
 import type { TypeName } from '@lpc-toolkit/core';
 
+/** High-level grouping used by add-layer, search, settings, and random outfit logic. */
 export type GroupId =
   | 'body'
   | 'face'
@@ -10,6 +11,7 @@ export type GroupId =
   | 'fx'
   | 'fantasy';
 
+/** User-facing bucket of upstream type_name values. */
 export interface CategoryGroup {
   readonly id: GroupId;
   readonly labelKey: TranslationKey;
@@ -95,6 +97,7 @@ const TYPE_TO_GROUP: ReadonlyMap<TypeName, GroupId> = new Map(
   CATEGORY_GROUPS.flatMap((g) => g.typeNames.map((tn) => [tn, g.id] as const)),
 );
 
+/** Return the high-level group containing a type_name, if it is configured. */
 export function groupForType(typeName: TypeName): GroupId | null {
   return TYPE_TO_GROUP.get(typeName) ?? null;
 }

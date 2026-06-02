@@ -2,6 +2,7 @@ import type { Selection, TypeName } from '@lpc-toolkit/core';
 import { orderedSelectionEntries, type SliceAction } from '../slice/selection';
 import type { Translator, LabelTranslator } from '../i18n';
 
+/** Legacy selected-items list used by tests and simple panel experiments. */
 export function SelectedItemsPanel({
   selections,
   dispatch,

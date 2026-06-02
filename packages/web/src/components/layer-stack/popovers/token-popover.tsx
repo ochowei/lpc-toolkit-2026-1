@@ -22,6 +22,7 @@ interface Props {
   anchorRef?: RefObject<HTMLButtonElement>;
 }
 
+/** Selection token popover for copying, pasting, and normalizing outfit hashes. */
 export function TokenPopover({
   open,
   setOpen,

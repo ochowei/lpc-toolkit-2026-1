@@ -41,6 +41,7 @@ interface Props {
   inputRef: RefObject<HTMLInputElement>;
 }
 
+/** Search box and keyboard-driven dropdown for adding/replacing catalog items. */
 export function SidebarSearch({
   catalog,
   palettes,

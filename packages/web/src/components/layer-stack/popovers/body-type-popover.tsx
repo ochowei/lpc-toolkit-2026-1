@@ -16,6 +16,7 @@ interface Props {
   onIncompatibilityWarning: (typeNames: string[]) => void;
 }
 
+/** Body-type selector that warns when existing layers do not support the new body. */
 export function BodyTypePopover({ open, setOpen, state, dispatch, catalog, t, tl, onIncompatibilityWarning }: Props) {
   const { anchorRef, panelRef, pos } = usePopover(open, () => setOpen(false));
 

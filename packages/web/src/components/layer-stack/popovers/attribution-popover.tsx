@@ -41,6 +41,7 @@ interface Row {
   animationIncompatible: boolean;
 }
 
+/** Attribution and license summary for currently selected layers. */
 export function AttributionPopover({
   open,
   setOpen,

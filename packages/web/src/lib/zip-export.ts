@@ -19,12 +19,14 @@ import {
 } from './custom-overlay';
 type JSZipInstance = InstanceType<typeof JSZipModule>;
 
+/** ZIP layouts exposed by the download popover. */
 export type ZipExportKind =
   | 'byAnimation'
   | 'byItem'
   | 'byAnimItem'
   | 'byFrame';
 
+/** Shared dependencies and current composition state for every ZIP exporter. */
 export interface ExportContext {
   readonly sheet: ComposedSheet;
   readonly selections: Selections;
@@ -49,10 +51,12 @@ const KIND_TO_SEGMENT: Readonly<Record<ZipExportKind, string>> = {
   byFrame: 'individual_frames',
 };
 
+/** Filesystem-safe timestamp used in generated ZIP names. */
 export function zipExportTimestamp(): string {
   return new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
 }
 
+/** Default ZIP filename for a body type and export layout. */
 export function zipName(
   bodyType: string,
   kind: ZipExportKind,
@@ -61,6 +65,7 @@ export function zipName(
   return `lpc_${bodyType}_${KIND_TO_SEGMENT[kind]}_${timestamp}.zip`;
 }
 
+/** Inputs for naming an individual item spritesheet inside a ZIP archive. */
 export interface ItemFileNameInput {
   readonly name: string;
   readonly zPos: number;
@@ -68,6 +73,7 @@ export interface ItemFileNameInput {
   readonly variant?: string;
 }
 
+/** Stable per-item filename ordered by z-position and sanitized for archives. */
 export function itemFileName(input: ItemFileNameInput): string {
   const fallback = input.itemId
     ? `${input.itemId}_${input.variant ?? ''}`
@@ -133,6 +139,7 @@ function reportGenerate(ctx: ExportContext, percent: number): void {
   ctx.onProgress(0.5 + (percent / 100) * 0.5);
 }
 
+/** Export one PNG per animation, plus mandatory credits files. */
 export async function exportByAnimationZip(ctx: ExportContext): Promise<Blob> {
   const { default: JSZip } = await import('jszip');
   const zip = new JSZip();
@@ -212,6 +219,7 @@ function buildSingleSelections(
   };
 }
 
+/** Export each selected item split by animation folder. */
 export async function exportByAnimItemZip(ctx: ExportContext): Promise<Blob> {
   const { default: JSZip } = await import('jszip');
   const zip = new JSZip();
@@ -312,6 +320,7 @@ export async function exportByAnimItemZip(ctx: ExportContext): Promise<Blob> {
   );
 }
 
+/** Export one full spritesheet per selected item, plus any custom overlay. */
 export async function exportByItemZip(ctx: ExportContext): Promise<Blob> {
   const { default: JSZip } = await import('jszip');
   const zip = new JSZip();
@@ -370,6 +379,7 @@ export async function exportByItemZip(ctx: ExportContext): Promise<Blob> {
 
 const yieldToUi = (): Promise<void> => new Promise((r) => setTimeout(r, 0));
 
+/** Export every non-empty frame as an individual PNG grouped by animation/direction. */
 export async function exportByFrameZip(ctx: ExportContext): Promise<Blob> {
   const { default: JSZip } = await import('jszip');
   const zip = new JSZip();

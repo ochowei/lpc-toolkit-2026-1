@@ -19,6 +19,7 @@ import {
   readWindowHash,
 } from './lib/url-hash-sync';
 
+/** Root application shell that loads upstream data and owns global UI state. */
 export default function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE);

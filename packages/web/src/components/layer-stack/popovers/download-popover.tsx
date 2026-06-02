@@ -54,6 +54,7 @@ interface Props {
   onStatus: (status: { kind: 'info' | 'error'; text: string }) => void;
 }
 
+/** Download menu for composed PNGs, attribution files, and ZIP export layouts. */
 export function DownloadPopover({
   open,
   setOpen,

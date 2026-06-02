@@ -11,6 +11,7 @@ import {
 import type { CatalogTreeItem } from './catalog-tree';
 import { CATEGORY_GROUPS } from './category-groups';
 
+/** Preview zoom bounds used by the reducer and preview controls. */
 export const MIN_ZOOM = 1;
 export const MAX_ZOOM = 8;
 export const DEFAULT_ZOOM = 4;
@@ -22,6 +23,7 @@ function clampZoom(z: number): number {
   return r;
 }
 
+/** Reducer-owned character selection and preview playback state. */
 export interface SliceState {
   readonly bodyType: BodyType;
   readonly selections: Readonly<Record<TypeName, Selection>>;
@@ -31,6 +33,7 @@ export interface SliceState {
   readonly zoom: number;
 }
 
+/** User actions that can change selections, playback, body type, or zoom. */
 export type SliceAction =
   | { type: 'set_body_type'; bodyType: BodyType }
   | {
@@ -52,6 +55,7 @@ export type SliceAction =
   | { type: 'toggle_play' }
   | { type: 'set_zoom'; zoom: number };
 
+/** Pure state reducer for the layer stack UI. */
 export function sliceReducer(s: SliceState, a: SliceAction): SliceState {
   switch (a.type) {
     case 'set_body_type':
@@ -127,6 +131,7 @@ export function toSelections(state: SliceState): Selections {
   return { bodyType: state.bodyType, items };
 }
 
+/** Convert a catalog item into the Selection shape expected by core. */
 export function selectionForItem(
   typeName: TypeName,
   item: ItemDefinition,
