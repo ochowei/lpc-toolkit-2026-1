@@ -47,6 +47,10 @@ interface Props {
   catalog: Catalog;
   assetSource: AssetSource;
   composeSingleItem: (s: Selections) => Promise<ComposedSheet>;
+  composeSingleItemLayer: (
+    s: Selections,
+    layerNumber: number,
+  ) => Promise<ComposedSheet>;
   customOverlay: CustomOverlay | null;
   zipRunning: ZipRunning | null;
   setZipRunning: (r: ZipRunning | null) => void;
@@ -64,6 +68,7 @@ export function DownloadPopover({
   catalog,
   assetSource,
   composeSingleItem,
+  composeSingleItemLayer,
   customOverlay,
   zipRunning,
   setZipRunning,
@@ -123,6 +128,7 @@ export function DownloadPopover({
         catalog,
         anim,
         composeSingleItem,
+        composeSingleItemLayer,
         adapter,
         customOverlay,
         onProgress: (p) => setZipRunning({ kind, progress: p }),

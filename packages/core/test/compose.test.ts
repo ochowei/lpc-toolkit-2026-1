@@ -554,6 +554,24 @@ describe('composeSelections', () => {
       ).toBe(true);
     });
 
+    it('can compose only one item layer for split-by-item exports', async () => {
+      const multiLayerItem: ItemDefinition = {
+        ...bodyItem,
+        layer_1: { zPos: 10, male: 'test/body/back/' },
+        layer_2: { zPos: 20, male: 'test/body/front/' },
+      };
+      const { adapter, loadCalls } = syntheticAdapter();
+
+      await composeSelections(selections, {
+        catalog: makeCatalog([multiLayerItem]),
+        adapter,
+        spritesheetsBaseUrl: '',
+        onlyLayerNumber: 2,
+      });
+
+      expect(loadCalls).toEqual(['spritesheets/test/body/front/walk.png']);
+    });
+
     it('draws extra standard layers according to z-position', async () => {
       const base = createNodeCanvasAdapter();
       const extra = makeCanvas(832, 3456, (ctx) => {

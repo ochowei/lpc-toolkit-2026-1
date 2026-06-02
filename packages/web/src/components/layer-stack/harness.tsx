@@ -190,12 +190,13 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   );
 
   const composeSingleItem = useCallback(
-    async (singleSelections: Selections) => {
+    async (singleSelections: Selections, onlyLayerNumber?: number) => {
       const adapter = createBrowserCanvasAdapter(props.assetSource);
       return composeSelections(singleSelections, {
         catalog: props.catalog,
         adapter,
         spritesheetsBaseUrl: '',
+        ...(onlyLayerNumber !== undefined ? { onlyLayerNumber } : {}),
         resolvePalette: makeResolvePalette(
           props.catalog,
           props.palettes,
@@ -520,6 +521,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
           catalog={props.catalog}
           assetSource={props.assetSource}
           composeSingleItem={composeSingleItem}
+          composeSingleItemLayer={composeSingleItem}
           customOverlay={customOverlay}
           zipRunning={zipRunning}
           setZipRunning={setZipRunning}
