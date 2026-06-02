@@ -216,9 +216,8 @@ describe('getSpritePathsForSelections', () => {
       return createCatalog(records).catalog;
     }
 
-    it('honours custom_animation filter from layer_1', () => {
-      // layer_1 has custom_animation 'wheelchair', layer_2 has no
-      // custom_animation. Only layer_1 should survive the filter.
+    it('resolves both standard and custom animation layers from the same item', () => {
+      // both custom and standard layers from the same item should be resolved.
       const wheels: ItemDefinition = {
         name: 'Wheelchair',
         type_name: 'wheels',
@@ -246,9 +245,20 @@ describe('getSpritePathsForSelections', () => {
         catalog,
       );
 
-      expect(layers).toHaveLength(1);
-      expect(layers[0]?.path).toBe('spritesheets/wheels/wheelchair/wood.png');
-      expect(layers[0]?.customAnimation).toBe('wheelchair');
+      expect(layers).toHaveLength(2);
+      expect(layers[0]).toEqual({
+        itemId: 'item_0_wheelchair',
+        typeName: 'wheels',
+        path: 'spritesheets/wheels/wheelchair/wood.png',
+        zPos: 50,
+        customAnimation: 'wheelchair',
+      });
+      expect(layers[1]).toEqual({
+        itemId: 'item_0_wheelchair',
+        typeName: 'wheels',
+        path: 'spritesheets/wheels/cover/walk/wood.png',
+        zPos: 60,
+      });
     });
 
     it('honours standard-only filter when layer_1 has no custom_animation', () => {

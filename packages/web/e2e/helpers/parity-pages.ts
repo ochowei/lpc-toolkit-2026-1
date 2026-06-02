@@ -152,6 +152,22 @@ export async function openUpstreamCase(
   const errors = attachConsoleCollector(page);
 
   await routeUpstreamMetadata(page);
+  await page.addInitScript(() => {
+    // Intercept upstream's setPaletteRecolorMode assignment and force CPU mode
+    let resolvedFn: ((mode: string) => void) | null = null;
+    Object.defineProperty(window, 'setPaletteRecolorMode', {
+      configurable: true,
+      get() {
+        return resolvedFn;
+      },
+      set(fn) {
+        resolvedFn = fn;
+        if (typeof fn === 'function') {
+          fn('cpu');
+        }
+      }
+    });
+  });
   await page.goto(`${UPSTREAM_BASE_URL}/?debug=false#${hash}`);
   await expect
     .poll(
@@ -167,6 +183,10 @@ export async function openUpstreamCase(
       { message: `upstream canvas did not become ready for hash: ${hash}` },
     )
     .toBe('ready');
+
+  // Wait for the upstream Mithril rendering busy overlay to disappear and settle
+  await page.locator('.preview-canvas-busy').waitFor({ state: 'detached', timeout: 10000 }).catch(() => {});
+  await page.waitForTimeout(500);
 
   const snapshot = await page.evaluate(() => {
     const win = window as Window & {

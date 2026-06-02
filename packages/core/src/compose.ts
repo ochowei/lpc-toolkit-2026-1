@@ -165,7 +165,6 @@ function resolveLayers(
 
     const layer1 = item.layer_1;
     if (!layer1) continue;
-    const layer1Custom = layer1.custom_animation;
 
     for (let n = 1; n < 10; n++) {
       const layer = item[`layer_${n}`];
@@ -173,12 +172,6 @@ function resolveLayers(
 
       const baseRaw = layer[selections.bodyType];
       if (typeof baseRaw !== 'string') continue;
-
-      if (layer1Custom) {
-        if (layer.custom_animation !== layer1Custom) continue;
-      } else if (layer.custom_animation) {
-        continue;
-      }
 
       const basePath = baseRaw.includes('${')
         ? replaceInPath(baseRaw, selections, item)

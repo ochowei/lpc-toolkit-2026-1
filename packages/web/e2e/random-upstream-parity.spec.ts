@@ -1,6 +1,7 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import { diffRgba } from './helpers/pixel-diff';
 import {
+  MINIMAL_PARITY_CASE,
   OBSERVED_REGRESSION_CASE,
   SEEDED_RANDOM_CASES,
   type FixedHashCase,
@@ -36,6 +37,10 @@ test.describe('random upstream parity', () => {
       });
     });
   }
+
+  test(MINIMAL_PARITY_CASE.name, async ({ context }) => {
+    await compareHashCase(context, MINIMAL_PARITY_CASE);
+  });
 
   test(OBSERVED_REGRESSION_CASE.name, async ({ context }) => {
     await compareHashCase(context, OBSERVED_REGRESSION_CASE);
