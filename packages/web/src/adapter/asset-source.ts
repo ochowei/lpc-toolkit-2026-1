@@ -2,8 +2,7 @@
 export type AssetSource = 'auto' | 'local' | 'upstream';
 
 /** Public upstream root used as the fallback when local copied assets are absent. */
-export const UPSTREAM_SPRITESHEET_BASE_URL =
-  'https://liberatedpixelcup.github.io/Universal-LPC-Spritesheet-Character-Generator/';
+export const UPSTREAM_SPRITESHEET_BASE_URL = '/upstream-assets/';
 
 /** Resolve a spritesheet path against the current app base URL. */
 export function resolveLocalSpriteUrl(path: string, baseHref: string): string {
@@ -12,7 +11,13 @@ export function resolveLocalSpriteUrl(path: string, baseHref: string): string {
 
 /** Resolve a spritesheet path against the public upstream LPC generator. */
 export function resolveUpstreamSpriteUrl(path: string): string {
-  return new URL(path, UPSTREAM_SPRITESHEET_BASE_URL).href;
+  try {
+    return new URL(path, UPSTREAM_SPRITESHEET_BASE_URL).href;
+  } catch {
+    const base = UPSTREAM_SPRITESHEET_BASE_URL;
+    const separator = base.endsWith('/') || path.startsWith('/') ? '' : '/';
+    return `${base}${separator}${path}`;
+  }
 }
 
 /**
