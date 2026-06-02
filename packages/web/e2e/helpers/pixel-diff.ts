@@ -38,12 +38,6 @@ export function diffRgba(
   const samples: PixelMismatchSample[] = [];
 
   for (let pixelIndex = 0; pixelIndex < width * height; pixelIndex += 1) {
-    const x = pixelIndex % width;
-    const y = Math.floor(pixelIndex / width);
-    if (x >= 64 || y >= 64) {
-      continue;
-    }
-
     const offset = pixelIndex * 4;
     const actualPixel = [
       actual[offset]!,
