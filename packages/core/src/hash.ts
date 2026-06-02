@@ -213,11 +213,20 @@ function buildSelection(
   item: ItemDefinition,
   matchedVariant: string,
   matchedRecolor: string,
+  palettes?: PaletteMetadata,
 ): Selection {
   const variant =
     matchedVariant ||
     (matchedRecolor !== '' ? '' : (item.variants?.[0] ?? ''));
-  const recolor = matchedRecolor;
+  
+  let recolor = matchedRecolor;
+  if (!recolor && (!item.variants || item.variants.length === 0) && palettes) {
+    const recolorVariants = getRecolorVariants(item, palettes);
+    if (recolorVariants.length > 0) {
+      recolor = recolorVariants[0] ?? '';
+    }
+  }
+
   return {
     typeName,
     name: item.name,
@@ -317,6 +326,7 @@ export function parseHash(
       foundItem,
       matchedVariant,
       matchedRecolor,
+      palettes,
     );
   }
 

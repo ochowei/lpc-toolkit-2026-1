@@ -1,5 +1,6 @@
 import {
   getSpritePathsForSelections,
+  ANIMATION_DEFAULTS,
   type Catalog,
   type Selections,
 } from '@lpc-toolkit/core';
@@ -20,9 +21,10 @@ export function dirsForSelections(
     
     // Find the item to check its default animation folder layout
     const item = catalog.byItemId.get(layer.itemId);
-    const defaultAnim = item?.animations?.includes('walk')
+    const animations = item?.animations ?? ANIMATION_DEFAULTS;
+    const defaultAnim = animations.includes('walk')
       ? 'walk'
-      : item?.animations?.[0];
+      : animations[0];
 
     if (defaultAnim && dir.endsWith(`/${defaultAnim}`)) {
       out.add(posixDirname(dir));
