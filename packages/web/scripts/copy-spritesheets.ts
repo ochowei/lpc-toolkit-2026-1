@@ -69,14 +69,16 @@ const { state, shownTypeNames } = pickInitialSelections(catalog);
 
 const dirs = new Set<string>();
 
-// Pass B: all items of shown type-names at the default body type.
-for (const tn of shownTypeNames) {
-  for (const item of catalog.byTypeName.get(tn) ?? []) {
-    const sel: Selections = {
-      bodyType: state.bodyType,
-      items: { [tn]: selectionForItem(tn, item) },
-    };
-    for (const d of dirsForSelections(catalog, sel)) dirs.add(d);
+// Pass B: all items of shown type-names across all body types.
+for (const bt of BODY_TYPES) {
+  for (const tn of shownTypeNames) {
+    for (const item of catalog.byTypeName.get(tn) ?? []) {
+      const sel: Selections = {
+        bodyType: bt,
+        items: { [tn]: selectionForItem(tn, item) },
+      };
+      for (const d of dirsForSelections(catalog, sel)) dirs.add(d);
+    }
   }
 }
 

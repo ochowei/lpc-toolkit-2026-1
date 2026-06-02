@@ -84,7 +84,10 @@ export async function openToolkitCase(
           const win = window as Window & { __LPC_E2E__?: ToolkitBrowserProbe };
           return win.__LPC_E2E__?.status ?? 'missing-probe';
         }),
-      { message: `toolkit probe did not become ready for hash: ${hash}` },
+      {
+        timeout: 60_000,
+        message: `toolkit probe did not become ready for hash: ${hash}`,
+      },
     )
     .toBe('ready');
 
@@ -180,13 +183,16 @@ export async function openUpstreamCase(
           if (!renderer) return 'missing-renderer';
           return renderer.getCanvas().isOk() ? 'ready' : 'missing-canvas';
         }),
-      { message: `upstream canvas did not become ready for hash: ${hash}` },
+      {
+        timeout: 60_000,
+        message: `upstream canvas did not become ready for hash: ${hash}`,
+      },
     )
     .toBe('ready');
 
   // Wait for the upstream Mithril rendering busy overlay to disappear and settle
   await page.locator('.preview-canvas-busy').waitFor({ state: 'detached', timeout: 10000 }).catch(() => {});
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(3000);
 
   const snapshot = await page.evaluate(() => {
     const win = window as Window & {

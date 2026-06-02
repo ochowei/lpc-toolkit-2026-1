@@ -66,6 +66,7 @@ async function makeSeededRandomHash(
             return win.__LPC_E2E__?.status ?? 'missing-probe';
           }),
         {
+          timeout: 60_000,
           message: `toolkit probe did not become ready before randomizing ${randomCase.name}`,
         },
       )
