@@ -1,19 +1,26 @@
 /**
- * Custom-animation data, lifted from
- * `upstream/sources/custom-animations.ts` (API.md Step 3.4 Q1 / N1).
+ * @file custom-animations.ts
  *
- * `animationRowsLayout`, `CustomAnimationDefinition` and `customAnimations`
- * are verbatim data (same shape, same values; only quote style and import
- * extensions adapted to the house style — same treatment as `constants.ts`).
+ * Custom-animation configuration and geometry definitions.
+ * Contains definitions for non-standard layout structures (e.g., wheelchair, oversized assets)
+ * and tools to compute their dynamic height/width allocations.
  *
- * `customAnimationSize` / `customAnimationBase` are tiny logic helpers, so
- * they are a *faithful* port rather than a byte-verbatim lift: upstream's
- * `frames[0][0]` indexing does not type-check under our stricter tsconfig
- * (`noUncheckedIndexedAccess`), so they use strict-safe access with the
- * same observable behaviour on the known-good literal data above (N1).
+ * Lifted from `upstream/sources/custom-animations.ts` (API.md Step 3.4 Q1 / N1).
  *
- * Pure data + leaf logic — no DOM / fs / canvas. Safe to import anywhere
- * in core.
+ * ## Non-Standard Layout Structures
+ * Standard LPC character animations are constrained to 64x64px squares.
+ * Modern/complex actions require non-standard structures:
+ * 1. Wheelchair (`wheelchair`): A 64x64px layout containing 4 directional rows of 2 frames each.
+ *    Renders standard `sit` base frames placed on top of a wheelchair frame.
+ * 2. Oversized Swings/Whips/Thrusts (`tool_rod`, `walk_128`, `slash_oversize`, etc.):
+ *    Spans 128x128px or 192x192px frames to accommodate extended weapons, poles, or whips
+ *    without cropping, keeping the character centered.
+ *
+ * ## Dynamic Height Allocations
+ * Each custom animation declares a custom `frameSize` (64, 128, 192) and a grid of `frames`.
+ * During sprite composition, these custom blocks are appended below the standard 832x3456px sheet
+ * sequentially. The dynamic vertical space allocated for each block is computed as:
+ * `blockHeight = frameSize * rows`.
  */
 
 export type AnimationRowsLayout = Record<string, number>;
@@ -487,6 +494,14 @@ const customAnimations: Record<string, CustomAnimationDefinition> = {
   },
 };
 
+/**
+ * Computes the total width and height of a custom animation block
+ * based on its configured frame size, rows count, and columns count.
+ * Used for dynamic sheet layout resizing.
+ * 
+ * @param customAnimation The custom animation definition.
+ * @returns An object containing the computed width and height.
+ */
 const customAnimationSize = (
   customAnimation: CustomAnimationDefinition,
 ): { width: number; height: number } => ({
@@ -494,6 +509,15 @@ const customAnimationSize = (
   height: customAnimation.frameSize * customAnimation.frames.length,
 });
 
+/**
+ * Extracts the standard base animation name (e.g. "sit" or "thrust")
+ * from the first frame definition of a custom animation.
+ * Custom frames are defined like "sit-n,2", where "sit" is the base animation name
+ * whose standard frames will be extracted and re-laid onto the custom animation region.
+ * 
+ * @param custAnim The custom animation definition.
+ * @returns The base standard animation name (e.g. "sit" or "thrust").
+ */
 const customAnimationBase = (custAnim: CustomAnimationDefinition): string => {
   const first = custAnim.frames[0]?.[0];
   if (first === undefined) {

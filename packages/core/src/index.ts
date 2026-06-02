@@ -1,3 +1,16 @@
+/**
+ * @module @lpc-toolkit/core
+ *
+ * The pure TypeScript core library for the Liberated Pixel Cup (LPC) character sprite toolkit.
+ * Contains core composition, animation parsing, palette recoloring, and credit attribution logic.
+ *
+ * Strictly environment-agnostic. All I/O, canvas operations, and image loading are abstracted via
+ * `CanvasAdapter` and must be provided by the caller.
+ */
+
+// ==========================================
+// 1. Foundation Types and Definitions
+// ==========================================
 export type {
   AliasEntry,
   AnimationName,
@@ -28,6 +41,9 @@ export type {
   TypeName,
 } from './types.js';
 
+// ==========================================
+// 2. Environment-Agnostic Adapters
+// ==========================================
 export type {
   CanvasAdapter,
   CanvasLike,
@@ -36,18 +52,30 @@ export type {
   ImageLike,
 } from './adapters.js';
 
+// ==========================================
+// 3. Functional Error Handling
+// ==========================================
 export type { Result } from './result.js';
 export { ok, err, isOk, isErr, unwrapOr } from './result.js';
 
+// ==========================================
+// 4. Sprite and Metadata Catalog Loader
+// ==========================================
 export type { CatalogLoadWarning, CreateCatalogResult } from './catalog.js';
 export { createCatalog } from './catalog.js';
 
+// ==========================================
+// 5. Palette and Color Metadata Catalog
+// ==========================================
 export type {
   CreatePaletteCatalogResult,
   PaletteLoadWarning,
 } from './palettes.js';
 export { createPaletteCatalog } from './palettes.js';
 
+// ==========================================
+// 6. Recolor SWATCHES and Variant Resolvers
+// ==========================================
 export type {
   MakeResolvePaletteOptions,
   RecolorSwatch,
@@ -59,12 +87,21 @@ export {
   makeResolvePalette,
 } from './recolor-resolve.js';
 
+// ==========================================
+// 7. Layer Composition Engine
+// ==========================================
 export type { ComposeOptions } from './compose.js';
 export { composeSelections, getSpritePathsForSelections } from './compose.js';
 
+// ==========================================
+// 8. License & Credit Attribution Engine
+// ==========================================
 export { getCredits, computeEffectiveLicense } from './credits.js';
 export { creditsToTxt, creditsToCsv } from './credits-format.js';
 
+// ==========================================
+// 9. Selection URL State Serializer
+// ==========================================
 export type { HashWarning, ParseHashResult } from './hash.js';
 export {
   decodeSelectionToken,
@@ -73,12 +110,21 @@ export {
   serializeHash,
 } from './hash.js';
 
+// ==========================================
+// 10. Animation Strip Extractor
+// ==========================================
 export type { ExtractAnimationOptions } from './animation.js';
 export { extractAnimation } from './animation.js';
 
+// ==========================================
+// 11. Individual Frame Slicer
+// ==========================================
 export { extractAnimationFrames } from './frames.js';
 export type { ExtractFramesOptions, FrameSlice } from './frames.js';
 
+// ==========================================
+// 12. Custom Animations Layout Config
+// ==========================================
 export type {
   AnimationRowsLayout,
   CustomAnimationDefinition,
@@ -90,6 +136,9 @@ export {
   customAnimationSize,
 } from './custom-animations.js';
 
+// ==========================================
+// 13. System Constants and Configurations
+// ==========================================
 export type {
   AnimationConfig,
   AnimationFolderName,
@@ -117,6 +166,9 @@ export {
   STANDARD_ANIMATION_FRAMES_PER_ROW,
 } from './constants.js';
 
+// ==========================================
+// 14. Image & Pixel Recolor Core
+// ==========================================
 export type {
   ColorHex,
   Palette,

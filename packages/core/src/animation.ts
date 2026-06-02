@@ -6,28 +6,39 @@ import type {
   ComposedSheet,
 } from './types.js';
 
+/**
+ * Options configuring the animation cropping process.
+ */
 export interface ExtractAnimationOptions {
+  /** Canvas adapter utilized to create Canvas elements for the cropped animation. */
   readonly adapter: CanvasAdapter;
 }
 
 /**
- * Crop one animation out of a composed master sheet.
+ * Crops one specific logical animation block out of the composed master sheet.
  *
- * Standard animations (`ANIMATION_CONFIGS`) mirror upstream
- * `extractAnimationFromCanvas`: full sheet width (832) and `config.num*64`
- * rows starting at `config.row*64`; columns are not tight-cropped (unused
- * frame columns stay transparent). A known standard animation that was not
- * actually composed yields a valid, fully-transparent crop (Step 3.3 Q4).
+ * This function supports two layouts:
  *
- * Custom animations (wheelchair / `tool_rod` / …) live in variable-height
- * blocks below the standard sheet; their geometry is on
- * `sheet.customAnimations` (Step 3.4 Q3). They are tight-cropped to the
- * block's own `cols*frameSize × rows*frameSize` at `(0, offsetY)` (N4),
- * with `directions = rows`, `frameCount = cols`.
+ * 1. Standard Animations (`ANIMATION_CONFIGS`):
+ *    - Row Indexing: Maps to a pre-defined standard row offset. The vertical start offset
+ *      `srcY` on the master canvas is computed as: `config.row * FRAME_SIZE` (64px).
+ *    - Frame Interval Slices: Spans the full width of the standard sheet (`SHEET_WIDTH` = 832px),
+ *      which contains up to 13 frames per row. Unused frames remain transparent.
+ *    - Direction Coordinates: Spans `config.num` rows, where each row represents one direction
+ *      coordinate: north, west, south, east. The vertical height is `num * FRAME_SIZE`.
  *
- * Lookup order is standard → this sheet's custom blocks; only a name in
- * neither throws (refines Step 3.3 Q3 — not an override). `name` shares the
- * `ComposedSheet.animations` / `customAnimations`-key namespace.
+ * 2. Custom Animations (Wheelchair, Riding, Oversized swings):
+ *    - Row Indexing: Located in the dynamically allocated region below the standard sheet (Y >= 3456).
+ *      Uses the block's `offsetY` coordinate.
+ *    - Frame Interval Slices: Tight-crops the horizontal layout to precisely the custom animation's
+ *      columns count: `width = cols * frameSize`. This avoids unnecessary transparent padding on the right.
+ *    - Direction Coordinates: Crops precisely the active directional rows: `height = rows * frameSize`.
+ *      The number of directions is mapped to `rows` (usually 4 rows).
+ *
+ * @param sheet The ComposedSheet master canvas to crop from.
+ * @param name The logical name of the animation (e.g., "walk", "spellcast", "wheelchair").
+ * @param options Configuration options including the canvas adapter.
+ * @returns A ComposedAnimation containing the cropped canvas and metadata.
  */
 export function extractAnimation(
   sheet: ComposedSheet,
@@ -36,10 +47,12 @@ export function extractAnimation(
 ): ComposedAnimation {
   const config = ANIMATION_CONFIGS[name];
   if (config) {
+    // --- Standard Animation Path ---
     const { row, num, cycle } = config;
     const srcY = row * FRAME_SIZE;
     const srcHeight = num * FRAME_SIZE;
 
+    // Standard animation crops always span the full sheet width (832px)
     const canvas = options.adapter.createCanvas(SHEET_WIDTH, srcHeight);
     const ctx = canvas.getContext('2d');
     ctx.drawImage(
@@ -67,10 +80,12 @@ export function extractAnimation(
 
   const region = sheet.customAnimations?.get(name);
   if (region) {
+    // --- Custom Animation Path (Tight-cropping) ---
     const { offsetY, frameSize, rows, cols } = region;
     const width = cols * frameSize;
     const height = rows * frameSize;
 
+    // Tight-crops the canvas to fit exactly the columns and rows count of this custom animation
     const canvas = options.adapter.createCanvas(width, height);
     const ctx = canvas.getContext('2d');
     ctx.drawImage(
@@ -98,6 +113,7 @@ export function extractAnimation(
     };
   }
 
+  // Handle errors for unknown animation requests
   const known = [
     ...Object.keys(ANIMATION_CONFIGS),
     ...(sheet.customAnimations ? [...sheet.customAnimations.keys()] : []),

@@ -53,6 +53,8 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: npm ci
+        working-directory: upstream
 
       - uses: actions/cache@v4
         id: playwright-cache

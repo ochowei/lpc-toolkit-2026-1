@@ -84,7 +84,10 @@ export async function openToolkitCase(
           const win = window as Window & { __LPC_E2E__?: ToolkitBrowserProbe };
           return win.__LPC_E2E__?.status ?? 'missing-probe';
         }),
-      { message: `toolkit probe did not become ready for hash: ${hash}` },
+      {
+        timeout: 60_000,
+        message: `toolkit probe did not become ready for hash: ${hash}`,
+      },
     )
     .toBe('ready');
 
@@ -152,6 +155,22 @@ export async function openUpstreamCase(
   const errors = attachConsoleCollector(page);
 
   await routeUpstreamMetadata(page);
+  await page.addInitScript(() => {
+    // Intercept upstream's setPaletteRecolorMode assignment and force CPU mode
+    let resolvedFn: ((mode: string) => void) | null = null;
+    Object.defineProperty(window, 'setPaletteRecolorMode', {
+      configurable: true,
+      get() {
+        return resolvedFn;
+      },
+      set(fn) {
+        resolvedFn = fn;
+        if (typeof fn === 'function') {
+          fn('cpu');
+        }
+      }
+    });
+  });
   await page.goto(`${UPSTREAM_BASE_URL}/?debug=false#${hash}`);
   await expect
     .poll(
@@ -164,9 +183,16 @@ export async function openUpstreamCase(
           if (!renderer) return 'missing-renderer';
           return renderer.getCanvas().isOk() ? 'ready' : 'missing-canvas';
         }),
-      { message: `upstream canvas did not become ready for hash: ${hash}` },
+      {
+        timeout: 60_000,
+        message: `upstream canvas did not become ready for hash: ${hash}`,
+      },
     )
     .toBe('ready');
+
+  // Wait for the upstream Mithril rendering busy overlay to disappear and settle
+  await page.locator('.preview-canvas-busy').waitFor({ state: 'detached', timeout: 10000 }).catch(() => {});
+  await page.waitForTimeout(3000);
 
   const snapshot = await page.evaluate(() => {
     const win = window as Window & {

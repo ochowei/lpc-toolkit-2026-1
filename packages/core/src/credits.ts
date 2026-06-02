@@ -19,8 +19,8 @@ const SPRITESHEETS_PREFIX = 'spritesheets/';
 
 /**
  * Strip the `spritesheets/` prefix from a `LayerSpec.path` to get the
- * upstream-style "used path" (`body/bodies/male/walk.png`). Credits are
- * keyed by folder prefix without the `spritesheets/` root.
+ * upstream-style "used path" (e.g., `body/bodies/male/walk.png`). Credits in
+ * catalog metadata are keyed by file prefix relative to the `spritesheets/` root.
  */
 function stripSpritesheetsPrefix(path: string): string {
   return path.startsWith(SPRITESHEETS_PREFIX)
@@ -29,15 +29,16 @@ function stripSpritesheetsPrefix(path: string): string {
 }
 
 /**
- * Upstream prefix-match rule (`utils/credits.ts:72`): the credit row's
- * `file` field is a folder prefix, the layer's `usedPath` is the full PNG
- * path. Returns the matched used path (first hit wins, same as upstream),
- * or null if no used path matches.
+ * Upstream prefix-match rule (`utils/credits.ts:72`):
+ * Compares a credit's `file` path pattern with the loaded layer's `usedPath`.
+ * The credit entry matches if it equals the `usedPath` exactly, or if it is
+ * a parent directory prefix of `usedPath` (e.g., credit for `hair/makeup` matches `hair/makeup/red.png`).
+ * Returns the matched used path (first hit wins, same as upstream), or null if none match.
  */
 function matchCreditUsedPath(
   creditFile: string,
   usedPaths: readonly string[],
-): string | null {
+ ): string | null {
   for (const usedPath of usedPaths) {
     if (
       usedPath === creditFile ||
@@ -68,28 +69,27 @@ function findItem(
 }
 
 /**
- * Walk the selections and produce a deduped list of credit entries plus
- * the union of their licenses.
+ * Extracts, resolves, and deduplicates the credit attributions for a given character selection set.
  *
- * Algorithm (mirrors upstream `getAllCredits` in `utils/credits.ts`):
- *   1. Resolve the full set of used PNG paths via
- *      `getSpritePathsForSelections`, stripped of the `spritesheets/`
- *      prefix to match the credit-file convention.
- *   2. For each selected item (in selection iteration order), iterate
- *      its `credits[]`. Keep entries whose `file` is a prefix of any
- *      used path.
- *   3. Dedupe by `credit.file` across all items — first occurrence wins,
- *      preserving (selection-order, item-credit-order).
- *   4. Aggregate `licenses` across kept entries; dedupe preserving first
- *      appearance.
+ * Attribution Matching & Deduplication Algorithm:
+ * 1. Resolves all active sprite sheet layers for the selections via `getSpritePathsForSelections()`.
+ * 2. Group the active sprite paths by their corresponding `ItemId`. This ensures that a body credit
+ *    doesn't match a hair path simply because they happen to share a folder prefix (folder boundaries are strictly enforced).
+ * 3. Walk through each selected item type in the selections (respecting selection order).
+ * 4. Iterate over the item's `credits` metadata list.
+ * 5. Prefix-match the credit's `file` path against the item's active layer paths via `matchCreditUsedPath`.
+ * 6. Deduplication Rules:
+ *    - Dedupes credit entries by `credit.file` using `seenFiles = new Set<string>()`. The first encounter wins, which preserves selection-order and catalog declaration-order priority.
+ *    - Dedupes licenses using `seenLicenses = new Set<License>()` to aggregate a unique list of licenses required by the composed sheet.
+ *
+ * @param selections The active Selections object.
+ * @param catalog The LPC items Catalog containing metadata.
+ * @returns A CreditsManifest object containing unique credit entries, resolved file paths, and active licenses.
  */
 export function getCredits(
   selections: Selections,
   catalog: Catalog,
 ): CreditsManifest {
-  // Group used paths by itemId so each item only matches against its own
-  // sprite paths — a body credit shouldn't be accidentally promoted by a
-  // hair layer that happens to share a folder prefix.
   const layers = getSpritePathsForSelections(selections, catalog);
   const usedPathsByItemId = new Map<ItemId, string[]>();
   for (const layer of layers) {
@@ -132,14 +132,19 @@ export function getCredits(
 }
 
 /**
- * Pick the most "restrictive" license required by an attribution set:
- * the highest group per `LICENSE_GROUP_ORDER` (CC0 < CC-BY < OGA-BY <
- * CC-BY-SA < GPL), then the highest version per `LICENSE_VERSION_RANK`
- * inside that group.
+ * Picks the most "restrictive" license required by a composed sprite attribution set.
  *
- * Throws on empty input — there's no sensible "License of nothing".
- * Callers should check `manifest.licenses.length` first if the empty
- * case is reachable.
+ * Restrictiveness License Sorting Rules:
+ * 1. Finds the highest-ranked license group present in the CreditsManifest via `LICENSE_GROUP_OF` and `LICENSE_GROUP_ORDER`.
+ *    Groups are ranked in ascending restrictiveness order:
+ *    `CC0` (Public Domain) < `CC-BY` (Attribution) < `OGA-BY` (OGA Custom Attribution) < `CC-BY-SA` (Share-alike copyleft) < `GPL` (Strict copyleft).
+ *    A composed sprite sheet inherits the license of its most restrictive component (GPL-3.0 inherits all, making it the effective license of the compilation).
+ * 2. Within that highest group, picks the highest version rank per `LICENSE_VERSION_RANK`
+ *    (e.g., `GPL-3.0` is ranked higher/newer than `GPL-2.0`).
+ * 
+ * @param credits The CreditsManifest containing all unique licenses.
+ * @returns The single License representing the effective license of the entire composition.
+ * @throws Error if the manifest contains no licenses.
  */
 export function computeEffectiveLicense(credits: CreditsManifest): License {
   if (credits.licenses.length === 0) {

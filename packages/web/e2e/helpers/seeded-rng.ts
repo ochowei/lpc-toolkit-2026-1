@@ -17,6 +17,12 @@ export const SEEDED_RANDOM_CASES: readonly SeededCase[] = [
   { name: 'seed-20260530', seed: 20260530 },
 ];
 
+export const MINIMAL_PARITY_CASE: FixedHashCase = {
+  name: 'minimal-parity-test',
+  source: 'Minimal layer combination (body, head, expression) in light color',
+  hash: 'sex=male&body=Body_Color_light&head=Human_Male_light&expression=Neutral_light',
+};
+
 export const OBSERVED_REGRESSION_CASE: FixedHashCase = {
   name: 'observed-deployed-mismatch-2026-05-30',
   source: 'User-reported deployed toolkit vs upstream visual mismatch',

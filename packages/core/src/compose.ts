@@ -27,17 +27,36 @@ import type {
   TypeName,
 } from './types.js';
 
+/**
+ * Represents an extra static standard layer to be injected into the sprite composition.
+ * Useful for custom body modifications, backgrounds, or overlay effects that do
+ * not exist in the default LPC spritesheet catalogs.
+ */
 export interface ExtraStandardLayer {
+  /** The source image or canvas element to draw. */
   readonly image: ImageLike;
+  /** The z-index position of the layer. Determines the rendering order relative to other layers. */
   readonly zPos: number;
 }
 
+/**
+ * Options configuration for the LPC sprite composition process.
+ */
 export interface ComposeOptions {
+  /** The parsed LPC item catalog containing metadata and sheet mappings. */
   readonly catalog: Catalog;
+  /** Environment-agnostic canvas adapter facilitating loading images and creating canvas elements. */
   readonly adapter: CanvasAdapter;
+  /** Base URL path from which spritesheet image files will be requested. */
   readonly spritesheetsBaseUrl: string;
+  /**
+   * Optional sub-array of logical animations to restrict composition to.
+   * If omitted, all standard animations are composed.
+   */
   readonly animations?: readonly AnimationName[];
+  /** Optional progress callback invoked as spritesheets are fetched and loaded. */
   readonly onProgress?: (loaded: number, total: number) => void;
+  /** Optional extra static layers to compose onto the standard sheet, respecting their zPos. */
   readonly extraStandardLayers?: readonly ExtraStandardLayer[];
   /**
    * Resolves a per-layer `PaletteSwap` for recoloring (A2). Core has no
@@ -46,6 +65,10 @@ export interface ComposeOptions {
    * caller injects the swap, mirroring the `CanvasAdapter` / catalog DI
    * seam. When omitted, or when it returns `undefined`, the layer is
    * drawn without recoloring.
+   * 
+   * @param selection The active Selection for this layer's item type.
+   * @param item The ItemDefinition metadata from the catalog.
+   * @returns A PaletteSwap configuration or undefined if no swap is required.
    */
   readonly resolvePalette?: (
     selection: Selection,
@@ -142,7 +165,6 @@ function resolveLayers(
 
     const layer1 = item.layer_1;
     if (!layer1) continue;
-    const layer1Custom = layer1.custom_animation;
 
     for (let n = 1; n < 10; n++) {
       const layer = item[`layer_${n}`];
@@ -150,12 +172,6 @@ function resolveLayers(
 
       const baseRaw = layer[selections.bodyType];
       if (typeof baseRaw !== 'string') continue;
-
-      if (layer1Custom) {
-        if (layer.custom_animation !== layer1Custom) continue;
-      } else if (layer.custom_animation) {
-        continue;
-      }
 
       const basePath = baseRaw.includes('${')
         ? replaceInPath(baseRaw, selections, item)
@@ -186,7 +202,9 @@ function resolveLayers(
 }
 
 /**
- * Resolve which sprite-sheet PNGs are referenced by the given selections.
+ * Resolves which sprite-sheet PNGs are referenced by the given selections.
+ * Walk through all selected layers, build their resolved filenames (including variant handling),
+ * and sort them strictly by z-index.
  *
  * Each surviving layer maps to one `LayerSpec` whose `path` points at the
  * item's default animation (`walk` if declared, else `animations[0]`) plus
@@ -195,6 +213,10 @@ function resolveLayers(
  *
  * Selections that fail resolution are skipped silently (Q9 / Q10). The
  * returned `LayerSpec[]` is sorted by `zPos` ascending across all items.
+ * 
+ * @param selections The active Selections object representing selected item/variant names per type.
+ * @param catalog The LPC items Catalog containing metadata and paths.
+ * @returns A read-only list of LayerSpec objects, sorted by z-index.
  */
 export function getSpritePathsForSelections(
   selections: Selections,
@@ -207,9 +229,15 @@ export function getSpritePathsForSelections(
 
     let path: string;
     if (layer.customAnimation) {
+      // Custom animation layers (such as wheelchair or riding accessories)
+      // do not follow the standard animation subfolders structure (like "walk/").
+      // Instead, they are direct spritesheet PNGs at the base path with the variant name.
       if (!variantFile) continue;
       path = `spritesheets/${layer.basePath}${variantFile}.png`;
     } else {
+      // Standard animations require locating a default fallback animation to display
+      // in preview mode or for static asset resolution. We prefer "walk" if available,
+      // otherwise fall back to the first declared animation in the item's specification.
       const defaultAnim = layer.animations.includes('walk')
         ? 'walk'
         : layer.animations[0];
@@ -229,8 +257,13 @@ export function getSpritePathsForSelections(
     });
   }
 
-  // Stable sort by zPos ascending. Array.prototype.sort is stable in
-  // modern JS engines (ES2019), so insertion order is preserved on ties.
+  // --- The Z-Index Sorting Algorithm ---
+  // We perform an ascending sort based on the `zPos` value of each layer.
+  // Lower `zPos` values represent background layers (e.g., body, legs, back equipment),
+  // which must be drawn FIRST. Higher `zPos` values represent foreground layers (e.g., hair,
+  // hats, front accessories), which must be drawn LATER to overlay correctly on top of background elements.
+  // Array.prototype.sort is stable in modern JS engines (ES2019/V8), meaning that if two layers have
+  // the exact same `zPos`, their insertion/catalog declaration order is strictly preserved, preventing flickering.
   out.sort((a, b) => a.zPos - b.zPos);
   return out;
 }
@@ -329,6 +362,7 @@ export async function composeSelections(
 ): Promise<ComposedSheet> {
   const { catalog, adapter, spritesheetsBaseUrl } = options;
 
+  // Filter folders if a specific set of animations was requested in ComposeOptions.
   const allowedFolders = options.animations
     ? new Set(
         options.animations
@@ -344,6 +378,7 @@ export async function composeSelections(
   const customLayers: CustomLayerEntry[] = [];
   const addedCustomAnimations = new Set<string>();
 
+  // Walk through each resolved layer to categorize standard vs custom animations
   for (const layer of resolved) {
     const selection = selections.items[layer.typeName];
     if (!selection) continue;
@@ -351,9 +386,9 @@ export async function composeSelections(
     const variantFile = layer.variant ? variantToFilename(layer.variant) : '';
 
     if (layer.customAnimation) {
-      // Direct path, no anim segment (C1). No-variant custom layers are
-      // skipped, mirroring `getSpritePathsForSelections` so `.layers`
-      // stays the single source of truth (N6).
+      // --- Custom Animation Path ---
+      // Custom layers (e.g., wheelchair) do not have separate standard folder structures.
+      // They are loaded from a single PNG file corresponding to the custom animation name.
       if (!variantFile) continue;
       customLayers.push({
         customAnim: layer.customAnimation,
@@ -366,6 +401,9 @@ export async function composeSelections(
       continue;
     }
 
+    // --- Standard Animation Path ---
+    // Standard layers map to multiple animation folders (e.g., "walk", "thrust", "shoot").
+    // We add an entry for each folder if the item's metadata states it supports the animation.
     const tail = variantFile ? `/${variantFile}` : '';
 
     for (const [folder, yPos] of Object.entries(ANIMATION_OFFSETS)) {
@@ -383,11 +421,17 @@ export async function composeSelections(
     }
   }
 
-  // Lay out custom-animation blocks below the standard sheet (Q2). Unknown
-  // names (no def in the lifted table) are skipped (N7).
+  // --- Custom Animation Region Allocation & Vertical Sheet Resizing ---
+  // Standard LPC sheets have a fixed layout of 832x3456 pixels.
+  // Custom animations (such as wheelchair or oversized tool swings) are laid out dynamically
+  // directly UNDERNEATH the standard sheet (offsetY starting at 3456).
+  // This vertical resizing ensures backward-compatibility with older sheets while supporting
+  // complex modern layouts.
+  // We iterate through all active custom animations, look up their definition geometries,
+  // allocate their Y coordinates sequentially, and compute the new canvas dimensions.
   const customRegions = new Map<string, CustomRegionInternal>();
   let totalWidth: number = SHEET_WIDTH;
-  let currentY = SHEET_HEIGHT;
+  let currentY = SHEET_HEIGHT; // Start vertical allocation at the bottom of the standard sheet (3456px)
   for (const name of addedCustomAnimations) {
     const def = customAnimations[name];
     if (!def) continue;
@@ -396,6 +440,8 @@ export async function composeSelections(
     const frameSize = def.frameSize;
     const height = frameSize * rows;
     const width = frameSize * cols;
+    
+    // Allocate the region starting at currentY, then shift currentY down by the block height.
     customRegions.set(name, {
       def,
       offsetY: currentY,
@@ -406,12 +452,12 @@ export async function composeSelections(
       width,
     });
     currentY += height;
-    totalWidth = Math.max(totalWidth, width);
+    totalWidth = Math.max(totalWidth, width); // Canvas width adapts to the widest block (e.g., oversize blocks)
   }
-  const totalHeight = currentY;
+  const totalHeight = currentY; // Dynamically resized canvas height
 
-  // Stable sort by zPos: lower drawn first (behind). Push order (selection
-  // → layer → ANIMATION_OFFSETS) is preserved on ties, matching upstream.
+  // Stable sort by zPos: background drawn first (lower zPos).
+  // Array.prototype.sort preserves insertion order for identical values (stable sort).
   drawItems.sort((a, b) => a.zPos - b.zPos);
 
   let loaded = 0;
@@ -421,6 +467,7 @@ export async function composeSelections(
     options.onProgress?.(loaded, total);
   };
 
+  // Fetch all standard layers in parallel using the CanvasAdapter dependency injection seam.
   const settled = await Promise.all(
     drawItems.map(
       async (d): Promise<{ d: DrawItem; img: Sprite | null }> => {
@@ -438,9 +485,14 @@ export async function composeSelections(
     ),
   );
 
+  // Initialize the master canvas with our dynamically calculated dimensions.
   const canvas = adapter.createCanvas(totalWidth, totalHeight);
   const ctx = canvas.getContext('2d');
 
+  // --- Z-Index Rendering Sorting Algorithm (Standard Sheet) ---
+  // Both catalog layers and extra standard layers are merged into a single list
+  // and sorted ascendingly by their `zPos`. This ensures that even injected extra layers
+  // respect correct layering (e.g., behind hair but in front of body).
   const standardDrawItems: Array<
     | {
         readonly kind: 'catalog';
@@ -460,6 +512,7 @@ export async function composeSelections(
     return az - bz;
   });
 
+  // Render the standard sheet layers.
   const drawnFolders = new Set<string>();
   for (const item of standardDrawItems) {
     if (item.kind === 'extra') {
@@ -469,16 +522,19 @@ export async function composeSelections(
 
     const { d, img } = item.value;
     if (!img) continue;
+
+    // Apply color shifting/palette swaps dynamically if a swap resolver is provided.
     const swap = options.resolvePalette?.(d.selection, d.item);
     const sprite = swap ? recolorImage(img, swap, { adapter }) : img;
+    
+    // Draw the entire spritesheet row at its vertical animation offset.
     ctx.drawImage(sprite, 0, d.yPos);
     drawnFolders.add(d.folder);
   }
 
-  // Custom-animation blocks. Load every custom-sprite PNG in parallel
-  // (these are the only *new* loads — extracted base-anim frames reuse the
-  // already-loaded standard sprites, Q5), then per block draw custom
-  // sprites + re-laid base-anim frames in `zPos` order.
+  // --- Custom Animation Blocks Rendering ---
+  // Load custom-sprite PNGs (like wheelchair frame asset) in parallel,
+  // and compose them into their allotted regions below standard sheet.
   if (customRegions.size > 0) {
     const loadedCustom = await Promise.all(
       customLayers.map(
@@ -506,7 +562,7 @@ export async function composeSelections(
       const baseAnim = customAnimationBase(region.def);
       const areaItems: AreaItem[] = [];
 
-      // 1. Custom-sprite layers (wheelchair background / foreground).
+      // 1. Draw the static custom-sprite layers (e.g. wheelchair wheels/back).
       for (const { c, img } of loadedCustom) {
         if (c.customAnim !== name || !img) continue;
         const swap = options.resolvePalette?.(c.selection, c.item);
@@ -517,10 +573,10 @@ export async function composeSelections(
         });
       }
 
-      // 2. Standard items whose folder is this block's base animation
-      // (e.g. body `sit` → wheelchair) get re-laid into the block. Source
-      // is the already-loaded standard sprite (Q5); if the base anim was
-      // filtered out / undeclared there simply are none (N5).
+      // 2. Draw standard character items whose folder matches this block's base animation.
+      // E.g., for wheelchair, body "sit" standard frames are cropped and re-arranged
+      // to line up with the wheelchair's custom wheels frame layout.
+      // Re-use standard sprites already loaded (no extra network fetches).
       for (const { d, img } of settled) {
         if (d.folder !== baseAnim || !img) continue;
         const swap = options.resolvePalette?.(d.selection, d.item);
@@ -537,19 +593,14 @@ export async function composeSelections(
         });
       }
 
-      // Stable sort by zPos (push order preserved on ties), matching
-      // upstream's custom-area draw order.
+      // Sort custom block components by zPos before drawing to ensure correct overlays.
       areaItems.sort((a, b) => a.zPos - b.zPos);
       for (const item of areaItems) item.draw();
     }
   }
 
-  // Output animations: logical names (input/UI namespace, symmetric with
-  // `options.animations`) whose folder was actually drawn and that a
-  // composed item declares. Folder→logical is one-to-many (`backslash` ←
-  // `1h_slash` / `1h_backslash`), so report every matching declared name.
-  // Custom-animation names are a separate axis (`customAnimations` map),
-  // not standard `sheet.animations`.
+  // --- Output Meta Construction ---
+  // Return standard and custom meta, including active animation lists and credit manifests.
   const declaredLogical = new Set<AnimationName>();
   for (const layer of resolved) {
     if (layer.customAnimation) continue;
