@@ -58,6 +58,8 @@ export interface ComposeOptions {
   readonly onProgress?: (loaded: number, total: number) => void;
   /** Optional extra static layers to compose onto the standard sheet, respecting their zPos. */
   readonly extraStandardLayers?: readonly ExtraStandardLayer[];
+  /** Optional 1-based item layer filter, used by split-by-item ZIP parity exports. */
+  readonly onlyLayerNumber?: number;
   /**
    * Resolves a per-layer `PaletteSwap` for recoloring (A2). Core has no
    * palette color data — `RecolorConfig` carries palette *names* and
@@ -155,6 +157,7 @@ interface ResolvedLayer {
 function resolveLayers(
   selections: Selections,
   catalog: Catalog,
+  onlyLayerNumber?: number,
 ): ResolvedLayer[] {
   const out: ResolvedLayer[] = [];
 
@@ -169,6 +172,7 @@ function resolveLayers(
     for (let n = 1; n < 10; n++) {
       const layer = item[`layer_${n}`];
       if (!layer) break;
+      if (onlyLayerNumber !== undefined && n !== onlyLayerNumber) continue;
 
       const baseRaw = layer[selections.bodyType];
       if (typeof baseRaw !== 'string') continue;
@@ -371,7 +375,7 @@ export async function composeSelections(
       )
     : null;
 
-  const resolved = resolveLayers(selections, catalog);
+  const resolved = resolveLayers(selections, catalog, options.onlyLayerNumber);
 
   const drawItems: DrawItem[] = [];
   // Custom-animation sprite layers + their encounter-order set (Q6).

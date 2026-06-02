@@ -44,6 +44,7 @@ interface Props {
   setExpanded: (v: TypeName | null) => void;
 }
 
+/** Left-side layer management panel: search, filters, active stack, and settings. */
 export function StackPanel({
   catalog,
   palettes,

@@ -7,6 +7,7 @@ import {
   type ItemDefinition,
 } from '@lpc-toolkit/core';
 
+/** Small wrapper kept for tests that build a catalog from synthetic records. */
 export function recordsToCatalog(
   records: Readonly<Record<FilePath, ItemDefinition>>,
 ): CreateCatalogResult {
@@ -29,6 +30,7 @@ export function normalizeUpstreamKey(key: string): string {
 // module naturally resets the flag.
 let warningsEmitted = false;
 
+/** Log catalog load warnings once per module lifetime. */
 export function emitCatalogWarningsOnce(
   warnings: readonly CatalogLoadWarning[],
 ): void {

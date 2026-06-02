@@ -19,6 +19,7 @@ interface Props {
   assetSource: AssetSource;
 }
 
+/** Tiny rendered preview for an item row, backed by the thumbnail hook/cache. */
 export function ItemThumbnail({
   typeName, name, variant, recolor, size,
   bodyType, catalog, palettes, assetSource,

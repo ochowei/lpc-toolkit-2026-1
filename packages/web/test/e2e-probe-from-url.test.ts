@@ -1,3 +1,4 @@
+/** Verifies URL parsing for the test-only E2E probe switch. */
 import { describe, expect, it } from 'vitest';
 import { e2eProbeFromUrl } from '../src/lib/e2e-probe-from-url';
 

@@ -59,6 +59,7 @@ export function applyTransparencyMaskToCanvas(
   ctx.putImageData(imgData, 0, 0);
 }
 
+/** Display toggles for the browser-only full-sheet renderer. */
 export interface RenderFullSheetOptions {
   readonly grid: boolean;
   readonly mask: boolean;

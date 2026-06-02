@@ -1,3 +1,4 @@
+/** Verifies catalog tree construction and body-type support checks. */
 import { describe, expect, it } from 'vitest';
 import { createCatalog, type ItemDefinition } from '@lpc-toolkit/core';
 import { buildCatalogTree, itemSupportsBodyType } from '../src/slice/catalog-tree';

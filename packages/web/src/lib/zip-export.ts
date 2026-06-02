@@ -8,6 +8,7 @@ import type {
   Catalog,
   CanvasAdapter,
   ComposedSheet,
+  ItemDefinition,
   Selections,
 } from '@lpc-toolkit/core';
 // Type-only import — erased at compile time, so the actual jszip module
@@ -19,12 +20,14 @@ import {
 } from './custom-overlay';
 type JSZipInstance = InstanceType<typeof JSZipModule>;
 
+/** ZIP layouts exposed by the download popover. */
 export type ZipExportKind =
   | 'byAnimation'
   | 'byItem'
   | 'byAnimItem'
   | 'byFrame';
 
+/** Shared dependencies and current composition state for every ZIP exporter. */
 export interface ExportContext {
   readonly sheet: ComposedSheet;
   readonly selections: Selections;
@@ -37,6 +40,10 @@ export interface ExportContext {
    */
   readonly anim: string;
   readonly composeSingleItem: (s: Selections) => Promise<ComposedSheet>;
+  readonly composeSingleItemLayer?: (
+    s: Selections,
+    layerNumber: number,
+  ) => Promise<ComposedSheet>;
   readonly adapter: CanvasAdapter;
   readonly customOverlay?: CustomOverlay | null;
   readonly onProgress: (progress: number) => void;
@@ -49,10 +56,12 @@ const KIND_TO_SEGMENT: Readonly<Record<ZipExportKind, string>> = {
   byFrame: 'individual_frames',
 };
 
+/** Filesystem-safe timestamp used in generated ZIP names. */
 export function zipExportTimestamp(): string {
   return new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
 }
 
+/** Default ZIP filename for a body type and export layout. */
 export function zipName(
   bodyType: string,
   kind: ZipExportKind,
@@ -61,6 +70,7 @@ export function zipName(
   return `lpc_${bodyType}_${KIND_TO_SEGMENT[kind]}_${timestamp}.zip`;
 }
 
+/** Inputs for naming an individual item spritesheet inside a ZIP archive. */
 export interface ItemFileNameInput {
   readonly name: string;
   readonly zPos: number;
@@ -68,6 +78,7 @@ export interface ItemFileNameInput {
   readonly variant?: string;
 }
 
+/** Stable per-item filename ordered by z-position and sanitized for archives. */
 export function itemFileName(input: ItemFileNameInput): string {
   const fallback = input.itemId
     ? `${input.itemId}_${input.variant ?? ''}`
@@ -133,6 +144,7 @@ function reportGenerate(ctx: ExportContext, percent: number): void {
   ctx.onProgress(0.5 + (percent / 100) * 0.5);
 }
 
+/** Export one PNG per animation, plus mandatory credits files. */
 export async function exportByAnimationZip(ctx: ExportContext): Promise<Blob> {
   const { default: JSZip } = await import('jszip');
   const zip = new JSZip();
@@ -181,6 +193,10 @@ interface ItemMeta {
   readonly zPos: number;
 }
 
+interface ItemLayerMeta extends ItemMeta {
+  readonly layerNumber: number;
+}
+
 // Map<typeName, ItemMeta> so callers can resolve by typeName cleanly even
 // when two selected items share a name across different typeNames.
 function lookupItemMetas(ctx: ExportContext): ReadonlyMap<string, ItemMeta> {
@@ -212,6 +228,26 @@ function buildSingleSelections(
   };
 }
 
+function itemLayerMetas(
+  itemId: string,
+  item: ItemDefinition,
+  meta: ItemMeta,
+): ItemLayerMeta[] {
+  const out: ItemLayerMeta[] = [];
+  for (let n = 1; n < 10; n++) {
+    const layer = item[`layer_${n}`];
+    if (!layer) break;
+    out.push({
+      ...meta,
+      itemId,
+      zPos: layer.zPos,
+      layerNumber: n,
+    });
+  }
+  return out;
+}
+
+/** Export each selected item split by animation folder. */
 export async function exportByAnimItemZip(ctx: ExportContext): Promise<Blob> {
   const { default: JSZip } = await import('jszip');
   const zip = new JSZip();
@@ -312,12 +348,19 @@ export async function exportByAnimItemZip(ctx: ExportContext): Promise<Blob> {
   );
 }
 
+/** Export one full spritesheet per selected item layer, plus any custom overlay. */
 export async function exportByItemZip(ctx: ExportContext): Promise<Blob> {
   const { default: JSZip } = await import('jszip');
   const zip = new JSZip();
 
   const metas = lookupItemMetas(ctx);
-  const total = metas.size + (ctx.customOverlay ? 1 : 0);
+  const itemLayerCount = [...metas.values()].reduce((count, meta) => {
+    const itemDef = ctx.catalog.byItemId.get(meta.itemId);
+    return (
+      count + (itemDef ? itemLayerMetas(meta.itemId, itemDef, meta).length : 0)
+    );
+  }, 0);
+  const total = itemLayerCount + (ctx.customOverlay ? 1 : 0);
   let done = 0;
 
   const fileOpts = { createFolders: false };
@@ -325,25 +368,33 @@ export async function exportByItemZip(ctx: ExportContext): Promise<Blob> {
   for (const [typeName, sel] of Object.entries(ctx.selections.items)) {
     const meta = metas.get(typeName);
     if (!meta) continue;
+    const itemDef = ctx.catalog.byItemId.get(meta.itemId);
+    if (!itemDef) continue;
+    const layers = itemLayerMetas(meta.itemId, itemDef, meta);
     try {
-      const itemSheet = await ctx.composeSingleItem(
-        buildSingleSelections(ctx.selections, typeName, sel),
-      );
-      const filename = itemFileName({
-        name: meta.name,
-        zPos: meta.zPos,
-        itemId: meta.itemId,
-        ...(meta.variant ? { variant: meta.variant } : {}),
-      });
-      const buf = await encodePng(
-        itemSheet.canvas as unknown as HTMLCanvasElement,
-      );
-      zip.file(`items/${filename}`, buf, fileOpts);
+      for (const layer of layers) {
+        const composeItemLayer =
+          ctx.composeSingleItemLayer ?? ctx.composeSingleItem;
+        const itemSheet = await composeItemLayer(
+          buildSingleSelections(ctx.selections, typeName, sel),
+          layer.layerNumber,
+        );
+        const filename = itemFileName({
+          name: layer.name,
+          zPos: layer.zPos,
+          itemId: layer.itemId,
+          ...(layer.variant ? { variant: layer.variant } : {}),
+        });
+        const buf = await encodePng(
+          itemSheet.canvas as unknown as HTMLCanvasElement,
+        );
+        zip.file(`items/${filename}`, buf, fileOpts);
+        done += 1;
+        reportEncode(ctx, done, total);
+      }
     } catch (err) {
       console.warn(`exportByItemZip: skipping ${typeName}/${sel.name}:`, err);
     }
-    done += 1;
-    reportEncode(ctx, done, total);
   }
 
   if (ctx.customOverlay) {
@@ -370,6 +421,7 @@ export async function exportByItemZip(ctx: ExportContext): Promise<Blob> {
 
 const yieldToUi = (): Promise<void> => new Promise((r) => setTimeout(r, 0));
 
+/** Export every non-empty frame as an individual PNG grouped by animation/direction. */
 export async function exportByFrameZip(ctx: ExportContext): Promise<Blob> {
   const { default: JSZip } = await import('jszip');
   const zip = new JSZip();
@@ -408,7 +460,7 @@ export async function exportByFrameZip(ctx: ExportContext): Promise<Blob> {
   for (const animName of customAnims) {
     const byDir = extractAnimationFrames(ctx.sheet, animName, {
       adapter: ctx.adapter,
-      skipEmpty: true,
+      skipEmpty: false,
     });
     for (const [direction, frames] of byDir) {
       for (const frame of frames) {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { computeRatioFromPointer } from '../../lib/splitter-math';
 
+/** Geometry and callback contract for the draggable preview/sidebar splitter. */
 export interface PreviewPaneSplitterProps {
   /**
    * The y-coordinate (in viewport pixels) of the splitter container's

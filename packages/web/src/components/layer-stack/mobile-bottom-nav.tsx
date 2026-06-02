@@ -1,6 +1,7 @@
 import { Button } from '../ui/button';
 import type { Translator } from '../../i18n';
 
+/** Mobile-only switch between preview and layer-management panes. */
 export type MobileView = 'preview' | 'layers';
 
 interface Props {
@@ -9,6 +10,7 @@ interface Props {
   t: Translator;
 }
 
+/** Bottom navigation used when the main two-pane layout collapses on phones. */
 export function MobileBottomNav({ value, onChange, t }: Props) {
   return (
     <nav

@@ -13,6 +13,7 @@ import type { AssetSource } from '../adapter/asset-source';
 import type { CustomOverlay } from '../lib/custom-overlay';
 import { toSelections, type SliceState } from '../slice/selection';
 
+/** Async composition state exposed to preview and export UI. */
 export interface ComposedResult {
   readonly status: 'idle' | 'loading' | 'ready' | 'error';
   readonly progress: number; // 0..1

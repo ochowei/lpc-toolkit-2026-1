@@ -4,6 +4,7 @@ import { usePopover } from './use-popover';
 import { cn } from '../../../lib/cn';
 import type { Locale, Translator } from '../../../i18n';
 
+/** Secondary popover destinations opened from the compact more menu. */
 export type MoreMenuTarget = 'token' | 'attribution';
 
 interface Props {
@@ -21,6 +22,7 @@ interface Props {
   anchorRefOut?: RefObject<HTMLButtonElement>;
 }
 
+/** Compact overflow menu for language/theme toggles and secondary popovers. */
 export function MoreMenuPopover({
   open,
   setOpen,

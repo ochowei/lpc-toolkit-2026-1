@@ -4,8 +4,10 @@ import { renderFullSheet } from '../../lib/full-sheet-render';
 import type { Translator } from '../../i18n';
 import { Button } from '../ui/button';
 
+/** Zoom modes supported by the full-sheet inspection pane. */
 export type FullSheetZoom = 'fit' | 1 | 2 | 4;
 
+/** Props for rendering and controlling the full composed spritesheet preview. */
 export interface FullSpritesheetPreviewProps {
   sheet: ComposedSheet | null;
   status: 'idle' | 'loading' | 'ready' | 'error';
@@ -21,6 +23,7 @@ export interface FullSpritesheetPreviewProps {
 
 const ZOOM_PRESETS: readonly FullSheetZoom[] = ['fit', 1, 2, 4];
 
+/** Full universal-sheet preview with transparency grid, mask, and zoom controls. */
 export function FullSpritesheetPreview({
   sheet,
   status,

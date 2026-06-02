@@ -18,6 +18,7 @@ import type { AssetSource } from '../adapter/asset-source';
 import { frameRect } from '../slice/frame-rect';
 import { cacheGet, cacheSet, makeCacheKey } from './thumbnail-cache';
 
+/** Inputs needed to compose and crop one catalog item thumbnail. */
 export interface UseItemThumbnailArgs {
   readonly typeName: TypeName;
   readonly name: string;
@@ -30,6 +31,7 @@ export interface UseItemThumbnailArgs {
   readonly assetSource: AssetSource;
 }
 
+/** Thumbnail canvas and load status returned to layer-picker rows. */
 export interface UseItemThumbnailResult {
   readonly canvas: HTMLCanvasElement | null;
   readonly status: 'loading' | 'ready' | 'error';

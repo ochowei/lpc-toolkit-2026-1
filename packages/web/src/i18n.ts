@@ -1,5 +1,6 @@
 import { ITEM_NAME_LABELS_ZH } from './i18n-item-names';
 
+/** Static UI copy keyed by locale; catalog-derived labels are handled below. */
 export const TRANSLATIONS = {
   en: {
     'app.subtitle': 'foundation slice',
@@ -320,12 +321,17 @@ export const TRANSLATIONS = {
   },
 } as const;
 
+/** Supported UI locale code. */
 export type Locale = keyof typeof TRANSLATIONS;
+/** Compile-time-safe translation key shared by all locales. */
 export type TranslationKey = keyof (typeof TRANSLATIONS)['en'];
+/** Runtime lookup function for fixed UI copy. */
 export type Translator = (key: TranslationKey) => string;
 
+/** Initial locale for the app before the user toggles languages. */
 export const DEFAULT_LOCALE: Locale = 'en';
 
+/** Create a fixed-copy translator for the selected locale. */
 export function createTranslator(locale: Locale): Translator {
   return (key) => TRANSLATIONS[locale][key];
 }
@@ -556,6 +562,7 @@ const ANIM_LABELS_ZH: Record<string, string> = {
   '1h_halfslash': '單手半揮砍',
 };
 
+/** Translation helpers for values that come from upstream catalog metadata. */
 export interface LabelTranslator {
   /** type_name or advanced-tree path segment, e.g. "body", "weapon". */
   category(value: string): string;

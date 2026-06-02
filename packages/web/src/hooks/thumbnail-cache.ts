@@ -1,7 +1,9 @@
 import type { BodyType, TypeName } from '@lpc-toolkit/core';
 
+/** Maximum number of thumbnail canvases kept in the in-memory LRU cache. */
 export const CACHE_MAX = 200;
 
+/** Values that uniquely affect the pixels of a rendered thumbnail. */
 export interface CacheKeyArgs {
   readonly bodyType: BodyType;
   readonly typeName: TypeName;
@@ -11,6 +13,7 @@ export interface CacheKeyArgs {
   readonly recolor?: string;
 }
 
+/** Stable delimiter-based cache key for thumbnail canvases. */
 export function makeCacheKey(args: CacheKeyArgs): string {
   return [
     args.bodyType,
@@ -28,6 +31,7 @@ export function makeCacheKey(args: CacheKeyArgs): string {
 // oldest insertion / least-recently-used entry.
 const cache = new Map<string, HTMLCanvasElement>();
 
+/** Read a cached thumbnail and refresh its LRU position. */
 export function cacheGet(key: string): HTMLCanvasElement | undefined {
   const v = cache.get(key);
   if (v === undefined) return undefined;
@@ -36,6 +40,7 @@ export function cacheGet(key: string): HTMLCanvasElement | undefined {
   return v;
 }
 
+/** Store a rendered thumbnail canvas and evict oldest entries over CACHE_MAX. */
 export function cacheSet(key: string, canvas: HTMLCanvasElement): void {
   if (cache.has(key)) cache.delete(key);
   cache.set(key, canvas);
@@ -46,6 +51,7 @@ export function cacheSet(key: string, canvas: HTMLCanvasElement): void {
   }
 }
 
+/** Clear thumbnail cache state between tests or hard catalog resets. */
 export function cacheClear(): void {
   cache.clear();
 }

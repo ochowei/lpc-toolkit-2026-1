@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 
+/** Shared fixed-position popover state with outside-click and Escape dismissal. */
 export function usePopover(
   open: boolean,
   onClose: () => void,

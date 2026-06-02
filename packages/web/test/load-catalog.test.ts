@@ -1,3 +1,4 @@
+/** Verifies catalog loading helpers and warning emission behavior. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ItemDefinition } from '@lpc-toolkit/core';
 import {

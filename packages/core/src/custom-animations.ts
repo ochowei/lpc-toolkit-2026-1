@@ -52,6 +52,7 @@ const animationRowsLayout: AnimationRowsLayout = {
   'sit-e': 32,
 };
 
+/** Layout metadata for one custom animation block appended after the base sheet. */
 export interface CustomAnimationDefinition {
   frameSize: number;
   frames: string[][];

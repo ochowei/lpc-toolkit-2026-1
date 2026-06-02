@@ -15,6 +15,7 @@ export function assetSourceFromUrl(search: string): AssetSource | undefined {
     : undefined;
 }
 
+/** Choose the runtime asset source, preferring the validated URL override. */
 export function defaultAssetSourceFromUrl(
   search: string,
   isDev: boolean,

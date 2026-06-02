@@ -18,6 +18,7 @@ interface Props {
   onApplied: (name: string, skippedCount: number, skippedTypes: string[]) => void;
 }
 
+/** Popover menu that applies curated presets and reports skipped incompatible items. */
 export function PresetMenuPopover({
   open,
   setOpen,

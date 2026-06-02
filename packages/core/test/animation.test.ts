@@ -255,6 +255,15 @@ describe('extractAnimation', () => {
       ).toBe(true);
     });
 
+    it('documents custom animation extraction as a toolkit API extension', async () => {
+      const sheet = await composeWheelchair();
+      const anim = extractAnimation(sheet, 'wheelchair', { adapter });
+
+      expect(anim.animation).toBe('wheelchair');
+      expect(anim.width).toBe(128);
+      expect(anim.height).toBe(256);
+    });
+
     it('still extracts standard animations from the same sheet', async () => {
       const sheet = await composeWheelchair();
       // No body → walk row group is a valid, transparent 832×256 crop.

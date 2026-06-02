@@ -1,3 +1,4 @@
+/** Verifies selection actions produced when catalog items are picked. */
 import { describe, expect, it } from 'vitest';
 import type { ItemDefinition } from '@lpc-toolkit/core';
 import { pickActionForItem } from '../src/slice/selection';

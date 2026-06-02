@@ -6,8 +6,10 @@ import {
 } from '@lpc-toolkit/core';
 import { frameRect } from '../slice/frame-rect';
 
+/** Fixed preview playback rate for all standard LPC animations. */
 export const ANIMATION_FPS = 8;
 
+/** Playback counters exposed to preview controls. */
 export interface UseAnimationPlayerResult {
   readonly currentFrame: number;
   readonly totalFrames: number;

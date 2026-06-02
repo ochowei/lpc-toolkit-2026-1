@@ -23,12 +23,14 @@ const buttonVariants = cva(
   },
 );
 
+/** Shared button props, including optional shadcn-style Slot composition. */
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
   asChild?: boolean;
 }
 
+/** Theme-aware app button with variant and size classes. */
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, ...props }, ref) => {
     const Comp = asChild ? Slot : 'button';

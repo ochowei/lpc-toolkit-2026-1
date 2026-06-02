@@ -194,8 +194,19 @@ function makeItem(zPos: number): ItemDefinition {
   };
 }
 
+function makeMultiLayerItem(): ItemDefinition {
+  return {
+    name: 'robe',
+    type_name: 'clothes',
+    animations: ['walk'],
+    credits: [],
+    layer_1: { zPos: 40, male: 'clothes/robe/back/' },
+    layer_2: { zPos: 140, male: 'clothes/robe/front/' },
+  };
+}
+
 describe('exportByItemZip (F5)', () => {
-  it('produces a ZIP with one items/<zPos> <name>.png entry per selected item', async () => {
+  it('produces a ZIP with an items/<zPos> <name>.png entry for a single-layer item', async () => {
     const sheet = makeWalkSheet();
     const selections = {
       bodyType: 'male',
@@ -226,6 +237,45 @@ describe('exportByItemZip (F5)', () => {
     const itemKey = keys.find((k) => k.startsWith('items/'))!;
     const pngBytes = await zip.file(itemKey)!.async('uint8array');
     expect(pngBytes.length).toBeGreaterThan(0);
+  });
+
+  it('exports each layer of a multi-layer selected item separately', async () => {
+    const sheet = makeWalkSheet();
+    const selections = {
+      bodyType: 'male',
+      items: { clothes: { typeName: 'clothes', name: 'robe' } },
+    };
+    const itemDef = makeMultiLayerItem();
+    const composeLayerCalls: number[] = [];
+    const ctx: ExportContext = {
+      sheet,
+      selections,
+      catalog: {
+        byItemId: new Map([['clothes/robe', itemDef]]),
+        byTypeName: new Map([['clothes', [itemDef]]]),
+        typeNames: ['clothes'],
+        aliases: new Map(),
+      },
+      anim: 'walk',
+      composeSingleItem: async () => {
+        throw new Error('exportByItemZip should use layer-aware composition');
+      },
+      composeSingleItemLayer: async (_singleSelections, layerNumber) => {
+        composeLayerCalls.push(layerNumber);
+        return sheet;
+      },
+      adapter: makeAdapter(),
+      onProgress: () => {},
+    };
+
+    const blob = await exportByItemZip(ctx);
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const keys = Object.keys(zip.files).sort();
+
+    expect(composeLayerCalls).toEqual([1, 2]);
+    expect(keys).toContain('items/040 robe.png');
+    expect(keys).toContain('items/140 robe.png');
+    expect(keys.filter((k) => k.startsWith('items/'))).toHaveLength(2);
   });
 
   it('includes a custom-upload item entry without adding it to credits', async () => {
@@ -446,5 +496,51 @@ describe('exportByFrameZip (F7)', () => {
     expect(keys).toContain('standard/walk/down/3.png');
     expect(keys).toContain('credits/credits.txt');
     expect(keys).toContain('credits/credits.csv');
+  });
+
+  it('includes transparent frames for custom animations to match upstream ZIP slicing', async () => {
+    const frameSize = 64;
+    const baseCanvas = createCanvas(832, 3456 + frameSize);
+    const ctx2 = baseCanvas.getContext('2d');
+    ctx2.fillStyle = '#00ff00';
+    ctx2.fillRect(0, 3456, frameSize, frameSize);
+    ctx2.fillRect(2 * frameSize, 3456, frameSize, frameSize);
+    const sheet: ComposedSheet = {
+      canvas: baseCanvas as unknown as import('@lpc-toolkit/core').CanvasLike,
+      width: 832,
+      height: 3456 + frameSize,
+      selections: { bodyType: 'male', items: {} },
+      credits: EMPTY_CREDITS,
+      layers: [],
+      animations: [],
+      customAnimations: new Map([
+        ['wheelchair', { offsetY: 3456, frameSize, rows: 1, cols: 3 }],
+      ]),
+    };
+    const exportCtx: ExportContext = {
+      sheet,
+      selections: sheet.selections,
+      catalog: {
+        byItemId: new Map(),
+        byTypeName: new Map(),
+        typeNames: [],
+        aliases: new Map(),
+      },
+      anim: 'walk',
+      composeSingleItem: async () => sheet,
+      adapter: makeAdapter(),
+      onProgress: () => {},
+    };
+
+    const blob = await exportByFrameZip(exportCtx);
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const keys = Object.keys(zip.files).sort();
+
+    expect(keys).toContain('custom/wheelchair/up/1.png');
+    expect(keys).toContain('custom/wheelchair/up/2.png');
+    expect(keys).toContain('custom/wheelchair/up/3.png');
+    expect(
+      keys.filter((k) => k.startsWith('custom/wheelchair/up/')),
+    ).toHaveLength(3);
   });
 });

@@ -1,3 +1,4 @@
+/** Compares local toolkit output against upstream-rendered random cases. */
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import { diffRgba } from './helpers/pixel-diff';
 import {

@@ -13,11 +13,13 @@ import {
 } from '../../../slice/animation-filter';
 import type { SliceState } from '../../../slice/selection';
 
+/** Compact attribution badge state shown in the top bar. */
 export interface AttributionSummary {
   sourceCount: number;
   incompatibleAny: boolean;
 }
 
+/** Count distinct effective source buckets and detect filter incompatibilities. */
 export function summarizeAttribution(
   catalog: Catalog,
   state: SliceState,

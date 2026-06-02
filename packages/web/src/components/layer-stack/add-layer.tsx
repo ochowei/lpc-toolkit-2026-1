@@ -16,6 +16,7 @@ interface Props {
   onAdded: (tn: TypeName) => void;
 }
 
+/** Inline picker for adding currently inactive catalog type slots. */
 export function AddLayer({
   catalog, dispatch, inactive, bodyType, t, tl,
   adding, setAdding, onAdded,

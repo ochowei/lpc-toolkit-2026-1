@@ -47,6 +47,10 @@ interface Props {
   catalog: Catalog;
   assetSource: AssetSource;
   composeSingleItem: (s: Selections) => Promise<ComposedSheet>;
+  composeSingleItemLayer: (
+    s: Selections,
+    layerNumber: number,
+  ) => Promise<ComposedSheet>;
   customOverlay: CustomOverlay | null;
   zipRunning: ZipRunning | null;
   setZipRunning: (r: ZipRunning | null) => void;
@@ -54,6 +58,7 @@ interface Props {
   onStatus: (status: { kind: 'info' | 'error'; text: string }) => void;
 }
 
+/** Download menu for composed PNGs, attribution files, and ZIP export layouts. */
 export function DownloadPopover({
   open,
   setOpen,
@@ -63,6 +68,7 @@ export function DownloadPopover({
   catalog,
   assetSource,
   composeSingleItem,
+  composeSingleItemLayer,
   customOverlay,
   zipRunning,
   setZipRunning,
@@ -122,6 +128,7 @@ export function DownloadPopover({
         catalog,
         anim,
         composeSingleItem,
+        composeSingleItemLayer,
         adapter,
         customOverlay,
         onProgress: (p) => setZipRunning({ kind, progress: p }),

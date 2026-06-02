@@ -1,3 +1,4 @@
+/** Verifies the RGBA diff helper used by parity E2E tests. */
 import { describe, expect, it } from 'vitest';
 import { diffRgba } from '../e2e/helpers/pixel-diff';
 

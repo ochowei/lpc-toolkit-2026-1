@@ -11,13 +11,16 @@ import { toSelections, type SliceState } from '../slice/selection';
 import type { SliceAction } from '../slice/selection';
 import type { Translator } from '../i18n';
 
+/** History operation selected after comparing the current and next URL hash. */
 export type HashWriteAction = 'replace' | 'push' | null;
 
+/** Initial reducer state plus warnings decoded from the current URL hash. */
 export interface BootstrapResult {
   readonly state: SliceState;
   readonly warnings: readonly HashWarning[];
 }
 
+/** Parsed browser hashchange result for the reducer and warning UI. */
 export interface HashChangeAction {
   readonly shouldApply: boolean;
   readonly selections: Selections | null;

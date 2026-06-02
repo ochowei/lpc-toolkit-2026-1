@@ -1,3 +1,4 @@
+/** Verifies custom overlay dimensions, z-order parsing, and ZIP naming. */
 import { createCanvas } from '@napi-rs/canvas';
 import { describe, expect, it } from 'vitest';
 import {
@@ -24,6 +25,16 @@ function makeOverlay(zPos = 70): CustomOverlay {
 describe('validateCustomOverlayDimensions', () => {
   it('accepts the standard master spritesheet size', () => {
     expect(validateCustomOverlayDimensions(832, 3456)).toEqual({ ok: true });
+  });
+
+  it('documents the toolkit full-sheet overlay model instead of upstream per-animation uploads', () => {
+    expect(CUSTOM_OVERLAY_WIDTH).toBe(832);
+    expect(CUSTOM_OVERLAY_HEIGHT).toBe(3456);
+    expect(validateCustomOverlayDimensions(64, 64)).toEqual({
+      ok: false,
+      width: 64,
+      height: 64,
+    });
   });
 
   it('rejects non-standard dimensions with exact actual dimensions', () => {

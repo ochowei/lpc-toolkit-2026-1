@@ -6,6 +6,7 @@ import type {
 } from '@lpc-toolkit/core';
 import { itemSupportsBodyType } from '../../slice/catalog-tree';
 
+/** Search inputs for flattening the catalog into the sidebar palette. */
 export interface PaletteSearchArgs {
   readonly catalog: Catalog;
   readonly bodyType: BodyType;
@@ -13,6 +14,7 @@ export interface PaletteSearchArgs {
   readonly shownTypeNames: readonly TypeName[];
 }
 
+/** One searchable catalog row plus compatibility for the active body type. */
 export interface PaletteResult {
   readonly typeName: TypeName;
   readonly item: ItemDefinition;

@@ -1,3 +1,4 @@
+/** Verifies URL parsing for the web asset-source selector. */
 import { describe, expect, it } from 'vitest';
 import {
   assetSourceFromUrl,

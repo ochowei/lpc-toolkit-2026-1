@@ -4,6 +4,7 @@ import {
   type PaletteMetadata,
 } from '@lpc-toolkit/core';
 
+/** Swatch-backed color option that writes to `Selection.recolor`. */
 export interface RecolorColorOption {
   readonly kind: 'recolor';
   readonly value: string; // goes into Selection.recolor
@@ -11,12 +12,14 @@ export interface RecolorColorOption {
   readonly label: string; // display text + tooltip
 }
 
+/** Named variant option that writes to `Selection.variant`. */
 export interface VariantColorOption {
   readonly kind: 'variant';
   readonly value: string; // goes into Selection.variant
   readonly label: string; // display text
 }
 
+/** UI-ready color choices for an item: recolor swatches, variant names, or none. */
 export type ColorOptions =
   | { readonly mode: 'recolors'; readonly options: readonly RecolorColorOption[] }
   | { readonly mode: 'variants'; readonly options: readonly VariantColorOption[] }

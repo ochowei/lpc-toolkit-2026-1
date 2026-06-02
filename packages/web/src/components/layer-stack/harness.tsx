@@ -84,6 +84,7 @@ declare global {
   }
 }
 
+/** Top-level web UI dependencies and state passed from App into the layer stack. */
 export interface LayerStackHarnessProps {
   catalog: Catalog;
   palettes: PaletteMetadata;
@@ -103,6 +104,7 @@ export interface LayerStackHarnessProps {
   onToggleLocale: () => void;
 }
 
+/** Coordinates layer state, composition hooks, popovers, filters, and responsive layout. */
 export function LayerStackHarness(props: LayerStackHarnessProps) {
   const { t, theme, locale, onToggleTheme, onToggleLocale } = props;
   const [licenseFilter, setLicenseFilter] = useState<LicenseFilter>(ALL_LICENSE_GROUPS);
@@ -188,12 +190,13 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   );
 
   const composeSingleItem = useCallback(
-    async (singleSelections: Selections) => {
+    async (singleSelections: Selections, onlyLayerNumber?: number) => {
       const adapter = createBrowserCanvasAdapter(props.assetSource);
       return composeSelections(singleSelections, {
         catalog: props.catalog,
         adapter,
         spritesheetsBaseUrl: '',
+        ...(onlyLayerNumber !== undefined ? { onlyLayerNumber } : {}),
         resolvePalette: makeResolvePalette(
           props.catalog,
           props.palettes,
@@ -518,6 +521,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
           catalog={props.catalog}
           assetSource={props.assetSource}
           composeSingleItem={composeSingleItem}
+          composeSingleItemLayer={composeSingleItem}
           customOverlay={customOverlay}
           zipRunning={zipRunning}
           setZipRunning={setZipRunning}

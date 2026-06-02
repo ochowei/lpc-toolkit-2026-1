@@ -1,3 +1,4 @@
+/** Verifies the class-name merge helper used by shared UI components. */
 import { describe, expect, it } from 'vitest';
 import { cn } from '../src/lib/cn';
 

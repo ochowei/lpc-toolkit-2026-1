@@ -29,6 +29,7 @@ interface FetchSemaphore {
   acquire(): Promise<() => void>;
 }
 
+/** Small FIFO semaphore used to throttle image fetches in Vite dev. */
 export function createFetchSemaphore(limit: number): FetchSemaphore {
   let active = 0;
   const queue: Array<() => void> = [];
@@ -55,6 +56,7 @@ export function createFetchSemaphore(limit: number): FetchSemaphore {
 
 const sharedFetchSemaphore = createFetchSemaphore(FETCH_CONCURRENCY);
 
+/** Browser implementation of core's environment-agnostic CanvasAdapter. */
 export function createBrowserCanvasAdapter(
   source: AssetSource = 'local',
 ): CanvasAdapter {

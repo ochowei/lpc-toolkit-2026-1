@@ -35,6 +35,7 @@ interface Props {
 const TOTAL_GROUPS = LICENSE_GROUP_ORDER.length;
 const VISIBLE_ANIMATIONS = ANIMATIONS.filter((a) => !a.noExport);
 
+/** Collapsible controls for license filters, animation filters, asset source, and uploads. */
 export function SettingsCollapsible({
   t,
   licenseFilter,

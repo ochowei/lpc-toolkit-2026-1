@@ -1,3 +1,4 @@
+/** Verifies mobile/desktop responsive layout behavior in the browser. */
 import { expect, test } from '@playwright/test';
 import { attachConsoleCollector } from './helpers/console-collector';
 
