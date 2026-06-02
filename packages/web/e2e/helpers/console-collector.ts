@@ -1,5 +1,6 @@
 import type { ConsoleMessage, Page, Request, Response } from '@playwright/test';
 
+/** Error channels collected from Playwright page and network events. */
 export type CapturedErrorKind =
   | 'console.error'
   | 'console.warn'
@@ -7,6 +8,7 @@ export type CapturedErrorKind =
   | 'response'
   | 'requestfailed';
 
+/** Normalized browser/page/network error captured during E2E tests. */
 export type CapturedError = {
   kind: CapturedErrorKind;
   text: string;
@@ -26,14 +28,17 @@ const BROWSER_AUTO_RESOURCE_PATTERNS: readonly RegExp[] = [
   /^Access to fetch at .* has been blocked by CORS policy/,
 ];
 
+/** True when Chromium emitted a duplicate resource-load console message. */
 export function isBrowserAutoConsoleText(text: string): boolean {
   return BROWSER_AUTO_RESOURCE_PATTERNS.some((re) => re.test(text));
 }
 
+/** True when a missing sprite placeholder should suppress a console message. */
 export function isKnownSpriteAssetConsoleText(text: string): boolean {
   return /^Failed to load (?:image|sprite): spritesheets\/.+$/.test(text);
 }
 
+/** True for noisy WebGL readback warnings outside app behavior. */
 export function isWebGlReadbackWarningText(text: string): boolean {
   return /^\[\.WebGL-[^\]]+\]GL Driver Message \(OpenGL, Performance, .*ReadPixels/.test(
     text,
@@ -66,6 +71,7 @@ const APP_CONSOLE_ALLOWLIST: readonly ConsoleAllowlistEntry[] = [
   },
 ];
 
+/** True when an app-console entry is intentionally allowlisted. */
 export function isAllowlistedConsoleEntry(entry: {
   kind: CapturedErrorKind;
   text: string;
@@ -96,6 +102,7 @@ export function isSpriteAssetUrl(url: string): boolean {
   return /\/spritesheets\//.test(url);
 }
 
+/** Attach collectors for console, page, response, and request failures. */
 export function attachConsoleCollector(page: Page): CapturedError[] {
   const errors: CapturedError[] = [];
 

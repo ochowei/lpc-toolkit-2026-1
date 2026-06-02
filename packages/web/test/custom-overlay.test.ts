@@ -1,3 +1,4 @@
+/** Verifies custom overlay dimensions, z-order parsing, and ZIP naming. */
 import { createCanvas } from '@napi-rs/canvas';
 import { describe, expect, it } from 'vitest';
 import {

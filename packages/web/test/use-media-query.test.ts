@@ -1,3 +1,4 @@
+/** Verifies media-query reading without depending on a real browser viewport. */
 import { describe, expect, it, vi } from 'vitest';
 import { readMediaQuery } from '../src/hooks/use-media-query';
 

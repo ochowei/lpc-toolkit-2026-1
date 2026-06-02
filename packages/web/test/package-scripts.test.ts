@@ -1,3 +1,4 @@
+/** Verifies web package lifecycle scripts that prepare deployable assets. */
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

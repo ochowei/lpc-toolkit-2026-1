@@ -1,3 +1,4 @@
+/** Verifies sprite directory collection for selected catalog items. */
 import { describe, expect, it } from 'vitest';
 import { createCatalog, type ItemDefinition } from '@lpc-toolkit/core';
 import { dirsForSelections, posixDirname } from '../src/slice/sprite-dirs';

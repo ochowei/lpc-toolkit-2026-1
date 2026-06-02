@@ -1,3 +1,4 @@
+/** Verifies locale defaults, key coverage, and label translation behavior. */
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_LOCALE,

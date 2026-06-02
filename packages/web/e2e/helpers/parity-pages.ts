@@ -4,12 +4,14 @@ import {
   type CapturedError,
 } from './console-collector';
 
+/** Base64-encoded RGBA capture with its canvas dimensions. */
 export interface RgbaSnapshot {
   readonly width: number;
   readonly height: number;
   readonly dataBase64: string;
 }
 
+/** Local toolkit probe data captured from the test-only browser hook. */
 export interface ToolkitProbeSnapshot {
   readonly hash: string;
   readonly bodyType: string;
@@ -23,6 +25,7 @@ export interface ToolkitProbeSnapshot {
   readonly rgba: RgbaSnapshot;
 }
 
+/** Upstream canvas capture used as the parity baseline. */
 export interface UpstreamSnapshot {
   readonly rgba: RgbaSnapshot;
 }
@@ -69,6 +72,7 @@ const UPSTREAM_BASE_URL = 'http://127.0.0.1:5174';
 const UPSTREAM_METADATA_ROUTE =
   /^http:\/\/127\.0\.0\.1:5174\/(?:index|item|layers)-metadata\.js$/;
 
+/** Open the local toolkit, wait for its E2E probe, and capture RGBA output. */
 export async function openToolkitCase(
   context: BrowserContext,
   hash: string,
@@ -147,6 +151,7 @@ export async function openToolkitCase(
   return { page, errors, snapshot };
 }
 
+/** Open the upstream mirror, wait for its renderer, and capture RGBA output. */
 export async function openUpstreamCase(
   context: BrowserContext,
   hash: string,
@@ -248,6 +253,7 @@ async function routeUpstreamMetadata(page: Page): Promise<void> {
   });
 }
 
+/** Format captured page errors into stable assertion output. */
 export function formatErrors(errors: readonly CapturedError[]): string {
   return errors
     .map(

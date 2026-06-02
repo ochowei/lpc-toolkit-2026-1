@@ -13,7 +13,9 @@ import { CATEGORY_GROUPS } from './category-groups';
 
 /** Preview zoom bounds used by the reducer and preview controls. */
 export const MIN_ZOOM = 1;
+/** Largest supported integer preview zoom. */
 export const MAX_ZOOM = 8;
+/** Initial preview zoom used when building/resetting slice state. */
 export const DEFAULT_ZOOM = 4;
 
 function clampZoom(z: number): number {

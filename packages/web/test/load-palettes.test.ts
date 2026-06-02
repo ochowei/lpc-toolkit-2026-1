@@ -1,3 +1,4 @@
+/** Verifies palette-record ingestion and upstream glob-key normalization. */
 import { describe, expect, it } from 'vitest';
 import { normalizePaletteKey, recordsToPalettes } from '../src/catalog/load-palettes';
 

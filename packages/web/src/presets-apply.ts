@@ -2,6 +2,7 @@ import type { BodyType, Catalog, Selection, TypeName } from '@lpc-toolkit/core';
 import { itemSupportsBodyType } from './slice/catalog-tree';
 import { CLOTHING_TYPES, type Preset, type PresetItem } from './presets';
 
+/** Result of applying a clothing preset to the current character selections. */
 export interface PresetApplyResult {
   /** Full new selections: personal categories kept, clothing replaced. */
   readonly selections: Record<TypeName, Selection>;

@@ -1,3 +1,4 @@
+/** One pixel that differs between actual and expected RGBA buffers. */
 export interface PixelMismatchSample {
   readonly x: number;
   readonly y: number;
@@ -5,6 +6,7 @@ export interface PixelMismatchSample {
   readonly expected: readonly [number, number, number, number];
 }
 
+/** Aggregate pixel-diff result plus a bounded set of mismatch samples. */
 export interface PixelDiffResult {
   readonly mismatchCount: number;
   readonly samples: readonly PixelMismatchSample[];
@@ -12,6 +14,7 @@ export interface PixelDiffResult {
 
 const SAMPLE_LIMIT = 10;
 
+/** Compare two RGBA buffers and sample mismatches in the visible 64px frame area. */
 export function diffRgba(
   actual: ArrayLike<number>,
   expected: ArrayLike<number>,

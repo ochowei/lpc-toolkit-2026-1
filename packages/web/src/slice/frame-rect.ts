@@ -5,6 +5,7 @@ import {
   type Direction,
 } from '@lpc-toolkit/core';
 
+/** Source rectangle for copying one 64px playback frame out of an animation canvas. */
 export interface FrameRect {
   readonly sx: number;
   readonly sy: number;

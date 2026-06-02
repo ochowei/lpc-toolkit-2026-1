@@ -1,3 +1,4 @@
+/** Verifies animation compatibility filtering for items and selections. */
 import { describe, expect, it } from 'vitest';
 import type {
   Catalog,

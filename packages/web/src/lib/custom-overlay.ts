@@ -2,6 +2,7 @@ import { SHEET_HEIGHT, SHEET_WIDTH, type ImageLike } from '@lpc-toolkit/core';
 
 /** Custom uploads must match the standard universal sheet dimensions. */
 export const CUSTOM_OVERLAY_WIDTH = SHEET_WIDTH;
+/** Required custom-upload height, matching the standard universal sheet. */
 export const CUSTOM_OVERLAY_HEIGHT = SHEET_HEIGHT;
 
 /** Browser-owned image overlay that can be injected into the composed sheet. */

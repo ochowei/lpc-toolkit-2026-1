@@ -1,3 +1,4 @@
+/** Verifies item color-option derivation from recolor palettes and variants. */
 import { describe, expect, it } from 'vitest';
 import { createPaletteCatalog, type ItemDefinition } from '@lpc-toolkit/core';
 import { getColorOptions, pickDefaults } from '../src/slice/color-options';

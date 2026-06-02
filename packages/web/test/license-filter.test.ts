@@ -1,3 +1,4 @@
+/** Verifies GPL-compatible license filtering for catalog items and selections. */
 import { describe, expect, it } from 'vitest';
 import type {
   Catalog,
