@@ -4,8 +4,23 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/upstream-assets/:path*",
+      "destination": "https://liberatedpixelcup.github.io/Universal-LPC-Spritesheet-Character-Generator/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/upstream-assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
     }
   ]
 }
