@@ -16,16 +16,16 @@ export function recordsToPalettes(
   return palettes;
 }
 
-const UPSTREAM_PREFIX = 'upstream/palette_definitions/';
+const ASSETS_PREFIX = 'assets/palette_definitions/';
 
 /**
- * Strip the Vite glob prefix preceding `upstream/palette_definitions/` so a
- * record key reflects the path inside the upstream root (keeps load
+ * Strip the Vite glob prefix preceding `assets/palette_definitions/` so a
+ * record key reflects the path inside the assets root (keeps load
  * warnings readable). Mirrors `normalizeUpstreamKey` in `load-catalog.ts`.
  */
 export function normalizePaletteKey(key: string): string {
-  const idx = key.lastIndexOf(UPSTREAM_PREFIX);
-  return idx >= 0 ? key.slice(idx + UPSTREAM_PREFIX.length) : key;
+  const idx = key.lastIndexOf(ASSETS_PREFIX);
+  return idx >= 0 ? key.slice(idx + ASSETS_PREFIX.length) : key;
 }
 
 /**
@@ -37,7 +37,7 @@ export function normalizePaletteKey(key: string): string {
  */
 export function loadPalettesFromUpstream(): PaletteMetadata {
   const mods = import.meta.glob<unknown>(
-    '../../../../upstream/palette_definitions/**/*.json',
+    '../../../../assets/palette_definitions/**/*.json',
     { eager: true, import: 'default' },
   );
   if (Object.keys(mods).length === 0) {

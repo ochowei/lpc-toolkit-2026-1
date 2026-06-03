@@ -26,10 +26,10 @@ describe('recordsToPalettes', () => {
 });
 
 describe('normalizePaletteKey', () => {
-  it('strips the vite glob prefix preceding upstream/palette_definitions/', () => {
+  it('strips the vite glob prefix preceding assets/palette_definitions/', () => {
     expect(
       normalizePaletteKey(
-        '../../../../upstream/palette_definitions/body/body_ulpc.json',
+        '../../../../assets/palette_definitions/body/body_ulpc.json',
       ),
     ).toBe('body/body_ulpc.json');
   });

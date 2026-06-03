@@ -14,14 +14,14 @@ export function recordsToCatalog(
   return createCatalog(records);
 }
 
-const UPSTREAM_PREFIX = 'upstream/sheet_definitions/';
+const ASSETS_PREFIX = 'assets/sheet_definitions/';
 
 // Vite's `import.meta.glob` keys are relative to this file
-// (e.g. `../../../../upstream/sheet_definitions/headwear/...`). Strip that
-// leading noise so `sourcePath` reflects the path inside the upstream root.
+// (e.g. `../../../../assets/sheet_definitions/headwear/...`). Strip that
+// leading noise so `sourcePath` reflects the path inside the assets root.
 export function normalizeUpstreamKey(key: string): string {
-  const idx = key.lastIndexOf(UPSTREAM_PREFIX);
-  return idx >= 0 ? key.slice(idx + UPSTREAM_PREFIX.length) : key;
+  const idx = key.lastIndexOf(ASSETS_PREFIX);
+  return idx >= 0 ? key.slice(idx + ASSETS_PREFIX.length) : key;
 }
 
 // Module-level gate: React StrictMode mounts → unmounts → re-mounts the App
@@ -60,7 +60,7 @@ export function loadCatalogFromUpstream(): Catalog {
   // '**/*.json' also matches meta_*.json; createCatalog skips those
   // internally (isMetaFile), so they never become items or warnings.
   const mods = import.meta.glob<ItemDefinition>(
-    '../../../../upstream/sheet_definitions/**/*.json',
+    '../../../../assets/sheet_definitions/**/*.json',
     { eager: true, import: 'default' },
   );
   const records: Record<FilePath, ItemDefinition> = {};
