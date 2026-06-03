@@ -1,25 +1,49 @@
 import { defineConfig } from 'vite';
 import { fileURLToPath } from 'node:url';
-import { join } from 'node:path';
-import { existsSync, readFileSync } from 'node:fs';
+import { resolve, sep } from 'node:path';
+import { createReadStream } from 'node:fs';
+import { stat } from 'node:fs/promises';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
+const baseDir = resolve(__dirname, '../../assets/spritesheets');
 
 function localSpritesheetsPlugin() {
   return {
     name: 'local-spritesheets-plugin',
     configureServer(server) {
-      server.middlewares.use((req, res, next) => {
+      server.middlewares.use(async (req, res, next) => {
         if (req.url && req.url.startsWith('/spritesheets/')) {
           const pathname = req.url.split('?')[0];
-          const filePath = join(__dirname, '../../assets', pathname);
-          
-          if (existsSync(filePath)) {
-            res.setHeader('Content-Type', 'image/png');
-            res.end(readFileSync(filePath));
+
+          if (!pathname.endsWith('.png')) {
+            next();
             return;
+          }
+
+          const filePath = resolve(__dirname, '../../assets', pathname.slice(1));
+          
+          if (!filePath.startsWith(baseDir + sep)) {
+            next();
+            return;
+          }
+
+          try {
+            const stats = await stat(filePath);
+            if (stats.isFile()) {
+              res.setHeader('Content-Type', 'image/png');
+              const stream = createReadStream(filePath);
+              stream.on('error', (err) => {
+                if (!res.headersSent) {
+                  next(err);
+                }
+              });
+              stream.pipe(res);
+              return;
+            }
+          } catch {
+            // File does not exist, pass through to next
           }
         }
         next();
