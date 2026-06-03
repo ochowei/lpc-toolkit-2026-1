@@ -23,14 +23,19 @@ export async function loadFileFromZip(path: string, baseHref: string): Promise<s
     if (!promise) {
       promise = (async () => {
         const zipUrl = new URL(`zips/${category}.zip`, baseHref).href;
-        const res = await fetch(zipUrl);
-        if (!res.ok) {
-          throw new Error(`Failed to download ZIP: ${zipUrl} (HTTP ${res.status})`);
+        try {
+          const res = await fetch(zipUrl);
+          if (!res.ok) {
+            throw new Error(`Failed to download ZIP: ${zipUrl} (HTTP ${res.status})`);
+          }
+          const buffer = await res.arrayBuffer();
+          const newZip = await JSZip.loadAsync(buffer);
+          zipCache.set(category, newZip);
+          return newZip;
+        } catch (error) {
+          downloadPromises.delete(category);
+          throw error;
         }
-        const buffer = await res.arrayBuffer();
-        const newZip = await JSZip.loadAsync(buffer);
-        zipCache.set(category, newZip);
-        return newZip;
       })();
       downloadPromises.set(category, promise);
     }
