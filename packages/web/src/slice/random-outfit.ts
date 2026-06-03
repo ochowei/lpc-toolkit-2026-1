@@ -7,6 +7,7 @@ import type {
 } from '@lpc-toolkit/core';
 import { itemSupportsBodyType } from './catalog-tree';
 import { CATEGORY_GROUPS, type GroupId } from './category-groups';
+import { selectionForItem } from './selection';
 
 /** Inputs for generating a random outfit from the currently loaded catalog. */
 export interface PickRandomOutfitArgs {
@@ -53,7 +54,7 @@ export function pickRandomOutfit(args: PickRandomOutfitArgs): Selections {
     if (compatible.length === 0) continue;
 
     const pick = compatible[Math.floor(rng() * compatible.length)]!;
-    items[typeName] = { typeName, name: pick.name };
+    items[typeName] = selectionForItem(typeName, pick);
   }
 
   return { bodyType: args.bodyType, items };
