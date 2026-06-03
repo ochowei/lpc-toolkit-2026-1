@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ANIMATION_CONFIGS, type Direction } from '@lpc-toolkit/core';
 import type { ComposedResult } from '../../hooks/use-composed-character';
 import { useAnimationPlayer } from '../../hooks/use-animation-player';
@@ -107,6 +107,16 @@ export function PreviewPane({
     };
   }, [fullSheet.open]);
 
+  const animOptions = useMemo(() => {
+    const list = [...Object.keys(ANIMATION_CONFIGS)];
+    if (result.sheet?.customAnimations) {
+      for (const name of result.sheet.customAnimations.keys()) {
+        if (!list.includes(name)) list.push(name);
+      }
+    }
+    return list;
+  }, [result.sheet]);
+
   return (
     <div ref={previewRef} className="relative flex h-full min-h-0 flex-col">
       {/* Action bar — now at the TOP, above the single preview. */}
@@ -127,7 +137,7 @@ export function PreviewPane({
         <select className="rounded-md border border-border bg-surface-2 px-2 py-1"
           value={state.anim}
           onChange={(e) => dispatch({ type: 'set_anim', anim: e.target.value as typeof state.anim })}>
-          {Object.keys(ANIMATION_CONFIGS).map((a) => (
+          {animOptions.map((a) => (
             <option key={a} value={a}>{a}</option>
           ))}
         </select>

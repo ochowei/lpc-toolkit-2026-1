@@ -29,9 +29,9 @@ export interface ComposedResult {
  * for a known-but-uncomposed animation, never throws).
  */
 function resolveAnim(sheet: ComposedSheet, anim: string): string {
-  return sheet.animations.includes(anim)
-    ? anim
-    : (sheet.animations[0] ?? 'walk');
+  if (sheet.animations.includes(anim)) return anim;
+  if (sheet.customAnimations?.has(anim)) return anim;
+  return sheet.animations[0] ?? 'walk';
 }
 
 /**

@@ -1,10 +1,11 @@
 import { useEffect, useState, type RefObject } from 'react';
 import {
   ANIMATION_CONFIGS,
+  DIRECTIONS,
+  FRAME_SIZE,
   type ComposedAnimation,
   type Direction,
 } from '@lpc-toolkit/core';
-import { frameRect } from '../slice/frame-rect';
 
 /** Fixed preview playback rate for all standard LPC animations. */
 export const ANIMATION_FPS = 8;
@@ -16,9 +17,44 @@ export interface UseAnimationPlayerResult {
   readonly fps: number;
 }
 
+export interface FrameRect {
+  readonly sx: number;
+  readonly sy: number;
+  readonly size: number;
+}
+
+/**
+ * Calculates the bounding rectangle of a specific frame in a standard or custom animation.
+ */
+export function animationFrameRect(
+  animation: ComposedAnimation | { animation: string; width: number; height: number; frameCount: number; directions: number },
+  dir: Direction,
+  frameIndex: number,
+): FrameRect {
+  const config = ANIMATION_CONFIGS[animation.animation];
+  if (config) {
+    const col = config.cycle[frameIndex % config.cycle.length] ?? 0;
+    const rowIndex = animation.directions === 1 ? 0 : Math.max(0, DIRECTIONS.indexOf(dir));
+    return {
+      sx: col * FRAME_SIZE,
+      sy: rowIndex * FRAME_SIZE,
+      size: FRAME_SIZE,
+    };
+  }
+
+  const size = animation.height / animation.directions;
+  const col = frameIndex % animation.frameCount;
+  const rowIndex = animation.directions === 1 ? 0 : Math.max(0, DIRECTIONS.indexOf(dir));
+  return {
+    sx: col * size,
+    sy: rowIndex * size,
+    size,
+  };
+}
+
 /**
  * Draws one direction of `animation` to `canvasRef` at integer `zoom`,
- * advancing through ANIMATION_CONFIGS[name].cycle at ANIMATION_FPS.
+ * advancing through standard cycle or custom frames count at ANIMATION_FPS.
  * Pauses (holds frame 0) when `playing` is false or there is no animation.
  *
  * Returns the current frame index (0-based), the total frames in the
@@ -34,11 +70,13 @@ export function useAnimationPlayer(
 ): UseAnimationPlayerResult {
   const [currentFrame, setCurrentFrame] = useState(0);
   const config = animation ? ANIMATION_CONFIGS[animation.animation] : null;
-  const totalFrames = config?.cycle.length ?? 0;
+  const totalFrames = animation
+    ? (config?.cycle.length ?? animation.frameCount)
+    : 0;
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !animation || !config) {
+    if (!canvas || !animation || totalFrames === 0) {
       setCurrentFrame(0);
       return;
     }
@@ -58,7 +96,7 @@ export function useAnimationPlayer(
     const step = 1000 / ANIMATION_FPS;
 
     const draw = () => {
-      const r = frameRect(config, animation.directions, dir, frame);
+      const r = animationFrameRect(animation, dir, frame);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(
         src,
@@ -76,7 +114,7 @@ export function useAnimationPlayer(
       last = t;
       while (acc >= step) {
         acc -= step;
-        frame = (frame + 1) % config.cycle.length;
+        frame = (frame + 1) % totalFrames;
         draw();
         setCurrentFrame(frame);
       }
@@ -84,7 +122,8 @@ export function useAnimationPlayer(
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [canvasRef, animation, config, dir, playing, zoom]);
+  }, [canvasRef, animation, totalFrames, dir, playing, zoom]);
 
   return { currentFrame, totalFrames, fps: ANIMATION_FPS };
 }
+
