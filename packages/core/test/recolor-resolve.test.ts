@@ -317,6 +317,52 @@ describe('makeResolvePalette', () => {
         '#0000cc',
       ]);
     });
+
+    it('falls back to a secondary material base when that slot has no selected recolor', () => {
+      const multiPalettes = createPaletteCatalog({
+        'metal/meta_metal.json': { type: 'material', default: 'v1', base: 'c0' },
+        'metal/metal_v1.json': {
+          c0: ['#100000', '#200000'],
+          gold: ['#ffd700', '#ccaa00'],
+        },
+        'cloth/meta_cloth.json': { type: 'material', default: 'v1', base: 'c0' },
+        'cloth/cloth_v1.json': {
+          c0: ['#001000', '#002000'],
+          blue: ['#0000ff', '#0000cc'],
+        },
+      }).palettes;
+
+      const sword: ItemDefinition = {
+        name: 'Sword',
+        type_name: 'weapon',
+        animations: ['walk'],
+        credits: [],
+        recolors: {
+          color_1: { material: 'metal', palettes: ['v1'] },
+          color_2: { material: 'cloth', palettes: ['v1'], type_name: 'grip' },
+        },
+        layer_1: { zPos: 1, male: 'weapon/' },
+      };
+      const cat = syntheticCatalog([sword]);
+      const selections: Selections = {
+        bodyType: 'male',
+        items: {
+          weapon: { typeName: 'weapon', name: 'Sword', recolor: 'gold' },
+        },
+      };
+      const swap = makeResolvePalette(cat, multiPalettes, selections)(
+        selections.items.weapon!,
+        sword,
+      );
+
+      expect(swap?.material).toBe('metal+cloth');
+      expect(swap?.target).toEqual([
+        '#ffd700',
+        '#ccaa00',
+        '#001000',
+        '#002000',
+      ]);
+    });
   });
 });
 
