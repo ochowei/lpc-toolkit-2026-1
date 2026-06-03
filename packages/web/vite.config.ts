@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import { fileURLToPath } from 'node:url';
 import { resolve, sep } from 'node:path';
 import { createReadStream } from 'node:fs';
@@ -9,13 +9,13 @@ import tailwindcss from '@tailwindcss/vite';
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const baseDir = resolve(__dirname, '../../assets/spritesheets');
 
-function localSpritesheetsPlugin() {
+function localSpritesheetsPlugin(): Plugin {
   return {
     name: 'local-spritesheets-plugin',
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
         if (req.url && req.url.startsWith('/spritesheets/')) {
-          const pathname = req.url.split('?')[0];
+          const pathname = req.url.split('?')[0] ?? '';
 
           if (!pathname.endsWith('.png')) {
             next();

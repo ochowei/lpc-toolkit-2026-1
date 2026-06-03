@@ -20,7 +20,7 @@ describe('zip-loader', () => {
 
     const originalURL = globalThis.URL;
     class MockURL extends originalURL {
-      static createObjectURL = createObjectURLMock;
+      static override createObjectURL = createObjectURLMock;
     }
     vi.stubGlobal('URL', MockURL);
 
@@ -42,7 +42,7 @@ describe('zip-loader', () => {
     const originalURL = globalThis.URL;
     const createObjectURLMock = vi.fn().mockReturnValue('blob:mock-url');
     class MockURL extends originalURL {
-      static createObjectURL = createObjectURLMock;
+      static override createObjectURL = createObjectURLMock;
     }
     vi.stubGlobal('URL', MockURL);
 

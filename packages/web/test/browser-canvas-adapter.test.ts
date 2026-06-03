@@ -85,8 +85,8 @@ describe('createBrowserCanvasAdapter', () => {
     const createObjectURLMock = vi.fn().mockReturnValue('blob:mock-url');
     const revokeObjectURLMock = vi.fn();
     class MockURL extends originalURL {
-      static createObjectURL = createObjectURLMock;
-      static revokeObjectURL = revokeObjectURLMock;
+      static override createObjectURL = createObjectURLMock;
+      static override revokeObjectURL = revokeObjectURLMock;
     }
     vi.stubGlobal('URL', MockURL);
 

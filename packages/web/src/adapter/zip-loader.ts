@@ -13,6 +13,9 @@ export async function loadFileFromZip(path: string, baseHref: string): Promise<s
   const parts = cleanPath.split('/');
   const category = parts[0];
   const subPath = parts.slice(1).join('/');
+  if (!category || !subPath) {
+    throw new Error(`Invalid spritesheet path for ZIP loading: ${path}`);
+  }
 
   let zip = zipCache.get(category);
   if (!zip) {
