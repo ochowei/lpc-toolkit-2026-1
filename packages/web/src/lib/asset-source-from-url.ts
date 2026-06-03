@@ -20,5 +20,5 @@ export function defaultAssetSourceFromUrl(
   search: string,
   isDev: boolean,
 ): AssetSource {
-  return assetSourceFromUrl(search) ?? (isDev ? 'local' : 'auto');
+  return assetSourceFromUrl(search) ?? (isDev ? 'local' : 'zip');
 }

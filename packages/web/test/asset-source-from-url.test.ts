@@ -53,8 +53,8 @@ describe('defaultAssetSourceFromUrl', () => {
     expect(defaultAssetSourceFromUrl('?assetSource=nope', true)).toBe('local');
   });
 
-  it('defaults to auto outside dev mode when assetSource is absent or invalid', () => {
-    expect(defaultAssetSourceFromUrl('', false)).toBe('auto');
-    expect(defaultAssetSourceFromUrl('?assetSource=nope', false)).toBe('auto');
+  it('defaults to zip outside dev mode when assetSource is absent or invalid', () => {
+    expect(defaultAssetSourceFromUrl('', false)).toBe('zip');
+    expect(defaultAssetSourceFromUrl('?assetSource=nope', false)).toBe('zip');
   });
 });
