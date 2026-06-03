@@ -29,10 +29,10 @@ export function normalizePaletteKey(key: string): string {
 }
 
 /**
- * Build `PaletteMetadata` from the read-only `upstream/` submodule. The
+ * Build `PaletteMetadata` from the local `assets/` directory. The
  * glob is static and relative: from packages/web/src/catalog/ the repo
  * root is four levels up. Vite inlines every matched JSON at build time.
- * Throws with a fix instruction if the submodule is not initialized.
+ * Throws with a fix instruction if the assets directory is not populated.
  * Throws if all palette files fail to parse (empty catalog after ingest).
  */
 export function loadPalettesFromUpstream(): PaletteMetadata {
@@ -42,7 +42,7 @@ export function loadPalettesFromUpstream(): PaletteMetadata {
   );
   if (Object.keys(mods).length === 0) {
     throw new Error(
-      'No palette definitions found. Run: git submodule update --init',
+      'No palette definitions found. Ensure the assets/ directory is populated.',
     );
   }
   const records: Record<string, unknown> = {};

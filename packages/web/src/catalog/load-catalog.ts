@@ -50,11 +50,10 @@ export function __resetCatalogWarningOnceForTests(): void {
 }
 
 /**
- * Build the catalog from the read-only `upstream/` submodule. The glob is
+ * Build the catalog from the local `assets/` directory. The glob is
  * static and relative: from packages/web/src/catalog/ the repo root is four
  * levels up. Vite inlines every matched JSON's default export at build time.
- * If the submodule is not initialized the glob is empty and we throw with a
- * fix instruction (spec §5).
+ * If the assets directory is empty we throw with a fix instruction (spec §5).
  */
 export function loadCatalogFromUpstream(): Catalog {
   // '**/*.json' also matches meta_*.json; createCatalog skips those
@@ -70,7 +69,7 @@ export function loadCatalogFromUpstream(): Catalog {
 
   if (Object.keys(records).length === 0) {
     throw new Error(
-      'No sheet definitions found. Run: git submodule update --init',
+      'No sheet definitions found. Ensure the assets/ directory is populated.',
     );
   }
 
