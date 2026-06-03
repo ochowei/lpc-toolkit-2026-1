@@ -19,8 +19,8 @@ import {
 } from './helpers/node-canvas-adapter.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const upstreamRoot = path.join(here, '../../../upstream/sheet_definitions');
-const upstreamBase = path.join(here, '../../../upstream');
+const upstreamRoot = path.join(here, '../../../assets/sheet_definitions');
+const upstreamBase = path.join(here, '../../../assets');
 
 function loadFixture(relPath: FilePath): ItemDefinition {
   return JSON.parse(

@@ -6,7 +6,7 @@ import { createPaletteCatalog } from '../src/palettes.js';
 import type { FilePath } from '../src/types.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const paletteRoot = path.join(here, '../../../upstream/palette_definitions');
+const paletteRoot = path.join(here, '../../../assets/palette_definitions');
 
 /** Recursively load every palette JSON, keyed by repo-relative path. */
 function loadRealRecords(): Record<FilePath, unknown> {

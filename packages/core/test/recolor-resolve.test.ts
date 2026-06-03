@@ -17,7 +17,7 @@ import type {
 import { createNodeCanvasAdapter } from './helpers/node-canvas-adapter.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const upstreamBase = path.join(here, '../../../upstream');
+const upstreamBase = path.join(here, '../../../assets');
 const sheetRoot = path.join(upstreamBase, 'sheet_definitions');
 const paletteRoot = path.join(upstreamBase, 'palette_definitions');
 
