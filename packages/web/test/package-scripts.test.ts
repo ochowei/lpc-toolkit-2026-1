@@ -12,7 +12,7 @@ const packageJson = JSON.parse(
 describe('package scripts', () => {
   it('generates sprite assets before production builds', () => {
     expect(packageJson.scripts?.prebuild).toBe(
-      'pnpm --filter @lpc-toolkit/core build && tsx scripts/copy-spritesheets.ts',
+      'pnpm --filter @lpc-toolkit/core build && tsx scripts/copy-spritesheets.ts && pnpm zip-assets',
     );
   });
 });
