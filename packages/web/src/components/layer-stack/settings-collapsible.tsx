@@ -189,12 +189,12 @@ export function SettingsCollapsible({
               {t('assetSource.title')}
             </div>
             <div className="flex gap-1">
-              {(['auto', 'local', 'upstream'] as const).map((src) => (
+              {(['auto', 'local', 'upstream', 'zip'] as const).map((src) => (
                 <Button
                   key={src}
                   size="sm"
                   variant={assetSource === src ? 'primary' : 'ghost'}
-                  className="flex-1"
+                  className="flex-1 text-[11px] px-1"
                   onClick={() => setAssetSource(src)}
                 >
                   {t(`assetSource.${src}` as const)}

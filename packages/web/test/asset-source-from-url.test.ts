@@ -18,6 +18,10 @@ describe('assetSourceFromUrl', () => {
     expect(assetSourceFromUrl('?assetSource=auto')).toBe('auto');
   });
 
+  it('returns the parsed value when assetSource is "zip"', () => {
+    expect(assetSourceFromUrl('?assetSource=zip')).toBe('zip');
+  });
+
   it('returns undefined when assetSource is absent', () => {
     expect(assetSourceFromUrl('')).toBeUndefined();
     expect(assetSourceFromUrl('?foo=bar')).toBeUndefined();
@@ -41,6 +45,7 @@ describe('defaultAssetSourceFromUrl', () => {
     expect(defaultAssetSourceFromUrl('?assetSource=upstream', true)).toBe(
       'upstream',
     );
+    expect(defaultAssetSourceFromUrl('?assetSource=zip', true)).toBe('zip');
   });
 
   it('defaults to local in dev mode when assetSource is absent or invalid', () => {

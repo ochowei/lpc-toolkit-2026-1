@@ -1,5 +1,5 @@
 /** Where the browser should try to load LPC spritesheet PNGs from. */
-export type AssetSource = 'auto' | 'local' | 'upstream';
+export type AssetSource = 'auto' | 'local' | 'upstream' | 'zip';
 
 /** Public upstream root used as the fallback when local copied assets are absent. */
 export const UPSTREAM_SPRITESHEET_BASE_URL =
