@@ -2,13 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { createCatalog, type ItemDefinition } from '@lpc-toolkit/core';
 import { pickRandomOutfit } from '../src/slice/random-outfit';
 
-function makeItem(name: string, typeName: string, layerKey: 'male' | 'female' = 'male'): ItemDefinition {
+function makeItem(
+  name: string,
+  typeName: string,
+  layerKey: 'male' | 'female' = 'male',
+  variants: readonly string[] = [],
+): ItemDefinition {
   return {
     name,
     type_name: typeName,
     animations: ['walk'],
     credits: [{ file: '', notes: '', authors: ['A'], licenses: ['CC0'], urls: [] }],
     layer_1: { zPos: 10, [layerKey]: `${typeName}/${name}/` },
+    ...(variants.length > 0 ? { variants } : {}),
   } as unknown as ItemDefinition;
 }
 
@@ -47,6 +53,29 @@ describe('pickRandomOutfit', () => {
       catalog: c2, bodyType: 'male', rng: () => 0.99, optionalProb: 1.0,
     });
     expect(sel.items['hair']).toBeUndefined();
+  });
+
+  it('sets the first variant for randomly picked variant-backed items', () => {
+    const { catalog: variantCatalog } = createCatalog({
+      'body/light.json': makeItem('Light', 'body'),
+      'shield/round.json': makeItem('Round Shield', 'shield', 'male', [
+        'brown',
+        'silver',
+      ]),
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: variantCatalog,
+      bodyType: 'male',
+      rng: () => 0,
+      optionalProb: 1.0,
+    });
+
+    expect(sel.items['shield']).toEqual({
+      typeName: 'shield',
+      name: 'Round Shield',
+      variant: 'brown',
+    });
   });
 
   it('respects optionalProb: 0 produces no optional categories', () => {
