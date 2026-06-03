@@ -23,7 +23,7 @@ import { pickInitialSelections, toSelections } from '../src/slice/selection';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../../..');
-const sheetDefsDir = path.join(repoRoot, 'upstream/sheet_definitions');
+const sheetDefsDir = path.join(repoRoot, 'assets/sheet_definitions');
 const publicSprites = path.join(here, '../public/spritesheets');
 
 function walkJson(dir: string, base = dir): Record<FilePath, ItemDefinition> {
@@ -115,7 +115,7 @@ describe.runIf(haveUpstream && haveSprites)('core pipeline (real assets)', () =>
 
 it('fails loudly if assets are missing', () => {
   if (!haveUpstream)
-    throw new Error('upstream/ not initialized — run git submodule update --init');
+    throw new Error('assets/ not found. Run copy commands first.');
   if (!haveSprites)
     throw new Error('public/spritesheets missing — run pnpm --filter @lpc-toolkit/web copy-sprites');
   expect(true).toBe(true);
