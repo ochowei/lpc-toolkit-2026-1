@@ -27,13 +27,13 @@ import { dirsForSelections } from '../src/slice/sprite-dirs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../../..');
-const sheetDefsDir = path.join(repoRoot, 'upstream/sheet_definitions');
-const spritesSrc = path.join(repoRoot, 'upstream/spritesheets');
+const sheetDefsDir = path.join(repoRoot, 'assets/sheet_definitions');
+const spritesSrc = path.join(repoRoot, 'assets/spritesheets');
 const spritesDest = path.join(here, '../public/spritesheets');
 
 if (!existsSync(sheetDefsDir) || !existsSync(spritesSrc)) {
   console.error(
-    '[copy-sprites] upstream/ not initialized. Run: git submodule update --init',
+    '[copy-sprites] assets/ not found.',
   );
   process.exit(1);
 }

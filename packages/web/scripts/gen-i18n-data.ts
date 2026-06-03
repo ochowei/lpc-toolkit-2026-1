@@ -22,12 +22,12 @@ import {
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../../..');
-const sheetDefsDir = path.join(repoRoot, 'upstream/sheet_definitions');
+const sheetDefsDir = path.join(repoRoot, 'assets/sheet_definitions');
 const outFile = path.join(here, '../src/i18n-item-names.ts');
 
 if (!existsSync(sheetDefsDir)) {
   console.error(
-    '[gen-i18n] upstream/ not initialized. Run: git submodule update --init',
+    '[gen-i18n] assets/ not found.',
   );
   process.exit(1);
 }
