@@ -110,6 +110,7 @@ export function StackPanel({
       />
       <PresetBar
         catalog={catalog}
+        palettes={palettes}
         state={state}
         dispatch={dispatch}
         t={t}
