@@ -90,7 +90,7 @@ export {
 // ==========================================
 // 7. Layer Composition Engine
 // ==========================================
-export type { ComposeOptions } from './compose.js';
+export type { ComposeOptions, SpritePathResolutionOptions } from './compose.js';
 export { composeSelections, getSpritePathsForSelections } from './compose.js';
 
 // ==========================================
