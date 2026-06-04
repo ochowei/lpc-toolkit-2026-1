@@ -261,6 +261,101 @@ describe('getSpritePathsForSelections', () => {
       });
     });
 
+    it('keeps the default representative path when no existence hook is provided', () => {
+      const item: ItemDefinition = {
+        name: 'Shades',
+        type_name: 'facial_eyes',
+        animations: ['walk'],
+        credits: [],
+        variants: ['base'],
+        layer_1: { zPos: 115, male: 'facial/glasses/shades/adult/' },
+      };
+      const catalog = makeCatalog([item]);
+      const layers = getSpritePathsForSelections(
+        {
+          bodyType: 'male',
+          items: {
+            facial_eyes: {
+              typeName: 'facial_eyes',
+              name: 'Shades',
+              variant: 'base',
+            },
+          },
+        },
+        catalog,
+      );
+
+      expect(layers[0]?.path).toBe(
+        'spritesheets/facial/glasses/shades/adult/walk/base.png',
+      );
+    });
+
+    it('uses the flat animation file when a variant representative path is missing', () => {
+      const item: ItemDefinition = {
+        name: 'Shades',
+        type_name: 'facial_eyes',
+        animations: ['walk'],
+        credits: [],
+        variants: ['base'],
+        layer_1: { zPos: 115, male: 'facial/glasses/shades/adult/' },
+      };
+      const catalog = makeCatalog([item]);
+      const existing = new Set([
+        'spritesheets/facial/glasses/shades/adult/walk.png',
+      ]);
+      const layers = getSpritePathsForSelections(
+        {
+          bodyType: 'male',
+          items: {
+            facial_eyes: {
+              typeName: 'facial_eyes',
+              name: 'Shades',
+              variant: 'base',
+            },
+          },
+        },
+        catalog,
+        { pathExists: (spritePath) => existing.has(spritePath) },
+      );
+
+      expect(layers[0]?.path).toBe(
+        'spritesheets/facial/glasses/shades/adult/walk.png',
+      );
+    });
+
+    it('uses another supported animation when walk has no representative file', () => {
+      const item: ItemDefinition = {
+        name: 'Shield',
+        type_name: 'shield',
+        animations: ['walk', 'idle'],
+        credits: [],
+        variants: ['red'],
+        layer_1: { zPos: 2, male: 'shield/heater/original/wood/bg/' },
+      };
+      const catalog = makeCatalog([item]);
+      const existing = new Set([
+        'spritesheets/shield/heater/original/wood/bg/idle/red.png',
+      ]);
+      const layers = getSpritePathsForSelections(
+        {
+          bodyType: 'male',
+          items: {
+            shield: {
+              typeName: 'shield',
+              name: 'Shield',
+              variant: 'red',
+            },
+          },
+        },
+        catalog,
+        { pathExists: (spritePath) => existing.has(spritePath) },
+      );
+
+      expect(layers[0]?.path).toBe(
+        'spritesheets/shield/heater/original/wood/bg/idle/red.png',
+      );
+    });
+
     it('honours standard-only filter when layer_1 has no custom_animation', () => {
       // layer_1 standard, layer_2 custom. Only layer_1 survives.
       const item: ItemDefinition = {

@@ -23,6 +23,16 @@ const KNOWN_DEFAULT_VARIANT_PATH_GAPS = new Set([
   'hat_helmet_bascinet_pigface',
   'hat_helmet_bascinet_pigface_raised',
 ]);
+const KNOWN_UNRESOLVED_STRICT_PATH_GAPS = new Set([
+  // Catalog points at hat/helmet/bascinet_pigface..., but copied assets live
+  // under hat/visor/pigface... with flat animation PNGs.
+  'hat_helmet_bascinet_pigface',
+  'hat_helmet_bascinet_pigface_raised',
+  // Background layer points at shield/two_engrailed/trim/bg/... but the
+  // matching trim filenames are under shield/two_engrailed_trim/bg/...
+  // and shield/two_engrailed/trim/bg contains base shield filenames.
+  'shield_two_engrailed_trim',
+]);
 
 function walkJson(dir: string): Record<string, ItemDefinition> {
   const out: Record<string, ItemDefinition> = {};
@@ -65,6 +75,7 @@ describe('random outfit variant path audit', () => {
       if (!coveredTypes.has(item.type_name)) continue;
       if (!itemSupportsBodyType(item, 'male')) continue;
       if (!item.variants || item.variants.length === 0) continue;
+      if (KNOWN_UNRESOLVED_STRICT_PATH_GAPS.has(itemId)) continue;
 
       auditedItems++;
       const selection = selectionForItem(item.type_name, item);
@@ -74,6 +85,7 @@ describe('random outfit variant path audit', () => {
       const layers = getSpritePathsForSelections(
         { bodyType: 'male', items },
         catalog,
+        { pathExists: spritePathExists },
       );
 
       if (layers.length === 0) {

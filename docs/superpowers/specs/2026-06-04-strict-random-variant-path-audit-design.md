@@ -59,6 +59,28 @@ Allowed fix levels, in priority order:
 4. A narrow documented allowlist only for true missing copied assets or
    upstream/catalog orphan entries that cannot be resolved safely in code.
 
+## Implemented Decision
+
+`packages/core` remains environment-agnostic. `getSpritePathsForSelections()`
+accepts an optional caller-provided `pathExists` hook. Without that hook it
+keeps the previous deterministic representative path contract. With the hook,
+it tries the current representative path first, then variant/flat candidates
+for supported animation folders, and returns the first existing candidate.
+
+The strict web audit injects a filesystem-backed existence check because tests
+run in Node and can inspect `assets/spritesheets`.
+
+Three unresolved catalog/copied asset gaps are allowlisted in the strict audit:
+
+- `hat_helmet_bascinet_pigface`
+- `hat_helmet_bascinet_pigface_raised`
+- `shield_two_engrailed_trim`
+
+These are not hidden resolver bugs: the assets either live under a different
+base path than the catalog declares, or the background-layer filenames do not
+match the declared default variant. Fixing them should be handled in a later
+catalog/copy phase rather than by adding item-specific path rewrites to core.
+
 ## Success Criteria
 
 - The strict audit fails before implementation and reports the current missing

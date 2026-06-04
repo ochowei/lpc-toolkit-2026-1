@@ -28,19 +28,19 @@ asset gaps.
 - [x] Read follow-up context, existing audit, resolver, selection, and random
   outfit code.
 - [x] Write this design spec and implementation plan.
-- [ ] Add a failing strict audit that reproduces the missing representative
+- [x] Add a failing strict audit that reproduces the missing representative
   layer paths.
   - Verify: `pnpm --filter @lpc-toolkit/web test -- random-outfit-variant-audit.test.ts`
     fails with the expected missing paths.
-- [ ] Classify failures by root cause.
+- [x] Classify failures by root cause.
   - Verify: failure notes map each missing path to a fix level.
-- [ ] Implement the smallest resolver/catalog fix.
+- [x] Implement the smallest resolver/catalog fix.
   - Verify: focused strict audit passes.
-- [ ] Run broader verification.
+- [x] Run broader verification.
   - Verify: `pnpm --filter @lpc-toolkit/web test`
   - Verify: `pnpm -r typecheck`
   - Verify: `pnpm -r test` if practical.
-- [ ] Commit changes with clear messages.
+- [x] Commit changes with clear messages.
 
 ## Guardrails
 
