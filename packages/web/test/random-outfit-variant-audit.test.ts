@@ -20,19 +20,13 @@ const spritesheetsDir = path.join(repoRoot, 'assets/spritesheets');
 const DEFAULT_EXCLUDED_GROUPS = new Set(['fx']);
 const KNOWN_DEFAULT_VARIANT_PATH_GAPS = new Set([
   'facial_glasses_shades',
-  'hat_helmet_bascinet_pigface',
-  'hat_helmet_bascinet_pigface_raised',
 ]);
-const KNOWN_UNRESOLVED_STRICT_PATH_GAPS = new Set([
-  // Catalog points at hat/helmet/bascinet_pigface..., but copied assets live
-  // under hat/visor/pigface... with flat animation PNGs.
+const KNOWN_UNRESOLVED_STRICT_PATH_GAPS = new Set<string>();
+const CATALOG_COPIED_ASSET_MISMATCH_TARGETS = [
   'hat_helmet_bascinet_pigface',
   'hat_helmet_bascinet_pigface_raised',
-  // Background layer points at shield/two_engrailed/trim/bg/... but the
-  // matching trim filenames are under shield/two_engrailed_trim/bg/...
-  // and shield/two_engrailed/trim/bg contains base shield filenames.
   'shield_two_engrailed_trim',
-]);
+] as const;
 
 function walkJson(dir: string): Record<string, ItemDefinition> {
   const out: Record<string, ItemDefinition> = {};
@@ -64,7 +58,72 @@ function spritePathExists(spritePath: string): boolean {
   return existsSync(path.join(spritesheetsDir, rel));
 }
 
+function expectedRepresentativeLayerCount(
+  item: ItemDefinition,
+  bodyType: string,
+): number {
+  let count = 0;
+  for (let n = 1; n < 10; n++) {
+    const layer = item[`layer_${n}`];
+    if (!layer) break;
+    const bodyPath = layer[bodyType];
+    if (typeof bodyPath !== 'string') continue;
+    if (bodyPath.includes('${')) continue;
+    count++;
+  }
+  return count;
+}
+
 describe('random outfit variant path audit', () => {
+  it('catalog/copied asset mismatch cleanup targets resolve every representative sprite path', () => {
+    const { catalog } = createCatalog(walkJson(sheetDefsDir));
+    const failures: string[] = [];
+
+    for (const itemId of CATALOG_COPIED_ASSET_MISMATCH_TARGETS) {
+      const item = catalog.byItemId.get(itemId);
+      if (!item) {
+        failures.push(`${itemId} missing from catalog`);
+        continue;
+      }
+
+      const selection = selectionForItem(item.type_name, item);
+      const layers = getSpritePathsForSelections(
+        {
+          bodyType: 'male',
+          items: { [item.type_name]: selection },
+        },
+        catalog,
+        { pathExists: spritePathExists },
+      );
+
+      if (layers.length === 0) {
+        failures.push(
+          `${item.type_name}/${item.name} (${itemId}) produced no representative layers`,
+        );
+        continue;
+      }
+
+      const expectedLayerCount = expectedRepresentativeLayerCount(item, 'male');
+      if (layers.length !== expectedLayerCount) {
+        failures.push(
+          `${item.type_name}/${item.name} (${itemId}) variant=${selection.variant ?? ''} resolved ${layers.length}/${expectedLayerCount} representative layers`,
+        );
+      }
+
+      for (const layer of layers) {
+        if (spritePathExists(layer.path)) continue;
+        failures.push(
+          `${item.type_name}/${item.name} (${itemId}) variant=${selection.variant ?? ''} missing ${layer.path}`,
+        );
+      }
+    }
+
+    expect(
+      failures,
+      `${failures.length} catalog/copied asset mismatch target failure(s):\n${failures.join('\n')}`,
+    ).toEqual([]);
+  });
+
   it('random-covered variant-backed male items resolve every representative sprite path', () => {
     const { catalog } = createCatalog(walkJson(sheetDefsDir));
     const coveredTypes = randomCoveredTypeNames();
@@ -93,6 +152,13 @@ describe('random outfit variant path audit', () => {
           `${item.type_name}/${item.name} (${itemId}) produced no representative layers`,
         );
         continue;
+      }
+
+      const expectedLayerCount = expectedRepresentativeLayerCount(item, 'male');
+      if (layers.length !== expectedLayerCount) {
+        failures.push(
+          `${item.type_name}/${item.name} (${itemId}) variant=${selection.variant ?? ''} resolved ${layers.length}/${expectedLayerCount} representative layers`,
+        );
       }
 
       for (const layer of layers) {
