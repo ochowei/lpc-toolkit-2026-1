@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { createCatalog, type ItemDefinition } from '@lpc-toolkit/core';
+import {
+  createCatalog,
+  createPaletteCatalog,
+  type ItemDefinition,
+} from '@lpc-toolkit/core';
 import { pickRandomOutfit } from '../src/slice/random-outfit';
 
 function makeItem(
@@ -17,6 +21,14 @@ function makeItem(
     ...(variants.length > 0 ? { variants } : {}),
   } as unknown as ItemDefinition;
 }
+
+const palettes = createPaletteCatalog({
+  'm/meta_m.json': { type: 'material', default: 'v1', base: 'c0' },
+  'm/m_v1.json': {
+    c0: ['#000000', '#111111'],
+    red: ['#ff0000', '#ee0000'],
+  },
+}).palettes;
 
 // Deterministic RNG: returns a sequence of values from `values`.
 function seqRng(values: number[]): () => number {
@@ -75,6 +87,52 @@ describe('pickRandomOutfit', () => {
       typeName: 'shield',
       name: 'Round Shield',
       variant: 'brown',
+    });
+  });
+
+  it('sets the first recolor swatch for randomly picked recolor-backed items when palettes are provided', () => {
+    const { catalog: recolorCatalog } = createCatalog({
+      'body/light.json': makeItem('Light', 'body'),
+      'cape/hooded.json': {
+        ...makeItem('Hooded Cape', 'cape'),
+        recolors: { material: 'm', palettes: ['v1'] },
+      },
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: recolorCatalog,
+      palettes,
+      bodyType: 'male',
+      rng: () => 0,
+      optionalProb: 1.0,
+    });
+
+    expect(sel.items['cape']).toEqual({
+      typeName: 'cape',
+      name: 'Hooded Cape',
+      recolor: 'c0',
+    });
+  });
+
+  it('does not set a recolor default without palette metadata', () => {
+    const { catalog: recolorCatalog } = createCatalog({
+      'body/light.json': makeItem('Light', 'body'),
+      'cape/hooded.json': {
+        ...makeItem('Hooded Cape', 'cape'),
+        recolors: { material: 'm', palettes: ['v1'] },
+      },
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: recolorCatalog,
+      bodyType: 'male',
+      rng: () => 0,
+      optionalProb: 1.0,
+    });
+
+    expect(sel.items['cape']).toEqual({
+      typeName: 'cape',
+      name: 'Hooded Cape',
     });
   });
 
