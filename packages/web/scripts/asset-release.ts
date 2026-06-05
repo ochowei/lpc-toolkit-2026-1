@@ -1,9 +1,11 @@
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -58,6 +60,10 @@ function requireString(value: unknown, fieldName: string): string {
   return value;
 }
 
+function errorDetail(error: unknown): string {
+  return error instanceof Error ? `: ${error.message}` : '';
+}
+
 function parseManifestFile(
   pathName: string,
   value: unknown,
@@ -87,6 +93,45 @@ function parseManifestFile(
     size: record.size,
     sha256: record.sha256,
   };
+}
+
+function parseManifestFileListEntry(value: unknown): readonly [
+  string,
+  AssetManifestFile,
+] {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error('asset manifest file list entry must be an object');
+  }
+
+  const record = value as Record<string, unknown>;
+  if (typeof record.path !== 'string' || record.path.length === 0) {
+    throw new Error('asset manifest file list entry has invalid path');
+  }
+
+  return [
+    record.path,
+    parseManifestFile(record.path, {
+      size: record.sizeBytes,
+      sha256: record.sha256,
+    }),
+  ];
+}
+
+function parseManifestFiles(value: unknown): Record<string, AssetManifestFile> {
+  if (Array.isArray(value)) {
+    return Object.fromEntries(value.map(parseManifestFileListEntry));
+  }
+
+  if (typeof value !== 'object' || value === null) {
+    throw new Error('asset manifest must contain a files object or array');
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).map(([pathName, entry]) => [
+      pathName,
+      parseManifestFile(pathName, entry),
+    ]),
+  );
 }
 
 export function hashBuffer(buffer: Buffer): string {
@@ -135,6 +180,72 @@ export function loadReleaseConfig(repoRoot: string): ReleaseConfig {
   };
 }
 
+export async function downloadBuffer(url: string): Promise<Buffer> {
+  let response: Response;
+
+  try {
+    response = await fetch(url);
+  } catch (error) {
+    throw new Error(
+      `Failed to download ${url}${errorDetail(error)}. Rerun prepare-assets to retry.`,
+    );
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to download ${url}: HTTP ${response.status} ${response.statusText}. Rerun prepare-assets to retry.`,
+    );
+  }
+
+  try {
+    return Buffer.from(await response.arrayBuffer());
+  } catch (error) {
+    throw new Error(
+      `Failed to download ${url}${errorDetail(error)}. Rerun prepare-assets to retry.`,
+    );
+  }
+}
+
+function validateTarEntries(tarPath: string, targetDir: string): void {
+  let listing: string;
+  try {
+    listing = execFileSync('tar', ['-tzf', tarPath], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } catch (error) {
+    throw new Error(`Failed to list asset tarball${errorDetail(error)}`);
+  }
+
+  for (const entry of listing.split('\n')) {
+    if (entry.length > 0) {
+      ensureInsideDirectory(targetDir, entry);
+    }
+  }
+}
+
+export function extractTarGz(tarball: Buffer, targetDir: string): void {
+  mkdirSync(targetDir, { recursive: true });
+  const tempDir = mkdtempSync(path.join(tmpdir(), 'lpc-asset-tarball-'));
+  const tarPath = path.join(tempDir, 'assets.tar.gz');
+
+  try {
+    writeFileSync(tarPath, tarball);
+    validateTarEntries(tarPath, targetDir);
+    try {
+      execFileSync('tar', ['-xzf', tarPath, '-C', targetDir], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    } catch (error) {
+      throw new Error(
+        `Failed to extract asset tarball into ${targetDir}${errorDetail(error)}`,
+      );
+    }
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+}
+
 export function parseAssetManifest(
   json: string,
   config: ReleaseConfig,
@@ -155,19 +266,7 @@ export function parseAssetManifest(
     );
   }
 
-  if (
-    typeof record.files !== 'object' ||
-    record.files === null ||
-    Array.isArray(record.files)
-  ) {
-    throw new Error('asset manifest must contain a files object');
-  }
-
-  const files: Record<string, AssetManifestFile> = {};
-
-  for (const [pathName, value] of Object.entries(record.files)) {
-    files[pathName] = parseManifestFile(pathName, value);
-  }
+  const files = parseManifestFiles(record.files);
 
   if (!files['CREDITS.csv']) {
     throw new Error(
@@ -179,6 +278,38 @@ export function parseAssetManifest(
     sourceSha: config.sourceSha,
     files,
   };
+}
+
+export function loadMaterializedManifest(
+  repoRoot: string,
+  config: ReleaseConfig,
+): AssetManifest {
+  return parseAssetManifest(
+    readFileSync(path.join(repoRoot, 'assets/asset-manifest.json'), 'utf8'),
+    config,
+  );
+}
+
+export function verifyUpstreamParity({
+  config,
+  manifest,
+  upstreamHead,
+}: {
+  readonly config: ReleaseConfig;
+  readonly manifest: AssetManifest;
+  readonly upstreamHead: string;
+}): void {
+  if (manifest.sourceSha !== config.sourceSha) {
+    throw new Error(
+      `Parity baseline mismatch: manifest sourceSha ${manifest.sourceSha} does not match config sourceSha ${config.sourceSha}`,
+    );
+  }
+
+  if (upstreamHead !== config.sourceSha) {
+    throw new Error(
+      `Parity baseline mismatch: upstream HEAD ${upstreamHead} does not match config sourceSha ${config.sourceSha}`,
+    );
+  }
 }
 
 export function expectedMaterializedFiles(
@@ -198,6 +329,10 @@ export function expectedMaterializedFiles(
 }
 
 function materializedPath(repoRoot: string, pathName: string): string {
+  if (pathName === 'asset-manifest.json') {
+    return path.join(repoRoot, 'assets/asset-manifest.json');
+  }
+
   if (pathName === 'CREDITS.csv') {
     return path.join(repoRoot, 'assets/CREDITS.csv');
   }
@@ -212,11 +347,54 @@ function materializedPath(repoRoot: string, pathName: string): string {
   return path.join(repoRoot, pathName);
 }
 
-function cacheIsValid(repoRoot: string, manifest: AssetManifest): boolean {
+function manifestsMatch(
+  left: AssetManifest,
+  right: AssetManifest,
+): boolean {
+  const leftEntries = Object.entries(left.files).sort(([a], [b]) =>
+    a.localeCompare(b),
+  );
+  const rightEntries = Object.entries(right.files).sort(([a], [b]) =>
+    a.localeCompare(b),
+  );
+
   if (
+    left.sourceSha !== right.sourceSha ||
+    leftEntries.length !== rightEntries.length
+  ) {
+    return false;
+  }
+
+  return leftEntries.every(([pathName, file], index) => {
+    const rightEntry = rightEntries[index];
+
+    return (
+      rightEntry !== undefined &&
+      pathName === rightEntry[0] &&
+      file.size === rightEntry[1].size &&
+      file.sha256 === rightEntry[1].sha256
+    );
+  });
+}
+
+function cacheIsValid(
+  repoRoot: string,
+  config: ReleaseConfig,
+  manifest: AssetManifest,
+): boolean {
+  if (
+    !existsSync(path.join(repoRoot, 'assets/asset-manifest.json')) ||
     !existsSync(path.join(repoRoot, 'assets/sheet_definitions')) ||
     !existsSync(path.join(repoRoot, 'assets/palette_definitions'))
   ) {
+    return false;
+  }
+
+  try {
+    if (!manifestsMatch(loadMaterializedManifest(repoRoot, config), manifest)) {
+      return false;
+    }
+  } catch {
     return false;
   }
 
@@ -230,6 +408,33 @@ function cacheIsValid(repoRoot: string, manifest: AssetManifest): boolean {
   }
 
   return true;
+}
+
+function writeMaterializedManifest(
+  repoRoot: string,
+  manifestJson: string,
+): void {
+  const targetPath = materializedPath(repoRoot, 'asset-manifest.json');
+  mkdirSync(path.dirname(targetPath), { recursive: true });
+  writeFileSync(targetPath, manifestJson);
+}
+
+function readExtractedTarEntry(extractDir: string, pathName: string): Buffer {
+  const candidates = [
+    pathName,
+    ...readdirSync(extractDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => path.join(entry.name, pathName)),
+  ];
+
+  for (const candidate of candidates) {
+    const targetPath = ensureInsideDirectory(extractDir, candidate);
+    if (existsSync(targetPath)) {
+      return readFileSync(targetPath);
+    }
+  }
+
+  throw new Error(`asset tarball missing required entry: ${pathName}`);
 }
 
 function ensureInsideDirectory(targetDir: string, entryName: string): string {
@@ -299,6 +504,7 @@ export async function prepareAssetSnapshot(
   options: PrepareOptions,
 ): Promise<{ readonly status: PrepareStatus }> {
   let manifest = options.manifest;
+  let manifestJson = manifest ? JSON.stringify(manifest) : undefined;
 
   if (manifest && manifest.sourceSha !== options.config.sourceSha) {
     throw new Error(
@@ -306,18 +512,23 @@ export async function prepareAssetSnapshot(
     );
   }
 
-  if (manifest && cacheIsValid(options.repoRoot, manifest)) {
+  if (manifest && cacheIsValid(options.repoRoot, options.config, manifest)) {
     return { status: 'cache-hit' };
   }
 
   if (!manifest) {
     const manifestBuffer = await options.download(options.config.manifestUrl);
     verifyHash('manifest', manifestBuffer, options.config.manifestSha256);
-    manifest = parseAssetManifest(manifestBuffer.toString('utf8'), options.config);
+    manifestJson = manifestBuffer.toString('utf8');
+    manifest = parseAssetManifest(manifestJson, options.config);
   }
 
-  if (cacheIsValid(options.repoRoot, manifest)) {
+  if (cacheIsValid(options.repoRoot, options.config, manifest)) {
     return { status: 'cache-hit' };
+  }
+
+  if (!manifestJson) {
+    throw new Error('asset manifest JSON was not available for materialization');
   }
 
   let tarball = options.tarball;
@@ -334,10 +545,8 @@ export async function prepareAssetSnapshot(
     tempExtractDir = mkdtempSync(path.join(tmpdir(), 'lpc-asset-release-'));
     await options.extractTarball(tarball, tempExtractDir);
     const extractedDir = tempExtractDir;
-    readTarEntry = async (pathName) => {
-      const targetPath = ensureInsideDirectory(extractedDir, pathName);
-      return readFileSync(targetPath);
-    };
+    readTarEntry = async (pathName) =>
+      readExtractedTarEntry(extractedDir, pathName);
   }
 
   try {
@@ -382,6 +591,8 @@ export async function prepareAssetSnapshot(
         await readTarEntry(pathName),
       );
     }
+
+    writeMaterializedManifest(options.repoRoot, manifestJson);
   } finally {
     if (tempExtractDir) {
       rmSync(tempExtractDir, { force: true, recursive: true });
