@@ -1,7 +1,0 @@
-{
-    "type": "material",
-    "label": "Any",
-    "desc": "Choose from any palette from any material type (except eyes).",
-    "default": "lpcr",
-    "base": "white"
-}
