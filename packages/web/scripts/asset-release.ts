@@ -1,6 +1,15 @@
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
+import JSZip from 'jszip';
 
 export interface ReleaseConfig {
   readonly tag: string;
@@ -20,6 +29,25 @@ export interface AssetManifestFile {
 export interface AssetManifest {
   readonly sourceSha: string;
   readonly files: Readonly<Record<string, AssetManifestFile>>;
+}
+
+export type PrepareStatus = 'cache-hit' | 'refreshed';
+
+export type AssetDownload = (url: string) => Promise<Buffer>;
+
+export type ReadTarEntry = (pathName: string) => Promise<Buffer>;
+
+export interface PrepareOptions {
+  readonly repoRoot: string;
+  readonly config: ReleaseConfig;
+  readonly manifest?: AssetManifest;
+  readonly tarball?: Buffer;
+  readonly download: AssetDownload;
+  readonly readTarEntry?: ReadTarEntry;
+  readonly extractTarball: (
+    tarball: Buffer,
+    targetDir: string,
+  ) => Promise<void> | void;
 }
 
 function requireString(value: unknown, fieldName: string): string {
@@ -151,4 +179,214 @@ export function parseAssetManifest(
     sourceSha: config.sourceSha,
     files,
   };
+}
+
+export function expectedMaterializedFiles(
+  manifest: AssetManifest,
+): readonly string[] {
+  const runtimeZips = Object.keys(manifest.files)
+    .filter(
+      (pathName) =>
+        pathName.startsWith('zips/') &&
+        pathName.endsWith('.zip') &&
+        pathName !== 'zips/sheet_definitions.zip' &&
+        pathName !== 'zips/palette_definitions.zip',
+    )
+    .sort();
+
+  return ['CREDITS.csv', ...runtimeZips];
+}
+
+function materializedPath(repoRoot: string, pathName: string): string {
+  if (pathName === 'CREDITS.csv') {
+    return path.join(repoRoot, 'assets/CREDITS.csv');
+  }
+
+  if (pathName.startsWith('zips/')) {
+    return ensureInsideDirectory(
+      path.join(repoRoot, 'packages/web/public/zips'),
+      pathName.slice('zips/'.length),
+    );
+  }
+
+  return path.join(repoRoot, pathName);
+}
+
+function cacheIsValid(repoRoot: string, manifest: AssetManifest): boolean {
+  if (
+    !existsSync(path.join(repoRoot, 'assets/sheet_definitions')) ||
+    !existsSync(path.join(repoRoot, 'assets/palette_definitions'))
+  ) {
+    return false;
+  }
+
+  for (const pathName of expectedMaterializedFiles(manifest)) {
+    const file = manifest.files[pathName];
+    const targetPath = materializedPath(repoRoot, pathName);
+
+    if (!file || !existsSync(targetPath) || hashFile(targetPath) !== file.sha256) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function ensureInsideDirectory(targetDir: string, entryName: string): string {
+  const resolvedTargetDir = path.resolve(targetDir);
+  const resolvedEntryPath = path.resolve(resolvedTargetDir, entryName);
+
+  if (
+    resolvedEntryPath !== resolvedTargetDir &&
+    !resolvedEntryPath.startsWith(`${resolvedTargetDir}${path.sep}`)
+  ) {
+    throw new Error(`metadata zip entry escapes target directory: ${entryName}`);
+  }
+
+  return resolvedEntryPath;
+}
+
+async function expandMetadataZip(buffer: Buffer, targetDir: string): Promise<void> {
+  const zip = await JSZip.loadAsync(buffer);
+  const entries = Object.values(zip.files);
+
+  for (const entry of entries) {
+    ensureInsideDirectory(targetDir, entry.name);
+  }
+
+  rmSync(targetDir, { force: true, recursive: true });
+  mkdirSync(targetDir, { recursive: true });
+
+  for (const entry of entries) {
+    if (entry.dir) {
+      continue;
+    }
+
+    const targetPath = ensureInsideDirectory(targetDir, entry.name);
+    mkdirSync(path.dirname(targetPath), { recursive: true });
+    writeFileSync(targetPath, Buffer.from(await entry.async('nodebuffer')));
+  }
+}
+
+function writeVerifiedFile(
+  repoRoot: string,
+  manifest: AssetManifest,
+  pathName: string,
+  buffer: Buffer,
+): void {
+  verifyManifestFile(manifest, pathName, buffer);
+
+  const targetPath = materializedPath(repoRoot, pathName);
+  mkdirSync(path.dirname(targetPath), { recursive: true });
+  writeFileSync(targetPath, buffer);
+}
+
+function verifyManifestFile(
+  manifest: AssetManifest,
+  pathName: string,
+  buffer: Buffer,
+): void {
+  const file = manifest.files[pathName];
+
+  if (!file) {
+    throw new Error(`asset manifest missing entry: ${pathName}`);
+  }
+
+  verifyHash(pathName, buffer, file.sha256);
+}
+
+export async function prepareAssetSnapshot(
+  options: PrepareOptions,
+): Promise<{ readonly status: PrepareStatus }> {
+  let manifest = options.manifest;
+
+  if (manifest && manifest.sourceSha !== options.config.sourceSha) {
+    throw new Error(
+      `asset manifest sourceSha mismatch: expected ${options.config.sourceSha}, actual ${manifest.sourceSha}`,
+    );
+  }
+
+  if (manifest && cacheIsValid(options.repoRoot, manifest)) {
+    return { status: 'cache-hit' };
+  }
+
+  if (!manifest) {
+    const manifestBuffer = await options.download(options.config.manifestUrl);
+    verifyHash('manifest', manifestBuffer, options.config.manifestSha256);
+    manifest = parseAssetManifest(manifestBuffer.toString('utf8'), options.config);
+  }
+
+  if (cacheIsValid(options.repoRoot, manifest)) {
+    return { status: 'cache-hit' };
+  }
+
+  let tarball = options.tarball;
+
+  if (!tarball) {
+    tarball = await options.download(options.config.tarballUrl);
+  }
+  verifyHash('tarball', tarball, options.config.tarballSha256);
+
+  let tempExtractDir: string | undefined;
+  let readTarEntry = options.readTarEntry;
+
+  if (!readTarEntry) {
+    tempExtractDir = mkdtempSync(path.join(tmpdir(), 'lpc-asset-release-'));
+    await options.extractTarball(tarball, tempExtractDir);
+    const extractedDir = tempExtractDir;
+    readTarEntry = async (pathName) => {
+      const targetPath = ensureInsideDirectory(extractedDir, pathName);
+      return readFileSync(targetPath);
+    };
+  }
+
+  try {
+    writeVerifiedFile(
+      options.repoRoot,
+      manifest,
+      'CREDITS.csv',
+      await readTarEntry('CREDITS.csv'),
+    );
+
+    const sheetDefinitions = await readTarEntry('zips/sheet_definitions.zip');
+    verifyManifestFile(
+      manifest,
+      'zips/sheet_definitions.zip',
+      sheetDefinitions,
+    );
+    await expandMetadataZip(
+      sheetDefinitions,
+      path.join(options.repoRoot, 'assets/sheet_definitions'),
+    );
+
+    const paletteDefinitions = await readTarEntry('zips/palette_definitions.zip');
+    verifyManifestFile(
+      manifest,
+      'zips/palette_definitions.zip',
+      paletteDefinitions,
+    );
+    await expandMetadataZip(
+      paletteDefinitions,
+      path.join(options.repoRoot, 'assets/palette_definitions'),
+    );
+
+    for (const pathName of expectedMaterializedFiles(manifest)) {
+      if (pathName === 'CREDITS.csv') {
+        continue;
+      }
+
+      writeVerifiedFile(
+        options.repoRoot,
+        manifest,
+        pathName,
+        await readTarEntry(pathName),
+      );
+    }
+  } finally {
+    if (tempExtractDir) {
+      rmSync(tempExtractDir, { force: true, recursive: true });
+    }
+  }
+
+  return { status: 'refreshed' };
 }
