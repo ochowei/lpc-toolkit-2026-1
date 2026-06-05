@@ -10,9 +10,17 @@ const packageJson = JSON.parse(
 ) as { scripts?: Record<string, string> };
 
 describe('package scripts', () => {
-  it('generates sprite assets before production builds', () => {
+  it('prepares release assets before production builds', () => {
     expect(packageJson.scripts?.prebuild).toBe(
-      'pnpm --filter @lpc-toolkit/core build && tsx scripts/copy-spritesheets.ts && pnpm zip-assets',
+      'pnpm prepare-assets && pnpm --filter @lpc-toolkit/core build',
+    );
+  });
+
+  it('prepares release assets before tests that read generated assets', () => {
+    expect(packageJson.scripts?.pretest).toBe('pnpm prepare-assets');
+    expect(packageJson.scripts?.['pretest:e2e']).toBe('pnpm prepare-assets');
+    expect(packageJson.scripts?.['pretest:e2e:parity']).toBe(
+      'pnpm prepare-assets && pnpm verify-upstream-parity',
     );
   });
 });
