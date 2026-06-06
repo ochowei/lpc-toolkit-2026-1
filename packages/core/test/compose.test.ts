@@ -20,7 +20,7 @@ import {
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const upstreamRoot = path.join(here, '../../../assets/sheet_definitions');
-const upstreamBase = path.join(here, '../../../assets');
+const upstreamBase = path.join(here, '../../../upstream');
 
 function loadFixture(relPath: FilePath): ItemDefinition {
   return JSON.parse(

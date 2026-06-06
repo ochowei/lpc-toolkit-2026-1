@@ -17,9 +17,10 @@ import type {
 import { createNodeCanvasAdapter } from './helpers/node-canvas-adapter.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const upstreamBase = path.join(here, '../../../assets');
-const sheetRoot = path.join(upstreamBase, 'sheet_definitions');
-const paletteRoot = path.join(upstreamBase, 'palette_definitions');
+const assetMetadataBase = path.join(here, '../../../assets');
+const upstreamBase = path.join(here, '../../../upstream');
+const sheetRoot = path.join(assetMetadataBase, 'sheet_definitions');
+const paletteRoot = path.join(assetMetadataBase, 'palette_definitions');
 
 function loadCatalog(rels: readonly FilePath[]): Catalog {
   const records: Record<FilePath, ItemDefinition> = {};
