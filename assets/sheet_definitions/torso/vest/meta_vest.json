@@ -1,5 +1,0 @@
-{
-    "priority": 50,
-    "required": ["male"],
-    "animations": ["spellcast", "thrust", "walk", "slash", "shoot", "hurt", "watering"]
-}

@@ -78,6 +78,17 @@ export interface ComposeOptions {
   ) => PaletteSwap | undefined;
 }
 
+/** Optional existence hook for callers that can validate sprite paths. */
+export interface SpritePathResolutionOptions {
+  /**
+   * Returns whether a resolved `spritesheets/...` path exists in the caller's
+   * asset source. Core stays environment-agnostic; filesystem, ZIP, or network
+   * checks are injected by the caller when stricter representative resolution
+   * is needed.
+   */
+  readonly pathExists?: (spritePath: string) => boolean;
+}
+
 function variantToFilename(variant: string): string {
   return variant.replaceAll(' ', '_');
 }
@@ -225,30 +236,18 @@ function resolveLayers(
 export function getSpritePathsForSelections(
   selections: Selections,
   catalog: Catalog,
+  options?: SpritePathResolutionOptions,
 ): readonly LayerSpec[] {
   const out: LayerSpec[] = [];
 
   for (const layer of resolveLayers(selections, catalog)) {
     const variantFile = layer.variant ? variantToFilename(layer.variant) : '';
 
-    let path: string;
-    if (layer.customAnimation) {
-      // Custom animation layers (such as wheelchair or riding accessories)
-      // do not follow the standard animation subfolders structure (like "walk/").
-      // Instead, they are direct spritesheet PNGs at the base path with the variant name.
-      if (!variantFile) continue;
-      path = `spritesheets/${layer.basePath}${variantFile}.png`;
-    } else {
-      // Standard animations require locating a default fallback animation to display
-      // in preview mode or for static asset resolution. We prefer "walk" if available,
-      // otherwise fall back to the first declared animation in the item's specification.
-      const defaultAnim = layer.animations.includes('walk')
-        ? 'walk'
-        : layer.animations[0];
-      if (!defaultAnim) continue;
-      const tail = variantFile ? `/${variantFile}` : '';
-      path = `spritesheets/${layer.basePath}${defaultAnim}${tail}.png`;
-    }
+    const candidates = layer.customAnimation
+      ? representativeCustomPaths(layer, variantFile)
+      : representativeStandardPaths(layer, variantFile);
+    const path = firstExistingPath(candidates, options);
+    if (!path) continue;
 
     out.push({
       itemId: layer.itemId,
@@ -303,6 +302,65 @@ function logicalToFolder(logical: string): string | undefined {
 function joinUrl(base: string, path: string): string {
   if (!base) return path;
   return base.endsWith('/') ? `${base}${path}` : `${base}/${path}`;
+}
+
+function firstExistingPath(
+  candidates: readonly string[],
+  options?: SpritePathResolutionOptions,
+): string | undefined {
+  if (candidates.length === 0) return undefined;
+  if (!options?.pathExists) return candidates[0];
+  return candidates.find((candidate) => options.pathExists?.(candidate));
+}
+
+function supportedFolders(animations: readonly string[]): string[] {
+  return Object.keys(ANIMATION_OFFSETS).filter((folder) =>
+    supportsFolder(animations, folder),
+  );
+}
+
+function representativeStandardPaths(
+  layer: ResolvedLayer,
+  variantFile: string,
+): string[] {
+  const defaultAnim = layer.animations.includes('walk')
+    ? 'walk'
+    : layer.animations[0];
+  if (!defaultAnim) return [];
+
+  const defaultTail = variantFile ? `/${variantFile}` : '';
+  const candidates = [
+    `spritesheets/${layer.basePath}${defaultAnim}${defaultTail}.png`,
+  ];
+  const seen = new Set(candidates);
+
+  for (const folder of supportedFolders(layer.animations)) {
+    const folderCandidates = variantFile
+      ? [
+          `spritesheets/${layer.basePath}${folder}/${variantFile}.png`,
+          `spritesheets/${layer.basePath}${folder}.png`,
+        ]
+      : [`spritesheets/${layer.basePath}${folder}.png`];
+
+    for (const candidate of folderCandidates) {
+      if (seen.has(candidate)) continue;
+      seen.add(candidate);
+      candidates.push(candidate);
+    }
+  }
+
+  return candidates;
+}
+
+function representativeCustomPaths(
+  layer: ResolvedLayer,
+  variantFile: string,
+): string[] {
+  if (!variantFile) return [];
+  const candidates = [`spritesheets/${layer.basePath}${variantFile}.png`];
+  const flatPath = `spritesheets/${layer.basePath.replace(/\/$/, '')}.png`;
+  if (flatPath !== candidates[0]) candidates.push(flatPath);
+  return candidates;
 }
 
 interface DrawItem {

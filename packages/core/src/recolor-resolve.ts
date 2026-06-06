@@ -198,13 +198,13 @@ function getBasePalette(
  */
 function getTargetPalette(
   material: string,
-  targetColor: string,
+  targetColor: string | null | undefined,
   materials: Materials,
 ): readonly string[] | null {
   let mm = materials[material];
   if (!mm) return null;
   const [newMat, version, recolor] = parseRecolorKey(
-    targetColor,
+    targetColor ?? null,
     materialCtx(material, mm),
     materials,
   );
@@ -458,6 +458,7 @@ export function makeResolvePalette(
       catalog,
       selections,
     );
+    if (Object.keys(chosen).length === 0) return undefined;
 
     const source: string[] = [];
     const target: string[] = [];
@@ -471,21 +472,24 @@ export function makeResolvePalette(
       }
 
       const key = chosen[nr.typeName ?? item.type_name];
-      if (!key) continue; // no recolor picked for this entry
+      let targetColor: string | undefined = undefined;
 
-      const verified = fixMissingRecolor(key, nr, materials);
-      if (!verified) {
-        warn?.(
-          `recolor: "${key}" is not a valid ${nr.material} color for "${item.name}"`,
-        );
-        continue;
+      if (key) {
+        const verified = fixMissingRecolor(key, nr, materials);
+        if (!verified) {
+          warn?.(
+            `recolor: "${key}" is not a valid ${nr.material} color for "${item.name}"`,
+          );
+          continue;
+        }
+        targetColor = verified;
       }
 
       const sourceRamp = getBasePalette(nr, materials);
-      const targetRamp = getTargetPalette(nr.material, verified, materials);
+      const targetRamp = getTargetPalette(nr.material, targetColor, materials);
       if (!sourceRamp || !targetRamp) {
         warn?.(
-          `recolor: could not resolve ${nr.material} ramp "${verified}" for "${item.name}"`,
+          `recolor: could not resolve ${nr.material} ramp "${targetColor ?? '(default)'}" for "${item.name}"`,
         );
         continue;
       }

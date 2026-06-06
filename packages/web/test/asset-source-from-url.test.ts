@@ -18,6 +18,10 @@ describe('assetSourceFromUrl', () => {
     expect(assetSourceFromUrl('?assetSource=auto')).toBe('auto');
   });
 
+  it('returns the parsed value when assetSource is "zip"', () => {
+    expect(assetSourceFromUrl('?assetSource=zip')).toBe('zip');
+  });
+
   it('returns undefined when assetSource is absent', () => {
     expect(assetSourceFromUrl('')).toBeUndefined();
     expect(assetSourceFromUrl('?foo=bar')).toBeUndefined();
@@ -41,6 +45,7 @@ describe('defaultAssetSourceFromUrl', () => {
     expect(defaultAssetSourceFromUrl('?assetSource=upstream', true)).toBe(
       'upstream',
     );
+    expect(defaultAssetSourceFromUrl('?assetSource=zip', true)).toBe('zip');
   });
 
   it('defaults to local in dev mode when assetSource is absent or invalid', () => {
@@ -48,8 +53,8 @@ describe('defaultAssetSourceFromUrl', () => {
     expect(defaultAssetSourceFromUrl('?assetSource=nope', true)).toBe('local');
   });
 
-  it('defaults to auto outside dev mode when assetSource is absent or invalid', () => {
-    expect(defaultAssetSourceFromUrl('', false)).toBe('auto');
-    expect(defaultAssetSourceFromUrl('?assetSource=nope', false)).toBe('auto');
+  it('defaults to zip outside dev mode when assetSource is absent or invalid', () => {
+    expect(defaultAssetSourceFromUrl('', false)).toBe('zip');
+    expect(defaultAssetSourceFromUrl('?assetSource=nope', false)).toBe('zip');
   });
 });

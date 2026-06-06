@@ -8,6 +8,7 @@ import {
   resolveSpriteUrlCandidates,
   type AssetSource,
 } from './asset-source';
+import { loadFileFromZip } from './zip-loader';
 
 /**
  * Core hands us paths like `spritesheets/body/bodies/male/walk.png` (it
@@ -68,6 +69,22 @@ export function createBrowserCanvasAdapter(
       return c as unknown as CanvasLike;
     },
     async loadImage(path: string): Promise<ImageLike> {
+      if (source === 'zip') {
+        const url = await loadFileFromZip(path, document.baseURI);
+        const release = await sharedFetchSemaphore.acquire();
+        try {
+          const res = await fetch(url);
+          if (!res.ok) {
+            throw new Error(`Failed to fetch local blob URL: ${url} (HTTP ${res.status})`);
+          }
+          const blob = await res.blob();
+          return (await createImageBitmap(blob)) as unknown as ImageLike;
+        } finally {
+          URL.revokeObjectURL(url); // Clean up Blob URL to prevent memory leak
+          release();
+        }
+      }
+
       const urls = resolveSpriteUrlCandidates(path, document.baseURI, source);
       const errors: string[] = [];
 

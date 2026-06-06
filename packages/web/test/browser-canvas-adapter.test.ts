@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import JSZip from 'jszip';
 import {
   createBrowserCanvasAdapter,
   resolveSpriteUrl,
@@ -52,6 +53,53 @@ describe('createBrowserCanvasAdapter', () => {
         'https://liberatedpixelcup.github.io/Universal-LPC-Spritesheet-Character-Generator/spritesheets/a.png',
       );
       expect(createImageBitmapMock).toHaveBeenCalledWith(blob);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('loads from ZIP in zip mode', async () => {
+    const zip = new JSZip();
+    zip.file('male/walk.png', 'fake-png-content');
+    const zipBuffer = await zip.generateAsync({ type: 'arraybuffer' });
+
+    const bitmap = { width: 1, height: 1 };
+    const documentStub = { baseURI: 'http://x/app/' } satisfies Pick<
+      Document,
+      'baseURI'
+    >;
+
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(zipBuffer))
+      .mockResolvedValueOnce(new Response(new Blob(['fake-png-content'])));
+
+    const createImageBitmapMock = vi
+      .fn()
+      .mockResolvedValue(bitmap as ImageBitmap);
+
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('createImageBitmap', createImageBitmapMock);
+    vi.stubGlobal('document', documentStub);
+
+    const originalURL = globalThis.URL;
+    const createObjectURLMock = vi.fn().mockReturnValue('blob:mock-url');
+    const revokeObjectURLMock = vi.fn();
+    class MockURL extends originalURL {
+      static override createObjectURL = createObjectURLMock;
+      static override revokeObjectURL = revokeObjectURLMock;
+    }
+    vi.stubGlobal('URL', MockURL);
+
+    try {
+      const image = await createBrowserCanvasAdapter('zip').loadImage(
+        'spritesheets/body/male/walk.png',
+      );
+
+      expect(image).toBe(bitmap);
+      expect(fetchMock).toHaveBeenCalledWith('http://x/app/zips/body.zip');
+      expect(fetchMock).toHaveBeenCalledWith('blob:mock-url');
+      expect(createImageBitmapMock).toHaveBeenCalled();
+      expect(revokeObjectURLMock).toHaveBeenCalledWith('blob:mock-url');
     } finally {
       vi.unstubAllGlobals();
     }

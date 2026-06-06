@@ -1,7 +1,0 @@
-{
-    "type": "material",
-    "label": "Cloth",
-    "desc": "Palettes designed for cloth materials such as clothing and fabric.",
-    "default": "ulpc",
-    "base": "white"
-}
