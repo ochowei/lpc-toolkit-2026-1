@@ -1,8 +1,7 @@
 import { defineConfig, type Plugin } from 'vite';
 import { fileURLToPath } from 'node:url';
 import { resolve, sep } from 'node:path';
-import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
@@ -30,18 +29,11 @@ function localSpritesheetsPlugin(): Plugin {
           }
 
           try {
-            const stats = await stat(filePath);
-            if (stats.isFile()) {
-              res.setHeader('Content-Type', 'image/png');
-              const stream = createReadStream(filePath);
-              stream.on('error', (err) => {
-                if (!res.headersSent) {
-                  next(err);
-                }
-              });
-              stream.pipe(res);
-              return;
-            }
+            const contents = await readFile(filePath);
+            res.setHeader('Content-Type', 'image/png');
+            res.setHeader('Content-Length', contents.byteLength);
+            res.end(contents);
+            return;
           } catch {
             // File does not exist, pass through to next
           }
