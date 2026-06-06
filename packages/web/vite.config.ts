@@ -4,11 +4,43 @@ import { resolve, sep } from 'node:path';
 import { readFile } from 'node:fs/promises';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import JSZip from 'jszip';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const baseDir = resolve(__dirname, '../../assets/spritesheets');
 
 function localSpritesheetsPlugin(): Plugin {
+  const zipPromises = new Map<string, Promise<JSZip>>();
+
+  async function readSprite(pathname: string, filePath: string): Promise<Buffer> {
+    try {
+      return await readFile(filePath);
+    } catch {
+      const relativePath = pathname.slice('/spritesheets/'.length);
+      const [category, ...pathParts] = relativePath.split('/');
+      const zipEntryPath = pathParts.join('/');
+      if (!category || !zipEntryPath) {
+        throw new Error(`Invalid spritesheet path: ${pathname}`);
+      }
+
+      let zipPromise = zipPromises.get(category);
+      if (!zipPromise) {
+        const zipPath = resolve(__dirname, 'public/zips', `${category}.zip`);
+        zipPromise = readFile(zipPath).then((buffer) => JSZip.loadAsync(buffer));
+        zipPromises.set(category, zipPromise);
+      }
+
+      const zip = await zipPromise;
+      const entry = zip.file(zipEntryPath);
+      if (!entry) {
+        throw new Error(
+          `Spritesheet ${zipEntryPath} is missing from ${category}.zip`,
+        );
+      }
+      return entry.async('nodebuffer');
+    }
+  }
+
   return {
     name: 'local-spritesheets-plugin',
     configureServer(server) {
@@ -29,7 +61,7 @@ function localSpritesheetsPlugin(): Plugin {
           }
 
           try {
-            const contents = await readFile(filePath);
+            const contents = await readSprite(pathname, filePath);
             res.setHeader('Content-Type', 'image/png');
             res.setHeader('Content-Length', contents.byteLength);
             res.end(contents);
