@@ -9,7 +9,7 @@ sprites, plus a modern React web UI and a CLI built on top of it.
 - **Package manager**: pnpm (workspaces)
 - **Web**: React 18 + Vite + Tailwind CSS v4 + shadcn/ui
 - **State**: useState/useReducer first; Zustand only when needed
-- **Deployment**: Cloudflare Pages (static SPA)
+- **Deployment**: Vercel (static SPA)
 
 ## Hard rules (do not violate)
 

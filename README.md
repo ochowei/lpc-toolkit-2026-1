@@ -28,7 +28,7 @@ The core composition pipeline and the web UI are fully working and tested. The C
 - **Package manager**: pnpm (workspaces) — do not switch to npm/yarn/bun
 - **Tests**: Vitest
 - **Web**: React 18 + Vite + Tailwind CSS v4 + shadcn-style UI
-- **Deployment**: Cloudflare Pages (static SPA)
+- **Deployment**: Vercel (static SPA)
 
 ## Layout
 
