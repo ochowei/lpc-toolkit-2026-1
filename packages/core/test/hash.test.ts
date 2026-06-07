@@ -20,7 +20,7 @@ import type {
 } from '../src/types.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const upstreamBase = path.join(here, '../../../upstream');
+const upstreamBase = path.join(here, '../../../assets');
 
 function realPalettes(): PaletteMetadata {
   const records: Record<FilePath, unknown> = {};

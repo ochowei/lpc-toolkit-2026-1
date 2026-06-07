@@ -68,6 +68,11 @@ interface UpstreamCanvasRenderer {
   readonly getCanvas: () => UpstreamCanvasResult;
 }
 
+interface UpstreamImageTracker {
+  readonly pending: number;
+  readonly version: number;
+}
+
 const UPSTREAM_BASE_URL = 'http://127.0.0.1:5174';
 const UPSTREAM_METADATA_ROUTE =
   /^http:\/\/127\.0\.0\.1:5174\/(?:index|item|layers)-metadata\.js$/;
@@ -76,11 +81,12 @@ const UPSTREAM_METADATA_ROUTE =
 export async function openToolkitCase(
   context: BrowserContext,
   hash: string,
+  assetSource: 'local' | 'zip' = 'local',
 ): Promise<ToolkitCase> {
   const page = await context.newPage();
   const errors = attachConsoleCollector(page);
 
-  await page.goto(`/?assetSource=local&e2eProbe=1#${hash}`);
+  await page.goto(`/?assetSource=${assetSource}&e2eProbe=1#${hash}`);
   await expect
     .poll(
       () =>
@@ -175,6 +181,49 @@ export async function openUpstreamCase(
         }
       }
     });
+
+    let pendingImages = 0;
+    let trackerVersion = 0;
+    const imageSrc = Object.getOwnPropertyDescriptor(
+      HTMLImageElement.prototype,
+      'src',
+    );
+
+    if (imageSrc?.set && imageSrc.get) {
+      Object.defineProperty(window, '__LPC_UPSTREAM_IMAGE_TRACKER__', {
+        configurable: true,
+        value: {
+          get pending() {
+            return pendingImages;
+          },
+          get version() {
+            return trackerVersion;
+          },
+        },
+      });
+
+      Object.defineProperty(HTMLImageElement.prototype, 'src', {
+        configurable: true,
+        enumerable: imageSrc.enumerable ?? true,
+        get: imageSrc.get,
+        set(value: string) {
+          if (value) {
+            pendingImages += 1;
+            trackerVersion += 1;
+            let settled = false;
+            const settle = () => {
+              if (settled) return;
+              settled = true;
+              pendingImages = Math.max(0, pendingImages - 1);
+              trackerVersion += 1;
+            };
+            this.addEventListener('load', settle, { once: true });
+            this.addEventListener('error', settle, { once: true });
+          }
+          imageSrc.set!.call(this, value);
+        },
+      });
+    }
   });
   await page.goto(`${UPSTREAM_BASE_URL}/?debug=false#${hash}`);
   await expect
@@ -197,7 +246,8 @@ export async function openUpstreamCase(
 
   // Wait for the upstream Mithril rendering busy overlay to disappear and settle
   await page.locator('.preview-canvas-busy').waitFor({ state: 'detached', timeout: 10000 }).catch(() => {});
-  await page.waitForTimeout(3000);
+  await waitForUpstreamImagesIdle(page, hash);
+  await waitForUpstreamCanvasStable(page, hash);
 
   const snapshot = await page.evaluate(() => {
     const win = window as Window & {
@@ -241,6 +291,85 @@ export async function openUpstreamCase(
   });
 
   return { page, errors, snapshot };
+}
+
+async function waitForUpstreamImagesIdle(page: Page, hash: string): Promise<void> {
+  let lastVersion = -1;
+  let stablePolls = 0;
+
+  await expect
+    .poll(
+      async () => {
+        const tracker = await page.evaluate(() => {
+          const win = window as Window & {
+            __LPC_UPSTREAM_IMAGE_TRACKER__?: UpstreamImageTracker;
+          };
+          return win.__LPC_UPSTREAM_IMAGE_TRACKER__ ?? null;
+        });
+
+        if (!tracker) return 'missing-tracker';
+        if (tracker.pending !== 0) {
+          lastVersion = tracker.version;
+          stablePolls = 0;
+          return `pending:${tracker.pending}`;
+        }
+        if (tracker.version !== lastVersion) {
+          lastVersion = tracker.version;
+          stablePolls = 0;
+          return 'settling';
+        }
+        stablePolls += 1;
+        return stablePolls >= 2 ? 'idle' : 'settling';
+      },
+      {
+        timeout: 60_000,
+        message: `upstream images did not become idle for hash: ${hash}`,
+      },
+    )
+    .toBe('idle');
+}
+
+async function waitForUpstreamCanvasStable(page: Page, hash: string): Promise<void> {
+  let previousSignature = '';
+  let stablePolls = 0;
+
+  await expect
+    .poll(
+      async () => {
+        const signature = await page.evaluate(() => {
+          const win = window as Window & {
+            canvasRenderer?: UpstreamCanvasRenderer;
+          };
+          const canvasResult = win.canvasRenderer?.getCanvas();
+          if (!canvasResult?.isOk() || !canvasResult.value) return 'missing-canvas';
+
+          const canvas = canvasResult.value;
+          const context2d = canvas.getContext('2d');
+          if (!context2d) return 'missing-context';
+
+          const sampleY = Math.max(0, Math.floor(canvas.height * 0.84));
+          const sample = context2d.getImageData(0, sampleY, canvas.width, 1).data;
+          let checksum = 0;
+          for (let i = 0; i < sample.length; i += 16) {
+            checksum = (checksum + sample[i]! * 3 + sample[i + 1]! * 5 + sample[i + 2]! * 7 + sample[i + 3]! * 11) >>> 0;
+          }
+          return `${canvas.width}x${canvas.height}:${checksum}`;
+        });
+
+        if (signature !== previousSignature) {
+          previousSignature = signature;
+          stablePolls = 0;
+          return 'settling';
+        }
+        stablePolls += 1;
+        return stablePolls >= 2 ? 'stable' : 'settling';
+      },
+      {
+        timeout: 60_000,
+        message: `upstream canvas did not stabilize for hash: ${hash}`,
+      },
+    )
+    .toBe('stable');
 }
 
 async function routeUpstreamMetadata(page: Page): Promise<void> {

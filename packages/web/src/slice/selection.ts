@@ -4,12 +4,14 @@ import {
   type Catalog,
   type Direction,
   type ItemDefinition,
+  type PaletteMetadata,
   type Selection,
   type Selections,
   type TypeName,
 } from '@lpc-toolkit/core';
 import type { CatalogTreeItem } from './catalog-tree';
 import { CATEGORY_GROUPS } from './category-groups';
+import { pickDefaults } from './color-options';
 
 /** Preview zoom bounds used by the reducer and preview controls. */
 export const MIN_ZOOM = 1;
@@ -137,11 +139,13 @@ export function toSelections(state: SliceState): Selections {
 export function selectionForItem(
   typeName: TypeName,
   item: ItemDefinition,
+  palettes?: PaletteMetadata,
 ): Selection {
   return {
     typeName,
     name: item.name,
-    ...(item.variants?.[0] ? { variant: item.variants[0] } : {}),
+    ...(palettes ? pickDefaults(item, palettes) : {}),
+    ...(!palettes && item.variants?.[0] ? { variant: item.variants[0] } : {}),
   };
 }
 

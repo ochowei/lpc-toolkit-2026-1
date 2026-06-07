@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import type { Catalog } from '@lpc-toolkit/core';
+import type { Catalog, PaletteMetadata } from '@lpc-toolkit/core';
 import type { SliceState, SliceAction } from '../../slice/selection';
 import type { Translator } from '../../i18n';
 import { pickRandomOutfit } from '../../slice/random-outfit';
@@ -8,6 +8,7 @@ import { ResetMenuPopover } from './popovers/reset-menu-popover';
 
 interface Props {
   catalog: Catalog;
+  palettes: PaletteMetadata;
   state: SliceState;
   dispatch: (a: SliceAction) => void;
   t: Translator;
@@ -16,7 +17,7 @@ interface Props {
 }
 
 /** Toolbar for random outfits, curated presets, and reset actions. */
-export function PresetBar({ catalog, state, dispatch, t, onApplied, onReset }: Props) {
+export function PresetBar({ catalog, palettes, state, dispatch, t, onApplied, onReset }: Props) {
   const [presetOpen, setPresetOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const presetTriggerRef = useRef<HTMLButtonElement>(null);
@@ -30,7 +31,11 @@ export function PresetBar({ catalog, state, dispatch, t, onApplied, onReset }: P
           onClick={() =>
             dispatch({
               type: 'apply_selections',
-              selections: pickRandomOutfit({ catalog, bodyType: state.bodyType }),
+              selections: pickRandomOutfit({
+                catalog,
+                palettes,
+                bodyType: state.bodyType,
+              }),
             })
           }
           title={t('randomize.title')}

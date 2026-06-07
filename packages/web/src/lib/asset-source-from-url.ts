@@ -1,6 +1,6 @@
 import type { AssetSource } from '../adapter/asset-source';
 
-const VALID_VALUES: readonly AssetSource[] = ['auto', 'local', 'upstream'];
+const VALID_VALUES: readonly AssetSource[] = ['auto', 'local', 'upstream', 'zip'];
 
 /**
  * Parse a URL search-string and return the validated `assetSource` value
@@ -20,5 +20,5 @@ export function defaultAssetSourceFromUrl(
   search: string,
   isDev: boolean,
 ): AssetSource {
-  return assetSourceFromUrl(search) ?? (isDev ? 'local' : 'auto');
+  return assetSourceFromUrl(search) ?? (isDev ? 'local' : 'zip');
 }

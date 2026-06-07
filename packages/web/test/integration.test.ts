@@ -23,7 +23,8 @@ import { pickInitialSelections, toSelections } from '../src/slice/selection';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../../..');
-const sheetDefsDir = path.join(repoRoot, 'upstream/sheet_definitions');
+const sheetDefsDir = path.join(repoRoot, 'assets/sheet_definitions');
+const publicZips = path.join(here, '../public/zips');
 const publicSprites = path.join(here, '../public/spritesheets');
 
 function walkJson(dir: string, base = dir): Record<FilePath, ItemDefinition> {
@@ -64,6 +65,7 @@ function nodeAdapter(): CanvasAdapter {
 }
 
 const haveUpstream = existsSync(sheetDefsDir);
+const haveZips = existsSync(publicZips);
 const haveSprites = existsSync(publicSprites);
 
 describe.runIf(haveUpstream)('pickInitialSelections determinism', () => {
@@ -83,7 +85,13 @@ describe.runIf(haveUpstream)('pickInitialSelections determinism', () => {
   });
 });
 
-describe.runIf(haveUpstream && haveSprites)('core pipeline (real assets)', () => {
+describe.runIf(haveUpstream && haveZips)('release ZIP assets', () => {
+  it('materializes runtime ZIPs for the production asset source', () => {
+    expect(existsSync(path.join(publicZips, 'body.zip'))).toBe(true);
+  });
+});
+
+describe.runIf(haveUpstream && haveSprites)('core pipeline (legacy local sprites)', () => {
   it('composes, extracts, and attributes the initial outfit', async () => {
     const { catalog } = createCatalog(sortedRecords(walkJson(sheetDefsDir)));
     const { state } = pickInitialSelections(catalog);
@@ -115,8 +123,10 @@ describe.runIf(haveUpstream && haveSprites)('core pipeline (real assets)', () =>
 
 it('fails loudly if assets are missing', () => {
   if (!haveUpstream)
-    throw new Error('upstream/ not initialized — run git submodule update --init');
+    throw new Error('assets/ not found. Run pnpm --filter @lpc-toolkit/web prepare-assets.');
+  if (!haveZips)
+    throw new Error('public/zips missing. Run pnpm --filter @lpc-toolkit/web prepare-assets.');
   if (!haveSprites)
-    throw new Error('public/spritesheets missing — run pnpm --filter @lpc-toolkit/web copy-sprites');
+    return;
   expect(true).toBe(true);
 });

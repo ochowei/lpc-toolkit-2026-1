@@ -1,0 +1,9 @@
+{
+  "tag": "assets-v2026.06.05-initial",
+  "sourceRepository": "ochowei/Universal-LPC-Spritesheet-Character-Generator",
+  "sourceSha": "212abfd21493e9957bd556250ac538fa40fe1fc9",
+  "manifestUrl": "https://github.com/ochowei/Universal-LPC-Spritesheet-Character-Generator/releases/download/assets-v2026.06.05-initial/asset-manifest.json",
+  "manifestSha256": "1cce0f4a5fd9b7ac72ae732f04bda39cf9096518ad067ad6009757fe83b9e72c",
+  "tarballUrl": "https://github.com/ochowei/Universal-LPC-Spritesheet-Character-Generator/releases/download/assets-v2026.06.05-initial/lpc-runtime-zips.tar.gz",
+  "tarballSha256": "dd603191c7185323013153b9b35f8d9b4987637d15d7e3195b9d320d9fbac6e7"
+}

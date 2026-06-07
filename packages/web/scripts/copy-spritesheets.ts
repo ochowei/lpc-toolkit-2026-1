@@ -1,12 +1,12 @@
 /**
- * Copies the spritesheet PNG subset the slice needs from the read-only
- * `upstream/` submodule into packages/web/public/spritesheets/.
+ * Copies the spritesheet PNG subset the slice needs from the local
+ * `assets/` directory into packages/web/public/spritesheets/.
  *
  *  - Pass B (layer switching): every item of each shown type-name at the
  *    default body type.
  *  - Pass A (body-type switching): the initial outfit across all BODY_TYPES.
  *
- * upstream/ is never written. Idempotent: clears the target subtree first.
+ * assets/ is never written. Idempotent: clears the target subtree first.
  */
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import path from 'node:path';
@@ -27,13 +27,13 @@ import { dirsForSelections } from '../src/slice/sprite-dirs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../../..');
-const sheetDefsDir = path.join(repoRoot, 'upstream/sheet_definitions');
-const spritesSrc = path.join(repoRoot, 'upstream/spritesheets');
+const sheetDefsDir = path.join(repoRoot, 'assets/sheet_definitions');
+const spritesSrc = path.join(repoRoot, 'assets/spritesheets');
 const spritesDest = path.join(here, '../public/spritesheets');
 
 if (!existsSync(sheetDefsDir) || !existsSync(spritesSrc)) {
   console.error(
-    '[copy-sprites] upstream/ not initialized. Run: git submodule update --init',
+    '[copy-sprites] assets/ not found. Run copy commands first.',
   );
   process.exit(1);
 }

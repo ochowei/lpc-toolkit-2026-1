@@ -21,6 +21,9 @@ export const TRANSLATIONS = {
     'assetSource.localHelp': 'Uses only bundled images from this app.',
     'assetSource.upstreamHelp':
       'Loads images from the upstream GitHub Pages project.',
+    'assetSource.zip': 'ZIP Archive',
+    'assetSource.zipHelp':
+      'Loads all assets on-demand from local category ZIP archives.',
     'picker.licenseFilter': 'License filter',
     'picker.allLicenses': 'All licenses',
     'picker.current': 'current',
@@ -180,6 +183,8 @@ export const TRANSLATIONS = {
     'assetSource.autoHelp': '優先使用本地打包圖片，缺圖時改用上游。',
     'assetSource.localHelp': '只使用此 app 內打包的圖片。',
     'assetSource.upstreamHelp': '從上游 GitHub Pages 專案載入圖片。',
+    'assetSource.zip': 'ZIP 壓縮包',
+    'assetSource.zipHelp': '按需從本地的分類 ZIP 檔案中動態載入（完全本地化）。',
     'picker.licenseFilter': '授權篩選',
     'picker.allLicenses': '所有授權',
     'picker.current': '目前選取',

@@ -94,7 +94,7 @@ describe('groupForType', () => {
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../../..');
-const sheetDefsDir = path.join(repoRoot, 'upstream/sheet_definitions');
+const sheetDefsDir = path.join(repoRoot, 'assets/sheet_definitions');
 
 function readCatalogTypeNames(): Set<string> {
   const out = new Set<string>();

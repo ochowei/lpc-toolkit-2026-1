@@ -2,12 +2,12 @@
  * Enumerates the catalog-derived picker strings that need Traditional
  * Chinese translations, and (re)generates packages/web/src/i18n-item-names.ts.
  *
- * Reads the read-only upstream/ submodule; upstream/ is never written.
+ * Reads the local assets/ directory; assets/ is never written.
  * Re-running is merge-safe: existing translations are preserved and any new
  * asset names are appended with an identity value, so this also serves as a
- * maintenance check when upstream adds assets. Note: if upstream renames an
- * asset, its old translation is dropped and the new name appears untranslated
- * — watch the `untranslated` count after an upstream bump.
+ * maintenance check when local assets are updated. Note: if an asset is renamed,
+ * its old translation is dropped and the new name appears untranslated
+ * — watch the `untranslated` count after an assets update.
  *
  * Run: pnpm --filter @lpc-toolkit/web gen-i18n
  */
@@ -22,12 +22,12 @@ import {
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../../..');
-const sheetDefsDir = path.join(repoRoot, 'upstream/sheet_definitions');
+const sheetDefsDir = path.join(repoRoot, 'assets/sheet_definitions');
 const outFile = path.join(here, '../src/i18n-item-names.ts');
 
 if (!existsSync(sheetDefsDir)) {
   console.error(
-    '[gen-i18n] upstream/ not initialized. Run: git submodule update --init',
+    '[gen-i18n] assets/sheet_definitions not found.',
   );
   process.exit(1);
 }

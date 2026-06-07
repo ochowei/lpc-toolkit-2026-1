@@ -6,7 +6,7 @@ import { createCatalog } from '../src/catalog.js';
 import type { FilePath, ItemDefinition } from '../src/types.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const upstreamRoot = path.join(here, '../../../upstream/sheet_definitions');
+const upstreamRoot = path.join(here, '../../../assets/sheet_definitions');
 
 function loadFixture(relPath: FilePath): ItemDefinition {
   const full = path.join(upstreamRoot, relPath);

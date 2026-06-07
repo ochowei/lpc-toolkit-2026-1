@@ -12,7 +12,7 @@ import { CLOTHING_TYPES, PRESETS } from '../src/presets';
 import { TRANSLATIONS } from '../src/i18n';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const sheetDefsDir = path.resolve(here, '../../../upstream/sheet_definitions');
+const sheetDefsDir = path.resolve(here, '../../../assets/sheet_definitions');
 const haveUpstream = existsSync(sheetDefsDir);
 
 function walkJson(dir: string, base = dir): Record<FilePath, ItemDefinition> {

@@ -27,10 +27,10 @@ describe('recordsToCatalog', () => {
 });
 
 describe('normalizeUpstreamKey', () => {
-  it('strips the vite glob prefix preceding upstream/sheet_definitions/', () => {
+  it('strips the vite glob prefix preceding assets/sheet_definitions/', () => {
     expect(
       normalizeUpstreamKey(
-        '../../../../upstream/sheet_definitions/headwear/hats/magic/hat_magic_large.json',
+        '../../../../assets/sheet_definitions/headwear/hats/magic/hat_magic_large.json',
       ),
     ).toBe('headwear/hats/magic/hat_magic_large.json');
   });
