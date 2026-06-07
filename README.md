@@ -1,8 +1,8 @@
 # lpc-toolkit
 
 A monorepo providing an **environment-agnostic core library for composing
-[LPC](https://lpc.opengameart.org/) character spritesheets**, plus a planned
-React web UI and CLI built on top of it.
+[LPC](https://lpc.opengameart.org/) character spritesheets**, plus a modern
+React web UI and a planned CLI built on top of it.
 
 LPC (Liberated Pixel Cup) art ships as many layered spritesheets — body,
 hair, clothing, weapons, expressions, and so on. The
@@ -17,27 +17,26 @@ CLI can share one engine.
 | Package             | State        | What it is                                          |
 | ------------------- | ------------ | --------------------------------------------------- |
 | `packages/core/`    | **Working**  | Pure TypeScript composition logic (catalog, compose, recolor, hash, credits) |
-| `packages/web/`     | _Foundation slice_ | React 18 + Vite + Tailwind v4 + shadcn-style UI; core integration verified locally. See `docs/superpowers/specs/2026-05-18-web-ui-foundation-slice-design.md`. |
+| `packages/web/`     | **Working**  | React 18 + Vite + Tailwind CSS v4 + shadcn-style UI with a full three-region grid desktop editor and mobile responsive layout |
 | `packages/cli/`     | _Planned_    | Node CLI                                             |
 
-The core composition pipeline is implemented and tested with Vitest. The web
-and CLI packages have not been started yet.
+The core composition pipeline and the web UI are fully working and tested. The CLI package has not been started yet.
 
 ## Stack
 
 - **Language**: TypeScript (strict mode)
 - **Package manager**: pnpm (workspaces) — do not switch to npm/yarn/bun
 - **Tests**: Vitest
-- **Web (planned)**: React 18 + Vite + Tailwind CSS + shadcn/ui
-- **Deployment (planned)**: Cloudflare Pages (static SPA)
+- **Web**: React 18 + Vite + Tailwind CSS v4 + shadcn-style UI
+- **Deployment**: Cloudflare Pages (static SPA)
 
 ## Layout
 
 ```
-upstream/          git submodule, read-only — LPC source, spritesheets,
-                   sheet_definitions, CREDITS.csv (reference material only)
+assets/            LPC art assets (spritesheets, sheet definitions, palette definitions, CREDITS.csv) migrated from upstream
+upstream/          git submodule, read-only — LPC source (reference material only)
 packages/core/     pure TypeScript composition logic (no DOM, no fs)
-packages/web/      planned React + Vite browser UI
+packages/web/      React + Vite browser UI
 packages/cli/      planned Node CLI
 ```
 
@@ -60,7 +59,7 @@ These constraints are load-bearing — see `CLAUDE.md` for the authoritative lis
 
 ## Getting started
 
-The LPC source lives in a submodule, so clone recursively:
+The LPC source references a submodule, so clone recursively:
 
 ```bash
 git clone --recurse-submodules <repo-url>
@@ -75,6 +74,14 @@ pnpm install
 pnpm typecheck   # tsc --noEmit across all packages
 pnpm test        # vitest run across all packages
 pnpm build       # tsc build across all packages
+```
+
+All core art assets (spritesheets, sheet definitions, palette definitions, and `CREDITS.csv`) have been migrated from the `upstream/` submodule into the local `assets/` folder. The submodule is now kept for reference only.
+
+To start the web UI development server locally:
+
+```bash
+pnpm --filter @lpc-toolkit/web dev
 ```
 
 ## `@lpc-toolkit/core`
@@ -149,12 +156,7 @@ Exported from `@lpc-toolkit/core` (see `API.md` for full signatures):
 
 ## Web UI design reference
 
-`packages/web/` has not been built yet, but its UI is fully designed. The
-design lives in [`reference/LPC-Tool-Web_UI/`](reference/LPC-Tool-Web_UI) as a
-self-contained, build-free React prototype (Babel-standalone in the browser,
-mock fixtures, inline styles). It is **reference material only** — the real
-`packages/web/` will be React 18 + Vite + Tailwind + shadcn/ui consuming
-`@lpc-toolkit/core`, not a port of this prototype's code.
+The web UI in `packages/web/` is fully built. Its original design and prototype live in [`reference/LPC-Tool-Web_UI/`](reference/LPC-Tool-Web_UI) as a self-contained, build-free React prototype (Babel-standalone in the browser, mock fixtures, inline styles). It serves as the **design source and reference material** — the production `packages/web/` is built with React 18 + Vite + Tailwind CSS v4 + shadcn-style UI consuming `@lpc-toolkit/core`.
 
 ### Previewing it
 

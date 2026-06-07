@@ -7,7 +7,7 @@ sprites, plus a modern React web UI and a CLI built on top of it.
 
 - **Language**: TypeScript (strict mode)
 - **Package manager**: pnpm (workspaces)
-- **Web**: React 18 + Vite + Tailwind CSS + shadcn/ui
+- **Web**: React 18 + Vite + Tailwind CSS v4 + shadcn/ui
 - **State**: useState/useReducer first; Zustand only when needed
 - **Deployment**: Cloudflare Pages (static SPA)
 
@@ -15,8 +15,8 @@ sprites, plus a modern React web UI and a CLI built on top of it.
 
 1. **`upstream/` is a git submodule, read-only.** Never modify, never
    commit changes inside it, never run `npm install` or `pnpm install`
-   inside it. It exists only as reference material and as the source
-   of `spritesheets/` and `sheet_definitions/`.
+   inside it. It is now legacy/reference, as active assets are migrated
+   to the local `assets/` folder.
 
 2. **License is GPL-3.0.** Upstream is GPL-3.0 and we inherit it.
    Do not add dependencies with incompatible licenses. When suggesting
@@ -24,7 +24,8 @@ sprites, plus a modern React web UI and a CLI built on top of it.
 
 3. **Attribution is mandatory.** Every sprite rendered by this toolkit
    must be accompanied by credit metadata derived from
-   `upstream/CREDITS.csv`. This applies to both web and cli outputs.
+   `assets/CREDITS.csv` (or the `upstream/CREDITS.csv`). This applies to
+   both web and cli outputs.
 
 4. **`packages/core/` must be environment-agnostic.** No direct use of
    `window`, `document`, `fs`, or `node-canvas`. Image loading and
