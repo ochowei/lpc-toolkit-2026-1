@@ -88,5 +88,14 @@ export default defineConfig({
       ),
     },
   },
-  server: { fs: { allow: ['../..'] } },
+  server: { 
+    fs: { allow: ['../..'] },
+    proxy: {
+      '/upstream-assets': {
+        target: 'https://liberatedpixelcup.github.io/Universal-LPC-Spritesheet-Character-Generator',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/upstream-assets/, ''),
+      },
+    },
+  },
 });

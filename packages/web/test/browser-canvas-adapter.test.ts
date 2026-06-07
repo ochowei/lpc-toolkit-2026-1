@@ -4,6 +4,7 @@ import {
   createBrowserCanvasAdapter,
   resolveSpriteUrl,
 } from '../src/adapter/browser-canvas-adapter';
+import { resolveUpstreamSpriteUrl } from '../src/adapter/asset-source';
 
 describe('resolveSpriteUrl', () => {
   it('resolves a core sprite path against the document base', () => {
@@ -50,7 +51,7 @@ describe('createBrowserCanvasAdapter', () => {
       );
       expect(fetchMock).toHaveBeenNthCalledWith(
         2,
-        'https://liberatedpixelcup.github.io/Universal-LPC-Spritesheet-Character-Generator/spritesheets/a.png',
+        resolveUpstreamSpriteUrl('spritesheets/a.png'),
       );
       expect(createImageBitmapMock).toHaveBeenCalledWith(blob);
     } finally {
