@@ -156,28 +156,21 @@ Exported from `@lpc-toolkit/core` (see `API.md` for full signatures):
 
 ## Web UI design reference
 
-The web UI in `packages/web/` is fully built. Its original design and prototype live in [`reference/v1/`](reference/v1) as a self-contained, build-free React prototype (Babel-standalone in the browser, mock fixtures, inline styles). It serves as the **design source and reference material** — the production `packages/web/` is built with React 18 + Vite + Tailwind CSS v4 + shadcn-style UI consuming `@lpc-toolkit/core`.
+The web UI in `packages/web/` is fully built. Its design and component mockup live in [`reference/v2/`](reference/v2) as a self-contained HTML file ([`LPC-Toolkit-LayerStack.html`](file:///Users/william/gitRepo/lpc-toolkit-2026-1/reference/v2/LPC-Toolkit-LayerStack.html)). It serves as the **design source and reference material** — the production `packages/web/` is built with React 18 + Vite + Tailwind CSS v4 + shadcn-style UI consuming `@lpc-toolkit/core`.
 
 ### Previewing it
 
-Open `reference/v1/index.html` in a browser (no install, no build
-step). It renders a "design canvas" of artboards: desktop (dark + light),
-mobile, required states, design tokens, and the component inventory.
+Open [LPC-Toolkit-LayerStack.html](file:///Users/william/gitRepo/lpc-toolkit-2026-1/reference/v2/LPC-Toolkit-LayerStack.html) in a browser (no install, no build step). It renders the mockup for the Layer Stack component, showcasing the styling, structure, and design system.
 
 ### Layout
 
-Desktop is a top bar over a fixed three-region grid; mobile collapses the
-three regions into four bottom tabs with the preview kept as the priority.
+Desktop is a top bar over a fixed 2-column grid; mobile collapses the view using a bottom navigation bar.
 
 | Region | Desktop | Contents |
 | ------ | ------- | -------- |
-| **Left** | `320px` | Body-type grid (6 types) · search (`⌘K`) · category accordion · item grid with pixel thumbnails · inline variant chips + recolor ramp swatches |
-| **Center** | `1fr` | Checkerboard preview canvas (`image-rendering: pixelated`) · animation tabs (12 animations) · 3×3 N/S/E/W direction pad · zoom stepper (1×/2×/4×/8×) · playback transport (play/pause, frame scrubber, FPS) |
-| **Right** | `340px` | **Attribution** panel (mandatory, never hidden) — effective-license hero card ("strictest wins") + per-layer credit rows · **Export** panel — 832×3456 PNG, current strip, animated GIF, share link |
-| **Mobile** | — | Bottom tabs: Preview · Layers · Credits · Export |
-
-Attribution being a permanent, prominent region is a direct expression of the
-mandatory-attribution hard rule, not a UI afterthought.
+| **Left** | `340px` | Category accordions · search (`⌘K`) · active layers list (re-orderable) · inline variant selectors & color ramp swatches · active license & animation filters. |
+| **Right** | `1fr` | Checkerboard preview canvas (`image-rendering: pixelated`) · playback transport & scrubber · zoom controls (fit/1×/2×/4×/8×) · collapsible attribution/export sidebar (attributions summary + licensing badge, download options). |
+| **Mobile** | — | Bottom tabs to toggle between Preview and Layers, with popovers for settings and export. |
 
 ### Required states
 
