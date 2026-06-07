@@ -37,7 +37,8 @@ sprites, plus a modern React web UI and a CLI built on top of it.
 
 ## Layout
 
-- `upstream/` — git submodule, read-only LPC source
+- `assets/` — LPC art assets (spritesheets, definitions, CREDITS.csv) migrated from upstream
+- `upstream/` — git submodule, read-only LPC source (reference material only)
 - `packages/core/` — pure TypeScript composition logic
 - `packages/web/` — React + Vite browser UI
 - `packages/cli/` — Node CLI (built later)

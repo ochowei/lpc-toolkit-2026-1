@@ -45,13 +45,13 @@ packages/cli/      planned Node CLI
 These constraints are load-bearing — see `CLAUDE.md` for the authoritative list.
 
 1. **`upstream/` is a read-only git submodule.** Never modify it, never
-   commit inside it, never run a package manager inside it. It is the source
-   of `spritesheets/` and `sheet_definitions/`.
+   commit inside it, never run a package manager inside it. It is now legacy/reference,
+   as active assets are migrated to the local `assets/` folder.
 2. **License is GPL-3.0-or-later.** Upstream is GPL-3.0 and we inherit it. New
    dependencies must be license-compatible.
 3. **Attribution is mandatory.** Every rendered sprite must carry credit
-   metadata derived from `upstream/CREDITS.csv`. `composeSelections` always
-   returns a `credits` manifest for exactly this reason.
+   metadata derived from `assets/CREDITS.csv` (or `upstream/CREDITS.csv`).
+   `composeSelections` always returns a `credits` manifest for exactly this reason.
 4. **`packages/core/` is environment-agnostic.** No `window`, `document`,
    `fs`, or `node-canvas`. Canvas creation and image loading are injected by
    the caller via a `CanvasAdapter`.
