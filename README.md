@@ -156,11 +156,11 @@ Exported from `@lpc-toolkit/core` (see `API.md` for full signatures):
 
 ## Web UI design reference
 
-The web UI in `packages/web/` is fully built. Its original design and prototype live in [`reference/LPC-Tool-Web_UI/`](reference/LPC-Tool-Web_UI) as a self-contained, build-free React prototype (Babel-standalone in the browser, mock fixtures, inline styles). It serves as the **design source and reference material** — the production `packages/web/` is built with React 18 + Vite + Tailwind CSS v4 + shadcn-style UI consuming `@lpc-toolkit/core`.
+The web UI in `packages/web/` is fully built. Its original design and prototype live in [`reference/v1/`](reference/v1) as a self-contained, build-free React prototype (Babel-standalone in the browser, mock fixtures, inline styles). It serves as the **design source and reference material** — the production `packages/web/` is built with React 18 + Vite + Tailwind CSS v4 + shadcn-style UI consuming `@lpc-toolkit/core`.
 
 ### Previewing it
 
-Open `reference/LPC-Tool-Web_UI/index.html` in a browser (no install, no build
+Open `reference/v1/index.html` in a browser (no install, no build
 step). It renders a "design canvas" of artboards: desktop (dark + light),
 mobile, required states, design tokens, and the component inventory.
 
@@ -209,8 +209,8 @@ onto (Button, Input, Accordion, Tabs, Slider, Badge, Skeleton, Sheet, Toast,
 - `CLAUDE.md` — project rules and conventions (authoritative)
 - `API.md` — full `@lpc-toolkit/core` public API surface
 - `RESEARCH.md` — read-only reconnaissance of the upstream LPC project
-- `reference/LPC-Tool-Web_UI/` — Claude-designed web UI prototype and design
-  spec for the planned `packages/web/` (see above)
+- [reference/v1/](file:///Users/william/gitRepo/lpc-toolkit-2026-1/reference/v1/) — Claude-designed web UI prototype and design spec (v1)
+- [reference/v2/](file:///Users/william/gitRepo/lpc-toolkit-2026-1/reference/v2/) — HTML design mockup and specs for the layer stack component (v2)
 
 ## License
 
