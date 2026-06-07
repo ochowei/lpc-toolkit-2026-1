@@ -204,14 +204,6 @@ each annotated with key props/states and the shadcn/ui primitive it composes
 onto (Button, Input, Accordion, Tabs, Slider, Badge, Skeleton, Sheet, Toast,
 …). See the "Component inventory" artboard for the full handoff table.
 
-## Documentation
-
-- `CLAUDE.md` — project rules and conventions (authoritative)
-- `API.md` — full `@lpc-toolkit/core` public API surface
-- `RESEARCH.md` — read-only reconnaissance of the upstream LPC project
-- [reference/v1/](file:///Users/william/gitRepo/lpc-toolkit-2026-1/reference/v1/) — Claude-designed web UI prototype and design spec (v1)
-- [reference/v2/](file:///Users/william/gitRepo/lpc-toolkit-2026-1/reference/v2/) — HTML design mockup and specs for the layer stack component (v2)
-
 ## License
 
 GPL-3.0-or-later. See `LICENSE`. This project inherits GPL-3.0 from the
