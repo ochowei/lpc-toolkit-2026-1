@@ -3,21 +3,13 @@ import type {
   CanvasLike,
   ImageLike,
 } from '@lpc-toolkit/core';
-import {
-  resolveLocalSpriteUrl,
-  resolveSpriteUrlCandidates,
-  type AssetSource,
-} from './asset-source';
 import { loadFileFromZip } from './zip-loader';
 
-/**
- * Core hands us paths like `spritesheets/body/bodies/male/walk.png` (it
- * prepends `spritesheets/` itself — see compose.ts). We serve the copied
- * subset from Vite's `public/`, so resolve relative to the document base.
- * Pure + DOM-free so it is unit-testable.
- */
-export function resolveSpriteUrl(path: string, baseHref: string): string {
-  return resolveLocalSpriteUrl(path, baseHref);
+export async function resolveSpriteUrl(
+  path: string,
+  baseHref: string,
+): Promise<string> {
+  return loadFileFromZip(path, baseHref);
 }
 
 // Chromium enforces a per-origin HTTP/1.1 limit of 6 simultaneous connections.
@@ -58,9 +50,7 @@ export function createFetchSemaphore(limit: number): FetchSemaphore {
 const sharedFetchSemaphore = createFetchSemaphore(FETCH_CONCURRENCY);
 
 /** Browser implementation of core's environment-agnostic CanvasAdapter. */
-export function createBrowserCanvasAdapter(
-  source: AssetSource = 'local',
-): CanvasAdapter {
+export function createBrowserCanvasAdapter(): CanvasAdapter {
   return {
     createCanvas(width: number, height: number): CanvasLike {
       const c = document.createElement('canvas');
@@ -69,44 +59,19 @@ export function createBrowserCanvasAdapter(
       return c as unknown as CanvasLike;
     },
     async loadImage(path: string): Promise<ImageLike> {
-      if (source === 'zip') {
-        const url = await loadFileFromZip(path, document.baseURI);
-        const release = await sharedFetchSemaphore.acquire();
-        try {
-          const res = await fetch(url);
-          if (!res.ok) {
-            throw new Error(`Failed to fetch local blob URL: ${url} (HTTP ${res.status})`);
-          }
-          const blob = await res.blob();
-          return (await createImageBitmap(blob)) as unknown as ImageLike;
-        } finally {
-          URL.revokeObjectURL(url); // Clean up Blob URL to prevent memory leak
-          release();
+      const url = await loadFileFromZip(path, document.baseURI);
+      const release = await sharedFetchSemaphore.acquire();
+      try {
+        const res = await fetch(url);
+        if (!res.ok) {
+          throw new Error(`Failed to fetch local blob URL: ${url} (HTTP ${res.status})`);
         }
+        const blob = await res.blob();
+        return (await createImageBitmap(blob)) as unknown as ImageLike;
+      } finally {
+        URL.revokeObjectURL(url);
+        release();
       }
-
-      const urls = resolveSpriteUrlCandidates(path, document.baseURI, source);
-      const errors: string[] = [];
-
-      for (const url of urls) {
-        const release = await sharedFetchSemaphore.acquire();
-        try {
-          const res = await fetch(url);
-          if (!res.ok) {
-            errors.push(`${url}: HTTP ${res.status}`);
-            continue;
-          }
-          const blob = await res.blob();
-          return (await createImageBitmap(blob)) as unknown as ImageLike;
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          errors.push(`${url}: ${message}`);
-        } finally {
-          release();
-        }
-      }
-
-      throw new Error(`loadImage failed for ${path}: ${errors.join('; ')}`);
     },
   };
 }

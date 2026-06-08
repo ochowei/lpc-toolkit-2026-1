@@ -6,10 +6,7 @@ const RANDOM_CLICKS = 20;
 test('clicking random 20 times produces no console errors', async ({ page }) => {
   const errors = attachConsoleCollector(page);
 
-  // Force assetSource=local: avoids the auto-fallback to liberatedpixelcup.github.io
-  // (CORS-rejected fetches add ~24k noise events). See docs/superpowers/specs/
-  // 2026-05-28-e2e-noise-cleanup-design.md §3.1.
-  await page.goto('/?assetSource=local');
+  await page.goto('/?assetSource=zip');
 
   const randomBtn = page.getByTitle('Randomize outfit');
   await expect(randomBtn).toBeVisible({ timeout: 30_000 });

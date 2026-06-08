@@ -30,15 +30,9 @@ describe('i18n', () => {
     expect(en('controls.play')).toBe('Play');
     expect(en('direction.left')).toBe('Left');
     expect(en('language.toChinese')).toBe('中文');
-    expect(en('assetSource.title')).toBe('Sprite source');
-    expect(en('assetSource.auto')).toBe('Auto');
-    expect(en('assetSource.upstream')).toBe('Upstream');
     expect(zh('controls.play')).toBe('播放');
     expect(zh('direction.left')).toBe('左');
     expect(zh('language.toEnglish')).toBe('English');
-    expect(zh('assetSource.title')).toBe('圖片來源');
-    expect(zh('assetSource.auto')).toBe('自動');
-    expect(zh('assetSource.upstream')).toBe('上游');
 
     expect(en('picker.common')).toBe('Common');
     expect(en('picker.advanced')).toBe('Advanced: all upstream assets');

@@ -14,7 +14,6 @@ import {
   type TypeName,
 } from '@lpc-toolkit/core';
 import { createBrowserCanvasAdapter } from '../adapter/browser-canvas-adapter';
-import type { AssetSource } from '../adapter/asset-source';
 import { frameRect } from '../slice/frame-rect';
 import { cacheGet, cacheSet, makeCacheKey } from './thumbnail-cache';
 
@@ -28,7 +27,6 @@ export interface UseItemThumbnailArgs {
   readonly size: number;
   readonly catalog: Catalog;
   readonly palettes: PaletteMetadata;
-  readonly assetSource: AssetSource;
 }
 
 /** Thumbnail canvas and load status returned to layer-picker rows. */
@@ -128,7 +126,7 @@ export function useItemThumbnail(args: UseItemThumbnailArgs): UseItemThumbnailRe
     const reqId = ++reqIdRef.current;
     setState({ canvas: null, status: 'loading' });
 
-    const adapter = createBrowserCanvasAdapter(args.assetSource);
+    const adapter = createBrowserCanvasAdapter();
     const def = findItemDef(args.catalog, args.typeName, args.name);
     const siblings = def
       ? siblingSelectionsFor(def, args.bodyType)
@@ -190,7 +188,7 @@ export function useItemThumbnail(args: UseItemThumbnailArgs): UseItemThumbnailRe
         if (reqId !== reqIdRef.current) return;
         setState({ canvas: null, status: 'error' });
       });
-  }, [key, args.catalog, args.palettes, args.assetSource]);
+  }, [key, args.catalog, args.palettes]);
 
   return state;
 }

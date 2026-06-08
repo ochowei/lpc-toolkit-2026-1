@@ -4,7 +4,6 @@ import type {
   PaletteMetadata,
   TypeName,
 } from '@lpc-toolkit/core';
-import type { AssetSource } from '../../adapter/asset-source';
 import { useItemThumbnail } from '../../hooks/use-item-thumbnail';
 
 interface Props {
@@ -16,16 +15,15 @@ interface Props {
   bodyType: BodyType;
   catalog: Catalog;
   palettes: PaletteMetadata;
-  assetSource: AssetSource;
 }
 
 /** Tiny rendered preview for an item row, backed by the thumbnail hook/cache. */
 export function ItemThumbnail({
   typeName, name, variant, recolor, size,
-  bodyType, catalog, palettes, assetSource,
+  bodyType, catalog, palettes,
 }: Props) {
   const { canvas, status } = useItemThumbnail({
-    typeName, name, size, bodyType, catalog, palettes, assetSource,
+    typeName, name, size, bodyType, catalog, palettes,
     ...(variant !== undefined ? { variant } : {}),
     ...(recolor !== undefined ? { recolor } : {}),
   });

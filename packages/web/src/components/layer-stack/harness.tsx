@@ -20,7 +20,6 @@ import type {
 import { useUrlHashSync } from '../../lib/url-hash-sync';
 import type { SliceState, SliceAction } from '../../slice/selection';
 import type { Locale, Translator, LabelTranslator } from '../../i18n';
-import type { AssetSource } from '../../adapter/asset-source';
 import {
   ALL_LICENSE_GROUPS,
   incompatibleTypeNamesFor,
@@ -95,10 +94,8 @@ export interface LayerStackHarnessProps {
   dispatch: (a: SliceAction) => void;
   theme: 'dark' | 'light';
   locale: Locale;
-  assetSource: AssetSource;
   t: Translator;
   tl: LabelTranslator;
-  onAssetSourceChange: (source: AssetSource) => void;
   onReset: (scopes: { outfit: boolean; view: boolean }) => void;
   onToggleTheme: () => void;
   onToggleLocale: () => void;
@@ -191,7 +188,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
 
   const composeSingleItem = useCallback(
     async (singleSelections: Selections, onlyLayerNumber?: number) => {
-      const adapter = createBrowserCanvasAdapter(props.assetSource);
+      const adapter = createBrowserCanvasAdapter();
       return composeSelections(singleSelections, {
         catalog: props.catalog,
         adapter,
@@ -204,7 +201,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
         ),
       });
     },
-    [props.catalog, props.palettes, props.assetSource],
+    [props.catalog, props.palettes],
   );
 
   const clearCustomOverlay = useCallback(() => {
@@ -273,7 +270,6 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     props.catalog,
     props.palettes,
     props.state,
-    props.assetSource,
     reloadCounter,
     customOverlay,
   );
@@ -425,8 +421,6 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
       toggleAnimation={toggleAnimation}
       animationIncompatibleCount={animationIncompatibleCount}
       removeAnimationIncompatibleSelections={removeAnimationIncompatibleSelections}
-      assetSource={props.assetSource}
-      setAssetSource={props.onAssetSourceChange}
       customOverlay={customOverlay}
       customOverlayZPos={customOverlayZPos}
       onCustomOverlayUpload={handleCustomOverlayUpload}
@@ -519,7 +513,6 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
           anim={props.state.anim}
           selections={toSelections(props.state)}
           catalog={props.catalog}
-          assetSource={props.assetSource}
           composeSingleItem={composeSingleItem}
           composeSingleItemLayer={composeSingleItem}
           customOverlay={customOverlay}

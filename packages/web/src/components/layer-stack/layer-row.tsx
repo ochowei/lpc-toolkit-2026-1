@@ -7,7 +7,6 @@ import { itemMatchesLicenseFilter, type LicenseFilter } from '../../slice/licens
 import { itemMatchesAnimationFilter, type AnimationFilter } from '../../slice/animation-filter';
 import { ColorPicker } from '../color-picker';
 import { ItemThumbnail } from './item-thumbnail';
-import type { AssetSource } from '../../adapter/asset-source';
 
 interface Props {
   typeName: TypeName;
@@ -19,13 +18,12 @@ interface Props {
   t: Translator;
   licenseFilter: LicenseFilter;
   animationFilter: AnimationFilter;
-  assetSource: AssetSource;
   expanded: boolean;
   onToggle: () => void;
 }
 
 /** Active layer row with thumbnail, color controls, and compatible replacement items. */
-export function LayerRow({ typeName, catalog, palettes, state, dispatch, tl, t, licenseFilter, animationFilter, assetSource, expanded, onToggle }: Props) {
+export function LayerRow({ typeName, catalog, palettes, state, dispatch, tl, t, licenseFilter, animationFilter, expanded, onToggle }: Props) {
   const selection = state.selections[typeName];
   if (!selection) return null;
 
@@ -52,7 +50,6 @@ export function LayerRow({ typeName, catalog, palettes, state, dispatch, tl, t, 
             bodyType={state.bodyType}
             catalog={catalog}
             palettes={palettes}
-            assetSource={assetSource}
             {...(selection.variant !== undefined ? { variant: selection.variant } : {})}
             {...(selection.recolor !== undefined ? { recolor: selection.recolor } : {})}
           />
@@ -160,7 +157,6 @@ export function LayerRow({ typeName, catalog, palettes, state, dispatch, tl, t, 
                       bodyType={state.bodyType}
                       catalog={catalog}
                       palettes={palettes}
-                      assetSource={assetSource}
                     />
                     <span className="max-w-full truncate">{it.name}</span>
                     {exceeds && supports && (
