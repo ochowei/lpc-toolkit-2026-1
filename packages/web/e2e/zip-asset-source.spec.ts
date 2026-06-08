@@ -23,10 +23,15 @@ test.describe('ZIP asset source', () => {
       ).toBe(0);
       expect(result.snapshot.status).toBe('ready');
       expect(result.snapshot.layers.length).toBeGreaterThan(0);
+      const content = summarizeRgbaContent(result.snapshot.rgba);
       expect(
-        `${result.snapshot.rgba.width}x${result.snapshot.rgba.height}`,
-        diagnostic(result.snapshot),
-      ).not.toBe('0x0');
+        content.byteLength,
+        diagnostic(result.snapshot, content),
+      ).toBe(content.expectedByteLength);
+      expect(
+        content.visiblePixelCount,
+        diagnostic(result.snapshot, content),
+      ).toBeGreaterThan(0);
     } finally {
       await result.page.close();
     }
@@ -56,11 +61,48 @@ function significantErrors(
   );
 }
 
-function diagnostic(snapshot: ToolkitProbeSnapshot): string {
+interface RgbaContentSummary {
+  readonly byteLength: number;
+  readonly expectedByteLength: number;
+  readonly visiblePixelCount: number;
+  readonly maxAlpha: number;
+}
+
+function summarizeRgbaContent(
+  rgba: ToolkitProbeSnapshot['rgba'],
+): RgbaContentSummary {
+  const bytes = Buffer.from(rgba.dataBase64, 'base64');
+  let visiblePixelCount = 0;
+  let maxAlpha = 0;
+
+  for (let alphaIndex = 3; alphaIndex < bytes.length; alphaIndex += 4) {
+    const alpha = bytes[alphaIndex] ?? 0;
+    if (alpha > 0) {
+      visiblePixelCount += 1;
+      maxAlpha = Math.max(maxAlpha, alpha);
+    }
+  }
+
+  return {
+    byteLength: bytes.length,
+    expectedByteLength: rgba.width * rgba.height * 4,
+    visiblePixelCount,
+    maxAlpha,
+  };
+}
+
+function diagnostic(
+  snapshot: ToolkitProbeSnapshot,
+  content: RgbaContentSummary,
+): string {
   return [
     `case=${OBSERVED_REGRESSION_CASE.name}`,
     `hash=${OBSERVED_REGRESSION_CASE.hash}`,
     `status=${snapshot.status}`,
+    `dimensions=${snapshot.rgba.width}x${snapshot.rgba.height}`,
+    `rgbaBytes=${content.byteLength}/${content.expectedByteLength}`,
+    `visiblePixels=${content.visiblePixelCount}`,
+    `maxAlpha=${content.maxAlpha}`,
     `layers=${JSON.stringify(snapshot.layers)}`,
   ].join('\n');
 }
