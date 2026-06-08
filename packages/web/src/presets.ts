@@ -8,6 +8,8 @@ export interface PresetItem {
   readonly name: string;
   /** Color/variant; required when the catalog item declares variants. */
   readonly variant?: string;
+  /** Palette recolor; used for recolor-backed items. */
+  readonly recolor?: string;
 }
 
 /** A themed outfit the user can apply with one click. */

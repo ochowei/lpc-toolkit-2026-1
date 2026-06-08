@@ -1,5 +1,12 @@
-import type { BodyType, Catalog, Selection, TypeName } from '@lpc-toolkit/core';
+import type {
+  BodyType,
+  Catalog,
+  PaletteMetadata,
+  Selection,
+  TypeName,
+} from '@lpc-toolkit/core';
 import { itemSupportsBodyType } from './slice/catalog-tree';
+import { pickDefaults } from './slice/color-options';
 import { CLOTHING_TYPES, type Preset, type PresetItem } from './presets';
 
 /** Result of applying a clothing preset to the current character selections. */
@@ -22,6 +29,7 @@ export function computePresetSelection(
   current: Readonly<Record<TypeName, Selection>>,
   bodyType: BodyType,
   catalog: Catalog,
+  palettes: PaletteMetadata,
 ): PresetApplyResult {
   const selections: Record<TypeName, Selection> = {};
   for (const [typeName, selection] of Object.entries(current)) {
@@ -37,10 +45,17 @@ export function computePresetSelection(
       skipped.push(item);
       continue;
     }
+    const colorFields =
+      item.variant || item.recolor
+        ? {
+            ...(item.variant ? { variant: item.variant } : {}),
+            ...(item.recolor ? { recolor: item.recolor } : {}),
+          }
+        : pickDefaults(def, palettes);
     selections[item.typeName] = {
       typeName: item.typeName,
       name: item.name,
-      ...(item.variant ? { variant: item.variant } : {}),
+      ...colorFields,
     };
   }
 
