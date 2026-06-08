@@ -4,7 +4,6 @@ import type { SliceState, SliceAction } from '../../slice/selection';
 import type { Translator, LabelTranslator } from '../../i18n';
 import { type LicenseFilter } from '../../slice/license-filter';
 import { type AnimationFilter } from '../../slice/animation-filter';
-import type { AssetSource } from '../../adapter/asset-source';
 import type { CustomOverlay } from '../../lib/custom-overlay';
 import { LayerRow } from './layer-row';
 import { AddLayer } from './add-layer';
@@ -27,8 +26,6 @@ interface Props {
   toggleAnimation: (anim: AnimationName) => void;
   animationIncompatibleCount: number;
   removeAnimationIncompatibleSelections: () => void;
-  assetSource: AssetSource;
-  setAssetSource: (v: AssetSource) => void;
   customOverlay: CustomOverlay | null;
   customOverlayZPos: number;
   onCustomOverlayUpload: (file: File) => void;
@@ -59,8 +56,6 @@ export function StackPanel({
   toggleAnimation,
   animationIncompatibleCount,
   removeAnimationIncompatibleSelections,
-  assetSource,
-  setAssetSource,
   customOverlay,
   customOverlayZPos,
   onCustomOverlayUpload,
@@ -99,7 +94,6 @@ export function StackPanel({
         palettes={palettes}
         state={state}
         dispatch={dispatch}
-        assetSource={assetSource}
         shownTypeNames={shownTypeNames}
         licenseFilter={licenseFilter}
         animationFilter={animationFilter}
@@ -146,7 +140,6 @@ export function StackPanel({
               t={t}
               licenseFilter={licenseFilter}
               animationFilter={animationFilter}
-              assetSource={assetSource}
               expanded={expanded === tn}
               onToggle={() => setExpanded(expanded === tn ? null : tn)}
             />
@@ -177,8 +170,6 @@ export function StackPanel({
         toggleAnimation={toggleAnimation}
         animationIncompatibleCount={animationIncompatibleCount}
         removeAnimationIncompatibleSelections={removeAnimationIncompatibleSelections}
-        assetSource={assetSource}
-        setAssetSource={setAssetSource}
         customOverlay={customOverlay}
         customOverlayZPos={customOverlayZPos}
         onCustomOverlayUpload={onCustomOverlayUpload}

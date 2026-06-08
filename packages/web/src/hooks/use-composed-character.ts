@@ -9,7 +9,6 @@ import {
   type PaletteMetadata,
 } from '@lpc-toolkit/core';
 import { createBrowserCanvasAdapter } from '../adapter/browser-canvas-adapter';
-import type { AssetSource } from '../adapter/asset-source';
 import type { CustomOverlay } from '../lib/custom-overlay';
 import { toSelections, type SliceState } from '../slice/selection';
 
@@ -46,14 +45,10 @@ export function useComposedCharacter(
   catalog: Catalog,
   palettes: PaletteMetadata,
   state: SliceState,
-  assetSource: AssetSource,
   reloadCounter: number = 0,
   customOverlay: CustomOverlay | null = null,
 ): ComposedResult {
-  const adapter = useMemo(
-    () => createBrowserCanvasAdapter(assetSource),
-    [assetSource],
-  );
+  const adapter = useMemo(() => createBrowserCanvasAdapter(), []);
   const [result, setResult] = useState<ComposedResult>({
     status: 'idle',
     progress: 0,

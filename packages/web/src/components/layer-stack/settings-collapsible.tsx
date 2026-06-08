@@ -9,7 +9,6 @@ import {
 import { Button } from '../ui/button';
 import type { LicenseFilter } from '../../slice/license-filter';
 import type { AnimationFilter } from '../../slice/animation-filter';
-import type { AssetSource } from '../../adapter/asset-source';
 import type { Translator } from '../../i18n';
 import type { CustomOverlay } from '../../lib/custom-overlay';
 
@@ -23,8 +22,6 @@ interface Props {
   toggleAnimation: (anim: AnimationName) => void;
   animationIncompatibleCount: number;
   removeAnimationIncompatibleSelections: () => void;
-  assetSource: AssetSource;
-  setAssetSource: (v: AssetSource) => void;
   customOverlay: CustomOverlay | null;
   customOverlayZPos: number;
   onCustomOverlayUpload: (file: File) => void;
@@ -46,8 +43,6 @@ export function SettingsCollapsible({
   toggleAnimation,
   animationIncompatibleCount,
   removeAnimationIncompatibleSelections,
-  assetSource,
-  setAssetSource,
   customOverlay,
   customOverlayZPos,
   onCustomOverlayUpload,
@@ -182,25 +177,6 @@ export function SettingsCollapsible({
                 </Button>
               </div>
             )}
-          </div>
-
-          <div>
-            <div className="mb-1 text-[10px] uppercase tracking-wide text-text-mute">
-              {t('assetSource.title')}
-            </div>
-            <div className="flex gap-1">
-              {(['auto', 'local', 'upstream', 'zip'] as const).map((src) => (
-                <Button
-                  key={src}
-                  size="sm"
-                  variant={assetSource === src ? 'primary' : 'ghost'}
-                  className="flex-1 text-[11px] px-1"
-                  onClick={() => setAssetSource(src)}
-                >
-                  {t(`assetSource.${src}` as const)}
-                </Button>
-              ))}
-            </div>
           </div>
 
           <div>

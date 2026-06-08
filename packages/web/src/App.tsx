@@ -11,8 +11,6 @@ import {
   createTranslator,
   type Locale,
 } from './i18n';
-import type { AssetSource } from './adapter/asset-source';
-import { defaultAssetSourceFromUrl } from './lib/asset-source-from-url';
 import { LayerStackHarness } from './components/layer-stack/harness';
 import {
   bootstrapStateFromHash,
@@ -23,9 +21,6 @@ import {
 export default function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE);
-  const [assetSource, setAssetSource] = useState<AssetSource>(
-    () => defaultAssetSourceFromUrl(window.location.search, import.meta.env.DEV),
-  );
 
   const init = useMemo(() => {
     const catalog = loadCatalogFromUpstream();
@@ -68,10 +63,8 @@ export default function App() {
       dispatch={dispatch}
       theme={theme}
       locale={locale}
-      assetSource={assetSource}
       t={t}
       tl={tl}
-      onAssetSourceChange={setAssetSource}
       onReset={handleReset}
       onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
       onToggleLocale={() =>

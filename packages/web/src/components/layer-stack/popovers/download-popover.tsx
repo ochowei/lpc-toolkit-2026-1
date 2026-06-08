@@ -18,7 +18,6 @@ import {
   type ZipExportKind,
 } from '../../../lib/zip-export';
 import { createBrowserCanvasAdapter } from '../../../adapter/browser-canvas-adapter';
-import type { AssetSource } from '../../../adapter/asset-source';
 import type { Translator } from '../../../i18n';
 import type { ComposedResult } from '../../../hooks/use-composed-character';
 import type { CustomOverlay } from '../../../lib/custom-overlay';
@@ -45,7 +44,6 @@ interface Props {
   anim: string;
   selections: Selections;
   catalog: Catalog;
-  assetSource: AssetSource;
   composeSingleItem: (s: Selections) => Promise<ComposedSheet>;
   composeSingleItemLayer: (
     s: Selections,
@@ -66,7 +64,6 @@ export function DownloadPopover({
   anim,
   selections,
   catalog,
-  assetSource,
   composeSingleItem,
   composeSingleItemLayer,
   customOverlay,
@@ -119,7 +116,7 @@ export function DownloadPopover({
     if (!sheet) return;
     const frozenSheet = sheet;
     const frozenSelections = selections;
-    const adapter = createBrowserCanvasAdapter(assetSource);
+    const adapter = createBrowserCanvasAdapter();
     setZipRunning({ kind, progress: 0 });
     try {
       const blob = await fn({

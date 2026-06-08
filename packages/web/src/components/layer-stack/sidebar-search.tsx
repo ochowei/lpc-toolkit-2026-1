@@ -13,7 +13,6 @@ import {
   type TypeName,
 } from '@lpc-toolkit/core';
 import { pickActionForItem, type SliceState, type SliceAction } from '../../slice/selection';
-import type { AssetSource } from '../../adapter/asset-source';
 import type { LabelTranslator, Translator } from '../../i18n';
 import { itemMatchesLicenseFilter, type LicenseFilter } from '../../slice/license-filter';
 import { itemMatchesAnimationFilter, type AnimationFilter } from '../../slice/animation-filter';
@@ -31,7 +30,6 @@ interface Props {
   palettes: PaletteMetadata;
   state: SliceState;
   dispatch: (a: SliceAction) => void;
-  assetSource: AssetSource;
   shownTypeNames: TypeName[];
   licenseFilter: LicenseFilter;
   animationFilter: AnimationFilter;
@@ -47,7 +45,6 @@ export function SidebarSearch({
   palettes,
   state,
   dispatch,
-  assetSource,
   shownTypeNames,
   licenseFilter,
   animationFilter,
@@ -225,7 +222,6 @@ export function SidebarSearch({
                       bodyType={state.bodyType}
                       catalog={catalog}
                       palettes={palettes}
-                      assetSource={assetSource}
                     />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1 truncate text-[12px] font-semibold">
