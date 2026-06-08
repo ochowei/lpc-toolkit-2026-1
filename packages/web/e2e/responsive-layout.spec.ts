@@ -6,7 +6,7 @@ test.describe('responsive layout', () => {
   test('mobile opens to preview and can switch to layers', async ({ page }) => {
     const errors = attachConsoleCollector(page);
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/?assetSource=local');
+    await page.goto('/?assetSource=zip');
 
     await expect(page.getByRole('navigation', { name: 'Mobile view' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Preview' })).toHaveAttribute('aria-pressed', 'true');
@@ -30,7 +30,7 @@ test.describe('responsive layout', () => {
   test('desktop keeps the two-column editor and hides mobile nav', async ({ page }) => {
     const errors = attachConsoleCollector(page);
     await page.setViewportSize({ width: 1280, height: 900 });
-    await page.goto('/?assetSource=local');
+    await page.goto('/?assetSource=zip');
 
     await expect(page.getByRole('navigation', { name: 'Mobile view' })).toBeHidden();
     await expect(page.getByText('Your layers')).toBeVisible();
@@ -47,7 +47,7 @@ test.describe('responsive layout', () => {
   test('mobile download popover fits within the viewport', async ({ page }) => {
     const errors = attachConsoleCollector(page);
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/?assetSource=local');
+    await page.goto('/?assetSource=zip');
 
     await page.getByRole('button', { name: /Download/ }).click();
     const panel = page.getByTestId('download-popover');

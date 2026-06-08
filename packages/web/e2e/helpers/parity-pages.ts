@@ -81,12 +81,11 @@ const UPSTREAM_METADATA_ROUTE =
 export async function openToolkitCase(
   context: BrowserContext,
   hash: string,
-  assetSource: 'local' | 'zip' = 'local',
 ): Promise<ToolkitCase> {
   const page = await context.newPage();
   const errors = attachConsoleCollector(page);
 
-  await page.goto(`/?assetSource=${assetSource}&e2eProbe=1#${hash}`);
+  await page.goto(`/?assetSource=zip&e2eProbe=1#${hash}`);
   await expect
     .poll(
       () =>
