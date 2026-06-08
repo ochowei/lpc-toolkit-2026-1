@@ -10,6 +10,16 @@ beforeEach(() => {
   clearZipCacheForTests();
 });
 
+async function waitForQueuedFetches(
+  releaseControllers: ReadonlyArray<() => void>,
+): Promise<void> {
+  const maxAttempts = 100;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (releaseControllers.length > 0) return;
+    await new Promise<void>((resolve) => setTimeout(resolve, 1));
+  }
+}
+
 describe('resolveSpriteUrl', () => {
   it('resolves a core sprite path through the category ZIP archive', async () => {
     const zip = new JSZip();
@@ -142,8 +152,7 @@ describe('createBrowserCanvasAdapter', () => {
       const pending = Array.from({ length: totalRequests }, (_, i) =>
         adapter.loadImage(`spritesheets/body/img-${i}.png`),
       );
-      // Give microtasks a chance to schedule.
-      await new Promise<void>((resolve) => setTimeout(resolve, 10));
+      await waitForQueuedFetches(releaseControllers);
 
       expect(peakActive).toBeLessThanOrEqual(6);
       expect(peakActive).toBeGreaterThan(0);
@@ -222,7 +231,7 @@ describe('createBrowserCanvasAdapter', () => {
       const pending = adapters.map((adapter, i) =>
         adapter.loadImage(`spritesheets/body/img-${i}.png`),
       );
-      await new Promise<void>((resolve) => setTimeout(resolve, 10));
+      await waitForQueuedFetches(releaseControllers);
 
       expect(peakActive).toBeLessThanOrEqual(6);
       expect(peakActive).toBeGreaterThan(0);
