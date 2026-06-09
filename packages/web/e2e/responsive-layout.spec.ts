@@ -12,7 +12,7 @@ test.describe('responsive layout', () => {
     await expect(page.getByRole('button', { name: 'Preview' })).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByTestId('composition-loading-overlay')).toBeHidden({ timeout: 30_000 });
     await page.getByTitle('Reload assets').click();
-    await expect(page.getByRole('status')).toContainText('Reloaded.');
+    await expect(page.getByText('Reloaded.', { exact: true })).toBeVisible();
 
     await page.getByRole('button', { name: 'Layers' }).click();
     await expect(page.getByText('Your layers')).toBeVisible();

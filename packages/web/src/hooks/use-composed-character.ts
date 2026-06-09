@@ -21,6 +21,50 @@ export interface ComposedResult {
   readonly error: string | null;
 }
 
+export interface KeyedComposedResult {
+  readonly key: string | null;
+  readonly result: ComposedResult;
+}
+
+interface CompositionOverlayIdentity {
+  readonly objectUrl: string;
+  readonly zPos: number;
+}
+
+/** Stable identity for inputs that require rebuilding the composed sheet. */
+export function compositionInputKey(
+  state: SliceState,
+  reloadCounter: number,
+  customOverlay: CompositionOverlayIdentity | null,
+): string {
+  return JSON.stringify({
+    b: state.bodyType,
+    s: state.selections,
+    r: reloadCounter,
+    custom: customOverlay
+      ? {
+          objectUrl: customOverlay.objectUrl,
+          zPos: customOverlay.zPos,
+        }
+      : null,
+  });
+}
+
+/** Render loading synchronously until stored state belongs to the current input. */
+export function resultForCompositionKey(
+  stored: KeyedComposedResult,
+  currentKey: string,
+): ComposedResult {
+  return stored.key === currentKey
+    ? stored.result
+    : {
+        ...stored.result,
+        status: 'loading',
+        progress: 0,
+        error: null,
+      };
+}
+
 /**
  * The animation to show: the requested one if it was composed, else the
  * first composed standard animation, else 'walk' (always a valid
@@ -49,35 +93,35 @@ export function useComposedCharacter(
   customOverlay: CustomOverlay | null = null,
 ): ComposedResult {
   const adapter = useMemo(() => createBrowserCanvasAdapter(), []);
-  const [result, setResult] = useState<ComposedResult>({
-    status: 'idle',
-    progress: 0,
-    sheet: null,
-    animation: null,
-    error: null,
+  const [stored, setStored] = useState<KeyedComposedResult>({
+    key: null,
+    result: {
+      status: 'idle',
+      progress: 0,
+      sheet: null,
+      animation: null,
+      error: null,
+    },
   });
   const reqIdRef = useRef(0);
   const sheetRef = useRef<ComposedSheet | null>(null);
   const animRef = useRef(state.anim);
   animRef.current = state.anim;
 
-  const key = JSON.stringify({
-    b: state.bodyType,
-    s: state.selections,
-    r: reloadCounter,
-    custom: customOverlay
-      ? {
-          fileName: customOverlay.fileName,
-          objectUrl: customOverlay.objectUrl,
-          zPos: customOverlay.zPos,
-        }
-      : null,
-  });
+  const key = compositionInputKey(state, reloadCounter, customOverlay);
 
   useEffect(() => {
     const reqId = ++reqIdRef.current;
     const selections = toSelections(state);
-    setResult((r) => ({ ...r, status: 'loading', progress: 0, error: null }));
+    setStored((current) => ({
+      key,
+      result: {
+        ...current.result,
+        status: 'loading',
+        progress: 0,
+        error: null,
+      },
+    }));
 
     composeSelections(selections, {
       catalog,
@@ -93,9 +137,12 @@ export function useComposedCharacter(
         : {}),
       onProgress: (loaded, total) => {
         if (reqId !== reqIdRef.current) return;
-        setResult((r) => ({
-          ...r,
-          progress: total === 0 ? 1 : loaded / total,
+        setStored((current) => ({
+          key,
+          result: {
+            ...current.result,
+            progress: total === 0 ? 1 : loaded / total,
+          },
         }));
       },
     })
@@ -107,24 +154,28 @@ export function useComposedCharacter(
           resolveAnim(sheet, animRef.current),
           { adapter },
         );
-        setResult({
-          status: 'ready',
-          progress: 1,
-          sheet,
-          animation,
-          error: null,
+        setStored({
+          key,
+          result: {
+            status: 'ready',
+            progress: 1,
+            sheet,
+            animation,
+            error: null,
+          },
         });
       })
       .catch((e: unknown) => {
         if (reqId !== reqIdRef.current) return;
-        sheetRef.current = null;
-        setResult({
-          status: 'error',
-          progress: 1,
-          sheet: null,
-          animation: null,
-          error: e instanceof Error ? e.message : String(e),
-        });
+        setStored((current) => ({
+          key,
+          result: {
+            ...current.result,
+            status: 'error',
+            progress: 1,
+            error: e instanceof Error ? e.message : String(e),
+          },
+        }));
       });
     // key encodes the selection-relevant state and custom overlay identity
     // (anim handled by Effect 2).
@@ -140,10 +191,15 @@ export function useComposedCharacter(
       resolveAnim(sheet, state.anim),
       { adapter },
     );
-    setResult((r) =>
-      r.status === 'ready' && r.sheet === sheet ? { ...r, animation } : r,
+    setStored((current) =>
+      current.result.status === 'ready' && current.result.sheet === sheet
+        ? {
+            ...current,
+            result: { ...current.result, animation },
+          }
+        : current,
     );
   }, [adapter, state.anim]);
 
-  return result;
+  return resultForCompositionKey(stored, key);
 }

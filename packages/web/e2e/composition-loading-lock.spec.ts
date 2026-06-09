@@ -89,4 +89,41 @@ test.describe('composition loading lock', () => {
     await expect(page.getByTitle('Randomize outfit')).toBeEnabled();
     expect(errors).toEqual([]);
   });
+
+  test('defers Back selection until composition unlocks without replacing history', async ({ page }) => {
+    const errors = attachConsoleCollector(page);
+    await page.goto('/?e2eProbe=1');
+
+    const overlay = page.getByTestId('composition-loading-overlay');
+    await expect(overlay).toBeHidden({ timeout: 30_000 });
+
+    await page.getByRole('button', { name: 'Presets' }).click();
+    await page.getByRole('menuitem', { name: /Farmer/ }).click();
+    await expect(overlay).toBeHidden({ timeout: 30_000 });
+    const farmerUrl = page.url();
+
+    const gate = createZipGate();
+    await page.route('**/zips/*.zip', (route) => gate.handler(route));
+    await page.getByRole('button', { name: 'Presets' }).click();
+    await page.getByRole('menuitem', { name: /Mage/ }).click();
+    await gate.waitUntilBlocked();
+    const mageUrl = page.url();
+    const mageStateHash = await page.evaluate(() => window.__LPC_E2E__?.hash);
+
+    await page.evaluate(() => window.history.back());
+    await expect(page).toHaveURL(farmerUrl);
+    await expect(overlay).toBeVisible();
+    expect(await page.evaluate(() => window.__LPC_E2E__?.hash)).toBe(mageStateHash);
+
+    await gate.release();
+    await expect(overlay).toBeHidden({ timeout: 30_000 });
+    expect(await page.evaluate(() => window.__LPC_E2E__?.hash)).toBe(
+      new URL(page.url()).hash.slice(1),
+    );
+
+    await page.evaluate(() => window.history.forward());
+    await expect(page).toHaveURL(mageUrl);
+    await expect(overlay).toBeHidden({ timeout: 30_000 });
+    expect(errors).toEqual([]);
+  });
 });

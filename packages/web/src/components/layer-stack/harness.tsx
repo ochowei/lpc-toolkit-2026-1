@@ -156,33 +156,11 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   );
   const licenseIncompatibleCount = licenseIncompatibleTypeNames.length;
 
-  const removeLicenseIncompatibleSelections = useCallback(() => {
-    if (licenseIncompatibleTypeNames.length === 0) return;
-    for (const tn of licenseIncompatibleTypeNames) {
-      props.dispatch({ type: 'clear', typeName: tn });
-    }
-    setStatus({
-      kind: 'info',
-      text: t('licenseFilter.removed').replace('{n}', String(licenseIncompatibleTypeNames.length)),
-    });
-  }, [licenseIncompatibleTypeNames, props.dispatch, t]);
-
   const animationIncompatibleTypeNames = useMemo(
     () => incompatibleAnimationTypeNamesFor(props.state, props.catalog, animationFilter),
     [props.state, props.catalog, animationFilter],
   );
   const animationIncompatibleCount = animationIncompatibleTypeNames.length;
-
-  const removeAnimationIncompatibleSelections = useCallback(() => {
-    if (animationIncompatibleTypeNames.length === 0) return;
-    for (const tn of animationIncompatibleTypeNames) {
-      props.dispatch({ type: 'clear', typeName: tn });
-    }
-    setStatus({
-      kind: 'info',
-      text: t('animationFilter.removed').replace('{n}', String(animationIncompatibleTypeNames.length)),
-    });
-  }, [animationIncompatibleTypeNames, props.dispatch, t]);
 
   const attributionSummary = useMemo(
     () => summarizeAttribution(props.catalog, props.state, licenseFilter, animationFilter),
@@ -217,6 +195,30 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   const isComposing = isCompositionLocked(composeResult.status);
   const isComposingRef = useRef(isComposing);
   isComposingRef.current = isComposing;
+
+  const removeLicenseIncompatibleSelections = useCallback(() => {
+    if (isComposing) return;
+    if (licenseIncompatibleTypeNames.length === 0) return;
+    for (const tn of licenseIncompatibleTypeNames) {
+      props.dispatch({ type: 'clear', typeName: tn });
+    }
+    setStatus({
+      kind: 'info',
+      text: t('licenseFilter.removed').replace('{n}', String(licenseIncompatibleTypeNames.length)),
+    });
+  }, [isComposing, licenseIncompatibleTypeNames, props.dispatch, t]);
+
+  const removeAnimationIncompatibleSelections = useCallback(() => {
+    if (isComposing) return;
+    if (animationIncompatibleTypeNames.length === 0) return;
+    for (const tn of animationIncompatibleTypeNames) {
+      props.dispatch({ type: 'clear', typeName: tn });
+    }
+    setStatus({
+      kind: 'info',
+      text: t('animationFilter.removed').replace('{n}', String(animationIncompatibleTypeNames.length)),
+    });
+  }, [animationIncompatibleTypeNames, isComposing, props.dispatch, t]);
 
   const clearCustomOverlay = useCallback(() => {
     if (isComposing) return;

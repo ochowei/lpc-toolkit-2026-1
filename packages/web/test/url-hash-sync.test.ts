@@ -5,7 +5,7 @@ import {
   computeHashChangeAction,
   computeHashWrite,
   effectiveHash,
-  hashAfterSelectionDispatch,
+  reducePendingHashChange,
 } from '../src/lib/url-hash-sync';
 import { loadCatalogFromUpstream } from '../src/catalog/load-catalog';
 import { loadPalettesFromUpstream } from '../src/catalog/load-palettes';
@@ -180,27 +180,41 @@ describe('computeHashChangeAction', () => {
   });
 });
 
-describe('hashAfterSelectionDispatch', () => {
-  it('restores the current canonical hash when dispatch rejects the incoming selection', () => {
+describe('reducePendingHashChange', () => {
+  const incoming = {
+    selections: {
+      bodyType: 'female',
+      items: {
+        body: { typeName: 'body', name: 'Body Color', recolor: 'dark' },
+      },
+    },
+    canonicalHash: 'sex=female&body=Body_color_dark',
+  };
+
+  it('defers the incoming selection without normalizing the reached history entry', () => {
     expect(
-      hashAfterSelectionDispatch({
+      reducePendingHashChange({
         dispatchResult: false,
-        currentCanonicalHash: 'sex=male&body=Body_color_light',
-        incomingCanonicalHash: 'sex=female&body=Body_color_dark',
+        incoming,
       }),
-    ).toBe('sex=male&body=Body_color_light');
+    ).toEqual({
+      pending: incoming,
+      canonicalHashToNormalize: null,
+    });
   });
 
   it.each([true, undefined])(
-    'keeps the incoming canonical hash when dispatch returns %s',
+    'applies and normalizes the pending selection when dispatch returns %s',
     (dispatchResult) => {
       expect(
-        hashAfterSelectionDispatch({
+        reducePendingHashChange({
           dispatchResult,
-          currentCanonicalHash: 'sex=male&body=Body_color_light',
-          incomingCanonicalHash: 'sex=female&body=Body_color_dark',
+          incoming,
         }),
-      ).toBe('sex=female&body=Body_color_dark');
+      ).toEqual({
+        pending: null,
+        canonicalHashToNormalize: incoming.canonicalHash,
+      });
     },
   );
 });
