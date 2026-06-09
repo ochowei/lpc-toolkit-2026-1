@@ -178,7 +178,7 @@ export function PreviewPane({
               role="status"
               aria-live="polite"
               data-testid="composition-loading-overlay"
-              className="absolute inset-0 z-20 flex items-center justify-center bg-app/45 backdrop-blur-[1px]"
+              className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-app/45 backdrop-blur-[1px]"
             >
               <div className="flex min-w-36 flex-col items-center gap-2 rounded-md border border-border bg-surface/95 px-4 py-3 shadow-lg">
                 <span
