@@ -279,9 +279,10 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   );
   const isComposing = isCompositionLocked(composeResult.status);
   const guardedDispatch = useCallback(
-    (action: SliceAction) => {
-      if (isComposing && isCompositionChangingAction(action)) return;
+    (action: SliceAction): boolean => {
+      if (isComposing && isCompositionChangingAction(action)) return false;
       props.dispatch(action);
+      return true;
     },
     [isComposing, props.dispatch],
   );

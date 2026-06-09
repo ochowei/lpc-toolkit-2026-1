@@ -5,6 +5,7 @@ import {
   computeHashChangeAction,
   computeHashWrite,
   effectiveHash,
+  hashAfterSelectionDispatch,
 } from '../src/lib/url-hash-sync';
 import { loadCatalogFromUpstream } from '../src/catalog/load-catalog';
 import { loadPalettesFromUpstream } from '../src/catalog/load-palettes';
@@ -177,4 +178,29 @@ describe('computeHashChangeAction', () => {
     expect(Object.keys(result.selections?.items ?? {}).length).toBe(0);
     expect(result.warnings.length).toBe(1);
   });
+});
+
+describe('hashAfterSelectionDispatch', () => {
+  it('restores the current canonical hash when dispatch rejects the incoming selection', () => {
+    expect(
+      hashAfterSelectionDispatch({
+        dispatchResult: false,
+        currentCanonicalHash: 'sex=male&body=Body_color_light',
+        incomingCanonicalHash: 'sex=female&body=Body_color_dark',
+      }),
+    ).toBe('sex=male&body=Body_color_light');
+  });
+
+  it.each([true, undefined])(
+    'keeps the incoming canonical hash when dispatch returns %s',
+    (dispatchResult) => {
+      expect(
+        hashAfterSelectionDispatch({
+          dispatchResult,
+          currentCanonicalHash: 'sex=male&body=Body_color_light',
+          incomingCanonicalHash: 'sex=female&body=Body_color_dark',
+        }),
+      ).toBe('sex=female&body=Body_color_dark');
+    },
+  );
 });

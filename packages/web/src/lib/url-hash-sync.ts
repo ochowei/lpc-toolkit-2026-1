@@ -27,6 +27,17 @@ export interface HashChangeAction {
   readonly warnings: readonly HashWarning[];
 }
 
+/** Hash that should remain after attempting to dispatch incoming selections. */
+export function hashAfterSelectionDispatch(args: {
+  dispatchResult: boolean | void;
+  currentCanonicalHash: string;
+  incomingCanonicalHash: string;
+}): string {
+  return args.dispatchResult === false
+    ? args.currentCanonicalHash
+    : args.incomingCanonicalHash;
+}
+
 /** Read `window.location.hash`, stripping the leading `#`. */
 export function readWindowHash(): string {
   const h = window.location.hash;
@@ -140,7 +151,7 @@ export function computeHashChangeAction(args: {
 export function useUrlHashSync(args: {
   state: SliceState;
   defaults: SliceState;
-  dispatch: (a: SliceAction) => void;
+  dispatch: (a: SliceAction) => boolean | void;
   catalog: Catalog;
   palettes: PaletteMetadata;
   t: Translator;
@@ -219,14 +230,26 @@ export function useUrlHashSync(args: {
         return;
       }
 
-      // Normalize the URL to canonical form before dispatching, so the
-      // subsequent write effect is a no-op (no extra pushState entry for
-      // non-canonical incoming URLs).
-      const canonical = serializeHash(action.selections);
+      const incomingCanonicalHash = serializeHash(action.selections);
+      const dispatchResult = args.dispatch({
+        type: 'apply_selections',
+        selections: action.selections,
+      });
+      const canonical = hashAfterSelectionDispatch({
+        dispatchResult,
+        currentCanonicalHash: effectiveHash(
+          stateRef.current,
+          defaultsHashRef.current,
+        ),
+        incomingCanonicalHash,
+      });
       if (canonical !== readWindowHash()) {
-        window.history.replaceState(null, '', '#' + canonical);
+        const target =
+          canonical === ''
+            ? window.location.pathname + window.location.search
+            : '#' + canonical;
+        window.history.replaceState(null, '', target);
       }
-      args.dispatch({ type: 'apply_selections', selections: action.selections });
       if (action.warnings.length > 0) {
         onStatusRef.current(
           tRef.current('hashSync.skipped').replace(
