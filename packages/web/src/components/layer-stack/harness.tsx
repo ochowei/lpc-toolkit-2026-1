@@ -421,6 +421,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
 
   const stackPanel = (
     <StackPanel
+      disabled={isComposing}
       catalog={props.catalog}
       palettes={props.palettes}
       state={props.state}

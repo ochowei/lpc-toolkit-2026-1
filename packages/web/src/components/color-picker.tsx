@@ -19,12 +19,14 @@ export function ColorPicker({
   palettes,
   colorLabel,
   onSelect,
+  disabled = false,
 }: {
   item: ItemDefinition;
   selection: Selection | undefined;
   palettes: PaletteMetadata;
   colorLabel: string;
   onSelect: (change: { variant: string } | { recolor: string }) => void;
+  disabled?: boolean;
 }) {
   const colors = useMemo(
     () => getColorOptions(item, palettes),
@@ -41,10 +43,11 @@ export function ColorPicker({
               <button
                 key={opt.value}
                 type="button"
+                disabled={disabled}
                 title={opt.label}
                 aria-label={opt.label}
                 aria-pressed={opt.value === selection?.recolor}
-                className={`h-5 w-5 rounded border border-border ${
+                className={`h-5 w-5 rounded border border-border disabled:cursor-not-allowed disabled:opacity-50 ${
                   opt.value === selection?.recolor ? 'ring-2 ring-accent' : ''
                 }`}
                 style={{ backgroundColor: opt.swatch }}
@@ -55,8 +58,9 @@ export function ColorPicker({
               <button
                 key={opt.value}
                 type="button"
+                disabled={disabled}
                 aria-pressed={opt.value === selection?.variant}
-                className={`rounded border border-border px-1.5 py-0.5 text-[11px] ${
+                className={`rounded border border-border px-1.5 py-0.5 text-[11px] disabled:cursor-not-allowed disabled:opacity-50 ${
                   opt.value === selection?.variant
                     ? 'bg-accent text-accent-ink'
                     : 'bg-surface-2 text-text'

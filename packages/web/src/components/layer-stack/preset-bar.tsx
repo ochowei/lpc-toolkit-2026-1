@@ -7,6 +7,7 @@ import { PresetMenuPopover } from './popovers/preset-menu-popover';
 import { ResetMenuPopover } from './popovers/reset-menu-popover';
 
 interface Props {
+  disabled: boolean;
   catalog: Catalog;
   palettes: PaletteMetadata;
   state: SliceState;
@@ -17,7 +18,7 @@ interface Props {
 }
 
 /** Toolbar for random outfits, curated presets, and reset actions. */
-export function PresetBar({ catalog, palettes, state, dispatch, t, onApplied, onReset }: Props) {
+export function PresetBar({ disabled, catalog, palettes, state, dispatch, t, onApplied, onReset }: Props) {
   const [presetOpen, setPresetOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const presetTriggerRef = useRef<HTMLButtonElement>(null);
@@ -28,6 +29,7 @@ export function PresetBar({ catalog, palettes, state, dispatch, t, onApplied, on
       <div className="flex items-center gap-2">
         <button
           type="button"
+          disabled={disabled}
           onClick={() =>
             dispatch({
               type: 'apply_selections',
@@ -39,17 +41,18 @@ export function PresetBar({ catalog, palettes, state, dispatch, t, onApplied, on
             })
           }
           title={t('randomize.title')}
-          className="rounded border border-border bg-surface-2 px-2 py-1 text-[12px] hover:bg-surface-3"
+          className="rounded border border-border bg-surface-2 px-2 py-1 text-[12px] hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-50"
         >
           🎲
         </button>
         <button
           ref={presetTriggerRef}
           type="button"
+          disabled={disabled}
           aria-haspopup="menu"
           aria-expanded={presetOpen}
           onClick={() => setPresetOpen(!presetOpen)}
-          className="inline-flex items-center gap-1 rounded border border-border bg-surface-2 px-2 py-1 text-[12px] hover:bg-surface-3"
+          className="inline-flex items-center gap-1 rounded border border-border bg-surface-2 px-2 py-1 text-[12px] hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <span>{t('preset.title')}</span>
           <span aria-hidden>▼</span>
@@ -67,6 +70,7 @@ export function PresetBar({ catalog, palettes, state, dispatch, t, onApplied, on
         </button>
       </div>
       <PresetMenuPopover
+        disabled={disabled}
         open={presetOpen}
         setOpen={setPresetOpen}
         anchorRef={presetTriggerRef}
@@ -78,6 +82,7 @@ export function PresetBar({ catalog, palettes, state, dispatch, t, onApplied, on
         onApplied={onApplied}
       />
       <ResetMenuPopover
+        disabled={disabled}
         open={resetOpen}
         setOpen={setResetOpen}
         t={t}

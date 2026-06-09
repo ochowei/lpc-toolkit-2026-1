@@ -4,6 +4,7 @@ import { usePopover } from './use-popover';
 import type { Translator } from '../../../i18n';
 
 interface Props {
+  disabled: boolean;
   open: boolean;
   setOpen: (v: boolean) => void;
   t: Translator;
@@ -13,11 +14,12 @@ interface Props {
 }
 
 /** Reset menu that lets users choose outfit, view, and filter scopes independently. */
-export function ResetMenuPopover({ open, setOpen, t, onReset, anchorRef: externalAnchorRef }: Props) {
+export function ResetMenuPopover({ disabled, open, setOpen, t, onReset, anchorRef: externalAnchorRef }: Props) {
   const { anchorRef, panelRef, pos } = usePopover(open, () => setOpen(false), externalAnchorRef);
   const [outfit, setOutfit] = useState(true);
   const [view, setView] = useState(false);
   const [filters, setFilters] = useState(false);
+  const compositionResetBlocked = disabled && outfit;
 
   return (
     <>
@@ -50,7 +52,7 @@ export function ResetMenuPopover({ open, setOpen, t, onReset, anchorRef: externa
           <Button
             size="sm"
             variant="primary"
-            disabled={!outfit && !view && !filters}
+            disabled={compositionResetBlocked || (!outfit && !view && !filters)}
             onClick={() => {
               onReset({ outfit, view, filters });
               setOpen(false);
