@@ -26,6 +26,17 @@ export interface KeyedComposedResult {
   readonly result: ComposedResult;
 }
 
+/** Hard composition failures must not expose a stale preview or exports. */
+export function compositionErrorResult(error: unknown): ComposedResult {
+  return {
+    status: 'error',
+    progress: 1,
+    sheet: null,
+    animation: null,
+    error: error instanceof Error ? error.message : String(error),
+  };
+}
+
 interface CompositionOverlayIdentity {
   readonly objectUrl: string;
   readonly zPos: number;
@@ -167,15 +178,11 @@ export function useComposedCharacter(
       })
       .catch((e: unknown) => {
         if (reqId !== reqIdRef.current) return;
-        setStored((current) => ({
+        sheetRef.current = null;
+        setStored({
           key,
-          result: {
-            ...current.result,
-            status: 'error',
-            progress: 1,
-            error: e instanceof Error ? e.message : String(e),
-          },
-        }));
+          result: compositionErrorResult(e),
+        });
       });
     // key encodes the selection-relevant state and custom overlay identity
     // (anim handled by Effect 2).

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ComposedAnimation, ComposedSheet } from '@lpc-toolkit/core';
 import {
+  compositionErrorResult,
   compositionInputKey,
   resultForCompositionKey,
   type ComposedResult,
@@ -25,6 +26,18 @@ const settled: ComposedResult = {
   animation: {} as ComposedAnimation,
   error: null,
 };
+
+describe('compositionErrorResult', () => {
+  it('clears the stale sheet and animation for a hard composition error', () => {
+    expect(compositionErrorResult(new Error('compose failed'))).toEqual({
+      status: 'error',
+      progress: 1,
+      sheet: null,
+      animation: null,
+      error: 'compose failed',
+    });
+  });
+});
 
 describe('resultForCompositionKey', () => {
   it('exposes loading immediately when the current input key has no stored result', () => {
