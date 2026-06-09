@@ -10,6 +10,7 @@ import {
 } from '../../slice/selection';
 import { Button } from '../ui/button';
 import type { Translator } from '../../i18n';
+import { formatCompositionProgress } from '../../lib/composition-lock';
 import {
   FullSpritesheetPreview,
   type FullSheetZoom,
@@ -107,6 +108,9 @@ export function PreviewPane({
     };
   }, [fullSheet.open]);
 
+  const isComposing = result.status === 'loading';
+  const progressPercent = formatCompositionProgress(result.progress);
+
   return (
     <div ref={previewRef} className="relative flex h-full min-h-0 flex-col">
       {/* Action bar — now at the TOP, above the single preview. */}
@@ -132,7 +136,12 @@ export function PreviewPane({
           ))}
         </select>
 
-        <Button size="sm" variant="ghost" onClick={() => dispatch({ type: 'toggle_play' })}>
+        <Button
+          size="sm"
+          variant="ghost"
+          aria-label={state.playing ? t('controls.pause') : t('controls.play')}
+          onClick={() => dispatch({ type: 'toggle_play' })}
+        >
           {state.playing ? '⏸' : '▶'}
         </Button>
 
@@ -164,6 +173,27 @@ export function PreviewPane({
           <div className="flex h-full items-center justify-center">
             <canvas ref={canvasRef} className="image-render-pixel max-h-full max-w-full" />
           </div>
+          {isComposing && (
+            <div
+              role="status"
+              aria-live="polite"
+              data-testid="composition-loading-overlay"
+              className="absolute inset-0 z-20 flex items-center justify-center bg-app/45 backdrop-blur-[1px]"
+            >
+              <div className="flex min-w-36 flex-col items-center gap-2 rounded-md border border-border bg-surface/95 px-4 py-3 shadow-lg">
+                <span
+                  aria-hidden="true"
+                  className="h-6 w-6 animate-spin rounded-full border-2 border-border border-t-accent"
+                />
+                <span className="text-xs font-medium text-text">
+                  {t('composition.loading')}
+                </span>
+                <span className="font-mono text-[11px] text-text-mute">
+                  {progressPercent}%
+                </span>
+              </div>
+            </div>
+          )}
           <div className="absolute top-3 left-3 z-10 rounded bg-black/40 px-2 py-0.5 font-mono text-[10px] text-text-2 backdrop-blur-md">
             {state.anim} · {DIR_SHORT[state.dir]} · {state.zoom}× · f{String(currentFrame + 1).padStart(2, '0')}
           </div>
