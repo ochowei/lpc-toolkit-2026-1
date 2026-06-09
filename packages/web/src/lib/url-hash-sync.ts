@@ -131,10 +131,22 @@ export function computeHashWrite(args: {
 export function computeHashChangeAction(args: {
   rawHash: string;
   currentState: SliceState;
+  defaults: SliceState;
   catalog: Catalog;
   palettes: PaletteMetadata;
 }): HashChangeAction {
   const expected = serializeHash(toSelections(args.currentState));
+  const defaultsSelections = toSelections(args.defaults);
+  const defaultsHash = serializeHash(defaultsSelections);
+  if (args.rawHash === '') {
+    return expected === defaultsHash
+      ? { shouldApply: false, selections: null, warnings: [] }
+      : {
+          shouldApply: true,
+          selections: defaultsSelections,
+          warnings: [],
+        };
+  }
   if (args.rawHash === expected) {
     return { shouldApply: false, selections: null, warnings: [] };
   }
@@ -240,9 +252,11 @@ export function useUrlHashSync(args: {
   // Listen for external hash changes (back/forward, manual edit).
   useEffect(() => {
     const handler = () => {
+      const rawHash = readWindowHash();
       const action = computeHashChangeAction({
-        rawHash: readWindowHash(),
+        rawHash,
         currentState: stateRef.current,
+        defaults: args.defaults,
         catalog: args.catalog,
         palettes: args.palettes,
       });
@@ -253,7 +267,10 @@ export function useUrlHashSync(args: {
 
       // If nothing resolved, don't wipe the current outfit; just normalize
       // the URL back to the current canonical form so junk doesn't linger.
-      if (Object.keys(action.selections.items).length === 0) {
+      if (
+        rawHash !== '' &&
+        Object.keys(action.selections.items).length === 0
+      ) {
         pendingHashChangeRef.current = null;
         const canonical = effectiveHash(stateRef.current, defaultsHashRef.current);
         normalizeHash(canonical);
@@ -296,5 +313,5 @@ export function useUrlHashSync(args: {
     };
     window.addEventListener('hashchange', handler);
     return () => window.removeEventListener('hashchange', handler);
-  }, [args.catalog, args.palettes, args.dispatch]);
+  }, [args.catalog, args.defaults, args.palettes, args.dispatch]);
 }

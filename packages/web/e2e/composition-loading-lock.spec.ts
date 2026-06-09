@@ -126,4 +126,47 @@ test.describe('composition loading lock', () => {
     await expect(overlay).toBeHidden({ timeout: 30_000 });
     expect(errors).toEqual([]);
   });
+
+  test('defers Back to the default empty hash until composition unlocks', async ({ page }) => {
+    const errors = attachConsoleCollector(page);
+    await page.goto('/?e2eProbe=1');
+
+    const overlay = page.getByTestId('composition-loading-overlay');
+    await expect(overlay).toBeHidden({ timeout: 30_000 });
+    const defaultUrl = page.url();
+    const defaultHash = await page.evaluate(() => window.__LPC_E2E__?.hash);
+
+    await page.getByRole('button', { name: 'Presets' }).click();
+    await page.getByRole('menuitem', { name: /Farmer/ }).click();
+    await expect(overlay).toBeHidden({ timeout: 30_000 });
+    const farmerUrl = page.url();
+    const farmerHash = await page.evaluate(() => window.__LPC_E2E__?.hash);
+
+    const gate = createZipGate();
+    await page.route('**/zips/*.zip', (route) => gate.handler(route));
+    await page.getByRole('button', { name: 'Presets' }).click();
+    await page.getByRole('menuitem', { name: /Mage/ }).click();
+    await gate.waitUntilBlocked();
+
+    await page.evaluate(() => window.history.go(-2));
+    await expect(page).toHaveURL(defaultUrl);
+    await expect(overlay).toBeVisible();
+    expect(await page.evaluate(() => window.__LPC_E2E__?.hash)).not.toBe(
+      defaultHash,
+    );
+
+    await gate.release();
+    await expect(overlay).toBeHidden({ timeout: 30_000 });
+    await expect
+      .poll(() => page.evaluate(() => window.__LPC_E2E__?.hash))
+      .toBe(defaultHash);
+
+    await page.evaluate(() => window.history.forward());
+    await expect(page).toHaveURL(farmerUrl);
+    await expect(overlay).toBeHidden({ timeout: 30_000 });
+    await expect
+      .poll(() => page.evaluate(() => window.__LPC_E2E__?.hash))
+      .toBe(farmerHash);
+    expect(errors).toEqual([]);
+  });
 });
