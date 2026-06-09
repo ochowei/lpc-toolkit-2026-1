@@ -100,7 +100,6 @@ export interface LayerStackHarnessProps {
   locale: Locale;
   t: Translator;
   tl: LabelTranslator;
-  onReset: (scopes: { outfit: boolean; view: boolean }) => void;
   onToggleTheme: () => void;
   onToggleLocale: () => void;
 }
@@ -208,23 +207,35 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     [props.catalog, props.palettes],
   );
 
+  const composeResult = useComposedCharacter(
+    props.catalog,
+    props.palettes,
+    props.state,
+    reloadCounter,
+    customOverlay,
+  );
+  const isComposing = isCompositionLocked(composeResult.status);
+
   const clearCustomOverlay = useCallback(() => {
+    if (isComposing) return;
     setCustomOverlay((prev) => {
       if (prev) URL.revokeObjectURL(prev.objectUrl);
       return null;
     });
     setCustomOverlayZPos(0);
     setStatus({ kind: 'info', text: t('advancedTools.cleared') });
-  }, [t]);
+  }, [isComposing, t]);
 
   const handleCustomOverlayZPosChange = useCallback((raw: string) => {
+    if (isComposing) return;
     const zPos = parseCustomOverlayZPos(raw);
     setCustomOverlayZPos(zPos);
     setCustomOverlay((prev) => (prev ? { ...prev, zPos } : prev));
-  }, []);
+  }, [isComposing]);
 
   const handleCustomOverlayUpload = useCallback(
     async (file: File) => {
+      if (isComposing) return;
       try {
         const loaded = await loadCustomOverlayImage({
           file,
@@ -252,7 +263,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
         setStatus({ kind: 'error', text: t('download.failed') });
       }
     },
-    [customOverlayZPos, t],
+    [customOverlayZPos, isComposing, t],
   );
 
   const fullSheet: FullSheetUiState = {
@@ -270,14 +281,6 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     setSplitterRatio,
   };
 
-  const composeResult = useComposedCharacter(
-    props.catalog,
-    props.palettes,
-    props.state,
-    reloadCounter,
-    customOverlay,
-  );
-  const isComposing = isCompositionLocked(composeResult.status);
   const guardedDispatch = useCallback(
     (action: SliceAction): boolean => {
       if (isComposing && isCompositionChangingAction(action)) return false;
@@ -336,6 +339,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   ]);
 
   const handleForceReload = () => {
+    if (isComposing) return;
     cacheClear();
     setReloadCounter((c) => c + 1);
     setStatus({ kind: 'info', text: t('reload.done') });
@@ -393,11 +397,16 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   }, []);
 
   const handleReset = ({ outfit, view, filters }: { outfit: boolean; view: boolean; filters: boolean }) => {
-    if (outfit) {
+    const allowedOutfit = outfit && !isComposing;
+    if (allowedOutfit) {
       clearCustomOverlay();
     }
-    if (outfit || view) {
-      props.onReset({ outfit, view });
+    if (allowedOutfit || view) {
+      guardedDispatch({
+        type: 'reset',
+        scopes: { outfit: allowedOutfit, view },
+        init: props.defaults,
+      });
     }
     if (filters) {
       setLicenseFilter(ALL_LICENSE_GROUPS);
@@ -541,6 +550,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
           size="sm"
           variant="ghost"
           onClick={handleForceReload}
+          disabled={isComposing}
           title={t('reload.title')}
           aria-label={t('reload.title')}
         >

@@ -13,6 +13,7 @@ import type { Translator } from '../../i18n';
 import type { CustomOverlay } from '../../lib/custom-overlay';
 
 interface Props {
+  disabled: boolean;
   t: Translator;
   licenseFilter: LicenseFilter;
   toggleLicenseGroup: (group: LicenseGroup) => void;
@@ -34,6 +35,7 @@ const VISIBLE_ANIMATIONS = ANIMATIONS.filter((a) => !a.noExport);
 
 /** Collapsible controls for license filters, animation filters, asset source, and uploads. */
 export function SettingsCollapsible({
+  disabled,
   t,
   licenseFilter,
   toggleLicenseGroup,
@@ -127,6 +129,7 @@ export function SettingsCollapsible({
                   size="sm"
                   variant="primary"
                   onClick={removeLicenseIncompatibleSelections}
+                  disabled={disabled}
                   className="w-full"
                 >
                   {t('licenseFilter.removeIncompatible').replace('{n}', String(licenseIncompatibleCount))}
@@ -171,6 +174,7 @@ export function SettingsCollapsible({
                   size="sm"
                   variant="primary"
                   onClick={removeAnimationIncompatibleSelections}
+                  disabled={disabled}
                   className="w-full"
                 >
                   {t('animationFilter.removeIncompatible').replace('{n}', String(animationIncompatibleCount))}
@@ -191,12 +195,13 @@ export function SettingsCollapsible({
                 <input
                   type="file"
                   accept="image/*"
+                  disabled={disabled}
                   onChange={(e) => {
                     const file = e.currentTarget.files?.[0];
                     if (file) onCustomOverlayUpload(file);
                     e.currentTarget.value = '';
                   }}
-                  className="block w-full text-[11px] text-text file:mr-2 file:rounded file:border-0 file:bg-surface-2 file:px-2 file:py-1 file:text-[11px] file:text-text"
+                  className="block w-full text-[11px] text-text file:mr-2 file:rounded file:border-0 file:bg-surface-2 file:px-2 file:py-1 file:text-[11px] file:text-text disabled:cursor-not-allowed disabled:opacity-50"
                 />
               </label>
               {customOverlay && (
@@ -211,15 +216,22 @@ export function SettingsCollapsible({
                 <input
                   type="number"
                   value={customOverlayZPos}
+                  disabled={disabled}
                   onChange={(e) => onCustomOverlayZPosChange(e.currentTarget.value)}
-                  className="w-full rounded border border-border bg-app px-2 py-1 text-[11px] text-text"
+                  className="w-full rounded border border-border bg-app px-2 py-1 text-[11px] text-text disabled:cursor-not-allowed disabled:opacity-50"
                 />
               </label>
               <p className="text-[10px] text-text-mute">{t('advancedTools.acceptedSize')}</p>
               <p className="text-[10px] text-text-mute">{t('advancedTools.layerHints')}</p>
               <p className="text-[10px] text-text-mute">{t('advancedTools.userProvidedNotice')}</p>
               {customOverlay && (
-                <Button size="sm" variant="ghost" onClick={onClearCustomOverlay} className="w-full">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={onClearCustomOverlay}
+                  disabled={disabled}
+                  className="w-full"
+                >
                   {t('advancedTools.clear')}
                 </Button>
               )}

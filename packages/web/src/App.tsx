@@ -46,10 +46,6 @@ export default function App() {
 
   const [state, dispatch] = useReducer(sliceReducer, init.state);
 
-  const handleReset = (scopes: { outfit: boolean; view: boolean }) => {
-    dispatch({ type: 'reset', scopes, init: init.defaults });
-  };
-
   document.documentElement.className = `lpc ${theme}`;
 
   return (
@@ -65,7 +61,6 @@ export default function App() {
       locale={locale}
       t={t}
       tl={tl}
-      onReset={handleReset}
       onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
       onToggleLocale={() =>
         setLocale((current) => (current === 'en' ? 'zh-TW' : 'en'))

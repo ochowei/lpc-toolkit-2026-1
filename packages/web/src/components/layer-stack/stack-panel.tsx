@@ -167,6 +167,7 @@ export function StackPanel({
       </div>
 
       <SettingsCollapsible
+        disabled={disabled}
         t={t}
         licenseFilter={licenseFilter}
         toggleLicenseGroup={toggleLicenseGroup}
