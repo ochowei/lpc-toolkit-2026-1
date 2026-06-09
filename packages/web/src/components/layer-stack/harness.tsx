@@ -215,6 +215,8 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     customOverlay,
   );
   const isComposing = isCompositionLocked(composeResult.status);
+  const isComposingRef = useRef(isComposing);
+  isComposingRef.current = isComposing;
 
   const clearCustomOverlay = useCallback(() => {
     if (isComposing) return;
@@ -241,6 +243,10 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
           file,
           zPos: customOverlayZPos,
         });
+        if (isComposingRef.current) {
+          if (!('ok' in loaded)) URL.revokeObjectURL(loaded.objectUrl);
+          return;
+        }
         if ('ok' in loaded) {
           setStatus({
             kind: 'error',
