@@ -54,7 +54,7 @@ test.describe('composition loading lock', () => {
     await page.getByRole('button', { name: 'Pause' }).click();
 
     const previewCanvas = page.locator('main canvas').first();
-    const before = await previewCanvas.evaluate((canvas) => canvas.toDataURL());
+    const before = await previewCanvas.evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL());
     const gate = createZipGate();
     await page.route('**/zips/*.zip', (route) => gate.handler(route));
 
@@ -65,7 +65,7 @@ test.describe('composition loading lock', () => {
     await expect(page.getByRole('button', { name: 'Presets' })).toBeDisabled();
     await expect(page.getByTitle('Randomize outfit')).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Play' })).toBeEnabled();
-    expect(await previewCanvas.evaluate((canvas) => canvas.toDataURL())).toBe(before);
+    expect(await previewCanvas.evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL())).toBe(before);
 
     await gate.release();
     await expect(overlay).toBeHidden({ timeout: 30_000 });
