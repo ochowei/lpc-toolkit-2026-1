@@ -156,7 +156,7 @@ export function LayerRow({ disabled, typeName, catalog, palettes, state, dispatc
                       'relative flex flex-col items-center gap-1 rounded-md border p-1 text-[10px]',
                       isSelected ? 'border-accent bg-accent/10 text-text' : 'border-border bg-surface-2 text-text-2',
                       disabled || !supports ? 'opacity-30 cursor-not-allowed' : '',
-                      exceeds && supports ? 'opacity-60' : '',
+                      !disabled && exceeds && supports ? 'opacity-60' : '',
                     ].filter(Boolean).join(' ')}
                   >
                     <ItemThumbnail

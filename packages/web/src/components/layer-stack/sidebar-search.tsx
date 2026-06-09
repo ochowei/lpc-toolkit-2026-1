@@ -97,6 +97,13 @@ export function SidebarSearch({
     return () => document.removeEventListener('pointerdown', onPointerDown);
   }, [isFocused]);
 
+  useEffect(() => {
+    if (!disabled) return;
+    setIsFocused(false);
+    setActiveIndex(-1);
+    inputRef.current?.blur();
+  }, [disabled, inputRef]);
+
   function onPick(result: PaletteResult) {
     if (disabled || !result.supports) return;
     dispatch(pickActionForItem(result.typeName, result.item));
