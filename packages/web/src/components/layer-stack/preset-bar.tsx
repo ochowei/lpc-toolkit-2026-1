@@ -71,6 +71,7 @@ export function PresetBar({ catalog, palettes, state, dispatch, t, onApplied, on
         setOpen={setPresetOpen}
         anchorRef={presetTriggerRef}
         catalog={catalog}
+        palettes={palettes}
         state={state}
         dispatch={dispatch}
         t={t}

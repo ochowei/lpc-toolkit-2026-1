@@ -1,5 +1,5 @@
 import type { RefObject } from 'react';
-import type { Catalog } from '@lpc-toolkit/core';
+import type { Catalog, PaletteMetadata } from '@lpc-toolkit/core';
 import type { SliceState, SliceAction } from '../../../slice/selection';
 import type { Translator } from '../../../i18n';
 import { PRESETS, type Preset } from '../../../presets';
@@ -12,6 +12,7 @@ interface Props {
   setOpen: (v: boolean) => void;
   anchorRef: RefObject<HTMLButtonElement>;
   catalog: Catalog;
+  palettes: PaletteMetadata;
   state: SliceState;
   dispatch: (a: SliceAction) => void;
   t: Translator;
@@ -24,6 +25,7 @@ export function PresetMenuPopover({
   setOpen,
   anchorRef,
   catalog,
+  palettes,
   state,
   dispatch,
   t,
@@ -42,7 +44,13 @@ export function PresetMenuPopover({
       aria-label={t('preset.title')}
     >
       {PRESETS.map((preset: Preset) => {
-        const preview = computePresetSelection(preset, state.selections, state.bodyType, catalog);
+        const preview = computePresetSelection(
+          preset,
+          state.selections,
+          state.bodyType,
+          catalog,
+          palettes,
+        );
         const willSkip = preview.skipped.length;
         const label = t(preset.labelKey);
         return (

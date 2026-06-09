@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createCatalog, type ItemDefinition, type Selection } from '@lpc-toolkit/core';
+import {
+  createCatalog,
+  createPaletteCatalog,
+  type ItemDefinition,
+  type Selection,
+} from '@lpc-toolkit/core';
 import { computePresetSelection } from '../src/presets-apply';
 import type { Preset } from '../src/presets';
 
@@ -17,10 +22,22 @@ function defn(
   } as unknown as ItemDefinition;
 }
 
+const palettes = createPaletteCatalog({
+  'cloth/meta_cloth.json': { type: 'material', default: 'ulpc', base: 'white' },
+  'cloth/cloth_ulpc.json': {
+    brown: ['#3b2618'],
+    white: ['#ffffff'],
+  },
+}).palettes;
+
 const { catalog } = createCatalog({
   'tunic.json': defn('Tunic', 'clothes', 'male'),
   'helm.json': defn('Helm', 'hat', 'male'),
   'gown.json': defn('Gown', 'clothes', 'female'),
+  'shirt.json': {
+    ...defn('Shirt', 'clothes', 'male'),
+    recolors: { material: 'cloth', palettes: ['ulpc'] },
+  },
 });
 
 const malePreset: Preset = {
@@ -56,6 +73,7 @@ describe('computePresetSelection', () => {
       current,
       'male',
       catalog,
+      palettes,
     );
     expect(selections.body).toEqual(current.body);
     expect(selections.hair).toEqual(current.hair);
@@ -69,6 +87,7 @@ describe('computePresetSelection', () => {
       {},
       'male',
       catalog,
+      palettes,
     );
     expect(skipped).toHaveLength(0);
     expect(selections.clothes).toEqual({ typeName: 'clothes', name: 'Tunic' });
@@ -81,6 +100,7 @@ describe('computePresetSelection', () => {
       {},
       'male',
       catalog,
+      palettes,
     );
     expect(skipped.map((i) => i.name)).toEqual(['Gown']);
     expect('clothes' in selections).toBe(false);
@@ -94,7 +114,13 @@ describe('computePresetSelection', () => {
       emoji: '🗡️',
       items: [{ typeName: 'clothes', name: 'Nonexistent' }],
     };
-    const { skipped } = computePresetSelection(badPreset, {}, 'male', catalog);
+    const { skipped } = computePresetSelection(
+      badPreset,
+      {},
+      'male',
+      catalog,
+      palettes,
+    );
     expect(skipped.map((i) => i.name)).toEqual(['Nonexistent']);
   });
 
@@ -110,6 +136,7 @@ describe('computePresetSelection', () => {
       {},
       'male',
       catalog,
+      palettes,
     );
     expect(selections.clothes).toEqual({
       typeName: 'clothes',
@@ -118,14 +145,41 @@ describe('computePresetSelection', () => {
     });
   });
 
+  it('defaults recolor-backed preset items to their first swatch', () => {
+    const recolorPreset: Preset = {
+      id: 'r',
+      labelKey: 'preset.farmer',
+      emoji: '🌾',
+      items: [{ typeName: 'clothes', name: 'Shirt' }],
+    };
+    const { selections } = computePresetSelection(
+      recolorPreset,
+      {},
+      'male',
+      catalog,
+      palettes,
+    );
+    expect(selections.clothes).toEqual({
+      typeName: 'clothes',
+      name: 'Shirt',
+      recolor: 'brown',
+    });
+  });
+
   it('leaves no residue when switching from one preset to another', () => {
-    const afterA = computePresetSelection(malePreset, {}, 'male', catalog)
-      .selections;
+    const afterA = computePresetSelection(
+      malePreset,
+      {},
+      'male',
+      catalog,
+      palettes,
+    ).selections;
     const afterB = computePresetSelection(
       femaleOnlyPreset,
       afterA,
       'male',
       catalog,
+      palettes,
     ).selections;
     // malePreset's Tunic was cleared; femaleOnlyPreset's Gown was skipped.
     expect('clothes' in afterB).toBe(false);
