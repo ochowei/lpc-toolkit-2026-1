@@ -1,20 +1,34 @@
 import { expect, test, type Route } from '@playwright/test';
 import { attachConsoleCollector } from './helpers/console-collector';
 
-function createZipGate() {
+interface ZipGate {
+  handler(route: Route): Promise<void>;
+  waitUntilBlocked(): Promise<void>;
+  release(): Promise<void>;
+}
+
+function createZipGate(): ZipGate {
   let blocked = true;
   const pending = new Set<Route>();
+  let resolveBlocked: () => void;
+  const blockedPromise = new Promise<void>((resolve) => {
+    resolveBlocked = resolve;
+  });
 
   return {
-    async handler(route: Route) {
+    async handler(route: Route): Promise<void> {
       if (!blocked) {
         await route.continue();
         return;
       }
 
       pending.add(route);
+      resolveBlocked();
     },
-    async release() {
+    waitUntilBlocked(): Promise<void> {
+      return blockedPromise;
+    },
+    async release(): Promise<void> {
       blocked = false;
       const routes = [...pending];
       pending.clear();
@@ -31,6 +45,7 @@ test.describe('composition loading lock', () => {
     await page.goto('/');
 
     const overlay = page.getByTestId('composition-loading-overlay');
+    await gate.waitUntilBlocked();
     await expect(overlay).toBeVisible();
     await expect(overlay).toContainText('Loading character');
     await expect(overlay).toContainText(/\d+%/);
@@ -61,6 +76,7 @@ test.describe('composition loading lock', () => {
     await page.getByRole('button', { name: 'Presets' }).click();
     await page.getByRole('menuitem', { name: /Farmer/ }).click();
 
+    await gate.waitUntilBlocked();
     await expect(overlay).toBeVisible();
     await expect(page.getByRole('button', { name: 'Presets' })).toBeDisabled();
     await expect(page.getByTitle('Randomize outfit')).toBeDisabled();
