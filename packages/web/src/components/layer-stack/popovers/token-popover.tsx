@@ -15,6 +15,7 @@ interface Props {
   setOpen: (v: boolean) => void;
   state: SliceState;
   dispatch: (a: SliceAction) => void;
+  disabled: boolean;
   catalog: Catalog;
   t: Translator;
   onStatus: (text: string) => void;
@@ -28,6 +29,7 @@ export function TokenPopover({
   setOpen,
   state,
   dispatch,
+  disabled,
   catalog,
   t,
   onStatus,
@@ -103,7 +105,7 @@ export function TokenPopover({
             <Button
               size="sm"
               variant="primary"
-              disabled={!paste.trim()}
+              disabled={disabled || !paste.trim()}
               onClick={() => {
                 try {
                   const decoded = decodeSelectionToken(paste.trim(), catalog);

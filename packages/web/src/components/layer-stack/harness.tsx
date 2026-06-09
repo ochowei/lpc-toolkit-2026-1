@@ -12,6 +12,10 @@ import {
   type TypeName,
 } from '@lpc-toolkit/core';
 import { e2eProbeFromUrl } from '../../lib/e2e-probe-from-url';
+import {
+  isCompositionChangingAction,
+  isCompositionLocked,
+} from '../../lib/composition-lock';
 import type {
   FullSheetUiState,
   FullSheetUiActions,
@@ -273,6 +277,14 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     reloadCounter,
     customOverlay,
   );
+  const isComposing = isCompositionLocked(composeResult.status);
+  const guardedDispatch = useCallback(
+    (action: SliceAction) => {
+      if (isComposing && isCompositionChangingAction(action)) return;
+      props.dispatch(action);
+    },
+    [isComposing, props.dispatch],
+  );
   const loadingProgress =
     composeResult.status === 'loading' ? composeResult.progress : null;
   const e2eProbeEnabled =
@@ -359,7 +371,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   useUrlHashSync({
     state: props.state,
     defaults: props.defaults,
-    dispatch: props.dispatch,
+    dispatch: guardedDispatch,
     catalog: props.catalog,
     palettes: props.palettes,
     t,
@@ -411,7 +423,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
       catalog={props.catalog}
       palettes={props.palettes}
       state={props.state}
-      dispatch={props.dispatch}
+      dispatch={guardedDispatch}
       shownTypeNames={props.shownTypeNames}
       licenseFilter={licenseFilter}
       toggleLicenseGroup={toggleLicenseGroup}
@@ -440,7 +452,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   const previewPane = (
     <PreviewPane
       state={props.state}
-      dispatch={props.dispatch}
+      dispatch={guardedDispatch}
       t={t}
       result={composeResult}
       fullSheet={fullSheet}
@@ -474,7 +486,8 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
           open={popover === 'bodyType'}
           setOpen={(v) => setPopover(v ? 'bodyType' : null)}
           state={props.state}
-          dispatch={props.dispatch}
+          dispatch={guardedDispatch}
+          disabled={isComposing}
           catalog={props.catalog}
           t={props.t}
           tl={props.tl}
@@ -489,7 +502,8 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
           open={popover === 'token'}
           setOpen={(v) => setPopover(v ? 'token' : null)}
           state={props.state}
-          dispatch={props.dispatch}
+          dispatch={guardedDispatch}
+          disabled={isComposing}
           catalog={props.catalog}
           t={props.t}
           onStatus={(text) => setStatus({ kind: 'info', text })}
