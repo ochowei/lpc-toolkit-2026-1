@@ -27,6 +27,29 @@ export interface HashChangeAction {
   readonly warnings: readonly HashWarning[];
 }
 
+export interface PendingHashChange {
+  readonly selections: Selections;
+  readonly canonicalHash: string;
+}
+
+export interface PendingHashChangeResult {
+  readonly pending: PendingHashChange | null;
+  readonly canonicalHashToNormalize: string | null;
+}
+
+/** Keep rejected navigation pending; accepted navigation may be normalized. */
+export function reducePendingHashChange(args: {
+  dispatchResult: boolean | void;
+  incoming: PendingHashChange;
+}): PendingHashChangeResult {
+  return args.dispatchResult === false
+    ? { pending: args.incoming, canonicalHashToNormalize: null }
+    : {
+        pending: null,
+        canonicalHashToNormalize: args.incoming.canonicalHash,
+      };
+}
+
 /** Read `window.location.hash`, stripping the leading `#`. */
 export function readWindowHash(): string {
   const h = window.location.hash;
@@ -108,10 +131,22 @@ export function computeHashWrite(args: {
 export function computeHashChangeAction(args: {
   rawHash: string;
   currentState: SliceState;
+  defaults: SliceState;
   catalog: Catalog;
   palettes: PaletteMetadata;
 }): HashChangeAction {
   const expected = serializeHash(toSelections(args.currentState));
+  const defaultsSelections = toSelections(args.defaults);
+  const defaultsHash = serializeHash(defaultsSelections);
+  if (args.rawHash === '') {
+    return expected === defaultsHash
+      ? { shouldApply: false, selections: null, warnings: [] }
+      : {
+          shouldApply: true,
+          selections: defaultsSelections,
+          warnings: [],
+        };
+  }
   if (args.rawHash === expected) {
     return { shouldApply: false, selections: null, warnings: [] };
   }
@@ -140,7 +175,7 @@ export function computeHashChangeAction(args: {
 export function useUrlHashSync(args: {
   state: SliceState;
   defaults: SliceState;
-  dispatch: (a: SliceAction) => void;
+  dispatch: (a: SliceAction) => boolean | void;
   catalog: Catalog;
   palettes: PaletteMetadata;
   t: Translator;
@@ -150,6 +185,7 @@ export function useUrlHashSync(args: {
   const stateRef = useRef(args.state);
   const onStatusRef = useRef(args.onStatus);
   const tRef = useRef(args.t);
+  const pendingHashChangeRef = useRef<PendingHashChange | null>(null);
   const defaultsHash = serializeHash(toSelections(args.defaults));
   const defaultsHashRef = useRef(defaultsHash);
   useEffect(() => {
@@ -164,6 +200,15 @@ export function useUrlHashSync(args: {
   useEffect(() => {
     defaultsHashRef.current = defaultsHash;
   }, [defaultsHash]);
+
+  const normalizeHash = (canonical: string) => {
+    if (canonical === readWindowHash()) return;
+    const target =
+      canonical === ''
+        ? window.location.pathname + window.location.search
+        : '#' + canonical;
+    window.history.replaceState(null, '', target);
+  };
 
   // Write effect: state → hash.
   useEffect(() => {
@@ -186,28 +231,49 @@ export function useUrlHashSync(args: {
     }
   }, [args.state.bodyType, args.state.selections, defaultsHash]);
 
+  // A rejected Back/Forward target remains pending until the composition
+  // guard changes and accepts it.
+  useEffect(() => {
+    const pending = pendingHashChangeRef.current;
+    if (!pending) return;
+    const outcome = reducePendingHashChange({
+      dispatchResult: args.dispatch({
+        type: 'apply_selections',
+        selections: pending.selections,
+      }),
+      incoming: pending,
+    });
+    pendingHashChangeRef.current = outcome.pending;
+    if (outcome.canonicalHashToNormalize !== null) {
+      normalizeHash(outcome.canonicalHashToNormalize);
+    }
+  }, [args.dispatch]);
+
   // Listen for external hash changes (back/forward, manual edit).
   useEffect(() => {
     const handler = () => {
+      const rawHash = readWindowHash();
       const action = computeHashChangeAction({
-        rawHash: readWindowHash(),
+        rawHash,
         currentState: stateRef.current,
+        defaults: args.defaults,
         catalog: args.catalog,
         palettes: args.palettes,
       });
-      if (!action.shouldApply || action.selections === null) return;
+      if (!action.shouldApply || action.selections === null) {
+        pendingHashChangeRef.current = null;
+        return;
+      }
 
       // If nothing resolved, don't wipe the current outfit; just normalize
       // the URL back to the current canonical form so junk doesn't linger.
-      if (Object.keys(action.selections.items).length === 0) {
+      if (
+        rawHash !== '' &&
+        Object.keys(action.selections.items).length === 0
+      ) {
+        pendingHashChangeRef.current = null;
         const canonical = effectiveHash(stateRef.current, defaultsHashRef.current);
-        if (canonical !== readWindowHash()) {
-          const target =
-            canonical === ''
-              ? window.location.pathname + window.location.search
-              : '#' + canonical;
-          window.history.replaceState(null, '', target);
-        }
+        normalizeHash(canonical);
         if (action.warnings.length > 0) {
           onStatusRef.current(
             tRef.current('hashSync.skipped').replace(
@@ -219,14 +285,23 @@ export function useUrlHashSync(args: {
         return;
       }
 
-      // Normalize the URL to canonical form before dispatching, so the
-      // subsequent write effect is a no-op (no extra pushState entry for
-      // non-canonical incoming URLs).
-      const canonical = serializeHash(action.selections);
-      if (canonical !== readWindowHash()) {
-        window.history.replaceState(null, '', '#' + canonical);
+      const serialized = serializeHash(action.selections);
+      const incoming: PendingHashChange = {
+        selections: action.selections,
+        canonicalHash:
+          serialized === defaultsHashRef.current ? '' : serialized,
+      };
+      const outcome = reducePendingHashChange({
+        dispatchResult: args.dispatch({
+          type: 'apply_selections',
+          selections: action.selections,
+        }),
+        incoming,
+      });
+      pendingHashChangeRef.current = outcome.pending;
+      if (outcome.canonicalHashToNormalize !== null) {
+        normalizeHash(outcome.canonicalHashToNormalize);
       }
-      args.dispatch({ type: 'apply_selections', selections: action.selections });
       if (action.warnings.length > 0) {
         onStatusRef.current(
           tRef.current('hashSync.skipped').replace(
@@ -238,5 +313,5 @@ export function useUrlHashSync(args: {
     };
     window.addEventListener('hashchange', handler);
     return () => window.removeEventListener('hashchange', handler);
-  }, [args.catalog, args.palettes, args.dispatch]);
+  }, [args.catalog, args.defaults, args.palettes, args.dispatch]);
 }

@@ -9,6 +9,7 @@ import { ColorPicker } from '../color-picker';
 import { ItemThumbnail } from './item-thumbnail';
 
 interface Props {
+  disabled: boolean;
   typeName: TypeName;
   catalog: Catalog;
   palettes: PaletteMetadata;
@@ -23,7 +24,7 @@ interface Props {
 }
 
 /** Active layer row with thumbnail, color controls, and compatible replacement items. */
-export function LayerRow({ typeName, catalog, palettes, state, dispatch, tl, t, licenseFilter, animationFilter, expanded, onToggle }: Props) {
+export function LayerRow({ disabled, typeName, catalog, palettes, state, dispatch, tl, t, licenseFilter, animationFilter, expanded, onToggle }: Props) {
   const selection = state.selections[typeName];
   if (!selection) return null;
 
@@ -93,18 +94,26 @@ export function LayerRow({ typeName, catalog, palettes, state, dispatch, tl, t, 
         </div>
         <span
           role="button"
-          tabIndex={0}
+          aria-disabled={disabled}
+          tabIndex={disabled ? -1 : 0}
           onClick={(e) => {
             e.stopPropagation();
+            if (disabled) return;
             dispatch({ type: 'clear', typeName });
           }}
           onKeyDown={(e) => {
+            if (disabled) return;
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
               dispatch({ type: 'clear', typeName });
             }
           }}
-          className="rounded p-1 text-text-mute hover:bg-surface-3 hover:text-danger"
+          className={[
+            'rounded p-1 text-text-mute',
+            disabled
+              ? 'cursor-not-allowed opacity-50'
+              : 'hover:bg-surface-3 hover:text-danger',
+          ].join(' ')}
           aria-label={`Clear ${typeName}`}
         >
           ✕
@@ -136,7 +145,7 @@ export function LayerRow({ typeName, catalog, palettes, state, dispatch, tl, t, 
                   <button
                     key={it.name}
                     type="button"
-                    disabled={!supports}
+                    disabled={disabled || !supports}
                     title={
                       !supports ? 'incompatible body type' :
                       exceeds ? exceedsTitle :
@@ -146,8 +155,8 @@ export function LayerRow({ typeName, catalog, palettes, state, dispatch, tl, t, 
                     className={[
                       'relative flex flex-col items-center gap-1 rounded-md border p-1 text-[10px]',
                       isSelected ? 'border-accent bg-accent/10 text-text' : 'border-border bg-surface-2 text-text-2',
-                      !supports ? 'opacity-30 cursor-not-allowed' : '',
-                      exceeds && supports ? 'opacity-60' : '',
+                      disabled || !supports ? 'opacity-30 cursor-not-allowed' : '',
+                      !disabled && exceeds && supports ? 'opacity-60' : '',
                     ].filter(Boolean).join(' ')}
                   >
                     <ItemThumbnail
@@ -169,6 +178,7 @@ export function LayerRow({ typeName, catalog, palettes, state, dispatch, tl, t, 
 
             <div className="mt-2 rounded-md border border-border bg-surface-2 p-2">
               <ColorPicker
+                disabled={disabled}
                 item={item}
                 selection={selection}
                 palettes={palettes}

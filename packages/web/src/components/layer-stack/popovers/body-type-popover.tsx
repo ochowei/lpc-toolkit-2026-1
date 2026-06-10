@@ -10,6 +10,7 @@ interface Props {
   setOpen: (v: boolean) => void;
   state: SliceState;
   dispatch: (a: SliceAction) => void;
+  disabled: boolean;
   catalog: Catalog;
   t: Translator;
   tl: LabelTranslator;
@@ -17,7 +18,17 @@ interface Props {
 }
 
 /** Body-type selector that warns when existing layers do not support the new body. */
-export function BodyTypePopover({ open, setOpen, state, dispatch, catalog, t, tl, onIncompatibilityWarning }: Props) {
+export function BodyTypePopover({
+  open,
+  setOpen,
+  state,
+  dispatch,
+  disabled,
+  catalog,
+  t,
+  tl,
+  onIncompatibilityWarning,
+}: Props) {
   const { anchorRef, panelRef, pos } = usePopover(open, () => setOpen(false));
 
   return (
@@ -26,6 +37,7 @@ export function BodyTypePopover({ open, setOpen, state, dispatch, catalog, t, tl
         ref={anchorRef}
         size="sm"
         variant={open ? 'primary' : 'default'}
+        disabled={disabled}
         onClick={() => setOpen(!open)}
       >
         👤 {tl.bodyType(state.bodyType)} ▾
@@ -40,30 +52,41 @@ export function BodyTypePopover({ open, setOpen, state, dispatch, catalog, t, tl
             {t('bodyType.title')}
           </div>
           <div className="flex flex-col gap-1">
-            {BODY_TYPES.map((bt: BodyType) => (
-              <button
-                key={bt}
-                type="button"
-                onClick={() => {
-                  // Determine incompatibilities for the new bodyType.
-                  const incompatible: string[] = [];
-                  for (const [tn, sel] of Object.entries(state.selections)) {
-                    const def = (catalog.byTypeName.get(tn) ?? []).find((d) => d.name === sel.name);
-                    if (def && !itemSupportsBodyType(def, bt)) {
-                      incompatible.push(tl.category(tn));
-                    }
+            {BODY_TYPES.map((bt: BodyType) => {
+              const handleBodyTypeSelection = (): void => {
+                // Determine incompatibilities for the new bodyType.
+                const incompatible: string[] = [];
+                for (const [tn, sel] of Object.entries(state.selections)) {
+                  const def = (catalog.byTypeName.get(tn) ?? []).find(
+                    (d) => d.name === sel.name,
+                  );
+                  if (def && !itemSupportsBodyType(def, bt)) {
+                    incompatible.push(tl.category(tn));
                   }
-                  dispatch({ type: 'set_body_type', bodyType: bt });
-                  setOpen(false);
-                  if (incompatible.length > 0) onIncompatibilityWarning(incompatible);
-                }}
-                className={`rounded px-2 py-1 text-left text-[12px] ${
-                  bt === state.bodyType ? 'bg-accent/20 text-text' : 'hover:bg-surface-2 text-text-2'
-                }`}
-              >
-                {tl.bodyType(bt)}
-              </button>
-            ))}
+                }
+                dispatch({ type: 'set_body_type', bodyType: bt });
+                setOpen(false);
+                if (incompatible.length > 0) {
+                  onIncompatibilityWarning(incompatible);
+                }
+              };
+
+              return (
+                <button
+                  key={bt}
+                  type="button"
+                  disabled={disabled}
+                  onClick={handleBodyTypeSelection}
+                  className={`rounded px-2 py-1 text-left text-[12px] disabled:cursor-not-allowed disabled:opacity-50 ${
+                    bt === state.bodyType
+                      ? 'bg-accent/20 text-text'
+                      : 'hover:bg-surface-2 text-text-2'
+                  }`}
+                >
+                  {tl.bodyType(bt)}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

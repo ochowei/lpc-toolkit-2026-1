@@ -13,6 +13,7 @@ import { SettingsCollapsible } from './settings-collapsible';
 import { SidebarSearch } from './sidebar-search';
 
 interface Props {
+  disabled: boolean;
   catalog: Catalog;
   palettes: PaletteMetadata;
   state: SliceState;
@@ -43,6 +44,7 @@ interface Props {
 
 /** Left-side layer management panel: search, filters, active stack, and settings. */
 export function StackPanel({
+  disabled,
   catalog,
   palettes,
   state,
@@ -90,6 +92,7 @@ export function StackPanel({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <SidebarSearch
+        disabled={disabled}
         catalog={catalog}
         palettes={palettes}
         state={state}
@@ -103,6 +106,7 @@ export function StackPanel({
         inputRef={searchInputRef}
       />
       <PresetBar
+        disabled={disabled}
         catalog={catalog}
         palettes={palettes}
         state={state}
@@ -131,6 +135,7 @@ export function StackPanel({
           active.map((tn) => (
             <LayerRow
               key={tn}
+              disabled={disabled}
               typeName={tn}
               catalog={catalog}
               palettes={palettes}
@@ -148,6 +153,7 @@ export function StackPanel({
 
         {/* Task 10: AddLayer */}
         <AddLayer
+          disabled={disabled}
           catalog={catalog}
           dispatch={dispatch}
           inactive={inactive}
@@ -161,6 +167,7 @@ export function StackPanel({
       </div>
 
       <SettingsCollapsible
+        disabled={disabled}
         t={t}
         licenseFilter={licenseFilter}
         toggleLicenseGroup={toggleLicenseGroup}

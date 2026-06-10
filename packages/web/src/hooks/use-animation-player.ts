@@ -16,6 +16,13 @@ export interface UseAnimationPlayerResult {
   readonly fps: number;
 }
 
+/** Clear the current preview pixels without resizing the display canvas. */
+export function clearAnimationCanvas(canvas: HTMLCanvasElement): void {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
 /**
  * Draws one direction of `animation` to `canvasRef` at integer `zoom`,
  * advancing through ANIMATION_CONFIGS[name].cycle at ANIMATION_FPS.
@@ -38,7 +45,12 @@ export function useAnimationPlayer(
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !animation || !config) {
+    if (!canvas) {
+      setCurrentFrame(0);
+      return;
+    }
+    if (!animation || !config) {
+      clearAnimationCanvas(canvas);
       setCurrentFrame(0);
       return;
     }

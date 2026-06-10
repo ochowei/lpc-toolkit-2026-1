@@ -5,6 +5,7 @@ import {
   computeHashChangeAction,
   computeHashWrite,
   effectiveHash,
+  reducePendingHashChange,
 } from '../src/lib/url-hash-sync';
 import { loadCatalogFromUpstream } from '../src/catalog/load-catalog';
 import { loadPalettesFromUpstream } from '../src/catalog/load-palettes';
@@ -135,6 +136,7 @@ describe('computeHashChangeAction', () => {
     const result = computeHashChangeAction({
       rawHash: defaultsHash,
       currentState: defaults,
+      defaults,
       catalog,
       palettes,
     });
@@ -146,6 +148,7 @@ describe('computeHashChangeAction', () => {
     const result = computeHashChangeAction({
       rawHash: 'sex=female&body=Body_color_light',
       currentState: defaults,
+      defaults,
       catalog,
       palettes,
     });
@@ -158,6 +161,7 @@ describe('computeHashChangeAction', () => {
     const result = computeHashChangeAction({
       rawHash: 'sex=female&fictional_xyz=foo',
       currentState: defaults,
+      defaults,
       catalog,
       palettes,
     });
@@ -169,6 +173,7 @@ describe('computeHashChangeAction', () => {
     const result = computeHashChangeAction({
       rawHash: 'fictional_xyz=foo',
       currentState: defaults,
+      defaults,
       catalog,
       palettes,
     });
@@ -177,4 +182,79 @@ describe('computeHashChangeAction', () => {
     expect(Object.keys(result.selections?.items ?? {}).length).toBe(0);
     expect(result.warnings.length).toBe(1);
   });
+
+  it('treats empty hash as the complete default selections', () => {
+    const modified = {
+      ...defaults,
+      selections: {
+        ...defaults.selections,
+        body: { typeName: 'body', name: 'Body Color', recolor: 'dark' },
+      },
+    };
+    const result = computeHashChangeAction({
+      rawHash: '',
+      currentState: modified,
+      defaults,
+      catalog,
+      palettes,
+    });
+    expect(result).toEqual({
+      shouldApply: true,
+      selections: toSelections(defaults),
+      warnings: [],
+    });
+
+    const incoming = {
+      selections: result.selections!,
+      canonicalHash: '',
+    };
+    expect(
+      reducePendingHashChange({
+        dispatchResult: false,
+        incoming,
+      }),
+    ).toEqual({
+      pending: incoming,
+      canonicalHashToNormalize: null,
+    });
+  });
+});
+
+describe('reducePendingHashChange', () => {
+  const incoming = {
+    selections: {
+      bodyType: 'female',
+      items: {
+        body: { typeName: 'body', name: 'Body Color', recolor: 'dark' },
+      },
+    },
+    canonicalHash: 'sex=female&body=Body_color_dark',
+  };
+
+  it('defers the incoming selection without normalizing the reached history entry', () => {
+    expect(
+      reducePendingHashChange({
+        dispatchResult: false,
+        incoming,
+      }),
+    ).toEqual({
+      pending: incoming,
+      canonicalHashToNormalize: null,
+    });
+  });
+
+  it.each([true, undefined])(
+    'applies and normalizes the pending selection when dispatch returns %s',
+    (dispatchResult) => {
+      expect(
+        reducePendingHashChange({
+          dispatchResult,
+          incoming,
+        }),
+      ).toEqual({
+        pending: null,
+        canonicalHashToNormalize: incoming.canonicalHash,
+      });
+    },
+  );
 });

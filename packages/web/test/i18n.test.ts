@@ -38,6 +38,8 @@ describe('i18n', () => {
     expect(en('picker.advanced')).toBe('Advanced: all upstream assets');
     expect(en('picker.searchAssets')).toBe('Search all assets');
     expect(zh('picker.advanced')).toBe('進階：所有上游素材');
+    expect(en('composition.loading')).toBe('Loading character');
+    expect(zh('composition.loading')).toBe('角色載入中');
   });
 
   it('translates reset menu labels', () => {

@@ -5,6 +5,7 @@ import { itemSupportsBodyType } from '../../slice/catalog-tree';
 import { CATEGORY_GROUPS } from '../../slice/category-groups';
 
 interface Props {
+  disabled: boolean;
   catalog: Catalog;
   dispatch: (a: SliceAction) => void;
   inactive: TypeName[];
@@ -18,6 +19,7 @@ interface Props {
 
 /** Inline picker for adding currently inactive catalog type slots. */
 export function AddLayer({
+  disabled,
   catalog, dispatch, inactive, bodyType, t, tl,
   adding, setAdding, onAdded,
 }: Props) {
@@ -25,8 +27,9 @@ export function AddLayer({
     return (
       <button
         type="button"
+        disabled={disabled}
         onClick={() => setAdding(true)}
-        className="mt-2 mb-2 flex w-full items-center gap-2 rounded-md border border-dashed border-border px-3 py-2 text-[12px] text-text-mute hover:bg-surface-2"
+        className="mt-2 mb-2 flex w-full items-center gap-2 rounded-md border border-dashed border-border px-3 py-2 text-[12px] text-text-mute hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
       >
         <span>＋</span>
         <span>{t('add.button')}</span>
@@ -70,13 +73,13 @@ export function AddLayer({
             {types.map((tn) => {
               const items = catalog.byTypeName.get(tn) ?? [];
               const firstCompatible = items.find((it) => itemSupportsBodyType(it, bodyType));
-              const disabled = !firstCompatible;
+              const itemDisabled = disabled || !firstCompatible;
               return (
                 <button
                   key={tn}
                   type="button"
-                  disabled={disabled}
-                  title={disabled ? t('palette.incompatible') : tl.category(tn)}
+                  disabled={itemDisabled}
+                  title={!firstCompatible ? t('palette.incompatible') : tl.category(tn)}
                   onClick={() => {
                     if (!firstCompatible) return;
                     dispatch(pickActionForItem(tn, firstCompatible));
@@ -85,7 +88,7 @@ export function AddLayer({
                   }}
                   className={[
                     'rounded-full border border-border bg-surface-2 px-3 py-1 text-[11px]',
-                    disabled
+                    itemDisabled
                       ? 'cursor-not-allowed opacity-40'
                       : 'hover:bg-surface-3 cursor-pointer',
                   ].join(' ')}

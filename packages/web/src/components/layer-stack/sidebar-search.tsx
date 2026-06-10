@@ -26,6 +26,7 @@ import {
 const RESULT_LIMIT = 60;
 
 interface Props {
+  disabled: boolean;
   catalog: Catalog;
   palettes: PaletteMetadata;
   state: SliceState;
@@ -41,6 +42,7 @@ interface Props {
 
 /** Search box and keyboard-driven dropdown for adding/replacing catalog items. */
 export function SidebarSearch({
+  disabled,
   catalog,
   palettes,
   state,
@@ -95,8 +97,15 @@ export function SidebarSearch({
     return () => document.removeEventListener('pointerdown', onPointerDown);
   }, [isFocused]);
 
+  useEffect(() => {
+    if (!disabled) return;
+    setIsFocused(false);
+    setActiveIndex(-1);
+    inputRef.current?.blur();
+  }, [disabled, inputRef]);
+
   function onPick(result: PaletteResult) {
-    if (!result.supports) return;
+    if (disabled || !result.supports) return;
     dispatch(pickActionForItem(result.typeName, result.item));
     onPicked(result.typeName);
     setQuery('');
@@ -105,6 +114,7 @@ export function SidebarSearch({
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (disabled) return;
     if (e.key === 'Escape') {
       e.preventDefault();
       if (showDropdown) {
@@ -142,6 +152,7 @@ export function SidebarSearch({
         <input
           ref={inputRef}
           type="search"
+          disabled={disabled}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -151,7 +162,7 @@ export function SidebarSearch({
           onKeyDown={onKeyDown}
           placeholder={t('palette.placeholder')}
           aria-label={t('palette.title')}
-          className="flex-1 bg-transparent text-[12px] text-text outline-none"
+          className="flex-1 bg-transparent text-[12px] text-text outline-none disabled:cursor-not-allowed disabled:opacity-50"
         />
         {licenseFilter.size < LICENSE_GROUP_ORDER.length && (
           <span className="rounded bg-accent/15 px-2 py-0.5 font-mono text-[10px] text-accent">
@@ -194,7 +205,7 @@ export function SidebarSearch({
                     key={`${r.typeName}:${r.item.name}`}
                     ref={isActive ? activeRowRef : undefined}
                     type="button"
-                    disabled={!r.supports}
+                    disabled={disabled || !r.supports}
                     title={
                       !r.supports
                         ? t('palette.incompatible')
@@ -207,8 +218,10 @@ export function SidebarSearch({
                     className={[
                       'flex w-full items-center gap-2 px-3 py-1.5 text-left',
                       i > 0 ? 'border-t border-border' : '',
-                      !r.supports
-                        ? 'cursor-not-allowed opacity-35'
+                      disabled
+                        ? 'cursor-not-allowed opacity-50'
+                        : !r.supports
+                          ? 'cursor-not-allowed opacity-35'
                         : exceeded
                           ? 'opacity-65 hover:bg-surface-2'
                           : 'hover:bg-surface-2',

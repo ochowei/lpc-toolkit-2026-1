@@ -8,6 +8,7 @@ import { cn } from '../../../lib/cn';
 import { usePopover } from './use-popover';
 
 interface Props {
+  disabled: boolean;
   open: boolean;
   setOpen: (v: boolean) => void;
   anchorRef: RefObject<HTMLButtonElement>;
@@ -21,6 +22,7 @@ interface Props {
 
 /** Popover menu that applies curated presets and reports skipped incompatible items. */
 export function PresetMenuPopover({
+  disabled,
   open,
   setOpen,
   anchorRef,
@@ -57,6 +59,7 @@ export function PresetMenuPopover({
           <button
             key={preset.id}
             type="button"
+            disabled={disabled}
             role="menuitem"
             title={willSkip ? `${label} — ${t('preset.skipPreview').replace('{n}', String(willSkip))}` : label}
             onClick={() => {
@@ -74,6 +77,7 @@ export function PresetMenuPopover({
             className={cn(
               'flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[12px] hover:bg-surface-2',
               willSkip && 'opacity-80',
+              disabled && 'cursor-not-allowed opacity-50 hover:bg-transparent',
             )}
           >
             <span>{preset.emoji}</span>
