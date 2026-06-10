@@ -1,8 +1,8 @@
 # lpc-toolkit
 
 A monorepo providing an **environment-agnostic core library for composing
-[LPC](https://lpc.opengameart.org/) character spritesheets**, plus a planned
-React web UI and CLI built on top of it.
+[LPC](https://lpc.opengameart.org/) character spritesheets**, plus a modern
+React web UI and a planned CLI built on top of it.
 
 LPC (Liberated Pixel Cup) art ships as many layered spritesheets — body,
 hair, clothing, weapons, expressions, and so on. The
@@ -17,27 +17,26 @@ CLI can share one engine.
 | Package             | State        | What it is                                          |
 | ------------------- | ------------ | --------------------------------------------------- |
 | `packages/core/`    | **Working**  | Pure TypeScript composition logic (catalog, compose, recolor, hash, credits) |
-| `packages/web/`     | _Foundation slice_ | React 18 + Vite + Tailwind v4 + shadcn-style UI; core integration verified locally. See `docs/superpowers/specs/2026-05-18-web-ui-foundation-slice-design.md`. |
+| `packages/web/`     | **Working**  | React 18 + Vite + Tailwind CSS v4 + shadcn-style UI with a full three-region grid desktop editor and mobile responsive layout |
 | `packages/cli/`     | _Planned_    | Node CLI                                             |
 
-The core composition pipeline is implemented and tested with Vitest. The web
-and CLI packages have not been started yet.
+The core composition pipeline and the web UI are fully working and tested. The CLI package has not been started yet.
 
 ## Stack
 
 - **Language**: TypeScript (strict mode)
 - **Package manager**: pnpm (workspaces) — do not switch to npm/yarn/bun
 - **Tests**: Vitest
-- **Web (planned)**: React 18 + Vite + Tailwind CSS + shadcn/ui
-- **Deployment (planned)**: Cloudflare Pages (static SPA)
+- **Web**: React 18 + Vite + Tailwind CSS v4 + shadcn-style UI
+- **Deployment**: Vercel (static SPA)
 
 ## Layout
 
 ```
-upstream/          git submodule, read-only — LPC source, spritesheets,
-                   sheet_definitions, CREDITS.csv (reference material only)
+assets/            LPC art assets (spritesheets, sheet definitions, palette definitions, CREDITS.csv) migrated from upstream
+upstream/          git submodule, read-only — LPC source (reference material only)
 packages/core/     pure TypeScript composition logic (no DOM, no fs)
-packages/web/      planned React + Vite browser UI
+packages/web/      React + Vite browser UI
 packages/cli/      planned Node CLI
 ```
 
@@ -46,13 +45,13 @@ packages/cli/      planned Node CLI
 These constraints are load-bearing — see `CLAUDE.md` for the authoritative list.
 
 1. **`upstream/` is a read-only git submodule.** Never modify it, never
-   commit inside it, never run a package manager inside it. It is the source
-   of `spritesheets/` and `sheet_definitions/`.
+   commit inside it, never run a package manager inside it. It is now legacy/reference,
+   as active assets are migrated to the local `assets/` folder.
 2. **License is GPL-3.0-or-later.** Upstream is GPL-3.0 and we inherit it. New
    dependencies must be license-compatible.
 3. **Attribution is mandatory.** Every rendered sprite must carry credit
-   metadata derived from `upstream/CREDITS.csv`. `composeSelections` always
-   returns a `credits` manifest for exactly this reason.
+   metadata derived from `assets/CREDITS.csv` (or `upstream/CREDITS.csv`).
+   `composeSelections` always returns a `credits` manifest for exactly this reason.
 4. **`packages/core/` is environment-agnostic.** No `window`, `document`,
    `fs`, or `node-canvas`. Canvas creation and image loading are injected by
    the caller via a `CanvasAdapter`.
@@ -60,7 +59,7 @@ These constraints are load-bearing — see `CLAUDE.md` for the authoritative lis
 
 ## Getting started
 
-The LPC source lives in a submodule, so clone recursively:
+The LPC source references a submodule, so clone recursively:
 
 ```bash
 git clone --recurse-submodules <repo-url>
@@ -75,6 +74,14 @@ pnpm install
 pnpm typecheck   # tsc --noEmit across all packages
 pnpm test        # vitest run across all packages
 pnpm build       # tsc build across all packages
+```
+
+All core art assets (spritesheets, sheet definitions, palette definitions, and `CREDITS.csv`) have been migrated from the `upstream/` submodule into the local `assets/` folder. The submodule is now kept for reference only.
+
+To start the web UI development server locally:
+
+```bash
+pnpm --filter @lpc-toolkit/web dev
 ```
 
 ## `@lpc-toolkit/core`
@@ -149,33 +156,21 @@ Exported from `@lpc-toolkit/core` (see `API.md` for full signatures):
 
 ## Web UI design reference
 
-`packages/web/` has not been built yet, but its UI is fully designed. The
-design lives in [`reference/LPC-Tool-Web_UI/`](reference/LPC-Tool-Web_UI) as a
-self-contained, build-free React prototype (Babel-standalone in the browser,
-mock fixtures, inline styles). It is **reference material only** — the real
-`packages/web/` will be React 18 + Vite + Tailwind + shadcn/ui consuming
-`@lpc-toolkit/core`, not a port of this prototype's code.
+The web UI in `packages/web/` is fully built. Its design and component mockup live in [`reference/v2/`](reference/v2) as a self-contained HTML file ([`LPC-Toolkit-LayerStack.html`](file:///Users/william/gitRepo/lpc-toolkit-2026-1/reference/v2/LPC-Toolkit-LayerStack.html)). It serves as the **design source and reference material** — the production `packages/web/` is built with React 18 + Vite + Tailwind CSS v4 + shadcn-style UI consuming `@lpc-toolkit/core`.
 
 ### Previewing it
 
-Open `reference/LPC-Tool-Web_UI/index.html` in a browser (no install, no build
-step). It renders a "design canvas" of artboards: desktop (dark + light),
-mobile, required states, design tokens, and the component inventory.
+Open [LPC-Toolkit-LayerStack.html](file:///Users/william/gitRepo/lpc-toolkit-2026-1/reference/v2/LPC-Toolkit-LayerStack.html) in a browser (no install, no build step). It renders the mockup for the Layer Stack component, showcasing the styling, structure, and design system.
 
 ### Layout
 
-Desktop is a top bar over a fixed three-region grid; mobile collapses the
-three regions into four bottom tabs with the preview kept as the priority.
+Desktop is a top bar over a fixed 2-column grid; mobile collapses the view using a bottom navigation bar.
 
 | Region | Desktop | Contents |
 | ------ | ------- | -------- |
-| **Left** | `320px` | Body-type grid (6 types) · search (`⌘K`) · category accordion · item grid with pixel thumbnails · inline variant chips + recolor ramp swatches |
-| **Center** | `1fr` | Checkerboard preview canvas (`image-rendering: pixelated`) · animation tabs (12 animations) · 3×3 N/S/E/W direction pad · zoom stepper (1×/2×/4×/8×) · playback transport (play/pause, frame scrubber, FPS) |
-| **Right** | `340px` | **Attribution** panel (mandatory, never hidden) — effective-license hero card ("strictest wins") + per-layer credit rows · **Export** panel — 832×3456 PNG, current strip, animated GIF, share link |
-| **Mobile** | — | Bottom tabs: Preview · Layers · Credits · Export |
-
-Attribution being a permanent, prominent region is a direct expression of the
-mandatory-attribution hard rule, not a UI afterthought.
+| **Left** | `340px` | Category accordions · search (`⌘K`) · active layers list (re-orderable) · inline variant selectors & color ramp swatches · active license & animation filters. |
+| **Right** | `1fr` | Checkerboard preview canvas (`image-rendering: pixelated`) · playback transport & scrubber · zoom controls (fit/1×/2×/4×/8×) · collapsible attribution/export sidebar (attributions summary + licensing badge, download options). |
+| **Mobile** | — | Bottom tabs to toggle between Preview and Layers, with popovers for settings and export. |
 
 ### Required states
 
@@ -201,14 +196,6 @@ The design enumerates ~32 function components in 6 groups — App shell, Picker
 each annotated with key props/states and the shadcn/ui primitive it composes
 onto (Button, Input, Accordion, Tabs, Slider, Badge, Skeleton, Sheet, Toast,
 …). See the "Component inventory" artboard for the full handoff table.
-
-## Documentation
-
-- `CLAUDE.md` — project rules and conventions (authoritative)
-- `API.md` — full `@lpc-toolkit/core` public API surface
-- `RESEARCH.md` — read-only reconnaissance of the upstream LPC project
-- `reference/LPC-Tool-Web_UI/` — Claude-designed web UI prototype and design
-  spec for the planned `packages/web/` (see above)
 
 ## License
 
