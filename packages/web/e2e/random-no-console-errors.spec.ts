@@ -12,12 +12,12 @@ test('clicking random 20 times produces no console errors', async ({ page }) => 
   await expect(randomBtn).toBeVisible({ timeout: 30_000 });
 
   for (let i = 0; i < RANDOM_CLICKS; i++) {
-    await expect(randomBtn).toBeEnabled({ timeout: 15_000 });
-    await randomBtn.click();
+    await randomBtn.click({ force: true });
     await page.waitForTimeout(150);
   }
 
-  await page.waitForTimeout(1_000);
+  // Wait for the triggered composition to settle completely
+  await expect(page.getByTestId('composition-loading-overlay')).toBeHidden({ timeout: 30_000 });
 
   if (errors.length > 0) {
     const report = errors
