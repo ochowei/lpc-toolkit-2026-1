@@ -12,6 +12,7 @@ test('clicking random 20 times produces no console errors', async ({ page }) => 
   await expect(randomBtn).toBeVisible({ timeout: 30_000 });
 
   for (let i = 0; i < RANDOM_CLICKS; i++) {
+    await expect(randomBtn).toBeEnabled({ timeout: 15_000 });
     await randomBtn.click();
     await page.waitForTimeout(150);
   }
