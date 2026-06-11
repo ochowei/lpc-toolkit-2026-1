@@ -66,7 +66,7 @@ export function LayerRow({ disabled, typeName, catalog, palettes, state, dispatc
             {selection.variant && (
               <>
                 <span>·</span>
-                <span>{selection.variant}</span>
+                <span>{tl.color(selection.variant)}</span>
               </>
             )}
             {selection.recolor && item && (() => {
@@ -126,7 +126,7 @@ export function LayerRow({ disabled, typeName, catalog, palettes, state, dispatc
         return (
           <div className="px-2 pb-2">
             <div className="mb-1 text-[10px] uppercase tracking-wide text-text-mute">
-              Swap {typeName}
+              {t('layer.swap').replace('{name}', tl.category(typeName))}
             </div>
             <div className="grid grid-cols-[repeat(auto-fill,minmax(56px,1fr))] gap-1">
               {items.map((it) => {
@@ -147,9 +147,9 @@ export function LayerRow({ disabled, typeName, catalog, palettes, state, dispatc
                     type="button"
                     disabled={disabled || !supports}
                     title={
-                      !supports ? 'incompatible body type' :
+                      !supports ? t('picker.incompatibleBodyType') :
                       exceeds ? exceedsTitle :
-                      it.name
+                      tl.itemName(it.name)
                     }
                     onClick={() => dispatch(pickActionForItem(typeName, it))}
                     className={[
@@ -167,7 +167,7 @@ export function LayerRow({ disabled, typeName, catalog, palettes, state, dispatc
                       catalog={catalog}
                       palettes={palettes}
                     />
-                    <span className="max-w-full truncate">{it.name}</span>
+                    <span className="max-w-full truncate">{tl.itemName(it.name)}</span>
                     {exceeds && supports && (
                       <span className="absolute -top-1 -right-1 inline-flex h-3 w-3 items-center justify-center rounded-full bg-danger text-[8px] text-white" aria-label={exceedsTitle}>!</span>
                     )}
@@ -182,7 +182,8 @@ export function LayerRow({ disabled, typeName, catalog, palettes, state, dispatc
                 item={item}
                 selection={selection}
                 palettes={palettes}
-                colorLabel="Style"
+                colorLabel={t('picker.color')}
+                tl={tl}
                 onSelect={(change) => {
                   if ('variant' in change) {
                     dispatch({ type: 'pick', typeName, name: item.name, variant: change.variant });
