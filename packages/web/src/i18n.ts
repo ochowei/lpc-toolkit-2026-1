@@ -154,7 +154,7 @@ export const TRANSLATIONS = {
     'more.theme': 'Theme',
     'mobile.preview': 'Preview',
     'mobile.layers': 'Layers',
-    'layer.swap': 'Swap',
+    'layer.swap': 'Swap {name}',
   },
   'zh-TW': {
     'app.subtitle': '基礎切片',
@@ -305,7 +305,7 @@ export const TRANSLATIONS = {
     'more.theme': '主題',
     'mobile.preview': '預覽',
     'mobile.layers': '圖層',
-    'layer.swap': '置換',
+    'layer.swap': '更換{name}',
   },
 } as const;
 
@@ -551,36 +551,94 @@ const ANIM_LABELS_ZH: Record<string, string> = {
 };
 
 const COLOR_LABELS_ZH: Record<string, string> = {
-  // Simple colors
-  red: '紅',
-  blue: '藍',
-  green: '綠',
-  gold: '金',
-  white: '白',
-  black: '黑',
-  brown: '棕',
-  tan: '沙色',
-  gray: '灰',
-  silver: '銀',
-  purple: '紫',
-  yellow: '黃',
-  orange: '橘',
-  pink: '粉紅',
-  dark: '深色',
-  light: '淺色',
-  steel: '鋼鐵',
-  iron: '鐵',
-  bronze: '青銅',
-  brass: '黃銅',
-  copper: '紅銅',
-  leather: '皮革',
+  // Body/Skin
+  ivory: '象牙色',
+  porcelain: '瓷白色',
+  peach: '桃色',
+  tawny: '茶褐色',
+  honey: '蜜黃色',
+  light: '淺膚色',
+  amber: '琥珀色',
+  olive: '橄欖色',
+  taupe: '灰褐色',
+  bronze: '青銅色',
+  coffee: '咖啡色',
+  bright_green: '亮綠色',
+  dark_green: '深綠色',
+  zombie: '殭屍膚色',
+  zombie_green: '綠色殭屍膚色',
+
+  // Hair
+  ash_brown: '亞麻棕',
+  blonde: '金色',
+  chestnut: '板栗色',
+  platinum: '白金色',
+  raven: '烏黑色',
+  ruby: '紅寶石色',
+  silver: '銀色',
+  violet: '紫羅蘭色',
+  ash: '灰亞麻色',
+  sandy: '沙金色',
+  strawberry: '草莓金色',
+  gold: '金黃色',
+  ginger: '薑黃色',
+  carrot: '胡蘿蔔橘色',
+  redhead: '紅髮',
+  light_brown: '淺棕色',
+  dark_brown: '深棕色',
+  dark_gray: '深灰色',
+
+  // Fur
+  fur_black: '黑色毛皮',
+  fur_brown: '棕色毛皮',
+  fur_copper: '紅銅毛皮',
+  fur_gold: '金色毛皮',
+  fur_grey: '灰色毛皮',
+  fur_tan: '黃褐毛皮',
+  fur_white: '白色毛皮',
+
+  // Metal/Ceramic
+  brass: '黃銅色',
+  copper: '紅銅色',
+  iron: '鐵灰色',
+  steel: '鋼灰色',
+  ceramic: '陶瓷色',
+
+  // Eyes
+  hazel: '淡褐色',
+
+  // Clothing / Accents
+  brown: '棕色',
+  leather: '皮革色',
+  walnut: '胡桃木色',
+  yellow: '黃色',
+  tan: '黃褐色',
+  orange: '橘色',
+  rose: '玫瑰色',
+  maroon: '栗色',
+  red: '紅色',
+  pink: '粉紅色',
+  lavender: '薰衣草紫',
+  purple: '紫色',
+  blue: '藍色',
+  navy: '海軍藍',
+  teal: '藍綠色',
+  bluegray: '藍灰色',
+  forest: '森林綠',
+  green: '綠色',
+  white: '白色',
+  sky: '天藍色',
+  slate: '石板灰',
+  gray: '灰色',
+  black: '黑色',
+  charcoal: '炭灰色',
+  base: '基礎色',
+
+  // Legacy/misc if needed
   wood: '木色',
   cloth: '布料',
   fur: '毛皮',
   bone: '骨色',
-
-  // Prefixed/Composite colors
-  'fur_black': '黑色毛皮',
   'lpcr.tan': '沙色',
 };
 
@@ -626,9 +684,19 @@ export function createLabelTranslator(locale: Locale): LabelTranslator {
     bodyType: (value) => BODY_TYPE_LABELS_ZH[value] ?? value,
     anim: (value) => ANIM_LABELS_ZH[value] ?? value,
     itemName: (value) => ITEM_NAME_LABELS_ZH[value] ?? value,
-    color: (value) =>
-      COLOR_LABELS_ZH[value.toLowerCase()] ??
-      COLOR_LABELS_ZH[value] ??
-      humanizeColor(value),
+    color: (value) => {
+      const lower = value.toLowerCase();
+      if (COLOR_LABELS_ZH[lower] !== undefined) {
+        return COLOR_LABELS_ZH[lower];
+      }
+      const lastDot = lower.lastIndexOf('.');
+      if (lastDot !== -1) {
+        const suffix = lower.slice(lastDot + 1);
+        if (COLOR_LABELS_ZH[suffix] !== undefined) {
+          return COLOR_LABELS_ZH[suffix];
+        }
+      }
+      return humanizeColor(value);
+    },
   };
 }

@@ -41,8 +41,8 @@ describe('i18n', () => {
     expect(en('composition.loading')).toBe('Loading character');
     expect(zh('composition.loading')).toBe('角色載入中');
 
-    expect(en('layer.swap')).toBe('Swap');
-    expect(zh('layer.swap')).toBe('置換');
+    expect(en('layer.swap')).toBe('Swap {name}');
+    expect(zh('layer.swap')).toBe('更換{name}');
   });
 
   it('translates reset menu labels', () => {
@@ -108,6 +108,7 @@ describe('label translator', () => {
     expect(en.color('red')).toBe('Red');
     expect(en.color('fur_black')).toBe('Fur black');
     expect(en.color('lpcr.tan')).toBe('Tan');
+    expect(en.color('lpcr.brown')).toBe('Brown');
   });
 
   it('translates category, body type and animation labels for Chinese', () => {
@@ -116,9 +117,12 @@ describe('label translator', () => {
     expect(zh.category('expression')).toBe('表情');
     expect(zh.bodyType('male')).toBe('男性');
     expect(zh.anim('walk')).toBe('行走');
-    expect(zh.color('red')).toBe('紅');
+    expect(zh.color('red')).toBe('紅色');
     expect(zh.color('fur_black')).toBe('黑色毛皮');
     expect(zh.color('lpcr.tan')).toBe('沙色');
+    expect(zh.color('lpcr.brown')).toBe('棕色');
+    expect(zh.color('brown')).toBe('棕色');
+    expect(zh.color('ivory')).toBe('象牙色');
   });
 
   it('falls back to the raw value for unknown keys', () => {
@@ -128,6 +132,7 @@ describe('label translator', () => {
     expect(zh.anim('__nope__')).toBe('__nope__');
     expect(zh.itemName('__nope__')).toBe('__nope__');
     expect(zh.color('lpcr.unknown_color')).toBe('Unknown color');
+    expect(zh.color('lpcr.neon_purple')).toBe('Neon purple');
   });
 
   it('normalises category key case', () => {
