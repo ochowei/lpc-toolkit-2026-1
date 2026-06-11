@@ -5,6 +5,7 @@ import type {
   Selection,
 } from '@lpc-toolkit/core';
 import { getColorOptions } from '../slice/color-options';
+import type { LabelTranslator } from '../i18n';
 
 /**
  * Color swatches / variant chips for one selected item. Renders nothing
@@ -19,6 +20,7 @@ export function ColorPicker({
   palettes,
   colorLabel,
   onSelect,
+  tl,
   disabled = false,
 }: {
   item: ItemDefinition;
@@ -26,6 +28,7 @@ export function ColorPicker({
   palettes: PaletteMetadata;
   colorLabel: string;
   onSelect: (change: { variant: string } | { recolor: string }) => void;
+  tl: LabelTranslator;
   disabled?: boolean;
 }) {
   const colors = useMemo(
@@ -44,8 +47,8 @@ export function ColorPicker({
                 key={opt.value}
                 type="button"
                 disabled={disabled}
-                title={opt.label}
-                aria-label={opt.label}
+                title={tl.color(opt.value)}
+                aria-label={tl.color(opt.value)}
                 aria-pressed={opt.value === selection?.recolor}
                 className={`h-5 w-5 rounded border border-border disabled:cursor-not-allowed disabled:opacity-50 ${
                   opt.value === selection?.recolor ? 'ring-2 ring-accent' : ''
@@ -67,7 +70,7 @@ export function ColorPicker({
                 }`}
                 onClick={() => onSelect({ variant: opt.value })}
               >
-                {opt.label}
+                {tl.color(opt.value)}
               </button>
             ))}
       </div>

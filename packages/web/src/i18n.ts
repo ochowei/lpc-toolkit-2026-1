@@ -154,6 +154,7 @@ export const TRANSLATIONS = {
     'more.theme': 'Theme',
     'mobile.preview': 'Preview',
     'mobile.layers': 'Layers',
+    'layer.swap': 'Swap {name}',
   },
   'zh-TW': {
     'app.subtitle': '基礎切片',
@@ -304,6 +305,7 @@ export const TRANSLATIONS = {
     'more.theme': '主題',
     'mobile.preview': '預覽',
     'mobile.layers': '圖層',
+    'layer.swap': '更換{name}',
   },
 } as const;
 
@@ -548,6 +550,258 @@ const ANIM_LABELS_ZH: Record<string, string> = {
   '1h_halfslash': '單手半揮砍',
 };
 
+export const COLOR_LABELS_ZH: Record<string, string> = {
+  // Body/Skin
+  ivory: '象牙色',
+  porcelain: '瓷白色',
+  peach: '桃色',
+  tawny: '茶褐色',
+  honey: '蜜黃色',
+  light: '淺膚色',
+  amber: '琥珀色',
+  olive: '橄欖色',
+  taupe: '灰褐色',
+  bronze: '青銅色',
+  coffee: '咖啡色',
+  bright_green: '亮綠色',
+  dark_green: '深綠色',
+  zombie: '殭屍膚色',
+  zombie_green: '綠色殭屍膚色',
+
+  // Hair
+  ash_brown: '亞麻棕',
+  blonde: '金色',
+  chestnut: '板栗色',
+  platinum: '白金色',
+  raven: '烏黑色',
+  ruby: '紅寶石色',
+  silver: '銀色',
+  violet: '紫羅蘭色',
+  ash: '灰亞麻色',
+  sandy: '沙金色',
+  strawberry: '草莓金色',
+  gold: '金黃色',
+  ginger: '薑黃色',
+  carrot: '胡蘿蔔橘色',
+  redhead: '紅髮',
+  light_brown: '淺棕色',
+  dark_brown: '深棕色',
+  dark_gray: '深灰色',
+
+  // Fur
+  fur_black: '黑色毛皮',
+  fur_brown: '棕色毛皮',
+  fur_copper: '紅銅毛皮',
+  fur_gold: '金色毛皮',
+  fur_grey: '灰色毛皮',
+  fur_tan: '黃褐毛皮',
+  fur_white: '白色毛皮',
+
+  // Metal/Ceramic
+  brass: '黃銅色',
+  copper: '紅銅色',
+  iron: '鐵灰色',
+  steel: '鋼灰色',
+  ceramic: '陶瓷色',
+
+  // Eyes
+  hazel: '淡褐色',
+
+  // Clothing / Accents
+  brown: '棕色',
+  leather: '皮革色',
+  walnut: '胡桃木色',
+  yellow: '黃色',
+  tan: '黃褐色',
+  orange: '橘色',
+  rose: '玫瑰色',
+  maroon: '栗色',
+  red: '紅色',
+  pink: '粉紅色',
+  lavender: '薰衣草紫',
+  purple: '紫色',
+  blue: '藍色',
+  navy: '海軍藍',
+  teal: '藍綠色',
+  bluegray: '藍灰色',
+  forest: '森林綠',
+  green: '綠色',
+  white: '白色',
+  sky: '天藍色',
+  slate: '石板灰',
+  gray: '灰色',
+  black: '黑色',
+  charcoal: '炭灰色',
+  base: '基礎色',
+
+  // Additional palette-definition colors from catalog safety test
+  aegean: '愛琴海藍',
+  amethyst: '紫水晶色',
+  apple: '蘋果綠',
+  apricot: '杏黃色',
+  azure: '天藍色',
+  beige: '米色',
+  blue_violet: '藍紫色',
+  cerise: '櫻桃紅',
+  cerulean: '蔚藍色',
+  chocolate: '巧克力色',
+  coral: '珊瑚色',
+  cornflower: '矢車菊藍',
+  cyan: '青色',
+  denim: '牛仔藍',
+  dove: '鴿灰色',
+  emerald: '祖母綠',
+  fern: '蕨綠色',
+  garnet: '石榴紅',
+  heather: '石楠紫',
+  ice: '冰藍色',
+  indigo: '靛藍色',
+  lemon: '檸檬黃',
+  linen: '亞麻色',
+  mauve: '淡紫色',
+  midnight: '午夜藍',
+  mint: '薄荷綠',
+  mustard: '芥末黃',
+  neptune: '海王星藍',
+  oak: '橡木色',
+  ochre: '赭石色',
+  olivine: '橄欖石綠',
+  pearl: '珍珠色',
+  periwinkle: '長春花藍',
+  plum: '李子紫',
+  powder: '粉藍色',
+  red_orange: '紅橙色',
+  royal: '皇家藍',
+  salmon: '鮭魚紅',
+  sepia: '深褐色',
+  shadow: '陰影色',
+  smoke: '煙灰色',
+  soot: '煤煙色',
+  spring: '春綠色',
+  swamp: '沼澤綠',
+  tumeric: '薑黃色',
+  umber: '生褐碳色',
+  wine: '酒紅色',
+  pale_green: '淡綠色',
+
+  // Custom composite & skin & metal color labels
+  'light brown': '淺棕色',
+  'dark brown': '深棕色',
+  'dark gray': '深灰色',
+  'light gray': '淺灰色',
+  'forest green': '森林綠',
+  'brown striped': '棕色條紋',
+  'gray striped': '灰色條紋',
+  'green striped': '綠色條紋',
+  darkblue: '深藍色',
+  lightblue: '淺藍色',
+  dark: '深色',
+
+  skin_black: '黑色肌膚',
+  skin_blue: '藍色肌膚',
+  skin_green: '綠色肌膚',
+
+  metallic_steel: '金屬鋼灰色',
+  metallic_iron: '金屬鐵灰色',
+  metallic_ceramic: '金屬陶瓷色',
+  metallic_brass: '金屬黃銅色',
+  metallic_copper: '金屬紅銅色',
+  metallic_bronze: '金屬青銅色',
+  metallic_silver: '金屬銀色',
+  metallic_gold: '金屬金色',
+
+  crown_gold: '金皇冠',
+  crown_red: '紅皇冠',
+  crown_blue: '藍皇冠',
+  crown_gray: '灰皇冠',
+  tiara_bronze: '青銅頭冠',
+  tiara_gold: '金頭冠',
+  tiara_iron: '鐵頭冠',
+  tiara_purple: '紫頭冠',
+  tiara_silver: '銀頭冠',
+
+  base_black: '黑色基底',
+  base_gray: '灰色基底',
+  base_red: '紅色基底',
+  base_teal: '藍綠色基底',
+  base_yellow: '黃色基底',
+  base_maroon: '栗色基底',
+  base_brown: '棕色基底',
+
+  brass_blue: '藍色黃銅',
+  brass_green: '綠色黃銅',
+  brass_orange: '橘色黃銅',
+  brass_purple: '紫色黃銅',
+  brass_red: '紅色黃銅',
+  brass_yellow: '黃色黃銅',
+  bronze_blue: '藍色青銅',
+  bronze_green: '綠色青銅',
+  bronze_orange: '橘色青銅',
+  bronze_purple: '紫色青銅',
+  bronze_red: '紅色青銅',
+  bronze_yellow: '黃色青銅',
+  ceramic_blue: '藍色陶瓷',
+  ceramic_green: '綠色陶瓷',
+  ceramic_orange: '橘色陶瓷',
+  ceramic_purple: '紫色陶瓷',
+  ceramic_red: '紅色陶瓷',
+  ceramic_yellow: '黃色陶瓷',
+  copper_blue: '藍色紅銅',
+  copper_green: '綠色紅銅',
+  copper_orange: '橘色紅銅',
+  copper_purple: '紫色紅銅',
+  copper_red: '紅色紅銅',
+  copper_yellow: '黃色紅銅',
+  gold_blue: '藍色黃金',
+  gold_green: '綠色黃金',
+  gold_orange: '橘色黃金',
+  gold_purple: '紫色黃金',
+  gold_red: '紅色黃金',
+  gold_yellow: '黃色黃金',
+  iron_blue: '藍色鐵質',
+  iron_green: '綠色鐵質',
+  iron_orange: '橘色鐵質',
+  iron_purple: '紫色鐵質',
+  iron_red: '紅色鐵質',
+  iron_yellow: '黃色鐵質',
+  silver_blue: '藍色銀質',
+  silver_green: '綠色銀質',
+  silver_orange: '橘色銀質',
+  silver_purple: '紫色銀質',
+  silver_red: '紅色銀質',
+  silver_yellow: '黃色銀質',
+  steel_blue: '藍色鋼質',
+  steel_green: '綠色鋼質',
+  steel_orange: '橘色鋼質',
+  steel_purple: '紫色鋼質',
+  steel_red: '紅色鋼質',
+  steel_yellow: '黃色鋼質',
+
+  'kite blue blue': '藍藍風箏盾',
+  'kite blue gray': '藍灰風箏盾',
+  'kite gray blue': '灰藍風箏盾',
+  'kite gray gray': '雙灰風箏盾',
+  'kite gray green': '灰綠風箏盾',
+  'kite gray orange': '灰橘風箏盾',
+  'kite gray': '灰色風箏盾',
+  'kite green gray': '綠灰風箏盾',
+  'kite orange': '橘色風箏盾',
+  'kite red gray': '紅灰風箏盾',
+
+  // Legacy/misc if needed
+  wood: '木色',
+  cloth: '布料',
+  fur: '毛皮',
+  bone: '骨色',
+  'lpcr.tan': '沙色',
+};
+
+function humanizeColor(raw: string): string {
+  const tail = raw.includes('.') ? raw.slice(raw.lastIndexOf('.') + 1) : raw;
+  const spaced = tail.replace(/_/g, ' ');
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
 /** Translation helpers for values that come from upstream catalog metadata. */
 export interface LabelTranslator {
   /** type_name or advanced-tree path segment, e.g. "body", "weapon". */
@@ -558,6 +812,8 @@ export interface LabelTranslator {
   anim(value: string): string;
   /** asset display name, e.g. "Plate armor". */
   itemName(value: string): string;
+  /** color key, e.g. "lpcr.tan", "red", "fur_black". */
+  color(value: string): string;
 }
 
 /**
@@ -567,7 +823,13 @@ export interface LabelTranslator {
 export function createLabelTranslator(locale: Locale): LabelTranslator {
   if (locale !== 'zh-TW') {
     const raw = (value: string): string => value;
-    return { category: raw, bodyType: raw, anim: raw, itemName: raw };
+    return {
+      category: raw,
+      bodyType: raw,
+      anim: raw,
+      itemName: raw,
+      color: humanizeColor,
+    };
   }
   return {
     // Category keys (type names / tree path segments) can arrive in mixed
@@ -576,5 +838,19 @@ export function createLabelTranslator(locale: Locale): LabelTranslator {
     bodyType: (value) => BODY_TYPE_LABELS_ZH[value] ?? value,
     anim: (value) => ANIM_LABELS_ZH[value] ?? value,
     itemName: (value) => ITEM_NAME_LABELS_ZH[value] ?? value,
+    color: (value) => {
+      const lower = value.toLowerCase();
+      if (COLOR_LABELS_ZH[lower] !== undefined) {
+        return COLOR_LABELS_ZH[lower];
+      }
+      const lastDot = lower.lastIndexOf('.');
+      if (lastDot !== -1) {
+        const suffix = lower.slice(lastDot + 1);
+        if (COLOR_LABELS_ZH[suffix] !== undefined) {
+          return COLOR_LABELS_ZH[suffix];
+        }
+      }
+      return humanizeColor(value);
+    },
   };
 }
