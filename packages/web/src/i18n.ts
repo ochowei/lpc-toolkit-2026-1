@@ -154,6 +154,7 @@ export const TRANSLATIONS = {
     'more.theme': 'Theme',
     'mobile.preview': 'Preview',
     'mobile.layers': 'Layers',
+    'layer.swap': 'Swap',
   },
   'zh-TW': {
     'app.subtitle': '基礎切片',
@@ -304,6 +305,7 @@ export const TRANSLATIONS = {
     'more.theme': '主題',
     'mobile.preview': '預覽',
     'mobile.layers': '圖層',
+    'layer.swap': '置換',
   },
 } as const;
 
@@ -548,6 +550,46 @@ const ANIM_LABELS_ZH: Record<string, string> = {
   '1h_halfslash': '單手半揮砍',
 };
 
+const COLOR_LABELS_ZH: Record<string, string> = {
+  // Simple colors
+  red: '紅',
+  blue: '藍',
+  green: '綠',
+  gold: '金',
+  white: '白',
+  black: '黑',
+  brown: '棕',
+  tan: '沙色',
+  gray: '灰',
+  silver: '銀',
+  purple: '紫',
+  yellow: '黃',
+  orange: '橘',
+  pink: '粉紅',
+  dark: '深色',
+  light: '淺色',
+  steel: '鋼鐵',
+  iron: '鐵',
+  bronze: '青銅',
+  brass: '黃銅',
+  copper: '紅銅',
+  leather: '皮革',
+  wood: '木色',
+  cloth: '布料',
+  fur: '毛皮',
+  bone: '骨色',
+
+  // Prefixed/Composite colors
+  'fur_black': '黑色毛皮',
+  'lpcr.tan': '沙色',
+};
+
+function humanizeColor(raw: string): string {
+  const tail = raw.includes('.') ? raw.slice(raw.lastIndexOf('.') + 1) : raw;
+  const spaced = tail.replace(/_/g, ' ');
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
 /** Translation helpers for values that come from upstream catalog metadata. */
 export interface LabelTranslator {
   /** type_name or advanced-tree path segment, e.g. "body", "weapon". */
@@ -558,6 +600,8 @@ export interface LabelTranslator {
   anim(value: string): string;
   /** asset display name, e.g. "Plate armor". */
   itemName(value: string): string;
+  /** color key, e.g. "lpcr.tan", "red", "fur_black". */
+  color(value: string): string;
 }
 
 /**
@@ -567,7 +611,13 @@ export interface LabelTranslator {
 export function createLabelTranslator(locale: Locale): LabelTranslator {
   if (locale !== 'zh-TW') {
     const raw = (value: string): string => value;
-    return { category: raw, bodyType: raw, anim: raw, itemName: raw };
+    return {
+      category: raw,
+      bodyType: raw,
+      anim: raw,
+      itemName: raw,
+      color: humanizeColor,
+    };
   }
   return {
     // Category keys (type names / tree path segments) can arrive in mixed
@@ -576,5 +626,9 @@ export function createLabelTranslator(locale: Locale): LabelTranslator {
     bodyType: (value) => BODY_TYPE_LABELS_ZH[value] ?? value,
     anim: (value) => ANIM_LABELS_ZH[value] ?? value,
     itemName: (value) => ITEM_NAME_LABELS_ZH[value] ?? value,
+    color: (value) =>
+      COLOR_LABELS_ZH[value.toLowerCase()] ??
+      COLOR_LABELS_ZH[value] ??
+      humanizeColor(value),
   };
 }
