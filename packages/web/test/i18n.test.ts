@@ -9,6 +9,7 @@ import {
   createLabelTranslator,
   createTranslator,
   COLOR_LABELS_ZH,
+  VARIANT_LABELS_ZH,
   type TranslationKey,
 } from '../src/i18n';
 import { ITEM_NAME_LABELS_ZH } from '../src/i18n-item-names';
@@ -37,6 +38,9 @@ describe('i18n', () => {
     expect(zh('controls.play')).toBe('播放');
     expect(zh('direction.left')).toBe('左');
     expect(zh('language.toEnglish')).toBe('English');
+
+    expect(en('picker.style')).toBe('Style');
+    expect(zh('picker.style')).toBe('款式');
 
     expect(en('picker.common')).toBe('Common');
     expect(en('picker.advanced')).toBe('Advanced: all upstream assets');
@@ -113,6 +117,8 @@ describe('label translator', () => {
     expect(en.color('fur_black')).toBe('Fur black');
     expect(en.color('lpcr.tan')).toBe('Tan');
     expect(en.color('lpcr.brown')).toBe('Brown');
+    expect(en.variant('pickaxe')).toBe('Pickaxe');
+    expect(en.variant('longsword_alt')).toBe('Longsword alt');
   });
 
   it('translates category, body type and animation labels for Chinese', () => {
@@ -127,6 +133,35 @@ describe('label translator', () => {
     expect(zh.color('lpcr.brown')).toBe('棕色');
     expect(zh.color('brown')).toBe('棕色');
     expect(zh.color('ivory')).toBe('象牙色');
+  });
+
+  it('translates Tools variants for Chinese', () => {
+    const zh = createLabelTranslator('zh-TW');
+
+    expect(zh.variant('axe')).toBe('斧頭');
+    expect(zh.variant('hammer')).toBe('鐵鎚');
+    expect(zh.variant('pickaxe')).toBe('十字鎬');
+    expect(zh.variant('hoe')).toBe('鋤頭');
+    expect(zh.variant('shovel')).toBe('鏟子');
+    expect(zh.variant('watering')).toBe('澆水壺');
+    expect(zh.variant('rod')).toBe('釣竿');
+    expect(zh.variant('whip')).toBe('鞭子');
+  });
+
+  it('humanizes unknown variants without treating them as colors', () => {
+    const zh = createLabelTranslator('zh-TW');
+
+    expect(zh.variant('longsword_alt')).toBe('Longsword alt');
+    expect(zh.color('red')).toBe('紅色');
+  });
+
+  it('translates the four Tools item names for Chinese', () => {
+    const zh = createLabelTranslator('zh-TW');
+
+    expect(zh.itemName('Rod')).toBe('釣竿');
+    expect(zh.itemName('Smash')).toBe('敲擊工具');
+    expect(zh.itemName('Thrust')).toBe('推刺工具');
+    expect(zh.itemName('Whip')).toBe('鞭子');
   });
 
   it('falls back to the raw value for unknown keys', () => {
@@ -202,20 +237,16 @@ describe('i18n catalog safety guard', () => {
       }
     }
 
-    const missing: string[] = [];
-    const allKeys = new Set([...colorKeys, ...variantKeys]);
-
     const legitimatelyUnmapped = new Set([
       'hook', 'peg_leg', 'skeleton', 'dragonfly', 'monarch', 'pixie', 'lunar', 'sara', 'horns',
-      'cyclops', 'jack', 'pirate', 'sunglasses', 'rod', 'axe', 'hammer', 'pickaxe', 'hoe',
-      'shovel', 'watering', 'whip', 'round', 'square', 'coal', 'tin', '3_logs', '9_logs', 'quiver',
+      'cyclops', 'jack', 'pirate', 'sunglasses', 'round', 'square', 'coal', 'tin', '3_logs', '9_logs', 'quiver',
       'club', 'flail', 'mace', 'waraxe', 'medium', 'simple', 'wand', 'cane', 'halberd', 'scythe',
       'arrow', 'boomerang', 'crossbow', 'slingshot', 'crusader', 'plus', 'two_engrailed',
       'two_engrailed_trim', 'scutum', 'scutum_trim', 'spartan', 'dagger', 'katana', 'longsword',
       'longsword_alt', 'rapier', 'saber', 'scimitar'
     ]);
 
-    const isMapped = (k: string): boolean => {
+    const isMappedColor = (k: string): boolean => {
       const lower = k.toLowerCase();
       if (COLOR_LABELS_ZH[lower] !== undefined) return true;
       const lastDot = lower.lastIndexOf('.');
@@ -226,12 +257,17 @@ describe('i18n catalog safety guard', () => {
       return false;
     };
 
-    for (const key of allKeys) {
-      if (legitimatelyUnmapped.has(key)) continue;
-      if (!isMapped(key)) {
-        missing.push(key);
-      }
-    }
+    const missingColors = [...colorKeys].filter((key) => !isMappedColor(key));
+    const missingVariants = [...variantKeys].filter(
+      (key) =>
+        !legitimatelyUnmapped.has(key) &&
+        VARIANT_LABELS_ZH[key.toLowerCase()] === undefined &&
+        !isMappedColor(key),
+    );
+    const missing = [
+      ...missingColors.map((key) => `color: ${key}`),
+      ...missingVariants.map((key) => `variant: ${key}`),
+    ];
 
     if (missing.length > 0) {
       expect.fail(

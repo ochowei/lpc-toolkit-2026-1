@@ -21,6 +21,7 @@ export const TRANSLATIONS = {
     'picker.advanced': 'Advanced: all upstream assets',
     'picker.searchAssets': 'Search all assets',
     'picker.color': 'Color',
+    'picker.style': 'Style',
     'picker.incompatibleBodyType': 'Not available for current body type',
     'picker.clickToRemove': 'Click again to remove',
     'direction.up': 'Up',
@@ -175,6 +176,7 @@ export const TRANSLATIONS = {
     'picker.advanced': '進階：所有上游素材',
     'picker.searchAssets': '搜尋所有素材',
     'picker.color': '顏色',
+    'picker.style': '款式',
     'picker.incompatibleBodyType': '不支援目前身形',
     'picker.clickToRemove': '再點一次可取消',
     'direction.up': '上',
@@ -796,7 +798,18 @@ export const COLOR_LABELS_ZH: Record<string, string> = {
   'lpcr.tan': '沙色',
 };
 
-function humanizeColor(raw: string): string {
+export const VARIANT_LABELS_ZH: Readonly<Record<string, string>> = {
+  axe: '斧頭',
+  hammer: '鐵鎚',
+  pickaxe: '十字鎬',
+  hoe: '鋤頭',
+  shovel: '鏟子',
+  watering: '澆水壺',
+  rod: '釣竿',
+  whip: '鞭子',
+};
+
+function humanizeLabel(raw: string): string {
   const tail = raw.includes('.') ? raw.slice(raw.lastIndexOf('.') + 1) : raw;
   const spaced = tail.replace(/_/g, ' ');
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
@@ -814,6 +827,8 @@ export interface LabelTranslator {
   itemName(value: string): string;
   /** color key, e.g. "lpcr.tan", "red", "fur_black". */
   color(value: string): string;
+  /** asset variant key, e.g. "axe", "longsword_alt". */
+  variant(value: string): string;
 }
 
 /**
@@ -828,7 +843,8 @@ export function createLabelTranslator(locale: Locale): LabelTranslator {
       bodyType: raw,
       anim: raw,
       itemName: raw,
-      color: humanizeColor,
+      color: humanizeLabel,
+      variant: humanizeLabel,
     };
   }
   return {
@@ -850,7 +866,9 @@ export function createLabelTranslator(locale: Locale): LabelTranslator {
           return COLOR_LABELS_ZH[suffix];
         }
       }
-      return humanizeColor(value);
+      return humanizeLabel(value);
     },
+    variant: (value) =>
+      VARIANT_LABELS_ZH[value.toLowerCase()] ?? humanizeLabel(value),
   };
 }
