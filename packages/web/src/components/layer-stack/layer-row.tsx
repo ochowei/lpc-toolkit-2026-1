@@ -183,6 +183,7 @@ export function LayerRow({ disabled, typeName, catalog, palettes, state, dispatc
                 selection={selection}
                 palettes={palettes}
                 colorLabel={t('picker.color')}
+                styleLabel={t('picker.style')}
                 tl={tl}
                 onSelect={(change) => {
                   if ('variant' in change) {
