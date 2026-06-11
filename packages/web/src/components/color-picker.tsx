@@ -19,6 +19,7 @@ export function ColorPicker({
   selection,
   palettes,
   colorLabel,
+  styleLabel,
   onSelect,
   tl,
   disabled = false,
@@ -27,6 +28,7 @@ export function ColorPicker({
   selection: Selection | undefined;
   palettes: PaletteMetadata;
   colorLabel: string;
+  styleLabel: string;
   onSelect: (change: { variant: string } | { recolor: string }) => void;
   tl: LabelTranslator;
   disabled?: boolean;
@@ -37,9 +39,11 @@ export function ColorPicker({
   );
   if (colors.mode === 'none') return null;
 
+  const heading = colors.mode === 'recolors' ? colorLabel : styleLabel;
+
   return (
     <div className="text-xs">
-      <span className="text-text-mute uppercase">{colorLabel}</span>
+      <span className="text-text-mute uppercase">{heading}</span>
       <div className="mt-1 flex max-h-28 flex-wrap gap-1 overflow-y-auto">
         {colors.mode === 'recolors'
           ? colors.options.map((opt) => (
@@ -70,7 +74,7 @@ export function ColorPicker({
                 }`}
                 onClick={() => onSelect({ variant: opt.value })}
               >
-                {tl.color(opt.value)}
+                {tl.variant(opt.value)}
               </button>
             ))}
       </div>
