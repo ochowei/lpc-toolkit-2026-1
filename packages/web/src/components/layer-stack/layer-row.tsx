@@ -66,7 +66,7 @@ export function LayerRow({ disabled, typeName, catalog, palettes, state, dispatc
             {selection.variant && (
               <>
                 <span>·</span>
-                <span>{tl.color(selection.variant)}</span>
+                <span>{tl.variant(selection.variant)}</span>
               </>
             )}
             {selection.recolor && item && (() => {
