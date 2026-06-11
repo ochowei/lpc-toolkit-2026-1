@@ -1,10 +1,14 @@
 /** Verifies locale defaults, key coverage, and label translation behavior. */
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_LOCALE,
   TRANSLATIONS,
   createLabelTranslator,
   createTranslator,
+  COLOR_LABELS_ZH,
   type TranslationKey,
 } from '../src/i18n';
 import { ITEM_NAME_LABELS_ZH } from '../src/i18n-item-names';
@@ -153,5 +157,87 @@ describe('label translator', () => {
 
   it('has a non-trivial asset-name dictionary', () => {
     expect(Object.keys(ITEM_NAME_LABELS_ZH).length).toBeGreaterThan(100);
+  });
+});
+
+describe('i18n catalog safety guard', () => {
+  it('ensures all color and variant keys in the catalog have translations', () => {
+    const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
+    const paletteDir = path.join(repoRoot, 'assets/palette_definitions');
+    const sheetDir = path.join(repoRoot, 'assets/sheet_definitions');
+
+    function getJsonFiles(dir: string): string[] {
+      const results: string[] = [];
+      if (!fs.existsSync(dir)) return results;
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          results.push(...getJsonFiles(fullPath));
+        } else if (entry.isFile() && entry.name.endsWith('.json') && !entry.name.startsWith('meta_')) {
+          results.push(fullPath);
+        }
+      }
+      return results;
+    }
+
+    const colorKeys = new Set<string>();
+    const variantKeys = new Set<string>();
+
+    const paletteFiles = getJsonFiles(paletteDir);
+    for (const file of paletteFiles) {
+      const content = JSON.parse(fs.readFileSync(file, 'utf8'));
+      for (const key of Object.keys(content)) {
+        colorKeys.add(key);
+      }
+    }
+
+    const sheetFiles = getJsonFiles(sheetDir);
+    for (const file of sheetFiles) {
+      const content = JSON.parse(fs.readFileSync(file, 'utf8'));
+      if (Array.isArray(content.variants)) {
+        for (const v of content.variants) {
+          variantKeys.add(v);
+        }
+      }
+    }
+
+    const missing: string[] = [];
+    const allKeys = new Set([...colorKeys, ...variantKeys]);
+
+    const legitimatelyUnmapped = new Set([
+      'hook', 'peg_leg', 'skeleton', 'dragonfly', 'monarch', 'pixie', 'lunar', 'sara', 'horns',
+      'cyclops', 'jack', 'pirate', 'sunglasses', 'rod', 'axe', 'hammer', 'pickaxe', 'hoe',
+      'shovel', 'watering', 'whip', 'round', 'square', 'coal', 'tin', '3_logs', '9_logs', 'quiver',
+      'club', 'flail', 'mace', 'waraxe', 'medium', 'simple', 'wand', 'cane', 'halberd', 'scythe',
+      'arrow', 'boomerang', 'crossbow', 'slingshot', 'crusader', 'plus', 'two_engrailed',
+      'two_engrailed_trim', 'scutum', 'scutum_trim', 'spartan', 'dagger', 'katana', 'longsword',
+      'longsword_alt', 'rapier', 'saber', 'scimitar'
+    ]);
+
+    const isMapped = (k: string): boolean => {
+      const lower = k.toLowerCase();
+      if (COLOR_LABELS_ZH[lower] !== undefined) return true;
+      const lastDot = lower.lastIndexOf('.');
+      if (lastDot !== -1) {
+        const suffix = lower.slice(lastDot + 1);
+        if (COLOR_LABELS_ZH[suffix] !== undefined) return true;
+      }
+      return false;
+    };
+
+    for (const key of allKeys) {
+      if (legitimatelyUnmapped.has(key)) continue;
+      if (!isMapped(key)) {
+        missing.push(key);
+      }
+    }
+
+    if (missing.length > 0) {
+      expect.fail(
+        `The following ${missing.length} color/variant key(s) are missing Traditional Chinese translations:\n` +
+          missing.map((k) => `  - ${k}`).join('\n')
+      );
+    }
   });
 });
