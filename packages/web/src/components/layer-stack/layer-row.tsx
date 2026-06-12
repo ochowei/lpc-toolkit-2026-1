@@ -128,7 +128,7 @@ export function LayerRow({ disabled, typeName, catalog, palettes, state, dispatc
             <div className="mb-1 text-[10px] uppercase tracking-wide text-text-mute">
               {t('layer.swap').replace('{name}', tl.category(typeName))}
             </div>
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(56px,1fr))] gap-1">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-1">
               {items.map((it) => {
                 const supports = itemSupportsBodyType(it, state.bodyType);
                 const licenseExceeds = !itemMatchesLicenseFilter(it, licenseFilter);
@@ -171,7 +171,7 @@ export function LayerRow({ disabled, typeName, catalog, palettes, state, dispatc
                     <ItemThumbnail
                       typeName={typeName}
                       name={it.name}
-                      size={24}
+                      size={40}
                       bodyType={state.bodyType}
                       catalog={catalog}
                       palettes={palettes}
