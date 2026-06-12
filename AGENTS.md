@@ -62,6 +62,21 @@ Before doing any of these, ask first:
 - Tailwind utility classes
 - File names: kebab-case for files, PascalCase for component exports
 
+## Superpowers Workflow Extension
+
+After completing any plan step:
+
+- Update the plan file checkbox.
+- Add a short implementation note.
+- Record the commit hash.
+- Record verification status.
+
+Example:
+
+- [x] Implement asset validator
+  - Commit: abc1234
+  - Verification: pnpm typecheck PASS
+
 
 ---
 
