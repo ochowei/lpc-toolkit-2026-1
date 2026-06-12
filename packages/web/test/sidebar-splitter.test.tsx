@@ -23,5 +23,6 @@ describe('SidebarSplitter', () => {
     expect(html).toContain('aria-label="Resize sidebar"');
     expect(html).toContain('tabindex="0"');
     expect(html).toContain('cursor-ew-resize');
+    expect(html).toContain('class="absolute -inset-x-1 inset-y-0"');
   });
 });

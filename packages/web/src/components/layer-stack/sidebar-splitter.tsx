@@ -22,73 +22,82 @@ export function SidebarSplitter({
   onCommit,
   onReset,
 }: SidebarSplitterProps) {
-  const draggingRef = useRef(false);
-  const containerLeftRef = useRef(0);
   const latestWidthRef = useRef(value);
+  const activePointerIdRef = useRef<number | null>(null);
+  const activeCleanupRef = useRef<(() => void) | null>(null);
   const valueRef = useRef(value);
+  const minRef = useRef(min);
   const maxRef = useRef(max);
   const onChangeRef = useRef(onChange);
   const onCommitRef = useRef(onCommit);
   const onResetRef = useRef(onReset);
-  const moveHandlerRef = useRef<((event: PointerEvent) => void) | null>(null);
-  const upHandlerRef = useRef<(() => void) | null>(null);
 
   valueRef.current = value;
+  minRef.current = min;
   maxRef.current = max;
   onChangeRef.current = onChange;
   onCommitRef.current = onCommit;
   onResetRef.current = onReset;
 
-  const cleanupDrag = useCallback(() => {
-    draggingRef.current = false;
+  const onDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    activeCleanupRef.current?.();
 
-    if (moveHandlerRef.current) {
-      document.removeEventListener('pointermove', moveHandlerRef.current);
+    const pointerId = event.pointerId;
+    const containerLeft =
+      event.currentTarget.parentElement?.getBoundingClientRect().left ??
+      event.currentTarget.getBoundingClientRect().left;
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+
+    activePointerIdRef.current = pointerId;
+    latestWidthRef.current = valueRef.current;
+    document.body.style.cursor = 'ew-resize';
+    document.body.style.userSelect = 'none';
+
+    function cleanupDrag() {
+      document.removeEventListener('pointermove', handleMove);
+      document.removeEventListener('pointerup', handleUp);
+      document.removeEventListener('pointercancel', handleCancel);
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+      activePointerIdRef.current = null;
+
+      if (activeCleanupRef.current === cleanupDrag) {
+        activeCleanupRef.current = null;
+      }
     }
-    if (upHandlerRef.current) {
-      document.removeEventListener('pointerup', upHandlerRef.current);
+
+    function handleMove(moveEvent: PointerEvent) {
+      if (moveEvent.pointerId !== activePointerIdRef.current) return;
+
+      const next = computeSidebarWidthFromPointer(
+        moveEvent.clientX,
+        containerLeft,
+        maxRef.current,
+      );
+      latestWidthRef.current = next;
+      onChangeRef.current(next);
     }
 
-    document.body.style.cursor = '';
-    document.body.style.userSelect = '';
+    function handleUp(upEvent: PointerEvent) {
+      if (upEvent.pointerId !== activePointerIdRef.current) return;
+
+      const next = latestWidthRef.current;
+      cleanupDrag();
+      onCommitRef.current(next);
+    }
+
+    function handleCancel(cancelEvent: PointerEvent) {
+      if (cancelEvent.pointerId !== activePointerIdRef.current) return;
+      cleanupDrag();
+    }
+
+    activeCleanupRef.current = cleanupDrag;
+    document.addEventListener('pointermove', handleMove);
+    document.addEventListener('pointerup', handleUp);
+    document.addEventListener('pointercancel', handleCancel);
   }, []);
-
-  const onMove = useCallback((event: PointerEvent) => {
-    if (!draggingRef.current) return;
-
-    const next = computeSidebarWidthFromPointer(
-      event.clientX,
-      containerLeftRef.current,
-      maxRef.current,
-    );
-    latestWidthRef.current = next;
-    onChangeRef.current(next);
-  }, []);
-
-  const onUp = useCallback(() => {
-    const next = latestWidthRef.current;
-    cleanupDrag();
-    onCommitRef.current(next);
-  }, [cleanupDrag]);
-
-  moveHandlerRef.current = onMove;
-  upHandlerRef.current = onUp;
-
-  const onDown = useCallback(
-    (event: React.PointerEvent<HTMLDivElement>) => {
-      event.preventDefault();
-      draggingRef.current = true;
-      containerLeftRef.current =
-        event.currentTarget.parentElement?.getBoundingClientRect().left ??
-        event.currentTarget.getBoundingClientRect().left;
-      latestWidthRef.current = valueRef.current;
-      document.body.style.cursor = 'ew-resize';
-      document.body.style.userSelect = 'none';
-      document.addEventListener('pointermove', onMove);
-      document.addEventListener('pointerup', onUp);
-    },
-    [onMove, onUp],
-  );
 
   const onKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -102,7 +111,7 @@ export function SidebarSplitter({
           next = valueRef.current + SIDEBAR_KEYBOARD_STEP;
           break;
         case 'Home':
-          next = min;
+          next = minRef.current;
           break;
         case 'End':
           next = maxRef.current;
@@ -112,18 +121,28 @@ export function SidebarSplitter({
       }
 
       event.preventDefault();
-      const clamped = clampSidebarWidth(next, maxRef.current);
+      const clamped = Math.min(
+        maxRef.current,
+        Math.max(
+          minRef.current,
+          clampSidebarWidth(next, maxRef.current),
+        ),
+      );
       onChangeRef.current(clamped);
       onCommitRef.current(clamped);
     },
-    [min],
+    [],
   );
 
   const onDoubleClick = useCallback(() => {
     onResetRef.current();
   }, []);
 
-  useEffect(() => cleanupDrag, [cleanupDrag]);
+  useEffect(() => {
+    return () => {
+      activeCleanupRef.current?.();
+    };
+  }, []);
 
   return (
     <div
@@ -139,7 +158,7 @@ export function SidebarSplitter({
       onDoubleClick={onDoubleClick}
       className="group relative w-1.5 cursor-ew-resize bg-border transition-colors hover:bg-accent/60 focus-visible:bg-accent/60"
     >
-      <div className="pointer-events-none absolute -inset-x-1 inset-y-0" />
+      <div className="absolute -inset-x-1 inset-y-0" />
     </div>
   );
 }
