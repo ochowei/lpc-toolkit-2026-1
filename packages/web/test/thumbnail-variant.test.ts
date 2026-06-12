@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ItemDefinition } from '@lpc-toolkit/core';
-import { effectiveThumbnailVariant } from '../src/hooks/use-item-thumbnail';
+import { effectiveThumbnailVariant } from '../src/lib/item-thumbnail-selection';
 
 function def(variants?: readonly string[]): ItemDefinition {
   return {
