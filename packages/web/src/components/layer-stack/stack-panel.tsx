@@ -5,6 +5,7 @@ import type { Translator, LabelTranslator } from '../../i18n';
 import { type LicenseFilter } from '../../slice/license-filter';
 import { type AnimationFilter } from '../../slice/animation-filter';
 import type { CustomOverlay } from '../../lib/custom-overlay';
+import type { ReplacementCardDisplayMode } from '../../lib/replacement-card-display-mode';
 import { LayerRow } from './layer-row';
 import { AddLayer } from './add-layer';
 import { PresetBar } from './preset-bar';
@@ -40,6 +41,8 @@ interface Props {
   searchInputRef: RefObject<HTMLInputElement>;
   expanded: TypeName | null;
   setExpanded: (v: TypeName | null) => void;
+  replacementCardDisplayMode: ReplacementCardDisplayMode;
+  onReplacementCardDisplayModeChange: (mode: ReplacementCardDisplayMode) => void;
 }
 
 /** Left-side layer management panel: search, filters, active stack, and settings. */
@@ -71,6 +74,8 @@ export function StackPanel({
   searchInputRef,
   expanded,
   setExpanded,
+  replacementCardDisplayMode,
+  onReplacementCardDisplayModeChange,
 }: Props) {
   const [adding, setAdding] = useState(false);
 
@@ -147,6 +152,8 @@ export function StackPanel({
               animationFilter={animationFilter}
               expanded={expanded === tn}
               onToggle={() => setExpanded(expanded === tn ? null : tn)}
+              replacementCardDisplayMode={replacementCardDisplayMode}
+              onReplacementCardDisplayModeChange={onReplacementCardDisplayModeChange}
             />
           ))
         )}

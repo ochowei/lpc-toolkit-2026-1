@@ -76,6 +76,11 @@ import {
   loadSidebarWidth,
   saveSidebarWidth,
 } from '../../lib/sidebar-width';
+import {
+  loadReplacementCardDisplayMode,
+  saveReplacementCardDisplayMode,
+  type ReplacementCardDisplayMode,
+} from '../../lib/replacement-card-display-mode';
 
 interface LpcE2eProbe {
   readonly hash: string;
@@ -149,6 +154,21 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   const [customOverlayZPos, setCustomOverlayZPos] = useState(0);
   const isDesktop = useMediaQuery('(min-width: 768px)');
   const [mobileView, setMobileView] = useState<MobileView>('preview');
+  const [
+    replacementCardDisplayMode,
+    setReplacementCardDisplayMode,
+  ] = useState<ReplacementCardDisplayMode>(() =>
+    loadReplacementCardDisplayMode(browserLocalStorage()),
+  );
+
+  const changeReplacementCardDisplayMode = useCallback(
+    (mode: ReplacementCardDisplayMode) => {
+      setReplacementCardDisplayMode(mode);
+      saveReplacementCardDisplayMode(browserLocalStorage(), mode);
+    },
+    [],
+  );
+
   const [preferredSidebarWidth, setPreferredSidebarWidth] = useState(() => {
     if (
       typeof window === 'undefined' ||
@@ -567,6 +587,8 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
       expanded={expanded}
       setExpanded={setExpanded}
       searchInputRef={searchInputRef}
+      replacementCardDisplayMode={replacementCardDisplayMode}
+      onReplacementCardDisplayModeChange={changeReplacementCardDisplayMode}
     />
   );
 

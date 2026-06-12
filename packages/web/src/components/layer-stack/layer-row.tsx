@@ -77,6 +77,7 @@ export function LayerRow({
     >
       <button
         type="button"
+        aria-expanded={expanded}
         onClick={onToggle}
         className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-surface-2"
       >
