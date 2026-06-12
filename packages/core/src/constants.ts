@@ -300,3 +300,12 @@ export const ANIMATION_CONFIGS: Readonly<Record<string, AnimationConfig>> = {
   },
   '1h_halfslash': { row: 50, num: 4, cycle: [0, 1, 2, 3, 4, 5] },
 };
+
+/**
+ * Maps virtual/shared standard animations that do not have their own folder in ANIMATION_OFFSETS
+ * to the physical standard animation row they share/depend on.
+ */
+export const VIRTUAL_ANIMATION_MAP = {
+  watering: 'thrust',
+} as const satisfies Readonly<Record<string, string>>;
+
