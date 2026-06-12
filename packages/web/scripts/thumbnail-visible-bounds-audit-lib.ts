@@ -1,3 +1,5 @@
+import type { Catalog, ItemDefinition } from '@lpc-toolkit/core';
+
 export interface AlphaBounds {
   readonly x: number;
   readonly y: number;
@@ -13,6 +15,32 @@ export interface ThumbnailMetrics {
   readonly fitScalePxPerSourcePixel: number;
   readonly additionalScaleOverCurrent: number;
 }
+
+export interface ThumbnailAuditRow {
+  readonly itemId: string;
+  readonly typeName: string;
+  readonly itemName: string;
+  readonly bodyType: string;
+  readonly variant?: string;
+  readonly animation?: string;
+  readonly direction?: string;
+  readonly frameIndex?: number;
+  readonly frameSize?: number;
+  readonly status: 'ok' | 'empty' | 'error';
+  readonly bounds?: AlphaBounds;
+  readonly metrics?: ThumbnailMetrics;
+  readonly missingPaths?: readonly string[];
+  readonly errorMessage?: string;
+}
+
+export interface AuditCase {
+  readonly itemId: string;
+  readonly item: ItemDefinition;
+  readonly bodyType: string;
+  readonly variant?: string;
+}
+
+export const AUDIT_BODY_TYPES = ['male', 'female'] as const;
 
 export function findAlphaBounds(
   data: Uint8ClampedArray,
@@ -62,3 +90,302 @@ export function deriveThumbnailMetrics(
     additionalScaleOverCurrent: fitScalePxPerSourcePixel / currentScale,
   };
 }
+
+export function expandAuditCases(
+  catalog: Catalog,
+  bodyTypes: readonly string[],
+): readonly AuditCase[] {
+  const cases: AuditCase[] = [];
+  const itemEntries = Array.from(catalog.byItemId.entries()).sort((a, b) =>
+    a[0].localeCompare(b[0]),
+  );
+
+  for (const [itemId, item] of itemEntries) {
+    for (const bodyType of bodyTypes) {
+      // Check compatibility
+      const bodyTypesObj = (item as any).body_types;
+      if (bodyTypesObj) {
+        if (!bodyTypesObj[bodyType]) {
+          continue;
+        }
+      } else {
+        // Fallback: check if any layer_N has this bodyType, if layers exist
+        let hasLayers = false;
+        let hasBodyTypeInLayers = false;
+        for (const key of Object.keys(item)) {
+          if (key.startsWith('layer_')) {
+            hasLayers = true;
+            const layer = (item as any)[key];
+            if (layer && typeof layer === 'object' && layer[bodyType] !== undefined) {
+              hasBodyTypeInLayers = true;
+            }
+          }
+        }
+        if (hasLayers && !hasBodyTypeInLayers) {
+          continue;
+        }
+      }
+
+      // Handle variants
+      const variants = item.variants;
+      if (variants && variants.length > 0) {
+        for (const variant of variants) {
+          cases.push({
+            itemId,
+            item,
+            bodyType,
+            variant,
+          });
+        }
+      } else {
+        cases.push({
+          itemId,
+          item,
+          bodyType,
+        });
+      }
+    }
+  }
+
+  return cases;
+}
+
+export function rowsToCsv(rows: readonly ThumbnailAuditRow[]): string {
+  const columns = [
+    'itemId',
+    'typeName',
+    'itemName',
+    'bodyType',
+    'variant',
+    'animation',
+    'direction',
+    'frameIndex',
+    'frameSize',
+    'status',
+    'boundsX',
+    'boundsY',
+    'boundsWidth',
+    'boundsHeight',
+    'widthRatio',
+    'heightRatio',
+    'visibleWidthAt24',
+    'visibleHeightAt24',
+    'fitScalePxPerSourcePixel',
+    'additionalScaleOverCurrent',
+    'missingPaths',
+    'errorMessage',
+  ];
+
+  const headerRow = columns.join(',');
+  const dataRows = rows.map(row => {
+    return columns
+      .map(col => {
+        let val: any = '';
+        if (col === 'boundsX') val = row.bounds?.x;
+        else if (col === 'boundsY') val = row.bounds?.y;
+        else if (col === 'boundsWidth') val = row.bounds?.width;
+        else if (col === 'boundsHeight') val = row.bounds?.height;
+        else if (col === 'widthRatio') val = row.metrics?.widthRatio;
+        else if (col === 'heightRatio') val = row.metrics?.heightRatio;
+        else if (col === 'visibleWidthAt24') val = row.metrics?.visibleWidthAt24;
+        else if (col === 'visibleHeightAt24') val = row.metrics?.visibleHeightAt24;
+        else if (col === 'fitScalePxPerSourcePixel') val = row.metrics?.fitScalePxPerSourcePixel;
+        else if (col === 'additionalScaleOverCurrent') val = row.metrics?.additionalScaleOverCurrent;
+        else if (col === 'missingPaths') val = row.missingPaths?.join('; ');
+        else {
+          val = (row as any)[col];
+        }
+
+        if (val === undefined || val === null) {
+          return '';
+        }
+        const str = String(val);
+        return `"${str.replace(/"/g, '""')}"`;
+      })
+      .join(',');
+  });
+
+  return [headerRow, ...dataRows].join('\n') + '\n';
+}
+
+export function percentile(values: readonly number[], p: number): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const len = sorted.length;
+  if (len === 1) return sorted[0] ?? 0;
+  const idx = (len - 1) * (p / 100);
+  const low = Math.floor(idx);
+  const high = Math.ceil(idx);
+  const valLow = sorted[low];
+  const valHigh = sorted[high];
+  if (valLow === undefined || valHigh === undefined) return 0;
+  if (low === high) return valLow;
+  return valLow + (idx - low) * (valHigh - valLow);
+}
+
+function compareCases(a: ThumbnailAuditRow, b: ThumbnailAuditRow): number {
+  const itemIdComp = a.itemId.localeCompare(b.itemId);
+  if (itemIdComp !== 0) return itemIdComp;
+  const btComp = a.bodyType.localeCompare(b.bodyType);
+  if (btComp !== 0) return btComp;
+  const varComp = (a.variant || '').localeCompare(b.variant || '');
+  if (varComp !== 0) return varComp;
+  const animComp = (a.animation || '').localeCompare(b.animation || '');
+  if (animComp !== 0) return animComp;
+  const dirComp = (a.direction || '').localeCompare(b.direction || '');
+  if (dirComp !== 0) return dirComp;
+  return (a.frameIndex || 0) - (b.frameIndex || 0);
+}
+
+const sortByWidthAsc = (a: ThumbnailAuditRow, b: ThumbnailAuditRow) => {
+  const wA = a.bounds?.width ?? 0;
+  const wB = b.bounds?.width ?? 0;
+  if (wA !== wB) return wA - wB;
+  return compareCases(a, b);
+};
+
+const sortByHeightAsc = (a: ThumbnailAuditRow, b: ThumbnailAuditRow) => {
+  const hA = a.bounds?.height ?? 0;
+  const hB = b.bounds?.height ?? 0;
+  if (hA !== hB) return hA - hB;
+  return compareCases(a, b);
+};
+
+const sortByWidthDesc = (a: ThumbnailAuditRow, b: ThumbnailAuditRow) => {
+  const wA = a.bounds?.width ?? 0;
+  const wB = b.bounds?.width ?? 0;
+  if (wA !== wB) return wB - wA;
+  return compareCases(a, b);
+};
+
+const sortByHeightDesc = (a: ThumbnailAuditRow, b: ThumbnailAuditRow) => {
+  const hA = a.bounds?.height ?? 0;
+  const hB = b.bounds?.height ?? 0;
+  if (hA !== hB) return hB - hA;
+  return compareCases(a, b);
+};
+
+export function summaryToMarkdown(rows: readonly ThumbnailAuditRow[]): string {
+  const lines: string[] = [];
+  lines.push('# Thumbnail Visible Bounds Audit');
+  lines.push('');
+
+  // 1. Overall Status Counts
+  const statusCounts = { ok: 0, empty: 0, error: 0 };
+  for (const row of rows) {
+    statusCounts[row.status] = (statusCounts[row.status] || 0) + 1;
+  }
+
+  lines.push('## Status Summary');
+  lines.push('');
+  lines.push('| Status | Count |');
+  lines.push('| --- | --- |');
+  lines.push(`| ok | ${statusCounts.ok} |`);
+  lines.push(`| empty | ${statusCounts.empty} |`);
+  lines.push(`| error | ${statusCounts.error} |`);
+  lines.push('');
+
+  // 2. Group by Type Name
+  lines.push('## By Type');
+  lines.push('');
+
+  const typeNames = Array.from(new Set(rows.map(r => r.typeName))).sort();
+
+  for (const typeName of typeNames) {
+    const typeRows = rows.filter(r => r.typeName === typeName);
+    const typeOkRows = typeRows.filter(r => r.status === 'ok');
+    const typeStatusCounts = { ok: 0, empty: 0, error: 0 };
+    for (const r of typeRows) {
+      typeStatusCounts[r.status] = (typeStatusCounts[r.status] || 0) + 1;
+    }
+
+    lines.push(`### Type: ${typeName}`);
+    lines.push('');
+    lines.push(`- Total cases: ${typeRows.length}`);
+    lines.push(`- Statuses: ok: ${typeStatusCounts.ok}, empty: ${typeStatusCounts.empty}, error: ${typeStatusCounts.error}`);
+    lines.push('');
+
+    if (typeOkRows.length > 0) {
+      const widths = typeOkRows.map(r => r.metrics?.visibleWidthAt24 ?? 0);
+      const heights = typeOkRows.map(r => r.metrics?.visibleHeightAt24 ?? 0);
+      const fitScales = typeOkRows.map(r => r.metrics?.fitScalePxPerSourcePixel ?? 0);
+      const additionalScales = typeOkRows.map(r => r.metrics?.additionalScaleOverCurrent ?? 0);
+
+      lines.push('| Metric (Visible at 24px) | Min | P50 (Median) | P90 | P95 | Max |');
+      lines.push('| --- | --- | --- | --- | --- | --- |');
+      lines.push(`| Width | ${percentile(widths, 0).toFixed(2)} | ${percentile(widths, 50).toFixed(2)} | ${percentile(widths, 90).toFixed(2)} | ${percentile(widths, 95).toFixed(2)} | ${percentile(widths, 100).toFixed(2)} |`);
+      lines.push(`| Height | ${percentile(heights, 0).toFixed(2)} | ${percentile(heights, 50).toFixed(2)} | ${percentile(heights, 90).toFixed(2)} | ${percentile(heights, 95).toFixed(2)} | ${percentile(heights, 100).toFixed(2)} |`);
+      lines.push(`| Fit Scale | ${percentile(fitScales, 0).toFixed(2)} | ${percentile(fitScales, 50).toFixed(2)} | ${percentile(fitScales, 90).toFixed(2)} | ${percentile(fitScales, 95).toFixed(2)} | ${percentile(fitScales, 100).toFixed(2)} |`);
+      lines.push(`| Additional Scale | ${percentile(additionalScales, 0).toFixed(2)} | ${percentile(additionalScales, 50).toFixed(2)} | ${percentile(additionalScales, 90).toFixed(2)} | ${percentile(additionalScales, 95).toFixed(2)} | ${percentile(additionalScales, 100).toFixed(2)} |`);
+      lines.push('');
+    } else {
+      lines.push('*No successful cases to calculate metrics.*');
+      lines.push('');
+    }
+  }
+
+  // 3. Smallest and Largest Successful Cases
+  const okRows = rows.filter(r => r.status === 'ok');
+
+  lines.push('## Bounds Extremes');
+  lines.push('');
+
+  const renderExtremesTable = (title: string, sortedRows: ThumbnailAuditRow[]) => {
+    lines.push(`### ${title}`);
+    lines.push('');
+    lines.push('| Item ID | Body | Variant | Anim/Dir/Frame | Bounds (W x H) | Visible Size (24px) | Fit Scale |');
+    lines.push('| --- | --- | --- | --- | --- | --- | --- |');
+    for (const r of sortedRows.slice(0, 10)) {
+      const animInfo = `${r.animation ?? '-'}/${r.direction ?? '-'}/${r.frameIndex ?? 0}`;
+      const boundsStr = r.bounds ? `${r.bounds.width}x${r.bounds.height}` : '-';
+      const visibleSizeStr = r.metrics ? `${r.metrics.visibleWidthAt24.toFixed(2)}x${r.metrics.visibleHeightAt24.toFixed(2)}` : '-';
+      const fitScaleStr = r.metrics?.fitScalePxPerSourcePixel.toFixed(2) ?? '-';
+      lines.push(`| \`${r.itemId}\` | ${r.bodyType} | ${r.variant ?? '-'} | ${animInfo} | ${boundsStr} | ${visibleSizeStr} | ${fitScaleStr} |`);
+    }
+    lines.push('');
+  };
+
+  if (okRows.length > 0) {
+    const smallestByWidth = [...okRows].sort(sortByWidthAsc);
+    const smallestByHeight = [...okRows].sort(sortByHeightAsc);
+    const largestByWidth = [...okRows].sort(sortByWidthDesc);
+    const largestByHeight = [...okRows].sort(sortByHeightDesc);
+
+    renderExtremesTable('Top 10 Smallest Cases by Width', smallestByWidth);
+    renderExtremesTable('Top 10 Smallest Cases by Height', smallestByHeight);
+    renderExtremesTable('Top 10 Largest Cases by Width', largestByWidth);
+    renderExtremesTable('Top 10 Largest Cases by Height', largestByHeight);
+  } else {
+    lines.push('*No successful cases to report extremes.*');
+    lines.push('');
+  }
+
+  // 4. Empty and Error Cases
+  const errorOrEmptyRows = rows.filter(r => r.status === 'empty' || r.status === 'error' || (r.missingPaths && r.missingPaths.length > 0));
+  const sortedErrorOrEmptyRows = [...errorOrEmptyRows].sort(compareCases);
+
+  lines.push('## Empty, Error, or Missing Path Cases');
+  lines.push('');
+  if (sortedErrorOrEmptyRows.length > 0) {
+    lines.push('| Item ID | Body | Variant | Status | Missing Paths / Error Message |');
+    lines.push('| --- | --- | --- | --- | --- |');
+    for (const r of sortedErrorOrEmptyRows) {
+      let detail = '';
+      if (r.missingPaths && r.missingPaths.length > 0) {
+        detail = `Missing: ${r.missingPaths.join(', ')}`;
+      }
+      if (r.errorMessage) {
+        if (detail) detail += '; ';
+        detail += r.errorMessage;
+      }
+      lines.push(`| \`${r.itemId}\` | ${r.bodyType} | ${r.variant ?? '-'} | ${r.status} | ${detail || '-'} |`);
+    }
+    lines.push('');
+  } else {
+    lines.push('*No empty, error, or missing path cases found.*');
+    lines.push('');
+  }
+
+  return lines.join('\n');
+}
+
