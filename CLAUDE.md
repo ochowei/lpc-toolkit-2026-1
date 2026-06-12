@@ -35,6 +35,8 @@ sprites, plus a modern React web UI and a CLI built on top of it.
 
 6. **Use pnpm.** Do not switch to npm/yarn/bun mid-project.
 
+7. **Use RTK prefix for commands.** Run terminal commands using the `rtk` prefix to optimize token usage as described in [RTK.md][rtk-ref].
+
 ## Layout
 
 - `assets/` — LPC art assets (spritesheets, definitions, CREDITS.csv) migrated from upstream
@@ -130,3 +132,4 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
 
 
+[rtk-ref]: RTK.md
