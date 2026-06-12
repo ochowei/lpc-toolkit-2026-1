@@ -7,12 +7,11 @@ import {
   type Catalog,
   type ItemDefinition,
   type PaletteMetadata,
-  type Selection,
-  type Selections,
   type TypeName,
 } from '@lpc-toolkit/core';
 import { createBrowserCanvasAdapter } from '../adapter/browser-canvas-adapter';
 import { cacheGet, cacheSet, makeCacheKey } from './thumbnail-cache';
+import { buildItemThumbnailSelections } from '../lib/item-thumbnail-selection';
 
 export interface ThumbnailCropRect {
   readonly sx: number;
@@ -74,52 +73,7 @@ function findItemDef(
   return catalog.byTypeName.get(typeName)?.find((d) => d.name === name);
 }
 
-/**
- * Resolve the variant for a thumbnail Selection. Caller's explicit
- * `args.variant` wins; otherwise fall back to `def.variants[0]` so items
- * declaring variants (e.g. Skeleton head whose sprites live at
- * `head/heads/skeleton/adult/walk/skeleton.png`) render instead of 404ing
- * on `…/walk.png`. Mirrors the contract `pickActionForItem` and core's
- * `buildSelection` already use when constructing Selections elsewhere.
- */
-export function effectiveThumbnailVariant(
-  explicit: string | undefined,
-  def: ItemDefinition | undefined,
-): string | undefined {
-  if (explicit !== undefined) return explicit;
-  return def?.variants?.[0];
-}
 
-/**
- * For items whose layer paths reference `${siblingType}` (e.g. expressions
- * reference `${head}`), the core `replaceInPath` needs a sibling Selection
- * in `selections.items[siblingType]` to substitute. The thumbnail call
- * site only knows about the item itself, so without a synthesized sibling
- * the URL is shipped with literal `${head}` and 404s.
- *
- * Pick the sibling name from `def.replace_in_path[siblingType]`, preferring
- * an entry whose mapped value equals `bodyType` (keeps the rendered face
- * on the matching male/female/elderly head). Falls back to the first key.
- */
-function siblingSelectionsFor(
-  def: ItemDefinition,
-  bodyType: BodyType,
-): Record<TypeName, Selection> {
-  const map = def.replace_in_path;
-  if (!map) return {};
-  const out: Record<TypeName, Selection> = {};
-  for (const [siblingType, mapping] of Object.entries(map)) {
-    const entries = Object.entries(mapping);
-    if (entries.length === 0) continue;
-    const matched = entries.find(([, v]) => v === bodyType);
-    const [siblingKey] = matched ?? entries[0]!;
-    out[siblingType] = {
-      typeName: siblingType,
-      name: siblingKey.replaceAll('_', ' '),
-    };
-  }
-  return out;
-}
 
 /**
  * Renders a single catalog item to a `size×size` offscreen canvas (first
@@ -159,22 +113,24 @@ export function useItemThumbnail(args: UseItemThumbnailArgs): UseItemThumbnailRe
 
     const adapter = createBrowserCanvasAdapter();
     const def = findItemDef(args.catalog, args.typeName, args.name);
-    const siblings = def
-      ? siblingSelectionsFor(def, args.bodyType)
-      : {};
-    const variant = effectiveThumbnailVariant(args.variant, def);
-    const selections: Selections = {
-      bodyType: args.bodyType,
-      items: {
-        ...siblings,
-        [args.typeName]: {
-          typeName: args.typeName,
-          name: args.name,
-          ...(variant ? { variant } : {}),
-          ...(args.recolor ? { recolor: args.recolor } : {}),
-        },
-      },
-    };
+    const selections = def
+      ? buildItemThumbnailSelections({
+          item: def,
+          bodyType: args.bodyType,
+          ...(args.variant !== undefined ? { variant: args.variant } : {}),
+          ...(args.recolor !== undefined ? { recolor: args.recolor } : {}),
+        })
+      : {
+          bodyType: args.bodyType,
+          items: {
+            [args.typeName]: {
+              typeName: args.typeName,
+              name: args.name,
+              ...(args.variant ? { variant: args.variant } : {}),
+              ...(args.recolor ? { recolor: args.recolor } : {}),
+            },
+          },
+        };
 
     composeSelections(selections, {
       catalog: args.catalog,
