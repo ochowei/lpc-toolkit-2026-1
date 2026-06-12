@@ -63,6 +63,16 @@ import {
   MobileBottomNav,
   type MobileView,
 } from './mobile-bottom-nav';
+import { SidebarSplitter } from './sidebar-splitter';
+import {
+  DEFAULT_SIDEBAR_WIDTH,
+  MIN_SIDEBAR_WIDTH,
+  SIDEBAR_SPLITTER_WIDTH,
+  clampSidebarWidth,
+  getRenderedSidebarMax,
+  loadSidebarWidth,
+  saveSidebarWidth,
+} from '../../lib/sidebar-width';
 
 interface LpcE2eProbe {
   readonly hash: string;
@@ -104,6 +114,16 @@ export interface LayerStackHarnessProps {
   onToggleLocale: () => void;
 }
 
+function browserLocalStorage(): Storage | undefined {
+  if (typeof window === 'undefined') return undefined;
+
+  try {
+    return window.localStorage;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Coordinates layer state, composition hooks, popovers, filters, and responsive layout. */
 export function LayerStackHarness(props: LayerStackHarnessProps) {
   const { t, theme, locale, onToggleTheme, onToggleLocale } = props;
@@ -126,11 +146,53 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   const [customOverlayZPos, setCustomOverlayZPos] = useState(0);
   const isDesktop = useMediaQuery('(min-width: 768px)');
   const [mobileView, setMobileView] = useState<MobileView>('preview');
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    if (
+      typeof window === 'undefined' ||
+      !window.matchMedia('(min-width: 768px)').matches
+    ) {
+      return DEFAULT_SIDEBAR_WIDTH;
+    }
+
+    return loadSidebarWidth(browserLocalStorage());
+  });
+  const [viewportWidth, setViewportWidth] = useState(() => {
+    return typeof window === 'undefined' ? 1280 : window.innerWidth;
+  });
+  const renderedSidebarMax = getRenderedSidebarMax(viewportWidth);
+  const renderedSidebarWidth = clampSidebarWidth(
+    sidebarWidth,
+    renderedSidebarMax,
+  );
 
   const [zipRunning, setZipRunning] = useState<null | {
     kind: ZipExportKind;
     progress: number;
   }>(null);
+
+  useEffect(() => {
+    if (!isDesktop) return;
+
+    const updateViewportWidth = () => {
+      setViewportWidth(window.innerWidth);
+    };
+
+    updateViewportWidth();
+    window.addEventListener('resize', updateViewportWidth);
+    return () => {
+      window.removeEventListener('resize', updateViewportWidth);
+    };
+  }, [isDesktop]);
+
+  const commitSidebarWidth = useCallback((preferredWidth: number) => {
+    setSidebarWidth(preferredWidth);
+    saveSidebarWidth(browserLocalStorage(), preferredWidth);
+  }, []);
+
+  const resetSidebarWidth = useCallback(() => {
+    setSidebarWidth(DEFAULT_SIDEBAR_WIDTH);
+    saveSidebarWidth(browserLocalStorage(), DEFAULT_SIDEBAR_WIDTH);
+  }, []);
 
   const toggleLicenseGroup = useCallback((group: LicenseGroup) => {
     setLicenseFilter((prev) => {
@@ -566,10 +628,23 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
         </Button>
       </TopBar>
       {isDesktop ? (
-        <div className="relative grid min-h-0 flex-1 grid-cols-[340px_1fr]">
-          <aside className="min-h-0 overflow-hidden border-r border-border bg-surface">
+        <div
+          className="relative grid min-h-0 flex-1"
+          style={{
+            gridTemplateColumns: `${renderedSidebarWidth}px ${SIDEBAR_SPLITTER_WIDTH}px minmax(0, 1fr)`,
+          }}
+        >
+          <aside className="min-h-0 overflow-hidden bg-surface">
             {stackPanel}
           </aside>
+          <SidebarSplitter
+            value={renderedSidebarWidth}
+            min={MIN_SIDEBAR_WIDTH}
+            max={renderedSidebarMax}
+            onChange={setSidebarWidth}
+            onCommit={commitSidebarWidth}
+            onReset={resetSidebarWidth}
+          />
           <main className="min-h-0 overflow-hidden bg-app">
             {previewPane}
           </main>
