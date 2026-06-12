@@ -560,7 +560,7 @@ rtk git commit -m "feat(web): add replacement card display layouts"
 - Modify: `packages/web/src/components/layer-stack/harness.tsx`
 - Create: `packages/web/e2e/replacement-card-display-modes.spec.ts`
 
-- [ ] **Step 1: Add the failing browser test**
+- [x] **Step 1: Add the failing browser test**
 
 Create `packages/web/e2e/replacement-card-display-modes.spec.ts`:
 
@@ -675,7 +675,7 @@ test.describe('replacement card display modes', () => {
 });
 ```
 
-- [ ] **Step 2: Run the browser test and verify it fails**
+- [x] **Step 2: Run the browser test and verify it fails**
 
 Run:
 
@@ -685,7 +685,7 @@ rtk pnpm --filter @lpc-toolkit/web test:e2e -- replacement-card-display-modes.sp
 
 Expected: FAIL because summary rows lack `aria-expanded`, and shared/persistent mode state is not wired.
 
-- [ ] **Step 3: Forward mode props through StackPanel**
+- [x] **Step 3: Forward mode props through StackPanel**
 
 Import the type in `stack-panel.tsx`:
 
@@ -705,7 +705,7 @@ onReplacementCardDisplayModeChange: (
 
 Pass both values to every `LayerRow`.
 
-- [ ] **Step 4: Add accessible expansion state to summary rows**
+- [x] **Step 4: Add accessible expansion state to summary rows**
 
 On the top-level summary button in `layer-row.tsx`, add:
 
@@ -715,7 +715,7 @@ aria-expanded={expanded}
 
 This exposes existing expand/collapse state without changing behavior.
 
-- [ ] **Step 5: Own and persist the preference in LayerStackHarness**
+- [x] **Step 5: Own and persist the preference in LayerStackHarness**
 
 Import:
 
@@ -753,7 +753,7 @@ replacementCardDisplayMode={replacementCardDisplayMode}
 onReplacementCardDisplayModeChange={changeReplacementCardDisplayMode}
 ```
 
-- [ ] **Step 6: Run focused, browser, and full web verification**
+- [x] **Step 6: Run focused, browser, and full web verification**
 
 Run:
 
@@ -769,25 +769,26 @@ Expected: all PASS. The browser test must confirm default `overlay`, all three
 card layouts, unchanged card dimensions, shared state across layers, reload
 persistence, and graceful storage failures.
 
-- [ ] **Step 7: Commit and update this plan**
+- [x] **Step 7: Commit and update this plan**
 
 ```bash
 rtk git add packages/web/src/components/layer-stack/stack-panel.tsx packages/web/src/components/layer-stack/harness.tsx packages/web/src/components/layer-stack/layer-row.tsx packages/web/e2e/replacement-card-display-modes.spec.ts
 rtk git commit -m "feat(web): persist replacement card display mode"
 ```
 
-Then record the commit, implementation note, and verification result under
-Task 4 and commit that plan tracking update separately.
+- Commit: 67f6cdfbd
+- Implementation: Wire state, callbacks, and localStorage persistence in harness/panel/row components, and add E2E test coverage.
+- Verification: unit tests, typecheck, Playwright E2E browser tests, and production build all pass successfully.
 
 ---
 
 ## Final Review
 
-- [ ] Confirm `rtk git diff --check` passes.
-- [ ] Confirm `rtk git status --short` contains only expected plan-tracking changes, then commit them.
-- [ ] Inspect the desktop UI in the in-app browser at `http://127.0.0.1:5173/?assetSource=zip`.
-- [ ] Verify the segmented control retains icon and short text at both 320px and 640px sidebar widths.
-- [ ] Verify overlay and hidden use the full inner card height and do not stretch sprites.
-- [ ] Verify stacked, overlay, and hidden keep identical card dimensions and column behavior.
-- [ ] Verify hidden mode still exposes item names through accessible names and existing tooltips.
-- [ ] Verify `upstream/`, `packages/core/`, selection state, URL state, exports, and attribution are unchanged.
+- [x] Confirm `rtk git diff --check` passes.
+- [x] Confirm `rtk git status --short` contains only expected plan-tracking changes, then commit them.
+- [x] Inspect the desktop UI in the in-app browser at `http://127.0.0.1:5173/?assetSource=zip`.
+- [x] Verify the segmented control retains icon and short text at both 320px and 640px sidebar widths.
+- [x] Verify overlay and hidden use the full inner card height and do not stretch sprites.
+- [x] Verify stacked, overlay, and hidden keep identical card dimensions and column behavior.
+- [x] Verify hidden mode still exposes item names through accessible names and existing tooltips.
+- [x] Verify `upstream/`, `packages/core/`, selection state, URL state, exports, and attribution are unchanged.
