@@ -146,7 +146,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   const [customOverlayZPos, setCustomOverlayZPos] = useState(0);
   const isDesktop = useMediaQuery('(min-width: 768px)');
   const [mobileView, setMobileView] = useState<MobileView>('preview');
-  const [sidebarWidth, setSidebarWidth] = useState(() => {
+  const [preferredSidebarWidth, setPreferredSidebarWidth] = useState(() => {
     if (
       typeof window === 'undefined' ||
       !window.matchMedia('(min-width: 768px)').matches
@@ -156,12 +156,20 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
 
     return loadSidebarWidth(browserLocalStorage());
   });
+  const preferredSidebarWidthRef = useRef(preferredSidebarWidth);
+  preferredSidebarWidthRef.current = preferredSidebarWidth;
+  const [dragSidebarWidth, setDragSidebarWidth] = useState<number | null>(null);
+  const dragSidebarWidthRef = useRef<number | null>(null);
+  const sidebarHydratedRef = useRef(
+    typeof window !== 'undefined' &&
+      window.matchMedia('(min-width: 768px)').matches,
+  );
   const [viewportWidth, setViewportWidth] = useState(() => {
     return typeof window === 'undefined' ? 1280 : window.innerWidth;
   });
   const renderedSidebarMax = getRenderedSidebarMax(viewportWidth);
   const renderedSidebarWidth = clampSidebarWidth(
-    sidebarWidth,
+    dragSidebarWidth ?? preferredSidebarWidth,
     renderedSidebarMax,
   );
 
@@ -169,6 +177,19 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     kind: ZipExportKind;
     progress: number;
   }>(null);
+
+  useEffect(() => {
+    if (!isDesktop) {
+      dragSidebarWidthRef.current = null;
+      setDragSidebarWidth(null);
+      return;
+    }
+
+    if (!sidebarHydratedRef.current) {
+      sidebarHydratedRef.current = true;
+      setPreferredSidebarWidth(loadSidebarWidth(browserLocalStorage()));
+    }
+  }, [isDesktop]);
 
   useEffect(() => {
     if (!isDesktop) return;
@@ -184,13 +205,24 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     };
   }, [isDesktop]);
 
-  const commitSidebarWidth = useCallback((preferredWidth: number) => {
-    setSidebarWidth(preferredWidth);
-    saveSidebarWidth(browserLocalStorage(), preferredWidth);
+  const changeSidebarWidth = useCallback((nextWidth: number) => {
+    dragSidebarWidthRef.current = nextWidth;
+    setDragSidebarWidth(nextWidth);
+  }, []);
+
+  const commitSidebarWidth = useCallback(() => {
+    const committedWidth =
+      dragSidebarWidthRef.current ?? preferredSidebarWidthRef.current;
+    dragSidebarWidthRef.current = null;
+    setDragSidebarWidth(null);
+    setPreferredSidebarWidth(committedWidth);
+    saveSidebarWidth(browserLocalStorage(), committedWidth);
   }, []);
 
   const resetSidebarWidth = useCallback(() => {
-    setSidebarWidth(DEFAULT_SIDEBAR_WIDTH);
+    dragSidebarWidthRef.current = null;
+    setDragSidebarWidth(null);
+    setPreferredSidebarWidth(DEFAULT_SIDEBAR_WIDTH);
     saveSidebarWidth(browserLocalStorage(), DEFAULT_SIDEBAR_WIDTH);
   }, []);
 
@@ -641,7 +673,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
             value={renderedSidebarWidth}
             min={MIN_SIDEBAR_WIDTH}
             max={renderedSidebarMax}
-            onChange={setSidebarWidth}
+            onChange={changeSidebarWidth}
             onCommit={commitSidebarWidth}
             onReset={resetSidebarWidth}
           />
