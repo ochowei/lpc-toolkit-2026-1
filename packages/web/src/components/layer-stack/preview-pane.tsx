@@ -134,6 +134,9 @@ export function PreviewPane({
           {Object.keys(ANIMATION_CONFIGS).map((a) => (
             <option key={a} value={a}>{a}</option>
           ))}
+          {result.sheet?.customAnimations && Array.from(result.sheet.customAnimations.keys()).map((a) => (
+            <option key={a} value={a}>{a}</option>
+          ))}
         </select>
 
         <Button

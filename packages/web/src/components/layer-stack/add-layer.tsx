@@ -83,6 +83,13 @@ export function AddLayer({
                   onClick={() => {
                     if (!firstCompatible) return;
                     dispatch(pickActionForItem(tn, firstCompatible));
+                    const customAnim = firstCompatible.layer_1?.custom_animation ||
+                                       firstCompatible.layer_2?.custom_animation ||
+                                       firstCompatible.layer_3?.custom_animation ||
+                                       firstCompatible.layer_4?.custom_animation;
+                    if (customAnim) {
+                      dispatch({ type: 'set_anim', anim: customAnim });
+                    }
                     setAdding(false);
                     onAdded(tn);
                   }}

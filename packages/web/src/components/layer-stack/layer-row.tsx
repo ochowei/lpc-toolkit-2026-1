@@ -151,7 +151,16 @@ export function LayerRow({ disabled, typeName, catalog, palettes, state, dispatc
                       exceeds ? exceedsTitle :
                       tl.itemName(it.name)
                     }
-                    onClick={() => dispatch(pickActionForItem(typeName, it))}
+                    onClick={() => {
+                      dispatch(pickActionForItem(typeName, it));
+                      const customAnim = it.layer_1?.custom_animation ||
+                                         it.layer_2?.custom_animation ||
+                                         it.layer_3?.custom_animation ||
+                                         it.layer_4?.custom_animation;
+                      if (customAnim) {
+                        dispatch({ type: 'set_anim', anim: customAnim });
+                      }
+                    }}
                     className={[
                       'relative flex flex-col items-center gap-1 rounded-md border p-1 text-[10px]',
                       isSelected ? 'border-accent bg-accent/10 text-text' : 'border-border bg-surface-2 text-text-2',
