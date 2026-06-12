@@ -11,6 +11,7 @@ describe('SidebarSplitter', () => {
         max={640}
         onChange={() => {}}
         onCommit={() => {}}
+        onCancel={() => {}}
         onReset={() => {}}
       />,
     );

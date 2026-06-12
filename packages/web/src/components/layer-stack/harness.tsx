@@ -219,6 +219,11 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     saveSidebarWidth(browserLocalStorage(), committedWidth);
   }, []);
 
+  const cancelSidebarWidth = useCallback(() => {
+    dragSidebarWidthRef.current = null;
+    setDragSidebarWidth(null);
+  }, []);
+
   const resetSidebarWidth = useCallback(() => {
     dragSidebarWidthRef.current = null;
     setDragSidebarWidth(null);
@@ -675,6 +680,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
             max={renderedSidebarMax}
             onChange={changeSidebarWidth}
             onCommit={commitSidebarWidth}
+            onCancel={cancelSidebarWidth}
             onReset={resetSidebarWidth}
           />
           <main className="min-h-0 overflow-hidden bg-app">

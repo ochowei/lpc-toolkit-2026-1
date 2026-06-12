@@ -11,6 +11,7 @@ export interface SidebarSplitterProps {
   max: number;
   onChange: (next: number) => void;
   onCommit: (next: number) => void;
+  onCancel: () => void;
   onReset: () => void;
 }
 
@@ -20,6 +21,7 @@ export function SidebarSplitter({
   max,
   onChange,
   onCommit,
+  onCancel,
   onReset,
 }: SidebarSplitterProps) {
   const latestWidthRef = useRef(value);
@@ -30,6 +32,7 @@ export function SidebarSplitter({
   const maxRef = useRef(max);
   const onChangeRef = useRef(onChange);
   const onCommitRef = useRef(onCommit);
+  const onCancelRef = useRef(onCancel);
   const onResetRef = useRef(onReset);
 
   valueRef.current = value;
@@ -37,6 +40,7 @@ export function SidebarSplitter({
   maxRef.current = max;
   onChangeRef.current = onChange;
   onCommitRef.current = onCommit;
+  onCancelRef.current = onCancel;
   onResetRef.current = onReset;
 
   const onDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
@@ -97,6 +101,7 @@ export function SidebarSplitter({
     function handleCancel(cancelEvent: PointerEvent) {
       if (cancelEvent.pointerId !== activePointerIdRef.current) return;
       cleanupDrag();
+      onCancelRef.current();
     }
 
     activeCleanupRef.current = cleanupDrag;

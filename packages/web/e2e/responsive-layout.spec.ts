@@ -223,6 +223,55 @@ test.describe('responsive layout', () => {
     expect(errors).toEqual([]);
   });
 
+  test('desktop pointer cancel clears the transient width', async ({ page }) => {
+    const errors = attachConsoleCollector(page);
+    await page.addInitScript((storageKey) => {
+      window.localStorage.setItem(storageKey, '640');
+    }, SIDEBAR_STORAGE_KEY);
+    await page.setViewportSize({ width: 900, height: 900 });
+    await page.goto('/?assetSource=zip');
+
+    const separator = page.getByRole('separator', { name: 'Resize sidebar' });
+    await expectSidebarWidth(page, 574);
+    const box = await separator.boundingBox();
+    expect(box).not.toBeNull();
+
+    await page.evaluate(() => {
+      document.addEventListener(
+        'pointerdown',
+        (event) => {
+          document.documentElement.dataset.activePointerId = String(event.pointerId);
+        },
+        { once: true },
+      );
+    });
+    await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(500, box!.y + box!.height / 2);
+    await expectSidebarWidth(page, 500);
+
+    const pointerId = await page.evaluate(() => {
+      return Number(document.documentElement.dataset.activePointerId);
+    });
+    expect(pointerId).toBeGreaterThan(0);
+    await page.evaluate((activePointerId) => {
+      document.dispatchEvent(
+        new PointerEvent('pointercancel', {
+          bubbles: true,
+          pointerId: activePointerId,
+        }),
+      );
+    }, pointerId);
+
+    await expectSidebarWidth(page, 574);
+    expect(
+      await page.evaluate((storageKey) => window.localStorage.getItem(storageKey), SIDEBAR_STORAGE_KEY),
+    ).toBe('640');
+    await expect.poll(() => page.evaluate(() => document.body.style.cursor)).toBe('');
+    await expect.poll(() => page.evaluate(() => document.body.style.userSelect)).toBe('');
+    expect(errors).toEqual([]);
+  });
+
   test('mobile-first session hydrates the saved width on first desktop layout', async ({ page }) => {
     const errors = attachConsoleCollector(page);
     await page.addInitScript((storageKey) => {
