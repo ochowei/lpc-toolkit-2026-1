@@ -71,10 +71,16 @@ export function SidebarSplitter({
     function handleMove(moveEvent: PointerEvent) {
       if (moveEvent.pointerId !== activePointerIdRef.current) return;
 
-      const next = computeSidebarWidthFromPointer(
-        moveEvent.clientX,
-        containerLeft,
+      const next = Math.min(
         maxRef.current,
+        Math.max(
+          minRef.current,
+          computeSidebarWidthFromPointer(
+            moveEvent.clientX,
+            containerLeft,
+            maxRef.current,
+          ),
+        ),
       );
       latestWidthRef.current = next;
       onChangeRef.current(next);
