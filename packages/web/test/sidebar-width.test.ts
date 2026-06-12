@@ -9,6 +9,7 @@ import {
   MIN_PREVIEW_WIDTH,
   MIN_SIDEBAR_WIDTH,
   saveSidebarWidth,
+  SIDEBAR_KEYBOARD_STEP,
   SIDEBAR_SPLITTER_WIDTH,
   SIDEBAR_STORAGE_KEY,
 } from '../src/lib/sidebar-width';
@@ -20,6 +21,7 @@ describe('sidebar width constants', () => {
     expect(MAX_SIDEBAR_WIDTH).toBe(640);
     expect(MIN_PREVIEW_WIDTH).toBe(320);
     expect(SIDEBAR_SPLITTER_WIDTH).toBe(6);
+    expect(SIDEBAR_KEYBOARD_STEP).toBe(16);
     expect(SIDEBAR_STORAGE_KEY).toBe('lpc.sidebar-width.v1');
   });
 });
@@ -40,6 +42,10 @@ describe('clampSidebarWidth', () => {
   it('falls back to the default for non-finite widths', () => {
     expect(clampSidebarWidth(Number.NaN)).toBe(400);
     expect(clampSidebarWidth(Number.POSITIVE_INFINITY)).toBe(400);
+  });
+
+  it('clamps the non-finite fallback to the active bounds', () => {
+    expect(clampSidebarWidth(Number.NaN, 320)).toBe(320);
   });
 });
 
@@ -63,6 +69,23 @@ describe('computeSidebarWidthFromPointer', () => {
 describe('loadSidebarWidth', () => {
   it('loads a valid persisted width', () => {
     expect(loadSidebarWidth({ getItem: () => '512' })).toBe(512);
+  });
+
+  it('reads from the versioned storage key', () => {
+    const keys: string[] = [];
+
+    loadSidebarWidth({
+      getItem: (key) => {
+        keys.push(key);
+        return null;
+      },
+    });
+
+    expect(keys).toEqual([SIDEBAR_STORAGE_KEY]);
+  });
+
+  it('falls back to the default when storage is unavailable', () => {
+    expect(loadSidebarWidth(undefined)).toBe(400);
   });
 
   it.each([null, '', 'wide', '319', '641', 'Infinity'])(
@@ -110,5 +133,9 @@ describe('saveSidebarWidth', () => {
         512,
       ),
     ).not.toThrow();
+  });
+
+  it('does nothing when storage is unavailable', () => {
+    expect(() => saveSidebarWidth(undefined, 512)).not.toThrow();
   });
 });

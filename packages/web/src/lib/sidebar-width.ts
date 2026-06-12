@@ -18,15 +18,14 @@ export function clampSidebarWidth(
   width: number,
   activeMax: number = MAX_SIDEBAR_WIDTH,
 ): number {
-  if (!Number.isFinite(width)) return DEFAULT_SIDEBAR_WIDTH;
-
   const finiteMax = Number.isFinite(activeMax) ? activeMax : MAX_SIDEBAR_WIDTH;
   const renderedMax = Math.max(
     MIN_SIDEBAR_WIDTH,
     Math.min(finiteMax, MAX_SIDEBAR_WIDTH),
   );
+  const finiteWidth = Number.isFinite(width) ? width : DEFAULT_SIDEBAR_WIDTH;
 
-  return Math.min(Math.max(width, MIN_SIDEBAR_WIDTH), renderedMax);
+  return Math.min(Math.max(finiteWidth, MIN_SIDEBAR_WIDTH), renderedMax);
 }
 
 export function getRenderedSidebarMax(viewportWidth: number): number {
