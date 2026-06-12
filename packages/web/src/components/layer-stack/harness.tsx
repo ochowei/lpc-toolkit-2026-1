@@ -48,7 +48,10 @@ import {
   useComposedCharacter,
   type ComposedResult,
 } from '../../hooks/use-composed-character';
-import { useMediaQuery } from '../../hooks/use-media-query';
+import {
+  readMediaQuery,
+  useMediaQuery,
+} from '../../hooks/use-media-query';
 import { Button } from '../ui/button';
 import { createBrowserCanvasAdapter } from '../../adapter/browser-canvas-adapter';
 import { toSelections } from '../../slice/selection';
@@ -149,7 +152,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   const [preferredSidebarWidth, setPreferredSidebarWidth] = useState(() => {
     if (
       typeof window === 'undefined' ||
-      !window.matchMedia('(min-width: 768px)').matches
+      !readMediaQuery('(min-width: 768px)', window.matchMedia)
     ) {
       return DEFAULT_SIDEBAR_WIDTH;
     }
@@ -162,7 +165,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   const dragSidebarWidthRef = useRef<number | null>(null);
   const sidebarHydratedRef = useRef(
     typeof window !== 'undefined' &&
-      window.matchMedia('(min-width: 768px)').matches,
+      readMediaQuery('(min-width: 768px)', window.matchMedia),
   );
   const [viewportWidth, setViewportWidth] = useState(() => {
     return typeof window === 'undefined' ? 1280 : window.innerWidth;
