@@ -4,6 +4,7 @@ import {
   compositionErrorResult,
   compositionInputKey,
   resultForCompositionKey,
+  resolveAnim,
   type ComposedResult,
 } from '../src/hooks/use-composed-character';
 import type { SliceState } from '../src/slice/selection';
@@ -94,5 +95,40 @@ describe('compositionInputKey', () => {
     ).not.toBe(
       compositionInputKey(state, 0, { objectUrl: 'blob:first', zPos: 10 }),
     );
+  });
+});
+
+describe('resolveAnim', () => {
+  it('resolves standard composed animations directly', () => {
+    const sheet = {
+      animations: ['walk', 'spellcast'],
+      customAnimations: new Map(),
+    } as unknown as ComposedSheet;
+    expect(resolveAnim(sheet, 'walk')).toBe('walk');
+    expect(resolveAnim(sheet, 'spellcast')).toBe('spellcast');
+  });
+
+  it('falls back to the first composed animation when requesting an uncomposed animation', () => {
+    const sheet = {
+      animations: ['walk', 'spellcast'],
+      customAnimations: new Map(),
+    } as unknown as ComposedSheet;
+    expect(resolveAnim(sheet, 'slash')).toBe('walk');
+  });
+
+  it('resolves virtual animations (watering) when their physical row animation (thrust) is composed', () => {
+    const sheet = {
+      animations: ['walk', 'thrust'],
+      customAnimations: new Map(),
+    } as unknown as ComposedSheet;
+    expect(resolveAnim(sheet, 'watering')).toBe('watering');
+  });
+
+  it('falls back when the physical row animation for a virtual animation is not composed', () => {
+    const sheet = {
+      animations: ['walk', 'spellcast'],
+      customAnimations: new Map(),
+    } as unknown as ComposedSheet;
+    expect(resolveAnim(sheet, 'watering')).toBe('walk');
   });
 });

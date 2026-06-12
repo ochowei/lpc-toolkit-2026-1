@@ -3,6 +3,7 @@ import {
   composeSelections,
   extractAnimation,
   makeResolvePalette,
+  VIRTUAL_ANIMATION_MAP,
   type Catalog,
   type ComposedAnimation,
   type ComposedSheet,
@@ -82,9 +83,16 @@ export function resultForCompositionKey(
  * `ANIMATION_CONFIGS` key — `extractAnimation` returns a transparent crop
  * for a known-but-uncomposed animation, never throws).
  */
-function resolveAnim(sheet: ComposedSheet, anim: string): string {
+export function resolveAnim(sheet: ComposedSheet, anim: string): string {
   if (sheet.animations.includes(anim)) return anim;
   if (sheet.customAnimations?.has(anim)) return anim;
+
+  // Resolve virtual/shared animations using the map
+  const physical = VIRTUAL_ANIMATION_MAP[anim as keyof typeof VIRTUAL_ANIMATION_MAP];
+  if (physical && sheet.animations.includes(physical)) {
+    return anim;
+  }
+
   return sheet.animations[0] ?? 'walk';
 }
 
