@@ -311,7 +311,7 @@ rtk git commit -m "feat(web): translate replacement card display modes"
 - Modify: `packages/web/src/components/layer-stack/layer-row.tsx`
 - Modify: `packages/web/test/layer-row.test.tsx`
 
-- [ ] **Step 1: Expand the LayerRow test fixture and write failing mode tests**
+- [x] **Step 1: Expand the LayerRow test fixture and write failing mode tests**
 
 Import the mode type:
 
@@ -386,7 +386,7 @@ it('keeps one card height while changing thumbnail and label layout', () => {
 });
 ```
 
-- [ ] **Step 2: Run the LayerRow test and verify it fails**
+- [x] **Step 2: Run the LayerRow test and verify it fails**
 
 Run:
 
@@ -396,7 +396,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- layer-row.test.tsx
 
 Expected: FAIL because the new props, 56px size, control, and mode markup do not exist.
 
-- [ ] **Step 3: Permit 56px item thumbnails**
+- [x] **Step 3: Permit 56px item thumbnails**
 
 Change the size union in `item-thumbnail.tsx`:
 
@@ -404,7 +404,7 @@ Change the size union in `item-thumbnail.tsx`:
 size: 20 | 24 | 28 | 40 | 56;
 ```
 
-- [ ] **Step 4: Add LayerRow props and mode metadata**
+- [x] **Step 4: Add LayerRow props and mode metadata**
 
 In `layer-row.tsx`, import and add:
 
@@ -440,7 +440,7 @@ onReplacementCardDisplayModeChange: (
 
 Destructure both props in `LayerRow`.
 
-- [ ] **Step 5: Render the segmented control in the expanded heading**
+- [x] **Step 5: Render the segmented control in the expanded heading**
 
 Replace the existing heading `div` with:
 
@@ -480,7 +480,7 @@ Replace the existing heading `div` with:
 </div>
 ```
 
-- [ ] **Step 6: Apply the shared card height and mode-specific content**
+- [x] **Step 6: Apply the shared card height and mode-specific content**
 
 Before mapping items, derive:
 
@@ -528,7 +528,7 @@ label with:
 
 Keep the incompatibility badge as an absolute child after this label.
 
-- [ ] **Step 7: Run focused tests and typecheck**
+- [x] **Step 7: Run focused tests and typecheck**
 
 Run:
 
@@ -539,15 +539,16 @@ rtk pnpm --filter @lpc-toolkit/web typecheck
 
 Expected: both PASS.
 
-- [ ] **Step 8: Commit and update this plan**
+- [x] **Step 8: Commit and update this plan**
 
 ```bash
 rtk git add packages/web/src/components/layer-stack/item-thumbnail.tsx packages/web/src/components/layer-stack/layer-row.tsx packages/web/test/layer-row.test.tsx
 rtk git commit -m "feat(web): add replacement card display layouts"
 ```
 
-Then record the commit, implementation note, and verification result under
-Task 3 and commit that plan tracking update separately.
+- Commit: 5350852a8
+- Implementation: Render stacked, overlay, and hidden layouts for expanded replacement cards and add segmented control inside LayerRow.
+- Verification: unit tests and typecheck pass.
 
 ---
 
