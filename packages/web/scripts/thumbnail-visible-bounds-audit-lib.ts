@@ -1,4 +1,15 @@
-import type { Catalog, ItemDefinition } from '@lpc-toolkit/core';
+import {
+  ANIMATION_CONFIGS,
+  composeSelections,
+  extractAnimation,
+  makeResolvePalette,
+  type CanvasAdapter,
+  type Catalog,
+  type PaletteMetadata,
+  type ItemDefinition,
+} from '@lpc-toolkit/core';
+import { buildItemThumbnailSelections } from '../src/lib/item-thumbnail-selection';
+import { frameRect } from '../src/slice/frame-rect';
 
 export interface AlphaBounds {
   readonly x: number;
@@ -388,4 +399,74 @@ export function summaryToMarkdown(rows: readonly ThumbnailAuditRow[]): string {
 
   return lines.join('\n');
 }
+
+export interface RunAuditCaseDeps {
+  readonly catalog: Catalog;
+  readonly palettes: PaletteMetadata;
+  readonly adapter: CanvasAdapter;
+  readonly failedPaths: readonly string[];
+}
+
+export async function runAuditCase(
+  auditCase: AuditCase,
+  deps: RunAuditCaseDeps,
+): Promise<ThumbnailAuditRow> {
+  const base = {
+    itemId: auditCase.itemId,
+    typeName: auditCase.item.type_name,
+    itemName: auditCase.item.name,
+    bodyType: auditCase.bodyType,
+    ...(auditCase.variant !== undefined ? { variant: auditCase.variant } : {}),
+    direction: 'down' as const,
+    frameIndex: 0,
+  };
+
+  try {
+    const selections = buildItemThumbnailSelections({
+      item: auditCase.item,
+      bodyType: auditCase.bodyType,
+      ...(auditCase.variant !== undefined ? { variant: auditCase.variant } : {}),
+    });
+    const sheet = await composeSelections(selections, {
+      catalog: deps.catalog,
+      adapter: deps.adapter,
+      spritesheetsBaseUrl: '',
+      resolvePalette: makeResolvePalette(deps.catalog, deps.palettes, selections),
+    });
+    const animationName =
+      sheet.animations.includes('walk') ? 'walk' : sheet.animations[0];
+    if (!animationName) {
+      return { ...base, status: 'error', missingPaths: [...deps.failedPaths], errorMessage: 'No composed animation' };
+    }
+    const animation = extractAnimation(sheet, animationName, { adapter: deps.adapter });
+    const config = ANIMATION_CONFIGS[animation.animation];
+    if (!config) {
+      return { ...base, animation: animationName, status: 'error', missingPaths: [...deps.failedPaths], errorMessage: 'Representative animation has no standard frame config' };
+    }
+    const rect = frameRect(config, animation.directions, 'down', 0);
+    const pixels = animation.canvas.getContext('2d')
+      .getImageData(rect.sx, rect.sy, rect.size, rect.size);
+    const bounds = findAlphaBounds(pixels.data, rect.size, rect.size);
+    if (!bounds) {
+      return { ...base, animation: animationName, frameSize: rect.size, status: 'empty', missingPaths: [...deps.failedPaths] };
+    }
+    return {
+      ...base,
+      animation: animationName,
+      frameSize: rect.size,
+      status: 'ok',
+      bounds,
+      metrics: deriveThumbnailMetrics(bounds, rect.size),
+      missingPaths: [...deps.failedPaths],
+    };
+  } catch (error) {
+    return {
+      ...base,
+      status: 'error',
+      missingPaths: [...deps.failedPaths],
+      errorMessage: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
 
