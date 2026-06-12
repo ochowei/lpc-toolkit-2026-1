@@ -67,7 +67,7 @@ After each task:
 - Create: `packages/web/src/lib/replacement-card-display-mode.ts`
 - Test: `packages/web/test/replacement-card-display-mode.test.ts`
 
-- [ ] **Step 1: Write the failing helper tests**
+- [x] **Step 1: Write the failing helper tests**
 
 Create `packages/web/test/replacement-card-display-mode.test.ts`:
 
@@ -130,7 +130,7 @@ describe('replacement card display mode', () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused test and verify it fails**
+- [x] **Step 2: Run the focused test and verify it fails**
 
 Run:
 
@@ -140,7 +140,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- replacement-card-display-mode.test.ts
 
 Expected: FAIL because `../src/lib/replacement-card-display-mode` does not exist.
 
-- [ ] **Step 3: Implement the minimal helper**
+- [x] **Step 3: Implement the minimal helper**
 
 Create `packages/web/src/lib/replacement-card-display-mode.ts`:
 
@@ -205,7 +205,7 @@ export function saveReplacementCardDisplayMode(
 }
 ```
 
-- [ ] **Step 4: Run the focused test and typecheck**
+- [x] **Step 4: Run the focused test and typecheck**
 
 Run:
 
@@ -216,15 +216,16 @@ rtk pnpm --filter @lpc-toolkit/web typecheck
 
 Expected: both PASS.
 
-- [ ] **Step 5: Commit and update this plan**
+- [x] **Step 5: Commit and update this plan**
 
 ```bash
 rtk git add packages/web/src/lib/replacement-card-display-mode.ts packages/web/test/replacement-card-display-mode.test.ts
 rtk git commit -m "feat(web): add replacement card display preference"
 ```
 
-Then record the commit, implementation note, and verification result under
-Task 1 and commit that plan tracking update separately.
+- Commit: aa3a1ca1e
+- Implementation: Add pure helper/types for parsing/storing/loading display mode preferences.
+- Verification: unit tests and typecheck pass.
 
 ---
 
