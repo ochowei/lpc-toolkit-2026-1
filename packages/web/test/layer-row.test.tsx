@@ -66,6 +66,8 @@ describe('LayerRow collapsed summary', () => {
     expect(html).toContain('敲擊工具');
     // 'axe' variant translates to '斧頭'
     expect(html).toContain('斧頭');
+    expect(html).toContain('style="width:28px;height:28px"');
+    expect(html).not.toContain('grid-cols-[repeat(auto-fill,minmax(72px,1fr))]');
   });
 });
 
