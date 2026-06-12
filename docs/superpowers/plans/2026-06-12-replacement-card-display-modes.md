@@ -236,7 +236,7 @@ rtk git commit -m "feat(web): add replacement card display preference"
 - Modify: `packages/web/src/i18n.ts`
 - Modify: `packages/web/test/i18n.test.ts`
 
-- [ ] **Step 1: Add failing translation assertions**
+- [x] **Step 1: Add failing translation assertions**
 
 In the representative-label test in `packages/web/test/i18n.test.ts`, add:
 
@@ -251,7 +251,7 @@ expect(zh('replacementCards.overlay')).toBe('覆蓋');
 expect(zh('replacementCards.hidden')).toBe('隱藏');
 ```
 
-- [ ] **Step 2: Run the i18n test and verify it fails**
+- [x] **Step 2: Run the i18n test and verify it fails**
 
 Run:
 
@@ -261,7 +261,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- i18n.test.ts
 
 Expected: FAIL because the new translation keys are absent.
 
-- [ ] **Step 3: Add the keys to both locales**
+- [x] **Step 3: Add the keys to both locales**
 
 Add beside `layer.swap` in each locale in `packages/web/src/i18n.ts`:
 
@@ -279,7 +279,7 @@ Add beside `layer.swap` in each locale in `packages/web/src/i18n.ts`:
 'replacementCards.hidden': '隱藏',
 ```
 
-- [ ] **Step 4: Run the focused test and typecheck**
+- [x] **Step 4: Run the focused test and typecheck**
 
 Run:
 
@@ -290,15 +290,16 @@ rtk pnpm --filter @lpc-toolkit/web typecheck
 
 Expected: both PASS.
 
-- [ ] **Step 5: Commit and update this plan**
+- [x] **Step 5: Commit and update this plan**
 
 ```bash
 rtk git add packages/web/src/i18n.ts packages/web/test/i18n.test.ts
 rtk git commit -m "feat(web): translate replacement card display modes"
 ```
 
-Then record the commit, implementation note, and verification result under
-Task 2 and commit that plan tracking update separately.
+- Commit: 45f086e60
+- Implementation: Add English and Traditional Chinese localization labels for replacement card display modes.
+- Verification: vitest unit tests and typecheck pass.
 
 ---
 
