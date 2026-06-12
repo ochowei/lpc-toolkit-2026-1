@@ -107,6 +107,13 @@ export function SidebarSearch({
   function onPick(result: PaletteResult) {
     if (disabled || !result.supports) return;
     dispatch(pickActionForItem(result.typeName, result.item));
+    const customAnim = result.item.layer_1?.custom_animation ||
+                       result.item.layer_2?.custom_animation ||
+                       result.item.layer_3?.custom_animation ||
+                       result.item.layer_4?.custom_animation;
+    if (customAnim) {
+      dispatch({ type: 'set_anim', anim: customAnim });
+    }
     onPicked(result.typeName);
     setQuery('');
     setActiveIndex(-1);

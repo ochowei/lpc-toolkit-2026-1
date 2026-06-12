@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  ANIMATION_CONFIGS,
+  ANIMATION_OFFSETS,
   composeSelections,
-  extractAnimation,
   makeResolvePalette,
   type BodyType,
   type Catalog,
-  type Direction,
   type ItemDefinition,
   type PaletteMetadata,
   type Selection,
@@ -14,8 +12,41 @@ import {
   type TypeName,
 } from '@lpc-toolkit/core';
 import { createBrowserCanvasAdapter } from '../adapter/browser-canvas-adapter';
-import { frameRect } from '../slice/frame-rect';
 import { cacheGet, cacheSet, makeCacheKey } from './thumbnail-cache';
+
+export interface ThumbnailCropRect {
+  readonly sx: number;
+  readonly sy: number;
+  readonly size: number;
+}
+
+/**
+ * Calculates the crop rectangle (sx, sy, size = 64) within the composed master sheet canvas
+ * for drawing the item's thumbnail using the upstream metadata.
+ */
+export function getThumbnailCropRect(
+  def: ItemDefinition | undefined,
+  animName: string,
+  customAnimationsMap: ReadonlyMap<string, { offsetY: number }> | undefined,
+): ThumbnailCropRect {
+  const previewRow = def?.preview_row ?? 2;
+  const previewCol = (def as any)?.preview_column ?? 0;
+  const previewXOffset = (def as any)?.preview_x_offset ?? 0;
+  const previewYOffset = (def as any)?.preview_y_offset ?? 0;
+
+  let offsetY = 0;
+  if (animName in ANIMATION_OFFSETS) {
+    offsetY = ANIMATION_OFFSETS[animName as keyof typeof ANIMATION_OFFSETS] ?? 0;
+  } else if (customAnimationsMap?.has(animName)) {
+    offsetY = customAnimationsMap.get(animName)?.offsetY ?? 0;
+  }
+
+  return {
+    sx: previewCol * 64 + previewXOffset,
+    sy: offsetY + previewRow * 64 + previewYOffset,
+    size: 64,
+  };
+}
 
 /** Inputs needed to compose and crop one catalog item thumbnail. */
 export interface UseItemThumbnailArgs {
@@ -154,17 +185,12 @@ export function useItemThumbnail(args: UseItemThumbnailArgs): UseItemThumbnailRe
       .then((sheet) => {
         if (reqId !== reqIdRef.current) return;
         const animName =
-          sheet.animations.includes('walk') ? 'walk' : (sheet.animations[0] ?? 'walk');
-        const animation = extractAnimation(sheet, animName, { adapter });
-        if (!animation) {
-          setState({ canvas: null, status: 'error' });
-          return;
-        }
-        const config = ANIMATION_CONFIGS[animation.animation];
-        if (!config) {
-          setState({ canvas: null, status: 'error' });
-          return;
-        }
+          sheet.animations.includes('walk')
+            ? 'walk'
+            : (sheet.customAnimations && sheet.customAnimations.size > 0
+                ? Array.from(sheet.customAnimations.keys())[0]!
+                : (sheet.animations[0] ?? 'walk'));
+        const r = getThumbnailCropRect(def, animName, sheet.customAnimations);
         const canvas = document.createElement('canvas');
         canvas.width = args.size;
         canvas.height = args.size;
@@ -174,10 +200,8 @@ export function useItemThumbnail(args: UseItemThumbnailArgs): UseItemThumbnailRe
           return;
         }
         ctx.imageSmoothingEnabled = false;
-        const dir: Direction = 'down';
-        const r = frameRect(config, animation.directions, dir, 0);
         ctx.drawImage(
-          animation.canvas as unknown as CanvasImageSource,
+          sheet.canvas as unknown as CanvasImageSource,
           r.sx, r.sy, r.size, r.size,
           0, 0, args.size, args.size,
         );
