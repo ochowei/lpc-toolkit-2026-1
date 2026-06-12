@@ -22,7 +22,8 @@
     "pretest:e2e:parity": "pnpm prepare-assets && pnpm verify-upstream-parity",
     "test:e2e:parity": "playwright test -c playwright.parity.config.ts",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e:headed": "playwright test --headed",
+    "audit:thumbnail-bounds": "tsx scripts/audit-thumbnail-visible-bounds.ts"
   },
   "dependencies": {
     "@lpc-toolkit/core": "workspace:*",

@@ -31,3 +31,6 @@ packages/web/public/zips/
 # Playwright e2e artifacts
 packages/web/test-results/
 packages/web/playwright-report/
+
+# Generated local analysis reports
+packages/web/.audit-output/
