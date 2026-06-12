@@ -5,6 +5,7 @@ import { LayerRow } from '../src/components/layer-stack/layer-row';
 import { createLabelTranslator, createTranslator } from '../src/i18n';
 import { ALL_LICENSE_GROUPS } from '../src/slice/license-filter';
 import type { SliceState } from '../src/slice/selection';
+import type { ReplacementCardDisplayMode } from '../src/lib/replacement-card-display-mode';
 
 const palettes = createPaletteCatalog({}).palettes;
 
@@ -39,6 +40,27 @@ const state: SliceState = {
   zoom: 4,
 };
 
+function renderExpanded(mode: ReplacementCardDisplayMode): string {
+  return renderToStaticMarkup(
+    <LayerRow
+      disabled={false}
+      typeName="tools"
+      catalog={catalog}
+      palettes={palettes}
+      state={state}
+      dispatch={() => {}}
+      tl={createLabelTranslator('en')}
+      t={createTranslator('en')}
+      licenseFilter={ALL_LICENSE_GROUPS}
+      animationFilter={new Set()}
+      expanded
+      onToggle={() => {}}
+      replacementCardDisplayMode={mode}
+      onReplacementCardDisplayModeChange={() => {}}
+    />,
+  );
+}
+
 describe('LayerRow collapsed summary', () => {
   it('uses the variant translator in the collapsed layer summary', () => {
     const tl = createLabelTranslator('zh-TW');
@@ -58,6 +80,8 @@ describe('LayerRow collapsed summary', () => {
         animationFilter={new Set()}
         expanded={false}
         onToggle={() => {}}
+        replacementCardDisplayMode="overlay"
+        onReplacementCardDisplayModeChange={() => {}}
       />
     );
 
@@ -72,26 +96,38 @@ describe('LayerRow collapsed summary', () => {
 });
 
 describe('LayerRow expanded replacements', () => {
-  it('uses larger replacement cards and thumbnails without changing label truncation', () => {
-    const html = renderToStaticMarkup(
-      <LayerRow
-        disabled={false}
-        typeName="tools"
-        catalog={catalog}
-        palettes={palettes}
-        state={state}
-        dispatch={() => {}}
-        tl={createLabelTranslator('en')}
-        t={createTranslator('en')}
-        licenseFilter={ALL_LICENSE_GROUPS}
-        animationFilter={new Set()}
-        expanded
-        onToggle={() => {}}
-      />
-    );
+  it('renders an accessible icon-and-text segmented control', () => {
+    const html = renderExpanded('overlay');
+    expect(html).toContain('aria-label="Card labels"');
+    expect(html).toContain('aria-pressed="true"');
+    expect(html).toContain('Overlay');
+    expect(html).toContain('Stacked');
+    expect(html).toContain('Hidden');
+  });
 
-    expect(html).toContain('grid-cols-[repeat(auto-fill,minmax(72px,1fr))]');
-    expect(html.match(/style="width:40px;height:40px"/g)).toHaveLength(2);
-    expect(html).toContain('max-w-full truncate');
+  it('keeps one card height while changing thumbnail and label layout', () => {
+    const stacked = renderExpanded('stacked');
+    const overlay = renderExpanded('overlay');
+    const hidden = renderExpanded('hidden');
+
+    for (const html of [stacked, overlay, hidden]) {
+      expect(html).toContain('h-16');
+      expect(html).toContain(
+        'grid-cols-[repeat(auto-fill,minmax(72px,1fr))]',
+      );
+    }
+
+    expect(stacked.match(/style="width:40px;height:40px"/g)).toHaveLength(2);
+    expect(stacked).toContain('data-label-layout="stacked"');
+
+    expect(overlay.match(/style="width:56px;height:56px"/g)).toHaveLength(2);
+    expect(overlay).toContain('data-label-layout="overlay"');
+    expect(overlay).toContain('bg-black/65');
+
+    expect(hidden.match(/style="width:56px;height:56px"/g)).toHaveLength(2);
+    expect(hidden).toContain('data-label-layout="hidden"');
+    expect(hidden).not.toContain('data-visible-item-label="true"');
+    expect(hidden).toContain('aria-label="Smash"');
+    expect(hidden).toContain('aria-label="Hammer"');
   });
 });

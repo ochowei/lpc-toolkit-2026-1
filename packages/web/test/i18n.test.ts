@@ -51,6 +51,15 @@ describe('i18n', () => {
 
     expect(en('layer.swap')).toBe('Swap {name}');
     expect(zh('layer.swap')).toBe('更換{name}');
+
+    expect(en('replacementCards.displayMode')).toBe('Card labels');
+    expect(en('replacementCards.stacked')).toBe('Stacked');
+    expect(en('replacementCards.overlay')).toBe('Overlay');
+    expect(en('replacementCards.hidden')).toBe('Hidden');
+    expect(zh('replacementCards.displayMode')).toBe('卡片文字');
+    expect(zh('replacementCards.stacked')).toBe('上下');
+    expect(zh('replacementCards.overlay')).toBe('覆蓋');
+    expect(zh('replacementCards.hidden')).toBe('隱藏');
   });
 
   it('translates reset menu labels', () => {

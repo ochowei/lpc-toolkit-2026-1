@@ -11,7 +11,7 @@ interface Props {
   name: string;
   variant?: string;
   recolor?: string;
-  size: 20 | 24 | 28 | 40;
+  size: 20 | 24 | 28 | 40 | 56;
   bodyType: BodyType;
   catalog: Catalog;
   palettes: PaletteMetadata;

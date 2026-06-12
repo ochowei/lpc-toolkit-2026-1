@@ -7,6 +7,24 @@ import { itemMatchesLicenseFilter, type LicenseFilter } from '../../slice/licens
 import { itemMatchesAnimationFilter, type AnimationFilter } from '../../slice/animation-filter';
 import { ColorPicker } from '../color-picker';
 import { ItemThumbnail } from './item-thumbnail';
+import {
+  REPLACEMENT_CARD_DISPLAY_MODES,
+  type ReplacementCardDisplayMode,
+} from '../../lib/replacement-card-display-mode';
+import type { TranslationKey } from '../../i18n';
+
+const DISPLAY_MODE_ICONS: Record<ReplacementCardDisplayMode, string> = {
+  stacked: '▤',
+  overlay: '▣',
+  hidden: '□',
+};
+
+const DISPLAY_MODE_LABEL_KEYS:
+  Record<ReplacementCardDisplayMode, TranslationKey> = {
+    stacked: 'replacementCards.stacked',
+    overlay: 'replacementCards.overlay',
+    hidden: 'replacementCards.hidden',
+  };
 
 interface Props {
   disabled: boolean;
@@ -21,10 +39,29 @@ interface Props {
   animationFilter: AnimationFilter;
   expanded: boolean;
   onToggle: () => void;
+  replacementCardDisplayMode?: ReplacementCardDisplayMode;
+  onReplacementCardDisplayModeChange?: (
+    mode: ReplacementCardDisplayMode,
+  ) => void;
 }
 
 /** Active layer row with thumbnail, color controls, and compatible replacement items. */
-export function LayerRow({ disabled, typeName, catalog, palettes, state, dispatch, tl, t, licenseFilter, animationFilter, expanded, onToggle }: Props) {
+export function LayerRow({
+  disabled,
+  typeName,
+  catalog,
+  palettes,
+  state,
+  dispatch,
+  tl,
+  t,
+  licenseFilter,
+  animationFilter,
+  expanded,
+  onToggle,
+  replacementCardDisplayMode = 'overlay',
+  onReplacementCardDisplayModeChange = () => {},
+}: Props) {
   const selection = state.selections[typeName];
   if (!selection) return null;
 
@@ -40,6 +77,7 @@ export function LayerRow({ disabled, typeName, catalog, palettes, state, dispatc
     >
       <button
         type="button"
+        aria-expanded={expanded}
         onClick={onToggle}
         className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-surface-2"
       >
@@ -123,10 +161,42 @@ export function LayerRow({ disabled, typeName, catalog, palettes, state, dispatc
 
       {expanded && item && (() => {
         const items = catalog.byTypeName.get(typeName) ?? [];
+        const fullHeightThumbnail = replacementCardDisplayMode !== 'stacked';
+        const thumbnailSize = fullHeightThumbnail ? 56 : 40;
         return (
           <div className="px-2 pb-2">
-            <div className="mb-1 text-[10px] uppercase tracking-wide text-text-mute">
-              {t('layer.swap').replace('{name}', tl.category(typeName))}
+            <div className="mb-1 flex flex-wrap items-center gap-1">
+              <div className="mr-auto text-[10px] uppercase tracking-wide text-text-mute">
+                {t('layer.swap').replace('{name}', tl.category(typeName))}
+              </div>
+              <div
+                className="flex flex-wrap items-center gap-0.5"
+                role="group"
+                aria-label={t('replacementCards.displayMode')}
+              >
+                {REPLACEMENT_CARD_DISPLAY_MODES.map((mode) => {
+                  const selected = replacementCardDisplayMode === mode;
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => onReplacementCardDisplayModeChange(mode)}
+                      className={[
+                        'inline-flex items-center gap-1 rounded border px-1.5 py-0.5',
+                        'text-[9px] focus-visible:outline-none focus-visible:ring-1',
+                        'focus-visible:ring-accent',
+                        selected
+                          ? 'border-accent bg-accent/15 text-text'
+                          : 'border-border bg-surface-2 text-text-mute hover:bg-surface-3',
+                      ].join(' ')}
+                    >
+                      <span aria-hidden>{DISPLAY_MODE_ICONS[mode]}</span>
+                      <span>{t(DISPLAY_MODE_LABEL_KEYS[mode])}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
             <div className="grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-1">
               {items.map((it) => {
@@ -161,22 +231,40 @@ export function LayerRow({ disabled, typeName, catalog, palettes, state, dispatc
                         dispatch({ type: 'set_anim', anim: customAnim });
                       }
                     }}
+                    aria-label={tl.itemName(it.name)}
+                    data-label-layout={replacementCardDisplayMode}
                     className={[
-                      'relative flex flex-col items-center gap-1 rounded-md border p-1 text-[10px]',
-                      isSelected ? 'border-accent bg-accent/10 text-text' : 'border-border bg-surface-2 text-text-2',
-                      disabled || !supports ? 'opacity-30 cursor-not-allowed' : '',
+                      'relative flex h-16 items-center justify-center overflow-hidden',
+                      'rounded-md border p-1 text-[10px]',
+                      replacementCardDisplayMode === 'stacked' ? 'flex-col gap-1' : '',
+                      isSelected
+                        ? 'border-accent bg-accent/10 text-text'
+                        : 'border-border bg-surface-2 text-text-2',
+                      disabled || !supports ? 'cursor-not-allowed opacity-30' : '',
                       !disabled && exceeds && supports ? 'opacity-60' : '',
                     ].filter(Boolean).join(' ')}
                   >
                     <ItemThumbnail
                       typeName={typeName}
                       name={it.name}
-                      size={40}
+                      size={thumbnailSize}
                       bodyType={state.bodyType}
                       catalog={catalog}
                       palettes={palettes}
                     />
-                    <span className="max-w-full truncate">{tl.itemName(it.name)}</span>
+                    {replacementCardDisplayMode !== 'hidden' && (
+                      <span
+                        data-visible-item-label="true"
+                        className={[
+                          'max-w-full truncate',
+                          replacementCardDisplayMode === 'overlay'
+                            ? 'absolute inset-x-1 bottom-1 rounded-sm bg-black/65 px-1 py-0.5 text-white'
+                            : '',
+                        ].filter(Boolean).join(' ')}
+                      >
+                        {tl.itemName(it.name)}
+                      </span>
+                    )}
                     {exceeds && supports && (
                       <span className="absolute -top-1 -right-1 inline-flex h-3 w-3 items-center justify-center rounded-full bg-danger text-[8px] text-white" aria-label={exceedsTitle}>!</span>
                     )}

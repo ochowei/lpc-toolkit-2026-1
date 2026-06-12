@@ -156,6 +156,10 @@ export const TRANSLATIONS = {
     'mobile.preview': 'Preview',
     'mobile.layers': 'Layers',
     'layer.swap': 'Swap {name}',
+    'replacementCards.displayMode': 'Card labels',
+    'replacementCards.stacked': 'Stacked',
+    'replacementCards.overlay': 'Overlay',
+    'replacementCards.hidden': 'Hidden',
   },
   'zh-TW': {
     'app.subtitle': '基礎切片',
@@ -308,6 +312,10 @@ export const TRANSLATIONS = {
     'mobile.preview': '預覽',
     'mobile.layers': '圖層',
     'layer.swap': '更換{name}',
+    'replacementCards.displayMode': '卡片文字',
+    'replacementCards.stacked': '上下',
+    'replacementCards.overlay': '覆蓋',
+    'replacementCards.hidden': '隱藏',
   },
 } as const;
 
