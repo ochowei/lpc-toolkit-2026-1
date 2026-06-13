@@ -3,20 +3,22 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createCanvas, loadImage } from '@napi-rs/canvas';
 import { createCatalog, validateAssets } from '@lpc-toolkit/core';
+import type { CanvasAdapter, CanvasLike, ImageLike, ItemDefinition } from '@lpc-toolkit/core';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../../..');
 const sheetDefsDir = path.join(repoRoot, 'assets/sheet_definitions');
 const spritesheetsDir = path.join(repoRoot, 'assets/spritesheets');
 
-function walkJson(dir: string, base = dir): Record<string, any> {
-  const out: Record<string, any> = {};
+function walkJson(dir: string, base = dir): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, e.name);
-    if (e.isDirectory()) Object.assign(out, walkJson(full, base));
-    else if (e.name.endsWith('.json')) {
+    if (e.isDirectory()) {
+      Object.assign(out, walkJson(full, base));
+    } else if (e.name.endsWith('.json')) {
       const key = path.relative(base, full).split(path.sep).join('/');
-      out[key] = JSON.parse(readFileSync(full, 'utf8'));
+      out[key] = JSON.parse(readFileSync(full, 'utf8')) as unknown;
     }
   }
   return out;
@@ -29,15 +31,18 @@ async function main() {
   }
 
   console.log('Loading definitions...');
-  const catalogRecs = walkJson(sheetDefsDir);
+  const catalogRecs = walkJson(sheetDefsDir) as unknown as Record<string, ItemDefinition>;
   const { catalog } = createCatalog(catalogRecs);
 
   console.log('Validating catalog assets...');
-  const adapter = {
-    createCanvas: (w: any, h: any) => createCanvas(w, h) as any,
-    loadImage: async (url: string) => {
+  const adapter: CanvasAdapter = {
+    createCanvas: (w: number, h: number): CanvasLike => {
+      return createCanvas(w, h) as unknown as CanvasLike;
+    },
+    loadImage: async (url: string): Promise<ImageLike> => {
       const rel = url.replace(/^(spritesheets\/)+/, '');
-      return loadImage(path.join(spritesheetsDir, rel)) as any;
+      const img = await loadImage(path.join(spritesheetsDir, rel));
+      return img as unknown as ImageLike;
     }
   };
 
