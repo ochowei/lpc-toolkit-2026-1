@@ -3,10 +3,12 @@ import {
   composeSelections,
   extractAnimation,
   makeResolvePalette,
+  DIRECTIONS,
   type CanvasAdapter,
   type Catalog,
   type PaletteMetadata,
   type ItemDefinition,
+  type Direction,
 } from '@lpc-toolkit/core';
 import { buildItemThumbnailSelections } from '../src/lib/item-thumbnail-selection';
 import { frameRect } from '../src/slice/frame-rect';
@@ -433,30 +435,80 @@ export async function runAuditCase(
       spritesheetsBaseUrl: '',
       resolvePalette: makeResolvePalette(deps.catalog, deps.palettes, selections),
     });
-    const animationName =
+
+    let animationName: string | undefined =
       sheet.animations.includes('walk') ? 'walk' : sheet.animations[0];
+    let customRegion = null;
+
+    if (!animationName && sheet.customAnimations && sheet.customAnimations.size > 0) {
+      animationName = Array.from(sheet.customAnimations.keys())[0];
+      customRegion = sheet.customAnimations.get(animationName!);
+    }
+
     if (!animationName) {
       return { ...base, status: 'error', missingPaths: [...deps.failedPaths], errorMessage: 'No composed animation' };
     }
+
     const animation = extractAnimation(sheet, animationName, { adapter: deps.adapter });
-    const config = ANIMATION_CONFIGS[animation.animation];
-    if (!config) {
-      return { ...base, animation: animationName, status: 'error', missingPaths: [...deps.failedPaths], errorMessage: 'Representative animation has no standard frame config' };
+
+    // Direction fallback loop
+    const directionsToTry: Direction[] = ['down', 'up', 'left', 'right'];
+    let bounds: AlphaBounds | null = null;
+    let finalDirection: Direction = 'down';
+    let frameSize = 64;
+
+    if (customRegion) {
+      frameSize = customRegion.frameSize;
+      for (const dir of directionsToTry) {
+        const dirIndex = DIRECTIONS.indexOf(dir);
+        if (dirIndex >= 0 && dirIndex < customRegion.rows) {
+          const sx = 0;
+          const sy = dirIndex * frameSize;
+          const pixels = animation.canvas.getContext('2d')
+            .getImageData(sx, sy, frameSize, frameSize);
+          bounds = findAlphaBounds(pixels.data, frameSize, frameSize);
+          if (bounds) {
+            finalDirection = dir;
+            break;
+          }
+        }
+      }
+    } else {
+      const config = ANIMATION_CONFIGS[animation.animation];
+      if (!config) {
+        return { ...base, animation: animationName, status: 'error', missingPaths: [...deps.failedPaths], errorMessage: 'Representative animation has no standard frame config' };
+      }
+      frameSize = 64;
+      for (const dir of directionsToTry) {
+        const rect = frameRect(config, animation.directions, dir, 0);
+        const pixels = animation.canvas.getContext('2d')
+          .getImageData(rect.sx, rect.sy, rect.size, rect.size);
+        bounds = findAlphaBounds(pixels.data, rect.size, rect.size);
+        if (bounds) {
+          finalDirection = dir;
+          break;
+        }
+      }
     }
-    const rect = frameRect(config, animation.directions, 'down', 0);
-    const pixels = animation.canvas.getContext('2d')
-      .getImageData(rect.sx, rect.sy, rect.size, rect.size);
-    const bounds = findAlphaBounds(pixels.data, rect.size, rect.size);
+
     if (!bounds) {
-      return { ...base, animation: animationName, frameSize: rect.size, status: 'empty', missingPaths: [...deps.failedPaths] };
+      return {
+        ...base,
+        animation: animationName,
+        frameSize,
+        status: 'empty',
+        missingPaths: [...deps.failedPaths]
+      };
     }
+
     return {
       ...base,
       animation: animationName,
-      frameSize: rect.size,
+      direction: finalDirection,
+      frameSize,
       status: 'ok',
       bounds,
-      metrics: deriveThumbnailMetrics(bounds, rect.size),
+      metrics: deriveThumbnailMetrics(bounds, frameSize),
       missingPaths: [...deps.failedPaths],
     };
   } catch (error) {
