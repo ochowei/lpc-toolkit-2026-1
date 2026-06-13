@@ -6,6 +6,7 @@ import {
   cacheSet,
   makeCacheKey,
 } from '../src/hooks/thumbnail-cache';
+import { THUMBNAIL_FRAMING_POLICY_VERSION } from '../src/generated/thumbnail-framing-policy';
 
 function fakeCanvas(label: string): HTMLCanvasElement {
   // Test-only stand-in; the cache treats the value opaquely.
@@ -28,6 +29,16 @@ describe('makeCacheKey', () => {
     expect(makeCacheKey({ ...base, variant: 'red' })).not.toBe(makeCacheKey(base));
     expect(makeCacheKey({ ...base, recolor: 'pal_a' })).not.toBe(makeCacheKey(base));
     expect(makeCacheKey({ ...base, bodyType: 'female' })).not.toBe(makeCacheKey(base));
+  });
+
+  it('includes the framing policy version', () => {
+    const key = makeCacheKey({
+      bodyType: 'male',
+      typeName: 'ring',
+      name: 'Stud Ring',
+      size: 24,
+    });
+    expect(key).toContain(THUMBNAIL_FRAMING_POLICY_VERSION);
   });
 });
 

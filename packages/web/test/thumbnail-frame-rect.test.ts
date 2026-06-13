@@ -83,4 +83,21 @@ describe('getThumbnailCropRect', () => {
       size: 64,
     });
   });
+
+  it('retains original source crop values for representative item without modifications to sx, sy, or size', () => {
+    const def = {
+      name: 'Stud Ring',
+      type_name: 'ring',
+      preview_row: 2,
+      preview_column: 0,
+      layer_1: { zPos: 10, male: 'r/' },
+    } as unknown as ItemDefinition;
+
+    const rect = getThumbnailCropRect(def, 'walk', new Map());
+    expect(rect).toEqual({
+      sx: 0,
+      sy: 640,
+      size: 64,
+    });
+  });
 });

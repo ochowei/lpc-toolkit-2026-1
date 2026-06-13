@@ -9,35 +9,18 @@ import { describe, expect, it } from 'vitest';
 import { createCatalog, createPaletteCatalog } from '@lpc-toolkit/core';
 import type { Catalog, CanvasAdapter, CanvasLike, ImageLike } from '@lpc-toolkit/core';
 import {
+  applyThumbnailBoundsOverrides,
   deriveThumbnailMetrics,
-  findAlphaBounds,
+  deriveThumbnailTypeScales,
   expandAuditCases,
   rowsToCsv,
+  serializeThumbnailFramingPolicy,
   summaryToMarkdown,
   runAuditCase,
+  type ThumbnailBoundsOverrides,
   type ThumbnailAuditRow,
 } from '../scripts/thumbnail-visible-bounds-audit-lib';
 
-function rgba(width: number, height: number, visible: readonly [number, number][]) {
-  const data = new Uint8ClampedArray(width * height * 4);
-  for (const [x, y] of visible) data[(y * width + x) * 4 + 3] = 255;
-  return data;
-}
-
-describe('findAlphaBounds', () => {
-  it('returns null for a transparent frame', () => {
-    expect(findAlphaBounds(rgba(4, 4, []), 4, 4)).toBeNull();
-  });
-
-  it('returns inclusive bounds for visible pixels touching frame edges', () => {
-    expect(findAlphaBounds(rgba(4, 4, [[0, 1], [3, 2]]), 4, 4)).toEqual({
-      x: 0,
-      y: 1,
-      width: 4,
-      height: 2,
-    });
-  });
-});
 
 describe('deriveThumbnailMetrics', () => {
   it('calculates current visible size and two-pixel-margin fit scale', () => {
@@ -50,6 +33,106 @@ describe('deriveThumbnailMetrics', () => {
         fitScalePxPerSourcePixel: 1.25,
         additionalScaleOverCurrent: 10 / 3,
       });
+  });
+});
+
+describe('thumbnail framing policy generation', () => {
+  const okRow = (
+    typeName: string,
+    additionalScaleOverCurrent: number,
+    width: number,
+    height: number,
+  ): ThumbnailAuditRow => ({
+    itemId: `${typeName}_${width}_${height}`,
+    typeName,
+    itemName: typeName,
+    bodyType: 'male',
+    animation: 'walk',
+    direction: 'down',
+    frameIndex: 0,
+    frameSize: 64,
+    status: 'ok',
+    bounds: { x: 0, y: 0, width, height },
+    metrics: {
+      widthRatio: width / 64,
+      heightRatio: height / 64,
+      visibleWidthAt24: width * 24 / 64,
+      visibleHeightAt24: height * 24 / 64,
+      fitScalePxPerSourcePixel: Math.min(20 / width, 20 / height),
+      additionalScaleOverCurrent,
+    },
+    missingPaths: [],
+  });
+
+  it('uses the median target and omits scales below 1.5', () => {
+    expect(deriveThumbnailTypeScales([
+      okRow('ring', 2, 8, 8),
+      okRow('ring', 3, 8, 8),
+      okRow('ring', 4, 8, 8),
+      okRow('body', 1.2, 40, 40),
+    ])).toEqual({ ring: 3 });
+  });
+
+  it('caps at 4 and at the largest-case 20px safe multiplier', () => {
+    expect(deriveThumbnailTypeScales([
+      okRow('charm', 8, 8, 8),
+      okRow('charm', 8, 32, 16),
+    ])).toEqual({ charm: 1.6 });
+  });
+
+  it('ignores empty and error rows when deriving scale', () => {
+    const failed: ThumbnailAuditRow[] = [
+      {
+        itemId: 'ring_empty',
+        typeName: 'ring',
+        itemName: 'Empty',
+        bodyType: 'male',
+        status: 'empty',
+      },
+      {
+        itemId: 'ring_error',
+        typeName: 'ring',
+        itemName: 'Error',
+        bodyType: 'female',
+        status: 'error',
+        errorMessage: 'missing',
+      },
+    ];
+    expect(deriveThumbnailTypeScales([
+      okRow('ring', 3, 8, 8),
+      ...failed,
+    ])).toEqual({ ring: 3 });
+  });
+
+  it('applies only explicit case-keyed bounds overrides', () => {
+    const rows = [okRow('ring', 3, 8, 8)];
+    const overrides: ThumbnailBoundsOverrides = {
+      'ring_8_8|male|_': { x: 1, y: 1, width: 6, height: 6 },
+    };
+    expect(applyThumbnailBoundsOverrides(rows, overrides)[0]?.bounds)
+      .toEqual({ x: 1, y: 1, width: 6, height: 6 });
+  });
+
+  it('serializes sorted deterministic TypeScript', () => {
+    expect(serializeThumbnailFramingPolicy({ ring: 3, charm: 2 }))
+      .toContain(`export const THUMBNAIL_TYPE_SCALES = {\n  "charm": 2,\n  "ring": 3,\n} as const;`);
+  });
+
+  it('produces byte-identical policy output for identical rows', () => {
+    const scales = deriveThumbnailTypeScales([
+      okRow('ring', 3, 8, 8),
+      okRow('charm', 2, 10, 10),
+    ]);
+
+    expect(serializeThumbnailFramingPolicy(scales))
+      .toBe(serializeThumbnailFramingPolicy(scales));
+  });
+
+  it('uses the runtime policy export names', () => {
+    const output = serializeThumbnailFramingPolicy({ ring: 3 });
+
+    expect(output).toContain('THUMBNAIL_FRAMING_POLICY_VERSION');
+    expect(output).toContain('THUMBNAIL_TYPE_SCALES');
   });
 });
 
@@ -379,5 +462,3 @@ describe('runAuditCase behavior for custom animations and fallbacks', () => {
     });
   });
 });
-
-
