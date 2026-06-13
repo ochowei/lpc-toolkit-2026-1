@@ -685,7 +685,7 @@ verification. Commit the plan-only progress update.
 - Modify: `packages/web/test/thumbnail-framing.test.ts`
 - Modify: `packages/web/test/thumbnail-frame-rect.test.ts`
 
-- [ ] **Step 1: Write failing draw-plan tests for configured and fallback cases**
+- [x] **Step 1: Write failing draw-plan tests for configured and fallback cases**
 
 Add to `thumbnail-framing.ts`'s test imports:
 
@@ -731,7 +731,7 @@ In `thumbnail-frame-rect.test.ts`, add an assertion that the existing source
 crop remains unchanged for a representative item. The framing feature must
 change destination geometry only, not `sx`, `sy`, or source frame size.
 
-- [ ] **Step 2: Run focused tests and verify the new API test fails**
+- [x] **Step 2: Run focused tests and verify the new API test fails**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/web test -- thumbnail-framing.test.ts thumbnail-frame-rect.test.ts
@@ -739,7 +739,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- thumbnail-framing.test.ts thumbnail-f
 
 Expected: FAIL because `createThumbnailDrawPlan` does not exist.
 
-- [ ] **Step 3: Implement the fallback-aware draw-plan helper**
+- [x] **Step 3: Implement the fallback-aware draw-plan helper**
 
 Add:
 
@@ -771,7 +771,7 @@ export function createThumbnailDrawPlan(
 }
 ```
 
-- [ ] **Step 4: Update `useItemThumbnail` to scan and center the source frame**
+- [x] **Step 4: Update `useItemThumbnail` to scan and center the source frame**
 
 Add imports:
 
@@ -840,7 +840,7 @@ This makes audit `empty/error` types inherit their type scale whenever runtime
 composition produces bounds. Empty runtime frames fall back to full-frame
 drawing; composition failures retain the existing placeholder.
 
-- [ ] **Step 5: Run focused tests and web typecheck**
+- [x] **Step 5: Run focused tests and web typecheck**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/web test -- thumbnail-framing.test.ts thumbnail-frame-rect.test.ts thumbnail-cache.test.ts
@@ -849,7 +849,7 @@ rtk pnpm --filter @lpc-toolkit/web typecheck
 
 Expected: PASS.
 
-- [ ] **Step 6: Run the complete web unit suite**
+- [x] **Step 6: Run the complete web unit suite**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/web test
@@ -857,17 +857,18 @@ rtk pnpm --filter @lpc-toolkit/web test
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit runtime auto-framing**
+- [x] **Step 7: Commit runtime auto-framing**
 
 ```bash
 rtk git add packages/web/src/hooks/use-item-thumbnail.ts packages/web/src/lib/thumbnail-framing.ts packages/web/test/thumbnail-framing.test.ts packages/web/test/thumbnail-frame-rect.test.ts
 rtk git commit -m "feat(web): auto-frame asset thumbnails"
 ```
 
-- [ ] **Step 8: Record task completion in this plan**
+- [x] **Step 8: Record task completion in this plan**
 
-Append the Task 5 implementation note, implementation commit hash, and PASS
-verification. Commit the plan-only progress update.
+**Implementation note:** Runtime bounds detection and policy-based framing scale are now applied in `useItemThumbnail`, falling back to full-frame drawing for empty or error frames.
+**Commit:** 1066c68fa
+**Verification:** focused tests PASS, web unit suite PASS, web typecheck PASS.
 
 ### Task 6: Visual And Final Verification
 
