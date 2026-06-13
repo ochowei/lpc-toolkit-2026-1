@@ -243,7 +243,7 @@ rtk git commit -m "refactor(web): share thumbnail bounds geometry"
 - Modify: `packages/web/scripts/thumbnail-visible-bounds-audit-lib.ts`
 - Modify: `packages/web/test/thumbnail-visible-bounds-audit.test.ts`
 
-- [ ] **Step 1: Write failing aggregation and serialization tests**
+- [x] **Step 1: Write failing aggregation and serialization tests**
 
 Add imports:
 
@@ -343,7 +343,7 @@ describe('thumbnail framing policy generation', () => {
 });
 ```
 
-- [ ] **Step 2: Run the audit unit test and verify it fails**
+- [x] **Step 2: Run the audit unit test and verify it fails**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/web test -- thumbnail-visible-bounds-audit.test.ts
@@ -351,7 +351,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- thumbnail-visible-bounds-audit.test.t
 
 Expected: FAIL because the policy functions and override type do not exist.
 
-- [ ] **Step 3: Implement pure aggregation and serialization**
+- [x] **Step 3: Implement pure aggregation and serialization**
 
 Add to `thumbnail-visible-bounds-audit-lib.ts`:
 
@@ -462,7 +462,7 @@ import type { ThumbnailBoundsOverrides } from './thumbnail-visible-bounds-audit-
 export const THUMBNAIL_BOUNDS_OVERRIDES: ThumbnailBoundsOverrides = {};
 ```
 
-- [ ] **Step 4: Run focused tests and typecheck**
+- [x] **Step 4: Run focused tests and typecheck**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/web test -- thumbnail-visible-bounds-audit.test.ts thumbnail-framing.test.ts
@@ -471,17 +471,18 @@ rtk pnpm --filter @lpc-toolkit/web typecheck
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit policy derivation**
+- [x] **Step 5: Commit policy derivation**
 
 ```bash
 rtk git add packages/web/scripts/thumbnail-bounds-overrides.ts packages/web/scripts/thumbnail-visible-bounds-audit-lib.ts packages/web/test/thumbnail-visible-bounds-audit.test.ts
 rtk git commit -m "feat(web): derive thumbnail framing policy"
 ```
 
-- [ ] **Step 6: Record task completion in this plan**
+- [x] **Step 6: Record task completion in this plan**
 
-Append the Task 2 implementation note, implementation commit hash, and PASS
-verification, then commit the plan-only progress update.
+**Implementation note:** Successful audit rows now produce deterministic type-level scales constrained by median demand, the smallest-thumbnail margin, and the maximum scale; explicit case overrides recompute metrics.
+**Commit:** ae4d45199
+**Verification:** focused thumbnail tests (15 pass) and web typecheck PASS
 
 ### Task 3: Generate And Commit The Real Policy
 
