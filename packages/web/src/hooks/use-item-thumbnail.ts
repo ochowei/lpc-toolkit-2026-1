@@ -12,6 +12,11 @@ import {
 import { createBrowserCanvasAdapter } from '../adapter/browser-canvas-adapter';
 import { cacheGet, cacheSet, makeCacheKey } from './thumbnail-cache';
 import { buildItemThumbnailSelections } from '../lib/item-thumbnail-selection';
+import {
+  createThumbnailDrawPlan,
+  findAlphaBounds,
+} from '../lib/thumbnail-framing';
+import { THUMBNAIL_TYPE_SCALES } from '../generated/thumbnail-framing-policy';
 
 export interface ThumbnailCropRect {
   readonly sx: number;
@@ -156,10 +161,50 @@ export function useItemThumbnail(args: UseItemThumbnailArgs): UseItemThumbnailRe
           return;
         }
         ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(
+
+        const frameCanvas = document.createElement('canvas');
+        frameCanvas.width = r.size;
+        frameCanvas.height = r.size;
+        const frameCtx = frameCanvas.getContext('2d');
+        if (!frameCtx) {
+          setState({ canvas: null, status: 'error' });
+          return;
+        }
+        frameCtx.imageSmoothingEnabled = false;
+        frameCtx.drawImage(
           sheet.canvas as unknown as CanvasImageSource,
-          r.sx, r.sy, r.size, r.size,
-          0, 0, args.size, args.size,
+          r.sx,
+          r.sy,
+          r.size,
+          r.size,
+          0,
+          0,
+          r.size,
+          r.size,
+        );
+
+        const pixels = frameCtx.getImageData(0, 0, r.size, r.size);
+        const bounds = findAlphaBounds(pixels.data, r.size, r.size);
+        const scale = THUMBNAIL_TYPE_SCALES[
+          args.typeName as keyof typeof THUMBNAIL_TYPE_SCALES
+        ];
+        const draw = createThumbnailDrawPlan({
+          bounds,
+          frameSize: r.size,
+          outputSize: args.size,
+          scale,
+        });
+
+        ctx.drawImage(
+          frameCanvas,
+          0,
+          0,
+          r.size,
+          r.size,
+          draw.dx,
+          draw.dy,
+          draw.dWidth,
+          draw.dHeight,
         );
         cacheSet(key, canvas);
         setState({ canvas, status: 'ready' });

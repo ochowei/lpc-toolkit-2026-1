@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   computeThumbnailDrawRect,
+  createThumbnailDrawPlan,
   findAlphaBounds,
 } from '../src/lib/thumbnail-framing';
 
@@ -46,3 +47,34 @@ describe('computeThumbnailDrawRect', () => {
     });
   });
 });
+
+describe('createThumbnailDrawPlan', () => {
+  it('uses runtime bounds and the configured type scale', () => {
+    expect(createThumbnailDrawPlan({
+      bounds: { x: 24, y: 28, width: 16, height: 8 },
+      frameSize: 64,
+      outputSize: 24,
+      scale: 2,
+    })).toEqual({
+      dx: -12,
+      dy: -12,
+      dWidth: 48,
+      dHeight: 48,
+    });
+  });
+
+  it('falls back to full-frame drawing without usable bounds', () => {
+    expect(createThumbnailDrawPlan({
+      bounds: null,
+      frameSize: 64,
+      outputSize: 24,
+      scale: 3,
+    })).toEqual({
+      dx: 0,
+      dy: 0,
+      dWidth: 24,
+      dHeight: 24,
+    });
+  });
+});
+

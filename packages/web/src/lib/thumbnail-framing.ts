@@ -65,3 +65,30 @@ export function computeThumbnailDrawRect(
     dHeight: destinationFrameSize,
   };
 }
+
+export interface CreateThumbnailDrawPlanArgs {
+  readonly bounds: AlphaBounds | null;
+  readonly frameSize: number;
+  readonly outputSize: number;
+  readonly scale: number | undefined;
+}
+
+export function createThumbnailDrawPlan(
+  args: CreateThumbnailDrawPlanArgs,
+): ThumbnailDrawRect {
+  if (!args.bounds || args.scale === undefined) {
+    return {
+      dx: 0,
+      dy: 0,
+      dWidth: args.outputSize,
+      dHeight: args.outputSize,
+    };
+  }
+  return computeThumbnailDrawRect(
+    args.bounds,
+    args.frameSize,
+    args.outputSize,
+    args.scale,
+  );
+}
+
