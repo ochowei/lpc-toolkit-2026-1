@@ -1,4 +1,5 @@
 import type { BodyType, TypeName } from '@lpc-toolkit/core';
+import { THUMBNAIL_FRAMING_POLICY_VERSION } from '../generated/thumbnail-framing-policy';
 
 /** Maximum number of thumbnail canvases kept in the in-memory LRU cache. */
 export const CACHE_MAX = 200;
@@ -22,6 +23,7 @@ export function makeCacheKey(args: CacheKeyArgs): string {
     args.variant ?? '_',
     args.recolor ?? '_',
     args.size,
+    THUMBNAIL_FRAMING_POLICY_VERSION,
   ].join('|');
 }
 
