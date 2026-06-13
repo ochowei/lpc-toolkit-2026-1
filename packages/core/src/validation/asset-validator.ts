@@ -41,7 +41,7 @@ export async function validateAssets(
 
     for (const bodyType of bodyTypes) {
       // Check bodyType compatibility. We cast to Record<string, unknown> to check custom property body_types.
-      const bodyTypesObj = (item as Record<string, unknown>).body_types as Record<string, boolean> | undefined;
+      const bodyTypesObj = (item as unknown as Record<string, unknown>).body_types as Record<string, boolean> | undefined;
       if (bodyTypesObj && !bodyTypesObj[bodyType]) continue;
 
       const variants = item.variants && item.variants.length > 0 ? item.variants : [undefined];
