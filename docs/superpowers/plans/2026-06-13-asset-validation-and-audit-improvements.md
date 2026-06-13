@@ -307,7 +307,9 @@ git commit -m "feat: add static asset validator to core"
 - Create: `packages/web/scripts/validate-assets.ts`
 - Modify: `packages/web/package.json`
 
-- [ ] **Step 1: Create validate-assets.ts script**
+- [x] **Step 1: Create validate-assets.ts script**
+  - Commit: 0de768397, 2260a0378
+  - Verification: Created `validate-assets.ts` with strict TypeScript types.
 
 Create `packages/web/scripts/validate-assets.ts`:
 ```typescript
@@ -399,19 +401,25 @@ main().catch(err => {
 });
 ```
 
-- [ ] **Step 2: Add script command in packages/web/package.json**
+- [x] **Step 2: Add script command in packages/web/package.json**
+  - Commit: 0de768397
+  - Verification: Added script command to `packages/web/package.json`.
 
 Modify `packages/web/package.json` line 27:
 ```json
     "validate-assets": "tsx scripts/validate-assets.ts",
 ```
 
-- [ ] **Step 3: Test runner script manually**
+- [x] **Step 3: Test runner script manually**
+  - Commit: 0de768397, 2260a0378
+  - Verification: Ran script successfully and got exit code 0.
 
 Run: `pnpm --filter @lpc-toolkit/web validate-assets`
 Expected: Prints validation summary, lists warnings (like bowtie and bascinet pigface), but exits with Code 0.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
+  - Commit: 0de768397, 2260a0378
+  - Verification: Files successfully committed to repo.
 
 ```bash
 git add packages/web/package.json packages/web/scripts/validate-assets.ts
@@ -426,7 +434,9 @@ git commit -m "feat: add CLI asset validation script to web workspace"
 - Modify: `packages/web/scripts/thumbnail-visible-bounds-audit-lib.ts`
 - Modify: `packages/web/test/thumbnail-visible-bounds-audit.test.ts`
 
-- [ ] **Step 1: Write tests for backpack directions and custom animation bounds**
+- [x] **Step 1: Write tests for backpack directions and custom animation bounds**
+  - Commit: 563938477b70b0499ee5a9b1c5198674924dd16d
+  - Verification: Added tests verifying direction fallback and custom region calculations.
 
 Modify `packages/web/test/thumbnail-visible-bounds-audit.test.ts` to add test cases covering multi-directional fallback and custom regions:
 ```typescript
@@ -439,12 +449,16 @@ Modify `packages/web/test/thumbnail-visible-bounds-audit.test.ts` to add test ca
   });
 ```
 
-- [ ] **Step 2: Run tests to verify failure**
+- [x] **Step 2: Run tests to verify failure**
+  - Commit: 563938477b70b0499ee5a9b1c5198674924dd16d
+  - Verification: Verified tests fail before upgrades.
 
 Run: `pnpm --filter @lpc-toolkit/web test`
 Expected: FAIL
 
-- [ ] **Step 3: Upgrade thumbnail-visible-bounds-audit-lib.ts**
+- [x] **Step 3: Upgrade thumbnail-visible-bounds-audit-lib.ts**
+  - Commit: 563938477b70b0499ee5a9b1c5198674924dd16d
+  - Verification: Implemented alternate direction fallback and custom animation block support in `runAuditCase`.
 
 Modify `packages/web/scripts/thumbnail-visible-bounds-audit-lib.ts`:
 ```typescript
@@ -577,17 +591,23 @@ export async function runAuditCase(
 }
 ```
 
-- [ ] **Step 4: Run tests and verify PASS**
+- [x] **Step 4: Run tests and verify PASS**
+  - Commit: 563938477b70b0499ee5a9b1c5198674924dd16d
+  - Verification: Ran tests successfully and all 387 passed.
 
 Run: `pnpm --filter @lpc-toolkit/web test`
 Expected: PASS
 
-- [ ] **Step 5: Run the audit tool again to ensure clean outputs**
+- [x] **Step 5: Run the audit tool again to ensure clean outputs**
+  - Commit: 563938477b70b0499ee5a9b1c5198674924dd16d
+  - Verification: Verified that `wheelchair` and `backpack` items are audited cleanly without error.
 
 Run: `pnpm --filter @lpc-toolkit/web audit:thumbnail-bounds`
 Expected: Completes successfully with `wheelchair` and `tool_rod` correctly analyzed, and `backpack` items correctly analyzed via fallback.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
+  - Commit: 563938477b70b0499ee5a9b1c5198674924dd16d
+  - Verification: Files staged and committed.
 
 ```bash
 git add packages/web/scripts/thumbnail-visible-bounds-audit-lib.ts packages/web/test/thumbnail-visible-bounds-audit.test.ts
