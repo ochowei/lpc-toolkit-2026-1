@@ -68,6 +68,51 @@ describe('isAllowlistedConsoleEntry', () => {
     ).toBe(true);
   });
 
+  it('matches missing optional and custom spritesheet warnings from the composer', () => {
+    expect(
+      isAllowlistedConsoleEntry({
+        kind: 'console.warn',
+        text:
+          '[LPC Composer] Missing optional spritesheet: spritesheets/head/nose/straight/adult/climb.png Error: File not found\n' +
+          '    at loadFileFromZip (http://localhost:5173/src/adapter/zip-loader.ts:42:11)\n' +
+          '    at composeSelections (http://localhost:5173/@fs/workspace/packages/core/src/compose.ts:210:15)',
+        location:
+          'http://localhost:5173/@fs/workspace/packages/core/src/compose.ts:216:18',
+      }),
+    ).toBe(true);
+    expect(
+      isAllowlistedConsoleEntry({
+        kind: 'console.warn',
+        text:
+          '[LPC Composer] Missing custom spritesheet: spritesheets/wheels/wheelchair/black.png Error: File not found',
+        location:
+          'http://localhost:5173/@fs/workspace/packages/core/src/compose.ts:614:18',
+      }),
+    ).toBe(true);
+  });
+
+  it('rejects composer warnings from a different source location', () => {
+    expect(
+      isAllowlistedConsoleEntry({
+        kind: 'console.warn',
+        text:
+          '[LPC Composer] Missing optional spritesheet: spritesheets/body/walk.png Error: File not found',
+        location: 'http://localhost:5173/src/some-other-file.ts:1:1',
+      }),
+    ).toBe(false);
+  });
+
+  it('rejects unrelated composer warning text', () => {
+    expect(
+      isAllowlistedConsoleEntry({
+        kind: 'console.warn',
+        text: '[LPC Composer] Canvas allocation failed',
+        location:
+          'http://localhost:5173/@fs/workspace/packages/core/src/compose.ts:216:18',
+      }),
+    ).toBe(false);
+  });
+
   it('rejects the catalog text with extra trailing content', () => {
     expect(
       isAllowlistedConsoleEntry({

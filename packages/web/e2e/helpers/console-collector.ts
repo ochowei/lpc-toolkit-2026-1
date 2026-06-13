@@ -69,6 +69,12 @@ const APP_CONSOLE_ALLOWLIST: readonly ConsoleAllowlistEntry[] = [
       /^\[catalog\] \d+ load warning\(s\)(?: \[Object(?:, Object)*\])?$/,
     locationPattern: /\/catalog\/load-catalog\.ts/,
   },
+  {
+    kind: 'console.warn',
+    textPattern:
+      /^\[LPC Composer\] Missing (?:optional|custom) spritesheet: spritesheets\/.+\.png(?: Error: [\s\S]*)?$/,
+    locationPattern: /\/packages\/core\/src\/compose\.ts:\d+:\d+$/,
+  },
 ];
 
 /** True when an app-console entry is intentionally allowlisted. */

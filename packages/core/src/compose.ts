@@ -526,6 +526,7 @@ export async function composeSelections(
 
   let loaded = 0;
   const total = drawItems.length + customLayers.length;
+  const missingPaths = new Set<string>();
   const onSettle = (): void => {
     loaded++;
     options.onProgress?.(loaded, total);
@@ -541,6 +542,7 @@ export async function composeSelections(
           );
           return { d, img };
         } catch (error) {
+          missingPaths.add(d.path);
           console.warn(`[LPC Composer] Missing optional spritesheet: ${d.path}`, error);
           return { d, img: null };
         } finally {
@@ -610,6 +612,7 @@ export async function composeSelections(
             );
             return { c, img };
           } catch (error) {
+            missingPaths.add(c.path);
             console.warn(`[LPC Composer] Missing custom spritesheet: ${c.path}`, error);
             return { c, img: null };
           } finally {
@@ -695,6 +698,7 @@ export async function composeSelections(
     credits: getCredits(selections, catalog),
     layers: getSpritePathsForSelections(selections, catalog),
     animations: composedAnimations,
+    ...(missingPaths.size > 0 ? { missingPaths: [...missingPaths] } : {}),
     ...(customAnimationsMeta.size > 0
       ? { customAnimations: customAnimationsMeta }
       : {}),

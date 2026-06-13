@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { createCatalog } from '../src/catalog.js';
 import { composeSelections, getSpritePathsForSelections } from '../src/compose.js';
-import type { CanvasAdapter, CanvasLike } from '../src/adapters.js';
+import type { CanvasAdapter, CanvasLike, ImageLike } from '../src/adapters.js';
 import type { PaletteSwap } from '../src/recolor.js';
 import type {
   Catalog,
@@ -1026,7 +1026,9 @@ describe('composeSelections', () => {
   });
 
   describe('missing layers error handling', () => {
-    const mockCanvasAdapter = (loadImageFn: (url: string) => any): CanvasAdapter => {
+    const mockCanvasAdapter = (
+      loadImageFn: (url: string) => ImageLike,
+    ): CanvasAdapter => {
       const base = createNodeCanvasAdapter();
       return {
         createCanvas: base.createCanvas,
@@ -1051,15 +1053,28 @@ describe('composeSelections', () => {
         credits: [],
         layer_1: { zPos: 20, female: 'neck/' },
       };
+      const wheelsItem: ItemDefinition = {
+        name: 'Wheelchair',
+        type_name: 'wheels',
+        animations: [],
+        variants: ['black'],
+        credits: [],
+        layer_1: {
+          zPos: 20,
+          female: 'wheels/',
+          custom_animation: 'wheelchair',
+        },
+      };
       const records: Record<FilePath, ItemDefinition> = {
         'body/body.json': bodyItem,
         'neck/neck.json': neckItem,
+        'wheels/wheelchair.json': wheelsItem,
       };
       return createCatalog(records).catalog;
     };
 
-    it('skips missing optional layers gracefully instead of failing', async () => {
-      const selections = {
+    it('records missing optional layers while completing composition', async () => {
+      const selections: Selections = {
         bodyType: 'female',
         items: {
           body: { typeName: 'body', name: 'Human Female' },
@@ -1074,15 +1089,43 @@ describe('composeSelections', () => {
         return createMockImage(64, 64);
       });
 
-      const sheet = await composeSelections(selections as any, {
+      const sheet = await composeSelections(selections, {
         catalog: testCatalog(),
         adapter,
         spritesheetsBaseUrl: '',
       });
 
       expect(sheet.canvas).toBeDefined();
-      // Verify composition finished successfully despite missing bowtie
+      expect(sheet.missingPaths).toEqual([
+        'spritesheets/neck/walk.png',
+      ]);
+    });
+
+    it('records missing custom-animation layers while completing composition', async () => {
+      const selections: Selections = {
+        bodyType: 'female',
+        items: {
+          wheels: {
+            typeName: 'wheels',
+            name: 'Wheelchair',
+            variant: 'black',
+          },
+        },
+      };
+      const adapter = mockCanvasAdapter(() => {
+        throw new Error('Custom asset missing');
+      });
+
+      const sheet = await composeSelections(selections, {
+        catalog: testCatalog(),
+        adapter,
+        spritesheetsBaseUrl: '',
+      });
+
+      expect(sheet.canvas).toBeDefined();
+      expect(sheet.missingPaths).toEqual([
+        'spritesheets/wheels/black.png',
+      ]);
     });
   });
 });
-
