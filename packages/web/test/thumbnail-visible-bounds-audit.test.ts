@@ -9,11 +9,15 @@ import { describe, expect, it } from 'vitest';
 import { createCatalog, createPaletteCatalog } from '@lpc-toolkit/core';
 import type { Catalog, CanvasAdapter, CanvasLike, ImageLike } from '@lpc-toolkit/core';
 import {
+  applyThumbnailBoundsOverrides,
   deriveThumbnailMetrics,
+  deriveThumbnailTypeScales,
   expandAuditCases,
   rowsToCsv,
+  serializeThumbnailFramingPolicy,
   summaryToMarkdown,
   runAuditCase,
+  type ThumbnailBoundsOverrides,
   type ThumbnailAuditRow,
 } from '../scripts/thumbnail-visible-bounds-audit-lib';
 
@@ -29,6 +33,89 @@ describe('deriveThumbnailMetrics', () => {
         fitScalePxPerSourcePixel: 1.25,
         additionalScaleOverCurrent: 10 / 3,
       });
+  });
+});
+
+describe('thumbnail framing policy generation', () => {
+  const okRow = (
+    typeName: string,
+    additionalScaleOverCurrent: number,
+    width: number,
+    height: number,
+  ): ThumbnailAuditRow => ({
+    itemId: `${typeName}_${width}_${height}`,
+    typeName,
+    itemName: typeName,
+    bodyType: 'male',
+    animation: 'walk',
+    direction: 'down',
+    frameIndex: 0,
+    frameSize: 64,
+    status: 'ok',
+    bounds: { x: 0, y: 0, width, height },
+    metrics: {
+      widthRatio: width / 64,
+      heightRatio: height / 64,
+      visibleWidthAt24: width * 24 / 64,
+      visibleHeightAt24: height * 24 / 64,
+      fitScalePxPerSourcePixel: Math.min(20 / width, 20 / height),
+      additionalScaleOverCurrent,
+    },
+    missingPaths: [],
+  });
+
+  it('uses the median target and omits scales below 1.5', () => {
+    expect(deriveThumbnailTypeScales([
+      okRow('ring', 2, 8, 8),
+      okRow('ring', 3, 8, 8),
+      okRow('ring', 4, 8, 8),
+      okRow('body', 1.2, 40, 40),
+    ])).toEqual({ ring: 3 });
+  });
+
+  it('caps at 4 and at the largest-case 20px safe multiplier', () => {
+    expect(deriveThumbnailTypeScales([
+      okRow('charm', 8, 8, 8),
+      okRow('charm', 8, 32, 16),
+    ])).toEqual({ charm: 1.6 });
+  });
+
+  it('ignores empty and error rows when deriving scale', () => {
+    const failed: ThumbnailAuditRow[] = [
+      {
+        itemId: 'ring_empty',
+        typeName: 'ring',
+        itemName: 'Empty',
+        bodyType: 'male',
+        status: 'empty',
+      },
+      {
+        itemId: 'ring_error',
+        typeName: 'ring',
+        itemName: 'Error',
+        bodyType: 'female',
+        status: 'error',
+        errorMessage: 'missing',
+      },
+    ];
+    expect(deriveThumbnailTypeScales([
+      okRow('ring', 3, 8, 8),
+      ...failed,
+    ])).toEqual({ ring: 3 });
+  });
+
+  it('applies only explicit case-keyed bounds overrides', () => {
+    const rows = [okRow('ring', 3, 8, 8)];
+    const overrides: ThumbnailBoundsOverrides = {
+      'ring_8_8|male|_': { x: 1, y: 1, width: 6, height: 6 },
+    };
+    expect(applyThumbnailBoundsOverrides(rows, overrides)[0]?.bounds)
+      .toEqual({ x: 1, y: 1, width: 6, height: 6 });
+  });
+
+  it('serializes sorted deterministic TypeScript', () => {
+    expect(serializeThumbnailFramingPolicy({ ring: 3, charm: 2 }))
+      .toContain(`export const THUMBNAIL_TYPE_SCALES = {\n  "charm": 2,\n  "ring": 3,\n} as const;`);
   });
 });
 
@@ -358,5 +445,4 @@ describe('runAuditCase behavior for custom animations and fallbacks', () => {
     });
   });
 });
-
 
