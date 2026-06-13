@@ -17,7 +17,9 @@
 - Create: `packages/core/test/validation/asset-validator.test.ts`
 - Modify: `packages/core/src/index.ts`
 
-- [ ] **Step 1: Write unit tests for asset validator**
+- [x] **Step 1: Write unit tests for asset validator**
+  - Commit: 33de44301
+  - Verification: Created `packages/core/test/validation/asset-validator.test.ts` and helper `packages/core/test/helpers/catalog.ts`.
 
 Create `packages/core/test/validation/asset-validator.test.ts`:
 ```typescript
@@ -88,12 +90,16 @@ describe('validateAssets', () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify failure**
+- [x] **Step 2: Run tests to verify failure**
+  - Commit: 33de44301
+  - Verification: `vitest run` fails with missing module import error.
 
 Run: `pnpm --filter @lpc-toolkit/core test`
 Expected: FAIL due to missing `asset-validator.ts` module.
 
-- [ ] **Step 3: Implement asset-validator.ts**
+- [x] **Step 3: Implement asset-validator.ts**
+  - Commit: 33de44301, e52aa4ee5
+  - Verification: `packages/core/src/validation/asset-validator.ts` implemented with clean types.
 
 Create `packages/core/src/validation/asset-validator.ts`:
 ```typescript
@@ -238,7 +244,9 @@ function checkImagePixelsBlank(img: ImageLike, adapter: CanvasAdapter): boolean 
 }
 ```
 
-- [ ] **Step 4: Export validateAssets in packages/core/src/index.ts**
+- [x] **Step 4: Export validateAssets in packages/core/src/index.ts**
+  - Commit: 33de44301
+  - Verification: Exports added to `packages/core/src/index.ts`.
 
 Modify `packages/core/src/index.ts`:
 ```typescript
@@ -246,12 +254,16 @@ export { validateAssets } from './validation/asset-validator.js';
 export type { ValidateAssetsOptions, ValidationIssue } from './validation/asset-validator.js';
 ```
 
-- [ ] **Step 5: Run tests and verify PASS**
+- [x] **Step 5: Run tests and verify PASS**
+  - Commit: e52aa4ee5
+  - Verification: `vitest run` PASS (155 tests pass).
 
 Run: `pnpm --filter @lpc-toolkit/core test`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
+  - Commit: 33de44301, e52aa4ee5
+  - Verification: Successfully committed files to local repo.
 
 ```bash
 git add packages/core/src/index.ts packages/core/src/validation/asset-validator.ts packages/core/test/validation/asset-validator.test.ts
