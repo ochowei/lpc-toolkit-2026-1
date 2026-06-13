@@ -278,98 +278,26 @@ git commit -m "feat: add static asset validator to core"
 - Modify: `packages/core/src/compose.ts:532-548`
 - Modify: `packages/core/src/compose.ts:601-616`
 
-- [ ] **Step 1: Write test for composition error handling**
+- [x] **Step 1: Write test for composition error handling**
+  - Commit: 8ae241183c750f9e2ee9d7e497087cedf0dfd9f5
+  - Verification: Added missing layers test in `packages/core/test/compose.test.ts`
 
-Add to `packages/core/test/compose.test.ts`:
-```typescript
-  it('skips missing optional layers gracefully instead of failing', async () => {
-    const selections = {
-      bodyType: 'female',
-      items: {
-        body: { typeName: 'body', name: 'Human Female' },
-        neck: { typeName: 'neck', name: 'Bowtie' },
-      },
-    };
+- [x] **Step 2: Run tests to verify failure**
+  - Commit: 8ae241183c750f9e2ee9d7e497087cedf0dfd9f5
+  - Verification: Verified that the new test passes out of the box because the existing code already caught the errors, but lacked logging.
 
-    const adapter = mockCanvasAdapter((url) => {
-      if (url.includes('neck')) {
-        throw new Error('Optional asset missing');
-      }
-      return createMockImage(64, 64);
-    });
+- [x] **Step 3: Modify composeSelections in packages/core/src/compose.ts**
+  - Commit: 8ae241183c750f9e2ee9d7e497087cedf0dfd9f5
+  - Verification: Updated standard and custom image loaders to catch errors and log them via `console.warn`. Modified `packages/core/tsconfig.json` to include `"DOM"` in libs to support typing of global `console`.
 
-    const sheet = await composeSelections(selections as any, {
-      catalog: testCatalog(),
-      adapter,
-      spritesheetsBaseUrl: '',
-    });
+- [x] **Step 4: Run tests to verify PASS**
+  - Commit: 8ae241183c750f9e2ee9d7e497087cedf0dfd9f5
+  - Verification: Ran `pnpm test` and `pnpm typecheck`. Both completed successfully with no type errors.
 
-    expect(sheet.canvas).toBeDefined();
-    // Verify composition finished successfully despite missing bowtie
-  });
-```
+- [x] **Step 5: Commit**
+  - Commit: 8ae241183c750f9e2ee9d7e497087cedf0dfd9f5
+  - Verification: Staged and committed files successfully.
 
-- [ ] **Step 2: Run tests to verify failure**
-
-Run: `pnpm --filter @lpc-toolkit/core test`
-Expected: FAIL (composition rejects due to missing asset error)
-
-- [ ] **Step 3: Modify composeSelections in packages/core/src/compose.ts**
-
-Modify `packages/core/src/compose.ts` line 533-548:
-```typescript
-  // Fetch all standard layers in parallel using the CanvasAdapter dependency injection seam.
-  const settled = await Promise.all(
-    drawItems.map(
-      async (d): Promise<{ d: DrawItem; img: Sprite | null }> => {
-        try {
-          const img = await adapter.loadImage(
-            joinUrl(spritesheetsBaseUrl, d.path),
-          );
-          return { d, img };
-        } catch (error) {
-          console.warn(`[LPC Composer] Missing optional spritesheet: ${d.path}`, error);
-          return { d, img: null };
-        } finally {
-          onSettle();
-        }
-      },
-    ),
-  );
-```
-
-Modify custom layer loading in `packages/core/src/compose.ts` line 601-616:
-```typescript
-    const loadedCustom = await Promise.all(
-      customLayers.map(
-        async (c): Promise<{ c: CustomLayerEntry; img: Sprite | null }> => {
-          try {
-            const img = await adapter.loadImage(
-              joinUrl(spritesheetsBaseUrl, c.path),
-            );
-            return { c, img };
-          } catch (error) {
-            console.warn(`[LPC Composer] Missing custom spritesheet: ${c.path}`, error);
-            return { c, img: null };
-          } finally {
-            onSettle();
-          }
-        },
-      ),
-    );
-```
-
-- [ ] **Step 4: Run tests to verify PASS**
-
-Run: `pnpm --filter @lpc-toolkit/core test`
-Expected: PASS
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add packages/core/src/compose.ts packages/core/test/compose.test.ts
-git commit -m "feat: make composer skip missing layers gracefully with warnings"
-```
 
 ---
 
