@@ -117,6 +117,23 @@ describe('thumbnail framing policy generation', () => {
     expect(serializeThumbnailFramingPolicy({ ring: 3, charm: 2 }))
       .toContain(`export const THUMBNAIL_TYPE_SCALES = {\n  "charm": 2,\n  "ring": 3,\n} as const;`);
   });
+
+  it('produces byte-identical policy output for identical rows', () => {
+    const scales = deriveThumbnailTypeScales([
+      okRow('ring', 3, 8, 8),
+      okRow('charm', 2, 10, 10),
+    ]);
+
+    expect(serializeThumbnailFramingPolicy(scales))
+      .toBe(serializeThumbnailFramingPolicy(scales));
+  });
+
+  it('uses the runtime policy export names', () => {
+    const output = serializeThumbnailFramingPolicy({ ring: 3 });
+
+    expect(output).toContain('THUMBNAIL_FRAMING_POLICY_VERSION');
+    expect(output).toContain('THUMBNAIL_TYPE_SCALES');
+  });
 });
 
 describe('expandAuditCases', () => {
@@ -445,4 +462,3 @@ describe('runAuditCase behavior for custom animations and fallbacks', () => {
     });
   });
 });
-

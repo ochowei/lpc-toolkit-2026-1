@@ -8,18 +8,26 @@ import {
 import { createCatalog, createPaletteCatalog, BODY_TYPES } from '@lpc-toolkit/core';
 import type { CanvasAdapter, CanvasLike, ImageLike } from '@lpc-toolkit/core';
 import {
+  applyThumbnailBoundsOverrides,
+  deriveThumbnailTypeScales,
+  serializeThumbnailFramingPolicy,
   runAuditCase,
   expandAuditCases,
   rowsToCsv,
   summaryToMarkdown,
   type ThumbnailAuditRow,
 } from './thumbnail-visible-bounds-audit-lib';
+import { THUMBNAIL_BOUNDS_OVERRIDES } from './thumbnail-bounds-overrides';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../../..');
 const sheetDefsDir = path.join(repoRoot, 'assets/sheet_definitions');
 const paletteDefsDir = path.join(repoRoot, 'assets/palette_definitions');
 const spritesheetsDir = path.join(repoRoot, 'assets/spritesheets');
+const policyOutputPath = path.join(
+  repoRoot,
+  'packages/web/src/generated/thumbnail-framing-policy.ts',
+);
 
 function walkJson(dir: string, base = dir): Record<string, any> {
   const out: Record<string, any> = {};
@@ -129,12 +137,22 @@ async function main() {
   console.log('Generating reports...');
   const csvContent = rowsToCsv(rows);
   const markdownContent = summaryToMarkdown(rows);
+  const policyRows = applyThumbnailBoundsOverrides(
+    rows,
+    THUMBNAIL_BOUNDS_OVERRIDES,
+  );
+  const policyContent = serializeThumbnailFramingPolicy(
+    deriveThumbnailTypeScales(policyRows),
+  );
 
   mkdirSync(outputDir, { recursive: true });
   writeFileSync(path.join(outputDir, 'thumbnail-visible-bounds.csv'), csvContent, 'utf8');
   writeFileSync(path.join(outputDir, 'thumbnail-visible-bounds-summary.md'), markdownContent, 'utf8');
+  mkdirSync(path.dirname(policyOutputPath), { recursive: true });
+  writeFileSync(policyOutputPath, policyContent, 'utf8');
 
   console.log(`Audit complete. Output written to ${outputDir}`);
+  console.log(`Thumbnail framing policy written to ${policyOutputPath}`);
 }
 
 main().catch(err => {
