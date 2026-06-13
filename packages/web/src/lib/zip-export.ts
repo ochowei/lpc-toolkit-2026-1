@@ -3,6 +3,7 @@ import {
   creditsToTxt,
   extractAnimation,
   extractAnimationFrames,
+  VIRTUAL_ANIMATION_MAP,
 } from '@lpc-toolkit/core';
 import type {
   Catalog,
@@ -144,13 +145,24 @@ function reportGenerate(ctx: ExportContext, percent: number): void {
   ctx.onProgress(0.5 + (percent / 100) * 0.5);
 }
 
+/** Get all standard animations to export, including composed virtual animations. */
+function getExportableStandardAnimations(sheet: ComposedSheet): string[] {
+  const anims = [...sheet.animations];
+  for (const [virt, phys] of Object.entries(VIRTUAL_ANIMATION_MAP)) {
+    if (sheet.animations.includes(phys) && !anims.includes(virt)) {
+      anims.push(virt);
+    }
+  }
+  return anims;
+}
+
 /** Export one PNG per animation, plus mandatory credits files. */
 export async function exportByAnimationZip(ctx: ExportContext): Promise<Blob> {
   const { default: JSZip } = await import('jszip');
   const zip = new JSZip();
   const { sheet } = ctx;
 
-  const standardAnims = sheet.animations;
+  const standardAnims = getExportableStandardAnimations(sheet);
   const customAnims = sheet.customAnimations
     ? [...sheet.customAnimations.keys()]
     : [];
@@ -267,7 +279,7 @@ export async function exportByAnimItemZip(ctx: ExportContext): Promise<Blob> {
     }
   }
 
-  const standardAnims = ctx.sheet.animations;
+  const standardAnims = getExportableStandardAnimations(ctx.sheet);
   const customAnims = ctx.sheet.customAnimations
     ? [...ctx.sheet.customAnimations.keys()]
     : [];
@@ -426,7 +438,7 @@ export async function exportByFrameZip(ctx: ExportContext): Promise<Blob> {
   const { default: JSZip } = await import('jszip');
   const zip = new JSZip();
 
-  const standardAnims = ctx.sheet.animations;
+  const standardAnims = getExportableStandardAnimations(ctx.sheet);
   const customAnims = ctx.sheet.customAnimations
     ? [...ctx.sheet.customAnimations.keys()]
     : [];

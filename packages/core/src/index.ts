@@ -164,6 +164,7 @@ export {
   SHEET_HEIGHT,
   SHEET_WIDTH,
   STANDARD_ANIMATION_FRAMES_PER_ROW,
+  VIRTUAL_ANIMATION_MAP,
 } from './constants.js';
 
 // ==========================================

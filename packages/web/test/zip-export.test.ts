@@ -182,6 +182,37 @@ describe('exportByAnimationZip (F4)', () => {
     const pngBytes = await zip.file('custom/wheelchair.png')!.async('uint8array');
     expect(pngBytes.length).toBeGreaterThan(0);
   });
+
+  it('includes virtual animations whose physical row animations are composed (e.g. watering)', async () => {
+    const sheet = makeWalkSheet();
+    const sheetWithThrust: ComposedSheet = {
+      ...sheet,
+      animations: ['walk', 'thrust'],
+    };
+    const ctx: ExportContext = {
+      sheet: sheetWithThrust,
+      selections: sheetWithThrust.selections,
+      catalog: {
+        byItemId: new Map(),
+        byTypeName: new Map(),
+        typeNames: [],
+        aliases: new Map(),
+      },
+      anim: 'walk',
+      composeSingleItem: async () => sheetWithThrust,
+      adapter: makeAdapter(),
+      onProgress: () => {},
+    };
+    const blob = await exportByAnimationZip(ctx);
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    expect(Object.keys(zip.files).sort()).toEqual([
+      'credits/credits.csv',
+      'credits/credits.txt',
+      'standard/thrust.png',
+      'standard/walk.png',
+      'standard/watering.png',
+    ]);
+  });
 });
 
 function makeItem(zPos: number): ItemDefinition {
