@@ -56,7 +56,7 @@
 - Modify: `packages/web/scripts/thumbnail-visible-bounds-audit-lib.ts`
 - Modify: `packages/web/test/thumbnail-visible-bounds-audit.test.ts`
 
-- [ ] **Step 1: Write failing tests for alpha bounds and centered draw geometry**
+- [x] **Step 1: Write failing tests for alpha bounds and centered draw geometry**
 
 Create `packages/web/test/thumbnail-framing.test.ts`:
 
@@ -111,7 +111,7 @@ describe('computeThumbnailDrawRect', () => {
 });
 ```
 
-- [ ] **Step 2: Run the new test and verify it fails**
+- [x] **Step 2: Run the new test and verify it fails**
 
 Run:
 
@@ -121,7 +121,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- thumbnail-framing.test.ts
 
 Expected: FAIL because `../src/lib/thumbnail-framing` does not exist.
 
-- [ ] **Step 3: Implement the shared strict TypeScript utility**
+- [x] **Step 3: Implement the shared strict TypeScript utility**
 
 Create `packages/web/src/lib/thumbnail-framing.ts`:
 
@@ -212,7 +212,7 @@ Remove the duplicated `findAlphaBounds` tests and local `rgba` helper from
 `packages/web/test/thumbnail-visible-bounds-audit.test.ts`; the new focused
 test owns that behavior.
 
-- [ ] **Step 4: Run focused tests and typecheck**
+- [x] **Step 4: Run focused tests and typecheck**
 
 Run:
 
@@ -223,24 +223,18 @@ rtk pnpm --filter @lpc-toolkit/web typecheck
 
 Expected: both commands PASS.
 
-- [ ] **Step 5: Commit the shared utility**
+- [x] **Step 5: Commit the shared utility**
 
 ```bash
 rtk git add packages/web/src/lib/thumbnail-framing.ts packages/web/test/thumbnail-framing.test.ts packages/web/scripts/thumbnail-visible-bounds-audit-lib.ts packages/web/test/thumbnail-visible-bounds-audit.test.ts
 rtk git commit -m "refactor(web): share thumbnail bounds geometry"
 ```
 
-- [ ] **Step 6: Record task completion in this plan**
+- [x] **Step 6: Record task completion in this plan**
 
-Mark Task 1 steps complete and append:
-
-```markdown
 **Implementation note:** Shared alpha-bound scanning and draw geometry now serve both audit and browser code.
-**Commit:** Record the exact Task 1 implementation commit hash.
-**Verification:** focused thumbnail tests and web typecheck PASS
-```
-
-Commit the plan-only progress update.
+**Commit:** 54cba27
+**Verification:** focused thumbnail tests (3 pass) and audit tests (7 pass) and web typecheck PASS
 
 ### Task 2: Generate Safe Type-Level Scale Policy
 
