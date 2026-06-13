@@ -177,3 +177,10 @@ export type {
   RecolorOptions,
 } from './recolor.js';
 export { recolorImage, recolorPixels } from './recolor.js';
+
+// ==========================================
+// 15. Static Asset Validator
+// ==========================================
+export { validateAssets } from './validation/asset-validator.js';
+export type { ValidateAssetsOptions, ValidationIssue } from './validation/asset-validator.js';
+

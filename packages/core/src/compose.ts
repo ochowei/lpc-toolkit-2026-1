@@ -143,7 +143,7 @@ function replaceInPath(
  * and `composeSelections` (per-animation view), so the layer walk has one
  * source of truth and cannot drift.
  */
-interface ResolvedLayer {
+export interface ResolvedLayer {
   readonly itemId: ItemId;
   readonly typeName: TypeName;
   readonly item: ItemDefinition;
@@ -155,8 +155,10 @@ interface ResolvedLayer {
 }
 
 /**
- * Walk the selected items' layers, applying the same filters upstream
- * `getLayersToLoad` / `runRenderCharacter` use:
+ * Walks selections (C1) and yields layers that exist for the body type,
+ * resolving their paths and applying overrides.
+ *
+ * This function resolves:
  *   1. Reverse-lookup the `ItemDefinition` from `catalog` (skip if absent).
  *   2. Walk `layer_1` .. first missing `layer_N`.
  *   3. Skip layers whose `bodyType` path is absent.
@@ -165,7 +167,7 @@ interface ResolvedLayer {
  * Yields in selection-iteration → layer-number order (callers stable-sort
  * by `zPos` afterwards).
  */
-function resolveLayers(
+export function resolveLayers(
   selections: Selections,
   catalog: Catalog,
   onlyLayerNumber?: number,
