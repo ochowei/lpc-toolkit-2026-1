@@ -23,7 +23,8 @@
     "test:e2e:parity": "playwright test -c playwright.parity.config.ts",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
-    "audit:thumbnail-bounds": "tsx scripts/audit-thumbnail-visible-bounds.ts"
+    "audit:thumbnail-bounds": "tsx scripts/audit-thumbnail-visible-bounds.ts",
+    "validate-assets": "tsx scripts/validate-assets.ts"
   },
   "dependencies": {
     "@lpc-toolkit/core": "workspace:*",
