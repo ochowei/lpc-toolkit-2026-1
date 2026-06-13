@@ -615,7 +615,7 @@ progress update.
 - Modify: `packages/web/src/hooks/thumbnail-cache.ts`
 - Modify: `packages/web/test/thumbnail-cache.test.ts`
 
-- [ ] **Step 1: Write a failing cache-version test**
+- [x] **Step 1: Write a failing cache-version test**
 
 Add:
 
@@ -633,7 +633,7 @@ it('includes the framing policy version', () => {
 });
 ```
 
-- [ ] **Step 2: Run the cache test and verify it fails**
+- [x] **Step 2: Run the cache test and verify it fails**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/web test -- thumbnail-cache.test.ts
@@ -641,7 +641,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- thumbnail-cache.test.ts
 
 Expected: FAIL because the cache key does not contain the policy version.
 
-- [ ] **Step 3: Add the generated version to cache keys**
+- [x] **Step 3: Add the generated version to cache keys**
 
 In `thumbnail-cache.ts`:
 
@@ -652,7 +652,7 @@ import { THUMBNAIL_FRAMING_POLICY_VERSION } from '../generated/thumbnail-framing
 Append `THUMBNAIL_FRAMING_POLICY_VERSION` to the array returned by
 `makeCacheKey`.
 
-- [ ] **Step 4: Run cache tests and typecheck**
+- [x] **Step 4: Run cache tests and typecheck**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/web test -- thumbnail-cache.test.ts
@@ -661,17 +661,21 @@ rtk pnpm --filter @lpc-toolkit/web typecheck
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit cache invalidation**
+- [x] **Step 5: Commit cache invalidation**
 
 ```bash
 rtk git add packages/web/src/hooks/thumbnail-cache.ts packages/web/test/thumbnail-cache.test.ts
 rtk git commit -m "fix(web): version thumbnail cache policy"
 ```
 
-- [ ] **Step 6: Record task completion in this plan**
+- [x] **Step 6: Record task completion in this plan**
 
 Append the Task 4 implementation note, implementation commit hash, and PASS
 verification. Commit the plan-only progress update.
+
+**Implementation note:** Thumbnail cache keys now include the generated framing policy version so regenerated type scales invalidate stale in-memory canvases.
+**Commit:** 476501436
+**Verification:** cache-version test verified RED before implementation; focused cache tests (7 pass) and web typecheck PASS
 
 ### Task 5: Apply Runtime Bounds And Type Scale In The Hook
 
