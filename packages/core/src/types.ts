@@ -328,6 +328,8 @@ export interface ComposedSheet {
   readonly layers: readonly LayerSpec[];
   /** List of animations contained in the standard portion of the sheet. */
   readonly animations: readonly AnimationName[];
+  /** Logical spritesheet paths that could not be loaded during composition. */
+  readonly missingPaths?: readonly string[];
   /**
    * Custom-animation blocks composed below the standard 832×3456 sheet,
    * keyed by custom-animation name (e.g. `wheelchair`). Omitted entirely

@@ -262,3 +262,122 @@ describe.runIf(existsSync(sheetDefsDir))('real-asset integration audit test', ()
   });
 });
 
+describe('runAuditCase behavior for custom animations and fallbacks', () => {
+  it('falls back to alternate directions for empty default directions', async () => {
+    const mockBackpackItem = {
+      name: 'Backpack',
+      type_name: 'backpack',
+      credits: [],
+      variants: ['standard'],
+      layer_1: {
+        male: 'backpack_male',
+        zPos: 10,
+      },
+      animations: ['walk'],
+    };
+
+    const catalog = {
+      byItemId: new Map([['backpack', mockBackpackItem]]),
+    } as unknown as Catalog;
+
+    const palettes = {
+      materials: new Map(),
+    } as unknown as any;
+
+    const adapter: CanvasAdapter = {
+      createCanvas: (w, h) => {
+        return createCanvas(w, h) as unknown as CanvasLike;
+      },
+      loadImage: async () => {
+        const imgCanvas = createCanvas(832, 256);
+        const ctx = imgCanvas.getContext('2d');
+        ctx.fillStyle = 'rgba(255, 0, 0, 1)';
+        ctx.fillRect(74, 10, 10, 10);
+        return imgCanvas as unknown as ImageLike;
+      },
+    };
+
+    const caseData = {
+      itemId: 'backpack',
+      item: mockBackpackItem as any,
+      bodyType: 'male',
+    };
+
+    const row = await runAuditCase(caseData, {
+      catalog,
+      palettes,
+      adapter,
+      failedPaths: [],
+    });
+
+    expect(row.status).toBe('ok');
+    expect(row.direction).toBe('up');
+    expect(row.bounds).toEqual({
+      x: 10,
+      y: 10,
+      width: 10,
+      height: 10,
+    });
+  });
+
+  it('correctly calculates custom animation bounds', async () => {
+    const mockWheelchairItem = {
+      name: 'Wheelchair',
+      type_name: 'wheelchair',
+      credits: [],
+      variants: ['standard'],
+      layer_1: {
+        male: 'wheelchair_male',
+        zPos: 10,
+        custom_animation: 'wheelchair',
+      },
+      animations: [],
+    };
+
+    const catalog = {
+      byItemId: new Map([['wheelchair', mockWheelchairItem]]),
+    } as unknown as Catalog;
+
+    const palettes = {
+      materials: new Map(),
+    } as unknown as any;
+
+    const adapter: CanvasAdapter = {
+      createCanvas: (w, h) => {
+        return createCanvas(w, h) as unknown as CanvasLike;
+      },
+      loadImage: async () => {
+        const imgCanvas = createCanvas(128, 256);
+        const ctx = imgCanvas.getContext('2d');
+        ctx.fillStyle = 'rgba(255, 0, 0, 1)';
+        ctx.fillRect(15, 143, 10, 10);
+        return imgCanvas as unknown as ImageLike;
+      },
+    };
+
+    const caseData = {
+      itemId: 'wheelchair',
+      item: mockWheelchairItem as any,
+      bodyType: 'male',
+    };
+
+    const row = await runAuditCase(caseData, {
+      catalog,
+      palettes,
+      adapter,
+      failedPaths: [],
+    });
+
+    expect(row.status).toBe('ok');
+    expect(row.direction).toBe('down');
+    expect(row.frameSize).toBe(64);
+    expect(row.bounds).toEqual({
+      x: 15,
+      y: 15,
+      width: 10,
+      height: 10,
+    });
+  });
+});
+
+
