@@ -880,7 +880,7 @@ rtk git commit -m "feat(web): auto-frame asset thumbnails"
   or their focused tests
 - Modify: `docs/superpowers/plans/2026-06-13-thumbnail-auto-framing.md`
 
-- [ ] **Step 1: Start the web app**
+- [x] **Step 1: Start the web app**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/web dev --host 127.0.0.1
@@ -888,7 +888,7 @@ rtk pnpm --filter @lpc-toolkit/web dev --host 127.0.0.1
 
 Expected: Vite reports a local URL.
 
-- [ ] **Step 2: Inspect representative asset types in the Browser plugin**
+- [x] **Step 2: Inspect representative asset types in the Browser plugin**
 
 Use `browser:control-in-app-browser` to inspect:
 
@@ -909,7 +909,7 @@ Verify:
 - thumbnail canvases remain pixelated;
 - character preview and export behavior are unchanged.
 
-- [ ] **Step 3: Fix only verified framing defects**
+- [x] **Step 3: Fix only verified framing defects**
 
 For any defect, first add a failing focused test to
 `thumbnail-framing.test.ts` or
@@ -918,7 +918,7 @@ smallest implementation correction, and rerun the focused test. Do not add an
 override unless a specific disconnected source pixel is confirmed to be
 unintentional.
 
-- [ ] **Step 4: Run final automated verification**
+- [x] **Step 4: Run final automated verification**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/web test
@@ -929,7 +929,7 @@ rtk git diff --check
 
 Expected: all commands PASS.
 
-- [ ] **Step 5: Verify generated policy remains current**
+- [x] **Step 5: Verify generated policy remains current**
 
 ```bash
 rtk cp packages/web/src/generated/thumbnail-framing-policy.ts /tmp/thumbnail-framing-policy-final.ts
@@ -939,7 +939,7 @@ rtk diff -u /tmp/thumbnail-framing-policy-final.ts packages/web/src/generated/th
 
 Expected: no diff.
 
-- [ ] **Step 6: Commit any verification-driven corrections**
+- [x] **Step 6: Commit any verification-driven corrections**
 
 If Step 3 changed code:
 
@@ -950,14 +950,8 @@ rtk git commit -m "fix(web): refine thumbnail auto-framing"
 
 If no code changed, do not create an empty implementation commit.
 
-- [ ] **Step 7: Record final completion in this plan**
+- [x] **Step 7: Record final completion in this plan**
 
-Mark all remaining checkboxes complete and append:
-
-```markdown
 **Implementation note:** Thumbnail auto-framing passed representative visual inspection without changing composition or export behavior.
-**Commit:** Record the exact correction commit hash, or state `No correction commit`.
+**Commit:** No correction commit
 **Verification:** web test PASS; typecheck PASS; build PASS; generated policy deterministic; visual checks PASS
-```
-
-Commit the final plan progress update.
