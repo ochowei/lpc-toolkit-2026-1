@@ -613,3 +613,23 @@ Expected: Completes successfully with `wheelchair` and `tool_rod` correctly anal
 git add packages/web/scripts/thumbnail-visible-bounds-audit-lib.ts packages/web/test/thumbnail-visible-bounds-audit.test.ts
 git commit -m "feat: upgrade audit library with custom animation and direction fallbacks"
 ```
+
+---
+
+### Task 5: CI Follow-up - Preserve Runtime Warnings Without Failing E2E
+
+- [x] **Record missing paths and narrowly allowlist expected composer warnings**
+  - Implementation: Added `ComposedSheet.missingPaths` for failed standard and
+    custom spritesheet loads. Kept the required `console.warn` calls and added
+    an E2E allowlist constrained by warning shape and `compose.ts` source
+    location.
+  - Commit: 4593796b5
+  - Verification:
+    - `pnpm --filter @lpc-toolkit/core test`: PASS (159 tests)
+    - `pnpm --filter @lpc-toolkit/web exec vitest run`: PASS (395 tests)
+    - `pnpm --dir packages/core typecheck`: PASS
+    - `pnpm --dir packages/web typecheck`: PASS
+    - `playwright test e2e/random-no-console-errors.spec.ts`: PASS
+    - Full E2E: 20 PASS; 7 parity tests blocked by the local upstream mirror
+      failing with `send was called before connect` and then
+      `ERR_CONNECTION_REFUSED` on port 5174. The ZIP asset source test passed.
