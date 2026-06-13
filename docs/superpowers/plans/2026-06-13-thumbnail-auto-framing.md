@@ -491,7 +491,7 @@ rtk git commit -m "feat(web): derive thumbnail framing policy"
 - Modify: `packages/web/scripts/audit-thumbnail-visible-bounds.ts`
 - Modify: `packages/web/test/thumbnail-visible-bounds-audit.test.ts`
 
-- [ ] **Step 1: Write deterministic generation contract tests**
+- [x] **Step 1: Write deterministic generation contract tests**
 
 Add a test that writes the serializer result twice and compares exact strings:
 
@@ -514,7 +514,7 @@ expect(output).toContain('THUMBNAIL_FRAMING_POLICY_VERSION');
 expect(output).toContain('THUMBNAIL_TYPE_SCALES');
 ```
 
-- [ ] **Step 2: Run the focused test**
+- [x] **Step 2: Run the focused test**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/web test -- thumbnail-visible-bounds-audit.test.ts
@@ -523,7 +523,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- thumbnail-visible-bounds-audit.test.t
 Expected: PASS for the pure serializer baseline. This establishes the output
 contract before wiring filesystem generation.
 
-- [ ] **Step 3: Wire the audit command to generate the policy**
+- [x] **Step 3: Wire the audit command to generate the policy**
 
 In `audit-thumbnail-visible-bounds.ts`, add:
 
@@ -559,7 +559,7 @@ writeFileSync(policyOutputPath, policyContent, 'utf8');
 Keep CSV and Markdown output based on the original audit rows so diagnostic
 reports remain factual. Log the generated policy path separately.
 
-- [ ] **Step 4: Run the full audit to create the policy**
+- [x] **Step 4: Run the full audit to create the policy**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/web audit:thumbnail-bounds
@@ -573,7 +573,7 @@ Expected:
 - entries are sorted by type name;
 - no scale is below `1.5` or above `4`.
 
-- [ ] **Step 5: Verify regeneration is deterministic**
+- [x] **Step 5: Verify regeneration is deterministic**
 
 ```bash
 rtk cp packages/web/src/generated/thumbnail-framing-policy.ts /tmp/thumbnail-framing-policy.ts
@@ -583,7 +583,7 @@ rtk diff -u /tmp/thumbnail-framing-policy.ts packages/web/src/generated/thumbnai
 
 Expected: `diff` exits successfully with no output.
 
-- [ ] **Step 6: Run tests and typecheck**
+- [x] **Step 6: Run tests and typecheck**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/web test -- thumbnail-visible-bounds-audit.test.ts
@@ -592,18 +592,22 @@ rtk pnpm --filter @lpc-toolkit/web typecheck
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit generator wiring and generated policy**
+- [x] **Step 7: Commit generator wiring and generated policy**
 
 ```bash
 rtk git add packages/web/scripts/audit-thumbnail-visible-bounds.ts packages/web/test/thumbnail-visible-bounds-audit.test.ts packages/web/src/generated/thumbnail-framing-policy.ts
 rtk git commit -m "feat(web): generate thumbnail type scales"
 ```
 
-- [ ] **Step 8: Record task completion in this plan**
+- [x] **Step 8: Record task completion in this plan**
 
 Append the Task 3 implementation note, implementation commit hash, audit
 summary, deterministic diff result, and PASS verification. Commit the plan-only
 progress update.
+
+**Implementation note:** The audit now writes a committed framing policy from override-adjusted rows while preserving factual CSV and Markdown reports from the original rows. The full audit processed 29,995 cases (29,883 ok, 5 empty, 107 error) and generated 93 sorted type scales ranging from 1.505882 to 4.
+**Commit:** 9bb282885
+**Verification:** policy regeneration diff PASS (byte-identical); focused audit tests (14 pass); web typecheck PASS
 
 ### Task 4: Version Thumbnail Cache Entries
 
