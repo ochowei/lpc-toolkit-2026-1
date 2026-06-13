@@ -1024,4 +1024,65 @@ describe('composeSelections', () => {
       expect(differs).toBe(true);
     });
   });
+
+  describe('missing layers error handling', () => {
+    const mockCanvasAdapter = (loadImageFn: (url: string) => any): CanvasAdapter => {
+      const base = createNodeCanvasAdapter();
+      return {
+        createCanvas: base.createCanvas,
+        loadImage: async (url: string) => loadImageFn(url),
+      };
+    };
+    const createMockImage = (w: number, h: number) => {
+      return solidImage(w, h, '#ff0000');
+    };
+    const testCatalog = () => {
+      const bodyItem: ItemDefinition = {
+        name: 'Human Female',
+        type_name: 'body',
+        animations: ['walk'],
+        credits: [],
+        layer_1: { zPos: 10, female: 'body/' },
+      };
+      const neckItem: ItemDefinition = {
+        name: 'Bowtie',
+        type_name: 'neck',
+        animations: ['walk'],
+        credits: [],
+        layer_1: { zPos: 20, female: 'neck/' },
+      };
+      const records: Record<FilePath, ItemDefinition> = {
+        'body/body.json': bodyItem,
+        'neck/neck.json': neckItem,
+      };
+      return createCatalog(records).catalog;
+    };
+
+    it('skips missing optional layers gracefully instead of failing', async () => {
+      const selections = {
+        bodyType: 'female',
+        items: {
+          body: { typeName: 'body', name: 'Human Female' },
+          neck: { typeName: 'neck', name: 'Bowtie' },
+        },
+      };
+
+      const adapter = mockCanvasAdapter((url) => {
+        if (url.includes('neck')) {
+          throw new Error('Optional asset missing');
+        }
+        return createMockImage(64, 64);
+      });
+
+      const sheet = await composeSelections(selections as any, {
+        catalog: testCatalog(),
+        adapter,
+        spritesheetsBaseUrl: '',
+      });
+
+      expect(sheet.canvas).toBeDefined();
+      // Verify composition finished successfully despite missing bowtie
+    });
+  });
 });
+

@@ -540,7 +540,8 @@ export async function composeSelections(
             joinUrl(spritesheetsBaseUrl, d.path),
           );
           return { d, img };
-        } catch {
+        } catch (error) {
+          console.warn(`[LPC Composer] Missing optional spritesheet: ${d.path}`, error);
           return { d, img: null };
         } finally {
           onSettle();
@@ -608,7 +609,8 @@ export async function composeSelections(
               joinUrl(spritesheetsBaseUrl, c.path),
             );
             return { c, img };
-          } catch {
+          } catch (error) {
+            console.warn(`[LPC Composer] Missing custom spritesheet: ${c.path}`, error);
             return { c, img: null };
           } finally {
             onSettle();
