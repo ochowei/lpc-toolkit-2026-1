@@ -72,16 +72,14 @@ export function PreviewPane({
   }, [state.zoom]);
 
   const targets = useMemo(() => {
-    if (state.layout === 'single') {
-      return [{ canvasRef: canvasRefSingle, dir: state.dir }];
-    }
     return [
+      { canvasRef: canvasRefSingle, dir: state.dir },
       { canvasRef: canvasRefUp, dir: 'up' as const },
       { canvasRef: canvasRefDown, dir: 'down' as const },
       { canvasRef: canvasRefLeft, dir: 'left' as const },
       { canvasRef: canvasRefRight, dir: 'right' as const },
     ];
-  }, [state.layout, state.dir]);
+  }, [state.dir]);
 
   const { currentFrame, totalFrames, fps } = useMultiAnimationPlayer(
     targets,
@@ -208,45 +206,39 @@ export function PreviewPane({
             minHeight: 0,
           }}
         >
-          {state.layout === 'single' && (
-            <div className="flex h-full items-center justify-center">
-              <canvas ref={canvasRefSingle} className="image-render-pixel max-h-full max-w-full" />
-            </div>
-          )}
-          {state.layout === 'grid' && (
-            <div className="grid grid-cols-2 gap-4 p-4 h-full w-full justify-items-center items-center overflow-auto">
-              {([
-                { ref: canvasRefUp, dir: 'up' as const },
-                { ref: canvasRefDown, dir: 'down' as const },
-                { ref: canvasRefLeft, dir: 'left' as const },
-                { ref: canvasRefRight, dir: 'right' as const },
-              ]).map(({ ref, dir }) => (
-                <div key={dir} className="relative border border-border/20 rounded bg-black/10 p-2 flex items-center justify-center min-h-0 min-w-0">
-                  <canvas ref={ref} className="image-render-pixel max-h-full max-w-full" />
-                  <div className="absolute top-1 left-1 rounded bg-black/60 px-1.5 py-0.5 font-mono text-[9px] text-text-2">
-                    {t(`direction.${dir}`)} ({DIR_SHORT[dir]})
-                  </div>
+          <div className={state.layout === 'single' ? 'flex h-full items-center justify-center' : 'hidden'}>
+            <canvas ref={canvasRefSingle} className="image-render-pixel max-h-full max-w-full" />
+          </div>
+          <div className={state.layout === 'grid' ? 'grid grid-cols-2 gap-4 p-4 h-full w-full justify-items-center items-center overflow-auto' : 'hidden'}>
+            {([
+              { ref: canvasRefUp, dir: 'up' as const },
+              { ref: canvasRefDown, dir: 'down' as const },
+              { ref: canvasRefLeft, dir: 'left' as const },
+              { ref: canvasRefRight, dir: 'right' as const },
+            ]).map(({ ref, dir }) => (
+              <div key={dir} className="relative border border-border/20 rounded bg-black/10 p-2 flex items-center justify-center min-h-0 min-w-0">
+                <canvas ref={ref} className="image-render-pixel max-h-full max-w-full" />
+                <div className="absolute top-1 left-1 rounded bg-black/60 px-1.5 py-0.5 font-mono text-[9px] text-text-2">
+                  {t(`direction.${dir}`)} ({DIR_SHORT[dir]})
                 </div>
-              ))}
-            </div>
-          )}
-          {state.layout === 'row' && (
-            <div className="flex flex-row gap-4 p-4 h-full w-full justify-center items-center overflow-x-auto overflow-y-hidden">
-              {([
-                { ref: canvasRefUp, dir: 'up' as const },
-                { ref: canvasRefDown, dir: 'down' as const },
-                { ref: canvasRefLeft, dir: 'left' as const },
-                { ref: canvasRefRight, dir: 'right' as const },
-              ]).map(({ ref, dir }) => (
-                <div key={dir} className="relative border border-border/20 rounded bg-black/10 p-2 flex items-center justify-center min-h-0 min-w-0 flex-1 h-full">
-                  <canvas ref={ref} className="image-render-pixel max-h-full max-w-full" />
-                  <div className="absolute top-1 left-1 rounded bg-black/60 px-1.5 py-0.5 font-mono text-[9px] text-text-2">
-                    {t(`direction.${dir}`)} ({DIR_SHORT[dir]})
-                  </div>
+              </div>
+            ))}
+          </div>
+          <div className={state.layout === 'row' ? 'flex flex-row gap-4 p-4 h-full w-full justify-center items-center overflow-x-auto overflow-y-hidden' : 'hidden'}>
+            {([
+              { ref: canvasRefUp, dir: 'up' as const },
+              { ref: canvasRefDown, dir: 'down' as const },
+              { ref: canvasRefLeft, dir: 'left' as const },
+              { ref: canvasRefRight, dir: 'right' as const },
+            ]).map(({ ref, dir }) => (
+              <div key={dir} className="relative border border-border/20 rounded bg-black/10 p-2 flex items-center justify-center min-h-0 min-w-0 flex-1 h-full">
+                <canvas ref={ref} className="image-render-pixel max-h-full max-w-full" />
+                <div className="absolute top-1 left-1 rounded bg-black/60 px-1.5 py-0.5 font-mono text-[9px] text-text-2">
+                  {t(`direction.${dir}`)} ({DIR_SHORT[dir]})
                 </div>
-              ))}
-            </div>
-          )}
+              </div>
+            ))}
+          </div>
           {isComposing && (
             <div
               role="status"

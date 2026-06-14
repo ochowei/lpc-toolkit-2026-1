@@ -74,10 +74,12 @@ export function useMultiAnimationPlayer(
   const el1 = targets[1]?.canvasRef.current;
   const el2 = targets[2]?.canvasRef.current;
   const el3 = targets[3]?.canvasRef.current;
+  const el4 = targets[4]?.canvasRef.current;
   const dir0 = targets[0]?.dir;
   const dir1 = targets[1]?.dir;
   const dir2 = targets[2]?.dir;
   const dir3 = targets[3]?.dir;
+  const dir4 = targets[4]?.dir;
 
   useEffect(() => {
     const activeTargets = targets.filter(t => t.canvasRef.current !== null);
@@ -112,7 +114,7 @@ export function useMultiAnimationPlayer(
     }
 
     const src = animation.canvas as unknown as CanvasImageSource;
-    let frame = 0;
+    let frame = currentFrame;
     let raf = 0;
     let last = performance.now();
     let acc = 0;
@@ -142,7 +144,7 @@ export function useMultiAnimationPlayer(
     };
 
     draw();
-    setCurrentFrame(0);
+    setCurrentFrame(frame);
     if (!playing) return;
 
     const loop = (t: number) => {
@@ -170,10 +172,13 @@ export function useMultiAnimationPlayer(
     el1,
     el2,
     el3,
+    el4,
     dir0,
     dir1,
     dir2,
     dir3,
+    dir4,
+    currentFrame,
   ]);
 
   return { currentFrame, totalFrames, fps: ANIMATION_FPS };
