@@ -16,7 +16,7 @@
 - Modify: `packages/web/src/slice/selection.ts:30-130`
 - Test: `packages/web/test/slice/selection.test.ts` (Verify new reducer cases)
 
-- [ ] **Step 1: Write test cases in `packages/web/test/slice/selection.test.ts` to verify layout actions**
+- [x] **Step 1: Write test cases in `packages/web/test/slice/selection.test.ts` to verify layout actions**
   Add a test block:
   ```typescript
   import { describe, it, expect } from 'vitest';
@@ -44,11 +44,11 @@
   ```
   *(Note: Re-use/import mockCatalog or test harness constants from existing selection tests).*
 
-- [ ] **Step 2: Run tests to verify failure**
+- [x] **Step 2: Run tests to verify failure**
   Run: `rtk pnpm --filter @lpc-toolkit/web test run selection.test.ts`
   Expected: FAIL due to compilation errors (missing `layout` type and properties).
 
-- [ ] **Step 3: Update `SliceState`, `SliceAction` and `sliceReducer` in `packages/web/src/slice/selection.ts`**
+- [x] **Step 3: Update `SliceState`, `SliceAction` and `sliceReducer` in `packages/web/src/slice/selection.ts`**
   Modify type definitions and logic:
   ```typescript
   // In SliceState interface:
@@ -99,15 +99,14 @@
   };
   ```
 
-- [ ] **Step 4: Run tests to verify success**
+- [x] **Step 4: Run tests to verify success**
   Run: `rtk pnpm --filter @lpc-toolkit/web test run selection.test.ts`
   Expected: PASS
 
-- [ ] **Step 5: Commit**
-  ```bash
-  rm -f .git/index.lock && git add packages/web/src/slice/selection.ts packages/web/test/slice/selection.test.ts
-  rm -f .git/index.lock && git commit -m "feat(web): add layout state to selection slice"
-  ```
+- [x] **Step 5: Commit**
+  - Commit: `483678201237d8ba353fc9965be1e60d2b0dc37e`
+  - Verification: `pnpm typecheck` PASS, all unit tests PASS (410 tests)
+  - Note: Added `layout` to `SliceState`, `SliceAction`, and `sliceReducer`. Updated all mock tests and `composition-lock` to handle the new field and action.
 
 ---
 
