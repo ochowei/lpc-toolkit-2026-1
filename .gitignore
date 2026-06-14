@@ -34,3 +34,8 @@ packages/web/playwright-report/
 
 # Generated local analysis reports
 packages/web/.audit-output/
+
+# Understand Anything local scratch
+.understand-anything/intermediate/
+.understand-anything/diff-overlay.json
+.understand-anything/.trash-*
