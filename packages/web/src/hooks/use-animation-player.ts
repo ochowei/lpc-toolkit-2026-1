@@ -1,4 +1,4 @@
-import { useEffect, useState, type RefObject } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import type React from 'react';
 import {
   ANIMATION_CONFIGS,
@@ -62,6 +62,7 @@ export function useMultiAnimationPlayer(
   zoom: number,
 ): UseAnimationPlayerResult {
   const [currentFrame, setCurrentFrame] = useState(0);
+  const frameRef = useRef(0);
 
   const customDef = animation ? customAnimations[animation.animation as keyof typeof customAnimations] : null;
   const config = animation ? ANIMATION_CONFIGS[animation.animation as keyof typeof ANIMATION_CONFIGS] : null;
@@ -69,6 +70,11 @@ export function useMultiAnimationPlayer(
   const totalFrames = customDef
     ? (animation?.frameCount ?? 0)
     : (config?.cycle.length ?? 0);
+
+  // Sync / clamp frameRef if totalFrames changes
+  if (frameRef.current >= totalFrames) {
+    frameRef.current = 0;
+  }
 
   const el0 = targets[0]?.canvasRef.current;
   const el1 = targets[1]?.canvasRef.current;
@@ -85,6 +91,7 @@ export function useMultiAnimationPlayer(
     const activeTargets = targets.filter(t => t.canvasRef.current !== null);
     if (activeTargets.length === 0) {
       setCurrentFrame(0);
+      frameRef.current = 0;
       return;
     }
 
@@ -95,10 +102,12 @@ export function useMultiAnimationPlayer(
         }
       }
       setCurrentFrame(0);
+      frameRef.current = 0;
       return;
     }
 
     const size = customDef ? customDef.frameSize : 64;
+    const targetDim = size * zoom;
     const ctxs: { ctx: CanvasRenderingContext2D; dir: Direction; canvas: HTMLCanvasElement }[] = [];
 
     for (const target of activeTargets) {
@@ -107,14 +116,14 @@ export function useMultiAnimationPlayer(
       const ctx = canvas.getContext('2d');
       if (!ctx) continue;
 
-      canvas.width = size * zoom;
-      canvas.height = size * zoom;
+      if (canvas.width !== targetDim) canvas.width = targetDim;
+      if (canvas.height !== targetDim) canvas.height = targetDim;
       ctx.imageSmoothingEnabled = false;
       ctxs.push({ ctx, dir: target.dir, canvas });
     }
 
     const src = animation.canvas as unknown as CanvasImageSource;
-    let frame = currentFrame;
+    let frame = frameRef.current;
     let raf = 0;
     let last = performance.now();
     let acc = 0;
@@ -138,7 +147,7 @@ export function useMultiAnimationPlayer(
         ctx.drawImage(
           src,
           sx, sy, size, size,
-          0, 0, size * zoom, size * zoom,
+          0, 0, targetDim, targetDim,
         );
       }
     };
@@ -153,6 +162,7 @@ export function useMultiAnimationPlayer(
       while (acc >= step) {
         acc -= step;
         frame = (frame + 1) % totalFrames;
+        frameRef.current = frame;
         draw();
         setCurrentFrame(frame);
       }
@@ -178,9 +188,9 @@ export function useMultiAnimationPlayer(
     dir2,
     dir3,
     dir4,
-    currentFrame,
   ]);
 
   return { currentFrame, totalFrames, fps: ANIMATION_FPS };
 }
+
 

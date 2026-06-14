@@ -72,14 +72,16 @@ export function PreviewPane({
   }, [state.zoom]);
 
   const targets = useMemo(() => {
+    if (state.layout === 'single') {
+      return [{ canvasRef: canvasRefSingle, dir: state.dir }];
+    }
     return [
-      { canvasRef: canvasRefSingle, dir: state.dir },
       { canvasRef: canvasRefUp, dir: 'up' as const },
       { canvasRef: canvasRefDown, dir: 'down' as const },
       { canvasRef: canvasRefLeft, dir: 'left' as const },
       { canvasRef: canvasRefRight, dir: 'right' as const },
     ];
-  }, [state.dir]);
+  }, [state.layout, state.dir]);
 
   const { currentFrame, totalFrames, fps } = useMultiAnimationPlayer(
     targets,
