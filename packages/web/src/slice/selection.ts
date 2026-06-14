@@ -35,6 +35,7 @@ export interface SliceState {
   readonly dir: Direction;
   readonly playing: boolean;
   readonly zoom: number;
+  readonly layout: 'single' | 'grid' | 'row';
 }
 
 /** User actions that can change selections, playback, body type, or zoom. */
@@ -57,7 +58,8 @@ export type SliceAction =
   | { type: 'set_anim'; anim: AnimationName }
   | { type: 'set_dir'; dir: Direction }
   | { type: 'toggle_play' }
-  | { type: 'set_zoom'; zoom: number };
+  | { type: 'set_zoom'; zoom: number }
+  | { type: 'set_layout'; layout: 'single' | 'grid' | 'row' };
 
 /** Pure state reducer for the layer stack UI. */
 export function sliceReducer(s: SliceState, a: SliceAction): SliceState {
@@ -109,6 +111,7 @@ export function sliceReducer(s: SliceState, a: SliceAction): SliceState {
           dir: a.init.dir,
           playing: a.init.playing,
           zoom: a.init.zoom,
+          layout: a.init.layout,
         };
       }
       return next;
@@ -121,6 +124,8 @@ export function sliceReducer(s: SliceState, a: SliceAction): SliceState {
       return { ...s, playing: !s.playing };
     case 'set_zoom':
       return { ...s, zoom: clampZoom(a.zoom) };
+    case 'set_layout':
+      return { ...s, layout: a.layout };
     default:
       return s;
   }
@@ -261,6 +266,7 @@ export function pickInitialSelections(catalog: Catalog): {
       dir: 'down',
       playing: true,
       zoom: DEFAULT_ZOOM,
+      layout: 'single',
     },
     shownTypeNames,
   };

@@ -139,6 +139,7 @@ describe('toSelections', () => {
       dir: 'down',
       playing: true,
       zoom: 4,
+      layout: 'single',
     };
     const sel = toSelections(state);
     expect(sel.bodyType).toBe('male');
@@ -156,6 +157,7 @@ describe('toSelections', () => {
       dir: 'down',
       playing: true,
       zoom: 7,
+      layout: 'single',
     };
     const sel = toSelections(state);
     expect('zoom' in sel).toBe(false);
@@ -171,6 +173,7 @@ describe('sliceReducer', () => {
       dir: 'down',
       playing: true,
       zoom: 4,
+      layout: 'single',
     };
     const s1 = sliceReducer(s0, { type: 'pick', typeName: 'hair', name: 'Hair B' });
     expect(s1.selections['hair']).toEqual({
@@ -192,6 +195,7 @@ describe('sliceReducer', () => {
       dir: 'left',
       playing: false,
       zoom: 4,
+      layout: 'single',
     };
 
     const s1 = sliceReducer(s0, {
@@ -215,6 +219,7 @@ describe('sliceReducer', () => {
       dir: 'left',
       playing: false,
       zoom: 4,
+      layout: 'single',
     });
   });
 
@@ -226,6 +231,7 @@ describe('sliceReducer', () => {
       dir: 'down',
       playing: true,
       zoom: 4,
+      layout: 'single',
     };
 
     const s1 = sliceReducer(s0, {
@@ -258,6 +264,7 @@ describe('sliceReducer reset', () => {
     dir: 'down',
     playing: true,
     zoom: 4,
+    layout: 'single',
   };
 
   const mutated: SliceState = {
@@ -270,6 +277,7 @@ describe('sliceReducer reset', () => {
     dir: 'left',
     playing: false,
     zoom: 2,
+    layout: 'single',
   };
 
   it('outfit-only reset restores bodyType + selections, leaves view untouched', () => {
@@ -405,6 +413,7 @@ describe('sliceReducer set_zoom', () => {
     dir: 'down',
     playing: true,
     zoom: 4,
+    layout: 'single',
   };
 
   it('clamps zoom to MIN_ZOOM lower bound', () => {
@@ -429,3 +438,24 @@ describe('sliceReducer set_zoom', () => {
     expect(s.zoom).toBe(6);
   });
 });
+
+describe('selection slice layout', () => {
+  it('sets layout correctly', () => {
+    const { state: init } = pickInitialSelections(makeFullCatalog());
+    expect(init.layout).toBe('single');
+    const next = sliceReducer(init, { type: 'set_layout', layout: 'grid' });
+    expect(next.layout).toBe('grid');
+  });
+
+  it('resets layout to init layout on reset view scope', () => {
+    const { state: init } = pickInitialSelections(makeFullCatalog());
+    const changed = sliceReducer(init, { type: 'set_layout', layout: 'row' });
+    const resetState = sliceReducer(changed, {
+      type: 'reset',
+      scopes: { outfit: false, view: true },
+      init,
+    });
+    expect(resetState.layout).toBe('single');
+  });
+});
+
