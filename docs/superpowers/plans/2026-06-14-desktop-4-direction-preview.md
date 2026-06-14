@@ -332,7 +332,7 @@
 **Files:**
 - Modify: `packages/web/src/components/layer-stack/preview-pane.tsx`
 
-- [ ] **Step 1: Update imports, declare Refs, and setup `useMultiAnimationPlayer`**
+- [x] **Step 1: Update imports, declare Refs, and setup `useMultiAnimationPlayer`**
   Modify the top of `PreviewPane` inside `packages/web/src/components/layer-stack/preview-pane.tsx`:
   ```typescript
   import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -369,7 +369,7 @@
     );
   ```
 
-- [ ] **Step 2: Conditional Render for Layout Switcher Controls**
+- [x] **Step 2: Conditional Render for Layout Switcher Controls**
   In the top Action Bar (around line 118), render direction arrows conditionally:
   ```typescript
           {state.layout === 'single' && (
@@ -404,7 +404,7 @@
           </div>
   ```
 
-- [ ] **Step 3: Conditional Render for Preview Canvases**
+- [x] **Step 3: Conditional Render for Preview Canvases**
   Update the main canvas rendering container (around line 169):
   Replace the single canvas render with:
   ```typescript
@@ -450,12 +450,11 @@
   ```
   *(Update layout details to fit screen correctly, keeping overlays like composition-loading-overlay and top-left/top-right settings overlays aligned properly relative to the parent relative container).*
 
-- [ ] **Step 4: Build check & tests check**
+- [x] **Step 4: Build check & tests check**
   Run: `rtk pnpm build`
   Expected: Success without TypeScript or lint errors.
 
-- [ ] **Step 5: Commit**
-  ```bash
-  rm -f .git/index.lock && git add packages/web/src/components/layer-stack/preview-pane.tsx
-  rm -f .git/index.lock && git commit -m "feat(web): support Grid and Row layout layouts in PreviewPane"
-  ```
+- [x] **Step 5: Commit**
+  - Commit: `f8b4a07f6`
+  - Verification: `rtk pnpm build` PASS, `rtk pnpm test` PASS (52/52 test files, 411/411 tests)
+  - Note: Replaced single canvasRef with multi-direction refs. Configured the layout segmented control group in the Action Bar, conditionally rendering the direction selector (only in `'single'` layout). Rendered the three preview layouts (single, grid, and row) with layout badges, maintaining correct alignment of all overlays like the loading spinner and zoom controls. Passed all builds and tests successfully.
