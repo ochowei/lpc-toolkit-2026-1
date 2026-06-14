@@ -115,7 +115,7 @@
 **Files:**
 - Modify: `packages/web/src/i18n.ts:50-250`
 
-- [ ] **Step 1: Add translation strings for English and Chinese**
+- [x] **Step 1: Add translation strings for English and Chinese**
   Locate `TRANSLATIONS` map in `packages/web/src/i18n.ts`. Under `en` section:
   ```typescript
       'layout.single': 'Single',
@@ -129,15 +129,13 @@
       'layout.row': '水平排列',
   ```
 
-- [ ] **Step 2: Run typescript check to verify no errors**
+- [x] **Step 2: Run typescript check to verify no errors**
   Run: `rtk pnpm --filter @lpc-toolkit/web exec tsc --noEmit`
   Expected: PASS
 
-- [ ] **Step 3: Commit**
-  ```bash
-  rm -f .git/index.lock && git add packages/web/src/i18n.ts
-  rm -f .git/index.lock && git commit -m "intl: add layout translation strings for en/zh-TW"
-  ```
+- [x] **Step 3: Commit**
+  - Commit: `fc6eeb4cc`
+  - Verification: `pnpm typecheck` PASS
 
 ---
 
