@@ -1,7 +1,7 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ANIMATION_CONFIGS, type Direction } from '@lpc-toolkit/core';
 import type { ComposedResult } from '../../hooks/use-composed-character';
-import { useAnimationPlayer } from '../../hooks/use-animation-player';
+import { useMultiAnimationPlayer } from '../../hooks/use-animation-player';
 import {
   MAX_ZOOM,
   MIN_ZOOM,
@@ -59,7 +59,11 @@ export function PreviewPane({
   fullSheet,
   fullSheetActions,
 }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const canvasRefSingle = useRef<HTMLCanvasElement | null>(null);
+  const canvasRefUp = useRef<HTMLCanvasElement | null>(null);
+  const canvasRefDown = useRef<HTMLCanvasElement | null>(null);
+  const canvasRefLeft = useRef<HTMLCanvasElement | null>(null);
+  const canvasRefRight = useRef<HTMLCanvasElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const splitContainerRef = useRef<HTMLDivElement | null>(null);
   const zoomRef = useRef(state.zoom);
@@ -67,8 +71,23 @@ export function PreviewPane({
     zoomRef.current = state.zoom;
   }, [state.zoom]);
 
-  const { currentFrame, totalFrames, fps } = useAnimationPlayer(
-    canvasRef, result.animation, state.dir, state.playing, state.zoom,
+  const targets = useMemo(() => {
+    if (state.layout === 'single') {
+      return [{ canvasRef: canvasRefSingle, dir: state.dir }];
+    }
+    return [
+      { canvasRef: canvasRefUp, dir: 'up' as const },
+      { canvasRef: canvasRefDown, dir: 'down' as const },
+      { canvasRef: canvasRefLeft, dir: 'left' as const },
+      { canvasRef: canvasRefRight, dir: 'right' as const },
+    ];
+  }, [state.layout, state.dir]);
+
+  const { currentFrame, totalFrames, fps } = useMultiAnimationPlayer(
+    targets,
+    result.animation,
+    state.playing,
+    state.zoom,
   );
 
   useEffect(() => {
@@ -115,17 +134,33 @@ export function PreviewPane({
     <div ref={previewRef} className="relative flex h-full min-h-0 flex-col">
       {/* Action bar — now at the TOP, above the single preview. */}
       <div className="flex flex-wrap items-center gap-2 border-b border-border bg-surface px-2 py-2 text-xs sm:gap-3 sm:px-3">
-        <div className="flex gap-0.5">
-          <Button size="sm" variant={state.dir === 'up' ? 'primary' : 'ghost'}
-            className="w-6 px-0"
-            onClick={() => dispatch({ type: 'set_dir', dir: 'up' })}>{DIR_LABEL.up}</Button>
-          <Button size="sm" variant={state.dir === 'down' ? 'primary' : 'ghost'}
-            className="w-6 px-0"
-            onClick={() => dispatch({ type: 'set_dir', dir: 'down' })}>{DIR_LABEL.down}</Button>
-          <Button size="sm" variant={state.dir === 'left' ? 'primary' : 'ghost'}
-            className="w-6 px-0" onClick={() => dispatch({ type: 'set_dir', dir: 'left' })}>{DIR_LABEL.left}</Button>
-          <Button size="sm" variant={state.dir === 'right' ? 'primary' : 'ghost'}
-            className="w-6 px-0" onClick={() => dispatch({ type: 'set_dir', dir: 'right' })}>{DIR_LABEL.right}</Button>
+        {state.layout === 'single' && (
+          <div className="flex gap-0.5">
+            <Button size="sm" variant={state.dir === 'up' ? 'primary' : 'ghost'}
+              className="w-6 px-0"
+              onClick={() => dispatch({ type: 'set_dir', dir: 'up' })}>{DIR_LABEL.up}</Button>
+            <Button size="sm" variant={state.dir === 'down' ? 'primary' : 'ghost'}
+              className="w-6 px-0"
+              onClick={() => dispatch({ type: 'set_dir', dir: 'down' })}>{DIR_LABEL.down}</Button>
+            <Button size="sm" variant={state.dir === 'left' ? 'primary' : 'ghost'}
+              className="w-6 px-0" onClick={() => dispatch({ type: 'set_dir', dir: 'left' })}>{DIR_LABEL.left}</Button>
+            <Button size="sm" variant={state.dir === 'right' ? 'primary' : 'ghost'}
+              className="w-6 px-0" onClick={() => dispatch({ type: 'set_dir', dir: 'right' })}>{DIR_LABEL.right}</Button>
+          </div>
+        )}
+
+        <div className={`flex gap-0.5 ${state.layout === 'single' ? 'border-l border-border pl-2 sm:pl-3' : ''}`}>
+          {(['single', 'grid', 'row'] as const).map((l) => (
+            <Button
+              key={l}
+              size="sm"
+              variant={state.layout === l ? 'primary' : 'ghost'}
+              className="px-2"
+              onClick={() => dispatch({ type: 'set_layout', layout: l })}
+            >
+              {t(`layout.${l}`)}
+            </Button>
+          ))}
         </div>
 
         <select className="rounded-md border border-border bg-surface-2 px-2 py-1"
@@ -173,9 +208,45 @@ export function PreviewPane({
             minHeight: 0,
           }}
         >
-          <div className="flex h-full items-center justify-center">
-            <canvas ref={canvasRef} className="image-render-pixel max-h-full max-w-full" />
-          </div>
+          {state.layout === 'single' && (
+            <div className="flex h-full items-center justify-center">
+              <canvas ref={canvasRefSingle} className="image-render-pixel max-h-full max-w-full" />
+            </div>
+          )}
+          {state.layout === 'grid' && (
+            <div className="grid grid-cols-2 gap-4 p-4 h-full w-full justify-items-center items-center overflow-auto">
+              {([
+                { ref: canvasRefUp, dir: 'up' as const },
+                { ref: canvasRefDown, dir: 'down' as const },
+                { ref: canvasRefLeft, dir: 'left' as const },
+                { ref: canvasRefRight, dir: 'right' as const },
+              ]).map(({ ref, dir }) => (
+                <div key={dir} className="relative border border-border/20 rounded bg-black/10 p-2 flex items-center justify-center min-h-0 min-w-0">
+                  <canvas ref={ref} className="image-render-pixel max-h-full max-w-full" />
+                  <div className="absolute top-1 left-1 rounded bg-black/60 px-1.5 py-0.5 font-mono text-[9px] text-text-2">
+                    {t(`direction.${dir}`)} ({DIR_SHORT[dir]})
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {state.layout === 'row' && (
+            <div className="flex flex-row gap-4 p-4 h-full w-full justify-center items-center overflow-x-auto overflow-y-hidden">
+              {([
+                { ref: canvasRefUp, dir: 'up' as const },
+                { ref: canvasRefDown, dir: 'down' as const },
+                { ref: canvasRefLeft, dir: 'left' as const },
+                { ref: canvasRefRight, dir: 'right' as const },
+              ]).map(({ ref, dir }) => (
+                <div key={dir} className="relative border border-border/20 rounded bg-black/10 p-2 flex items-center justify-center min-h-0 min-w-0 flex-1 h-full">
+                  <canvas ref={ref} className="image-render-pixel max-h-full max-w-full" />
+                  <div className="absolute top-1 left-1 rounded bg-black/60 px-1.5 py-0.5 font-mono text-[9px] text-text-2">
+                    {t(`direction.${dir}`)} ({DIR_SHORT[dir]})
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
           {isComposing && (
             <div
               role="status"
@@ -198,7 +269,7 @@ export function PreviewPane({
             </div>
           )}
           <div className="absolute top-3 left-3 z-10 rounded bg-black/40 px-2 py-0.5 font-mono text-[10px] text-text-2 backdrop-blur-md">
-            {state.anim} · {DIR_SHORT[state.dir]} · {state.zoom}× · f{String(currentFrame + 1).padStart(2, '0')}
+            {state.anim} · {state.layout === 'single' ? `${DIR_SHORT[state.dir]} · ` : ''}{state.zoom}× · f{String(currentFrame + 1).padStart(2, '0')}
           </div>
           <div className="absolute top-3 right-3 z-10 flex items-center gap-0.5 rounded bg-black/40 p-0.5 backdrop-blur-md">
             <button
