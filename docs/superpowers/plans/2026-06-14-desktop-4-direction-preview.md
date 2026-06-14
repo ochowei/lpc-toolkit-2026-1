@@ -145,7 +145,7 @@
 - Modify: `packages/web/src/hooks/use-animation-player.ts`
 - Test: `packages/web/test/hooks/use-animation-player.test.ts`
 
-- [ ] **Step 1: Write Vitest test case for `useMultiAnimationPlayer`**
+- [x] **Step 1: Write Vitest test case for `useMultiAnimationPlayer`**
   Add test in `packages/web/test/hooks/use-animation-player.test.ts` or create it if not existing:
   ```typescript
   import { describe, it, expect } from 'vitest';
@@ -158,11 +158,11 @@
   });
   ```
 
-- [ ] **Step 2: Run tests to verify failure**
+- [x] **Step 2: Run tests to verify failure**
   Run: `rtk pnpm --filter @lpc-toolkit/web test run use-animation-player`
   Expected: FAIL (missing export)
 
-- [ ] **Step 3: Export `AnimationTarget` and implement `useMultiAnimationPlayer`**
+- [x] **Step 3: Export `AnimationTarget` and implement `useMultiAnimationPlayer`**
   Modify `packages/web/src/hooks/use-animation-player.ts`:
   ```typescript
   import { useEffect, useState, type RefObject } from 'react';
@@ -315,15 +315,15 @@
   }
   ```
 
-- [ ] **Step 4: Run tests to verify success**
+- [x] **Step 4: Run tests to verify success**
   Run: `rtk pnpm --filter @lpc-toolkit/web test run use-animation-player`
   Expected: PASS
 
-- [ ] **Step 5: Commit**
-  ```bash
-  rm -f .git/index.lock && git add packages/web/src/hooks/use-animation-player.ts packages/web/test/hooks/use-animation-player.test.ts
-  rm -f .git/index.lock && git commit -m "feat(web): implement useMultiAnimationPlayer hook for multi-canvas playback"
-  ```
+- [x] **Step 5: Commit**
+  - Commit: `20447e4f8`
+  - Verification: `pnpm test` PASS, `pnpm typecheck` PASS
+  - Note: Implemented the useMultiAnimationPlayer hook and updated useAnimationPlayer as a compatibility wrapper. Added unit test.
+
 
 ---
 
