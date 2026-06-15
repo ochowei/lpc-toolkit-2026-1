@@ -38,6 +38,7 @@ const state: SliceState = {
   dir: 'down',
   playing: false,
   zoom: 4,
+  layout: 'single',
 };
 
 function renderExpanded(mode: ReplacementCardDisplayMode): string {

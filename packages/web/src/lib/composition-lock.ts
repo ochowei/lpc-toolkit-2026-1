@@ -15,6 +15,7 @@ export function isCompositionChangingAction(action: SliceAction): boolean {
     case 'set_dir':
     case 'toggle_play':
     case 'set_zoom':
+    case 'set_layout':
       return false;
     default: {
       const exhaustiveAction: never = action;
