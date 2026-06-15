@@ -1,6 +1,6 @@
 import { createCanvas } from '@napi-rs/canvas';
 import { describe, expect, it } from 'vitest';
-import { clearAnimationCanvas } from '../src/hooks/use-animation-player';
+import { clearAnimationCanvas, useMultiAnimationPlayer } from '../src/hooks/use-animation-player';
 
 describe('clearAnimationCanvas', () => {
   it('clears stale pixels without changing the current canvas dimensions', () => {
@@ -13,5 +13,11 @@ describe('clearAnimationCanvas', () => {
 
     expect([canvas.width, canvas.height]).toEqual([8, 6]);
     expect(ctx.getImageData(4, 3, 1, 1).data[3]).toBe(0);
+  });
+});
+
+describe('useMultiAnimationPlayer', () => {
+  it('exists and is defined', () => {
+    expect(useMultiAnimationPlayer).toBeDefined();
   });
 });

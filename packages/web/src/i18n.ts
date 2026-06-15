@@ -160,6 +160,9 @@ export const TRANSLATIONS = {
     'replacementCards.stacked': 'Stacked',
     'replacementCards.overlay': 'Overlay',
     'replacementCards.hidden': 'Hidden',
+    'layout.single': 'Single',
+    'layout.grid': 'Grid',
+    'layout.row': 'Row',
   },
   'zh-TW': {
     'app.subtitle': '基礎切片',
@@ -316,6 +319,9 @@ export const TRANSLATIONS = {
     'replacementCards.stacked': '上下',
     'replacementCards.overlay': '覆蓋',
     'replacementCards.hidden': '隱藏',
+    'layout.single': '單方向',
+    'layout.grid': '網格',
+    'layout.row': '水平排列',
   },
 } as const;
 

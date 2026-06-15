@@ -18,6 +18,7 @@ const state: SliceState = {
   dir: 'down',
   playing: true,
   zoom: 4,
+  layout: 'single',
 };
 
 const settled: ComposedResult = {

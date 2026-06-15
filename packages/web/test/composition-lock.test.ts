@@ -13,6 +13,7 @@ const initialState: SliceState = {
   dir: 'down',
   playing: true,
   zoom: 4,
+  layout: 'single',
 };
 
 describe('isCompositionChangingAction', () => {
@@ -38,6 +39,7 @@ describe('isCompositionChangingAction', () => {
     { type: 'set_dir', dir: 'down' },
     { type: 'toggle_play' },
     { type: 'set_zoom', zoom: 4 },
+    { type: 'set_layout', layout: 'grid' },
     {
       type: 'reset',
       scopes: { outfit: false, view: true },
