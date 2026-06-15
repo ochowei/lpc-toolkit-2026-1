@@ -235,7 +235,7 @@ export function PreviewPane({
                   ].join(' ')}
                 >
                   <canvas ref={ref} className="image-render-pixel max-h-full max-w-full" />
-                  <div className="absolute top-1 left-1 rounded bg-black/60 px-1.5 py-0.5 font-mono text-[9px] text-text-2">
+                  <div className="absolute top-1 left-1 rounded bg-black/60 px-1.5 py-0.5 font-mono text-[9px] text-white/90">
                     {t(`direction.${dir}`)} ({DIR_SHORT[dir]})
                   </div>
                 </div>
@@ -263,7 +263,7 @@ export function PreviewPane({
               </div>
             </div>
           )}
-          <div className="absolute top-3 left-3 z-10 rounded bg-black/40 px-2 py-0.5 font-mono text-[10px] text-text-2 backdrop-blur-md">
+          <div className="absolute top-3 left-3 z-10 rounded bg-black/40 px-2 py-0.5 font-mono text-[10px] text-white/90 backdrop-blur-md">
             {state.anim} · {state.layout === 'single' ? `${DIR_SHORT[state.dir]} · ` : ''}{state.zoom}× · f{String(currentFrame + 1).padStart(2, '0')}
           </div>
           <div className="absolute top-3 right-3 z-10 flex items-center gap-0.5 rounded bg-black/40 p-0.5 backdrop-blur-md">
@@ -274,7 +274,7 @@ export function PreviewPane({
               onClick={() =>
                 dispatch({ type: 'set_zoom', zoom: state.zoom - 1 })
               }
-              className="rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold text-text-2 hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-transparent"
+              className="rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold text-white/90 hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-transparent"
             >
               −
             </button>
@@ -287,7 +287,7 @@ export function PreviewPane({
                   'rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold',
                   state.zoom === z
                     ? 'bg-accent text-accent-ink'
-                    : 'text-text-2 hover:bg-white/10',
+                    : 'text-white/90 hover:bg-white/10',
                 ].join(' ')}
               >
                 {z}×
@@ -300,7 +300,7 @@ export function PreviewPane({
               onClick={() =>
                 dispatch({ type: 'set_zoom', zoom: state.zoom + 1 })
               }
-              className="rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold text-text-2 hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-transparent"
+              className="rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold text-white/90 hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-transparent"
             >
               +
             </button>
