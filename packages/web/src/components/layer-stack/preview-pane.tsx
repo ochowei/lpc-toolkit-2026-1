@@ -212,31 +212,35 @@ export function PreviewPane({
             <canvas ref={canvasRefSingle} className="image-render-pixel max-h-full max-w-full" />
           </div>
           <div className={
-            state.layout === 'grid'
-              ? 'grid grid-cols-2 gap-4 p-4 h-full w-full justify-items-center items-center overflow-auto'
-              : state.layout === 'row'
-              ? 'flex flex-row gap-4 p-4 h-full w-full justify-center items-center overflow-x-auto overflow-y-hidden'
+            state.layout === 'grid' || state.layout === 'row'
+              ? 'flex h-full w-full items-center justify-center p-4 overflow-auto'
               : 'hidden'
           }>
-            {([
-              { ref: canvasRefUp, dir: 'up' as const },
-              { ref: canvasRefDown, dir: 'down' as const },
-              { ref: canvasRefLeft, dir: 'left' as const },
-              { ref: canvasRefRight, dir: 'right' as const },
-            ]).map(({ ref, dir }) => (
-              <div
-                key={dir}
-                className={[
-                  'relative border border-border/20 rounded bg-black/10 p-2 flex items-center justify-center min-h-0 min-w-0',
-                  state.layout === 'row' ? 'flex-1 h-full' : '',
-                ].join(' ')}
-              >
-                <canvas ref={ref} className="image-render-pixel max-h-full max-w-full" />
-                <div className="absolute top-1 left-1 rounded bg-black/60 px-1.5 py-0.5 font-mono text-[9px] text-text-2">
-                  {t(`direction.${dir}`)} ({DIR_SHORT[dir]})
+            <div className={
+              state.layout === 'grid'
+                ? 'grid grid-cols-2 gap-4 justify-items-center items-center'
+                : 'flex flex-row gap-4 justify-center items-center overflow-x-auto overflow-y-hidden'
+            }>
+              {([
+                { ref: canvasRefUp, dir: 'up' as const },
+                { ref: canvasRefDown, dir: 'down' as const },
+                { ref: canvasRefLeft, dir: 'left' as const },
+                { ref: canvasRefRight, dir: 'right' as const },
+              ]).map(({ ref, dir }) => (
+                <div
+                  key={dir}
+                  className={[
+                    'relative border border-border/20 rounded bg-black/10 p-2 flex items-center justify-center min-h-0 min-w-0',
+                    state.layout === 'row' ? 'flex-1 h-full' : '',
+                  ].join(' ')}
+                >
+                  <canvas ref={ref} className="image-render-pixel max-h-full max-w-full" />
+                  <div className="absolute top-1 left-1 rounded bg-black/60 px-1.5 py-0.5 font-mono text-[9px] text-text-2">
+                    {t(`direction.${dir}`)} ({DIR_SHORT[dir]})
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
           {isComposing && (
             <div
