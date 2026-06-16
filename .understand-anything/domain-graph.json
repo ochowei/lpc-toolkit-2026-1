@@ -2,769 +2,729 @@
   "version": "1.0.0",
   "project": {
     "name": "lpc-toolkit",
-    "languages": ["TypeScript", "JavaScript", "CSS", "HTML"],
-    "frameworks": ["React", "Vite", "Tailwind CSS"],
-    "description": "A toolkit for building, previewing, recoloring, and exporting layered Liberated Pixel Cup character sprites while preserving asset attribution and licensing metadata.",
-    "analyzedAt": "2026-06-14T04:48:23Z",
-    "gitCommitHash": "47839be58e1e090d96b2330c96c7c2e856992cd4"
+    "languages": [
+      "TypeScript",
+      "JavaScript",
+      "CSS",
+      "HTML"
+    ],
+    "frameworks": [
+      "React",
+      "Vite",
+      "Tailwind CSS"
+    ],
+    "description": "An LPC character spritesheet toolkit that loads a catalog of layered art, lets users configure a character, composes and recolors sprites through an environment-agnostic core, and exports rendered assets with mandatory attribution metadata.",
+    "analyzedAt": "2026-06-15T14:49:03Z",
+    "gitCommitHash": "ed13a3022d0ebfd945f4a3d50a348d62b205458c"
   },
   "nodes": [
     {
-      "id": "domain:character-composition",
+      "id": "domain:asset-catalog-management",
       "type": "domain",
-      "name": "Character Composition",
-      "summary": "This domain turns selected LPC body parts, equipment, and colors into ordered sprite layers and rendered animation frames. It keeps the composition pipeline portable by relying on caller-provided image and canvas adapters.",
-      "tags": ["sprite-composition", "animation", "recoloring"],
+      "name": "Asset Catalog Management",
+      "summary": "This domain turns migrated LPC definitions, palettes, spritesheets, and release metadata into the runtime catalog used by the character editor. It also verifies and packages asset snapshots so browser consumers receive consistent, traceable inputs.",
+      "tags": ["assets", "catalog", "palettes", "validation"],
       "complexity": "complex",
       "domainMeta": {
-        "entities": ["Catalog Item", "Selection", "Sprite Layer", "Animation", "Frame", "Palette"],
+        "entities": ["Asset snapshot", "Catalog item", "Palette catalog", "Spritesheet", "Asset manifest"],
         "businessRules": [
-          "Selections resolve through catalog aliases and layer ordering before rendering.",
-          "Animation frames may come from standard or custom spritesheet layouts.",
-          "Palette substitutions must preserve aligned source and target colors."
+          "Only validated asset definitions and spritesheets should enter the runtime catalog.",
+          "Catalog aliases and segmented targets must resolve to composable items.",
+          "Released asset files must match their manifest and expected hashes."
         ],
         "crossDomainInteractions": [
-          "Consumes editor selections and animation choices.",
-          "Provides rendered frames to preview and export workflows.",
-          "Uses the validated local asset catalog and palette data."
+          "Supplies selectable items and palettes to Character Configuration.",
+          "Supplies image paths and metadata to Sprite Composition.",
+          "Supplies credit-bearing asset metadata to Attribution and Licensing."
         ]
       }
     },
     {
-      "id": "flow:compose-character",
-      "type": "flow",
-      "name": "Compose Character",
-      "summary": "Resolve selected catalog items into sprite paths and render their ordered layers into composed character frames.",
-      "tags": ["composition", "layers", "rendering"],
-      "complexity": "complex",
-      "domainMeta": {
-        "entryPoint": "Character selection or animation change",
-        "entryType": "event"
-      }
-    },
-    {
-      "id": "step:compose-character:resolve-selected-layers",
-      "type": "step",
-      "name": "Resolve Selected Layers",
-      "summary": "Resolve selected catalog entries, aliases, replacements, and layer metadata into renderable layers.",
-      "tags": ["catalog", "selection", "layers"],
-      "complexity": "moderate",
-      "filePath": "packages/core/src/compose.ts",
-      "lineRange": [170, 219]
-    },
-    {
-      "id": "step:compose-character:collect-sprite-paths",
-      "type": "step",
-      "name": "Collect Sprite Paths",
-      "summary": "Determine the spritesheet paths required by the resolved selections.",
-      "tags": ["assets", "spritesheets", "selection"],
-      "complexity": "moderate",
-      "filePath": "packages/core/src/compose.ts",
-      "lineRange": [238, 274]
-    },
-    {
-      "id": "step:compose-character:resolve-active-animation",
-      "type": "step",
-      "name": "Resolve Active Animation",
-      "summary": "Choose an animation supported by the current composition before asynchronous rendering begins.",
-      "tags": ["animation", "react", "composition"],
-      "complexity": "simple",
-      "filePath": "packages/web/src/hooks/use-composed-character.ts",
-      "lineRange": [86, 97]
-    },
-    {
-      "id": "step:compose-character:render-composed-frames",
-      "type": "step",
-      "name": "Render Composed Frames",
-      "summary": "Load, recolor, order, and draw the selected sprite layers into the final frame collection.",
-      "tags": ["canvas", "rendering", "frames"],
-      "complexity": "complex",
-      "filePath": "packages/core/src/compose.ts",
-      "lineRange": [423, 706]
-    },
-    {
-      "id": "step:compose-character:publish-latest-result",
-      "type": "step",
-      "name": "Publish Latest Result",
-      "summary": "Cache and expose the current composition result while preventing stale asynchronous work from replacing newer selections.",
-      "tags": ["react-hook", "cache", "async"],
-      "complexity": "complex",
-      "filePath": "packages/web/src/hooks/use-composed-character.ts",
-      "lineRange": [107, 220]
-    },
-    {
-      "id": "flow:apply-character-colors",
-      "type": "flow",
-      "name": "Apply Character Colors",
-      "summary": "Resolve material palette choices and replace source pixels with the selected target colors.",
-      "tags": ["palette", "recoloring", "materials"],
-      "complexity": "complex",
-      "domainMeta": {
-        "entryPoint": "Palette or body-color selection",
-        "entryType": "event"
-      }
-    },
-    {
-      "id": "step:apply-character-colors:build-palette-catalog",
-      "type": "step",
-      "name": "Build Palette Catalog",
-      "summary": "Normalize palette records into the material and color catalog used by composition.",
-      "tags": ["palette", "catalog", "normalization"],
-      "complexity": "moderate",
-      "filePath": "packages/core/src/palettes.ts",
-      "lineRange": [144, 227]
-    },
-    {
-      "id": "step:apply-character-colors:normalize-recolor-request",
-      "type": "step",
-      "name": "Normalize Recolor Request",
-      "summary": "Normalize selected recolor values and repair missing choices against available catalog data.",
-      "tags": ["recoloring", "validation", "selection"],
-      "complexity": "simple",
-      "filePath": "packages/core/src/recolor-resolve.ts",
-      "lineRange": [228, 264]
-    },
-    {
-      "id": "step:apply-character-colors:resolve-source-and-target-palettes",
-      "type": "step",
-      "name": "Resolve Source and Target Palettes",
-      "summary": "Create a resolver that aligns base material colors with the requested target palette.",
-      "tags": ["palette", "materials", "resolution"],
-      "complexity": "moderate",
-      "filePath": "packages/core/src/recolor-resolve.ts",
-      "lineRange": [441, 508]
-    },
-    {
-      "id": "step:apply-character-colors:build-color-pairs",
-      "type": "step",
-      "name": "Build Color Pairs",
-      "summary": "Pair each source palette color with its selected replacement color.",
-      "tags": ["colors", "palette", "mapping"],
-      "complexity": "simple",
-      "filePath": "packages/core/src/recolor.ts",
-      "lineRange": [102, 116]
-    },
-    {
-      "id": "step:apply-character-colors:replace-image-pixels",
-      "type": "step",
-      "name": "Replace Image Pixels",
-      "summary": "Apply the resolved color pairs to matching pixels in the sprite image.",
-      "tags": ["pixels", "recoloring", "image-processing"],
-      "complexity": "simple",
-      "filePath": "packages/core/src/recolor.ts",
-      "lineRange": [144, 182]
-    },
-    {
-      "id": "flow:extract-animation-frames",
-      "type": "flow",
-      "name": "Extract Animation Frames",
-      "summary": "Locate an animation in a spritesheet and slice its standard or custom frame layout into individual images.",
-      "tags": ["animation", "frames", "spritesheet"],
-      "complexity": "moderate",
-      "domainMeta": {
-        "entryPoint": "Animation preview or export request",
-        "entryType": "event"
-      }
-    },
-    {
-      "id": "step:extract-animation-frames:locate-animation",
-      "type": "step",
-      "name": "Locate Animation",
-      "summary": "Resolve the requested animation and its spritesheet layout metadata.",
-      "tags": ["animation", "metadata", "lookup"],
-      "complexity": "moderate",
-      "filePath": "packages/core/src/animation.ts",
-      "lineRange": [43, 124]
-    },
-    {
-      "id": "step:extract-animation-frames:detect-content-rows",
-      "type": "step",
-      "name": "Detect Content Rows",
-      "summary": "Inspect candidate rows to identify whether they contain visible animation pixels.",
-      "tags": ["frames", "pixels", "validation"],
-      "complexity": "simple",
-      "filePath": "packages/core/src/frames.ts",
-      "lineRange": [47, 61]
-    },
-    {
-      "id": "step:extract-animation-frames:extract-layout-frames",
-      "type": "step",
-      "name": "Extract Layout Frames",
-      "summary": "Dispatch frame extraction according to the animation's standard or custom layout.",
-      "tags": ["frames", "layout", "animation"],
-      "complexity": "simple",
-      "filePath": "packages/core/src/frames.ts",
-      "lineRange": [72, 87]
-    },
-    {
-      "id": "step:extract-animation-frames:slice-frame-images",
-      "type": "step",
-      "name": "Slice Frame Images",
-      "summary": "Copy each frame rectangle into an independent canvas image for playback or export.",
-      "tags": ["canvas", "frames", "image-processing"],
-      "complexity": "simple",
-      "filePath": "packages/core/src/frames.ts",
-      "lineRange": [204, 227]
-    },
-    {
-      "id": "domain:character-editor",
+      "id": "domain:character-configuration",
       "type": "domain",
-      "name": "Character Editor",
-      "summary": "This domain manages the interactive construction of a character through item picking, presets, random outfits, animation controls, and shareable URL state. It translates user intent into deterministic selection state consumed by the composition engine.",
-      "tags": ["editor", "selection", "react"],
+      "name": "Character Configuration",
+      "summary": "This domain manages the user's layered character choices, including initial selections, direct picks, presets, random outfits, animation choices, and shareable URL state. It converts editor state into the core selection model consumed by composition.",
+      "tags": ["character-editor", "selection", "presets", "sharing"],
       "complexity": "complex",
       "domainMeta": {
-        "entities": ["Editor Selection", "Layer", "Preset", "Outfit", "Animation Filter", "URL Hash"],
+        "entities": ["Character selection", "Layer", "Preset", "Body type", "Animation", "URL hash"],
         "businessRules": [
-          "Selection mutations are reducer actions with stable layer ordering.",
-          "Presets and random outfits must produce valid catalog selections.",
-          "URL state must bootstrap and synchronize without feedback loops."
+          "Selections must remain compatible with the chosen body type, animation, and catalog item capabilities.",
+          "Selection order determines the visual layer stack.",
+          "Serialized URL state must restore supported selections without corrupting current editor state."
         ],
         "crossDomainInteractions": [
-          "Sends selections and animation choices to character composition.",
-          "Receives catalog and palette data from the asset supply chain.",
-          "Initiates attribution-aware exports."
+          "Consumes catalog items and palettes from Asset Catalog Management.",
+          "Provides ordered selections to Sprite Composition.",
+          "Provides export scope and selected items to Export and Delivery."
         ]
       }
     },
     {
-      "id": "flow:edit-character-layers",
-      "type": "flow",
-      "name": "Edit Character Layers",
-      "summary": "Convert item picks and layer actions into an ordered set of character selections.",
-      "tags": ["selection", "layers", "reducer"],
-      "complexity": "complex",
-      "domainMeta": {
-        "entryPoint": "Layer stack item interaction",
-        "entryType": "event"
-      }
-    },
-    {
-      "id": "step:edit-character-layers:choose-item-action",
-      "type": "step",
-      "name": "Choose Item Action",
-      "summary": "Determine the reducer action required when a catalog item is picked.",
-      "tags": ["selection", "action", "catalog"],
-      "complexity": "simple",
-      "filePath": "packages/web/src/slice/selection.ts",
-      "lineRange": [160, 170]
-    },
-    {
-      "id": "step:edit-character-layers:apply-selection-reducer",
-      "type": "step",
-      "name": "Apply Selection Reducer",
-      "summary": "Apply add, remove, replace, recolor, and ordering changes to editor selection state.",
-      "tags": ["reducer", "state", "selection"],
-      "complexity": "moderate",
-      "filePath": "packages/web/src/slice/selection.ts",
-      "lineRange": [63, 127]
-    },
-    {
-      "id": "step:edit-character-layers:build-item-selection",
-      "type": "step",
-      "name": "Build Item Selection",
-      "summary": "Convert the chosen catalog item into a concrete selection entry.",
-      "tags": ["catalog-item", "selection", "mapping"],
-      "complexity": "simple",
-      "filePath": "packages/web/src/slice/selection.ts",
-      "lineRange": [139, 150]
-    },
-    {
-      "id": "step:edit-character-layers:order-selected-layers",
-      "type": "step",
-      "name": "Order Selected Layers",
-      "summary": "Return selection entries in the stable order required by the editor and renderer.",
-      "tags": ["ordering", "layers", "selection"],
-      "complexity": "simple",
-      "filePath": "packages/web/src/slice/selection.ts",
-      "lineRange": [297, 311]
-    },
-    {
-      "id": "flow:generate-character-configuration",
-      "type": "flow",
-      "name": "Generate Character Configuration",
-      "summary": "Create a valid character selection from initial defaults, a saved preset, or a randomized outfit.",
-      "tags": ["presets", "random-outfit", "initialization"],
-      "complexity": "moderate",
-      "domainMeta": {
-        "entryPoint": "Reset, preset, or randomize command",
-        "entryType": "manual"
-      }
-    },
-    {
-      "id": "step:generate-character-configuration:pick-initial-selections",
-      "type": "step",
-      "name": "Pick Initial Selections",
-      "summary": "Choose the initial set of catalog items used when the editor starts or resets.",
-      "tags": ["initial-state", "selection", "catalog"],
-      "complexity": "moderate",
-      "filePath": "packages/web/src/slice/selection.ts",
-      "lineRange": [218, 267]
-    },
-    {
-      "id": "step:generate-character-configuration:compute-preset-selection",
-      "type": "step",
-      "name": "Compute Preset Selection",
-      "summary": "Translate a named character preset into concrete catalog selections.",
-      "tags": ["preset", "selection", "catalog"],
-      "complexity": "moderate",
-      "filePath": "packages/web/src/presets-apply.ts",
-      "lineRange": [27, 63]
-    },
-    {
-      "id": "step:generate-character-configuration:pick-random-outfit",
-      "type": "step",
-      "name": "Pick Random Outfit",
-      "summary": "Select a randomized, catalog-backed outfit configuration.",
-      "tags": ["randomization", "outfit", "selection"],
-      "complexity": "moderate",
-      "filePath": "packages/web/src/slice/random-outfit.ts",
-      "lineRange": [36, 63]
-    },
-    {
-      "id": "step:generate-character-configuration:normalize-selection-list",
-      "type": "step",
-      "name": "Normalize Selection List",
-      "summary": "Convert generated selection state into the list consumed by composition and other workflows.",
-      "tags": ["selection", "normalization", "state"],
-      "complexity": "simple",
-      "filePath": "packages/web/src/slice/selection.ts",
-      "lineRange": [130, 136]
-    },
-    {
-      "id": "flow:share-character-state",
-      "type": "flow",
-      "name": "Share Character State",
-      "summary": "Load editor state from the browser URL and keep later selection changes synchronized back to the hash.",
-      "tags": ["url", "serialization", "sharing"],
-      "complexity": "complex",
-      "domainMeta": {
-        "entryPoint": "Browser navigation or editor state change",
-        "entryType": "event"
-      }
-    },
-    {
-      "id": "step:share-character-state:read-current-hash",
-      "type": "step",
-      "name": "Read Current Hash",
-      "summary": "Read the browser hash containing a serialized character configuration.",
-      "tags": ["browser", "url-hash", "input"],
-      "complexity": "simple",
-      "filePath": "packages/web/src/lib/url-hash-sync.ts",
-      "lineRange": [54, 57]
-    },
-    {
-      "id": "step:share-character-state:bootstrap-from-hash",
-      "type": "step",
-      "name": "Bootstrap From Hash",
-      "summary": "Parse the initial hash into editor state while retaining safe defaults for missing values.",
-      "tags": ["bootstrap", "url-hash", "selection"],
-      "complexity": "moderate",
-      "filePath": "packages/web/src/lib/url-hash-sync.ts",
-      "lineRange": [85, 106]
-    },
-    {
-      "id": "step:share-character-state:compute-navigation-action",
-      "type": "step",
-      "name": "Compute Navigation Action",
-      "summary": "Translate an external hash change into an editor action when the represented state differs.",
-      "tags": ["navigation", "state-sync", "action"],
-      "complexity": "moderate",
-      "filePath": "packages/web/src/lib/url-hash-sync.ts",
-      "lineRange": [131, 159]
-    },
-    {
-      "id": "step:share-character-state:synchronize-hash",
-      "type": "step",
-      "name": "Synchronize Hash",
-      "summary": "Coordinate browser events and editor updates while avoiding redundant hash writes.",
-      "tags": ["react-hook", "url-hash", "synchronization"],
-      "complexity": "complex",
-      "filePath": "packages/web/src/lib/url-hash-sync.ts",
-      "lineRange": [175, 317]
-    },
-    {
-      "id": "domain:attribution-and-export",
+      "id": "domain:sprite-composition",
       "type": "domain",
-      "name": "Attribution and Export",
-      "summary": "This domain packages composed character artwork for download and keeps the required LPC credit and license information attached to the selected assets. It supports several ZIP organizations and preview-ready full-sheet rendering.",
-      "tags": ["attribution", "licensing", "export"],
+      "name": "Sprite Composition",
+      "summary": "This domain resolves selected LPC layers, applies palette recoloring and frame rules, and draws composed character output. Its core contracts receive image-loading and canvas capabilities from callers, preserving an environment-agnostic composition engine.",
+      "tags": ["sprite-processing", "composition", "recoloring", "animation"],
       "complexity": "complex",
       "domainMeta": {
-        "entities": ["Credit", "License", "Export Bundle", "PNG Frame", "Custom Overlay"],
+        "entities": ["Composition request", "Resolved layer", "Frame", "Animation", "Palette", "Composed canvas"],
         "businessRules": [
-          "Rendered sprite output must be accompanied by credit metadata.",
-          "Effective licensing reflects all selected asset licenses.",
-          "Export filenames and grouping must remain deterministic and usable."
+          "The core must not depend directly on browser, DOM, filesystem, or Node canvas APIs.",
+          "Layer order, animation geometry, and recolor mappings determine the rendered pixels.",
+          "Every successful composition must carry credit metadata for the assets that contributed pixels."
         ],
         "crossDomainInteractions": [
-          "Consumes selected catalog items and composed images.",
-          "Uses asset credit records supplied by the asset pipeline.",
-          "Returns downloadable artifacts to the character editor."
+          "Consumes asset definitions and images from Asset Catalog Management.",
+          "Consumes ordered selections from Character Configuration.",
+          "Requests mandatory credit metadata from Attribution and Licensing.",
+          "Provides rendered canvases and frames to Export and Delivery."
         ]
       }
     },
     {
-      "id": "flow:resolve-character-attribution",
-      "type": "flow",
-      "name": "Resolve Character Attribution",
-      "summary": "Match selected sprite paths to credit records and calculate the effective license for the character.",
-      "tags": ["credits", "license", "compliance"],
-      "complexity": "moderate",
-      "domainMeta": {
-        "entryPoint": "Selection or export preparation",
-        "entryType": "event"
-      }
-    },
-    {
-      "id": "step:resolve-character-attribution:match-used-paths",
-      "type": "step",
-      "name": "Match Used Paths",
-      "summary": "Match each used sprite path against the available credit metadata.",
-      "tags": ["credits", "paths", "matching"],
-      "complexity": "simple",
-      "filePath": "packages/core/src/credits.ts",
-      "lineRange": [38, 51]
-    },
-    {
-      "id": "step:resolve-character-attribution:collect-credit-records",
-      "type": "step",
-      "name": "Collect Credit Records",
-      "summary": "Collect and deduplicate the credit entries required by the active selections.",
-      "tags": ["credits", "selection", "metadata"],
-      "complexity": "moderate",
-      "filePath": "packages/core/src/credits.ts",
-      "lineRange": [89, 132]
-    },
-    {
-      "id": "step:resolve-character-attribution:compute-effective-license",
-      "type": "step",
-      "name": "Compute Effective License",
-      "summary": "Determine the effective license obligations across the selected asset set.",
-      "tags": ["license", "compliance", "aggregation"],
-      "complexity": "moderate",
-      "filePath": "packages/core/src/credits.ts",
-      "lineRange": [149, 190]
-    },
-    {
-      "id": "step:resolve-character-attribution:format-credit-files",
-      "type": "step",
-      "name": "Format Credit Files",
-      "summary": "Serialize resolved credits into human-readable text and structured CSV forms.",
-      "tags": ["credits", "text", "csv"],
-      "complexity": "simple",
-      "filePath": "packages/core/src/credits-format.ts",
-      "lineRange": [38, 87]
-    },
-    {
-      "id": "flow:export-character-bundle",
-      "type": "flow",
-      "name": "Export Character Bundle",
-      "summary": "Encode composed character images and package them with layer metadata and attribution into a ZIP download.",
-      "tags": ["zip", "png", "download"],
-      "complexity": "complex",
-      "domainMeta": {
-        "entryPoint": "Export command",
-        "entryType": "manual"
-      }
-    },
-    {
-      "id": "step:export-character-bundle:name-export-artifacts",
-      "type": "step",
-      "name": "Name Export Artifacts",
-      "summary": "Generate timestamped ZIP and item filenames for the selected export layout.",
-      "tags": ["filename", "zip", "timestamp"],
-      "complexity": "simple",
-      "filePath": "packages/web/src/lib/zip-export.ts",
-      "lineRange": [61, 91]
-    },
-    {
-      "id": "step:export-character-bundle:encode-png-images",
-      "type": "step",
-      "name": "Encode PNG Images",
-      "summary": "Convert rendered canvases and custom overlays into PNG data for the archive.",
-      "tags": ["png", "canvas", "encoding"],
-      "complexity": "simple",
-      "filePath": "packages/web/src/lib/zip-export.ts",
-      "lineRange": [99, 132]
-    },
-    {
-      "id": "step:export-character-bundle:collect-layer-metadata",
-      "type": "step",
-      "name": "Collect Layer Metadata",
-      "summary": "Look up selected item metadata and build the per-layer records included with exported images.",
-      "tags": ["metadata", "layers", "catalog"],
-      "complexity": "moderate",
-      "filePath": "packages/web/src/lib/zip-export.ts",
-      "lineRange": [214, 260]
-    },
-    {
-      "id": "step:export-character-bundle:package-selected-layout",
-      "type": "step",
-      "name": "Package Selected Layout",
-      "summary": "Package images by animation, item, animation-item pair, or individual frame according to the chosen export mode.",
-      "tags": ["zip", "export-mode", "packaging"],
-      "complexity": "complex",
-      "filePath": "packages/web/src/lib/zip-export.ts",
-      "lineRange": [263, 511]
-    },
-    {
-      "id": "domain:asset-supply-chain",
+      "id": "domain:attribution-and-licensing",
       "type": "domain",
-      "name": "Asset Supply Chain",
-      "summary": "This domain acquires pinned LPC asset releases, verifies their integrity, materializes browser-ready local data, and validates the resulting catalog. It separates legacy upstream reference material from the assets used by the active application.",
-      "tags": ["assets", "validation", "build-pipeline"],
-      "complexity": "complex",
+      "name": "Attribution and Licensing",
+      "summary": "This domain identifies the source credits and effective license obligations associated with the assets used in a composition. It formats attribution for human-readable and machine-readable delivery so rendered sprites remain accompanied by required credit metadata.",
+      "tags": ["attribution", "credits", "licensing", "compliance"],
+      "complexity": "moderate",
       "domainMeta": {
-        "entities": ["Asset Release", "Manifest", "Spritesheet", "Catalog", "Palette Catalog", "Credits File"],
+        "entities": ["Credit record", "Used asset path", "Contributor", "License", "Attribution document"],
         "businessRules": [
-          "Release files must match pinned SHA-256 hashes and manifest metadata.",
-          "Archive entries must not escape their extraction directory.",
-          "Catalog assets must be valid and nonblank before application use.",
-          "Runtime catalog, palettes, spritesheets, and credits are loaded from local migrated assets."
+          "Every rendered sprite must be accompanied by credit metadata derived from the asset credits catalog.",
+          "Credits must be matched to the actual sprite paths used by the composition.",
+          "The effective license must reflect the obligations of all contributing assets."
         ],
         "crossDomainInteractions": [
-          "Supplies catalog, palettes, spritesheets, and credits to all runtime domains.",
-          "Validates composition compatibility before assets are released.",
-          "Feeds browser-specific loaders without coupling the core library to the environment."
+          "Consumes used asset paths and item metadata from Sprite Composition.",
+          "Consumes source credit metadata from Asset Catalog Management.",
+          "Supplies attribution files and license summaries to Export and Delivery."
         ]
       }
     },
     {
-      "id": "flow:prepare-pinned-asset-release",
-      "type": "flow",
-      "name": "Prepare Pinned Asset Release",
-      "summary": "Download, authenticate, safely extract, and materialize the configured LPC asset snapshot.",
-      "tags": ["release", "manifest", "integrity"],
+      "id": "domain:export-and-delivery",
+      "type": "domain",
+      "name": "Export and Delivery",
+      "summary": "This domain converts composed LPC output into downloadable PNG and ZIP deliverables organized by animation, item, or frame. It packages the corresponding attribution metadata with exported sprites and triggers browser downloads.",
+      "tags": ["export", "download", "png", "zip"],
       "complexity": "complex",
       "domainMeta": {
-        "entryPoint": "pnpm asset preparation command",
-        "entryType": "cli"
+        "entities": ["PNG", "ZIP archive", "Animation export", "Item export", "Frame export", "Download"],
+        "businessRules": [
+          "Exported pixel assets must include the attribution metadata associated with their composition.",
+          "File names and archive structure must identify the exported animation, item, or frame.",
+          "Browser-specific encoding and download behavior must remain outside the environment-agnostic core."
+        ],
+        "crossDomainInteractions": [
+          "Consumes configured selections from Character Configuration.",
+          "Consumes rendered canvases and frame data from Sprite Composition.",
+          "Consumes credit and license documents from Attribution and Licensing."
+        ]
       }
     },
+
     {
-      "id": "step:prepare-pinned-asset-release:load-release-configuration",
-      "type": "step",
-      "name": "Load Release Configuration",
-      "summary": "Read and validate the pinned source revision and artifact configuration.",
-      "tags": ["configuration", "release", "validation"],
-      "complexity": "moderate",
-      "filePath": "packages/web/scripts/asset-release.ts",
-      "lineRange": [159, 181]
-    },
-    {
-      "id": "step:prepare-pinned-asset-release:download-release-artifact",
-      "type": "step",
-      "name": "Download Release Artifact",
-      "summary": "Download the configured release artifact into memory with transport errors surfaced.",
-      "tags": ["download", "artifact", "release"],
-      "complexity": "moderate",
-      "filePath": "packages/web/scripts/asset-release.ts",
-      "lineRange": [183, 207]
-    },
-    {
-      "id": "step:prepare-pinned-asset-release:verify-artifact-integrity",
-      "type": "step",
-      "name": "Verify Artifact Integrity",
-      "summary": "Calculate and compare SHA-256 digests against the release manifest.",
-      "tags": ["sha256", "integrity", "manifest"],
-      "complexity": "simple",
-      "filePath": "packages/web/scripts/asset-release.ts",
-      "lineRange": [137, 157]
-    },
-    {
-      "id": "step:prepare-pinned-asset-release:validate-archive-paths",
-      "type": "step",
-      "name": "Validate Archive Paths",
-      "summary": "Reject archive entries that could traverse outside the intended extraction directory.",
-      "tags": ["security", "archive", "path-validation"],
-      "complexity": "moderate",
-      "filePath": "packages/web/scripts/asset-release.ts",
-      "lineRange": [209, 247]
-    },
-    {
-      "id": "step:prepare-pinned-asset-release:materialize-asset-snapshot",
-      "type": "step",
-      "name": "Materialize Asset Snapshot",
-      "summary": "Expand verified metadata and runtime assets into the local repository asset layout.",
-      "tags": ["assets", "materialization", "cache"],
-      "complexity": "complex",
-      "filePath": "packages/web/scripts/asset-release.ts",
-      "lineRange": [503, 603]
-    },
-    {
-      "id": "flow:validate-runtime-assets",
+      "id": "flow:load-runtime-catalog",
       "type": "flow",
-      "name": "Validate Runtime Assets",
-      "summary": "Walk the generated asset definitions and verify their catalog references, images, and composition behavior.",
-      "tags": ["asset-validation", "catalog", "quality"],
+      "name": "Load Runtime Catalog",
+      "summary": "Build the browser's searchable catalog and palette metadata from packaged LPC definition records.",
+      "tags": ["catalog", "palettes", "startup"],
       "complexity": "moderate",
-      "domainMeta": {
-        "entryPoint": "pnpm asset validation command",
-        "entryType": "cli"
-      }
+      "domainMeta": {"entryPoint": "React application startup", "entryType": "manual"}
     },
     {
-      "id": "step:validate-runtime-assets:discover-definition-files",
+      "id": "step:load-runtime-catalog:normalize-definition-keys",
       "type": "step",
-      "name": "Discover Definition Files",
-      "summary": "Walk generated JSON definitions to collect the catalog inputs subject to validation.",
-      "tags": ["filesystem", "json", "discovery"],
-      "complexity": "simple",
-      "filePath": "packages/web/scripts/validate-assets.ts",
-      "lineRange": [13, 25]
-    },
-    {
-      "id": "step:validate-runtime-assets:run-asset-validation",
-      "type": "step",
-      "name": "Run Asset Validation",
-      "summary": "Load generated metadata and invoke the shared validation process over the runtime assets.",
-      "tags": ["validation", "script", "assets"],
-      "complexity": "moderate",
-      "filePath": "packages/web/scripts/validate-assets.ts",
-      "lineRange": [27, 100]
-    },
-    {
-      "id": "step:validate-runtime-assets:check-catalog-assets",
-      "type": "step",
-      "name": "Check Catalog Assets",
-      "summary": "Validate catalog references and exercise composition-oriented checks for each asset.",
-      "tags": ["catalog", "validation", "composition"],
-      "complexity": "moderate",
-      "filePath": "packages/core/src/validation/asset-validator.ts",
-      "lineRange": [30, 124]
-    },
-    {
-      "id": "step:validate-runtime-assets:reject-blank-images",
-      "type": "step",
-      "name": "Reject Blank Images",
-      "summary": "Inspect image pixels and report assets whose expected content is entirely blank.",
-      "tags": ["pixels", "validation", "images"],
-      "complexity": "simple",
-      "filePath": "packages/core/src/validation/asset-validator.ts",
-      "lineRange": [126, 140]
-    },
-    {
-      "id": "flow:load-browser-asset-catalog",
-      "type": "flow",
-      "name": "Load Browser Asset Catalog",
-      "summary": "Convert Vite-provided local asset modules into the catalog and palette structures used by the editor.",
-      "tags": ["browser", "catalog", "palettes"],
-      "complexity": "moderate",
-      "domainMeta": {
-        "entryPoint": "Web application startup",
-        "entryType": "event"
-      }
-    },
-    {
-      "id": "step:load-browser-asset-catalog:normalize-catalog-keys",
-      "type": "step",
-      "name": "Normalize Catalog Keys",
-      "summary": "Normalize generated asset module paths into catalog-relative keys.",
-      "tags": ["catalog", "paths", "normalization"],
+      "name": "Normalize Definition Keys",
+      "summary": "Normalize packaged definition paths before converting them into catalog records.",
+      "tags": ["catalog", "normalization"],
       "complexity": "simple",
       "filePath": "packages/web/src/catalog/load-catalog.ts",
       "lineRange": [22, 25]
     },
     {
-      "id": "step:load-browser-asset-catalog:create-runtime-catalog",
+      "id": "step:load-runtime-catalog:create-catalog",
       "type": "step",
-      "name": "Create Runtime Catalog",
-      "summary": "Convert browser-loaded definition records into the core catalog representation and emit warnings once.",
-      "tags": ["catalog", "browser", "loading"],
+      "name": "Create Catalog",
+      "summary": "Resolve catalog item aliases and segmented targets into the runtime catalog of composable items.",
+      "tags": ["catalog", "aliases"],
+      "complexity": "moderate",
+      "filePath": "packages/core/src/catalog.ts",
+      "lineRange": [245, 334]
+    },
+    {
+      "id": "step:load-runtime-catalog:load-catalog-records",
+      "type": "step",
+      "name": "Load Catalog Records",
+      "summary": "Adapt packaged definition records into the browser runtime catalog and surface catalog warnings.",
+      "tags": ["catalog", "browser"],
       "complexity": "moderate",
       "filePath": "packages/web/src/catalog/load-catalog.ts",
       "lineRange": [58, 82]
     },
     {
-      "id": "step:load-browser-asset-catalog:normalize-palette-keys",
+      "id": "step:load-runtime-catalog:load-palette-records",
       "type": "step",
-      "name": "Normalize Palette Keys",
-      "summary": "Normalize generated palette module paths into stable palette identifiers.",
-      "tags": ["palette", "paths", "normalization"],
-      "complexity": "simple",
-      "filePath": "packages/web/src/catalog/load-palettes.ts",
-      "lineRange": [26, 29]
-    },
-    {
-      "id": "step:load-browser-asset-catalog:create-runtime-palettes",
-      "type": "step",
-      "name": "Create Runtime Palettes",
-      "summary": "Convert browser-loaded palette records into the palette catalog consumed by recoloring.",
-      "tags": ["palette", "browser", "loading"],
+      "name": "Load Palette Records",
+      "summary": "Build runtime palette metadata from packaged palette records for recolorable character layers.",
+      "tags": ["palettes", "recoloring"],
       "complexity": "moderate",
       "filePath": "packages/web/src/catalog/load-palettes.ts",
       "lineRange": [38, 59]
+    },
+    {
+      "id": "flow:prepare-asset-snapshot",
+      "type": "flow",
+      "name": "Prepare Asset Snapshot",
+      "summary": "Acquire, verify, and materialize a release snapshot of LPC assets for browser packaging.",
+      "tags": ["asset-release", "manifest", "integrity"],
+      "complexity": "complex",
+      "domainMeta": {"entryPoint": "asset preparation command", "entryType": "cli"}
+    },
+    {
+      "id": "step:prepare-asset-snapshot:load-release-configuration",
+      "type": "step",
+      "name": "Load Release Configuration",
+      "summary": "Read the asset release configuration that identifies the snapshot and expected manifest.",
+      "tags": ["asset-release", "configuration"],
+      "complexity": "simple",
+      "filePath": "packages/web/scripts/asset-release.ts",
+      "lineRange": [159, 181]
+    },
+    {
+      "id": "step:prepare-asset-snapshot:download-release",
+      "type": "step",
+      "name": "Download Release",
+      "summary": "Retrieve the configured asset archive for local verification and materialization.",
+      "tags": ["asset-release", "download"],
+      "complexity": "moderate",
+      "filePath": "packages/web/scripts/asset-release.ts",
+      "lineRange": [183, 207]
+    },
+    {
+      "id": "step:prepare-asset-snapshot:verify-manifest-and-hashes",
+      "type": "step",
+      "name": "Verify Manifest and Hashes",
+      "summary": "Verify archive entries and file hashes against the release manifest before accepting asset data.",
+      "tags": ["manifest", "hash", "validation"],
+      "complexity": "complex",
+      "filePath": "packages/web/scripts/asset-release.ts",
+      "lineRange": [489, 501]
+    },
+    {
+      "id": "step:prepare-asset-snapshot:materialize-assets",
+      "type": "step",
+      "name": "Materialize Assets",
+      "summary": "Write the verified snapshot into the asset layout consumed by the web package.",
+      "tags": ["assets", "materialization"],
+      "complexity": "complex",
+      "filePath": "packages/web/scripts/asset-release.ts",
+      "lineRange": [503, 603]
+    },
+
+    {
+      "id": "flow:initialize-character",
+      "type": "flow",
+      "name": "Initialize Character",
+      "summary": "Create the initial character selection and restore compatible shared state from the browser URL.",
+      "tags": ["selection", "startup", "url-state"],
+      "complexity": "moderate",
+      "domainMeta": {"entryPoint": "Open character editor", "entryType": "manual"}
+    },
+    {
+      "id": "step:initialize-character:read-url-state",
+      "type": "step",
+      "name": "Read URL State",
+      "summary": "Read the current browser hash as the source of potentially shared character configuration.",
+      "tags": ["url-state", "sharing"],
+      "complexity": "simple",
+      "filePath": "packages/web/src/lib/url-hash-sync.ts",
+      "lineRange": [54, 57]
+    },
+    {
+      "id": "step:initialize-character:parse-shared-selection",
+      "type": "step",
+      "name": "Parse Shared Selection",
+      "summary": "Parse the initial URL hash into supported character state and selection values.",
+      "tags": ["url-state", "selection"],
+      "complexity": "moderate",
+      "filePath": "packages/web/src/lib/url-hash-sync.ts",
+      "lineRange": [85, 106]
+    },
+    {
+      "id": "step:initialize-character:choose-required-layers",
+      "type": "step",
+      "name": "Choose Required Layers",
+      "summary": "Build required initial selections for the character when shared state is absent or incomplete.",
+      "tags": ["selection", "defaults"],
+      "complexity": "moderate",
+      "filePath": "packages/web/src/slice/selection.ts",
+      "lineRange": [223, 273]
+    },
+    {
+      "id": "step:initialize-character:synchronize-url",
+      "type": "step",
+      "name": "Synchronize URL",
+      "summary": "Keep reducer selections and browser navigation synchronized through serialized hash state.",
+      "tags": ["url-state", "sharing"],
+      "complexity": "complex",
+      "filePath": "packages/web/src/lib/url-hash-sync.ts",
+      "lineRange": [175, 317]
+    },
+    {
+      "id": "flow:customize-character-layers",
+      "type": "flow",
+      "name": "Customize Character Layers",
+      "summary": "Apply direct item choices, presets, or randomized outfits to the ordered character layer selection.",
+      "tags": ["selection", "layers", "presets", "randomization"],
+      "complexity": "complex",
+      "domainMeta": {"entryPoint": "Character editor layer controls", "entryType": "manual"}
+    },
+    {
+      "id": "step:customize-character-layers:filter-compatible-items",
+      "type": "step",
+      "name": "Filter Compatible Items",
+      "summary": "Limit available catalog choices to items compatible with the current body type and animation constraints.",
+      "tags": ["catalog", "compatibility"],
+      "complexity": "moderate",
+      "filePath": "packages/web/src/slice/catalog-tree.ts",
+      "lineRange": [18, 23]
+    },
+    {
+      "id": "step:customize-character-layers:build-selection-action",
+      "type": "step",
+      "name": "Build Selection Action",
+      "summary": "Translate an item choice into a reducer action that picks or clears the corresponding layer.",
+      "tags": ["selection", "action"],
+      "complexity": "simple",
+      "filePath": "packages/web/src/slice/selection.ts",
+      "lineRange": [165, 175]
+    },
+    {
+      "id": "step:customize-character-layers:apply-preset-or-random-outfit",
+      "type": "step",
+      "name": "Apply Preset or Random Outfit",
+      "summary": "Replace clothing choices from a preset or construct a randomized compatible outfit.",
+      "tags": ["presets", "randomization"],
+      "complexity": "moderate",
+      "filePath": "packages/web/src/presets-apply.ts",
+      "lineRange": [27, 63]
+    },
+    {
+      "id": "step:customize-character-layers:update-selection-state",
+      "type": "step",
+      "name": "Update Selection State",
+      "summary": "Apply layer, animation, direction, playback, and reset actions to editor selection state.",
+      "tags": ["selection", "reducer"],
+      "complexity": "moderate",
+      "filePath": "packages/web/src/slice/selection.ts",
+      "lineRange": [65, 132]
+    },
+    {
+      "id": "step:customize-character-layers:order-selected-layers",
+      "type": "step",
+      "name": "Order Selected Layers",
+      "summary": "Return non-empty selections in the order used by the layer stack and composition pipeline.",
+      "tags": ["selection", "layer-order"],
+      "complexity": "simple",
+      "filePath": "packages/web/src/slice/selection.ts",
+      "lineRange": [303, 317]
+    },
+
+    {
+      "id": "flow:compose-character",
+      "type": "flow",
+      "name": "Compose Character",
+      "summary": "Resolve selected asset layers, recolor their pixels, draw them through caller-supplied adapters, and return structured composition output with credits.",
+      "tags": ["composition", "layers", "recoloring", "credits"],
+      "complexity": "complex",
+      "domainMeta": {"entryPoint": "Character selection change", "entryType": "event"}
+    },
+    {
+      "id": "step:compose-character:convert-editor-selections",
+      "type": "step",
+      "name": "Convert Editor Selections",
+      "summary": "Convert UI selection entries into the environment-agnostic core selection model.",
+      "tags": ["selection", "core-contract"],
+      "complexity": "simple",
+      "filePath": "packages/web/src/slice/selection.ts",
+      "lineRange": [135, 141]
+    },
+    {
+      "id": "step:compose-character:resolve-selected-layers",
+      "type": "step",
+      "name": "Resolve Selected Layers",
+      "summary": "Resolve selected catalog items into ordered sprite layers and paths for the requested character state.",
+      "tags": ["composition", "layers"],
+      "complexity": "moderate",
+      "filePath": "packages/core/src/compose.ts",
+      "lineRange": [170, 219]
+    },
+    {
+      "id": "step:compose-character:resolve-recolor-palettes",
+      "type": "step",
+      "name": "Resolve Recolor Palettes",
+      "summary": "Normalize recolor choices and resolve base and target palette mappings for selected layers.",
+      "tags": ["recoloring", "palettes"],
+      "complexity": "complex",
+      "filePath": "packages/core/src/recolor-resolve.ts",
+      "lineRange": [441, 508]
+    },
+    {
+      "id": "step:compose-character:draw-composed-output",
+      "type": "step",
+      "name": "Draw Composed Output",
+      "summary": "Load images and draw recolored layers through injected image and canvas adapter capabilities.",
+      "tags": ["composition", "adapter", "environment-agnostic"],
+      "complexity": "complex",
+      "filePath": "packages/core/src/compose.ts",
+      "lineRange": [423, 706]
+    },
+    {
+      "id": "step:compose-character:attach-credit-metadata",
+      "type": "step",
+      "name": "Attach Credit Metadata",
+      "summary": "Collect the credit records for the sprite paths used in the completed composition.",
+      "tags": ["credits", "attribution"],
+      "complexity": "moderate",
+      "filePath": "packages/core/src/credits.ts",
+      "lineRange": [89, 132]
+    },
+    {
+      "id": "flow:render-animation-output",
+      "type": "flow",
+      "name": "Render Animation Output",
+      "summary": "Choose a supported animation and transform composed spritesheet data into animation frames or a full-sheet preview.",
+      "tags": ["animation", "frames", "preview"],
+      "complexity": "complex",
+      "domainMeta": {"entryPoint": "Preview animation or full spritesheet", "entryType": "manual"}
+    },
+    {
+      "id": "step:render-animation-output:choose-supported-animation",
+      "type": "step",
+      "name": "Choose Supported Animation",
+      "summary": "Choose a valid standard, custom, or fallback animation for the current composition.",
+      "tags": ["animation", "compatibility"],
+      "complexity": "moderate",
+      "filePath": "packages/web/src/hooks/use-composed-character.ts",
+      "lineRange": [86, 97]
+    },
+    {
+      "id": "step:render-animation-output:extract-animation",
+      "type": "step",
+      "name": "Extract Animation",
+      "summary": "Extract the requested animation from composed spritesheet output.",
+      "tags": ["animation", "extraction"],
+      "complexity": "complex",
+      "filePath": "packages/core/src/animation.ts",
+      "lineRange": [43, 124]
+    },
+    {
+      "id": "step:render-animation-output:slice-animation-frames",
+      "type": "step",
+      "name": "Slice Animation Frames",
+      "summary": "Slice standard or custom spritesheet regions into individual frame canvases.",
+      "tags": ["frames", "spritesheet"],
+      "complexity": "moderate",
+      "filePath": "packages/core/src/frames.ts",
+      "lineRange": [72, 87]
+    },
+    {
+      "id": "step:render-animation-output:render-full-sheet",
+      "type": "step",
+      "name": "Render Full Sheet",
+      "summary": "Draw a full composed spritesheet with transparency treatment for preview or export.",
+      "tags": ["spritesheet", "preview"],
+      "complexity": "moderate",
+      "filePath": "packages/web/src/lib/full-sheet-render.ts",
+      "lineRange": [75, 108]
+    },
+
+    {
+      "id": "flow:derive-composition-attribution",
+      "type": "flow",
+      "name": "Derive Composition Attribution",
+      "summary": "Map the sprite paths used by a composition to credit records and determine the resulting license obligations.",
+      "tags": ["credits", "licensing", "composition"],
+      "complexity": "moderate",
+      "domainMeta": {"entryPoint": "Successful sprite composition", "entryType": "event"}
+    },
+    {
+      "id": "step:derive-composition-attribution:collect-used-sprite-paths",
+      "type": "step",
+      "name": "Collect Used Sprite Paths",
+      "summary": "Derive the concrete sprite paths represented by the current ordered selections.",
+      "tags": ["credits", "sprite-paths"],
+      "complexity": "moderate",
+      "filePath": "packages/core/src/compose.ts",
+      "lineRange": [238, 274]
+    },
+    {
+      "id": "step:derive-composition-attribution:match-credit-records",
+      "type": "step",
+      "name": "Match Credit Records",
+      "summary": "Match each used sprite path to its applicable source credit metadata.",
+      "tags": ["credits", "matching"],
+      "complexity": "simple",
+      "filePath": "packages/core/src/credits.ts",
+      "lineRange": [38, 51]
+    },
+    {
+      "id": "step:derive-composition-attribution:aggregate-credits",
+      "type": "step",
+      "name": "Aggregate Credits",
+      "summary": "Aggregate and return the contributor and source records required for the composition.",
+      "tags": ["credits", "attribution"],
+      "complexity": "moderate",
+      "filePath": "packages/core/src/credits.ts",
+      "lineRange": [89, 132]
+    },
+    {
+      "id": "step:derive-composition-attribution:compute-effective-license",
+      "type": "step",
+      "name": "Compute Effective License",
+      "summary": "Determine the effective license obligations across all contributing asset credit records.",
+      "tags": ["licensing", "compliance"],
+      "complexity": "moderate",
+      "filePath": "packages/core/src/credits.ts",
+      "lineRange": [149, 190]
+    },
+    {
+      "id": "flow:format-attribution-files",
+      "type": "flow",
+      "name": "Format Attribution Files",
+      "summary": "Convert composition credit metadata into text and CSV representations suitable for delivery with sprites.",
+      "tags": ["credits", "text", "csv"],
+      "complexity": "simple",
+      "domainMeta": {"entryPoint": "Prepare sprite export", "entryType": "event"}
+    },
+    {
+      "id": "step:format-attribution-files:receive-composition-credits",
+      "type": "step",
+      "name": "Receive Composition Credits",
+      "summary": "Use the credit metadata attached to the composed sprite result as the attribution source.",
+      "tags": ["credits", "composition-result"],
+      "complexity": "simple",
+      "filePath": "packages/core/src/compose.ts",
+      "lineRange": [423, 706]
+    },
+    {
+      "id": "step:format-attribution-files:format-text-credits",
+      "type": "step",
+      "name": "Format Text Credits",
+      "summary": "Format contributor, source, and license metadata as a human-readable text attribution document.",
+      "tags": ["credits", "text"],
+      "complexity": "simple",
+      "filePath": "packages/core/src/credits-format.ts",
+      "lineRange": [38, 54]
+    },
+    {
+      "id": "step:format-attribution-files:format-csv-credits",
+      "type": "step",
+      "name": "Format CSV Credits",
+      "summary": "Format credit metadata as CSV for machine-readable inclusion in exported deliverables.",
+      "tags": ["credits", "csv"],
+      "complexity": "simple",
+      "filePath": "packages/core/src/credits-format.ts",
+      "lineRange": [73, 87]
+    },
+
+    {
+      "id": "flow:export-animation-archive",
+      "type": "flow",
+      "name": "Export Animation Archive",
+      "summary": "Encode composed animation output as PNG files, add attribution metadata, and assemble a downloadable ZIP archive.",
+      "tags": ["export", "animation", "zip", "attribution"],
+      "complexity": "complex",
+      "domainMeta": {"entryPoint": "Export animation action", "entryType": "manual"}
+    },
+    {
+      "id": "step:export-animation-archive:extract-export-frames",
+      "type": "step",
+      "name": "Extract Export Frames",
+      "summary": "Extract the selected animation frames from composed character output.",
+      "tags": ["animation", "frames"],
+      "complexity": "moderate",
+      "filePath": "packages/core/src/animation.ts",
+      "lineRange": [43, 124]
+    },
+    {
+      "id": "step:export-animation-archive:encode-png-files",
+      "type": "step",
+      "name": "Encode PNG Files",
+      "summary": "Encode the frame canvases as PNG blobs for inclusion in the export archive.",
+      "tags": ["png", "encoding"],
+      "complexity": "simple",
+      "filePath": "packages/web/src/lib/zip-export.ts",
+      "lineRange": [99, 109]
+    },
+    {
+      "id": "step:export-animation-archive:add-attribution",
+      "type": "step",
+      "name": "Add Attribution",
+      "summary": "Include the composition's required credit and license metadata alongside exported animation files.",
+      "tags": ["attribution", "licensing"],
+      "complexity": "moderate",
+      "filePath": "packages/web/src/lib/zip-export.ts",
+      "lineRange": [160, 199]
+    },
+    {
+      "id": "step:export-animation-archive:build-animation-zip",
+      "type": "step",
+      "name": "Build Animation ZIP",
+      "summary": "Organize encoded frames and metadata into an animation-named ZIP archive.",
+      "tags": ["zip", "animation"],
+      "complexity": "complex",
+      "filePath": "packages/web/src/lib/zip-export.ts",
+      "lineRange": [160, 199]
+    },
+    {
+      "id": "step:export-animation-archive:download-archive",
+      "type": "step",
+      "name": "Download Archive",
+      "summary": "Trigger the browser download for the completed animation archive.",
+      "tags": ["download", "browser"],
+      "complexity": "simple",
+      "filePath": "packages/web/src/lib/download.ts",
+      "lineRange": [10, 21]
+    },
+    {
+      "id": "flow:export-layered-assets",
+      "type": "flow",
+      "name": "Export Layered Assets",
+      "summary": "Export configured character assets grouped by contributing item or by individual frame while preserving layer metadata and attribution.",
+      "tags": ["export", "items", "frames", "layers"],
+      "complexity": "complex",
+      "domainMeta": {"entryPoint": "Export by item or frame action", "entryType": "manual"}
+    },
+    {
+      "id": "step:export-layered-assets:resolve-selected-item-metadata",
+      "type": "step",
+      "name": "Resolve Selected Item Metadata",
+      "summary": "Look up metadata for the items represented by the current character selections.",
+      "tags": ["items", "metadata"],
+      "complexity": "moderate",
+      "filePath": "packages/web/src/lib/zip-export.ts",
+      "lineRange": [214, 230]
+    },
+    {
+      "id": "step:export-layered-assets:build-single-item-selections",
+      "type": "step",
+      "name": "Build Single-Item Selections",
+      "summary": "Create per-item selection sets used to render isolated contributing layers.",
+      "tags": ["selection", "layers"],
+      "complexity": "simple",
+      "filePath": "packages/web/src/lib/zip-export.ts",
+      "lineRange": [232, 241]
+    },
+    {
+      "id": "step:export-layered-assets:render-item-assets",
+      "type": "step",
+      "name": "Render Item Assets",
+      "summary": "Render and encode composition output grouped by each selected contributing item.",
+      "tags": ["items", "layers", "png"],
+      "complexity": "complex",
+      "filePath": "packages/web/src/lib/zip-export.ts",
+      "lineRange": [364, 432]
+    },
+    {
+      "id": "step:export-layered-assets:render-frame-assets",
+      "type": "step",
+      "name": "Render Frame Assets",
+      "summary": "Render and encode composition output grouped by individual spritesheet frame.",
+      "tags": ["frames", "spritesheet", "png"],
+      "complexity": "complex",
+      "filePath": "packages/web/src/lib/zip-export.ts",
+      "lineRange": [437, 511]
+    },
+    {
+      "id": "step:export-layered-assets:package-metadata-and-credits",
+      "type": "step",
+      "name": "Package Metadata and Credits",
+      "summary": "Package item layer metadata and required attribution with the rendered asset files.",
+      "tags": ["metadata", "attribution"],
+      "complexity": "moderate",
+      "filePath": "packages/web/src/lib/zip-export.ts",
+      "lineRange": [243, 260]
+    },
+    {
+      "id": "step:export-layered-assets:download-layered-archive",
+      "type": "step",
+      "name": "Download Layered Archive",
+      "summary": "Trigger the browser download for the completed item- or frame-organized archive.",
+      "tags": ["download", "zip"],
+      "complexity": "simple",
+      "filePath": "packages/web/src/lib/download.ts",
+      "lineRange": [10, 21]
     }
   ],
   "edges": [
-    {"source": "domain:character-composition", "target": "flow:compose-character", "type": "contains_flow", "direction": "forward", "weight": 1.0},
-    {"source": "domain:character-composition", "target": "flow:apply-character-colors", "type": "contains_flow", "direction": "forward", "weight": 1.0},
-    {"source": "domain:character-composition", "target": "flow:extract-animation-frames", "type": "contains_flow", "direction": "forward", "weight": 1.0},
-    {"source": "flow:compose-character", "target": "step:compose-character:resolve-selected-layers", "type": "flow_step", "direction": "forward", "weight": 0.2},
-    {"source": "flow:compose-character", "target": "step:compose-character:collect-sprite-paths", "type": "flow_step", "direction": "forward", "weight": 0.4},
-    {"source": "flow:compose-character", "target": "step:compose-character:resolve-active-animation", "type": "flow_step", "direction": "forward", "weight": 0.6},
-    {"source": "flow:compose-character", "target": "step:compose-character:render-composed-frames", "type": "flow_step", "direction": "forward", "weight": 0.8},
-    {"source": "flow:compose-character", "target": "step:compose-character:publish-latest-result", "type": "flow_step", "direction": "forward", "weight": 1.0},
-    {"source": "flow:apply-character-colors", "target": "step:apply-character-colors:build-palette-catalog", "type": "flow_step", "direction": "forward", "weight": 0.2},
-    {"source": "flow:apply-character-colors", "target": "step:apply-character-colors:normalize-recolor-request", "type": "flow_step", "direction": "forward", "weight": 0.4},
-    {"source": "flow:apply-character-colors", "target": "step:apply-character-colors:resolve-source-and-target-palettes", "type": "flow_step", "direction": "forward", "weight": 0.6},
-    {"source": "flow:apply-character-colors", "target": "step:apply-character-colors:build-color-pairs", "type": "flow_step", "direction": "forward", "weight": 0.8},
-    {"source": "flow:apply-character-colors", "target": "step:apply-character-colors:replace-image-pixels", "type": "flow_step", "direction": "forward", "weight": 1.0},
-    {"source": "flow:extract-animation-frames", "target": "step:extract-animation-frames:locate-animation", "type": "flow_step", "direction": "forward", "weight": 0.3},
-    {"source": "flow:extract-animation-frames", "target": "step:extract-animation-frames:detect-content-rows", "type": "flow_step", "direction": "forward", "weight": 0.5},
-    {"source": "flow:extract-animation-frames", "target": "step:extract-animation-frames:extract-layout-frames", "type": "flow_step", "direction": "forward", "weight": 0.8},
-    {"source": "flow:extract-animation-frames", "target": "step:extract-animation-frames:slice-frame-images", "type": "flow_step", "direction": "forward", "weight": 1.0},
+    {"source": "domain:asset-catalog-management", "target": "flow:load-runtime-catalog", "type": "contains_flow", "direction": "forward", "weight": 1.0},
+    {"source": "domain:asset-catalog-management", "target": "flow:prepare-asset-snapshot", "type": "contains_flow", "direction": "forward", "weight": 1.0},
+    {"source": "domain:character-configuration", "target": "flow:initialize-character", "type": "contains_flow", "direction": "forward", "weight": 1.0},
+    {"source": "domain:character-configuration", "target": "flow:customize-character-layers", "type": "contains_flow", "direction": "forward", "weight": 1.0},
+    {"source": "domain:sprite-composition", "target": "flow:compose-character", "type": "contains_flow", "direction": "forward", "weight": 1.0},
+    {"source": "domain:sprite-composition", "target": "flow:render-animation-output", "type": "contains_flow", "direction": "forward", "weight": 1.0},
+    {"source": "domain:attribution-and-licensing", "target": "flow:derive-composition-attribution", "type": "contains_flow", "direction": "forward", "weight": 1.0},
+    {"source": "domain:attribution-and-licensing", "target": "flow:format-attribution-files", "type": "contains_flow", "direction": "forward", "weight": 1.0},
+    {"source": "domain:export-and-delivery", "target": "flow:export-animation-archive", "type": "contains_flow", "direction": "forward", "weight": 1.0},
+    {"source": "domain:export-and-delivery", "target": "flow:export-layered-assets", "type": "contains_flow", "direction": "forward", "weight": 1.0},
 
-    {"source": "domain:character-editor", "target": "flow:edit-character-layers", "type": "contains_flow", "direction": "forward", "weight": 1.0},
-    {"source": "domain:character-editor", "target": "flow:generate-character-configuration", "type": "contains_flow", "direction": "forward", "weight": 1.0},
-    {"source": "domain:character-editor", "target": "flow:share-character-state", "type": "contains_flow", "direction": "forward", "weight": 1.0},
-    {"source": "flow:edit-character-layers", "target": "step:edit-character-layers:choose-item-action", "type": "flow_step", "direction": "forward", "weight": 0.3},
-    {"source": "flow:edit-character-layers", "target": "step:edit-character-layers:apply-selection-reducer", "type": "flow_step", "direction": "forward", "weight": 0.5},
-    {"source": "flow:edit-character-layers", "target": "step:edit-character-layers:build-item-selection", "type": "flow_step", "direction": "forward", "weight": 0.8},
-    {"source": "flow:edit-character-layers", "target": "step:edit-character-layers:order-selected-layers", "type": "flow_step", "direction": "forward", "weight": 1.0},
-    {"source": "flow:generate-character-configuration", "target": "step:generate-character-configuration:pick-initial-selections", "type": "flow_step", "direction": "forward", "weight": 0.3},
-    {"source": "flow:generate-character-configuration", "target": "step:generate-character-configuration:compute-preset-selection", "type": "flow_step", "direction": "forward", "weight": 0.5},
-    {"source": "flow:generate-character-configuration", "target": "step:generate-character-configuration:pick-random-outfit", "type": "flow_step", "direction": "forward", "weight": 0.8},
-    {"source": "flow:generate-character-configuration", "target": "step:generate-character-configuration:normalize-selection-list", "type": "flow_step", "direction": "forward", "weight": 1.0},
-    {"source": "flow:share-character-state", "target": "step:share-character-state:read-current-hash", "type": "flow_step", "direction": "forward", "weight": 0.3},
-    {"source": "flow:share-character-state", "target": "step:share-character-state:bootstrap-from-hash", "type": "flow_step", "direction": "forward", "weight": 0.5},
-    {"source": "flow:share-character-state", "target": "step:share-character-state:compute-navigation-action", "type": "flow_step", "direction": "forward", "weight": 0.8},
-    {"source": "flow:share-character-state", "target": "step:share-character-state:synchronize-hash", "type": "flow_step", "direction": "forward", "weight": 1.0},
+    {"source": "flow:load-runtime-catalog", "target": "step:load-runtime-catalog:normalize-definition-keys", "type": "flow_step", "direction": "forward", "weight": 0.2},
+    {"source": "flow:load-runtime-catalog", "target": "step:load-runtime-catalog:create-catalog", "type": "flow_step", "direction": "forward", "weight": 0.4},
+    {"source": "flow:load-runtime-catalog", "target": "step:load-runtime-catalog:load-catalog-records", "type": "flow_step", "direction": "forward", "weight": 0.6},
+    {"source": "flow:load-runtime-catalog", "target": "step:load-runtime-catalog:load-palette-records", "type": "flow_step", "direction": "forward", "weight": 0.8},
+    {"source": "flow:prepare-asset-snapshot", "target": "step:prepare-asset-snapshot:load-release-configuration", "type": "flow_step", "direction": "forward", "weight": 0.2},
+    {"source": "flow:prepare-asset-snapshot", "target": "step:prepare-asset-snapshot:download-release", "type": "flow_step", "direction": "forward", "weight": 0.4},
+    {"source": "flow:prepare-asset-snapshot", "target": "step:prepare-asset-snapshot:verify-manifest-and-hashes", "type": "flow_step", "direction": "forward", "weight": 0.6},
+    {"source": "flow:prepare-asset-snapshot", "target": "step:prepare-asset-snapshot:materialize-assets", "type": "flow_step", "direction": "forward", "weight": 0.8},
+    {"source": "flow:initialize-character", "target": "step:initialize-character:read-url-state", "type": "flow_step", "direction": "forward", "weight": 0.2},
+    {"source": "flow:initialize-character", "target": "step:initialize-character:parse-shared-selection", "type": "flow_step", "direction": "forward", "weight": 0.4},
+    {"source": "flow:initialize-character", "target": "step:initialize-character:choose-required-layers", "type": "flow_step", "direction": "forward", "weight": 0.6},
+    {"source": "flow:initialize-character", "target": "step:initialize-character:synchronize-url", "type": "flow_step", "direction": "forward", "weight": 0.8},
+    {"source": "flow:customize-character-layers", "target": "step:customize-character-layers:filter-compatible-items", "type": "flow_step", "direction": "forward", "weight": 0.2},
+    {"source": "flow:customize-character-layers", "target": "step:customize-character-layers:build-selection-action", "type": "flow_step", "direction": "forward", "weight": 0.4},
+    {"source": "flow:customize-character-layers", "target": "step:customize-character-layers:apply-preset-or-random-outfit", "type": "flow_step", "direction": "forward", "weight": 0.6},
+    {"source": "flow:customize-character-layers", "target": "step:customize-character-layers:update-selection-state", "type": "flow_step", "direction": "forward", "weight": 0.8},
+    {"source": "flow:customize-character-layers", "target": "step:customize-character-layers:order-selected-layers", "type": "flow_step", "direction": "forward", "weight": 1.0},
+    {"source": "flow:compose-character", "target": "step:compose-character:convert-editor-selections", "type": "flow_step", "direction": "forward", "weight": 0.2},
+    {"source": "flow:compose-character", "target": "step:compose-character:resolve-selected-layers", "type": "flow_step", "direction": "forward", "weight": 0.4},
+    {"source": "flow:compose-character", "target": "step:compose-character:resolve-recolor-palettes", "type": "flow_step", "direction": "forward", "weight": 0.6},
+    {"source": "flow:compose-character", "target": "step:compose-character:draw-composed-output", "type": "flow_step", "direction": "forward", "weight": 0.8},
+    {"source": "flow:compose-character", "target": "step:compose-character:attach-credit-metadata", "type": "flow_step", "direction": "forward", "weight": 1.0},
+    {"source": "flow:render-animation-output", "target": "step:render-animation-output:choose-supported-animation", "type": "flow_step", "direction": "forward", "weight": 0.2},
+    {"source": "flow:render-animation-output", "target": "step:render-animation-output:extract-animation", "type": "flow_step", "direction": "forward", "weight": 0.4},
+    {"source": "flow:render-animation-output", "target": "step:render-animation-output:slice-animation-frames", "type": "flow_step", "direction": "forward", "weight": 0.6},
+    {"source": "flow:render-animation-output", "target": "step:render-animation-output:render-full-sheet", "type": "flow_step", "direction": "forward", "weight": 0.8},
+    {"source": "flow:derive-composition-attribution", "target": "step:derive-composition-attribution:collect-used-sprite-paths", "type": "flow_step", "direction": "forward", "weight": 0.2},
+    {"source": "flow:derive-composition-attribution", "target": "step:derive-composition-attribution:match-credit-records", "type": "flow_step", "direction": "forward", "weight": 0.4},
+    {"source": "flow:derive-composition-attribution", "target": "step:derive-composition-attribution:aggregate-credits", "type": "flow_step", "direction": "forward", "weight": 0.6},
+    {"source": "flow:derive-composition-attribution", "target": "step:derive-composition-attribution:compute-effective-license", "type": "flow_step", "direction": "forward", "weight": 0.8},
+    {"source": "flow:format-attribution-files", "target": "step:format-attribution-files:receive-composition-credits", "type": "flow_step", "direction": "forward", "weight": 0.3},
+    {"source": "flow:format-attribution-files", "target": "step:format-attribution-files:format-text-credits", "type": "flow_step", "direction": "forward", "weight": 0.6},
+    {"source": "flow:format-attribution-files", "target": "step:format-attribution-files:format-csv-credits", "type": "flow_step", "direction": "forward", "weight": 0.9},
+    {"source": "flow:export-animation-archive", "target": "step:export-animation-archive:extract-export-frames", "type": "flow_step", "direction": "forward", "weight": 0.2},
+    {"source": "flow:export-animation-archive", "target": "step:export-animation-archive:encode-png-files", "type": "flow_step", "direction": "forward", "weight": 0.4},
+    {"source": "flow:export-animation-archive", "target": "step:export-animation-archive:add-attribution", "type": "flow_step", "direction": "forward", "weight": 0.6},
+    {"source": "flow:export-animation-archive", "target": "step:export-animation-archive:build-animation-zip", "type": "flow_step", "direction": "forward", "weight": 0.8},
+    {"source": "flow:export-animation-archive", "target": "step:export-animation-archive:download-archive", "type": "flow_step", "direction": "forward", "weight": 1.0},
+    {"source": "flow:export-layered-assets", "target": "step:export-layered-assets:resolve-selected-item-metadata", "type": "flow_step", "direction": "forward", "weight": 0.1},
+    {"source": "flow:export-layered-assets", "target": "step:export-layered-assets:build-single-item-selections", "type": "flow_step", "direction": "forward", "weight": 0.2},
+    {"source": "flow:export-layered-assets", "target": "step:export-layered-assets:render-item-assets", "type": "flow_step", "direction": "forward", "weight": 0.3},
+    {"source": "flow:export-layered-assets", "target": "step:export-layered-assets:render-frame-assets", "type": "flow_step", "direction": "forward", "weight": 0.4},
+    {"source": "flow:export-layered-assets", "target": "step:export-layered-assets:package-metadata-and-credits", "type": "flow_step", "direction": "forward", "weight": 0.5},
+    {"source": "flow:export-layered-assets", "target": "step:export-layered-assets:download-layered-archive", "type": "flow_step", "direction": "forward", "weight": 0.6},
 
-    {"source": "domain:attribution-and-export", "target": "flow:resolve-character-attribution", "type": "contains_flow", "direction": "forward", "weight": 1.0},
-    {"source": "domain:attribution-and-export", "target": "flow:export-character-bundle", "type": "contains_flow", "direction": "forward", "weight": 1.0},
-    {"source": "flow:resolve-character-attribution", "target": "step:resolve-character-attribution:match-used-paths", "type": "flow_step", "direction": "forward", "weight": 0.3},
-    {"source": "flow:resolve-character-attribution", "target": "step:resolve-character-attribution:collect-credit-records", "type": "flow_step", "direction": "forward", "weight": 0.5},
-    {"source": "flow:resolve-character-attribution", "target": "step:resolve-character-attribution:compute-effective-license", "type": "flow_step", "direction": "forward", "weight": 0.8},
-    {"source": "flow:resolve-character-attribution", "target": "step:resolve-character-attribution:format-credit-files", "type": "flow_step", "direction": "forward", "weight": 1.0},
-    {"source": "flow:export-character-bundle", "target": "step:export-character-bundle:name-export-artifacts", "type": "flow_step", "direction": "forward", "weight": 0.3},
-    {"source": "flow:export-character-bundle", "target": "step:export-character-bundle:encode-png-images", "type": "flow_step", "direction": "forward", "weight": 0.5},
-    {"source": "flow:export-character-bundle", "target": "step:export-character-bundle:collect-layer-metadata", "type": "flow_step", "direction": "forward", "weight": 0.8},
-    {"source": "flow:export-character-bundle", "target": "step:export-character-bundle:package-selected-layout", "type": "flow_step", "direction": "forward", "weight": 1.0},
-
-    {"source": "domain:asset-supply-chain", "target": "flow:prepare-pinned-asset-release", "type": "contains_flow", "direction": "forward", "weight": 1.0},
-    {"source": "domain:asset-supply-chain", "target": "flow:validate-runtime-assets", "type": "contains_flow", "direction": "forward", "weight": 1.0},
-    {"source": "domain:asset-supply-chain", "target": "flow:load-browser-asset-catalog", "type": "contains_flow", "direction": "forward", "weight": 1.0},
-    {"source": "flow:prepare-pinned-asset-release", "target": "step:prepare-pinned-asset-release:load-release-configuration", "type": "flow_step", "direction": "forward", "weight": 0.2},
-    {"source": "flow:prepare-pinned-asset-release", "target": "step:prepare-pinned-asset-release:download-release-artifact", "type": "flow_step", "direction": "forward", "weight": 0.4},
-    {"source": "flow:prepare-pinned-asset-release", "target": "step:prepare-pinned-asset-release:verify-artifact-integrity", "type": "flow_step", "direction": "forward", "weight": 0.6},
-    {"source": "flow:prepare-pinned-asset-release", "target": "step:prepare-pinned-asset-release:validate-archive-paths", "type": "flow_step", "direction": "forward", "weight": 0.8},
-    {"source": "flow:prepare-pinned-asset-release", "target": "step:prepare-pinned-asset-release:materialize-asset-snapshot", "type": "flow_step", "direction": "forward", "weight": 1.0},
-    {"source": "flow:validate-runtime-assets", "target": "step:validate-runtime-assets:discover-definition-files", "type": "flow_step", "direction": "forward", "weight": 0.3},
-    {"source": "flow:validate-runtime-assets", "target": "step:validate-runtime-assets:run-asset-validation", "type": "flow_step", "direction": "forward", "weight": 0.5},
-    {"source": "flow:validate-runtime-assets", "target": "step:validate-runtime-assets:check-catalog-assets", "type": "flow_step", "direction": "forward", "weight": 0.8},
-    {"source": "flow:validate-runtime-assets", "target": "step:validate-runtime-assets:reject-blank-images", "type": "flow_step", "direction": "forward", "weight": 1.0},
-    {"source": "flow:load-browser-asset-catalog", "target": "step:load-browser-asset-catalog:normalize-catalog-keys", "type": "flow_step", "direction": "forward", "weight": 0.3},
-    {"source": "flow:load-browser-asset-catalog", "target": "step:load-browser-asset-catalog:create-runtime-catalog", "type": "flow_step", "direction": "forward", "weight": 0.5},
-    {"source": "flow:load-browser-asset-catalog", "target": "step:load-browser-asset-catalog:normalize-palette-keys", "type": "flow_step", "direction": "forward", "weight": 0.8},
-    {"source": "flow:load-browser-asset-catalog", "target": "step:load-browser-asset-catalog:create-runtime-palettes", "type": "flow_step", "direction": "forward", "weight": 1.0},
-
-    {"source": "domain:character-editor", "target": "domain:character-composition", "type": "cross_domain", "direction": "forward", "description": "Editor selections, colors, and animation choices drive the composition pipeline.", "weight": 0.6},
-    {"source": "domain:character-composition", "target": "domain:attribution-and-export", "type": "cross_domain", "direction": "forward", "description": "Composed images and used sprite paths become export content and attribution inputs.", "weight": 0.6},
-    {"source": "domain:asset-supply-chain", "target": "domain:character-editor", "type": "cross_domain", "direction": "forward", "description": "The local catalog and palettes populate editor browsing and selection choices.", "weight": 0.6},
-    {"source": "domain:asset-supply-chain", "target": "domain:character-composition", "type": "cross_domain", "direction": "forward", "description": "Validated spritesheets and metadata provide the composition engine's render inputs.", "weight": 0.6},
-    {"source": "domain:asset-supply-chain", "target": "domain:attribution-and-export", "type": "cross_domain", "direction": "forward", "description": "Migrated credit metadata supplies the records included with rendered output.", "weight": 0.6}
+    {"source": "domain:asset-catalog-management", "target": "domain:character-configuration", "type": "cross_domain", "direction": "forward", "description": "The runtime catalog and palettes define the items and color choices available to the character editor.", "weight": 0.6},
+    {"source": "domain:asset-catalog-management", "target": "domain:sprite-composition", "type": "cross_domain", "direction": "forward", "description": "Validated definitions and spritesheets provide the source layers resolved and drawn by composition.", "weight": 0.7},
+    {"source": "domain:asset-catalog-management", "target": "domain:attribution-and-licensing", "type": "cross_domain", "direction": "forward", "description": "Asset metadata supplies the credit records matched to sprites used in a composition.", "weight": 0.7},
+    {"source": "domain:character-configuration", "target": "domain:sprite-composition", "type": "cross_domain", "direction": "forward", "description": "Ordered character selections, animation, direction, and recolor choices form the composition request.", "weight": 0.8},
+    {"source": "domain:sprite-composition", "target": "domain:attribution-and-licensing", "type": "cross_domain", "direction": "forward", "description": "Composition reports the concrete asset paths used so mandatory credits and effective licensing can be derived.", "weight": 0.9},
+    {"source": "domain:sprite-composition", "target": "domain:export-and-delivery", "type": "cross_domain", "direction": "forward", "description": "Composed sheets, animations, frames, and isolated layers become the pixel content of exports.", "weight": 0.8},
+    {"source": "domain:attribution-and-licensing", "target": "domain:export-and-delivery", "type": "cross_domain", "direction": "forward", "description": "Formatted credit and license metadata accompanies every exported sprite deliverable.", "weight": 1.0},
+    {"source": "domain:character-configuration", "target": "domain:export-and-delivery", "type": "cross_domain", "direction": "forward", "description": "The active selection determines which animations, items, and frames are included in an export.", "weight": 0.6}
   ],
   "layers": [],
   "tour": []
