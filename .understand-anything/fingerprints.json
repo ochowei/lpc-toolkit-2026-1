@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "gitCommitHash": "47839be58e1e090d96b2330c96c7c2e856992cd4",
-  "generatedAt": "2026-06-13T16:17:22.878Z",
+  "gitCommitHash": "ed13a3022d0ebfd945f4a3d50a348d62b205458c",
+  "generatedAt": "2026-06-15T14:44:04.809Z",
   "files": {
     ".codex/environments/environment.toml": {
       "filePath": ".codex/environments/environment.toml",
@@ -45,12 +45,12 @@
     },
     ".understand-anything/config.json": {
       "filePath": ".understand-anything/config.json",
-      "contentHash": "08d37f20ea0af2233ae24f094723759f952381ecb6dd7f2aaa05ef96e95eae6b",
+      "contentHash": "29781e305ef5e2da466fce83e1f88f648ced8f598a3ee134af66e253235cddac",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 4,
+      "totalLines": 5,
       "hasStructuralAnalysis": true
     },
     "AGENTS.md": {
@@ -3025,7 +3025,7 @@
     },
     "packages/web/e2e/responsive-layout.spec.ts": {
       "filePath": "packages/web/e2e/responsive-layout.spec.ts",
-      "contentHash": "291d9168d9c7d6fa8501ce572fda8bf5c40c6573b2186429ac352cf902a44f08",
+      "contentHash": "054e2248b921a6c441eefda21c50e4777d01cc12b67726906374a314f17f635d",
       "functions": [
         {
           "name": "sidebarWidth",
@@ -5797,7 +5797,7 @@
     },
     "packages/web/src/components/layer-stack/preview-pane.tsx": {
       "filePath": "packages/web/src/components/layer-stack/preview-pane.tsx",
-      "contentHash": "2e0f27c5563d29b4bcd3757bd23d35fd6d45102b269bdc7b54a10e57471a8d2d",
+      "contentHash": "15fd201f6bb8edc9719712720a0409f34ecb5adf9807646f557012e4972e1e6b",
       "functions": [
         {
           "name": "PreviewPane",
@@ -5805,7 +5805,7 @@
             "{\n  state,\n  dispatch,\n  t,\n  result,\n  fullSheet,\n  fullSheetActions,\n}"
           ],
           "exported": true,
-          "lineCount": 220
+          "lineCount": 286
         }
       ],
       "classes": [],
@@ -5815,6 +5815,7 @@
           "specifiers": [
             "useEffect",
             "useLayoutEffect",
+            "useMemo",
             "useRef",
             "useState"
           ]
@@ -5835,7 +5836,7 @@
         {
           "source": "../../hooks/use-animation-player",
           "specifiers": [
-            "useAnimationPlayer"
+            "useMultiAnimationPlayer"
           ]
         },
         {
@@ -5883,7 +5884,7 @@
         "FullSheetZoom",
         "PreviewPane"
       ],
-      "totalLines": 274,
+      "totalLines": 340,
       "hasStructuralAnalysis": true
     },
     "packages/web/src/components/layer-stack/settings-collapsible.tsx": {
@@ -6451,7 +6452,7 @@
     },
     "packages/web/src/hooks/use-animation-player.ts": {
       "filePath": "packages/web/src/hooks/use-animation-player.ts",
-      "contentHash": "41e1d2f4d8e9a3ced7ee05a0c67580d48ce5b6370ed8c4511ff899e19d065900",
+      "contentHash": "0ee0ea6f7bc5ae31a67947dea6dfbe6f92f6ed914260e7a283c3988deb2e55f5",
       "functions": [
         {
           "name": "clearAnimationCanvas",
@@ -6473,7 +6474,19 @@
           ],
           "returnType": "UseAnimationPlayerResult",
           "exported": true,
-          "lineCount": 85
+          "lineCount": 14
+        },
+        {
+          "name": "useMultiAnimationPlayer",
+          "params": [
+            "targets",
+            "animation",
+            "playing",
+            "zoom"
+          ],
+          "returnType": "UseAnimationPlayerResult",
+          "exported": true,
+          "lineCount": 137
         }
       ],
       "classes": [],
@@ -6482,8 +6495,15 @@
           "source": "react",
           "specifiers": [
             "useEffect",
+            "useRef",
             "useState",
             "RefObject"
+          ]
+        },
+        {
+          "source": "react",
+          "specifiers": [
+            "React"
           ]
         },
         {
@@ -6506,9 +6526,10 @@
       "exports": [
         "ANIMATION_FPS",
         "clearAnimationCanvas",
-        "useAnimationPlayer"
+        "useAnimationPlayer",
+        "useMultiAnimationPlayer"
       ],
-      "totalLines": 122,
+      "totalLines": 197,
       "hasStructuralAnalysis": true
     },
     "packages/web/src/hooks/use-composed-character.ts": {
@@ -6778,7 +6799,7 @@
     },
     "packages/web/src/i18n.ts": {
       "filePath": "packages/web/src/i18n.ts",
-      "contentHash": "d987015936d61e591d6116c877b993c51c90093a8eeba80321e873b7b6d93718",
+      "contentHash": "49923a5221a45e172c71850e2da007bd904f7b13bf1701272044365c6d47fc63",
       "functions": [
         {
           "name": "createTranslator",
@@ -6825,7 +6846,7 @@
         "VARIANT_LABELS_ZH",
         "createLabelTranslator"
       ],
-      "totalLines": 883,
+      "totalLines": 889,
       "hasStructuralAnalysis": true
     },
     "packages/web/src/index.css": {
@@ -6916,7 +6937,7 @@
     },
     "packages/web/src/lib/composition-lock.ts": {
       "filePath": "packages/web/src/lib/composition-lock.ts",
-      "contentHash": "16b8c6a9183658500c6b8b3f9041ec855883178e8a601d003f4f67f9d10ce1ae",
+      "contentHash": "d69adda16b76a4da20da3a8bde8a019cd8725596e159684c516fe8a88df207b7",
       "functions": [
         {
           "name": "isCompositionChangingAction",
@@ -6925,7 +6946,7 @@
           ],
           "returnType": "boolean",
           "exported": true,
-          "lineCount": 20
+          "lineCount": 21
         },
         {
           "name": "formatCompositionProgress",
@@ -6960,7 +6981,7 @@
         "formatCompositionProgress",
         "isCompositionLocked"
       ],
-      "totalLines": 33,
+      "totalLines": 34,
       "hasStructuralAnalysis": true
     },
     "packages/web/src/lib/custom-overlay.ts": {
@@ -8221,7 +8242,7 @@
     },
     "packages/web/src/slice/selection.ts": {
       "filePath": "packages/web/src/slice/selection.ts",
-      "contentHash": "167fd0f7098aaee7c1cbb3bb3caa8461251b6c25e2aa7fa3ce02c6885ce8a886",
+      "contentHash": "f92da9379149f966e67a7112bad8afd6419a4bc822936a2c38e3e8a020405e74",
       "functions": [
         {
           "name": "clampZoom",
@@ -8240,7 +8261,7 @@
           ],
           "returnType": "SliceState",
           "exported": true,
-          "lineCount": 65
+          "lineCount": 68
         },
         {
           "name": "toSelections",
@@ -8279,7 +8300,7 @@
           ],
           "returnType": "{\n  state: SliceState;\n  shownTypeNames: TypeName[];\n}",
           "exported": true,
-          "lineCount": 50
+          "lineCount": 51
         },
         {
           "name": "treeItemAction",
@@ -8350,7 +8371,7 @@
         "treeItemAction",
         "orderedSelectionEntries"
       ],
-      "totalLines": 312,
+      "totalLines": 318,
       "hasStructuralAnalysis": true
     },
     "packages/web/src/slice/sprite-dirs.ts": {
@@ -8972,7 +8993,7 @@
     },
     "packages/web/test/composition-lock.test.ts": {
       "filePath": "packages/web/test/composition-lock.test.ts",
-      "contentHash": "b886949a7afa49dbc7b1d04178836f8be3c3e67ff4b44fc52a7b6ce2d9cb79ea",
+      "contentHash": "12addb06edfa023e3a85f7901fad0dfc50f286b8dff3a4abb9154fd4c668f99d",
       "functions": [],
       "classes": [],
       "imports": [
@@ -9001,7 +9022,7 @@
         }
       ],
       "exports": [],
-      "totalLines": 73,
+      "totalLines": 75,
       "hasStructuralAnalysis": true
     },
     "packages/web/test/console-collector-filters.test.ts": {
@@ -9388,7 +9409,7 @@
     },
     "packages/web/test/layer-row.test.tsx": {
       "filePath": "packages/web/test/layer-row.test.tsx",
-      "contentHash": "4db1594a6bd542ab272ddb9a69247c40b6f11b910a79d9a5f0f59e333b98680e",
+      "contentHash": "3e8b05a9187f35ac81f5be2cb19da1ed60d972bd044b60633f018114c2691151",
       "functions": [
         {
           "name": "renderExpanded",
@@ -9457,7 +9478,7 @@
         }
       ],
       "exports": [],
-      "totalLines": 134,
+      "totalLines": 135,
       "hasStructuralAnalysis": true
     },
     "packages/web/test/license-filter.test.ts": {
@@ -10148,7 +10169,7 @@
     },
     "packages/web/test/selection.test.ts": {
       "filePath": "packages/web/test/selection.test.ts",
-      "contentHash": "8e2792f02c2c5c5ad586e5ccb8de7b7f6e9e072e99e2f79ab6785a35a78ce70d",
+      "contentHash": "64eb390d74646f83806a8ba0733917bf16269a87aca40c91af84ece67e96bd02",
       "functions": [
         {
           "name": "defn",
@@ -10198,7 +10219,7 @@
         }
       ],
       "exports": [],
-      "totalLines": 432,
+      "totalLines": 462,
       "hasStructuralAnalysis": true
     },
     "packages/web/test/sidebar-search-keyboard.test.ts": {
@@ -10671,7 +10692,7 @@
     },
     "packages/web/test/use-animation-player.test.ts": {
       "filePath": "packages/web/test/use-animation-player.test.ts",
-      "contentHash": "87259c593cb42f6d3527c9b4b8f3a10c9d59569fa023bd0d6ac72c4ca5441662",
+      "contentHash": "fd87a8221baac098ec856b5ab8bd3d0546ab71170a7040668f6f04484a159dbc",
       "functions": [],
       "classes": [],
       "imports": [
@@ -10692,17 +10713,18 @@
         {
           "source": "../src/hooks/use-animation-player",
           "specifiers": [
-            "clearAnimationCanvas"
+            "clearAnimationCanvas",
+            "useMultiAnimationPlayer"
           ]
         }
       ],
       "exports": [],
-      "totalLines": 18,
+      "totalLines": 24,
       "hasStructuralAnalysis": true
     },
     "packages/web/test/use-composed-character.test.ts": {
       "filePath": "packages/web/test/use-composed-character.test.ts",
-      "contentHash": "031c592feebd969066874b535745a0b38203b002ec339f9e5615fa0ecd277d5e",
+      "contentHash": "ef81c3dd012280885b465181690b12986d485064055e41b963e62636d3fbf902",
       "functions": [],
       "classes": [],
       "imports": [
@@ -10739,7 +10761,7 @@
         }
       ],
       "exports": [],
-      "totalLines": 135,
+      "totalLines": 136,
       "hasStructuralAnalysis": true
     },
     "packages/web/test/use-media-query.test.ts": {
