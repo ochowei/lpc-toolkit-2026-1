@@ -109,7 +109,7 @@ declare global {
 export interface LayerStackHarnessProps {
   catalog: Catalog;
   palettes: PaletteMetadata;
-  shownTypeNames: string[];
+  shownTypeNames: TypeName[];
   initialHashWarnings: readonly HashWarning[];
   defaults: SliceState;
   state: SliceState;

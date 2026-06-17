@@ -6,6 +6,7 @@ import { type LicenseFilter } from '../../slice/license-filter';
 import { type AnimationFilter } from '../../slice/animation-filter';
 import type { CustomOverlay } from '../../lib/custom-overlay';
 import type { ReplacementCardDisplayMode } from '../../lib/replacement-card-display-mode';
+import { buildUpstreamCategoryGroups } from '../../slice/upstream-category-groups';
 import { LayerRow } from './layer-row';
 import { AddLayer } from './add-layer';
 import { PresetBar } from './preset-bar';
@@ -19,7 +20,7 @@ interface Props {
   palettes: PaletteMetadata;
   state: SliceState;
   dispatch: (a: SliceAction) => void;
-  shownTypeNames: string[];
+  shownTypeNames: TypeName[];
   licenseFilter: LicenseFilter;
   toggleLicenseGroup: (group: LicenseGroup) => void;
   licenseIncompatibleCount: number;
@@ -87,6 +88,10 @@ export function StackPanel({
     () => shownTypeNames.filter((tn) => state.selections[tn] == null),
     [shownTypeNames, state.selections],
   );
+  const sections = useMemo(
+    () => buildUpstreamCategoryGroups(catalog, shownTypeNames),
+    [catalog, shownTypeNames],
+  );
 
   // Spec edge case: body-type change can leave `expanded` pointing at a
   // type that no longer has a selection. Reset to null when that happens.
@@ -133,30 +138,39 @@ export function StackPanel({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2">
-        {/* Task 8/9: active rows */}
-        {active.length === 0 ? (
-          <div className="px-2 py-3 text-[11px] text-text-mute">No layers yet.</div>
-        ) : (
-          active.map((tn) => (
-            <LayerRow
-              key={tn}
-              disabled={disabled}
-              typeName={tn}
-              catalog={catalog}
-              palettes={palettes}
-              state={state}
-              dispatch={dispatch}
-              tl={tl}
-              t={t}
-              licenseFilter={licenseFilter}
-              animationFilter={animationFilter}
-              expanded={expanded === tn}
-              onToggle={() => setExpanded(expanded === tn ? null : tn)}
-              replacementCardDisplayMode={replacementCardDisplayMode}
-              onReplacementCardDisplayModeChange={onReplacementCardDisplayModeChange}
-            />
-          ))
-        )}
+        {sections.map((section) => {
+          const activeTypeNames = section.typeNames.filter((tn) => active.includes(tn));
+          return (
+            <section key={section.id} className="border-b border-border/60 py-2 last:border-b-0">
+              <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-text-mute">
+                {section.label}
+              </div>
+              {activeTypeNames.length === 0 ? (
+                <div className="px-2 py-1.5 text-[11px] text-text-dim">No layer selected</div>
+              ) : (
+                activeTypeNames.map((tn) => (
+                  <LayerRow
+                    key={tn}
+                    disabled={disabled}
+                    typeName={tn}
+                    catalog={catalog}
+                    palettes={palettes}
+                    state={state}
+                    dispatch={dispatch}
+                    tl={tl}
+                    t={t}
+                    licenseFilter={licenseFilter}
+                    animationFilter={animationFilter}
+                    expanded={expanded === tn}
+                    onToggle={() => setExpanded(expanded === tn ? null : tn)}
+                    replacementCardDisplayMode={replacementCardDisplayMode}
+                    onReplacementCardDisplayModeChange={onReplacementCardDisplayModeChange}
+                  />
+                ))
+              )}
+            </section>
+          );
+        })}
 
         {/* Task 10: AddLayer */}
         <AddLayer

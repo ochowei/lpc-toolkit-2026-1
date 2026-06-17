@@ -2,7 +2,7 @@ import type { BodyType, Catalog, TypeName } from '@lpc-toolkit/core';
 import { pickActionForItem, type SliceAction } from '../../slice/selection';
 import type { LabelTranslator, Translator } from '../../i18n';
 import { itemSupportsBodyType } from '../../slice/catalog-tree';
-import { CATEGORY_GROUPS } from '../../slice/category-groups';
+import { buildUpstreamCategoryGroups } from '../../slice/upstream-category-groups';
 
 interface Props {
   disabled: boolean;
@@ -40,12 +40,10 @@ export function AddLayer({
     );
   }
 
-  // Build per-group inactive type lists (intersection of group typeNames and inactive)
-  const inactiveSet = new Set(inactive);
-  const sections = CATEGORY_GROUPS
-    .map((g) => ({
-      group: g,
-      types: g.typeNames.filter((tn) => inactiveSet.has(tn)),
+  const sections = buildUpstreamCategoryGroups(catalog, inactive)
+    .map((group) => ({
+      group,
+      types: group.typeNames,
     }))
     .filter((s) => s.types.length > 0);
 
@@ -67,7 +65,7 @@ export function AddLayer({
       {sections.map(({ group, types }) => (
         <div key={group.id} className="mb-2 last:mb-0">
           <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-text-mute">
-            {t(group.labelKey)}
+            {group.label}
           </div>
           <div className="flex flex-wrap gap-1">
             {types.map((tn) => {
