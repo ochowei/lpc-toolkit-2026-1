@@ -41,7 +41,7 @@ export function PresetBar({ disabled, catalog, palettes, state, dispatch, t, onA
             })
           }
           title={t('randomize.title')}
-          className="rounded border border-border bg-surface-2 px-2 py-1 text-[12px] hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-surface-2"
+          className="rounded border border-border bg-surface-2 px-2 py-1 text-sm hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-surface-2"
         >
           🎲
         </button>
@@ -52,7 +52,7 @@ export function PresetBar({ disabled, catalog, palettes, state, dispatch, t, onA
           aria-haspopup="menu"
           aria-expanded={presetOpen}
           onClick={() => setPresetOpen(!presetOpen)}
-          className="inline-flex items-center gap-1 rounded border border-border bg-surface-2 px-2 py-1 text-[12px] hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-surface-2"
+          className="inline-flex items-center gap-1 rounded border border-border bg-surface-2 px-2 py-1 text-sm hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-surface-2"
         >
           <span>{t('preset.title')}</span>
           <span aria-hidden>▼</span>
@@ -63,7 +63,7 @@ export function PresetBar({ disabled, catalog, palettes, state, dispatch, t, onA
           aria-haspopup="menu"
           aria-expanded={resetOpen}
           onClick={() => setResetOpen(!resetOpen)}
-          className="inline-flex items-center gap-1 rounded border border-border bg-surface-2 px-2 py-1 text-[12px] hover:bg-surface-3"
+          className="inline-flex items-center gap-1 rounded border border-border bg-surface-2 px-2 py-1 text-sm hover:bg-surface-3"
         >
           <span>↻ {t('reset.button')}</span>
           <span aria-hidden>▼</span>
