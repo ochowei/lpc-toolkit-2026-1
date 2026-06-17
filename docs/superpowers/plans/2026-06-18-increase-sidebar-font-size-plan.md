@@ -419,7 +419,10 @@ git commit -m "feat(web): update font sizes in PresetBar, StackPanel, and AddLay
 - Modify: `packages/web/src/components/color-picker.tsx`
 - Modify: `packages/web/src/components/layer-stack/type-item-picker.tsx`
 
-- [ ] **Step 1: Replace hardcoded font sizes in layer-row.tsx**
+- [x] **Step 1: Replace hardcoded font sizes in layer-row.tsx**
+  - Commit: 0dba1459e
+  - Verification: pnpm typecheck PASS, unit tests PASS
+  - Note: Replaced all custom pixel sizes with standard text-xs/text-sm in layer-row.tsx.
 
 Replace `text-[12px]` with `text-sm`, and `text-[10px]` with `text-xs`.
 
@@ -463,7 +466,10 @@ Replacement content:
       </button>
 ```
 
-- [ ] **Step 2: Replace hardcoded font sizes in group-type-slot-entries.tsx**
+- [x] **Step 2: Replace hardcoded font sizes in group-type-slot-entries.tsx**
+  - Commit: 0dba1459e
+  - Verification: pnpm typecheck PASS, unit tests PASS
+  - Note: Replaced all custom pixel sizes with standard text-sm in group-type-slot-entries.tsx.
 
 Replace `text-[12px]` with `text-sm`.
 
@@ -513,7 +519,10 @@ Replacement content:
                     selected
 ```
 
-- [ ] **Step 3: Replace hardcoded font sizes in color-picker.tsx**
+- [x] **Step 3: Replace hardcoded font sizes in color-picker.tsx**
+  - Commit: 0dba1459e
+  - Verification: pnpm typecheck PASS, unit tests PASS
+  - Note: Replaced all custom pixel sizes with standard text-xs in color-picker.tsx.
 
 Replace `text-[11px]` with `text-xs`.
 
@@ -539,7 +548,10 @@ Replacement content:
                   opt.value === selection?.variant
 ```
 
-- [ ] **Step 4: Replace hardcoded font sizes in type-item-picker.tsx**
+- [x] **Step 4: Replace hardcoded font sizes in type-item-picker.tsx**
+  - Commit: 0dba1459e
+  - Verification: pnpm typecheck PASS, unit tests PASS
+  - Note: Replaced custom pixel sizes with standard text-xs in type-item-picker.tsx.
 
 Replace `text-[10px]` with `text-xs`, `text-[9px]` with `text-xs`, and `text-[8px]` with `text-xs`.
 
@@ -617,17 +629,23 @@ Replacement content:
               )}
 ```
 
-- [ ] **Step 5: Verify typecheck passes**
+- [x] **Step 5: Verify typecheck passes**
+  - Commit: 0dba1459e
+  - Verification: pnpm typecheck PASS
 
 Run: `rtk pnpm --filter @lpc-toolkit/web typecheck`
 Expected: PASS with no errors.
 
-- [ ] **Step 6: Run unit tests**
+- [x] **Step 6: Run unit tests**
+  - Commit: 0dba1459e
+  - Verification: pnpm test PASS
 
 Run: `rtk pnpm --filter @lpc-toolkit/web test`
 Expected: PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
+  - Commit: 0dba1459e
+  - Verification: Commit succeeded with hash 0dba1459e
 
 ```bash
 git add packages/web/src/components/layer-stack/layer-row.tsx packages/web/src/components/layer-stack/group-type-slot-entries.tsx packages/web/src/components/color-picker.tsx packages/web/src/components/layer-stack/type-item-picker.tsx
