@@ -659,7 +659,10 @@ git commit -m "feat(web): update font sizes in LayerRow, GroupTypeSlotEntries, C
 **Files:**
 - Modify: `packages/web/src/components/layer-stack/preview-pane.tsx`
 
-- [ ] **Step 1: Replace hardcoded font sizes in preview-pane.tsx**
+- [x] **Step 1: Replace hardcoded font sizes in preview-pane.tsx**
+  - Commit: c08b35d68
+  - Verification: pnpm typecheck PASS, unit tests PASS
+  - Note: Replaced all custom pixel sizes with standard text-xs in preview-pane.tsx.
 
 Replace `text-[10px]` with `text-xs`, `text-[9px]` with `text-xs`, and `text-[11px]` with `text-xs`.
 
@@ -807,17 +810,23 @@ Replacement content:
             >
 ```
 
-- [ ] **Step 2: Verify typecheck passes**
+- [x] **Step 2: Verify typecheck passes**
+  - Commit: c08b35d68
+  - Verification: pnpm typecheck PASS
 
 Run: `rtk pnpm --filter @lpc-toolkit/web typecheck`
 Expected: PASS with no errors.
 
-- [ ] **Step 3: Run unit tests**
+- [x] **Step 3: Run unit tests**
+  - Commit: c08b35d68
+  - Verification: pnpm test PASS
 
 Run: `rtk pnpm --filter @lpc-toolkit/web test`
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
+  - Commit: c08b35d68
+  - Verification: Commit succeeded with hash c08b35d68
 
 ```bash
 git add packages/web/src/components/layer-stack/preview-pane.tsx
