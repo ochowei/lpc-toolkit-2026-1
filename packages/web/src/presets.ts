@@ -65,8 +65,8 @@ export const PRESETS: readonly Preset[] = [
       { typeName: 'expression', name: 'Neutral', recolor: 'light' },
       { typeName: 'clothes', name: 'Shortsleeve', recolor: 'brown' },
       { typeName: 'overalls', name: 'Overalls', variant: 'brown' },
-      { typeName: 'shoes', name: 'Sandals', variant: 'brown' },
-      { typeName: 'hair', name: 'Messy3' },
+      { typeName: 'shoes', name: 'Basic Boots', variant: 'brown' },
+      { typeName: 'hair', name: 'Messy3', recolor: 'orange' },
     ],
   },
   {
