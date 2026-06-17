@@ -237,7 +237,7 @@ Implementation note: record the commit hash and the failing verification result 
 - Modify: `packages/web/src/components/layer-stack/layer-row.tsx`
 - Test: `packages/web/test/layer-row.test.tsx`
 
-- [ ] **Step 1: Create the shared picker component**
+- [x] **Step 1: Create the shared picker component**
 
 Create `packages/web/src/components/layer-stack/type-item-picker.tsx` with this content:
 
@@ -444,7 +444,7 @@ export function TypeItemPicker({
 }
 ```
 
-- [ ] **Step 2: Replace the embedded picker in LayerRow**
+- [x] **Step 2: Replace the embedded picker in LayerRow**
 
 In `packages/web/src/components/layer-stack/layer-row.tsx`:
 
@@ -502,7 +502,7 @@ import { TypeItemPicker } from './type-item-picker';
 
 Keep the collapsed `LayerRow` summary and clear button unchanged.
 
-- [ ] **Step 3: Run LayerRow tests**
+- [x] **Step 3: Run LayerRow tests**
 
 Run:
 
@@ -512,7 +512,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- layer-row
 
 Expected: PASS. The HTML output for display modes remains the same because `TypeItemPicker` preserves class names and labels.
 
-- [ ] **Step 4: Run the StackPanel test to confirm Task 1 is still failing only for missing inline entries**
+- [x] **Step 4: Run the StackPanel test to confirm Task 1 is still failing only for missing inline entries**
 
 Run:
 
@@ -522,7 +522,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- stack-panel
 
 Expected: FAIL because `StackPanel` has not rendered `GroupTypeSlotEntries` yet. It should not fail because `LayerRow` replacement cards disappeared.
 
-- [ ] **Step 5: Commit the extraction**
+- [x] **Step 5: Commit the extraction**
 
 Run:
 
@@ -531,7 +531,11 @@ rtk git add packages/web/src/components/layer-stack/type-item-picker.tsx package
 rtk git commit -m "refactor: share type item picker"
 ```
 
-Implementation note: record the commit hash and verification results below this task.
+**Implementation Note:**
+- **Commit:** 5cb393614911d957388741364d9b1e988220f188
+- **Verification:**
+  - `rtk pnpm --filter @lpc-toolkit/web test -- layer-row`: PASS
+  - `rtk pnpm --filter @lpc-toolkit/web test -- stack-panel`: FAIL (as expected, 5 failing tests because components/group-type-slot-entries do not exist yet)
 
 ---
 
