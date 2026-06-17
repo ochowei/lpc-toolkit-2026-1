@@ -71,7 +71,7 @@ export function TypeItemPicker({
   return (
     <div className="px-2 pb-2">
       <div className="mb-1 flex flex-wrap items-center gap-1">
-        <div className="mr-auto text-[10px] uppercase tracking-wide text-text-mute">
+        <div className="mr-auto text-xs uppercase tracking-wide text-text-mute">
           {t('layer.swap').replace('{name}', tl.category(typeName))}
         </div>
         <div
@@ -89,7 +89,7 @@ export function TypeItemPicker({
                 onClick={() => onReplacementCardDisplayModeChange(mode)}
                 className={[
                   'inline-flex items-center gap-1 rounded border px-1.5 py-0.5',
-                  'text-[9px] focus-visible:outline-none focus-visible:ring-1',
+                  'text-xs focus-visible:outline-none focus-visible:ring-1',
                   'focus-visible:ring-accent',
                   selected
                     ? 'border-accent bg-accent/15 text-text'
@@ -137,7 +137,7 @@ export function TypeItemPicker({
               data-label-layout={replacementCardDisplayMode}
               className={[
                 'relative flex h-16 items-center justify-center overflow-hidden',
-                'rounded-md border p-1 text-[10px]',
+                'rounded-md border p-1 text-xs',
                 replacementCardDisplayMode === 'stacked' ? 'flex-col gap-1' : '',
                 isSelected
                   ? 'border-accent bg-accent/10 text-text'
@@ -168,7 +168,7 @@ export function TypeItemPicker({
                 </span>
               )}
               {exceeds && supports && (
-                <span className="absolute -top-1 -right-1 inline-flex h-3 w-3 items-center justify-center rounded-full bg-danger text-[8px] text-white" aria-label={exceedsTitle}>!</span>
+                <span className="absolute -top-1 -right-1 inline-flex h-3 w-3 items-center justify-center rounded-full bg-danger text-xs text-white" aria-label={exceedsTitle}>!</span>
               )}
             </button>
           );

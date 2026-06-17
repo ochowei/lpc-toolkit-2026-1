@@ -67,7 +67,7 @@ export function ColorPicker({
                 type="button"
                 disabled={disabled}
                 aria-pressed={opt.value === selection?.variant}
-                className={`rounded border border-border px-1.5 py-0.5 text-[11px] disabled:cursor-not-allowed disabled:opacity-50 ${
+                className={`rounded border border-border px-1.5 py-0.5 text-xs disabled:cursor-not-allowed disabled:opacity-50 ${
                   opt.value === selection?.variant
                     ? 'bg-accent text-accent-ink'
                     : 'bg-surface-2 text-text'

@@ -102,7 +102,7 @@ export function GroupTypeSlotEntries({
         onClick={onToggleSection}
         className={[
           'flex w-full items-center justify-between rounded-md border px-2.5 py-1.5',
-          'text-left text-[12px] font-medium',
+          'text-left text-sm font-medium',
           sectionOpen
             ? 'border-accent bg-accent/10 text-text'
             : 'border-border bg-surface-2 text-text-2',
@@ -135,7 +135,7 @@ export function GroupTypeSlotEntries({
                 aria-expanded={selected}
                 onClick={() => setExpanded(selected ? null : typeName)}
                 className={[
-                  'rounded-full border px-3 py-1.5 text-[12px]',
+                  'rounded-full border px-3 py-1.5 text-sm',
                   selected
                     ? 'border-accent bg-accent/15 text-text'
                     : 'border-border bg-surface-2 text-text-2',
