@@ -157,7 +157,10 @@ git commit -m "feat(web): migrate sidebar search font sizes to standard Tailwind
 - Modify: `packages/web/src/components/layer-stack/stack-panel.tsx`
 - Modify: `packages/web/src/components/layer-stack/add-layer.tsx`
 
-- [ ] **Step 1: Replace hardcoded font sizes in preset-bar.tsx**
+- [x] **Step 1: Replace hardcoded font sizes in preset-bar.tsx**
+  - Commit: e632042ee
+  - Verification: pnpm typecheck PASS, unit tests PASS
+  - Note: Replaced all custom pixel sizes with standard text-sm in preset-bar.tsx.
 
 Replace `text-[12px]` with `text-sm`.
 
@@ -217,7 +220,10 @@ Replacement content:
         >
 ```
 
-- [ ] **Step 2: Replace hardcoded font sizes in stack-panel.tsx**
+- [x] **Step 2: Replace hardcoded font sizes in stack-panel.tsx**
+  - Commit: e632042ee
+  - Verification: pnpm typecheck PASS, unit tests PASS
+  - Note: Replaced all custom pixel sizes with standard text-xs/text-sm in stack-panel.tsx.
 
 Replace `text-[10px]` with `text-xs`, `text-[12px]` with `text-sm`, and `text-[11px]` with `text-xs`.
 
@@ -267,7 +273,10 @@ Replacement content:
               ) : (
 ```
 
-- [ ] **Step 3: Replace hardcoded font sizes in add-layer.tsx**
+- [x] **Step 3: Replace hardcoded font sizes in add-layer.tsx**
+  - Commit: e632042ee
+  - Verification: pnpm typecheck PASS, unit tests PASS
+  - Note: Replaced all custom pixel sizes with standard text-xs/text-sm in add-layer.tsx.
 
 Replace `text-[12px]` with `text-sm`, `text-[11px]` with `text-xs`, and `text-[10px]` with `text-xs`.
 
@@ -377,17 +386,23 @@ Replacement content:
                   ].join(' ')}
 ```
 
-- [ ] **Step 4: Verify typecheck passes**
+- [x] **Step 4: Verify typecheck passes**
+  - Commit: e632042ee
+  - Verification: pnpm typecheck PASS
 
 Run: `rtk pnpm --filter @lpc-toolkit/web typecheck`
 Expected: PASS with no errors.
 
-- [ ] **Step 5: Run unit tests**
+- [x] **Step 5: Run unit tests**
+  - Commit: e632042ee
+  - Verification: pnpm test PASS
 
 Run: `rtk pnpm --filter @lpc-toolkit/web test`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
+  - Commit: e632042ee
+  - Verification: Commit succeeded with hash e632042ee
 
 ```bash
 git add packages/web/src/components/layer-stack/preset-bar.tsx packages/web/src/components/layer-stack/stack-panel.tsx packages/web/src/components/layer-stack/add-layer.tsx
