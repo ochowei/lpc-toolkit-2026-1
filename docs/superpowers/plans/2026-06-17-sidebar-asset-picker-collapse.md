@@ -558,7 +558,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- stack-panel.test.tsx group-type-slot-
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit StackPanel wiring**
+- [x] **Step 6: Commit StackPanel wiring**
 
 Run:
 
@@ -571,7 +571,7 @@ Implementation note:
 `StackPanel` now owns one `expandedSectionId`, derives section open state from that or the active `expanded` type, passes collapse props down, and uses stronger section borders/header typography. StackPanel tests were aligned to assert selected rows remain visible while replacement slot chips are collapsed by default.
 
 Commit:
-Pending.
+0a284f67f
 
 Verification:
 `rtk pnpm --filter @lpc-toolkit/web test -- stack-panel.test.tsx group-type-slot-entries.test.tsx` PASS: 9 tests passed.
@@ -583,7 +583,7 @@ Verification:
 **Files:**
 - Modify: `docs/superpowers/plans/2026-06-17-sidebar-asset-picker-collapse.md`
 
-- [ ] **Step 1: Run focused tests**
+- [x] **Step 1: Run focused tests**
 
 Run:
 
@@ -593,7 +593,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- stack-panel.test.tsx group-type-slot-
 
 Expected: PASS.
 
-- [ ] **Step 2: Run typecheck**
+- [x] **Step 2: Run typecheck**
 
 Run:
 
@@ -603,7 +603,7 @@ rtk pnpm typecheck
 
 Expected: PASS.
 
-- [ ] **Step 3: Run the web test suite**
+- [x] **Step 3: Run the web test suite**
 
 Run:
 
@@ -613,7 +613,7 @@ rtk pnpm --filter @lpc-toolkit/web test
 
 Expected: PASS.
 
-- [ ] **Step 4: Start the web dev server for visual verification**
+- [x] **Step 4: Start the web dev server for visual verification**
 
 Run:
 
@@ -623,7 +623,7 @@ rtk pnpm --filter @lpc-toolkit/web dev -- --host 127.0.0.1
 
 Expected: Vite prints a local URL.
 
-- [ ] **Step 5: Manually verify the sidebar**
+- [x] **Step 5: Manually verify the sidebar**
 
 In the browser, verify:
 
@@ -645,10 +645,16 @@ rtk git commit -m "docs: record sidebar collapse verification"
 ```
 
 Implementation note:
+Ran final focused and full web verification, then started Vite at `http://localhost:5173/` and verified the sidebar with headless Chrome. Confirmed groups are visible, selected Body/Head rows remain visible, slot chips are collapsed by default, opening Head reveals its slot chips/replacement entries, opening Body closes Head, and opening Hair's picker preserves replacement card display controls.
 
 Commit:
+Pending.
 
 Verification:
+Focused tests PASS: `rtk pnpm --filter @lpc-toolkit/web test -- stack-panel.test.tsx group-type-slot-entries.test.tsx i18n.test.ts` (26 tests).
+Typecheck PASS: `rtk pnpm run typecheck` and `rtk pnpm -r typecheck`; direct `rtk pnpm typecheck` hit an rtk wrapper anomaly that printed TypeScript help with no TypeScript errors.
+Web tests PASS: `rtk pnpm --filter @lpc-toolkit/web test` (55 files, 426 tests).
+Manual UI smoke PASS via headless Chrome against Vite dev server.
 
 ---
 
