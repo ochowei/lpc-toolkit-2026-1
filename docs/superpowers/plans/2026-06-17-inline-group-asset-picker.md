@@ -38,7 +38,7 @@ Follow the project workflow note while implementing each task: after completing 
 **Files:**
 - Modify: `packages/web/test/stack-panel.test.tsx`
 
-- [ ] **Step 1: Add the test data needed for inline add and replace entries**
+- [x] **Step 1: Add the test data needed for inline add and replace entries**
 
 In `packages/web/test/stack-panel.test.tsx`, replace the single clothes item with two clothes items so replacement behavior can be detected:
 
@@ -58,7 +58,7 @@ const { catalog } = createCatalog({
 });
 ```
 
-- [ ] **Step 2: Add a reusable render helper**
+- [x] **Step 2: Add a reusable render helper**
 
 First add `TypeName` to the existing core import:
 
@@ -120,7 +120,7 @@ function renderPanel(overrides: {
 }
 ```
 
-- [ ] **Step 3: Replace the existing render call with the helper**
+- [x] **Step 3: Replace the existing render call with the helper**
 
 In the existing test body, replace the long `renderToStaticMarkup` call that renders `StackPanel` with:
 
@@ -128,7 +128,7 @@ In the existing test body, replace the long `renderToStaticMarkup` call that ren
 const html = renderPanel();
 ```
 
-- [ ] **Step 4: Update the existing empty-group assertion**
+- [x] **Step 4: Update the existing empty-group assertion**
 
 The inline entries make empty groups actionable, so the exact count of `No layer selected` should go away. Replace:
 
@@ -149,7 +149,7 @@ expect(html).toContain('+ Shoes');
 expect(html).toContain('+ Tools');
 ```
 
-- [ ] **Step 5: Add tests for selected replace entries and expanded inline picker**
+- [x] **Step 5: Add tests for selected replace entries and expanded inline picker**
 
 Append these tests in the existing `describe('StackPanel upstream selected-layer groups', () => { ... })` block:
 
@@ -203,7 +203,7 @@ it('opens an inline picker for a selected type with the current item marked sele
 });
 ```
 
-- [ ] **Step 6: Run the targeted test and verify it fails for the expected reason**
+- [x] **Step 6: Run the targeted test and verify it fails for the expected reason**
 
 Run:
 
@@ -213,7 +213,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- stack-panel
 
 Expected: FAIL because the new inline entries and unselected inline picker do not exist yet.
 
-- [ ] **Step 7: Commit the failing test**
+- [x] **Step 7: Commit the failing test**
 
 Run:
 
@@ -223,6 +223,10 @@ rtk git commit -m "test: cover inline group asset picker"
 ```
 
 Implementation note: record the commit hash and the failing verification result below this task.
+
+**Implementation Note:**
+- **Commit:** a12c241c6380a99bcbe26ca95071065f690fdb8b
+- **Verification:** `rtk pnpm --filter @lpc-toolkit/web test -- stack-panel` failed as expected with 5 failing tests because components and picker do not yet exist.
 
 ---
 
