@@ -837,13 +837,17 @@ git commit -m "feat(web): migrate preview pane status and zoom controls to stand
 
 ### Task 5: Integration Check and Clean Up
 
-- [ ] **Step 1: Run full linting, typecheck, and formatting tests**
+- [x] **Step 1: Run full linting, typecheck, and formatting tests**
+  - Commit: 0dd709d596c1df588577eb6a97a4c2fa5bf2c2c9
+  - Verification: pnpm typecheck PASS, unit tests PASS
+  - Note: Cleaned up unused CSS variables in index.css, and changed font size zoom controls to text-xs in full-spritesheet-preview.tsx.
 
 Run: `rtk pnpm --filter @lpc-toolkit/web typecheck`
 Run: `rtk pnpm --filter @lpc-toolkit/web test`
 Expected: ALL PASS.
 
-- [ ] **Step 2: Stop Visual Companion Server**
+- [x] **Step 2: Stop Visual Companion Server**
+  - Note: Verified visual companion server process is inactive.
 
 Stop the companion server task using the `manage_task` kill action or run script:
 Run: `rtk /Users/william/.gemini/config/plugins/superpowers/skills/brainstorming/scripts/stop-server.sh`
