@@ -11,6 +11,8 @@ import { CLOTHING_TYPES, type Preset, type PresetItem } from './presets';
 
 /** Result of applying a clothing preset to the current character selections. */
 export interface PresetApplyResult {
+  /** Target body type resolved from the preset (falling back to current). */
+  readonly bodyType: BodyType;
   /** Full new selections: personal categories kept, clothing replaced. */
   readonly selections: Record<TypeName, Selection>;
   /** Preset items dropped — catalog miss or unsupported body type. */
@@ -21,8 +23,8 @@ export interface PresetApplyResult {
  * Compute the selections after applying `preset`:
  * - every CLOTHING_TYPES entry is removed from `current` (clean slate);
  * - personal-appearance categories are kept untouched;
- * - each preset item that resolves in the catalog AND supports `bodyType`
- *   is added; the rest are returned in `skipped`.
+ * - each preset item that resolves in the catalog AND supports the resolved
+ *   bodyType is added; the rest are returned in `skipped`.
  */
 export function computePresetSelection(
   preset: Preset,
@@ -31,6 +33,7 @@ export function computePresetSelection(
   catalog: Catalog,
   palettes: PaletteMetadata,
 ): PresetApplyResult {
+  const targetBodyType = preset.bodyType ?? bodyType;
   const selections: Record<TypeName, Selection> = {};
   for (const [typeName, selection] of Object.entries(current)) {
     if (!CLOTHING_TYPES.has(typeName)) selections[typeName] = selection;
@@ -41,7 +44,7 @@ export function computePresetSelection(
     const def = (catalog.byTypeName.get(item.typeName) ?? []).find(
       (d) => d.name === item.name,
     );
-    if (!def || !itemSupportsBodyType(def, bodyType)) {
+    if (!def || !itemSupportsBodyType(def, targetBodyType)) {
       skipped.push(item);
       continue;
     }
@@ -59,5 +62,5 @@ export function computePresetSelection(
     };
   }
 
-  return { selections, skipped };
+  return { bodyType: targetBodyType, selections, skipped };
 }

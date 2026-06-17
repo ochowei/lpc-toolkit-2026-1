@@ -7,6 +7,7 @@ import {
   type Catalog,
   type FilePath,
   type ItemDefinition,
+  type TypeName,
 } from '@lpc-toolkit/core';
 import { CLOTHING_TYPES, PRESETS } from '../src/presets';
 import { TRANSLATIONS } from '../src/i18n';
@@ -34,12 +35,18 @@ describe('PRESETS data', () => {
     expect(new Set(PRESETS.map((p) => p.id)).size).toBe(6);
   });
 
-  it('every preset item type is a clearable clothing category', () => {
+  it('every preset item type is a clearable clothing category or allowed personal appearance', () => {
+    const allowedNonClothing = new Set<TypeName>([
+      'body',
+      'head',
+      'expression',
+      'hair',
+    ]);
     for (const preset of PRESETS) {
       for (const item of preset.items) {
         expect(
-          CLOTHING_TYPES.has(item.typeName),
-          `${preset.id}: "${item.typeName}" not in CLOTHING_TYPES`,
+          CLOTHING_TYPES.has(item.typeName) || allowedNonClothing.has(item.typeName),
+          `${preset.id}: "${item.typeName}" not in CLOTHING_TYPES or allowed personal appearance`,
         ).toBe(true);
       }
     }

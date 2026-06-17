@@ -34,6 +34,7 @@ const { catalog } = createCatalog({
   'tunic.json': defn('Tunic', 'clothes', 'male'),
   'helm.json': defn('Helm', 'hat', 'male'),
   'gown.json': defn('Gown', 'clothes', 'female'),
+  'body.json': defn('Body Color', 'body', 'male'),
   'shirt.json': {
     ...defn('Shirt', 'clothes', 'male'),
     recolors: { material: 'cloth', palettes: ['ulpc'] },
@@ -184,5 +185,45 @@ describe('computePresetSelection', () => {
     // malePreset's Tunic was cleared; femaleOnlyPreset's Gown was skipped.
     expect('clothes' in afterB).toBe(false);
     expect(afterB.hat).toEqual({ typeName: 'hat', name: 'Helm' });
+  });
+
+  it('overwrites personal appearance categories if defined in the preset', () => {
+    const presetWithBody: Preset = {
+      id: 'pb',
+      labelKey: 'preset.farmer',
+      emoji: '🌾',
+      items: [
+        { typeName: 'body', name: 'Body Color' },
+      ],
+    };
+    const current: Record<string, Selection> = {
+      body: { typeName: 'body', name: 'Old Body' },
+    };
+    const { selections } = computePresetSelection(
+      presetWithBody,
+      current,
+      'male',
+      catalog,
+      palettes,
+    );
+    expect(selections.body).toEqual({ typeName: 'body', name: 'Body Color' });
+  });
+
+  it('uses preset bodyType when specified', () => {
+    const femalePreset: Preset = {
+      id: 'f_bt',
+      labelKey: 'preset.mage',
+      emoji: '🔮',
+      bodyType: 'female',
+      items: [],
+    };
+    const { bodyType } = computePresetSelection(
+      femalePreset,
+      {},
+      'male',
+      catalog,
+      palettes,
+    );
+    expect(bodyType).toBe('female');
   });
 });
