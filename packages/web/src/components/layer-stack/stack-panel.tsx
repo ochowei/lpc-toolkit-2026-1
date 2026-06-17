@@ -8,6 +8,7 @@ import type { CustomOverlay } from '../../lib/custom-overlay';
 import type { ReplacementCardDisplayMode } from '../../lib/replacement-card-display-mode';
 import { buildUpstreamCategoryGroups } from '../../slice/upstream-category-groups';
 import { LayerRow } from './layer-row';
+import { GroupTypeSlotEntries } from './group-type-slot-entries';
 import { AddLayer } from './add-layer';
 import { PresetBar } from './preset-bar';
 import { StatusToast } from './status-toast';
@@ -96,8 +97,8 @@ export function StackPanel({
   // Spec edge case: body-type change can leave `expanded` pointing at a
   // type that no longer has a selection. Reset to null when that happens.
   useEffect(() => {
-    if (expanded && !active.includes(expanded)) setExpanded(null);
-  }, [expanded, active, setExpanded]);
+    if (expanded && !shownTypeNames.includes(expanded)) setExpanded(null);
+  }, [expanded, shownTypeNames, setExpanded]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -168,6 +169,22 @@ export function StackPanel({
                   />
                 ))
               )}
+              <GroupTypeSlotEntries
+                disabled={disabled}
+                typeNames={section.typeNames}
+                catalog={catalog}
+                palettes={palettes}
+                state={state}
+                dispatch={dispatch}
+                tl={tl}
+                t={t}
+                licenseFilter={licenseFilter}
+                animationFilter={animationFilter}
+                expanded={expanded}
+                setExpanded={setExpanded}
+                replacementCardDisplayMode={replacementCardDisplayMode}
+                onReplacementCardDisplayModeChange={onReplacementCardDisplayModeChange}
+              />
             </section>
           );
         })}

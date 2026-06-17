@@ -115,21 +115,21 @@ describe('StackPanel upstream selected-layer groups', () => {
     }
     expect(html).toContain('Body Color');
     expect(html).toContain('Sword A');
-    expect(html).toContain('+ Head');
-    expect(html).toContain('+ Hair');
-    expect(html).toContain('+ Hat');
-    expect(html).toContain('+ Gloves');
-    expect(html).toContain('+ Clothes');
-    expect(html).toContain('+ Legs');
-    expect(html).toContain('+ Shoes');
-    expect(html).toContain('+ Tools');
+    expect(html).toContain('+ head');
+    expect(html).toContain('+ hair');
+    expect(html).toContain('+ hat');
+    expect(html).toContain('+ gloves');
+    expect(html).toContain('+ clothes');
+    expect(html).toContain('+ legs');
+    expect(html).toContain('+ shoes');
+    expect(html).toContain('+ tools');
   });
 
   it('shows selected type slots as replace entries in their groups', () => {
     const html = renderPanel();
 
-    expect(html).toContain('Body: Body Color');
-    expect(html).toContain('Weapon: Sword A');
+    expect(html).toContain('body: Body Color');
+    expect(html).toContain('weapon: Sword A');
     expect(html).toContain('Replace');
   });
 
@@ -144,14 +144,14 @@ describe('StackPanel upstream selected-layer groups', () => {
 
     const html = renderPanel({ state: missingCatalogState });
 
-    expect(html).toContain('Hat: Missing Hat');
+    expect(html).toContain('hat: Missing Hat');
     expect(html).toContain('Replace');
   });
 
   it('opens an inline picker for an unselected type without selecting the first item', () => {
     const html = renderPanel({ expanded: 'clothes' });
 
-    expect(html).toContain('Swap Clothes');
+    expect(html).toContain('Swap clothes');
     expect(html).toContain('Long Sleeve');
     expect(html).toContain('Short Sleeve');
     expect(html).toContain('grid-cols-[repeat(auto-fill,minmax(72px,1fr))]');
@@ -168,7 +168,7 @@ describe('StackPanel upstream selected-layer groups', () => {
 
     const html = renderPanel({ state: selectedClothesState, expanded: 'clothes' });
 
-    expect(html).toContain('Clothes: Long Sleeve');
+    expect(html).toContain('clothes: Long Sleeve');
     expect(html).toContain('Short Sleeve');
     expect(html).toContain('border-accent bg-accent/10 text-text');
   });

@@ -546,7 +546,7 @@ rtk git commit -m "refactor: share type item picker"
 - Modify: `packages/web/src/components/layer-stack/stack-panel.tsx`
 - Test: `packages/web/test/stack-panel.test.tsx`
 
-- [ ] **Step 1: Create GroupTypeSlotEntries**
+- [x] **Step 1: Create GroupTypeSlotEntries**
 
 Create `packages/web/src/components/layer-stack/group-type-slot-entries.tsx` with this content:
 
@@ -678,7 +678,7 @@ export function GroupTypeSlotEntries({
 }
 ```
 
-- [ ] **Step 2: Wire the entries into StackPanel**
+- [x] **Step 2: Wire the entries into StackPanel**
 
 In `packages/web/src/components/layer-stack/stack-panel.tsx`:
 
@@ -748,7 +748,7 @@ with:
               />
 ```
 
-- [ ] **Step 3: Run StackPanel tests**
+- [x] **Step 3: Run StackPanel tests**
 
 Run:
 
@@ -758,7 +758,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- stack-panel
 
 Expected: PASS.
 
-- [ ] **Step 4: Run LayerRow tests**
+- [x] **Step 4: Run LayerRow tests**
 
 Run:
 
@@ -768,7 +768,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- layer-row
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit the inline entries**
+- [x] **Step 5: Commit the inline entries**
 
 Run:
 
@@ -777,7 +777,11 @@ rtk git add packages/web/src/components/layer-stack/group-type-slot-entries.tsx 
 rtk git commit -m "feat: add inline group asset picker"
 ```
 
-Implementation note: record the commit hash and verification results below this task.
+**Implementation Note:**
+- **Commit:** feat: add inline group asset picker
+- **Verification:**
+  - `rtk pnpm --filter @lpc-toolkit/web test -- stack-panel`: PASS
+  - `rtk pnpm --filter @lpc-toolkit/web test -- layer-row`: PASS
 
 ---
 
