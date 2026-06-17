@@ -778,7 +778,7 @@ rtk git commit -m "feat: add inline group asset picker"
 ```
 
 **Implementation Note:**
-- **Commit:** feat: add inline group asset picker
+- **Commit:** 09cb58c69e6712864d689e06889cae2f933a102e
 - **Verification:**
   - `rtk pnpm --filter @lpc-toolkit/web test -- stack-panel`: PASS
   - `rtk pnpm --filter @lpc-toolkit/web test -- layer-row`: PASS
