@@ -169,14 +169,14 @@ export function SidebarSearch({
           onKeyDown={onKeyDown}
           placeholder={t('palette.placeholder')}
           aria-label={t('palette.title')}
-          className="flex-1 bg-transparent text-[12px] text-text outline-none disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex-1 bg-transparent text-sm text-text outline-none disabled:cursor-not-allowed disabled:opacity-50"
         />
         {licenseFilter.size < LICENSE_GROUP_ORDER.length && (
-          <span className="rounded bg-accent/15 px-2 py-0.5 font-mono text-[10px] text-accent">
+          <span className="rounded bg-accent/15 px-2 py-0.5 font-mono text-xs text-accent">
             {t('palette.licenseGroupsBadge').replace('{n}', String(licenseFilter.size))}
           </span>
         )}
-        <span className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-text-dim">
+        <span className="rounded border border-border px-1.5 py-0.5 font-mono text-xs text-text-dim">
           ⌘K
         </span>
       </div>
@@ -190,7 +190,7 @@ export function SidebarSearch({
         >
           <div className="max-h-[calc(50vh-28px)] overflow-y-auto">
             {shown.length === 0 ? (
-              <div className="px-3 py-6 text-center text-[12px] text-text-mute">
+              <div className="px-3 py-6 text-center text-sm text-text-mute">
                 {t('palette.no_match')}
               </div>
             ) : (
@@ -244,15 +244,15 @@ export function SidebarSearch({
                       palettes={palettes}
                     />
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1 truncate text-[12px] font-semibold">
+                      <div className="flex items-center gap-1 truncate text-sm font-semibold">
                         {tl.itemName(r.item.name)}
                         {!r.supports && (
-                          <span className="rounded bg-amber-500/15 px-1 text-[9px] uppercase tracking-wide text-amber-500">
+                          <span className="rounded bg-amber-500/15 px-1 text-xs uppercase tracking-wide text-amber-500">
                             {t('palette.incompatible')}
                           </span>
                         )}
                       </div>
-                      <div className="truncate text-[10px] uppercase tracking-wide text-text-mute">
+                      <div className="truncate text-xs uppercase tracking-wide text-text-mute">
                         {tl.category(r.typeName)}
                         {itemLicense && <> · {itemLicense}</>}
                       </div>
@@ -264,7 +264,7 @@ export function SidebarSearch({
               })
             )}
           </div>
-          <div className="flex items-center justify-between border-t border-border px-3 py-1 text-[10px] text-text-dim">
+          <div className="flex items-center justify-between border-t border-border px-3 py-1 text-xs text-text-dim">
             <span>
               {shown.length} of {results.length}
             </span>
