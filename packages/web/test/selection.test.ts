@@ -25,10 +25,10 @@ function defn(
 
 function makeFullCatalog() {
   return createCatalog({
-    'body.json': defn('Body Color', 'body'),
-    'heads_human_male.json': defn('Human Male', 'head'),
-    'face_neutral.json': defn('Neutral', 'expression'),
-    'hair_a.json': defn('Hair A', 'hair'),
+    'body/body.json': defn('Body Color', 'body'),
+    'head/heads_human_male.json': defn('Human Male', 'head'),
+    'head/face_neutral.json': defn('Neutral', 'expression'),
+    'hair/hair_a.json': defn('Hair A', 'hair'),
   }).catalog;
 }
 
@@ -66,44 +66,42 @@ describe('pickInitialSelections', () => {
     expect(state.selections['shoes']).toBeUndefined();
   });
 
-  it('exposes body / head / hair / expression in shownTypeNames so the Common picker shows them', () => {
+  it('exposes body / head / hair / expression in upstream group order', () => {
     const { shownTypeNames } = pickInitialSelections(makeFullCatalog());
     expect(shownTypeNames).toContain('body');
     expect(shownTypeNames).toContain('head');
     expect(shownTypeNames).toContain('expression');
     expect(shownTypeNames).toContain('hair');
-    // Order: defaults first, then the remaining "common" types in the
-    // declared order.
     expect(shownTypeNames.indexOf('body')).toBeLessThan(
       shownTypeNames.indexOf('head'),
     );
     expect(shownTypeNames.indexOf('head')).toBeLessThan(
-      shownTypeNames.indexOf('hair'),
-    );
-    expect(shownTypeNames.indexOf('hair')).toBeLessThan(
       shownTypeNames.indexOf('expression'),
+    );
+    expect(shownTypeNames.indexOf('expression')).toBeLessThan(
+      shownTypeNames.indexOf('hair'),
     );
   });
 
   it('omits common types whose catalog lookup is empty', () => {
     const { catalog } = createCatalog({
-      'body.json': defn('Body Color', 'body'),
-      'heads_human_male.json': defn('Human Male', 'head'),
-      'face_neutral.json': defn('Neutral', 'expression'),
+      'body/body.json': defn('Body Color', 'body'),
+      'head/heads_human_male.json': defn('Human Male', 'head'),
+      'head/face_neutral.json': defn('Neutral', 'expression'),
     });
     const { shownTypeNames } = pickInitialSelections(catalog);
     expect(shownTypeNames).not.toContain('hair');
     expect(shownTypeNames).not.toContain('legs');
   });
 
-  it('includes non-COMMON types from CATEGORY_GROUPS when catalog has them', () => {
+  it('includes non-default upstream type names when catalog has them', () => {
     const { catalog } = createCatalog({
-      'body.json': defn('Body Color', 'body'),
-      'heads_human_male.json': defn('Human Male', 'head'),
-      'face_neutral.json': defn('Neutral', 'expression'),
-      'weapon/sword.json': defn('Sword', 'weapon'),
-      'shield/heater.json': defn('Heater', 'shield'),
-      'wings/feather.json': defn('Feather Wings', 'wings'),
+      'body/body.json': defn('Body Color', 'body'),
+      'head/heads_human_male.json': defn('Human Male', 'head'),
+      'head/face_neutral.json': defn('Neutral', 'expression'),
+      'weapons/sword.json': defn('Sword', 'weapon'),
+      'weapons/shields/heater.json': defn('Heater', 'shield'),
+      'body/wings/feather.json': defn('Feather Wings', 'wings'),
     });
     const { shownTypeNames } = pickInitialSelections(catalog);
     expect(shownTypeNames).toContain('weapon');
@@ -458,4 +456,3 @@ describe('selection slice layout', () => {
     expect(resetState.layout).toBe('single');
   });
 });
-

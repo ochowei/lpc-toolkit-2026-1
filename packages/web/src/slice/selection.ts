@@ -10,8 +10,8 @@ import {
   type TypeName,
 } from '@lpc-toolkit/core';
 import type { CatalogTreeItem } from './catalog-tree';
-import { CATEGORY_GROUPS } from './category-groups';
 import { pickDefaults } from './color-options';
+import { buildShownTypeNamesFromUpstreamGroups } from './upstream-category-groups';
 
 /** Preview zoom bounds used by the reducer and preview controls. */
 export const MIN_ZOOM = 1;
@@ -242,21 +242,7 @@ export function pickInitialSelections(catalog: Catalog): {
     };
   }
 
-  // Show every catalog type the user can theoretically pick. COMMON_TYPE_ORDER
-  // goes first to preserve the head-to-toe display order in the active-layer
-  // list; remaining types follow in CATEGORY_GROUPS declaration order so they
-  // appear under the right super-group in AddLayer / SidebarSearch.
-  const seen = new Set<TypeName>();
-  const shownTypeNames: TypeName[] = [];
-  for (const tn of [
-    ...COMMON_TYPE_ORDER,
-    ...CATEGORY_GROUPS.flatMap((g) => g.typeNames),
-  ]) {
-    if (seen.has(tn)) continue;
-    if ((catalog.byTypeName.get(tn) ?? []).length === 0) continue;
-    seen.add(tn);
-    shownTypeNames.push(tn);
-  }
+  const shownTypeNames = buildShownTypeNamesFromUpstreamGroups(catalog);
 
   return {
     state: {
