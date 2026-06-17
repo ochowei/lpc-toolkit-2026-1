@@ -203,7 +203,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- stack-panel.test.tsx group-type-slot-
 
 Expected: FAIL because `GroupTypeSlotEntries` does not yet accept `sectionOpen` / `onToggleSection`, and `StackPanel` still renders all slot chips by default.
 
-- [ ] **Step 5: Commit the failing tests**
+- [x] **Step 5: Commit the failing tests**
 
 Run:
 
@@ -216,7 +216,7 @@ Implementation note:
 Added red tests for default-collapsed slot groups, active-type auto-open, and focused `GroupTypeSlotEntries` collapsed/open rendering.
 
 Commit:
-Pending.
+843f1e6ef
 
 Verification:
 `rtk pnpm --filter @lpc-toolkit/web test -- stack-panel.test.tsx group-type-slot-entries.test.tsx` FAIL as expected: missing `Show/Hide` toggle copy/rendering and default collapsed behavior.
@@ -229,7 +229,7 @@ Verification:
 - Modify: `packages/web/src/i18n.ts`
 - Modify: `packages/web/test/i18n.test.ts`
 
-- [ ] **Step 1: Add failing i18n coverage**
+- [x] **Step 1: Add failing i18n coverage**
 
 In `packages/web/test/i18n.test.ts`, add assertions to the existing translation key coverage test, or add this test if there is no direct copy lookup test:
 
@@ -255,7 +255,7 @@ Make sure the file imports `createTranslator` if it does not already:
 import { createTranslator } from '../src/i18n';
 ```
 
-- [ ] **Step 2: Run the i18n test and verify it fails**
+- [x] **Step 2: Run the i18n test and verify it fails**
 
 Run:
 
@@ -265,7 +265,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- i18n.test.ts
 
 Expected: FAIL because the new translation keys do not exist.
 
-- [ ] **Step 3: Add English keys**
+- [x] **Step 3: Add English keys**
 
 In `packages/web/src/i18n.ts`, in the `en` translation object near `layers.on` / `layers.off`, add:
 
@@ -276,7 +276,7 @@ In `packages/web/src/i18n.ts`, in the `en` translation object near `layers.on` /
 'groupSlots.slotPlural': 'slots',
 ```
 
-- [ ] **Step 4: Add Traditional Chinese keys**
+- [x] **Step 4: Add Traditional Chinese keys**
 
 In the `zh-TW` translation object near `layers.on` / `layers.off`, add:
 
@@ -287,7 +287,7 @@ In the `zh-TW` translation object near `layers.on` / `layers.off`, add:
 'groupSlots.slotPlural': '欄位',
 ```
 
-- [ ] **Step 5: Run the i18n test and verify it passes**
+- [x] **Step 5: Run the i18n test and verify it passes**
 
 Run:
 
@@ -307,10 +307,13 @@ rtk git commit -m "feat(web): add sidebar slot toggle copy"
 ```
 
 Implementation note:
+Added English and Traditional Chinese copy for sidebar slot group show/hide labels and covered the keys in i18n tests.
 
 Commit:
+Pending.
 
 Verification:
+`rtk pnpm --filter @lpc-toolkit/web test -- i18n.test.ts` PASS: 17 tests passed.
 
 ---
 
