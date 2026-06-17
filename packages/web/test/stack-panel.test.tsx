@@ -115,14 +115,28 @@ describe('StackPanel upstream selected-layer groups', () => {
     }
     expect(html).toContain('Body Color');
     expect(html).toContain('Sword A');
-    expect(html).toContain('+ head');
-    expect(html).toContain('+ hair');
-    expect(html).toContain('+ hat');
-    expect(html).toContain('+ gloves');
+    expect(html).toContain('Show 2 slots');
+    expect(html).toContain('Show 1 slot');
+    expect(html).not.toContain('+ head');
+    expect(html).not.toContain('+ hair');
+    expect(html).not.toContain('+ hat');
+    expect(html).not.toContain('+ gloves');
+    expect(html).not.toContain('+ clothes');
+    expect(html).not.toContain('+ legs');
+    expect(html).not.toContain('+ shoes');
+    expect(html).not.toContain('+ tools');
+  });
+
+  it('opens the containing group when an unselected type picker is active', () => {
+    const html = renderPanel({ expanded: 'clothes' });
+
+    expect(html).toContain('Hide 1 slot');
     expect(html).toContain('+ clothes');
-    expect(html).toContain('+ legs');
-    expect(html).toContain('+ shoes');
-    expect(html).toContain('+ tools');
+    expect(html).toContain('Swap clothes');
+    expect(html).toContain('Long Sleeve');
+    expect(html).toContain('Short Sleeve');
+    expect(html).not.toContain('+ head');
+    expect(html).not.toContain('+ hair');
   });
 
   it('shows selected type slots as replace entries in their groups', () => {
