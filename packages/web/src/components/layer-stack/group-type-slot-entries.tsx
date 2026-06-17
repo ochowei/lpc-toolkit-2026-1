@@ -102,7 +102,7 @@ export function GroupTypeSlotEntries({
         })}
       </div>
 
-      {expanded && typeNames.includes(expanded) && (
+      {expanded && typeNames.includes(expanded) && !state.selections[expanded] && (
         <div className="rounded-md border border-border bg-app pt-2">
           <TypeItemPicker
             disabled={disabled}
