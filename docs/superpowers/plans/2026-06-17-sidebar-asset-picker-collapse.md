@@ -447,7 +447,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- group-type-slot-entries.test.tsx
 
 Expected: PASS for `group-type-slot-entries.test.tsx`; `stack-panel.test.tsx` may still fail until `StackPanel` passes the new props.
 
-- [ ] **Step 8: Commit component rendering**
+- [x] **Step 8: Commit component rendering**
 
 Run:
 
@@ -460,7 +460,7 @@ Implementation note:
 `GroupTypeSlotEntries` now accepts section open/toggle props, renders localized show/hide controls, hides slot chips when closed, and keeps the inline picker outside the chip wrapper.
 
 Commit:
-Pending.
+e54459848
 
 Verification:
 `rtk pnpm --filter @lpc-toolkit/web test -- group-type-slot-entries.test.tsx` PASS: 3 tests passed.
@@ -473,7 +473,7 @@ Verification:
 - Modify: `packages/web/src/components/layer-stack/stack-panel.tsx`
 - Modify: `packages/web/test/stack-panel.test.tsx`
 
-- [ ] **Step 1: Add group-level state**
+- [x] **Step 1: Add group-level state**
 
 In `StackPanel`, after:
 
@@ -487,7 +487,7 @@ add:
   const [expandedSectionId, setExpandedSectionId] = useState<string | null>(null);
 ```
 
-- [ ] **Step 2: Add a helper for active type containment**
+- [x] **Step 2: Add a helper for active type containment**
 
 Inside the `sections.map((section) => { ... })` callback, after `activeTypeNames`, add:
 
@@ -498,7 +498,7 @@ Inside the `sections.map((section) => { ... })` callback, after `activeTypeNames
           const sectionOpen = expandedSectionId === section.id || sectionHasExpandedType;
 ```
 
-- [ ] **Step 3: Pass collapse props to `GroupTypeSlotEntries`**
+- [x] **Step 3: Pass collapse props to `GroupTypeSlotEntries`**
 
 Update the `GroupTypeSlotEntries` usage to include:
 
@@ -522,7 +522,7 @@ The full opening should look like:
                 catalog={catalog}
 ```
 
-- [ ] **Step 4: Strengthen group visual separation and label size**
+- [x] **Step 4: Strengthen group visual separation and label size**
 
 Change the group `<section>` class from:
 
@@ -548,7 +548,7 @@ to:
 className="mb-1 rounded-md bg-surface px-2 py-1.5 text-[12px] font-semibold uppercase tracking-wide text-text-2"
 ```
 
-- [ ] **Step 5: Run StackPanel tests**
+- [x] **Step 5: Run StackPanel tests**
 
 Run:
 
@@ -568,10 +568,13 @@ rtk git commit -m "feat(web): wire sidebar group slot collapse state"
 ```
 
 Implementation note:
+`StackPanel` now owns one `expandedSectionId`, derives section open state from that or the active `expanded` type, passes collapse props down, and uses stronger section borders/header typography. StackPanel tests were aligned to assert selected rows remain visible while replacement slot chips are collapsed by default.
 
 Commit:
+Pending.
 
 Verification:
+`rtk pnpm --filter @lpc-toolkit/web test -- stack-panel.test.tsx group-type-slot-entries.test.tsx` PASS: 9 tests passed.
 
 ---
 
