@@ -635,7 +635,7 @@ In the browser, verify:
 - Replacement card display modes still work.
 - Dark and light themes remain legible.
 
-- [ ] **Step 6: Record final verification and commit plan updates**
+- [x] **Step 6: Record final verification and commit plan updates**
 
 After filling in task notes, commit the final plan status update:
 
@@ -648,7 +648,7 @@ Implementation note:
 Ran final focused and full web verification, then started Vite at `http://localhost:5173/` and verified the sidebar with headless Chrome. Confirmed groups are visible, selected Body/Head rows remain visible, slot chips are collapsed by default, opening Head reveals its slot chips/replacement entries, opening Body closes Head, and opening Hair's picker preserves replacement card display controls.
 
 Commit:
-Pending.
+038ea0080
 
 Verification:
 Focused tests PASS: `rtk pnpm --filter @lpc-toolkit/web test -- stack-panel.test.tsx group-type-slot-entries.test.tsx i18n.test.ts` (26 tests).
