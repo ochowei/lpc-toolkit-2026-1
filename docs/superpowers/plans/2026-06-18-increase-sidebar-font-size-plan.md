@@ -15,7 +15,10 @@
 **Files:**
 - Modify: `packages/web/src/components/layer-stack/sidebar-search.tsx`
 
-- [ ] **Step 1: Replace hardcoded font sizes in sidebar-search.tsx**
+- [x] **Step 1: Replace hardcoded font sizes in sidebar-search.tsx**
+  - Commit: d3d0ffd57fabb623631cf3d3c251b41ab29538f4
+  - Verification: pnpm typecheck PASS, unit tests PASS
+  - Note: Replaced all custom pixel sizes with standard text-xs/text-sm in sidebar-search.tsx.
 
 Replace `text-[12px]` with `text-sm`, `text-[10px]` with `text-xs`, and `text-[9px]` with `text-xs`.
 
@@ -121,22 +124,29 @@ Replacement content:
             </span>
 ```
 
-- [ ] **Step 2: Verify typecheck passes**
+- [x] **Step 2: Verify typecheck passes**
+  - Commit: d3d0ffd57fabb623631cf3d3c251b41ab29538f4
+  - Verification: pnpm typecheck PASS
 
 Run: `rtk pnpm --filter @lpc-toolkit/web typecheck`
 Expected: PASS with no errors.
 
-- [ ] **Step 3: Run unit tests**
+- [x] **Step 3: Run unit tests**
+  - Commit: d3d0ffd57fabb623631cf3d3c251b41ab29538f4
+  - Verification: pnpm test PASS
 
 Run: `rtk pnpm --filter @lpc-toolkit/web test`
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
+  - Commit: d3d0ffd57fabb623631cf3d3c251b41ab29538f4
+  - Verification: Commit succeeded with hash d3d0ffd57fabb623631cf3d3c251b41ab29538f4
 
 ```bash
 git add packages/web/src/components/layer-stack/sidebar-search.tsx
 git commit -m "feat(web): migrate sidebar search font sizes to standard Tailwind scale"
 ```
+
 
 ---
 
