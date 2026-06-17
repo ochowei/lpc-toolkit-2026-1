@@ -1,4 +1,4 @@
-import type { TypeName } from '@lpc-toolkit/core';
+import type { TypeName, BodyType } from '@lpc-toolkit/core';
 import type { TranslationKey } from './i18n';
 
 /** One item slot in a preset: a catalog item plus an optional variant. */
@@ -17,6 +17,7 @@ export interface Preset {
   readonly id: string;
   readonly labelKey: TranslationKey;
   readonly emoji: string;
+  readonly bodyType?: BodyType;
   readonly items: readonly PresetItem[];
 }
 
@@ -57,11 +58,15 @@ export const PRESETS: readonly Preset[] = [
     id: 'farmer',
     labelKey: 'preset.farmer',
     emoji: '🌾',
+    bodyType: 'male',
     items: [
-      { typeName: 'clothes', name: 'Shortsleeve' },
+      { typeName: 'body', name: 'Body Color', recolor: 'light' },
+      { typeName: 'head', name: 'Human Male', recolor: 'light' },
+      { typeName: 'expression', name: 'Neutral', recolor: 'light' },
+      { typeName: 'clothes', name: 'Shortsleeve', recolor: 'brown' },
       { typeName: 'overalls', name: 'Overalls', variant: 'brown' },
-      { typeName: 'shoes', name: 'Sandals', variant: 'brown' },
-      { typeName: 'hat', name: 'Leather Cap', variant: 'brown' },
+      { typeName: 'shoes', name: 'Basic Boots', variant: 'brown' },
+      { typeName: 'hair', name: 'Messy3', recolor: 'orange' },
     ],
   },
   {

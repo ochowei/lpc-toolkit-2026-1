@@ -65,7 +65,7 @@ export function PresetMenuPopover({
             onClick={() => {
               dispatch({
                 type: 'apply_selections',
-                selections: { bodyType: state.bodyType, items: preview.selections },
+                selections: { bodyType: preview.bodyType, items: preview.selections },
               });
               onApplied(
                 label,
