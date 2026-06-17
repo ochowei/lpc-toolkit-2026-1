@@ -297,7 +297,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- i18n.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit localized copy**
+- [x] **Step 6: Commit localized copy**
 
 Run:
 
@@ -310,7 +310,7 @@ Implementation note:
 Added English and Traditional Chinese copy for sidebar slot group show/hide labels and covered the keys in i18n tests.
 
 Commit:
-Pending.
+cf62c8078
 
 Verification:
 `rtk pnpm --filter @lpc-toolkit/web test -- i18n.test.ts` PASS: 17 tests passed.
@@ -323,7 +323,7 @@ Verification:
 - Modify: `packages/web/src/components/layer-stack/group-type-slot-entries.tsx`
 - Modify: `packages/web/test/group-type-slot-entries.test.tsx`
 
-- [ ] **Step 1: Update component props**
+- [x] **Step 1: Update component props**
 
 In `packages/web/src/components/layer-stack/group-type-slot-entries.tsx`, extend `Props` with:
 
@@ -339,7 +339,7 @@ Update the function parameter list to destructure:
   onToggleSection,
 ```
 
-- [ ] **Step 2: Add a localized toggle label helper**
+- [x] **Step 2: Add a localized toggle label helper**
 
 Below `hasBodyCompatibleItem`, add:
 
@@ -359,7 +359,7 @@ function slotToggleLabel(args: {
 }
 ```
 
-- [ ] **Step 3: Compute compatible slot count**
+- [x] **Step 3: Compute compatible slot count**
 
 At the top of `GroupTypeSlotEntries`, after the empty-type guard, add:
 
@@ -374,7 +374,7 @@ At the top of `GroupTypeSlotEntries`, after the empty-type guard, add:
   });
 ```
 
-- [ ] **Step 4: Render the compact toggle control**
+- [x] **Step 4: Render the compact toggle control**
 
 Replace the outer returned `<div className="mt-1 space-y-1 px-1">` opening and its immediate child structure with:
 
@@ -406,7 +406,7 @@ Replace the outer returned `<div className="mt-1 space-y-1 px-1">` opening and i
 
 Keep the existing `{typeNames.map(...)}` block inside that new inner `<div>`.
 
-- [ ] **Step 5: Increase slot chip readability**
+- [x] **Step 5: Increase slot chip readability**
 
 Inside each slot chip button class list, change:
 
@@ -420,7 +420,7 @@ to:
 'rounded-full border px-3 py-1.5 text-[12px]',
 ```
 
-- [ ] **Step 6: Close the conditional wrapper**
+- [x] **Step 6: Close the conditional wrapper**
 
 After the existing `</div>` that closes the flex-wrap chip list, add the conditional close so the picker remains after the slot-chip list:
 
@@ -437,7 +437,7 @@ The inline picker block that starts with:
 
 must remain after the conditional chip wrapper, so an active picker is visible whenever `StackPanel` marks the section open.
 
-- [ ] **Step 7: Run focused component tests**
+- [x] **Step 7: Run focused component tests**
 
 Run:
 
@@ -457,10 +457,13 @@ rtk git commit -m "feat(web): collapse group slot entries"
 ```
 
 Implementation note:
+`GroupTypeSlotEntries` now accepts section open/toggle props, renders localized show/hide controls, hides slot chips when closed, and keeps the inline picker outside the chip wrapper.
 
 Commit:
+Pending.
 
 Verification:
+`rtk pnpm --filter @lpc-toolkit/web test -- group-type-slot-entries.test.tsx` PASS: 3 tests passed.
 
 ---
 
