@@ -93,7 +93,7 @@ export function FullSpritesheetPreview({
               type="button"
               onClick={() => onZoom(z)}
               className={[
-                'rounded px-2 py-0.5 font-mono text-[10px] font-semibold',
+                'rounded px-2 py-0.5 font-mono text-xs font-semibold',
                 zoom === z
                   ? 'bg-accent text-accent-ink'
                   : 'text-text-2 hover:bg-white/10',
