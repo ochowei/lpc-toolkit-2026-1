@@ -80,6 +80,7 @@ export function StackPanel({
   onReplacementCardDisplayModeChange,
 }: Props) {
   const [adding, setAdding] = useState(false);
+  const [expandedSectionId, setExpandedSectionId] = useState<string | null>(null);
 
   const active = useMemo(
     () => shownTypeNames.filter((tn) => state.selections[tn] != null),
@@ -141,9 +142,13 @@ export function StackPanel({
       <div className="min-h-0 flex-1 overflow-y-auto px-2">
         {sections.map((section) => {
           const activeTypeNames = section.typeNames.filter((tn) => active.includes(tn));
+          const sectionHasExpandedType = expanded
+            ? section.typeNames.includes(expanded)
+            : false;
+          const sectionOpen = expandedSectionId === section.id || sectionHasExpandedType;
           return (
-            <section key={section.id} className="border-b border-border/60 py-2 last:border-b-0">
-              <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-text-mute">
+            <section key={section.id} className="border-b border-border-strong/60 py-3 last:border-b-0">
+              <div className="mb-1 rounded-md bg-surface px-2 py-1.5 text-[12px] font-semibold uppercase tracking-wide text-text-2">
                 {section.label}
               </div>
               {activeTypeNames.length === 0 ? (
@@ -171,6 +176,10 @@ export function StackPanel({
               )}
               <GroupTypeSlotEntries
                 disabled={disabled}
+                sectionOpen={sectionOpen}
+                onToggleSection={() => {
+                  setExpandedSectionId(sectionOpen ? null : section.id);
+                }}
                 typeNames={section.typeNames}
                 catalog={catalog}
                 palettes={palettes}

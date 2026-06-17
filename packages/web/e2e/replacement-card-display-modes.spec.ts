@@ -2,10 +2,16 @@ import { expect, test } from '@playwright/test';
 
 const STORAGE_KEY = 'lpc.replacement-card-display-mode.v1';
 
+function selectedLayerButtons(page: import('@playwright/test').Page) {
+  return page
+    .locator('aside button[aria-expanded]:not([aria-haspopup])')
+    .filter({ has: page.locator('[aria-label^="Clear "]') });
+}
+
 async function openFirstReplacementGrid(
   page: import('@playwright/test').Page,
 ) {
-  const firstLayer = page.locator('aside button[aria-expanded]:not([aria-haspopup])').first();
+  const firstLayer = selectedLayerButtons(page).first();
   await expect(firstLayer).toBeVisible();
   await firstLayer.click();
   await expect(
@@ -50,9 +56,9 @@ test.describe('replacement card display modes', () => {
       page.evaluate((key) => window.localStorage.getItem(key), STORAGE_KEY)
     ).toBe('hidden');
 
-    const firstLayer = page.locator('aside button[aria-expanded]:not([aria-haspopup])').first();
+    const firstLayer = selectedLayerButtons(page).first();
     await firstLayer.click();
-    const secondLayer = page.locator('aside button[aria-expanded]:not([aria-haspopup])').nth(1);
+    const secondLayer = selectedLayerButtons(page).nth(1);
     await secondLayer.click();
     await expect(page.locator('button[data-label-layout]').first())
       .toHaveAttribute('data-label-layout', 'hidden');

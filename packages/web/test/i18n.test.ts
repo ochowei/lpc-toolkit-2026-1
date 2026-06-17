@@ -83,6 +83,20 @@ describe('i18n', () => {
     expect(zh('reset.cancel')).toBe('取消');
   });
 
+  it('translates sidebar slot group toggle copy', () => {
+    const en = createTranslator('en');
+    const zh = createTranslator('zh-TW');
+
+    expect(en('groupSlots.show')).toBe('Show {n} {slotLabel}');
+    expect(en('groupSlots.hide')).toBe('Hide {n} {slotLabel}');
+    expect(en('groupSlots.slotSingular')).toBe('slot');
+    expect(en('groupSlots.slotPlural')).toBe('slots');
+    expect(zh('groupSlots.show')).toBe('顯示 {n} 個欄位');
+    expect(zh('groupSlots.hide')).toBe('隱藏 {n} 個欄位');
+    expect(zh('groupSlots.slotSingular')).toBe('欄位');
+    expect(zh('groupSlots.slotPlural')).toBe('欄位');
+  });
+
   it('includes outfit preset keys in both locales', () => {
     const presetKeys = [
       'preset.title',

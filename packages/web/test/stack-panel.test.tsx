@@ -115,22 +115,38 @@ describe('StackPanel upstream selected-layer groups', () => {
     }
     expect(html).toContain('Body Color');
     expect(html).toContain('Sword A');
-    expect(html).toContain('+ head');
-    expect(html).toContain('+ hair');
-    expect(html).toContain('+ hat');
-    expect(html).toContain('+ gloves');
-    expect(html).toContain('+ clothes');
-    expect(html).toContain('+ legs');
-    expect(html).toContain('+ shoes');
-    expect(html).toContain('+ tools');
+    expect(html).toContain('Show 1 slot');
+    expect(html).not.toContain('+ head');
+    expect(html).not.toContain('+ hair');
+    expect(html).not.toContain('+ hat');
+    expect(html).not.toContain('+ gloves');
+    expect(html).not.toContain('+ clothes');
+    expect(html).not.toContain('+ legs');
+    expect(html).not.toContain('+ shoes');
+    expect(html).not.toContain('+ tools');
   });
 
-  it('shows selected type slots as replace entries in their groups', () => {
+  it('opens the containing group when an unselected type picker is active', () => {
+    const html = renderPanel({ expanded: 'clothes' });
+
+    expect(html).toContain('Hide 1 slot');
+    expect(html).toContain('+ clothes');
+    expect(html).toContain('Swap clothes');
+    expect(html).toContain('Long Sleeve');
+    expect(html).toContain('Short Sleeve');
+    expect(html).not.toContain('+ head');
+    expect(html).not.toContain('+ hair');
+  });
+
+  it('keeps selected layer rows visible while slot entries are collapsed', () => {
     const html = renderPanel();
 
-    expect(html).toContain('body: Body Color');
-    expect(html).toContain('weapon: Sword A');
-    expect(html).toContain('Replace');
+    expect(html).toContain('Body Color');
+    expect(html).toContain('Sword A');
+    expect(html).toContain('Clear body');
+    expect(html).toContain('Clear weapon');
+    expect(html).not.toContain('body: Body Color - Replace');
+    expect(html).not.toContain('weapon: Sword A - Replace');
   });
 
   it('shows selected item fallback names in replace entries when catalog lookup is missing', () => {
@@ -144,8 +160,9 @@ describe('StackPanel upstream selected-layer groups', () => {
 
     const html = renderPanel({ state: missingCatalogState });
 
-    expect(html).toContain('hat: Missing Hat');
-    expect(html).toContain('Replace');
+    expect(html).toContain('Missing Hat');
+    expect(html).toContain('Clear hat');
+    expect(html).not.toContain('hat: Missing Hat - Replace');
   });
 
   it('opens an inline picker for an unselected type without selecting the first item', () => {

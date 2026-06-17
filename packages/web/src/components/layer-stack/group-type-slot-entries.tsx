@@ -9,6 +9,8 @@ import { TypeItemPicker } from './type-item-picker';
 
 interface Props {
   disabled: boolean;
+  sectionOpen: boolean;
+  onToggleSection: () => void;
   typeNames: readonly TypeName[];
   catalog: Catalog;
   palettes: PaletteMetadata;
@@ -47,9 +49,25 @@ function hasBodyCompatibleItem(args: {
   );
 }
 
+function slotToggleLabel(args: {
+  readonly open: boolean;
+  readonly count: number;
+  readonly t: Translator;
+}) {
+  const slotLabel = args.t(
+    args.count === 1 ? 'groupSlots.slotSingular' : 'groupSlots.slotPlural',
+  );
+  return args
+    .t(args.open ? 'groupSlots.hide' : 'groupSlots.show')
+    .replace('{n}', String(args.count))
+    .replace('{slotLabel}', slotLabel);
+}
+
 /** Inline add/replace entries for every type slot in one upstream group. */
 export function GroupTypeSlotEntries({
   disabled,
+  sectionOpen,
+  onToggleSection,
   typeNames,
   catalog,
   palettes,
@@ -66,41 +84,72 @@ export function GroupTypeSlotEntries({
 }: Props) {
   if (typeNames.length === 0) return null;
 
+  const compatibleTypeNames = typeNames.filter((typeName) =>
+    hasBodyCompatibleItem({ catalog, state, typeName }),
+  );
+  const toggleLabel = slotToggleLabel({
+    open: sectionOpen,
+    count: compatibleTypeNames.length,
+    t,
+  });
+
   return (
     <div className="mt-1 space-y-1 px-1">
-      <div className="flex flex-wrap gap-1">
-        {typeNames.map((typeName) => {
-          const currentName = selectedItemName({ catalog, state, typeName });
-          const hasCompatible = hasBodyCompatibleItem({ catalog, state, typeName });
-          const entryDisabled = disabled || !hasCompatible;
-          const selected = expanded === typeName;
-          const label = currentName
-            ? `${tl.category(typeName)}: ${tl.itemName(currentName)} - Replace`
-            : `+ ${tl.category(typeName)}`;
+      <button
+        type="button"
+        disabled={disabled || compatibleTypeNames.length === 0}
+        aria-expanded={sectionOpen}
+        onClick={onToggleSection}
+        className={[
+          'flex w-full items-center justify-between rounded-md border px-2.5 py-1.5',
+          'text-left text-[12px] font-medium',
+          sectionOpen
+            ? 'border-accent bg-accent/10 text-text'
+            : 'border-border bg-surface-2 text-text-2',
+          disabled || compatibleTypeNames.length === 0
+            ? 'cursor-not-allowed opacity-40'
+            : 'hover:bg-surface-3 cursor-pointer',
+        ].join(' ')}
+      >
+        <span>{toggleLabel}</span>
+        <span aria-hidden>{sectionOpen ? '▾' : '▸'}</span>
+      </button>
 
-          return (
-            <button
-              key={typeName}
-              type="button"
-              disabled={entryDisabled}
-              title={!hasCompatible ? t('picker.incompatibleBodyType') : label}
-              aria-expanded={selected}
-              onClick={() => setExpanded(selected ? null : typeName)}
-              className={[
-                'rounded-full border px-2.5 py-1 text-[11px]',
-                selected
-                  ? 'border-accent bg-accent/15 text-text'
-                  : 'border-border bg-surface-2 text-text-2',
-                entryDisabled
-                  ? 'cursor-not-allowed opacity-40'
-                  : 'hover:bg-surface-3 cursor-pointer',
-              ].join(' ')}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
+      {sectionOpen && (
+        <div className="flex flex-wrap gap-1.5">
+          {typeNames.map((typeName) => {
+            const currentName = selectedItemName({ catalog, state, typeName });
+            const hasCompatible = hasBodyCompatibleItem({ catalog, state, typeName });
+            const entryDisabled = disabled || !hasCompatible;
+            const selected = expanded === typeName;
+            const label = currentName
+              ? `${tl.category(typeName)}: ${tl.itemName(currentName)} - Replace`
+              : `+ ${tl.category(typeName)}`;
+
+            return (
+              <button
+                key={typeName}
+                type="button"
+                disabled={entryDisabled}
+                title={!hasCompatible ? t('picker.incompatibleBodyType') : label}
+                aria-expanded={selected}
+                onClick={() => setExpanded(selected ? null : typeName)}
+                className={[
+                  'rounded-full border px-3 py-1.5 text-[12px]',
+                  selected
+                    ? 'border-accent bg-accent/15 text-text'
+                    : 'border-border bg-surface-2 text-text-2',
+                  entryDisabled
+                    ? 'cursor-not-allowed opacity-40'
+                    : 'hover:bg-surface-3 cursor-pointer',
+                ].join(' ')}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {expanded && typeNames.includes(expanded) && !state.selections[expanded] && (
         <div className="rounded-md border border-border bg-app pt-2">
