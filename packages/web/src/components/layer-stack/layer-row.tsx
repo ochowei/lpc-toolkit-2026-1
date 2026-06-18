@@ -52,13 +52,13 @@ export function LayerRow({
 
   return (
     <div
-      className="mb-2 rounded-lg border border-border bg-surface-2 p-2.5 transition hover:bg-surface-3 shadow-sm"
+      className="mb-2 rounded-lg border border-border bg-surface-2 p-2.5 transition hover:bg-surface-3 shadow-sm flex items-center justify-between gap-2 flex-wrap"
     >
       <button
         type="button"
         aria-expanded={expanded}
         onClick={onToggle}
-        className="flex w-full items-center gap-2 text-left bg-transparent p-0 focus:outline-none"
+        className="flex flex-1 items-center gap-2 text-left bg-transparent p-0 focus:outline-none cursor-pointer min-w-0"
       >
         {item ? (
           <ItemThumbnail
@@ -109,52 +109,58 @@ export function LayerRow({
             })()}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span
-            role="button"
-            aria-disabled={disabled}
-            tabIndex={disabled ? -1 : 0}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (disabled) return;
-              dispatch({ type: 'clear', typeName });
-            }}
-            onKeyDown={(e) => {
-              if (disabled) return;
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                dispatch({ type: 'clear', typeName });
-              }
-            }}
-            className={[
-              'rounded p-1 text-text-mute transition-colors',
-              disabled
-                ? 'cursor-not-allowed opacity-50'
-                : 'hover:bg-surface-3 hover:text-danger',
-            ].join(' ')}
-            aria-label={`Clear ${typeName}`}
-          >
-            ✕
-          </span>
-          <span className="text-xs text-text-mute">{expanded ? '▼' : '▶'}</span>
-        </div>
       </button>
 
-      {expanded && (
-        <TypeItemPicker
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
           disabled={disabled}
-          typeName={typeName}
-          catalog={catalog}
-          palettes={palettes}
-          state={state}
-          dispatch={dispatch}
-          tl={tl}
-          t={t}
-          licenseFilter={licenseFilter}
-          animationFilter={animationFilter}
-          replacementCardDisplayMode={replacementCardDisplayMode}
-          onReplacementCardDisplayModeChange={onReplacementCardDisplayModeChange}
-        />
+          onClick={(e) => {
+            e.stopPropagation();
+            if (disabled) return;
+            dispatch({ type: 'clear', typeName });
+          }}
+          className={[
+            'rounded p-1 text-text-mute transition-colors cursor-pointer',
+            disabled
+              ? 'cursor-not-allowed opacity-50'
+              : 'hover:bg-surface-3 hover:text-danger',
+          ].join(' ')}
+          aria-label={`Clear ${typeName}`}
+        >
+          ✕
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle();
+          }}
+          className="text-xs text-text-mute p-1 cursor-pointer focus:outline-none"
+          aria-expanded={expanded}
+          aria-label={expanded ? 'Collapse' : 'Expand'}
+        >
+          {expanded ? '▼' : '▶'}
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="w-full">
+          <TypeItemPicker
+            disabled={disabled}
+            typeName={typeName}
+            catalog={catalog}
+            palettes={palettes}
+            state={state}
+            dispatch={dispatch}
+            tl={tl}
+            t={t}
+            licenseFilter={licenseFilter}
+            animationFilter={animationFilter}
+            replacementCardDisplayMode={replacementCardDisplayMode}
+            onReplacementCardDisplayModeChange={onReplacementCardDisplayModeChange}
+          />
+        </div>
       )}
     </div>
   );
