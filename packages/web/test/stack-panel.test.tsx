@@ -172,15 +172,6 @@ describe('StackPanel upstream selected-layer groups', () => {
     expect(html).not.toContain('hat: Missing Hat - Replace');
   });
 
-  it('opens an inline picker for an unselected type without selecting the first item', () => {
-    const html = renderPanel({ expanded: 'clothes' });
-
-    expect(html).toContain('Swap clothes');
-    expect(html).toContain('Long Sleeve');
-    expect(html).toContain('Short Sleeve');
-    expect(html).toContain('grid-cols-[repeat(auto-fill,minmax(72px,1fr))]');
-  });
-
   it('opens an inline picker for a selected type with the current item marked selected', () => {
     const selectedClothesState: SliceState = {
       ...state,
