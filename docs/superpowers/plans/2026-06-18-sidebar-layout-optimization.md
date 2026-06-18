@@ -36,7 +36,7 @@
   rtk git add packages/web/src/components/layer-stack/layer-row.tsx
   rtk git commit -m "feat: redesign active layer row to card layout"
   ```
-  - Commit: 87701177f, refactored in 49c822426 (fixed nested interactive HTML/a11y violation) & e44771c2c (a11y review updates)
+  - Commit: 87701177f, refactored in 49c822426, e44771c2c, and 256b501f8 (vertical flex layout, nested caret, and clear button hover improvements)
 
 ---
 
