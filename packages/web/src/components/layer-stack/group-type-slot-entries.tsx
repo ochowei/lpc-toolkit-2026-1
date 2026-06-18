@@ -101,22 +101,18 @@ export function GroupTypeSlotEntries({
         aria-expanded={sectionOpen}
         onClick={onToggleSection}
         className={[
-          'flex w-full items-center justify-between rounded-md border px-2.5 py-1.5',
-          'text-left text-sm font-medium',
-          sectionOpen
-            ? 'border-accent bg-accent/10 text-text'
-            : 'border-border bg-surface-2 text-text-2',
+          'flex w-full items-center justify-between rounded-md bg-surface-2 border border-border px-3 py-2 text-left text-xs font-semibold text-text-2 hover:bg-surface-3 cursor-pointer',
           disabled || compatibleTypeNames.length === 0
             ? 'cursor-not-allowed opacity-40'
-            : 'hover:bg-surface-3 cursor-pointer',
+            : '',
         ].join(' ')}
       >
         <span>{toggleLabel}</span>
-        <span aria-hidden>{sectionOpen ? '▾' : '▸'}</span>
+        <span aria-hidden>{sectionOpen ? '▼' : '▶'}</span>
       </button>
 
       {sectionOpen && (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-col gap-1.5 mt-1.5">
           {typeNames.map((typeName) => {
             const currentName = selectedItemName({ catalog, state, typeName });
             const hasCompatible = hasBodyCompatibleItem({ catalog, state, typeName });
@@ -135,16 +131,17 @@ export function GroupTypeSlotEntries({
                 aria-expanded={selected}
                 onClick={() => setExpanded(selected ? null : typeName)}
                 className={[
-                  'rounded-full border px-3 py-1.5 text-sm',
+                  'flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-xs font-semibold transition shadow-sm',
                   selected
-                    ? 'border-accent bg-accent/15 text-text'
+                    ? 'border-accent bg-accent/10 text-text'
                     : 'border-border bg-surface-2 text-text-2',
                   entryDisabled
                     ? 'cursor-not-allowed opacity-40'
                     : 'hover:bg-surface-3 cursor-pointer',
                 ].join(' ')}
               >
-                {label}
+                <span>{label}</span>
+                <span aria-hidden className="text-xs text-text-mute select-none">{selected ? '▼' : '▶'}</span>
               </button>
             );
           })}
