@@ -52,15 +52,13 @@ export function LayerRow({
 
   return (
     <div
-      className={`mb-1 rounded-md border ${
-        expanded ? 'border-border bg-app' : 'border-transparent'
-      }`}
+      className="mb-2 rounded-lg border border-border bg-surface-2 p-2.5 transition hover:bg-surface-3 shadow-sm"
     >
       <button
         type="button"
         aria-expanded={expanded}
         onClick={onToggle}
-        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-surface-2"
+        className="flex w-full items-center gap-2 text-left bg-transparent p-0 focus:outline-none"
       >
         {item ? (
           <ItemThumbnail
@@ -76,12 +74,12 @@ export function LayerRow({
         ) : (
           <div className="h-7 w-7 shrink-0 rounded bg-surface-2" aria-hidden />
         )}
-        <div className="min-w-0 flex-1">
+        <div className="flex flex-col min-w-0 flex-1 justify-center">
           <div className="truncate text-sm font-semibold text-text">
             {item ? tl.itemName(item.name) : selection.name}
           </div>
-          <div className="flex items-center gap-1 text-xs uppercase tracking-wide text-text-mute">
-            <span>{tl.category(typeName)}</span>
+          <div className="flex items-center gap-1 text-xs text-text-mute">
+            <span className="uppercase tracking-wide font-medium">{tl.category(typeName)}</span>
             {selection.variant && (
               <>
                 <span>·</span>
@@ -111,33 +109,35 @@ export function LayerRow({
             })()}
           </div>
         </div>
-        <span
-          role="button"
-          aria-disabled={disabled}
-          tabIndex={disabled ? -1 : 0}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (disabled) return;
-            dispatch({ type: 'clear', typeName });
-          }}
-          onKeyDown={(e) => {
-            if (disabled) return;
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
+        <div className="flex items-center gap-2">
+          <span
+            role="button"
+            aria-disabled={disabled}
+            tabIndex={disabled ? -1 : 0}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (disabled) return;
               dispatch({ type: 'clear', typeName });
-            }
-          }}
-          className={[
-            'rounded p-1 text-text-mute',
-            disabled
-              ? 'cursor-not-allowed opacity-50'
-              : 'hover:bg-surface-3 hover:text-danger',
-          ].join(' ')}
-          aria-label={`Clear ${typeName}`}
-        >
-          ✕
-        </span>
-        <span className="text-xs text-text-mute">{expanded ? '▾' : '▸'}</span>
+            }}
+            onKeyDown={(e) => {
+              if (disabled) return;
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                dispatch({ type: 'clear', typeName });
+              }
+            }}
+            className={[
+              'rounded p-1 text-text-mute transition-colors',
+              disabled
+                ? 'cursor-not-allowed opacity-50'
+                : 'hover:bg-surface-3 hover:text-danger',
+            ].join(' ')}
+            aria-label={`Clear ${typeName}`}
+          >
+            ✕
+          </span>
+          <span className="text-xs text-text-mute">{expanded ? '▼' : '▶'}</span>
+        </div>
       </button>
 
       {expanded && (
