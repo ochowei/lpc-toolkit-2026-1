@@ -96,17 +96,17 @@ export function GroupTypeSlotEntries({
   const isDisabled = disabled || compatibleTypeNames.length === 0;
 
   return (
-    <div className="mt-1 space-y-1 px-1">
+    <div className="mt-1 space-y-1 pl-2 pr-1">
       <button
         type="button"
         disabled={isDisabled}
         aria-expanded={sectionOpen}
         onClick={onToggleSection}
         className={[
-          'flex w-full items-center justify-between rounded-md bg-surface-2 border border-border px-3 py-2 text-left text-xs font-semibold text-text-2',
+          'flex w-full items-center justify-between rounded-md bg-transparent border border-dashed border-border px-3 py-2 text-left text-xs font-semibold text-text-mute transition-colors',
           isDisabled
             ? 'cursor-not-allowed opacity-40'
-            : 'hover:bg-surface-3 cursor-pointer',
+            : 'hover:bg-surface-2 hover:text-text hover:border-border cursor-pointer',
         ].join(' ')}
       >
         <span>{toggleLabel}</span>
@@ -114,7 +114,7 @@ export function GroupTypeSlotEntries({
       </button>
 
       {sectionOpen && (
-        <div className="flex flex-col gap-1.5 mt-1.5">
+        <div className="flex flex-col gap-1.5 mt-1.5 pl-2">
           {typeNames.map((typeName) => {
             const currentName = selectedItemName({ catalog, state, typeName });
             const hasCompatible = hasBodyCompatibleItem({ catalog, state, typeName });

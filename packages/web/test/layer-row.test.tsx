@@ -93,6 +93,9 @@ describe('LayerRow collapsed summary', () => {
     expect(html).toContain('斧頭');
     expect(html).toContain('style="width:28px;height:28px"');
     expect(html).not.toContain('grid-cols-[repeat(auto-fill,minmax(72px,1fr))]');
+    expect(html).toContain('border-l-4');
+    expect(html).toContain('border-l-accent');
+    expect(html).toContain('pl-2');
   });
 });
 

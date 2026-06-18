@@ -73,6 +73,9 @@ describe('GroupTypeSlotEntries collapsed groups', () => {
 
     expect(html).toContain('Show 3 slots');
     expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain('bg-transparent');
+    expect(html).toContain('border-dashed');
+    expect(html).toContain('text-text-mute');
     expect(html).not.toContain('+ head');
     expect(html).not.toContain('expression: Neutral');
     expect(html).not.toContain('+ ears');
@@ -86,6 +89,8 @@ describe('GroupTypeSlotEntries collapsed groups', () => {
     expect(html).toContain('+ head');
     expect(html).toContain('expression: Neutral - Replace');
     expect(html).toContain('+ ears');
+    expect(html).toContain('pl-2 pr-1');
+    expect(html).toContain('mt-1.5 pl-2');
   });
 
   it('keeps the inline picker visible for the active unselected type', () => {
