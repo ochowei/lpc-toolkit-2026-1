@@ -16,33 +16,25 @@
 - Modify: `packages/web/src/components/layer-stack/layer-row.tsx:54-56`
 - Modify: `packages/web/test/layer-row.test.tsx:70-87`
 
-- [ ] **Step 1: Update layer-row.tsx wrapper styling**
+- [x] **Step 1: Update layer-row.tsx wrapper styling**
+  - Note: Added border-l-4, border-l-accent, and pl-2 classes.
+  - Commit: 8b14a7eca
+  - Verification: Checked render wrapper class name.
 
-Update the root wrapper `div` in `LayerRow` to add `border-l-4 border-l-accent` and change left padding from `p-2.5` to `pl-2`.
+- [x] **Step 2: Add test assertion for LayerRow classes**
+  - Note: Added expect statements for the new classes in layer-row.test.tsx.
+  - Commit: 8b14a7eca
+  - Verification: Checked test assertions in test file.
 
-```tsx
-    <div
-      className="mb-2 rounded-lg border border-border border-l-4 border-l-accent bg-surface-2 p-2.5 pl-2 transition hover:bg-surface-3 shadow-sm flex flex-col gap-1"
-    >
-```
+- [x] **Step 3: Run Vitest tests to verify LayerRow**
+  - Note: Ran vitest for layer-row.test.tsx.
+  - Commit: 8b14a7eca
+  - Verification: `rtk pnpm --filter web test layer-row.test.tsx` PASS.
 
-- [ ] **Step 2: Add test assertion for LayerRow classes**
-
-In `packages/web/test/layer-row.test.tsx`, assert that the rendered markup contains the new classes `border-l-4 border-l-accent pl-2`.
-
-```typescript
-    expect(html).toContain('border-l-4');
-    expect(html).toContain('border-l-accent');
-    expect(html).toContain('pl-2');
-```
-
-- [ ] **Step 3: Run Vitest tests to verify LayerRow**
-
-Run command to run the layer-row test file.
-Run: `pnpm --filter web test layer-row.test.tsx`
-Expected: PASS
-
-- [ ] **Step 4: Commit changes for Task 1**
+- [x] **Step 4: Commit changes for Task 1**
+  - Note: Committed staged files with appropriate message.
+  - Commit: 8b14a7eca
+  - Verification: `git log -n 1` shows the commit.
 
 ```bash
 git add packages/web/src/components/layer-stack/layer-row.tsx packages/web/test/layer-row.test.tsx
