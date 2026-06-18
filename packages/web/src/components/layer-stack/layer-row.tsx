@@ -52,7 +52,7 @@ export function LayerRow({
 
   return (
     <div
-      className="mb-2 rounded-lg border border-border bg-surface-2 p-2.5 transition hover:bg-surface-3 shadow-sm flex flex-col gap-1"
+      className="mb-2 rounded-lg border border-border border-l-4 border-l-accent bg-surface-2 p-2.5 pl-2 transition hover:bg-surface-3 shadow-sm flex flex-col gap-1"
     >
       <div className="flex w-full items-center justify-between gap-2">
         <button
