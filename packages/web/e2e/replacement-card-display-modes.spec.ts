@@ -4,8 +4,8 @@ const STORAGE_KEY = 'lpc.replacement-card-display-mode.v1';
 
 function selectedLayerButtons(page: import('@playwright/test').Page) {
   return page
-    .locator('aside button[aria-expanded]:not([aria-haspopup])')
-    .filter({ has: page.locator('[aria-label^="Clear "]') });
+    .locator('aside div:has(> button[aria-label^="Clear "])')
+    .locator('> button[aria-expanded]:not([aria-haspopup])');
 }
 
 async function openFirstReplacementGrid(

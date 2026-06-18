@@ -93,30 +93,28 @@ export function GroupTypeSlotEntries({
     t,
   });
 
+  const isDisabled = disabled || compatibleTypeNames.length === 0;
+
   return (
     <div className="mt-1 space-y-1 px-1">
       <button
         type="button"
-        disabled={disabled || compatibleTypeNames.length === 0}
+        disabled={isDisabled}
         aria-expanded={sectionOpen}
         onClick={onToggleSection}
         className={[
-          'flex w-full items-center justify-between rounded-md border px-2.5 py-1.5',
-          'text-left text-sm font-medium',
-          sectionOpen
-            ? 'border-accent bg-accent/10 text-text'
-            : 'border-border bg-surface-2 text-text-2',
-          disabled || compatibleTypeNames.length === 0
+          'flex w-full items-center justify-between rounded-md bg-surface-2 border border-border px-3 py-2 text-left text-xs font-semibold text-text-2',
+          isDisabled
             ? 'cursor-not-allowed opacity-40'
             : 'hover:bg-surface-3 cursor-pointer',
         ].join(' ')}
       >
         <span>{toggleLabel}</span>
-        <span aria-hidden>{sectionOpen ? '▾' : '▸'}</span>
+        <span aria-hidden>{sectionOpen ? '▼' : '▶'}</span>
       </button>
 
       {sectionOpen && (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-col gap-1.5 mt-1.5">
           {typeNames.map((typeName) => {
             const currentName = selectedItemName({ catalog, state, typeName });
             const hasCompatible = hasBodyCompatibleItem({ catalog, state, typeName });
@@ -127,46 +125,47 @@ export function GroupTypeSlotEntries({
               : `+ ${tl.category(typeName)}`;
 
             return (
-              <button
-                key={typeName}
-                type="button"
-                disabled={entryDisabled}
-                title={!hasCompatible ? t('picker.incompatibleBodyType') : label}
-                aria-expanded={selected}
-                onClick={() => setExpanded(selected ? null : typeName)}
-                className={[
-                  'rounded-full border px-3 py-1.5 text-sm',
-                  selected
-                    ? 'border-accent bg-accent/15 text-text'
-                    : 'border-border bg-surface-2 text-text-2',
-                  entryDisabled
-                    ? 'cursor-not-allowed opacity-40'
-                    : 'hover:bg-surface-3 cursor-pointer',
-                ].join(' ')}
-              >
-                {label}
-              </button>
+              <div key={typeName} className="w-full flex flex-col gap-1">
+                <button
+                  type="button"
+                  disabled={entryDisabled}
+                  title={!hasCompatible ? t('picker.incompatibleBodyType') : label}
+                  aria-expanded={selected}
+                  onClick={() => setExpanded(selected ? null : typeName)}
+                  className={[
+                    'flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-xs font-semibold transition shadow-sm',
+                    selected
+                      ? 'border-accent bg-accent/10 text-text'
+                      : 'border-border bg-surface-2 text-text-2',
+                    entryDisabled
+                      ? 'cursor-not-allowed opacity-40'
+                      : 'hover:bg-surface-3 cursor-pointer',
+                  ].join(' ')}
+                >
+                  <span>{label}</span>
+                  <span aria-hidden className="text-xs text-text-mute select-none">{selected ? '▼' : '▶'}</span>
+                </button>
+                {selected && !state.selections[typeName] && (
+                  <div className="rounded-md border border-border bg-app pt-2 mt-1">
+                    <TypeItemPicker
+                      disabled={disabled}
+                      typeName={typeName}
+                      catalog={catalog}
+                      palettes={palettes}
+                      state={state}
+                      dispatch={dispatch}
+                      tl={tl}
+                      t={t}
+                      licenseFilter={licenseFilter}
+                      animationFilter={animationFilter}
+                      replacementCardDisplayMode={replacementCardDisplayMode}
+                      onReplacementCardDisplayModeChange={onReplacementCardDisplayModeChange}
+                    />
+                  </div>
+                )}
+              </div>
             );
           })}
-        </div>
-      )}
-
-      {expanded && typeNames.includes(expanded) && !state.selections[expanded] && (
-        <div className="rounded-md border border-border bg-app pt-2">
-          <TypeItemPicker
-            disabled={disabled}
-            typeName={expanded}
-            catalog={catalog}
-            palettes={palettes}
-            state={state}
-            dispatch={dispatch}
-            tl={tl}
-            t={t}
-            licenseFilter={licenseFilter}
-            animationFilter={animationFilter}
-            replacementCardDisplayMode={replacementCardDisplayMode}
-            onReplacementCardDisplayModeChange={onReplacementCardDisplayModeChange}
-          />
         </div>
       )}
     </div>

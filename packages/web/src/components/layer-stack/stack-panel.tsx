@@ -152,7 +152,7 @@ export function StackPanel({
                 {section.label}
               </div>
               {activeTypeNames.length === 0 ? (
-                <div className="px-2 py-1.5 text-xs text-text-dim">No layer selected</div>
+                <div className="italic text-text-mute text-xs px-3 py-2">No layer selected</div>
               ) : (
                 activeTypeNames.map((tn) => (
                   <LayerRow
