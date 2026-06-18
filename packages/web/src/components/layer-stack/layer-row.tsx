@@ -52,66 +52,69 @@ export function LayerRow({
 
   return (
     <div
-      className="mb-2 rounded-lg border border-border bg-surface-2 p-2.5 transition hover:bg-surface-3 shadow-sm flex items-center justify-between gap-2 flex-wrap"
+      className="mb-2 rounded-lg border border-border bg-surface-2 p-2.5 transition hover:bg-surface-3 shadow-sm flex flex-col gap-1"
     >
-      <button
-        type="button"
-        aria-expanded={expanded}
-        onClick={onToggle}
-        className="flex flex-1 items-center gap-2 text-left bg-transparent p-0 cursor-pointer min-w-0"
-      >
-        {item ? (
-          <ItemThumbnail
-            typeName={typeName}
-            name={item.name}
-            size={28}
-            bodyType={state.bodyType}
-            catalog={catalog}
-            palettes={palettes}
-            {...(selection.variant !== undefined ? { variant: selection.variant } : {})}
-            {...(selection.recolor !== undefined ? { recolor: selection.recolor } : {})}
-          />
-        ) : (
-          <div className="h-7 w-7 shrink-0 rounded bg-surface-2" aria-hidden />
-        )}
-        <div className="flex flex-col min-w-0 flex-1 justify-center">
-          <div className="truncate text-sm font-semibold text-text">
-            {item ? tl.itemName(item.name) : selection.name}
-          </div>
-          <div className="flex items-center gap-1 text-xs text-text-mute">
-            <span className="uppercase tracking-wide font-medium">{tl.category(typeName)}</span>
-            {selection.variant && (
-              <>
-                <span>·</span>
-                <span>{tl.variant(selection.variant)}</span>
-              </>
-            )}
-            {selection.recolor && item && (() => {
-              const swatches =
-                getRecolorSwatches(item, palettes).find(
-                  (s) => s.recolor === selection.recolor,
-                )?.colors ?? [];
-              if (swatches.length === 0) return null;
-              return (
+      <div className="flex w-full items-center justify-between gap-2">
+        <button
+          type="button"
+          aria-expanded={expanded}
+          onClick={onToggle}
+          className="flex flex-1 items-center gap-2 text-left bg-transparent p-0 cursor-pointer min-w-0"
+        >
+          {item ? (
+            <ItemThumbnail
+              typeName={typeName}
+              name={item.name}
+              size={28}
+              bodyType={state.bodyType}
+              catalog={catalog}
+              palettes={palettes}
+              {...(selection.variant !== undefined ? { variant: selection.variant } : {})}
+              {...(selection.recolor !== undefined ? { recolor: selection.recolor } : {})}
+            />
+          ) : (
+            <div className="h-7 w-7 shrink-0 rounded bg-surface-2" aria-hidden />
+          )}
+          <div className="flex flex-col min-w-0 flex-1 justify-center">
+            <div className="truncate text-sm font-semibold text-text">
+              {item ? tl.itemName(item.name) : selection.name}
+            </div>
+            <div className="flex items-center gap-1 text-xs text-text-mute">
+              <span className="uppercase tracking-wide font-medium">{tl.category(typeName)}</span>
+              {selection.variant && (
                 <>
                   <span>·</span>
-                  <span className="inline-flex gap-px">
-                    {swatches.map((c, i) => (
-                      <span
-                        key={i}
-                        className="h-1 w-1 rounded-sm"
-                        style={{ backgroundColor: c }}
-                      />
-                    ))}
-                  </span>
+                  <span>{tl.variant(selection.variant)}</span>
                 </>
-              );
-            })()}
+              )}
+              {selection.recolor && item && (() => {
+                const swatches =
+                  getRecolorSwatches(item, palettes).find(
+                    (s) => s.recolor === selection.recolor,
+                  )?.colors ?? [];
+                if (swatches.length === 0) return null;
+                return (
+                  <>
+                    <span>·</span>
+                    <span className="inline-flex gap-px">
+                      {swatches.map((c, i) => (
+                        <span
+                          key={i}
+                          className="h-1 w-1 rounded-sm"
+                          style={{ backgroundColor: c }}
+                        />
+                      ))}
+                    </span>
+                  </>
+                );
+              })()}
+            </div>
           </div>
-        </div>
-      </button>
+          <span className="text-xs text-text-mute ml-auto select-none" aria-hidden="true">
+            {expanded ? '▼' : '▶'}
+          </span>
+        </button>
 
-      <div className="flex items-center gap-2">
         <button
           type="button"
           disabled={disabled}
@@ -124,43 +127,29 @@ export function LayerRow({
             'rounded p-1 text-text-mute transition-colors cursor-pointer',
             disabled
               ? 'cursor-not-allowed opacity-50'
-              : 'hover:bg-surface-3 hover:text-danger',
+              : 'hover:bg-surface-4 hover:text-danger',
           ].join(' ')}
           aria-label={`Clear ${typeName}`}
         >
           ✕
         </button>
-        <button
-          type="button"
-          tabIndex={-1}
-          aria-hidden="true"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggle();
-          }}
-          className="text-xs text-text-mute p-1 cursor-pointer"
-        >
-          {expanded ? '▼' : '▶'}
-        </button>
       </div>
 
       {expanded && (
-        <div className="w-full">
-          <TypeItemPicker
-            disabled={disabled}
-            typeName={typeName}
-            catalog={catalog}
-            palettes={palettes}
-            state={state}
-            dispatch={dispatch}
-            tl={tl}
-            t={t}
-            licenseFilter={licenseFilter}
-            animationFilter={animationFilter}
-            replacementCardDisplayMode={replacementCardDisplayMode}
-            onReplacementCardDisplayModeChange={onReplacementCardDisplayModeChange}
-          />
-        </div>
+        <TypeItemPicker
+          disabled={disabled}
+          typeName={typeName}
+          catalog={catalog}
+          palettes={palettes}
+          state={state}
+          dispatch={dispatch}
+          tl={tl}
+          t={t}
+          licenseFilter={licenseFilter}
+          animationFilter={animationFilter}
+          replacementCardDisplayMode={replacementCardDisplayMode}
+          onReplacementCardDisplayModeChange={onReplacementCardDisplayModeChange}
+        />
       )}
     </div>
   );
