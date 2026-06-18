@@ -77,10 +77,10 @@ export function LayerRow({
           <div className="h-7 w-7 shrink-0 rounded bg-surface-2" aria-hidden />
         )}
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[12px] font-semibold text-text">
+          <div className="truncate text-sm font-semibold text-text">
             {item ? tl.itemName(item.name) : selection.name}
           </div>
-          <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-text-mute">
+          <div className="flex items-center gap-1 text-xs uppercase tracking-wide text-text-mute">
             <span>{tl.category(typeName)}</span>
             {selection.variant && (
               <>
@@ -137,7 +137,7 @@ export function LayerRow({
         >
           ✕
         </span>
-        <span className="text-[10px] text-text-mute">{expanded ? '▾' : '▸'}</span>
+        <span className="text-xs text-text-mute">{expanded ? '▾' : '▸'}</span>
       </button>
 
       {expanded && (

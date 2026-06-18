@@ -183,7 +183,7 @@ export function PreviewPane({
           {state.playing ? '⏸' : '▶'}
         </Button>
 
-        <span className="ml-auto whitespace-nowrap font-mono text-[10px] text-text-mute">
+        <span className="ml-auto whitespace-nowrap font-mono text-xs text-text-mute">
           f{String(currentFrame + 1).padStart(2, '0')}/
           {String(totalFrames).padStart(2, '0')} · {fps}fps
         </span>
@@ -235,7 +235,7 @@ export function PreviewPane({
                   ].join(' ')}
                 >
                   <canvas ref={ref} className="image-render-pixel max-h-full max-w-full" />
-                  <div className="absolute top-1 left-1 rounded bg-black/60 px-1.5 py-0.5 font-mono text-[9px] text-white/90">
+                  <div className="absolute top-1 left-1 rounded bg-black/60 px-1.5 py-0.5 font-mono text-xs text-white/90">
                     {t(`direction.${dir}`)} ({DIR_SHORT[dir]})
                   </div>
                 </div>
@@ -257,13 +257,13 @@ export function PreviewPane({
                 <span className="text-xs font-medium text-text">
                   {t('composition.loading')}
                 </span>
-                <span className="font-mono text-[11px] text-text-mute">
+                <span className="font-mono text-xs text-text-mute">
                   {progressPercent}%
                 </span>
               </div>
             </div>
           )}
-          <div className="absolute top-3 left-3 z-10 rounded bg-black/40 px-2 py-0.5 font-mono text-[10px] text-white/90 backdrop-blur-md">
+          <div className="absolute top-3 left-3 z-10 rounded bg-black/40 px-2 py-0.5 font-mono text-xs text-white/90 backdrop-blur-md">
             {state.anim} · {state.layout === 'single' ? `${DIR_SHORT[state.dir]} · ` : ''}{state.zoom}× · f{String(currentFrame + 1).padStart(2, '0')}
           </div>
           <div className="absolute top-3 right-3 z-10 flex items-center gap-0.5 rounded bg-black/40 p-0.5 backdrop-blur-md">
@@ -274,7 +274,7 @@ export function PreviewPane({
               onClick={() =>
                 dispatch({ type: 'set_zoom', zoom: state.zoom - 1 })
               }
-              className="rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold text-white/90 hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-transparent"
+              className="rounded px-1.5 py-0.5 font-mono text-xs font-semibold text-white/90 hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-transparent"
             >
               −
             </button>
@@ -284,7 +284,7 @@ export function PreviewPane({
                 type="button"
                 onClick={() => dispatch({ type: 'set_zoom', zoom: z })}
                 className={[
-                  'rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold',
+                  'rounded px-1.5 py-0.5 font-mono text-xs font-semibold',
                   state.zoom === z
                     ? 'bg-accent text-accent-ink'
                     : 'text-white/90 hover:bg-white/10',
@@ -300,7 +300,7 @@ export function PreviewPane({
               onClick={() =>
                 dispatch({ type: 'set_zoom', zoom: state.zoom + 1 })
               }
-              className="rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold text-white/90 hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-transparent"
+              className="rounded px-1.5 py-0.5 font-mono text-xs font-semibold text-white/90 hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-transparent"
             >
               +
             </button>

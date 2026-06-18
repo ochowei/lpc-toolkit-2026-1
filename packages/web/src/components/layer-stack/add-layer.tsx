@@ -29,11 +29,11 @@ export function AddLayer({
         type="button"
         disabled={disabled}
         onClick={() => setAdding(true)}
-        className="mt-2 mb-2 flex w-full items-center gap-2 rounded-md border border-dashed border-border px-3 py-2 text-[12px] text-text-mute hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+        className="mt-2 mb-2 flex w-full items-center gap-2 rounded-md border border-dashed border-border px-3 py-2 text-sm text-text-mute hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
       >
         <span>＋</span>
         <span>{t('add.button')}</span>
-        <span className="ml-auto font-mono text-[10px]">
+        <span className="ml-auto font-mono text-xs">
           {inactive.length} {t('add.available')}
         </span>
       </button>
@@ -50,13 +50,13 @@ export function AddLayer({
   return (
     <div className="mt-2 mb-2 rounded-md border border-border bg-app p-2">
       <div className="mb-2 flex items-center gap-2">
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-text-mute">
+        <span className="text-xs font-semibold uppercase tracking-wide text-text-mute">
           {t('add.button')}
         </span>
         <button
           type="button"
           onClick={() => setAdding(false)}
-          className="ml-auto rounded px-2 py-1 text-[11px] text-text-mute hover:bg-surface-2"
+          className="ml-auto rounded px-2 py-1 text-xs text-text-mute hover:bg-surface-2"
         >
           {t('common.close')}
         </button>
@@ -64,7 +64,7 @@ export function AddLayer({
 
       {sections.map(({ group, types }) => (
         <div key={group.id} className="mb-2 last:mb-0">
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-text-mute">
+          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-text-mute">
             {group.label}
           </div>
           <div className="flex flex-wrap gap-1">
@@ -92,7 +92,7 @@ export function AddLayer({
                     onAdded(tn);
                   }}
                   className={[
-                    'rounded-full border border-border bg-surface-2 px-3 py-1 text-[11px]',
+                    'rounded-full border border-border bg-surface-2 px-3 py-1 text-xs',
                     itemDisabled
                       ? 'cursor-not-allowed opacity-40'
                       : 'hover:bg-surface-3 cursor-pointer',
@@ -107,7 +107,7 @@ export function AddLayer({
       ))}
 
       {sections.length === 0 && (
-        <div className="px-2 py-2 text-[11px] text-text-mute">
+        <div className="px-2 py-2 text-xs text-text-mute">
           All categories already added.
         </div>
       )}

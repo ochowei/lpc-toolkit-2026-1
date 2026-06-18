@@ -6,11 +6,6 @@
 :root {
   --font-sans: 'Space Grotesk', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
-  --s-0: 2px; --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px;
-  --s-5: 20px; --s-6: 24px; --s-8: 32px; --s-10: 40px;
-  --r-1: 3px; --r-2: 5px; --r-3: 8px; --r-4: 12px;
-  --t-10: 10px; --t-11: 11px; --t-12: 12px; --t-13: 13px;
-  --t-14: 14px; --t-16: 16px; --t-20: 20px; --t-24: 24px; --t-32: 32px;
 }
 
 .lpc.dark {

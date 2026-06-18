@@ -131,10 +131,10 @@ export function StackPanel({
       <StatusToast status={status} />
 
       <div className="flex items-center gap-2 px-3 pt-3 pb-1">
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-text">
+        <span className="text-xs font-semibold uppercase tracking-wide text-text">
           {t('layers.title')}
         </span>
-        <span className="font-mono text-[10px] text-text-mute">
+        <span className="font-mono text-xs text-text-mute">
           {active.length} {t('layers.on')} · {inactive.length} {t('layers.off')}
         </span>
       </div>
@@ -148,11 +148,11 @@ export function StackPanel({
           const sectionOpen = expandedSectionId === section.id || sectionHasExpandedType;
           return (
             <section key={section.id} className="border-b border-border-strong/60 py-3 last:border-b-0">
-              <div className="mb-1 rounded-md bg-surface px-2 py-1.5 text-[12px] font-semibold uppercase tracking-wide text-text-2">
+              <div className="mb-1 rounded-md bg-surface px-2 py-1.5 text-sm font-semibold uppercase tracking-wide text-text-2">
                 {section.label}
               </div>
               {activeTypeNames.length === 0 ? (
-                <div className="px-2 py-1.5 text-[11px] text-text-dim">No layer selected</div>
+                <div className="px-2 py-1.5 text-xs text-text-dim">No layer selected</div>
               ) : (
                 activeTypeNames.map((tn) => (
                   <LayerRow
