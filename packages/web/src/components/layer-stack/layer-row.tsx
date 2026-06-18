@@ -73,7 +73,7 @@ export function LayerRow({
               {...(selection.recolor !== undefined ? { recolor: selection.recolor } : {})}
             />
           ) : (
-            <div className="h-7 w-7 shrink-0 rounded bg-surface-2" aria-hidden />
+            <div className="h-7 w-7 shrink-0 rounded bg-surface-3 border border-border" aria-hidden />
           )}
           <div className="flex flex-col min-w-0 flex-1 justify-center">
             <div className="truncate text-sm font-semibold text-text">
@@ -124,10 +124,10 @@ export function LayerRow({
             dispatch({ type: 'clear', typeName });
           }}
           className={[
-            'rounded p-1 text-text-mute transition-colors cursor-pointer',
+            'rounded p-1 text-text-mute transition-colors shrink-0',
             disabled
               ? 'cursor-not-allowed opacity-50'
-              : 'hover:bg-surface-4 hover:text-danger',
+              : 'hover:bg-black/10 dark:hover:bg-white/10 hover:text-danger cursor-pointer',
           ].join(' ')}
           aria-label={`Clear ${typeName}`}
         >
