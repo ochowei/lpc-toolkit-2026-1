@@ -183,7 +183,7 @@ describe('StackPanel upstream selected-layer groups', () => {
 
     const html = renderPanel({ state: selectedClothesState, expanded: 'clothes' });
 
-    expect(html).toContain('clothes: Long Sleeve');
+    expect(html).toContain('Swap clothes');
     expect(html).toContain('Short Sleeve');
     expect(html).toContain('border-accent bg-accent/10 text-text');
   });

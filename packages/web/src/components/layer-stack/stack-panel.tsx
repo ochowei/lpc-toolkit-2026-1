@@ -14,6 +14,7 @@ import { PresetBar } from './preset-bar';
 import { StatusToast } from './status-toast';
 import { SettingsCollapsible } from './settings-collapsible';
 import { SidebarSearch } from './sidebar-search';
+import { sectionIdForTypeNavigation } from './sidebar-slot-section';
 
 interface Props {
   disabled: boolean;
@@ -95,11 +96,32 @@ export function StackPanel({
     [catalog, shownTypeNames],
   );
 
+  const expandType = (typeName: TypeName) => {
+    setExpanded(typeName);
+    const nextSectionId = sectionIdForTypeNavigation({
+      sections,
+      state,
+      typeName,
+    });
+    if (nextSectionId !== undefined) {
+      setExpandedSectionId(nextSectionId);
+    }
+  };
+
   // Spec edge case: body-type change can leave `expanded` pointing at a
   // type that no longer has a selection. Reset to null when that happens.
   useEffect(() => {
     if (expanded && !shownTypeNames.includes(expanded)) setExpanded(null);
   }, [expanded, shownTypeNames, setExpanded]);
+
+  useEffect(() => {
+    if (
+      expandedSectionId &&
+      !sections.some((section) => section.id === expandedSectionId)
+    ) {
+      setExpandedSectionId(null);
+    }
+  }, [expandedSectionId, sections]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -114,7 +136,7 @@ export function StackPanel({
         animationFilter={animationFilter}
         t={t}
         tl={tl}
-        onPicked={(tn) => setExpanded(tn)}
+        onPicked={expandType}
         inputRef={searchInputRef}
       />
       <PresetBar
@@ -142,10 +164,7 @@ export function StackPanel({
       <div className="min-h-0 flex-1 overflow-y-auto px-2">
         {sections.map((section) => {
           const activeTypeNames = section.typeNames.filter((tn) => active.includes(tn));
-          const sectionHasExpandedType = expanded
-            ? section.typeNames.includes(expanded)
-            : false;
-          const sectionOpen = expandedSectionId === section.id || sectionHasExpandedType;
+          const sectionOpen = expandedSectionId === section.id;
           return (
             <section key={section.id} className="border-b border-border-strong/60 py-3 last:border-b-0">
               <div className="mb-1 rounded-md bg-surface px-2 py-1.5 text-sm font-semibold uppercase tracking-wide text-text-2">
@@ -209,7 +228,7 @@ export function StackPanel({
           tl={tl}
           adding={adding}
           setAdding={setAdding}
-          onAdded={(tn) => setExpanded(tn)}
+          onAdded={expandType}
         />
       </div>
 
