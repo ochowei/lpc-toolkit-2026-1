@@ -426,7 +426,7 @@ rtk git commit -m "docs: update sidebar slot collapse plan status"
 
 Expected: commit succeeds on branch `fix/sidebar-slot-list-collapse`.
 
-  - Commit: 8690af738
+  - Commit: 9bda66737
   - Implementation note: Final verification completed with only this plan file modified before the documentation commit; no `upstream/` changes.
   - Verification: `rtk pnpm --filter @lpc-toolkit/web test` PASS (`56` files, `429` tests); `rtk pnpm --filter @lpc-toolkit/web typecheck` reported `TypeScript: No errors found` but exited 1 through the rtk tsc shortcut, and `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS; `rtk git diff --stat HEAD` and `rtk git status --short` showed only this plan file modified.
 
