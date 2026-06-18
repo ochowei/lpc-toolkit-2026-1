@@ -93,18 +93,20 @@ export function GroupTypeSlotEntries({
     t,
   });
 
+  const isDisabled = disabled || compatibleTypeNames.length === 0;
+
   return (
     <div className="mt-1 space-y-1 px-1">
       <button
         type="button"
-        disabled={disabled || compatibleTypeNames.length === 0}
+        disabled={isDisabled}
         aria-expanded={sectionOpen}
         onClick={onToggleSection}
         className={[
-          'flex w-full items-center justify-between rounded-md bg-surface-2 border border-border px-3 py-2 text-left text-xs font-semibold text-text-2 hover:bg-surface-3 cursor-pointer',
-          disabled || compatibleTypeNames.length === 0
+          'flex w-full items-center justify-between rounded-md bg-surface-2 border border-border px-3 py-2 text-left text-xs font-semibold text-text-2',
+          isDisabled
             ? 'cursor-not-allowed opacity-40'
-            : '',
+            : 'hover:bg-surface-3 cursor-pointer',
         ].join(' ')}
       >
         <span>{toggleLabel}</span>
