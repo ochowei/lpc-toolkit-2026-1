@@ -30,7 +30,7 @@
 **Files:**
 - Modify: `packages/web/test/stack-panel.test.tsx`
 
-- [ ] **Step 1: Replace the stale expanded-inactive render expectation**
+- [x] **Step 1: Replace the stale expanded-inactive render expectation**
 
 In `packages/web/test/stack-panel.test.tsx`, replace the current test named:
 
@@ -71,7 +71,7 @@ it('does not reveal an expanded unselected type unless its slot group is open', 
 });
 ```
 
-- [ ] **Step 2: Run the focused test and verify it fails**
+- [x] **Step 2: Run the focused test and verify it fails**
 
 Run:
 
@@ -81,7 +81,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- stack-panel.test.tsx
 
 Expected: FAIL. The stale implementation still computes `sectionOpen` from `expandedSectionId === section.id || sectionHasExpandedType`, so `renderPanel({ expanded: 'body' })` includes the replace entry and does not keep the slot list collapsed.
 
-- [ ] **Step 3: Commit the failing test**
+- [x] **Step 3: Commit the failing test**
 
 ```bash
 rtk git add packages/web/test/stack-panel.test.tsx
@@ -95,6 +95,11 @@ Update this plan item with:
   - Verification: focused stack-panel test FAILS as expected before implementation
 ```
 
+  - Commit: 7eb22ff01
+  - Implementation note: Replaced the stale expanded-inactive StackPanel expectation with selected-body and unselected-clothes collapse coverage.
+  - Review checkpoint: Spec compliance PASS; code quality found one stale contradictory unselected-clothes picker test. Removed it in follow-up commit 83b60a7c5 and re-review approved.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web test -- stack-panel.test.tsx` FAILS as expected before implementation (`6 tests | 2 failed`, both new independent-collapse assertions).
+
 ## Task 2: Decouple Slot Section Visibility From Active Expansion
 
 **Files:**
@@ -102,7 +107,7 @@ Update this plan item with:
 - Modify: `packages/web/src/components/layer-stack/stack-panel.tsx`
 - Modify: `packages/web/test/stack-panel.test.tsx`
 
-- [ ] **Step 1: Create pure section navigation helpers**
+- [x] **Step 1: Create pure section navigation helpers**
 
 Create `packages/web/src/components/layer-stack/sidebar-slot-section.ts`:
 
@@ -135,7 +140,7 @@ export function sectionIdForTypeNavigation(args: {
 `undefined` means "leave the existing section state alone"; `null` means "the
 target is inactive but no containing section exists."
 
-- [ ] **Step 2: Import the helper in StackPanel**
+- [x] **Step 2: Import the helper in StackPanel**
 
 Add this import:
 
@@ -143,7 +148,7 @@ Add this import:
 import { sectionIdForTypeNavigation } from './sidebar-slot-section';
 ```
 
-- [ ] **Step 3: Add local navigation helper in StackPanel**
+- [x] **Step 3: Add local navigation helper in StackPanel**
 
 In `StackPanel`, after the `sections` `useMemo`, add:
 
@@ -161,7 +166,7 @@ In `StackPanel`, after the `sections` `useMemo`, add:
   };
 ```
 
-- [ ] **Step 4: Clear stale section ids when shown types change**
+- [x] **Step 4: Clear stale section ids when shown types change**
 
 After the existing `useEffect` that clears invalid `expanded`, add:
 
@@ -178,7 +183,7 @@ After the existing `useEffect` that clears invalid `expanded`, add:
 
 This keeps `expandedSectionId` from pointing at a removed section after body-type or visibility changes.
 
-- [ ] **Step 5: Route search picks through the helper**
+- [x] **Step 5: Route search picks through the helper**
 
 Change:
 
@@ -192,7 +197,7 @@ to:
         onPicked={expandType}
 ```
 
-- [ ] **Step 6: Make sectionOpen depend only on expandedSectionId**
+- [x] **Step 6: Make sectionOpen depend only on expandedSectionId**
 
 Inside `sections.map`, replace:
 
@@ -209,7 +214,7 @@ with:
           const sectionOpen = expandedSectionId === section.id;
 ```
 
-- [ ] **Step 7: Keep manual section toggles independent from expanded**
+- [x] **Step 7: Keep manual section toggles independent from expanded**
 
 Leave the existing toggle body as:
 
@@ -221,7 +226,7 @@ Leave the existing toggle body as:
 
 Do not call `setExpanded(null)` here. This preserves the selected layer row's open picker while hiding the lower slot list.
 
-- [ ] **Step 8: Route add-layer completion through the helper**
+- [x] **Step 8: Route add-layer completion through the helper**
 
 Change:
 
@@ -235,7 +240,7 @@ to:
           onAdded={expandType}
 ```
 
-- [ ] **Step 9: Run the focused StackPanel test**
+- [x] **Step 9: Run the focused StackPanel test**
 
 Run:
 
@@ -245,7 +250,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- stack-panel.test.tsx
 
 Expected: PASS.
 
-- [ ] **Step 10: Run TypeScript check**
+- [x] **Step 10: Run TypeScript check**
 
 Run:
 
@@ -255,7 +260,7 @@ rtk pnpm --filter @lpc-toolkit/web typecheck
 
 Expected: PASS.
 
-- [ ] **Step 11: Commit the implementation**
+- [x] **Step 11: Commit the implementation**
 
 ```bash
 rtk git add packages/web/src/components/layer-stack/sidebar-slot-section.ts packages/web/src/components/layer-stack/stack-panel.tsx packages/web/test/stack-panel.test.tsx
@@ -269,12 +274,17 @@ Update this plan item with:
   - Verification: stack-panel focused test PASS; web typecheck PASS
 ```
 
+  - Commit: 9aadeaa73f8dfdcc5bee1b4169eea62b1833103a
+  - Implementation note: Added pure sidebar slot-section navigation helpers and routed search/add navigation through them so selected type expansion no longer opens collapsed slot sections.
+  - Review checkpoint: Spec compliance PASS; code quality PASS.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web test -- stack-panel.test.tsx` PASS; `rtk pnpm --filter @lpc-toolkit/web typecheck` reported `TypeScript: No errors found` but exited 1 through the rtk tsc shortcut, and `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS.
+
 ## Task 3: Add Unit Coverage For Search/Add Navigation Logic
 
 **Files:**
 - Create: `packages/web/test/sidebar-slot-section.test.ts`
 
-- [ ] **Step 1: Create helper tests**
+- [x] **Step 1: Create helper tests**
 
 Create `packages/web/test/sidebar-slot-section.test.ts`:
 
@@ -333,7 +343,7 @@ describe('sidebar slot section helpers', () => {
 });
 ```
 
-- [ ] **Step 2: Run focused tests**
+- [x] **Step 2: Run focused tests**
 
 Run:
 
@@ -343,7 +353,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- stack-panel.test.tsx sidebar-slot-sec
 
 Expected: PASS.
 
-- [ ] **Step 3: Commit helper test coverage**
+- [x] **Step 3: Commit helper test coverage**
 
 ```bash
 rtk git add packages/web/test/sidebar-slot-section.test.ts
@@ -357,12 +367,17 @@ Update this plan item with:
   - Verification: focused sidebar tests PASS
 ```
 
+  - Commit: b12f43f01de5b5276d7de1262dba0a199cb92608
+  - Implementation note: Added focused helper coverage for section lookup and selected vs unselected type navigation decisions.
+  - Review checkpoint: Spec compliance PASS; code quality PASS with minor optional cleanup suggestions only.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web test -- stack-panel.test.tsx sidebar-slot-section.test.ts` PASS.
+
 ## Task 4: Final Verification
 
 **Files:**
 - Modify: `docs/superpowers/plans/2026-06-18-sidebar-slot-list-collapse.md`
 
-- [ ] **Step 1: Run all web unit tests**
+- [x] **Step 1: Run all web unit tests**
 
 Run:
 
@@ -372,7 +387,7 @@ rtk pnpm --filter @lpc-toolkit/web test
 
 Expected: PASS.
 
-- [ ] **Step 2: Run web typecheck**
+- [x] **Step 2: Run web typecheck**
 
 Run:
 
@@ -382,7 +397,7 @@ rtk pnpm --filter @lpc-toolkit/web typecheck
 
 Expected: PASS.
 
-- [ ] **Step 3: Inspect git diff**
+- [x] **Step 3: Inspect git diff**
 
 Run:
 
@@ -393,7 +408,7 @@ rtk git status --short
 
 Expected: only the implementation/test files and this plan file have intended changes before final commit; no changes under `upstream/`.
 
-- [ ] **Step 4: Update this plan with final notes**
+- [x] **Step 4: Update this plan with final notes**
 
 For each completed task, ensure this plan has:
 
@@ -402,7 +417,7 @@ For each completed task, ensure this plan has:
   - Verification: <command> PASS
 ```
 
-- [ ] **Step 5: Commit the updated plan**
+- [x] **Step 5: Commit the updated plan**
 
 ```bash
 rtk git add docs/superpowers/plans/2026-06-18-sidebar-slot-list-collapse.md
@@ -410,6 +425,10 @@ rtk git commit -m "docs: update sidebar slot collapse plan status"
 ```
 
 Expected: commit succeeds on branch `fix/sidebar-slot-list-collapse`.
+
+  - Commit: 8690af738
+  - Implementation note: Final verification completed with only this plan file modified before the documentation commit; no `upstream/` changes.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web test` PASS (`56` files, `429` tests); `rtk pnpm --filter @lpc-toolkit/web typecheck` reported `TypeScript: No errors found` but exited 1 through the rtk tsc shortcut, and `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS; `rtk git diff --stat HEAD` and `rtk git status --short` showed only this plan file modified.
 
 ## Self-Review
 
