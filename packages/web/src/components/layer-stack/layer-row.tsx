@@ -58,7 +58,7 @@ export function LayerRow({
         type="button"
         aria-expanded={expanded}
         onClick={onToggle}
-        className="flex flex-1 items-center gap-2 text-left bg-transparent p-0 focus:outline-none cursor-pointer min-w-0"
+        className="flex flex-1 items-center gap-2 text-left bg-transparent p-0 cursor-pointer min-w-0"
       >
         {item ? (
           <ItemThumbnail
@@ -132,13 +132,13 @@ export function LayerRow({
         </button>
         <button
           type="button"
+          tabIndex={-1}
+          aria-hidden="true"
           onClick={(e) => {
             e.stopPropagation();
             onToggle();
           }}
-          className="text-xs text-text-mute p-1 cursor-pointer focus:outline-none"
-          aria-expanded={expanded}
-          aria-label={expanded ? 'Collapse' : 'Expand'}
+          className="text-xs text-text-mute p-1 cursor-pointer"
         >
           {expanded ? '▼' : '▶'}
         </button>
