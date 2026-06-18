@@ -73,6 +73,9 @@ describe('GroupTypeSlotEntries collapsed groups', () => {
 
     expect(html).toContain('Show 3 slots');
     expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain('bg-transparent');
+    expect(html).toContain('border-dashed');
+    expect(html).toContain('text-text-mute');
     expect(html).not.toContain('+ head');
     expect(html).not.toContain('expression: Neutral');
     expect(html).not.toContain('+ ears');

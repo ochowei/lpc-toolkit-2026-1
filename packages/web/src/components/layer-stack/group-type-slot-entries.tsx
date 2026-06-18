@@ -103,10 +103,10 @@ export function GroupTypeSlotEntries({
         aria-expanded={sectionOpen}
         onClick={onToggleSection}
         className={[
-          'flex w-full items-center justify-between rounded-md bg-surface-2 border border-border px-3 py-2 text-left text-xs font-semibold text-text-2',
+          'flex w-full items-center justify-between rounded-md bg-transparent border border-dashed border-border px-3 py-2 text-left text-xs font-semibold text-text-mute transition-colors',
           isDisabled
             ? 'cursor-not-allowed opacity-40'
-            : 'hover:bg-surface-3 cursor-pointer',
+            : 'hover:bg-surface-2 hover:text-text hover:border-border cursor-pointer',
         ].join(' ')}
       >
         <span>{toggleLabel}</span>
