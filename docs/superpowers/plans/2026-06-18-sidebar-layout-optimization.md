@@ -16,22 +16,27 @@
 - Modify: `packages/web/src/components/layer-stack/layer-row.tsx`
 - Test: `packages/web/test/layer-row.test.tsx`
 
-- [ ] **Step 1: Modify LayerRow.tsx implementation**
+- [x] **Step 1: Modify LayerRow.tsx implementation**
   Update the main wrapper and button inside `LayerRow` to use card styling:
   - Add card classes: `mb-2 rounded-lg border border-border bg-surface-2 p-2.5 transition hover:bg-surface-3 shadow-sm`
   - Re-align the title and subtitle metadata vertically. Put the uppercase category label (`tl.category(typeName)`) and variant/swatches on the same line.
   - Position the clear button `✕` and the collapse/expand state arrow `▶` / `▼` on the right side using a flex row.
   - Keep thumbnail size at 28px (`size={28}`) to maintain compatibility with existing tests.
+  - Commit: 87701177f
+  - Verification: Manual review of styled code
 
-- [ ] **Step 2: Run unit tests to verify LayerRow**
+- [x] **Step 2: Run unit tests to verify LayerRow**
   Run: `rtk pnpm --filter @lpc-toolkit/web test packages/web/test/layer-row.test.tsx`
   Expected: PASS
+  - Commit: 87701177f
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web test test/layer-row.test.tsx` PASS
 
-- [ ] **Step 3: Commit changes**
+- [x] **Step 3: Commit changes**
   ```bash
   rtk git add packages/web/src/components/layer-stack/layer-row.tsx
   rtk git commit -m "feat: redesign active layer row to card layout"
   ```
+  - Commit: 87701177f
 
 ---
 
