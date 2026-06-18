@@ -96,7 +96,7 @@ export function GroupTypeSlotEntries({
   const isDisabled = disabled || compatibleTypeNames.length === 0;
 
   return (
-    <div className="mt-1 space-y-1 px-1">
+    <div className="mt-1 space-y-1 pl-2 pr-1">
       <button
         type="button"
         disabled={isDisabled}
@@ -114,7 +114,7 @@ export function GroupTypeSlotEntries({
       </button>
 
       {sectionOpen && (
-        <div className="flex flex-col gap-1.5 mt-1.5">
+        <div className="flex flex-col gap-1.5 mt-1.5 pl-2">
           {typeNames.map((typeName) => {
             const currentName = selectedItemName({ catalog, state, typeName });
             const hasCompatible = hasBodyCompatibleItem({ catalog, state, typeName });
