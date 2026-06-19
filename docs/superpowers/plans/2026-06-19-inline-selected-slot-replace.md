@@ -283,7 +283,10 @@ rtk git commit -m "docs: record inline slot render status"
 - Modify: `packages/web/test/stack-panel.test.tsx`
 - Modify: `docs/superpowers/plans/2026-06-19-inline-selected-slot-replace.md`
 
-- [ ] **Step 1: Update current selected-slot expectation**
+- [x] **Step 1: Update current selected-slot expectation**
+  - Implementation note: Replaced the selected-slot inline picker expectation with the row-expansion-only assertion from the plan.
+  - Commit: not committed
+  - Verification: rtk pnpm --filter @lpc-toolkit/web test -- stack-panel PASS unexpectedly; plan expected FAIL before StackPanel implementation
 
 Replace the test named `opens an inline picker for a selected type with the current item marked selected` with:
 
@@ -306,7 +309,10 @@ it('does not open a lower selected slot picker from selected row expansion alone
 });
 ```
 
-- [ ] **Step 2: Add a server-rendered selected row control test**
+- [x] **Step 2: Add a server-rendered selected row control test**
+  - Implementation note: Added the selected row picker availability coverage immediately after the row-expansion-only test.
+  - Commit: not committed
+  - Verification: rtk pnpm --filter @lpc-toolkit/web test -- stack-panel PASS unexpectedly; plan expected FAIL before StackPanel implementation
 
 Add this test after the replacement from Step 1:
 
@@ -328,7 +334,10 @@ it('keeps the selected row picker available from selected row expansion', () => 
 });
 ```
 
-- [ ] **Step 3: Run the focused StackPanel test and verify it fails**
+- [x] **Step 3: Run the focused StackPanel test and verify it fails**
+  - Implementation note: Ran the focused StackPanel test; the sandboxed run failed with tsx IPC EPERM, and the approved rerun completed successfully.
+  - Commit: not committed
+  - Verification: rtk pnpm --filter @lpc-toolkit/web test -- stack-panel PASS unexpectedly; plan expected FAIL before StackPanel implementation
 
 Run:
 
@@ -338,7 +347,10 @@ rtk pnpm --filter @lpc-toolkit/web test -- stack-panel
 
 Expected: FAIL because `StackPanel` still passes the old `expanded`/`setExpanded` props to `GroupTypeSlotEntries`.
 
-- [ ] **Step 4: Update the plan file**
+- [x] **Step 4: Update the plan file**
+  - Implementation note: Recorded Task 3 completion without committing; verification did not match the plan's expected red state.
+  - Commit: not committed
+  - Verification: rtk pnpm --filter @lpc-toolkit/web test -- stack-panel PASS unexpectedly; plan expected FAIL before StackPanel implementation
 
 Update this task checkbox block with:
 
@@ -354,7 +366,10 @@ Do not commit yet.
 - Modify: `packages/web/src/components/layer-stack/stack-panel.tsx`
 - Modify: `docs/superpowers/plans/2026-06-19-inline-selected-slot-replace.md`
 
-- [ ] **Step 1: Add slot expansion state**
+- [x] **Step 1: Add slot expansion state**
+  - Implementation note: Added `expandedSlotType` state alongside row and section expansion state.
+  - Commit: ee6ceccfd
+  - Verification: rtk pnpm --filter @lpc-toolkit/web test -- group-type-slot-entries stack-panel sidebar-slot-section PASS
 
 After:
 
@@ -369,7 +384,10 @@ add:
   const [expandedSlotType, setExpandedSlotType] = useState<TypeName | null>(null);
 ```
 
-- [ ] **Step 2: Add row and slot toggle helpers**
+- [x] **Step 2: Add row and slot toggle helpers**
+  - Implementation note: Added row and slot toggle helpers that clear same-type competing expansion state.
+  - Commit: ee6ceccfd
+  - Verification: rtk pnpm --filter @lpc-toolkit/web test -- group-type-slot-entries stack-panel sidebar-slot-section PASS
 
 After the `sections` memo, add:
 
@@ -389,7 +407,10 @@ After the `sections` memo, add:
   };
 ```
 
-- [ ] **Step 3: Update search/add navigation**
+- [x] **Step 3: Update search/add navigation**
+  - Implementation note: Updated search/add navigation to open lower slot pickers when a section is available and fall back to row expansion otherwise.
+  - Commit: ee6ceccfd
+  - Verification: rtk pnpm --filter @lpc-toolkit/web test -- group-type-slot-entries stack-panel sidebar-slot-section PASS
 
 Replace the current `expandType` helper with:
 
@@ -414,7 +435,10 @@ Replace the current `expandType` helper with:
   };
 ```
 
-- [ ] **Step 4: Clear invalid slot expansion**
+- [x] **Step 4: Clear invalid slot expansion**
+  - Implementation note: Added cleanup for stale `expandedSlotType` values after body-type or shown-type changes.
+  - Commit: ee6ceccfd
+  - Verification: rtk pnpm --filter @lpc-toolkit/web test -- group-type-slot-entries stack-panel sidebar-slot-section PASS
 
 After the existing effect that clears invalid `expanded`, add:
 
@@ -426,7 +450,10 @@ After the existing effect that clears invalid `expanded`, add:
   }, [expandedSlotType, shownTypeNames]);
 ```
 
-- [ ] **Step 5: Wire row toggles through the helper**
+- [x] **Step 5: Wire row toggles through the helper**
+  - Implementation note: Routed selected layer row toggles through `toggleRowType`.
+  - Commit: ee6ceccfd
+  - Verification: rtk pnpm --filter @lpc-toolkit/web test -- group-type-slot-entries stack-panel sidebar-slot-section PASS
 
 Replace:
 
@@ -440,7 +467,10 @@ with:
                     onToggle={() => toggleRowType(tn)}
 ```
 
-- [ ] **Step 6: Wire slot entries through the new props**
+- [x] **Step 6: Wire slot entries through the new props**
+  - Implementation note: Passed `expandedSlotType` and `toggleSlotType` to `GroupTypeSlotEntries`.
+  - Commit: ee6ceccfd
+  - Verification: rtk pnpm --filter @lpc-toolkit/web test -- group-type-slot-entries stack-panel sidebar-slot-section PASS
 
 Replace the `GroupTypeSlotEntries` props:
 
@@ -456,7 +486,10 @@ with:
                 onToggleSlotType={toggleSlotType}
 ```
 
-- [ ] **Step 7: Run focused tests**
+- [x] **Step 7: Run focused tests**
+  - Implementation note: Ran the requested focused web tests; sandboxed run hit tsx IPC EPERM and the approved rerun passed.
+  - Commit: ee6ceccfd
+  - Verification: rtk pnpm --filter @lpc-toolkit/web test -- group-type-slot-entries stack-panel sidebar-slot-section PASS
 
 Run:
 
@@ -466,7 +499,10 @@ rtk pnpm --filter @lpc-toolkit/web test -- group-type-slot-entries stack-panel s
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit StackPanel coordination**
+- [x] **Step 8: Commit StackPanel coordination**
+  - Implementation note: Committed StackPanel coordination with the reviewed Task 3 StackPanel test changes.
+  - Commit: ee6ceccfd
+  - Verification: rtk pnpm --filter @lpc-toolkit/web test -- group-type-slot-entries stack-panel sidebar-slot-section PASS
 
 Run:
 
@@ -475,7 +511,10 @@ rtk git add packages/web/src/components/layer-stack/stack-panel.tsx packages/web
 rtk git commit -m "fix: separate slot and row replacement expansion"
 ```
 
-- [ ] **Step 9: Update the plan file**
+- [x] **Step 9: Update the plan file**
+  - Implementation note: Recorded Task 4 notes, code commit hash, and focused verification status.
+  - Commit: ee6ceccfd
+  - Verification: rtk pnpm --filter @lpc-toolkit/web test -- group-type-slot-entries stack-panel sidebar-slot-section PASS
 
 Run:
 
@@ -489,7 +528,10 @@ Then update this task with the returned commit hash and:
   - Verification: rtk pnpm --filter @lpc-toolkit/web test -- group-type-slot-entries stack-panel sidebar-slot-section PASS
 ```
 
-- [ ] **Step 10: Commit the plan status update**
+- [x] **Step 10: Commit the plan status update**
+  - Implementation note: Prepared the Task 4 plan status update for the docs-only commit.
+  - Commit: ee6ceccfd
+  - Verification: rtk pnpm --filter @lpc-toolkit/web test -- group-type-slot-entries stack-panel sidebar-slot-section PASS
 
 Run:
 
