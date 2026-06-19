@@ -232,7 +232,7 @@ the plan progress update separately.
 - Modify: `packages/web/src/i18n.ts`
 - Create: `packages/web/test/sidebar-search-incompatibility.test.tsx`
 
-- [ ] **Step 1: Write a static component test for an incompatible row**
+- [x] **Step 1: Write a static component test for an incompatible row**
 
 Extract the body-incompatible result row from `SidebarSearch` as an exported
 `SidebarSearchResultRow` component so it can be rendered without manipulating
@@ -253,7 +253,7 @@ production sidebar. The rendered `ItemThumbnail` is expected to begin as its
 existing placeholder during SSR; this test verifies the row's accessible
 structure, not Canvas composition.
 
-- [ ] **Step 2: Run the new test and verify it fails**
+- [x] **Step 2: Run the new test and verify it fails**
 
 Run:
 
@@ -264,7 +264,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- sidebar-search-incompatibility.test.t
 Expected: FAIL because `SidebarSearchResultRow` and the formatted translation
 do not exist.
 
-- [ ] **Step 3: Add localized concrete body-type copy and a CSS tooltip wrapper**
+- [x] **Step 3: Add localized concrete body-type copy and a CSS tooltip wrapper**
 
 Add this key in both language maps in `packages/web/src/i18n.ts`:
 
@@ -298,7 +298,7 @@ license/animation indicators unchanged. The wrapper must not be added while
 the whole sidebar is composition-disabled; that state already has a distinct
 global cause and must not claim a body-type mismatch.
 
-- [ ] **Step 4: Run focused tests and typecheck**
+- [x] **Step 4: Run focused tests and typecheck**
 
 Run:
 
@@ -309,7 +309,7 @@ rtk pnpm --filter @lpc-toolkit/web typecheck
 
 Expected: all focused tests and typecheck PASS.
 
-- [ ] **Step 5: Commit and record Task 3**
+- [x] **Step 5: Commit and record Task 3**
 
 ```bash
 rtk git add packages/web/src/components/layer-stack/sidebar-search.tsx packages/web/src/i18n.ts packages/web/test/sidebar-search-incompatibility.test.tsx docs/superpowers/plans/2026-06-19-incompatible-asset-thumbnails.md
@@ -319,12 +319,22 @@ rtk git commit -m "feat(web): explain incompatible asset choices"
 Append the actual commit SHA and command results below this task, then commit
 the plan progress update separately.
 
+- **Commit**: e1e3aed9c
+- **Verification**:
+  - `rtk pnpm --filter @lpc-toolkit/web test -- sidebar-search-incompatibility.test.tsx sidebar-search-keyboard.test.ts item-thumbnail-selection.test.ts thumbnail-cache.test.ts` PASS
+  - `rtk pnpm --filter @lpc-toolkit/web typecheck` PASS
+- **Implementation Note**:
+  - Extracted the mapped search result row JSX into a new exported `SidebarSearchResultRow` component with its own prop interface `SidebarSearchResultRowProps`.
+  - Added localized incompatibility translations key `picker.incompatibleBodyTypeDetail` in both English and Chinese locales.
+  - Implemented focusable CSS tooltip wrapper for body-incompatible items in sidebar search.
+  - Capitalized English translated body type values using `humanizeLabel` to render properly in UI (e.g. "Male" instead of "male") and satisfy test assertions.
+
 ### Task 4: Full web verification
 
 **Files:**
 - Modify: `docs/superpowers/plans/2026-06-19-incompatible-asset-thumbnails.md`
 
-- [ ] **Step 1: Run the complete web test suite**
+- [x] **Step 1: Run the complete web test suite**
 
 Run:
 
@@ -335,7 +345,7 @@ rtk pnpm --filter @lpc-toolkit/web typecheck
 
 Expected: both commands PASS.
 
-- [ ] **Step 2: Inspect the completed diff**
+- [x] **Step 2: Inspect the completed diff**
 
 Run:
 
@@ -347,7 +357,7 @@ rtk git status --short
 Expected: no whitespace errors and no uncommitted changes except the required
 Task 4 plan-record update.
 
-- [ ] **Step 3: Record Task 4 completion**
+- [x] **Step 3: Record Task 4 completion**
 
 Mark every completed checkbox in this plan. Append an implementation note
 stating that incompatible assets remain disabled, render from a fallback
@@ -356,7 +366,7 @@ hover or focus. Record the actual Task 3 implementation commit SHA and the
 observed passing results of the complete web test suite, typecheck, and
 `git diff --check`.
 
-- [ ] **Step 4: Commit the final plan record**
+- [x] **Step 4: Commit the final plan record**
 
 ```bash
 rtk git add docs/superpowers/plans/2026-06-19-incompatible-asset-thumbnails.md
