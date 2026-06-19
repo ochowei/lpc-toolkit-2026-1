@@ -34,7 +34,10 @@
 - Modify: `packages/web/test/group-type-slot-entries.test.tsx`
 - Modify: `docs/superpowers/plans/2026-06-19-inline-selected-slot-replace.md`
 
-- [ ] **Step 1: Update the test helper props**
+- [x] **Step 1: Update the test helper props**
+  - Implementation note: Updated `renderEntries` to pass `expandedSlotType` and `onToggleSlotType`.
+  - Commit: not committed
+  - Verification: group-type-slot-entries FAIL as expected before implementation
 
 Replace the current `renderEntries` helper with this version:
 
@@ -66,7 +69,10 @@ function renderEntries(args: {
 }
 ```
 
-- [ ] **Step 2: Update the unselected inline picker test**
+- [x] **Step 2: Update the unselected inline picker test**
+  - Implementation note: Renamed the unselected slot inline picker test and switched it to `expandedSlotType`.
+  - Commit: not committed
+  - Verification: group-type-slot-entries FAIL as expected before implementation
 
 Replace the existing test named `keeps the inline picker visible for the active unselected type` with:
 
@@ -79,7 +85,10 @@ it('keeps the inline picker visible for the active unselected slot entry', () =>
 });
 ```
 
-- [ ] **Step 3: Add selected slot inline picker coverage**
+- [x] **Step 3: Add selected slot inline picker coverage**
+  - Implementation note: Added coverage for opening the inline picker under the selected `expression` slot entry.
+  - Commit: not committed
+  - Verification: group-type-slot-entries FAIL as expected before implementation
 
 Add this test after the unselected inline picker test:
 
@@ -98,7 +107,10 @@ it('opens the inline picker under a selected slot entry', () => {
 });
 ```
 
-- [ ] **Step 4: Run the focused test and verify it fails**
+- [x] **Step 4: Run the focused test and verify it fails**
+  - Implementation note: Focused test run verifies the red state before component implementation.
+  - Commit: not committed
+  - Verification: group-type-slot-entries FAIL as expected before implementation
 
 Run:
 
@@ -108,7 +120,10 @@ rtk pnpm --filter @lpc-toolkit/web test -- group-type-slot-entries
 
 Expected: FAIL because `GroupTypeSlotEntries` does not yet accept `expandedSlotType` or `onToggleSlotType`.
 
-- [ ] **Step 5: Update the plan file**
+- [x] **Step 5: Update the plan file**
+  - Implementation note: Recorded Task 1 completion state without committing.
+  - Commit: not committed
+  - Verification: group-type-slot-entries FAIL as expected before implementation
 
 Update this task checkbox block with:
 
@@ -124,7 +139,10 @@ Do not commit yet.
 - Modify: `packages/web/src/components/layer-stack/group-type-slot-entries.tsx`
 - Modify: `docs/superpowers/plans/2026-06-19-inline-selected-slot-replace.md`
 
-- [ ] **Step 1: Change the component props**
+- [x] **Step 1: Change the component props**
+  - Implementation note: Replaced the slot-entry expansion props with `expandedSlotType` and `onToggleSlotType`.
+  - Commit: bb0190e97
+  - Verification: rtk pnpm --filter @lpc-toolkit/web test -- group-type-slot-entries PASS
 
 In `Props`, replace:
 
@@ -140,7 +158,10 @@ with:
   onToggleSlotType: (typeName: TypeName) => void;
 ```
 
-- [ ] **Step 2: Update destructuring**
+- [x] **Step 2: Update destructuring**
+  - Implementation note: Updated `GroupTypeSlotEntries` destructuring to use the new slot expansion props.
+  - Commit: bb0190e97
+  - Verification: rtk pnpm --filter @lpc-toolkit/web test -- group-type-slot-entries PASS
 
 In the `GroupTypeSlotEntries` function parameter destructuring, replace:
 
@@ -156,7 +177,10 @@ with:
   onToggleSlotType,
 ```
 
-- [ ] **Step 3: Update slot selected state and click handler**
+- [x] **Step 3: Update slot selected state and click handler**
+  - Implementation note: Derived selected slot state from `expandedSlotType` and delegated clicks through `onToggleSlotType`.
+  - Commit: bb0190e97
+  - Verification: rtk pnpm --filter @lpc-toolkit/web test -- group-type-slot-entries PASS
 
 Inside the `typeNames.map` callback, replace:
 
@@ -182,7 +206,10 @@ with:
                   onClick={() => onToggleSlotType(typeName)}
 ```
 
-- [ ] **Step 4: Render the picker for selected and unselected expanded slots**
+- [x] **Step 4: Render the picker for selected and unselected expanded slots**
+  - Implementation note: Removed the selection guard so expanded selected slots render their inline replacement picker.
+  - Commit: bb0190e97
+  - Verification: rtk pnpm --filter @lpc-toolkit/web test -- group-type-slot-entries PASS
 
 Replace:
 
@@ -196,7 +223,10 @@ with:
                 {selected && (
 ```
 
-- [ ] **Step 5: Run the focused test and verify it passes**
+- [x] **Step 5: Run the focused test and verify it passes**
+  - Implementation note: Ran the focused web test target after implementation.
+  - Commit: bb0190e97
+  - Verification: rtk pnpm --filter @lpc-toolkit/web test -- group-type-slot-entries PASS
 
 Run:
 
@@ -206,7 +236,10 @@ rtk pnpm --filter @lpc-toolkit/web test -- group-type-slot-entries
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit the component and test changes**
+- [x] **Step 6: Commit the component and test changes**
+  - Implementation note: Committed the component implementation with the Task 1 focused test updates.
+  - Commit: bb0190e97
+  - Verification: rtk pnpm --filter @lpc-toolkit/web test -- group-type-slot-entries PASS
 
 Run:
 
@@ -215,7 +248,10 @@ rtk git add packages/web/src/components/layer-stack/group-type-slot-entries.tsx 
 rtk git commit -m "fix: render selected slot replacement inline"
 ```
 
-- [ ] **Step 7: Update the plan file**
+- [x] **Step 7: Update the plan file**
+  - Implementation note: Recorded Task 2 implementation notes, commit hash, and focused verification status.
+  - Commit: bb0190e97
+  - Verification: rtk pnpm --filter @lpc-toolkit/web test -- group-type-slot-entries PASS
 
 Run:
 
@@ -229,7 +265,10 @@ Then update this task with the returned commit hash and:
   - Verification: rtk pnpm --filter @lpc-toolkit/web test -- group-type-slot-entries PASS
 ```
 
-- [ ] **Step 8: Commit the plan status update**
+- [x] **Step 8: Commit the plan status update**
+  - Implementation note: Prepared the Task 2 plan status update for the docs-only commit.
+  - Commit: bb0190e97
+  - Verification: rtk pnpm --filter @lpc-toolkit/web test -- group-type-slot-entries PASS
 
 Run:
 
