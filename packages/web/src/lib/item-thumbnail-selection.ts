@@ -14,6 +14,22 @@ export function effectiveThumbnailVariant(
   return item?.variants?.[0];
 }
 
+export function previewBodyTypeForItem(
+  item: ItemDefinition,
+  activeBodyType: BodyType,
+): BodyType | null {
+  if (typeof item.layer_1?.[activeBodyType] === 'string') {
+    return activeBodyType;
+  }
+
+  for (const [bodyType, path] of Object.entries(item.layer_1 ?? {})) {
+    if (typeof path === 'string') return bodyType as BodyType;
+  }
+
+  return null;
+}
+
+
 function siblingSelectionsFor(
   item: ItemDefinition,
   bodyType: BodyType,

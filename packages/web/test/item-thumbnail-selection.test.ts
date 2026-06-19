@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest';
-import type { ItemDefinition } from '@lpc-toolkit/core';
 import {
   buildItemThumbnailSelections,
   effectiveThumbnailVariant,
+  previewBodyTypeForItem,
 } from '../src/lib/item-thumbnail-selection';
+import { describe, expect, it } from 'vitest';
+import type { ItemDefinition } from '@lpc-toolkit/core';
 
 function item(overrides: Partial<ItemDefinition> = {}): ItemDefinition {
   return {
@@ -58,5 +59,23 @@ describe('item thumbnail selections', () => {
       typeName: 'head',
       name: 'Human Female',
     });
+  });
+
+  it('uses the active body type when the item supports it', () => {
+    expect(previewBodyTypeForItem(item({
+      layer_1: { zPos: 10, male: 'hair/male/', female: 'hair/female/' },
+    }), 'male')).toBe('male');
+  });
+
+  it('falls back to the first primary-layer body type with a path', () => {
+    expect(previewBodyTypeForItem(item({
+      layer_1: { zPos: 10, female: 'clothes/tanktop/' },
+    }), 'male')).toBe('female');
+  });
+
+  it('returns null when the primary layer has no body-type spritesheet path', () => {
+    expect(previewBodyTypeForItem(item({
+      layer_1: { zPos: 10 },
+    }), 'male')).toBeNull();
   });
 });
