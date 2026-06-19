@@ -133,7 +133,7 @@ describe('label translator', () => {
   it('returns raw values for English', () => {
     const en = createLabelTranslator('en');
     expect(en.category('body')).toBe('body');
-    expect(en.bodyType('male')).toBe('male');
+    expect(en.bodyType('male')).toBe('Male');
     expect(en.anim('walk')).toBe('walk');
     expect(en.itemName('Plate armor')).toBe('Plate armor');
     expect(en.color('red')).toBe('Red');

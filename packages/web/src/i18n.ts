@@ -23,6 +23,7 @@ export const TRANSLATIONS = {
     'picker.color': 'Color',
     'picker.style': 'Style',
     'picker.incompatibleBodyType': 'Not available for current body type',
+    'picker.incompatibleBodyTypeDetail': 'Not available for current body type: {bodyType}',
     'picker.clickToRemove': 'Click again to remove',
     'direction.up': 'Up',
     'direction.left': 'Left',
@@ -189,6 +190,7 @@ export const TRANSLATIONS = {
     'picker.color': '顏色',
     'picker.style': '款式',
     'picker.incompatibleBodyType': '不支援目前身形',
+    'picker.incompatibleBodyTypeDetail': '不支援目前身形：{bodyType}',
     'picker.clickToRemove': '再點一次可取消',
     'direction.up': '上',
     'direction.left': '左',
@@ -862,7 +864,7 @@ export function createLabelTranslator(locale: Locale): LabelTranslator {
     const raw = (value: string): string => value;
     return {
       category: raw,
-      bodyType: raw,
+      bodyType: humanizeLabel,
       anim: raw,
       itemName: raw,
       color: humanizeLabel,
