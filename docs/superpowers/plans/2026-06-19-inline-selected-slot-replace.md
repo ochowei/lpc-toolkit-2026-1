@@ -545,7 +545,10 @@ rtk git commit -m "docs: record slot expansion coordination status"
 **Files:**
 - Modify: `docs/superpowers/plans/2026-06-19-inline-selected-slot-replace.md`
 
-- [ ] **Step 1: Run typecheck**
+- [x] **Step 1: Run typecheck**
+  - Implementation note: Ran the requested typecheck command; `rtk` printed a pnpm filter warning and exited 1 after reporting `TypeScript: No errors found`, then direct web package typecheck passed.
+  - Commit: no code commit, verification only
+  - Verification: rtk pnpm --filter @lpc-toolkit/web typecheck reported no TypeScript errors but exited 1 due rtk filter handling; rtk pnpm --dir packages/web typecheck PASS
 
 Run:
 
@@ -555,7 +558,10 @@ rtk pnpm --filter @lpc-toolkit/web typecheck
 
 Expected: PASS.
 
-- [ ] **Step 2: Run focused test suite**
+- [x] **Step 2: Run focused test suite**
+  - Implementation note: Ran the requested focused tests; sandboxed run hit tsx IPC EPERM and the approved rerun passed.
+  - Commit: no code commit, verification only
+  - Verification: rtk pnpm --filter @lpc-toolkit/web test -- group-type-slot-entries stack-panel sidebar-slot-section PASS
 
 Run:
 
@@ -565,7 +571,10 @@ rtk pnpm --filter @lpc-toolkit/web test -- group-type-slot-entries stack-panel s
 
 Expected: PASS.
 
-- [ ] **Step 3: Inspect final diff**
+- [x] **Step 3: Inspect final diff**
+  - Implementation note: Inspected final diff stat and whitespace errors against `origin/main...HEAD`.
+  - Commit: no code commit, verification only
+  - Verification: diff stat scoped to spec, plan, two component files, and two test files; rtk git diff --check origin/main...HEAD PASS
 
 Run:
 
@@ -576,7 +585,10 @@ rtk git diff --check origin/main...HEAD
 
 Expected: the stat includes only the spec, plan, two component files, and two test files. `git diff --check` exits cleanly.
 
-- [ ] **Step 4: Update the plan file**
+- [x] **Step 4: Update the plan file**
+  - Implementation note: Recorded final verification status, including the `rtk` typecheck command quirk and successful direct web typecheck.
+  - Commit: no code commit, verification only
+  - Verification: direct typecheck PASS; focused tests PASS; diff check PASS
 
 Update this task with:
 
@@ -585,7 +597,10 @@ Update this task with:
   - Verification: typecheck PASS; focused tests PASS; diff check PASS
 ```
 
-- [ ] **Step 5: Commit the final plan status**
+- [x] **Step 5: Commit the final plan status**
+  - Implementation note: Prepared the final verification status for the docs-only commit.
+  - Commit: no code commit, verification only
+  - Verification: direct typecheck PASS; focused tests PASS; diff check PASS
 
 Run:
 
