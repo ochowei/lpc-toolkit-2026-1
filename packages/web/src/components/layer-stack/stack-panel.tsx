@@ -9,7 +9,6 @@ import type { ReplacementCardDisplayMode } from '../../lib/replacement-card-disp
 import { buildUpstreamCategoryGroups } from '../../slice/upstream-category-groups';
 import { LayerRow } from './layer-row';
 import { GroupTypeSlotEntries } from './group-type-slot-entries';
-import { AddLayer } from './add-layer';
 import { PresetBar } from './preset-bar';
 import { StatusToast } from './status-toast';
 import { SettingsCollapsible } from './settings-collapsible';
@@ -80,7 +79,6 @@ export function StackPanel({
   replacementCardDisplayMode,
   onReplacementCardDisplayModeChange,
 }: Props) {
-  const [adding, setAdding] = useState(false);
   const [expandedSectionId, setExpandedSectionId] = useState<string | null>(null);
   const [expandedSlotType, setExpandedSlotType] = useState<TypeName | null>(null);
 
@@ -244,20 +242,6 @@ export function StackPanel({
             </section>
           );
         })}
-
-        {/* Task 10: AddLayer */}
-        <AddLayer
-          disabled={disabled}
-          catalog={catalog}
-          dispatch={dispatch}
-          inactive={inactive}
-          bodyType={state.bodyType}
-          t={t}
-          tl={tl}
-          adding={adding}
-          setAdding={setAdding}
-          onAdded={expandType}
-        />
       </div>
 
       <SettingsCollapsible
