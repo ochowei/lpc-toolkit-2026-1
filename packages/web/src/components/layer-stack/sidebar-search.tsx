@@ -333,7 +333,12 @@ export function SidebarSearchResultRow({
 
   if (showIncompatibleTooltip) {
     return (
-      <span className="group relative block w-full" tabIndex={0}>
+      <span
+        className="group relative block w-full"
+        tabIndex={0}
+        title={t('picker.incompatibleBodyTypeDetail')
+          .replace('{bodyType}', tl.bodyType(state.bodyType))}
+      >
         {button}
         <span
           role="tooltip"
