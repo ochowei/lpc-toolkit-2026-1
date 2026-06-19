@@ -40,6 +40,12 @@ describe('makeCacheKey', () => {
     });
     expect(key).toContain(THUMBNAIL_FRAMING_POLICY_VERSION);
   });
+
+  it('separates canvases rendered for different preview body types', () => {
+    const base = { typeName: 'clothes', name: 'Tanktop', size: 20 } as const;
+    expect(makeCacheKey({ ...base, bodyType: 'male' }))
+      .not.toBe(makeCacheKey({ ...base, bodyType: 'female' }));
+  });
 });
 
 describe('LRU cache', () => {

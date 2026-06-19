@@ -11,7 +11,10 @@ import {
 } from '@lpc-toolkit/core';
 import { createBrowserCanvasAdapter } from '../adapter/browser-canvas-adapter';
 import { cacheGet, cacheSet, makeCacheKey } from './thumbnail-cache';
-import { buildItemThumbnailSelections } from '../lib/item-thumbnail-selection';
+import {
+  buildItemThumbnailSelections,
+  previewBodyTypeForItem,
+} from '../lib/item-thumbnail-selection';
 import {
   createThumbnailDrawPlan,
   findAlphaBounds,
@@ -89,8 +92,13 @@ function findItemDef(
  * we synthesize a matching sibling so the path resolves.
  */
 export function useItemThumbnail(args: UseItemThumbnailArgs): UseItemThumbnailResult {
+  const def = findItemDef(args.catalog, args.typeName, args.name);
+  const previewBodyType = def
+    ? previewBodyTypeForItem(def, args.bodyType)
+    : args.bodyType;
+
   const key = makeCacheKey({
-    bodyType: args.bodyType,
+    bodyType: previewBodyType ?? args.bodyType,
     typeName: args.typeName,
     name: args.name,
     ...(args.variant !== undefined ? { variant: args.variant } : {}),
@@ -121,12 +129,12 @@ export function useItemThumbnail(args: UseItemThumbnailArgs): UseItemThumbnailRe
     const selections = def
       ? buildItemThumbnailSelections({
           item: def,
-          bodyType: args.bodyType,
+          bodyType: previewBodyType ?? args.bodyType,
           ...(args.variant !== undefined ? { variant: args.variant } : {}),
           ...(args.recolor !== undefined ? { recolor: args.recolor } : {}),
         })
       : {
-          bodyType: args.bodyType,
+          bodyType: previewBodyType ?? args.bodyType,
           items: {
             [args.typeName]: {
               typeName: args.typeName,
