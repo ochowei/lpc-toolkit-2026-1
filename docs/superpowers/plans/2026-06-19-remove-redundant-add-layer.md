@@ -15,7 +15,7 @@
 **Files:**
 - Modify: `packages/web/test/stack-panel.test.tsx`
 
-- [ ] **Step 1: Add the failing assertion to the existing category-rendering test**
+- [x] **Step 1: Add the failing assertion to the existing category-rendering test**
 
   In `renders every upstream group and keeps empty groups visible`, append this assertion after the existing inactive-slot assertions:
 
@@ -25,7 +25,7 @@
 
   This test uses the English translator and renders the complete `StackPanel`, so it detects the user-visible duplicate control rather than an implementation detail.
 
-- [ ] **Step 2: Run the targeted test and verify the expected failure**
+- [x] **Step 2: Run the targeted test and verify the expected failure**
 
   Run:
 
@@ -35,7 +35,7 @@
 
   Expected: FAIL because the current `AddLayer` button renders the text `Add layer`.
 
-- [ ] **Step 3: Commit the failing test**
+- [x] **Step 3: Commit the failing test**
 
   ```bash
   rtk git add packages/web/test/stack-panel.test.tsx
@@ -43,6 +43,8 @@
   ```
 
   Record the commit hash and the targeted-test failure in this plan.
+  - Commit: `119b19e87`
+  - Verification: Test failed with `expect(html).not.toContain('Add layer')` assertion failure as expected.
 
 ### Task 2: Remove the duplicate UI and its unused translations
 
@@ -52,7 +54,7 @@
 - Modify: `packages/web/src/i18n.ts`
 - Test: `packages/web/test/stack-panel.test.tsx`
 
-- [ ] **Step 1: Remove AddLayer integration from StackPanel**
+- [x] **Step 1: Remove AddLayer integration from StackPanel**
 
   In `packages/web/src/components/layer-stack/stack-panel.tsx`:
 
@@ -69,7 +71,7 @@
   `GroupTypeSlotEntries`: `inactive` remains part of the layer count and the
   per-section slot disclosure continues to add compatible layers.
 
-- [ ] **Step 2: Delete the obsolete component and translations**
+- [x] **Step 2: Delete the obsolete component and translations**
 
   Delete `packages/web/src/components/layer-stack/add-layer.tsx`.
 
@@ -83,7 +85,7 @@
   'add.available': '可選',
   ```
 
-- [ ] **Step 3: Run the targeted test and verify it passes**
+- [x] **Step 3: Run the targeted test and verify it passes**
 
   Run:
 
@@ -94,7 +96,7 @@
   Expected: PASS. The test confirms all ten sections still render and that
   the Add layer text is absent.
 
-- [ ] **Step 4: Confirm no obsolete reference remains**
+- [x] **Step 4: Confirm no obsolete reference remains**
 
   Run:
 
@@ -105,7 +107,7 @@
   Expected: no matches. This check intentionally excludes documentation,
   which may retain historical wording.
 
-- [ ] **Step 5: Commit the implementation**
+- [x] **Step 5: Commit the implementation**
 
   ```bash
   rtk git add packages/web/src/components/layer-stack/stack-panel.tsx packages/web/src/components/layer-stack/add-layer.tsx packages/web/src/i18n.ts packages/web/test/stack-panel.test.tsx
@@ -113,13 +115,15 @@
   ```
 
   Record the commit hash and targeted-test result in this plan.
+  - Commit: `bd9891ab6`
+  - Verification: Target tests passed successfully, and `rg` verified no remaining references.
 
 ### Task 3: Verify the web package and workspace
 
 **Files:**
 - Modify: `docs/superpowers/plans/2026-06-19-remove-redundant-add-layer.md` (checkboxes and verification notes only)
 
-- [ ] **Step 1: Run the web test suite**
+- [x] **Step 1: Run the web test suite**
 
   Run:
 
@@ -128,8 +132,9 @@
   ```
 
   Expected: PASS.
+  - Verification: PASS (57 files, 436 tests passed)
 
-- [ ] **Step 2: Run strict type checking for all workspaces**
+- [x] **Step 2: Run strict type checking for all workspaces**
 
   Run:
 
@@ -138,8 +143,9 @@
   ```
 
   Expected: PASS.
+  - Verification: PASS (`packages/core` and `packages/web` typecheck succeeded with tsc --noEmit)
 
-- [ ] **Step 3: Record verification and commit the plan status**
+- [x] **Step 3: Record verification and commit the plan status**
 
   Mark each completed checkbox in this plan. Under the completed task,
   record the implementation commit hash and the exact PASS results from
