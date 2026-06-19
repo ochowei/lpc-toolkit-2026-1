@@ -194,74 +194,25 @@ export function SidebarSearch({
                 {t('palette.no_match')}
               </div>
             ) : (
-              shown.map((r, i) => {
-                const licenseExceeded = !itemMatchesLicenseFilter(r.item, licenseFilter);
-                const animExceeded = !itemMatchesAnimationFilter(r.item, animationFilter);
-                const exceeded = licenseExceeded || animExceeded;
-                const selected = state.selections[r.typeName]?.name === r.item.name;
-                const itemLicense = r.item.credits[0]?.licenses[0];
-                const isActive = i === activeIndex;
-                const exceededTitle =
-                  licenseExceeded && animExceeded
-                    ? t('layer.bothIncompatibleTooltip')
-                    : licenseExceeded
-                      ? t('layer.licenseIncompatibleTooltip')
-                      : t('layer.animationIncompatibleTooltip');
-                return (
-                  <button
-                    key={`${r.typeName}:${r.item.name}`}
-                    ref={isActive ? activeRowRef : undefined}
-                    type="button"
-                    disabled={disabled || !r.supports}
-                    title={
-                      !r.supports
-                        ? t('palette.incompatible')
-                        : exceeded
-                          ? exceededTitle
-                          : r.item.name
-                    }
-                    onMouseEnter={() => setActiveIndex(i)}
-                    onClick={() => onPick(r)}
-                    className={[
-                      'flex w-full items-center gap-2 px-3 py-1.5 text-left',
-                      i > 0 ? 'border-t border-border' : '',
-                      disabled
-                        ? 'cursor-not-allowed opacity-50'
-                        : !r.supports
-                          ? 'cursor-not-allowed opacity-35'
-                        : exceeded
-                          ? 'opacity-65 hover:bg-surface-2'
-                          : 'hover:bg-surface-2',
-                      isActive && r.supports ? 'bg-surface-2' : '',
-                    ].join(' ')}
-                  >
-                    <ItemThumbnail
-                      typeName={r.typeName}
-                      name={r.item.name}
-                      size={20}
-                      bodyType={state.bodyType}
-                      catalog={catalog}
-                      palettes={palettes}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1 truncate text-sm font-semibold">
-                        {tl.itemName(r.item.name)}
-                        {!r.supports && (
-                          <span className="rounded bg-amber-500/15 px-1 text-xs uppercase tracking-wide text-amber-500">
-                            {t('palette.incompatible')}
-                          </span>
-                        )}
-                      </div>
-                      <div className="truncate text-xs uppercase tracking-wide text-text-mute">
-                        {tl.category(r.typeName)}
-                        {itemLicense && <> · {itemLicense}</>}
-                      </div>
-                    </div>
-                    {exceeded && <span className="text-danger">⚠</span>}
-                    {selected && <span className="text-accent">✓</span>}
-                  </button>
-                );
-              })
+              shown.map((r, i) => (
+                <SidebarSearchResultRow
+                  key={`${r.typeName}:${r.item.name}`}
+                  result={r}
+                  index={i}
+                  activeIndex={activeIndex}
+                  disabled={disabled}
+                  licenseFilter={licenseFilter}
+                  animationFilter={animationFilter}
+                  state={state}
+                  catalog={catalog}
+                  palettes={palettes}
+                  t={t}
+                  tl={tl}
+                  onPick={onPick}
+                  setActiveIndex={setActiveIndex}
+                  activeRowRef={activeRowRef}
+                />
+              ))
             )}
           </div>
           <div className="flex items-center justify-between border-t border-border px-3 py-1 text-xs text-text-dim">
@@ -276,4 +227,124 @@ export function SidebarSearch({
       )}
     </div>
   );
+}
+
+export interface SidebarSearchResultRowProps {
+  readonly result: PaletteResult;
+  readonly index: number;
+  readonly activeIndex: number;
+  readonly disabled: boolean;
+  readonly licenseFilter: LicenseFilter;
+  readonly animationFilter: AnimationFilter;
+  readonly state: SliceState;
+  readonly catalog: Catalog;
+  readonly palettes: PaletteMetadata;
+  readonly t: Translator;
+  readonly tl: LabelTranslator;
+  readonly onPick: (result: PaletteResult) => void;
+  readonly setActiveIndex: (index: number) => void;
+  readonly activeRowRef: RefObject<HTMLButtonElement>;
+}
+
+export function SidebarSearchResultRow({
+  result,
+  index,
+  activeIndex,
+  disabled,
+  licenseFilter,
+  animationFilter,
+  state,
+  catalog,
+  palettes,
+  t,
+  tl,
+  onPick,
+  setActiveIndex,
+  activeRowRef,
+}: SidebarSearchResultRowProps) {
+  const licenseExceeded = !itemMatchesLicenseFilter(result.item, licenseFilter);
+  const animExceeded = !itemMatchesAnimationFilter(result.item, animationFilter);
+  const exceeded = licenseExceeded || animExceeded;
+  const selected = state.selections[result.typeName]?.name === result.item.name;
+  const itemLicense = result.item.credits[0]?.licenses[0];
+  const isActive = index === activeIndex;
+  const exceededTitle =
+    licenseExceeded && animExceeded
+      ? t('layer.bothIncompatibleTooltip')
+      : licenseExceeded
+        ? t('layer.licenseIncompatibleTooltip')
+        : t('layer.animationIncompatibleTooltip');
+
+  const showIncompatibleTooltip = !result.supports && !disabled;
+
+  const button = (
+    <button
+      ref={isActive ? activeRowRef : undefined}
+      type="button"
+      disabled={disabled || !result.supports}
+      title={
+        !result.supports
+          ? t('palette.incompatible')
+          : exceeded
+            ? exceededTitle
+            : result.item.name
+      }
+      onMouseEnter={() => setActiveIndex(index)}
+      onClick={() => onPick(result)}
+      className={[
+        'flex w-full items-center gap-2 px-3 py-1.5 text-left',
+        index > 0 ? 'border-t border-border' : '',
+        disabled
+          ? 'cursor-not-allowed opacity-50'
+          : !result.supports
+            ? 'cursor-not-allowed opacity-35'
+          : exceeded
+            ? 'opacity-65 hover:bg-surface-2'
+            : 'hover:bg-surface-2',
+        isActive && result.supports ? 'bg-surface-2' : '',
+      ].join(' ')}
+    >
+      <ItemThumbnail
+        typeName={result.typeName}
+        name={result.item.name}
+        size={20}
+        bodyType={state.bodyType}
+        catalog={catalog}
+        palettes={palettes}
+      />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1 truncate text-sm font-semibold">
+          {tl.itemName(result.item.name)}
+          {!result.supports && (
+            <span className="rounded bg-amber-500/15 px-1 text-xs uppercase tracking-wide text-amber-500">
+              {t('palette.incompatible')}
+            </span>
+          )}
+        </div>
+        <div className="truncate text-xs uppercase tracking-wide text-text-mute">
+          {tl.category(result.typeName)}
+          {itemLicense && <> · {itemLicense}</>}
+        </div>
+      </div>
+      {exceeded && <span className="text-danger">⚠</span>}
+      {selected && <span className="text-accent">✓</span>}
+    </button>
+  );
+
+  if (showIncompatibleTooltip) {
+    return (
+      <span className="group relative block w-full" tabIndex={0}>
+        {button}
+        <span
+          role="tooltip"
+          className="pointer-events-none absolute left-3 top-full z-40 mt-1 max-w-56 rounded bg-surface-3 border border-border-strong px-2 py-1 text-xs text-text shadow-md opacity-0 group-hover:opacity-100 group-hover:delay-150 group-focus:opacity-100 transition-opacity duration-150"
+        >
+          {t('picker.incompatibleBodyTypeDetail')
+            .replace('{bodyType}', tl.bodyType(state.bodyType))}
+        </span>
+      </span>
+    );
+  }
+
+  return button;
 }
