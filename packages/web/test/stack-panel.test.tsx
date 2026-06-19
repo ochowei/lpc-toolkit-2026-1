@@ -126,16 +126,23 @@ describe('StackPanel upstream selected-layer groups', () => {
     expect(html).not.toContain('+ tools');
   });
 
-  it('opens the containing group when an unselected type picker is active', () => {
+  it('does not force a collapsed slot group open for an expanded selected type', () => {
+    const html = renderPanel({ expanded: 'body' });
+
+    expect(html).toContain('Body Color');
+    expect(html).toContain('Swap body');
+    expect(html).toContain('Show 1 slot');
+    expect(html).not.toContain('body: Body Color - Replace');
+  });
+
+  it('does not reveal an expanded unselected type unless its slot group is open', () => {
     const html = renderPanel({ expanded: 'clothes' });
 
-    expect(html).toContain('Hide 1 slot');
-    expect(html).toContain('+ clothes');
-    expect(html).toContain('Swap clothes');
-    expect(html).toContain('Long Sleeve');
-    expect(html).toContain('Short Sleeve');
-    expect(html).not.toContain('+ head');
-    expect(html).not.toContain('+ hair');
+    expect(html).toContain('Show 1 slot');
+    expect(html).not.toContain('+ clothes');
+    expect(html).not.toContain('Swap clothes');
+    expect(html).not.toContain('Long Sleeve');
+    expect(html).not.toContain('Short Sleeve');
   });
 
   it('keeps selected layer rows visible while slot entries are collapsed', () => {
@@ -165,15 +172,6 @@ describe('StackPanel upstream selected-layer groups', () => {
     expect(html).not.toContain('hat: Missing Hat - Replace');
   });
 
-  it('opens an inline picker for an unselected type without selecting the first item', () => {
-    const html = renderPanel({ expanded: 'clothes' });
-
-    expect(html).toContain('Swap clothes');
-    expect(html).toContain('Long Sleeve');
-    expect(html).toContain('Short Sleeve');
-    expect(html).toContain('grid-cols-[repeat(auto-fill,minmax(72px,1fr))]');
-  });
-
   it('opens an inline picker for a selected type with the current item marked selected', () => {
     const selectedClothesState: SliceState = {
       ...state,
@@ -185,7 +183,7 @@ describe('StackPanel upstream selected-layer groups', () => {
 
     const html = renderPanel({ state: selectedClothesState, expanded: 'clothes' });
 
-    expect(html).toContain('clothes: Long Sleeve');
+    expect(html).toContain('Swap clothes');
     expect(html).toContain('Short Sleeve');
     expect(html).toContain('border-accent bg-accent/10 text-text');
   });
