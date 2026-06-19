@@ -142,7 +142,7 @@ the plan progress update separately.
 - Modify: `packages/web/src/hooks/use-item-thumbnail.ts`
 - Modify: `packages/web/test/thumbnail-cache.test.ts`
 
-- [ ] **Step 1: Write the cache separation assertion**
+- [x] **Step 1: Write the cache separation assertion**
 
 Add this case to the `makeCacheKey` suite in `packages/web/test/thumbnail-cache.test.ts`:
 
@@ -154,7 +154,7 @@ it('separates canvases rendered for different preview body types', () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused cache test and record the baseline**
+- [x] **Step 2: Run the focused cache test and record the baseline**
 
 Run:
 
@@ -165,7 +165,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- thumbnail-cache.test.ts
 Expected: PASS; the test documents the existing cache-key invariant needed by
 the hook change.
 
-- [ ] **Step 3: Use the resolver before cache lookup and composition**
+- [x] **Step 3: Use the resolver before cache lookup and composition**
 
 In `packages/web/src/hooks/use-item-thumbnail.ts`, import
 `previewBodyTypeForItem`, find the definition before constructing `key`, and
@@ -194,7 +194,7 @@ or error placeholder. Do not change the hook's public arguments: callers
 continue passing the active character body type, and the hook makes the
 display-only decision locally.
 
-- [ ] **Step 4: Run focused tests and typecheck**
+- [x] **Step 4: Run focused tests and typecheck**
 
 Run:
 
@@ -205,7 +205,7 @@ rtk pnpm --filter @lpc-toolkit/web typecheck
 
 Expected: all focused tests and typecheck PASS.
 
-- [ ] **Step 5: Commit and record Task 2**
+- [x] **Step 5: Commit and record Task 2**
 
 ```bash
 rtk git add packages/web/src/hooks/use-item-thumbnail.ts packages/web/test/thumbnail-cache.test.ts docs/superpowers/plans/2026-06-19-incompatible-asset-thumbnails.md
@@ -214,6 +214,16 @@ rtk git commit -m "feat(web): render incompatible asset thumbnails"
 
 Append the actual commit SHA and command results below this task, then commit
 the plan progress update separately.
+
+- **Commit**: 1baed4083
+- **Verification**:
+  - `rtk pnpm --filter @lpc-toolkit/web test -- item-thumbnail-selection.test.ts thumbnail-cache.test.ts thumbnail-frame-rect.test.ts` PASS
+  - `rtk pnpm -r typecheck` PASS
+- **Implementation Note**:
+  - Imported `previewBodyTypeForItem` in `packages/web/src/hooks/use-item-thumbnail.ts`.
+  - Resolved `previewBodyType` using the resolver before constructing the cache `key` and before building the selections in both selection branches.
+  - Added cache key separation assertion to `packages/web/test/thumbnail-cache.test.ts`, verifying distinct keys are built for different body types.
+  - Verified focused tests pass and project typechecks successfully.
 
 ### Task 3: Expose the disabled reason in sidebar search
 
