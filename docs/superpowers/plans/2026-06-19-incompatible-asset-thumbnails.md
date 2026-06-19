@@ -41,7 +41,7 @@
 - Modify: `packages/web/src/lib/item-thumbnail-selection.ts`
 - Modify: `packages/web/test/item-thumbnail-selection.test.ts`
 
-- [ ] **Step 1: Write the failing resolver tests**
+- [x] **Step 1: Write the failing resolver tests**
 
 Add this import and cases to `packages/web/test/item-thumbnail-selection.test.ts`:
 
@@ -71,7 +71,7 @@ it('returns null when the primary layer has no body-type spritesheet path', () =
 });
 ```
 
-- [ ] **Step 2: Run the focused test and verify it fails**
+- [x] **Step 2: Run the focused test and verify it fails**
 
 Run:
 
@@ -81,7 +81,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- item-thumbnail-selection.test.ts
 
 Expected: FAIL because `previewBodyTypeForItem` is not exported.
 
-- [ ] **Step 3: Implement the pure resolver**
+- [x] **Step 3: Implement the pure resolver**
 
 Add this function to `packages/web/src/lib/item-thumbnail-selection.ts` after `effectiveThumbnailVariant`:
 
@@ -106,7 +106,7 @@ The `typeof path === 'string'` guard excludes layer metadata such as numeric
 `zPos`; insertion order preserves the asset definition's first available body
 type for the fallback.
 
-- [ ] **Step 4: Run the focused test and typecheck**
+- [x] **Step 4: Run the focused test and typecheck**
 
 Run:
 
@@ -117,7 +117,7 @@ rtk pnpm --filter @lpc-toolkit/web typecheck
 
 Expected: both commands PASS.
 
-- [ ] **Step 5: Commit and record Task 1**
+- [x] **Step 5: Commit and record Task 1**
 
 ```bash
 rtk git add packages/web/src/lib/item-thumbnail-selection.ts packages/web/test/item-thumbnail-selection.test.ts docs/superpowers/plans/2026-06-19-incompatible-asset-thumbnails.md
@@ -126,6 +126,15 @@ rtk git commit -m "feat(web): resolve fallback thumbnail body type"
 
 Append the actual commit SHA and command results below this task, then commit
 the plan progress update separately.
+
+- **Commit**: 1391ad12d
+- **Verification**:
+  - `rtk pnpm --filter @lpc-toolkit/web test -- item-thumbnail-selection.test.ts` PASS
+  - `rtk pnpm -r typecheck` PASS
+  - `rtk pnpm --filter @lpc-toolkit/web test` PASS
+- **Implementation Note**:
+  - Implemented `previewBodyTypeForItem` in `packages/web/src/lib/item-thumbnail-selection.ts` which uses the active body type if supported, or falls back to the first primary-layer body type with a path, or returns null.
+  - Added unit test cases in `packages/web/test/item-thumbnail-selection.test.ts` to verify active body type use, fallback behavior, and null return behavior, all of which pass successfully.
 
 ### Task 2: Compose and cache using the resolved display body type
 
