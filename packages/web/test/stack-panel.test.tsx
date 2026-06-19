@@ -124,6 +124,7 @@ describe('StackPanel upstream selected-layer groups', () => {
     expect(html).not.toContain('+ legs');
     expect(html).not.toContain('+ shoes');
     expect(html).not.toContain('+ tools');
+    expect(html).not.toContain('Add layer');
   });
 
   it('does not force a collapsed slot group open for an expanded selected type', () => {
