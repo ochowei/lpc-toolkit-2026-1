@@ -20,8 +20,8 @@ interface Props {
   t: Translator;
   licenseFilter: LicenseFilter;
   animationFilter: AnimationFilter;
-  expanded: TypeName | null;
-  setExpanded: (v: TypeName | null) => void;
+  expandedSlotType: TypeName | null;
+  onToggleSlotType: (typeName: TypeName) => void;
   replacementCardDisplayMode: ReplacementCardDisplayMode;
   onReplacementCardDisplayModeChange: (mode: ReplacementCardDisplayMode) => void;
 }
@@ -77,8 +77,8 @@ export function GroupTypeSlotEntries({
   t,
   licenseFilter,
   animationFilter,
-  expanded,
-  setExpanded,
+  expandedSlotType,
+  onToggleSlotType,
   replacementCardDisplayMode,
   onReplacementCardDisplayModeChange,
 }: Props) {
@@ -119,7 +119,7 @@ export function GroupTypeSlotEntries({
             const currentName = selectedItemName({ catalog, state, typeName });
             const hasCompatible = hasBodyCompatibleItem({ catalog, state, typeName });
             const entryDisabled = disabled || !hasCompatible;
-            const selected = expanded === typeName;
+            const selected = expandedSlotType === typeName;
             const label = currentName
               ? `${tl.category(typeName)}: ${tl.itemName(currentName)} - Replace`
               : `+ ${tl.category(typeName)}`;
@@ -131,7 +131,7 @@ export function GroupTypeSlotEntries({
                   disabled={entryDisabled}
                   title={!hasCompatible ? t('picker.incompatibleBodyType') : label}
                   aria-expanded={selected}
-                  onClick={() => setExpanded(selected ? null : typeName)}
+                  onClick={() => onToggleSlotType(typeName)}
                   className={[
                     'flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-xs font-semibold transition shadow-sm',
                     selected
@@ -145,7 +145,7 @@ export function GroupTypeSlotEntries({
                   <span>{label}</span>
                   <span aria-hidden className="text-xs text-text-mute select-none">{selected ? '▼' : '▶'}</span>
                 </button>
-                {selected && !state.selections[typeName] && (
+                {selected && (
                   <div className="rounded-md border border-border bg-app pt-2 mt-1">
                     <TypeItemPicker
                       disabled={disabled}

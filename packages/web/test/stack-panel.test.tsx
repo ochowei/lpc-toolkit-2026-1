@@ -172,7 +172,24 @@ describe('StackPanel upstream selected-layer groups', () => {
     expect(html).not.toContain('hat: Missing Hat - Replace');
   });
 
-  it('opens an inline picker for a selected type with the current item marked selected', () => {
+  it('does not open a lower selected slot picker from selected row expansion alone', () => {
+    const selectedClothesState: SliceState = {
+      ...state,
+      selections: {
+        ...state.selections,
+        clothes: { typeName: 'clothes', name: 'Long Sleeve' },
+      },
+    };
+
+    const html = renderPanel({ state: selectedClothesState, expanded: 'clothes' });
+
+    expect(html).toContain('Long Sleeve');
+    expect(html).toContain('Swap clothes');
+    expect(html).toContain('Short Sleeve');
+    expect(html).not.toContain('clothes: Long Sleeve - Replace');
+  });
+
+  it('keeps the selected row picker available from selected row expansion', () => {
     const selectedClothesState: SliceState = {
       ...state,
       selections: {
