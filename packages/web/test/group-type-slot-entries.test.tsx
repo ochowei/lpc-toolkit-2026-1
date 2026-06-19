@@ -43,7 +43,7 @@ const state: SliceState = {
 
 function renderEntries(args: {
   readonly sectionOpen: boolean;
-  readonly expanded?: TypeName | null;
+  readonly expandedSlotType?: TypeName | null;
 }): string {
   return renderToStaticMarkup(
     <GroupTypeSlotEntries
@@ -59,8 +59,8 @@ function renderEntries(args: {
       t={createTranslator('en')}
       licenseFilter={ALL_LICENSE_GROUPS}
       animationFilter={new Set()}
-      expanded={args.expanded ?? null}
-      setExpanded={() => {}}
+      expandedSlotType={args.expandedSlotType ?? null}
+      onToggleSlotType={() => {}}
       replacementCardDisplayMode="overlay"
       onReplacementCardDisplayModeChange={() => {}}
     />,
@@ -93,10 +93,23 @@ describe('GroupTypeSlotEntries collapsed groups', () => {
     expect(html).toContain('mt-1.5 pl-2');
   });
 
-  it('keeps the inline picker visible for the active unselected type', () => {
-    const html = renderEntries({ sectionOpen: true, expanded: 'head' });
+  it('keeps the inline picker visible for the active unselected slot entry', () => {
+    const html = renderEntries({ sectionOpen: true, expandedSlotType: 'head' });
 
     expect(html).toContain('Swap head');
     expect(html).toContain('Human Male');
+  });
+
+  it('opens the inline picker under a selected slot entry', () => {
+    const html = renderEntries({
+      sectionOpen: true,
+      expandedSlotType: 'expression',
+    });
+
+    expect(html).toContain('expression: Neutral - Replace');
+    expect(html).toContain('Swap expression');
+    expect(html).toContain('Neutral');
+    expect(html).toContain('border-accent bg-accent/10 text-text');
+    expect(html).toContain('aria-expanded="true"');
   });
 });
