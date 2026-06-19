@@ -82,6 +82,7 @@ export function StackPanel({
 }: Props) {
   const [adding, setAdding] = useState(false);
   const [expandedSectionId, setExpandedSectionId] = useState<string | null>(null);
+  const [expandedSlotType, setExpandedSlotType] = useState<TypeName | null>(null);
 
   const active = useMemo(
     () => shownTypeNames.filter((tn) => state.selections[tn] != null),
@@ -96,16 +97,37 @@ export function StackPanel({
     [catalog, shownTypeNames],
   );
 
+  const toggleRowType = (typeName: TypeName) => {
+    setExpanded(expanded === typeName ? null : typeName);
+    if (expandedSlotType === typeName) {
+      setExpandedSlotType(null);
+    }
+  };
+
+  const toggleSlotType = (typeName: TypeName) => {
+    setExpandedSlotType(expandedSlotType === typeName ? null : typeName);
+    if (expanded === typeName) {
+      setExpanded(null);
+    }
+  };
+
   const expandType = (typeName: TypeName) => {
-    setExpanded(typeName);
     const nextSectionId = sectionIdForTypeNavigation({
       sections,
       state,
       typeName,
     });
-    if (nextSectionId !== undefined) {
-      setExpandedSectionId(nextSectionId);
+    if (nextSectionId === undefined) {
+      setExpanded(typeName);
+      if (expandedSlotType === typeName) {
+        setExpandedSlotType(null);
+      }
+      return;
     }
+
+    setExpanded(null);
+    setExpandedSlotType(typeName);
+    setExpandedSectionId(nextSectionId);
   };
 
   // Spec edge case: body-type change can leave `expanded` pointing at a
@@ -113,6 +135,12 @@ export function StackPanel({
   useEffect(() => {
     if (expanded && !shownTypeNames.includes(expanded)) setExpanded(null);
   }, [expanded, shownTypeNames, setExpanded]);
+
+  useEffect(() => {
+    if (expandedSlotType && !shownTypeNames.includes(expandedSlotType)) {
+      setExpandedSlotType(null);
+    }
+  }, [expandedSlotType, shownTypeNames]);
 
   useEffect(() => {
     if (
@@ -187,7 +215,7 @@ export function StackPanel({
                     licenseFilter={licenseFilter}
                     animationFilter={animationFilter}
                     expanded={expanded === tn}
-                    onToggle={() => setExpanded(expanded === tn ? null : tn)}
+                    onToggle={() => toggleRowType(tn)}
                     replacementCardDisplayMode={replacementCardDisplayMode}
                     onReplacementCardDisplayModeChange={onReplacementCardDisplayModeChange}
                   />
@@ -208,8 +236,8 @@ export function StackPanel({
                 t={t}
                 licenseFilter={licenseFilter}
                 animationFilter={animationFilter}
-                expanded={expanded}
-                setExpanded={setExpanded}
+                expandedSlotType={expandedSlotType}
+                onToggleSlotType={toggleSlotType}
                 replacementCardDisplayMode={replacementCardDisplayMode}
                 onReplacementCardDisplayModeChange={onReplacementCardDisplayModeChange}
               />
