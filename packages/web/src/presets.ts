@@ -45,6 +45,8 @@ export const CLOTHING_TYPES: ReadonlySet<TypeName> = new Set<TypeName>([
   'weapon_magic_crystal',
   'shield',
   'quiver',
+  'arms',
+  'gloves',
 ]);
 
 /**
@@ -91,13 +93,19 @@ export const PRESETS: readonly Preset[] = [
     id: 'knight',
     labelKey: 'preset.knight',
     emoji: '⚔️',
+    bodyType: 'male',
     items: [
+      { typeName: 'body', name: 'Body Color', recolor: 'light' },
+      { typeName: 'head', name: 'Human Male', recolor: 'light' },
+      { typeName: 'expression', name: 'Neutral', recolor: 'light' },
       { typeName: 'armour', name: 'Plate' },
       { typeName: 'legs', name: 'Armour' },
       { typeName: 'shoes', name: 'Armour', variant: 'steel' },
-      { typeName: 'hat', name: 'Kettle helm' },
+      { typeName: 'hat', name: 'Armet' },
       { typeName: 'weapon', name: 'Longsword', variant: 'longsword' },
-      { typeName: 'shield', name: 'Round Shield', variant: 'silver' },
+      { typeName: 'shield', name: 'Kite', variant: 'kite blue gray' },
+      { typeName: 'arms', name: 'Armour' },
+      { typeName: 'gloves', name: 'Gloves', recolor: 'all.lpcr.smoke' },
     ],
   },
   {
