@@ -105,7 +105,6 @@ describe('i18n', () => {
       'preset.knight',
       'preset.ranger',
       'preset.noble',
-      'preset.rogue',
       'preset.applied',
       'preset.skipped',
     ];

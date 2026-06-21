@@ -136,15 +136,4 @@ export const PRESETS: readonly Preset[] = [
       { typeName: 'hat', name: 'Formal Tophat', variant: 'black' },
     ],
   },
-  {
-    id: 'rogue',
-    labelKey: 'preset.rogue',
-    emoji: '🗡️',
-    items: [
-      { typeName: 'chainmail', name: 'Chainmail' },
-      { typeName: 'legs', name: 'Pants' },
-      { typeName: 'shoes', name: 'Basic Boots', variant: 'black' },
-      { typeName: 'hat', name: 'Hood' },
-    ],
-  },
 ];

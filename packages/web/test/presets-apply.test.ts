@@ -111,7 +111,7 @@ describe('computePresetSelection', () => {
   it('skips items missing from the catalog', () => {
     const badPreset: Preset = {
       id: 'b',
-      labelKey: 'preset.rogue',
+      labelKey: 'preset.ranger',
       emoji: '🗡️',
       items: [{ typeName: 'clothes', name: 'Nonexistent' }],
     };
