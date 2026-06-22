@@ -106,6 +106,35 @@ describe('createCatalog with real upstream JSON', () => {
       expect(w.message).toMatch(/alias target/);
     }
   });
+
+  it('loads correct display names for key items', () => {
+    const expected = [
+      ['weapon_ranged_bow_normal', 'Normal Bow'],
+      ['weapon_ranged_bow_great', 'Great Bow'],
+      ['weapon_ranged_bow_recurve', 'Recurve Bow'],
+      ['weapon_ranged_bow_arrow', 'Arrow'],
+      ['hair_natural', 'Natural Hair'],
+      ['hair_plain', 'Plain Hair'],
+      ['face_neutral', 'Neutral Expression'],
+    ] as const;
+
+    const records = loadRecords([
+      'weapons/ranged/bow/weapon_ranged_bow_normal.json',
+      'weapons/ranged/bow/weapon_ranged_bow_great.json',
+      'weapons/ranged/bow/weapon_ranged_bow_recurve.json',
+      'weapons/ranged/bow/weapon_ranged_bow_arrow.json',
+      'hair/afro/hair_natural.json',
+      'hair/short/hair_plain.json',
+      'head/faces/face_neutral.json',
+    ]);
+    const { catalog, warnings } = createCatalog(records);
+
+    expect(warnings).toEqual([]);
+
+    for (const [itemId, displayName] of expected) {
+      expect(catalog.byItemId.get(itemId)?.display_name).toBe(displayName);
+    }
+  });
 });
 
 describe('createCatalog with synthetic records', () => {
