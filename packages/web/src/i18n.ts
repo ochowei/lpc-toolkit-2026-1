@@ -1,4 +1,6 @@
 import { ITEM_NAME_LABELS_ZH } from './i18n-item-names';
+import { ITEM_DISPLAY_NAMES_ZH } from './i18n-item-display-names';
+import type { ItemDefinition } from '@lpc-toolkit/core';
 
 /** Static UI copy keyed by locale; catalog-derived labels are handled below. */
 export const TRANSLATIONS = {
@@ -847,6 +849,8 @@ export interface LabelTranslator {
   color(value: string): string;
   /** asset variant key, e.g. "axe", "longsword_alt". */
   variant(value: string): string;
+  /** Localised display name by item ID with safe fallbacks. */
+  catalogItemName(item: Pick<ItemDefinition, 'name' | 'display_name' | 'itemId'>): string;
 }
 
 /**
@@ -861,6 +865,7 @@ export function createLabelTranslator(locale: Locale): LabelTranslator {
       bodyType: humanizeLabel,
       anim: raw,
       itemName: raw,
+      catalogItemName: (item) => item.display_name ?? item.name,
       color: humanizeLabel,
       variant: humanizeLabel,
     };
@@ -872,6 +877,11 @@ export function createLabelTranslator(locale: Locale): LabelTranslator {
     bodyType: (value) => BODY_TYPE_LABELS_ZH[value] ?? value,
     anim: (value) => ANIM_LABELS_ZH[value] ?? value,
     itemName: (value) => ITEM_NAME_LABELS_ZH[value] ?? value,
+    catalogItemName: (item) =>
+      ITEM_DISPLAY_NAMES_ZH[item.itemId ?? ''] ??
+      ITEM_NAME_LABELS_ZH[item.name] ??
+      item.display_name ??
+      item.name,
     color: (value) => {
       const lower = value.toLowerCase();
       if (COLOR_LABELS_ZH[lower] !== undefined) {
