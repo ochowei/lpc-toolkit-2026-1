@@ -1,4 +1,4 @@
-import type { Catalog, PaletteMetadata, TypeName } from '@lpc-toolkit/core';
+import type { Catalog, ItemDefinition, PaletteMetadata, TypeName } from '@lpc-toolkit/core';
 import type { LabelTranslator, Translator } from '../../i18n';
 import type { AnimationFilter } from '../../slice/animation-filter';
 import { itemSupportsBodyType } from '../../slice/catalog-tree';
@@ -26,17 +26,16 @@ interface Props {
   onReplacementCardDisplayModeChange: (mode: ReplacementCardDisplayMode) => void;
 }
 
-function selectedItemName(args: {
+function selectedItem(args: {
   catalog: Catalog;
   state: SliceState;
   typeName: TypeName;
-}) {
+}): ItemDefinition | undefined {
   const selection = args.state.selections[args.typeName];
-  if (!selection) return null;
-  const item = (args.catalog.byTypeName.get(args.typeName) ?? []).find(
+  if (!selection) return undefined;
+  return (args.catalog.byTypeName.get(args.typeName) ?? []).find(
     (candidate) => candidate.name === selection.name,
   );
-  return item?.name ?? selection.name;
 }
 
 function hasBodyCompatibleItem(args: {
@@ -116,13 +115,16 @@ export function GroupTypeSlotEntries({
       {sectionOpen && (
         <div className="flex flex-col gap-1.5 mt-1.5 pl-2">
           {typeNames.map((typeName) => {
-            const currentName = selectedItemName({ catalog, state, typeName });
+            const item = selectedItem({ catalog, state, typeName });
+            const selection = state.selections[typeName];
             const hasCompatible = hasBodyCompatibleItem({ catalog, state, typeName });
             const entryDisabled = disabled || !hasCompatible;
             const selected = expandedSlotType === typeName;
-            const label = currentName
-              ? `${tl.category(typeName)}: ${tl.itemName(currentName)} - Replace`
-              : `+ ${tl.category(typeName)}`;
+            const label = item
+              ? `${tl.category(typeName)}: ${tl.catalogItemName(item)} - Replace`
+              : (selection
+                ? `${tl.category(typeName)}: ${tl.itemName(selection.name)} - Replace`
+                : `+ ${tl.category(typeName)}`);
 
             return (
               <div key={typeName} className="w-full flex flex-col gap-1">

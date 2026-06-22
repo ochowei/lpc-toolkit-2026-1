@@ -124,7 +124,7 @@ export function TypeItemPicker({
               title={
                 !supports ? t('picker.incompatibleBodyType') :
                 exceeds ? exceedsTitle :
-                tl.itemName(it.name)
+                tl.catalogItemName(it)
               }
               onClick={() => {
                 dispatch(pickActionForItem(typeName, it));
@@ -133,7 +133,7 @@ export function TypeItemPicker({
                   dispatch({ type: 'set_anim', anim: customAnim });
                 }
               }}
-              aria-label={tl.itemName(it.name)}
+              aria-label={tl.catalogItemName(it)}
               data-label-layout={replacementCardDisplayMode}
               className={[
                 'relative flex h-16 items-center justify-center overflow-hidden',
@@ -164,7 +164,7 @@ export function TypeItemPicker({
                       : '',
                   ].filter(Boolean).join(' ')}
                 >
-                  {tl.itemName(it.name)}
+                  {tl.catalogItemName(it)}
                 </span>
               )}
               {exceeds && supports && (

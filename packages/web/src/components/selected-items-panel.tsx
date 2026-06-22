@@ -1,4 +1,4 @@
-import type { Selection, TypeName } from '@lpc-toolkit/core';
+import type { Catalog, Selection, TypeName } from '@lpc-toolkit/core';
 import { orderedSelectionEntries, type SliceAction } from '../slice/selection';
 import type { Translator, LabelTranslator } from '../i18n';
 
@@ -6,11 +6,13 @@ import type { Translator, LabelTranslator } from '../i18n';
 export function SelectedItemsPanel({
   selections,
   dispatch,
+  catalog,
   t,
   tl,
 }: {
   selections: Readonly<Record<TypeName, Selection>>;
   dispatch: (a: SliceAction) => void;
+  catalog: Catalog;
   t: Translator;
   tl: LabelTranslator;
 }) {
@@ -22,27 +24,34 @@ export function SelectedItemsPanel({
         <p className="mt-2 text-xs text-text-mute">{t('selected.empty')}</p>
       ) : (
         <ul className="mt-2 space-y-1">
-          {entries.map(([typeName, sel]) => (
-            <li
-              key={typeName}
-              className="flex items-center gap-2 text-xs"
-            >
-              <span className="flex-1">
-                <span className="text-text-mute">
-                  {tl.category(typeName)}:{' '}
-                </span>
-                <span>{tl.itemName(sel.name)}</span>
-              </span>
-              <button
-                type="button"
-                aria-label={`${t('selected.remove')} ${tl.itemName(sel.name)}`}
-                className="rounded px-1 text-text-dim hover:text-danger"
-                onClick={() => dispatch({ type: 'clear', typeName })}
+          {entries.map(([typeName, sel]) => {
+            const item = (catalog.byTypeName.get(typeName) ?? []).find(
+              (d) => d.name === sel.name,
+            );
+            return (
+              <li
+                key={typeName}
+                className="flex items-center gap-2 text-xs"
               >
-                ✕
-              </button>
-            </li>
-          ))}
+                <span className="flex-1">
+                  <span className="text-text-mute">
+                    {tl.category(typeName)}:{' '}
+                  </span>
+                  <span>{item ? tl.catalogItemName(item) : tl.itemName(sel.name)}</span>
+                </span>
+                <button
+                  type="button"
+                  aria-label={`${t('selected.remove')} ${
+                    item ? tl.catalogItemName(item) : tl.itemName(sel.name)
+                  }`}
+                  className="rounded px-1 text-text-dim hover:text-danger"
+                  onClick={() => dispatch({ type: 'clear', typeName })}
+                >
+                  ✕
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>
