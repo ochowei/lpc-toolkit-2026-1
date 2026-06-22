@@ -156,6 +156,24 @@ describe('createCatalog with synthetic records', () => {
     );
   });
 
+  it('preserves display_name and itemId on compiled catalog entry', () => {
+    const { catalog, warnings } = createCatalog({
+      'weapons/ranged/bow/weapon_ranged_bow_normal.json': mkItem({
+        name: 'Normal',
+        display_name: 'Normal Bow',
+        type_name: 'weapon',
+      }),
+    });
+
+    expect(warnings).toEqual([]);
+    expect(catalog.byItemId.get('weapon_ranged_bow_normal')).toMatchObject({
+      name: 'Normal',
+      display_name: 'Normal Bow',
+      itemId: 'weapon_ranged_bow_normal',
+    });
+  });
+
+
   it('warns on duplicate itemId and applies last-write-wins', () => {
     const first = mkItem({ name: 'First' });
     const second = mkItem({ name: 'Second' });
@@ -170,10 +188,11 @@ describe('createCatalog with synthetic records', () => {
     expect(warnings[0]!.message).toMatch(/duplicate itemId "foo"/);
     expect(catalog.byItemId.get('foo')).toEqual({
       ...second,
+      itemId: 'foo',
       sourcePath: 'b/foo.json',
     });
     expect(catalog.byTypeName.get('shoes')).toEqual([
-      { ...second, sourcePath: 'b/foo.json' },
+      { ...second, itemId: 'foo', sourcePath: 'b/foo.json' },
     ]);
   });
 
