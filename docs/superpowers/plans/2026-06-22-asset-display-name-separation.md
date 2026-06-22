@@ -275,9 +275,9 @@
 - Modify: `packages/web/src/components/layer-stack/popovers/download-popover.tsx`
 - Modify: `packages/web/test/zip-export.test.ts`
 
-- [ ] **Step 1: Add failing search and ZIP tests**
+- [x] **Step 1: Add failing search and ZIP tests**
 
-  Add a palette-search test that passes an item labelled `Normal Bow` with legacy name `Normal`, injects `itemLabel: (item) => item.display_name ?? item.name`, and verifies both queries match:
+  In `packages/web/test/palette-search.test.ts`, add a palette-search test that passes an item labelled `Normal Bow` with legacy name `Normal`, injects `itemLabel: (item) => item.display_name ?? item.name`, and verifies both queries match:
 
   ```ts
   expect(resultsFor('normal bow').map((r) => r.item.name)).toContain('Normal');
@@ -290,13 +290,13 @@
   expect(itemFileName({ name: 'Normal Bow', zPos: 100 })).toBe('100 normal_bow.png');
   ```
 
-- [ ] **Step 2: Run the focused tests and confirm failure**
+- [x] **Step 2: Run the focused tests and confirm failure**
 
   Run: `rtk pnpm --filter @lpc-toolkit/web test -- palette-search.test.ts zip-export.test.ts`
 
   Expected: FAIL because palette search does not accept a label function and ZIP metadata uses `sel.name`.
 
-- [ ] **Step 3: Inject display labels without changing identity lookups**
+- [x] **Step 3: Inject display labels without changing identity lookups**
 
   Add this optional argument to `PaletteSearchArgs`:
 
@@ -308,27 +308,28 @@
 
   Add an optional `itemLabel?: (item: ItemDefinition) => string` to `ExportContext`. In `lookupItemMetas`, after locating the definition by legacy `(typeName, name)`, set metadata `name` to `ctx.itemLabel?.(item) ?? item.display_name ?? item.name`. Pass `tl.catalogItemName` from `download-popover.tsx` into the export context. Do not change `itemId`, selection names, credit files, or error identifiers.
 
-- [ ] **Step 4: Run focused tests and typecheck**
+- [x] **Step 4: Run focused tests and typecheck**
 
   Run: `rtk pnpm --filter @lpc-toolkit/web test -- palette-search.test.ts zip-export.test.ts && rtk pnpm --filter @lpc-toolkit/web typecheck`
 
   Expected: PASS.
 
-- [ ] **Step 5: Commit search and export label behavior**
+- [x] **Step 5: Commit search and export label behavior**
 
   ```bash
   rtk git add packages/web/src/components/layer-stack/sidebar-search.tsx packages/web/src/components/layer-stack/palette-search.ts packages/web/src/components/layer-stack/popovers/download-popover.tsx packages/web/src/lib/zip-export.ts packages/web/test/palette-search.test.ts packages/web/test/zip-export.test.ts
   rtk git commit -m "feat(web): use display names in search and exports"
   ```
 
-  Record the resulting commit hash and PASS verification in this plan under this task.
+  - Commit: `a1db3244c017992c6cc262423fe5848bb2082ceb`
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web test -- palette-search.test.ts zip-export.test.ts && rtk pnpm --filter @lpc-toolkit/web typecheck` PASS
 
 ### Task 6: Verify compatibility and the complete workspace
 
 **Files:**
 - Modify: `docs/superpowers/plans/2026-06-22-asset-display-name-separation.md`
 
-- [ ] **Step 1: Add explicit legacy compatibility tests**
+- [x] **Step 1: Add explicit legacy compatibility tests**
 
   In the existing URL-hash and preset tests, assert the legacy identity remains valid:
 
@@ -342,19 +343,19 @@
 
   Keep the existing Ranger preset expectation as `name: 'Normal'`.
 
-- [ ] **Step 2: Run targeted compatibility tests**
+- [x] **Step 2: Run targeted compatibility tests**
 
   Run: `rtk pnpm --filter @lpc-toolkit/core test -- hash.test.ts credits.test.ts compose.test.ts && rtk pnpm --filter @lpc-toolkit/web test -- presets.test.ts url-hash-sync.test.ts`
 
   Expected: PASS, proving display labels do not alter identity, composition, or credit generation.
 
-- [ ] **Step 3: Run full verification**
+- [x] **Step 3: Run full verification**
 
   Run: `rtk pnpm typecheck && rtk pnpm test && rtk git diff --check`
 
   Expected: every command exits 0.
 
-- [ ] **Step 4: Record final verification and commit plan status**
+- [x] **Step 4: Record final verification and commit plan status**
 
   Mark every completed checkbox in this plan. Under each task, add the actual commit hash and verification result. Commit the plan-status update:
 
@@ -364,3 +365,6 @@
   ```
 
   Expected: a clean worktree after the commit.
+
+  - Commit for tests: `a5df41c8e87348923512b805650c82de6d182fa4`
+  - Verification: `rtk pnpm typecheck && rtk pnpm test && rtk git diff --check` PASS (all checks, typecheck, and 441/441 web + 74/74 core tests passed)
