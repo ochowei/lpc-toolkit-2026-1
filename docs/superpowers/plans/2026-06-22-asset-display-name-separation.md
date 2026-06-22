@@ -31,7 +31,7 @@
 - Modify: `packages/core/src/catalog.ts`
 - Modify: `packages/core/test/catalog.test.ts`
 
-- [ ] **Step 1: Add a failing catalog compilation test**
+- [x] **Step 1: Add a failing catalog compilation test**
 
   In `packages/core/test/catalog.test.ts`, add a catalog record with `name: 'Normal'`, `display_name: 'Normal Bow'`, and source path `weapons/ranged/bow/weapon_ranged_bow_normal.json`. Assert that the compiled entry is found by `catalog.byItemId.get('weapon_ranged_bow_normal')` and equals:
 
@@ -43,13 +43,13 @@
   });
   ```
 
-- [ ] **Step 2: Run the focused test and confirm failure**
+- [x] **Step 2: Run the focused test and confirm failure**
 
   Run: `rtk pnpm --filter @lpc-toolkit/core test -- catalog.test.ts`
 
   Expected: FAIL because `display_name` and `itemId` are not yet declared/preserved.
 
-- [ ] **Step 3: Extend the definition type and compiled catalog entry**
+- [x] **Step 3: Extend the definition type and compiled catalog entry**
 
   In `packages/core/src/types.ts`, add these optional fields to `ItemDefinition` next to `name` and `sourcePath`:
 
@@ -68,20 +68,21 @@
 
   Do not alter `deriveItemId`, aliases, `Selection`, hash parsing, or composition lookups.
 
-- [ ] **Step 4: Run the focused core test and typecheck**
+- [x] **Step 4: Run the focused core test and typecheck**
 
   Run: `rtk pnpm --filter @lpc-toolkit/core test -- catalog.test.ts && rtk pnpm --filter @lpc-toolkit/core typecheck`
 
   Expected: PASS.
 
-- [ ] **Step 5: Commit the catalog metadata boundary**
+- [x] **Step 5: Commit the catalog metadata boundary**
 
   ```bash
   rtk git add packages/core/src/types.ts packages/core/src/catalog.ts packages/core/test/catalog.test.ts
   rtk git commit -m "feat(core): preserve catalog display names"
   ```
 
-  Record the resulting commit hash and PASS verification in this plan under this task.
+  - Commit: `6c832fddb456ac2b16daa0b8c1a9ed9c7e447313`
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core test -- catalog.test.ts && rtk pnpm --filter @lpc-toolkit/core typecheck` PASS
 
 ### Task 2: Define the first standalone names in asset metadata
 
@@ -95,7 +96,7 @@
 - Modify: `assets/sheet_definitions/head/faces/face_neutral.json`
 - Test: `packages/core/test/catalog.test.ts`
 
-- [ ] **Step 1: Add assertions for all seven compiled display names**
+- [x] **Step 1: Add assertions for all seven compiled display names**
 
   Add a table-driven test that loads the seven definitions and expects these pairs:
 
@@ -111,13 +112,13 @@
   ] as const;
   ```
 
-- [ ] **Step 2: Run the test and confirm it fails on missing metadata**
+- [x] **Step 2: Run the test and confirm it fails on missing metadata**
 
   Run: `rtk pnpm --filter @lpc-toolkit/core test -- catalog.test.ts`
 
   Expected: FAIL because the definitions still have no `display_name`.
 
-- [ ] **Step 3: Add only the approved `display_name` fields**
+- [x] **Step 3: Add only the approved `display_name` fields**
 
   Insert the following immediately after each existing `name` property:
 
@@ -127,20 +128,21 @@
 
   Use the exact values from Step 1 for the other six files. Keep every existing legacy `name` unchanged (`Normal`, `Great`, `Recurve`, `Ammo`, `Natural`, `Plain`, `Neutral`).
 
-- [ ] **Step 4: Run catalog validation tests**
+- [x] **Step 4: Run catalog validation tests**
 
   Run: `rtk pnpm --filter @lpc-toolkit/core test -- catalog.test.ts`
 
   Expected: PASS; no catalog-load warnings are introduced.
 
-- [ ] **Step 5: Commit the asset-label metadata**
+- [x] **Step 5: Commit the asset-label metadata**
 
   ```bash
   rtk git add assets/sheet_definitions packages/core/test/catalog.test.ts
   rtk git commit -m "feat(assets): add standalone display names"
   ```
 
-  Record the resulting commit hash and PASS verification in this plan under this task.
+  - Commit: `8c765417d3b48ed939749aaf0c389677fa5abcda`
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core test -- catalog.test.ts` PASS
 
 ### Task 3: Add item-ID-specific localization with safe fallbacks
 
@@ -149,7 +151,7 @@
 - Modify: `packages/web/src/i18n.ts`
 - Modify: `packages/web/test/i18n.test.ts`
 
-- [ ] **Step 1: Write failing item-aware label tests**
+- [x] **Step 1: Write failing item-aware label tests**
 
   In `packages/web/test/i18n.test.ts`, construct catalog-like definitions and assert:
 
@@ -163,13 +165,13 @@
 
   Use `as ItemDefinition` only after supplying the minimum fields the test helper requires; do not introduce `any`.
 
-- [ ] **Step 2: Run the focused test and confirm failure**
+- [x] **Step 2: Run the focused test and confirm failure**
 
   Run: `rtk pnpm --filter @lpc-toolkit/web test -- i18n.test.ts`
 
   Expected: FAIL because `catalogItemName` and the item-ID map do not exist.
 
-- [ ] **Step 3: Add the localized item-ID map and translator method**
+- [x] **Step 3: Add the localized item-ID map and translator method**
 
   Create `packages/web/src/i18n-item-display-names.ts`:
 
@@ -193,13 +195,13 @@
 
   Implement it so English returns `item.display_name ?? item.name`; Chinese returns `ITEM_DISPLAY_NAMES_ZH[item.itemId ?? ''] ?? ITEM_NAME_LABELS_ZH[item.name] ?? item.display_name ?? item.name`. Retain `itemName(value)` unchanged as the raw-name fallback API for callers that cannot resolve a catalog item.
 
-- [ ] **Step 4: Run i18n tests and web typecheck**
+- [x] **Step 4: Run i18n tests and web typecheck**
 
   Run: `rtk pnpm --filter @lpc-toolkit/web test -- i18n.test.ts && rtk pnpm --filter @lpc-toolkit/web typecheck`
 
   Expected: PASS.
 
-- [ ] **Step 5: Commit the presentation API**
+- [x] **Step 5: Commit the presentation API**
 
   ```bash
   rtk git add packages/web/src/i18n.ts packages/web/src/i18n-item-display-names.ts packages/web/test/i18n.test.ts
@@ -207,6 +209,9 @@
   ```
 
   Record the resulting commit hash and PASS verification in this plan under this task.
+
+  - Commit: `76a6d9df67afb8fc9f74b58241e4385432b2c85e`
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web test -- i18n.test.ts && rtk pnpm --filter @lpc-toolkit/web typecheck` PASS
 
 ### Task 4: Migrate all resolved catalog labels in the UI
 
@@ -218,17 +223,17 @@
 - Modify: `packages/web/src/components/layer-stack/popovers/attribution-popover.tsx`
 - Modify: `packages/web/src/components/selected-items-panel.tsx`
 
-- [ ] **Step 1: Add a failing UI label rendering test**
+- [x] **Step 1: Add a failing UI label rendering test**
 
   Extend the existing component test closest to `TypeItemPicker` (or create `packages/web/test/type-item-picker.test.tsx`) with a catalog item `{ name: 'Normal', display_name: 'Normal Bow', itemId: 'weapon_ranged_bow_normal' }`. Render under `createLabelTranslator('zh-TW')` and assert that the visible card label and ARIA label are `普通弓`, not `正常`.
 
-- [ ] **Step 2: Run the focused UI test and confirm failure**
+- [x] **Step 2: Run the focused UI test and confirm failure**
 
   Run: `rtk pnpm --filter @lpc-toolkit/web test -- type-item-picker.test.tsx`
 
   Expected: FAIL because cards currently call `tl.itemName(it.name)`.
 
-- [ ] **Step 3: Replace raw-name presentation only where a definition is resolved**
+- [x] **Step 3: Replace raw-name presentation only where a definition is resolved**
 
   Apply this exact substitution pattern:
 
@@ -244,20 +249,21 @@
 
   Do not alter `ItemThumbnail`, selection comparison, dispatch actions, or any lookup predicate using `item.name`.
 
-- [ ] **Step 4: Run component tests and typecheck**
+- [x] **Step 4: Run component tests and typecheck**
 
   Run: `rtk pnpm --filter @lpc-toolkit/web test -- type-item-picker.test.tsx stack-panel.test.tsx && rtk pnpm --filter @lpc-toolkit/web typecheck`
 
   Expected: PASS.
 
-- [ ] **Step 5: Commit UI label migration**
+- [x] **Step 5: Commit UI label migration**
 
   ```bash
   rtk git add packages/web/src/components packages/web/test
   rtk git commit -m "feat(web): render catalog display names in UI"
   ```
 
-  Record the resulting commit hash and PASS verification in this plan under this task.
+  - Commit: `061d107296618f400e16996f3cb8d37c1b8751f0`
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web test -- type-item-picker.test.tsx stack-panel.test.tsx && rtk pnpm --filter @lpc-toolkit/web typecheck` PASS
 
 ### Task 5: Make search, sort, and ZIP filenames use the same display labels
 
