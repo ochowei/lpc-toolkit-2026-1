@@ -60,6 +60,12 @@ describe('itemFileName', () => {
       }),
     ).toBe('007 hair_messy_blonde.png');
   });
+
+  it('formats the filename using the display name', () => {
+    expect(itemFileName({ name: 'Normal Bow', zPos: 100 })).toBe(
+      '100 normal_bow.png',
+    );
+  });
 });
 
 
@@ -340,6 +346,37 @@ describe('exportByItemZip (F5)', () => {
     const credits = await zip.file('credits/credits.txt')!.async('string');
     expect(credits).not.toContain('Cape Test');
     expect(credits).not.toContain('custom-upload');
+  });
+
+  it('uses itemLabel to name files in exportByItemZip', async () => {
+    const sheet = makeWalkSheet();
+    const selections = {
+      bodyType: 'male',
+      items: { body: { typeName: 'body', name: 'male light' } },
+    };
+    const itemDef = {
+      ...makeItem(50),
+      display_name: 'Male Light Body',
+    } as unknown as ItemDefinition;
+    const ctx: ExportContext = {
+      sheet,
+      selections,
+      catalog: {
+        byItemId: new Map([['body/male_light', itemDef]]),
+        byTypeName: new Map([['body', [itemDef]]]),
+        typeNames: ['body'],
+        aliases: new Map(),
+      },
+      anim: 'walk',
+      composeSingleItem: async () => sheet,
+      adapter: makeAdapter(),
+      onProgress: () => {},
+      itemLabel: (item) => `Translated ${item.display_name}`,
+    };
+    const blob = await exportByItemZip(ctx);
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const keys = Object.keys(zip.files).sort();
+    expect(keys.find((k) => k.startsWith('items/'))).toBe('items/050 translated_male_light_body.png');
   });
 });
 

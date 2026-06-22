@@ -69,8 +69,9 @@ export function SidebarSearch({
         bodyType: state.bodyType,
         query: deferredQuery,
         shownTypeNames,
+        itemLabel: (item) => tl.catalogItemName(item),
       }),
-    [catalog, state.bodyType, deferredQuery, shownTypeNames],
+    [catalog, state.bodyType, deferredQuery, shownTypeNames, tl],
   );
   const shown = results.slice(0, RESULT_LIMIT);
 

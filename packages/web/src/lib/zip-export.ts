@@ -47,6 +47,7 @@ export interface ExportContext {
   ) => Promise<ComposedSheet>;
   readonly adapter: CanvasAdapter;
   readonly customOverlay?: CustomOverlay | null;
+  readonly itemLabel?: (item: ItemDefinition) => string;
   readonly onProgress: (progress: number) => void;
 }
 
@@ -219,7 +220,7 @@ function lookupItemMetas(ctx: ExportContext): ReadonlyMap<string, ItemMeta> {
       const zPos = item.layer_1?.zPos ?? 100;
       out.set(typeName, {
         itemId,
-        name: sel.name,
+        name: ctx.itemLabel?.(item) ?? item.display_name ?? item.name,
         ...(sel.variant ? { variant: sel.variant } : {}),
         zPos,
       });

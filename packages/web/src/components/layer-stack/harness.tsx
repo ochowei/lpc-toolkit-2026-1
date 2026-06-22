@@ -676,6 +676,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
           zipRunning={zipRunning}
           setZipRunning={setZipRunning}
           t={props.t}
+          tl={props.tl}
           onStatus={(s) => setStatus(s)}
         />
         <Button
