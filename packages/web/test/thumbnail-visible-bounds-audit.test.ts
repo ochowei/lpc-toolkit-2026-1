@@ -247,6 +247,7 @@ describe('serialization', () => {
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../../..');
 const sheetDefsDir = path.join(repoRoot, 'assets/sheet_definitions');
+const customDefsDir = path.join(repoRoot, 'assets_custom/sheet_definitions');
 const paletteDefsDir = path.join(repoRoot, 'assets/palette_definitions');
 const spritesheetsDir = path.join(repoRoot, 'assets/spritesheets');
 
@@ -284,6 +285,9 @@ describe.runIf(existsSync(sheetDefsDir))('real-asset integration audit test', ()
 
   it('runs runAuditCase on twists_fade, braid, and arming sword', async () => {
     const sheetRecs = walkJson(sheetDefsDir);
+    if (existsSync(customDefsDir)) {
+      Object.assign(sheetRecs, walkJson(customDefsDir));
+    }
     const sortedSheetRecs = Object.fromEntries(
       Object.entries(sheetRecs).sort(([a], [b]) => a.localeCompare(b))
     );

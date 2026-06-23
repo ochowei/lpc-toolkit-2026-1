@@ -15,13 +15,17 @@ export function recordsToCatalog(
 }
 
 const ASSETS_PREFIX = 'assets/sheet_definitions/';
+const ASSETS_CUSTOM_PREFIX = 'assets_custom/sheet_definitions/';
 
 // Vite's `import.meta.glob` keys are relative to this file
 // (e.g. `../../../../assets/sheet_definitions/headwear/...`). Strip that
 // leading noise so `sourcePath` reflects the path inside the assets root.
 export function normalizeUpstreamKey(key: string): string {
   const idx = key.lastIndexOf(ASSETS_PREFIX);
-  return idx >= 0 ? key.slice(idx + ASSETS_PREFIX.length) : key;
+  if (idx >= 0) return key.slice(idx + ASSETS_PREFIX.length);
+  const idxCustom = key.lastIndexOf(ASSETS_CUSTOM_PREFIX);
+  if (idxCustom >= 0) return key.slice(idxCustom + ASSETS_CUSTOM_PREFIX.length);
+  return key;
 }
 
 // Module-level gate: React StrictMode mounts → unmounts → re-mounts the App
@@ -62,8 +66,15 @@ export function loadCatalogFromUpstream(): Catalog {
     '../../../../assets/sheet_definitions/**/*.json',
     { eager: true, import: 'default' },
   );
+  const modsCustom = import.meta.glob<ItemDefinition>(
+    '../../../../assets_custom/sheet_definitions/**/*.json',
+    { eager: true, import: 'default' },
+  );
   const records: Record<FilePath, ItemDefinition> = {};
   for (const [key, def] of Object.entries(mods)) {
+    records[normalizeUpstreamKey(key)] = def;
+  }
+  for (const [key, def] of Object.entries(modsCustom)) {
     records[normalizeUpstreamKey(key)] = def;
   }
 

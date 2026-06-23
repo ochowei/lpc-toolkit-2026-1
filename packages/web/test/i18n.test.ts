@@ -261,7 +261,10 @@ describe('i18n catalog safety guard', () => {
       }
     }
 
-    const sheetFiles = getJsonFiles(sheetDir);
+    const sheetFiles = [
+      ...getJsonFiles(sheetDir),
+      ...getJsonFiles(path.join(repoRoot, 'assets_custom/sheet_definitions')),
+    ];
     for (const file of sheetFiles) {
       const content = JSON.parse(fs.readFileSync(file, 'utf8'));
       if (Array.isArray(content.variants)) {

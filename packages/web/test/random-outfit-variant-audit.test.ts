@@ -17,6 +17,7 @@ import { selectionForItem } from '../src/slice/selection';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../../..');
 const sheetDefsDir = path.join(repoRoot, 'assets/sheet_definitions');
+const customDefsDir = path.join(repoRoot, 'assets_custom/sheet_definitions');
 const publicZipsDir = path.join(repoRoot, 'packages/web/public/zips');
 const DEFAULT_EXCLUDED_GROUPS = new Set(['fx']);
 const KNOWN_DEFAULT_VARIANT_PATH_GAPS = new Set([
@@ -103,7 +104,11 @@ function expectedRepresentativeLayerCount(
 
 describe('random outfit variant path audit', () => {
   it('catalog/copied asset mismatch cleanup targets resolve every representative sprite path', () => {
-    const { catalog } = createCatalog(walkJson(sheetDefsDir));
+    const records = walkJson(sheetDefsDir);
+    if (existsSync(customDefsDir)) {
+      Object.assign(records, walkJson(customDefsDir));
+    }
+    const { catalog } = createCatalog(records);
     const failures: string[] = [];
 
     for (const itemId of CATALOG_COPIED_ASSET_MISMATCH_TARGETS) {
@@ -153,7 +158,11 @@ describe('random outfit variant path audit', () => {
   });
 
   it('random-covered variant-backed male items resolve every representative sprite path', () => {
-    const { catalog } = createCatalog(walkJson(sheetDefsDir));
+    const records = walkJson(sheetDefsDir);
+    if (existsSync(customDefsDir)) {
+      Object.assign(records, walkJson(customDefsDir));
+    }
+    const { catalog } = createCatalog(records);
     const coveredTypes = randomCoveredTypeNames();
     const failures: string[] = [];
     let auditedItems = 0;
@@ -205,7 +214,11 @@ describe('random outfit variant path audit', () => {
   });
 
   it('random-covered variant-backed male items resolve at least one representative sprite path', () => {
-    const { catalog } = createCatalog(walkJson(sheetDefsDir));
+    const records = walkJson(sheetDefsDir);
+    if (existsSync(customDefsDir)) {
+      Object.assign(records, walkJson(customDefsDir));
+    }
+    const { catalog } = createCatalog(records);
     const coveredTypes = randomCoveredTypeNames();
     const failures: string[] = [];
     let auditedItems = 0;

@@ -8,6 +8,7 @@ import type { CanvasAdapter, CanvasLike, ImageLike, ItemDefinition } from '@lpc-
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../../..');
 const sheetDefsDir = path.join(repoRoot, 'assets/sheet_definitions');
+const customDefsDir = path.join(repoRoot, 'assets_custom/sheet_definitions');
 const spritesheetsDir = path.join(repoRoot, 'assets/spritesheets');
 
 function walkJson(dir: string, base = dir): Record<string, unknown> {
@@ -32,6 +33,9 @@ async function main() {
 
   console.log('Loading definitions...');
   const catalogRecs = walkJson(sheetDefsDir) as unknown as Record<string, ItemDefinition>;
+  if (existsSync(customDefsDir)) {
+    Object.assign(catalogRecs, walkJson(customDefsDir));
+  }
   const { catalog } = createCatalog(catalogRecs);
 
   console.log('Validating catalog assets...');

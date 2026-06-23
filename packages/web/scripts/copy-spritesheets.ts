@@ -28,6 +28,7 @@ import { dirsForSelections } from '../src/slice/sprite-dirs';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../../..');
 const sheetDefsDir = path.join(repoRoot, 'assets/sheet_definitions');
+const customDefsDir = path.join(repoRoot, 'assets_custom/sheet_definitions');
 const spritesSrc = path.join(repoRoot, 'assets/spritesheets');
 const spritesDest = path.join(here, '../public/spritesheets');
 
@@ -57,10 +58,12 @@ function walkJson(dir: string, base = dir): Record<FilePath, ItemDefinition> {
 // order (createCatalog pushes byTypeName arrays in Object.entries order).
 // The app builds records from Vite import.meta.glob (keys returned sorted);
 // readdirSync order is filesystem/CI-dependent. Sorting by the shared
-// sheet_definitions-relative key makes BOTH call sites pick the IDENTICAL
-// outfit, so the bundled asset subset always matches what the app composes.
+const rawRecords = walkJson(sheetDefsDir);
+if (existsSync(customDefsDir)) {
+  Object.assign(rawRecords, walkJson(customDefsDir));
+}
 const records = Object.fromEntries(
-  Object.entries(walkJson(sheetDefsDir)).sort(([a], [b]) =>
+  Object.entries(rawRecords).sort(([a], [b]) =>
     a < b ? -1 : a > b ? 1 : 0,
   ),
 );

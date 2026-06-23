@@ -35,6 +35,14 @@ describe('normalizeUpstreamKey', () => {
     ).toBe('headwear/hats/magic/hat_magic_large.json');
   });
 
+  it('strips the vite glob prefix preceding assets_custom/sheet_definitions/', () => {
+    expect(
+      normalizeUpstreamKey(
+        '../../../../assets_custom/sheet_definitions/headwear/hats/magic/hat_magic_large.json',
+      ),
+    ).toBe('headwear/hats/magic/hat_magic_large.json');
+  });
+
   it('returns the path unchanged when the upstream prefix is absent', () => {
     expect(normalizeUpstreamKey('headwear/hat.json')).toBe('headwear/hat.json');
   });

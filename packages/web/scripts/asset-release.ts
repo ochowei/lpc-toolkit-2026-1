@@ -594,31 +594,7 @@ export async function prepareAssetSnapshot(
 
     writeMaterializedManifest(options.repoRoot, manifestJson);
 
-    try {
-      execFileSync(
-        'git',
-        ['checkout', '--', 'assets/sheet_definitions'],
-        {
-          cwd: options.repoRoot,
-          stdio: 'ignore',
-        },
-      );
-    } catch {
-      // Ignore
-    }
 
-    try {
-      execFileSync(
-        'git',
-        ['checkout', '--', 'assets/palette_definitions'],
-        {
-          cwd: options.repoRoot,
-          stdio: 'ignore',
-        },
-      );
-    } catch {
-      // Ignore
-    }
   } finally {
     if (tempExtractDir) {
       rmSync(tempExtractDir, { force: true, recursive: true });

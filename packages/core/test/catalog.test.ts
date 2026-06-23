@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -7,9 +7,11 @@ import type { FilePath, ItemDefinition } from '../src/types.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const upstreamRoot = path.join(here, '../../../assets/sheet_definitions');
+const customRoot = path.join(here, '../../../assets_custom/sheet_definitions');
 
 function loadFixture(relPath: FilePath): ItemDefinition {
-  const full = path.join(upstreamRoot, relPath);
+  const customFile = path.join(customRoot, relPath);
+  const full = existsSync(customFile) ? customFile : path.join(upstreamRoot, relPath);
   return JSON.parse(readFileSync(full, 'utf8')) as ItemDefinition;
 }
 
