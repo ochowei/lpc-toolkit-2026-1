@@ -23,6 +23,7 @@ import {
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../../..');
 const sheetDefsDir = path.join(repoRoot, 'assets/sheet_definitions');
+const customDefsDir = path.join(repoRoot, 'assets_custom/sheet_definitions');
 const outFile = path.join(here, '../src/i18n-item-names.ts');
 
 if (!existsSync(sheetDefsDir)) {
@@ -45,7 +46,11 @@ function walkJson(dir: string, base = dir): Record<FilePath, ItemDefinition> {
   return out;
 }
 
-const { catalog } = createCatalog(walkJson(sheetDefsDir));
+const records = walkJson(sheetDefsDir);
+if (existsSync(customDefsDir)) {
+  Object.assign(records, walkJson(customDefsDir));
+}
+const { catalog } = createCatalog(records);
 
 const names = new Set<string>();
 const categories = new Set<string>();

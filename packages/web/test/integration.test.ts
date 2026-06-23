@@ -24,6 +24,7 @@ import { pickInitialSelections, toSelections } from '../src/slice/selection';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../../..');
 const sheetDefsDir = path.join(repoRoot, 'assets/sheet_definitions');
+const customDefsDir = path.join(repoRoot, 'assets_custom/sheet_definitions');
 const publicZips = path.join(here, '../public/zips');
 const publicSprites = path.join(here, '../public/spritesheets');
 
@@ -71,6 +72,9 @@ const haveSprites = existsSync(publicSprites);
 describe.runIf(haveUpstream)('pickInitialSelections determinism', () => {
   it('is identical regardless of record order (copy-script vs app parity)', () => {
     const recs = walkJson(sheetDefsDir);
+    if (existsSync(customDefsDir)) {
+      Object.assign(recs, walkJson(customDefsDir));
+    }
     const forward = createCatalog(sortedRecords(recs)).catalog;
     const reversed = createCatalog(
       sortedRecords(
@@ -93,7 +97,11 @@ describe.runIf(haveUpstream && haveZips)('release ZIP assets', () => {
 
 describe.runIf(haveUpstream && haveSprites)('core pipeline (legacy local sprites)', () => {
   it('composes, extracts, and attributes the initial outfit', async () => {
-    const { catalog } = createCatalog(sortedRecords(walkJson(sheetDefsDir)));
+    const recs = walkJson(sheetDefsDir);
+    if (existsSync(customDefsDir)) {
+      Object.assign(recs, walkJson(customDefsDir));
+    }
+    const { catalog } = createCatalog(sortedRecords(recs));
     const { state } = pickInitialSelections(catalog);
     const selections = toSelections(state);
 

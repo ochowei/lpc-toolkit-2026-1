@@ -18,7 +18,7 @@ import {
   type ZipExportKind,
 } from '../../../lib/zip-export';
 import { createBrowserCanvasAdapter } from '../../../adapter/browser-canvas-adapter';
-import type { Translator } from '../../../i18n';
+import type { LabelTranslator, Translator } from '../../../i18n';
 import type { ComposedResult } from '../../../hooks/use-composed-character';
 import type { CustomOverlay } from '../../../lib/custom-overlay';
 
@@ -53,6 +53,7 @@ interface Props {
   zipRunning: ZipRunning | null;
   setZipRunning: (r: ZipRunning | null) => void;
   t: Translator;
+  tl: LabelTranslator;
   onStatus: (status: { kind: 'info' | 'error'; text: string }) => void;
 }
 
@@ -70,6 +71,7 @@ export function DownloadPopover({
   zipRunning,
   setZipRunning,
   t,
+  tl,
   onStatus,
 }: Props) {
   const { anchorRef, panelRef, pos } = usePopover(open, () => setOpen(false));
@@ -128,6 +130,7 @@ export function DownloadPopover({
         composeSingleItemLayer,
         adapter,
         customOverlay,
+        itemLabel: (item) => tl.catalogItemName(item),
         onProgress: (p) => setZipRunning({ kind, progress: p }),
       });
       const filename = zipName(

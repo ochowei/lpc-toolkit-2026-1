@@ -364,6 +364,23 @@ describe('parseHash ↔ serializeHash round-trip', () => {
     const parsedAgain = parseHash(`#${re}`, cat);
     expect(serializeHash(parsedAgain.selections)).toBe(original);
   });
+
+  it('proves legacy identity remains valid for display-name separated assets', () => {
+    const bow: ItemDefinition = {
+      name: 'Normal',
+      display_name: 'Normal Bow',
+      type_name: 'weapon',
+      animations: ['walk'],
+      credits: [],
+      variants: ['dark'],
+    };
+    const cat = makeCatalog([bow]);
+    expect(parseHash('sex=male&weapon=Normal_dark', cat).selections.items.weapon).toMatchObject({
+      typeName: 'weapon', name: 'Normal', variant: 'dark',
+    });
+    expect(serializeHash({ bodyType: 'male', items: { weapon: { typeName: 'weapon', name: 'Normal', variant: 'dark' } } }))
+      .toContain('weapon=Normal_dark');
+  });
 });
 
 describe('selection tokens', () => {

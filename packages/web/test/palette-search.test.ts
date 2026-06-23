@@ -75,4 +75,56 @@ describe('filterAndRankPaletteItems', () => {
     expect(r[0]?.item.name).toBe('Curly');          // compatible first
     expect(r[1]?.item.name).toBe('FemaleHair');     // incompatible after
   });
+
+  it('filters and sorts by display names / itemLabel', () => {
+    const normalBow = {
+      ...makeItem('Normal', 'weapon'),
+      display_name: 'Normal Bow',
+    } as unknown as ItemDefinition;
+    const longBow = {
+      ...makeItem('Long', 'weapon'),
+      display_name: 'Long Bow',
+    } as unknown as ItemDefinition;
+
+    const { catalog: c3 } = createCatalog({
+      'weapon/normal.json': normalBow,
+      'weapon/long.json': longBow,
+    });
+
+    const itemLabel = (item: ItemDefinition) => {
+      if (item.name === 'Normal') return 'Translated Normal Bow';
+      return item.display_name ?? item.name;
+    };
+
+    // Queries for 'normal bow' (part of itemLabel) should match
+    const r1 = filterAndRankPaletteItems({
+      catalog: c3,
+      bodyType: 'male',
+      query: 'normal bow',
+      shownTypeNames: ['weapon'],
+      itemLabel,
+    });
+    expect(r1.map((x) => x.item.name)).toEqual(['Normal']);
+
+    // Queries for 'normal' (the name/display_name/itemLabel) should match
+    const r2 = filterAndRankPaletteItems({
+      catalog: c3,
+      bodyType: 'male',
+      query: 'normal',
+      shownTypeNames: ['weapon'],
+      itemLabel,
+    });
+    expect(r2.map((x) => x.item.name)).toEqual(['Normal']);
+
+    // Test sorting by label. 'Long Bow' vs 'Translated Normal Bow'.
+    // Alphabetically, 'Long Bow' comes before 'Translated Normal Bow'.
+    const r3 = filterAndRankPaletteItems({
+      catalog: c3,
+      bodyType: 'male',
+      query: 'bow',
+      shownTypeNames: ['weapon'],
+      itemLabel,
+    });
+    expect(r3.map((x) => x.item.name)).toEqual(['Long', 'Normal']);
+  });
 });

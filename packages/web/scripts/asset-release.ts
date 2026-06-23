@@ -593,6 +593,8 @@ export async function prepareAssetSnapshot(
     }
 
     writeMaterializedManifest(options.repoRoot, manifestJson);
+
+
   } finally {
     if (tempExtractDir) {
       rmSync(tempExtractDir, { force: true, recursive: true });

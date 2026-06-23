@@ -69,8 +69,9 @@ export function SidebarSearch({
         bodyType: state.bodyType,
         query: deferredQuery,
         shownTypeNames,
+        itemLabel: (item) => tl.catalogItemName(item),
       }),
-    [catalog, state.bodyType, deferredQuery, shownTypeNames],
+    [catalog, state.bodyType, deferredQuery, shownTypeNames, tl],
   );
   const shown = results.slice(0, RESULT_LIMIT);
 
@@ -314,7 +315,7 @@ export function SidebarSearchResultRow({
       />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1 truncate text-sm font-semibold">
-          {tl.itemName(result.item.name)}
+          {tl.catalogItemName(result.item)}
           {!result.supports && (
             <span className="rounded bg-amber-500/15 px-1 text-xs uppercase tracking-wide text-amber-500">
               {t('palette.incompatible')}

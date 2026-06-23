@@ -13,6 +13,7 @@ import {
   type TranslationKey,
 } from '../src/i18n';
 import { ITEM_NAME_LABELS_ZH } from '../src/i18n-item-names';
+import type { ItemDefinition } from '@lpc-toolkit/core';
 
 describe('i18n', () => {
   it('defaults to English', () => {
@@ -215,6 +216,17 @@ describe('label translator', () => {
   it('has a non-trivial asset-name dictionary', () => {
     expect(Object.keys(ITEM_NAME_LABELS_ZH).length).toBeGreaterThan(100);
   });
+
+  it('translates catalog item names with fallback', () => {
+    const en = createLabelTranslator('en');
+    const zh = createLabelTranslator('zh-TW');
+
+    expect(en.catalogItemName({ name: 'Normal', display_name: 'Normal Bow', itemId: 'weapon_ranged_bow_normal' } as ItemDefinition)).toBe('Normal Bow');
+    expect(zh.catalogItemName({ name: 'Normal', display_name: 'Normal Bow', itemId: 'weapon_ranged_bow_normal' } as ItemDefinition)).toBe('普通弓');
+    expect(zh.catalogItemName({ name: 'Great', display_name: 'Great Bow', itemId: 'weapon_ranged_bow_great' } as ItemDefinition)).toBe('大弓');
+    expect(zh.catalogItemName({ name: 'Normal', itemId: 'unmapped_normal' } as ItemDefinition)).toBe('正常');
+    expect(en.catalogItemName({ name: 'Unknown' } as ItemDefinition)).toBe('Unknown');
+  });
 });
 
 describe('i18n catalog safety guard', () => {
@@ -249,7 +261,10 @@ describe('i18n catalog safety guard', () => {
       }
     }
 
-    const sheetFiles = getJsonFiles(sheetDir);
+    const sheetFiles = [
+      ...getJsonFiles(sheetDir),
+      ...getJsonFiles(path.join(repoRoot, 'assets_custom/sheet_definitions')),
+    ];
     for (const file of sheetFiles) {
       const content = JSON.parse(fs.readFileSync(file, 'utf8'));
       if (Array.isArray(content.variants)) {

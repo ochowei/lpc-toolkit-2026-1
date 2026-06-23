@@ -77,7 +77,7 @@ export function LayerRow({
           )}
           <div className="flex flex-col min-w-0 flex-1 justify-center">
             <div className="truncate text-sm font-semibold text-text">
-              {item ? tl.itemName(item.name) : selection.name}
+              {item ? tl.catalogItemName(item) : selection.name}
             </div>
             <div className="flex items-center gap-1 text-xs text-text-mute">
               <span className="uppercase tracking-wide font-medium">{tl.category(typeName)}</span>

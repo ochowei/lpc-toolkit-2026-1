@@ -22,6 +22,7 @@ import { THUMBNAIL_BOUNDS_OVERRIDES } from './thumbnail-bounds-overrides';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../../..');
 const sheetDefsDir = path.join(repoRoot, 'assets/sheet_definitions');
+const customDefsDir = path.join(repoRoot, 'assets_custom/sheet_definitions');
 const paletteDefsDir = path.join(repoRoot, 'assets/palette_definitions');
 const spritesheetsDir = path.join(repoRoot, 'assets/spritesheets');
 const policyOutputPath = path.join(
@@ -103,6 +104,9 @@ async function main() {
 
   console.log('Loading sheet and palette definitions...');
   const sheetRecs = walkJson(sheetDefsDir);
+  if (existsSync(customDefsDir)) {
+    Object.assign(sheetRecs, walkJson(customDefsDir));
+  }
   const sortedSheetRecs = Object.fromEntries(
     Object.entries(sheetRecs).sort(([a], [b]) => a.localeCompare(b))
   );

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   createCatalog,
   type Catalog,
@@ -14,6 +14,7 @@ import { TRANSLATIONS } from '../src/i18n';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const sheetDefsDir = path.resolve(here, '../../../assets/sheet_definitions');
+const customDefsDir = path.resolve(here, '../../../assets_custom/sheet_definitions');
 const haveUpstream = existsSync(sheetDefsDir);
 
 function walkJson(dir: string, base = dir): Record<FilePath, ItemDefinition> {
@@ -78,9 +79,11 @@ describe('PRESETS data', () => {
 describe.runIf(haveUpstream)('PRESETS catalog validation', () => {
   let catalog: Catalog;
 
-  beforeAll(() => {
-    catalog = createCatalog(walkJson(sheetDefsDir)).catalog;
-  });
+    const records = walkJson(sheetDefsDir);
+    if (existsSync(customDefsDir)) {
+      Object.assign(records, walkJson(customDefsDir));
+    }
+    catalog = createCatalog(records).catalog;
 
   function findDef(typeName: string, name: string) {
     return (catalog.byTypeName.get(typeName) ?? []).find(

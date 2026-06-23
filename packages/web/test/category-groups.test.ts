@@ -1,6 +1,6 @@
 /** Verifies category grouping metadata and coverage against upstream definitions. */
 import { describe, expect, it } from 'vitest';
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CATEGORY_GROUPS, groupForType, type GroupId } from '../src/slice/category-groups';
@@ -95,6 +95,7 @@ describe('groupForType', () => {
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../../..');
 const sheetDefsDir = path.join(repoRoot, 'assets/sheet_definitions');
+const customDefsDir = path.join(repoRoot, 'assets_custom/sheet_definitions');
 
 function readCatalogTypeNames(): Set<string> {
   const out = new Set<string>();
@@ -110,6 +111,9 @@ function readCatalogTypeNames(): Set<string> {
     }
   };
   walk(sheetDefsDir);
+  if (existsSync(customDefsDir)) {
+    walk(customDefsDir);
+  }
   return out;
 }
 

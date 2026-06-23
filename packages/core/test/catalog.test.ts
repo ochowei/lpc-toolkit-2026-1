@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -7,9 +7,11 @@ import type { FilePath, ItemDefinition } from '../src/types.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const upstreamRoot = path.join(here, '../../../assets/sheet_definitions');
+const customRoot = path.join(here, '../../../assets_custom/sheet_definitions');
 
 function loadFixture(relPath: FilePath): ItemDefinition {
-  const full = path.join(upstreamRoot, relPath);
+  const customFile = path.join(customRoot, relPath);
+  const full = existsSync(customFile) ? customFile : path.join(upstreamRoot, relPath);
   return JSON.parse(readFileSync(full, 'utf8')) as ItemDefinition;
 }
 
@@ -106,6 +108,35 @@ describe('createCatalog with real upstream JSON', () => {
       expect(w.message).toMatch(/alias target/);
     }
   });
+
+  it('loads correct display names for key items', () => {
+    const expected = [
+      ['weapon_ranged_bow_normal', 'Normal Bow'],
+      ['weapon_ranged_bow_great', 'Great Bow'],
+      ['weapon_ranged_bow_recurve', 'Recurve Bow'],
+      ['weapon_ranged_bow_arrow', 'Arrow'],
+      ['hair_natural', 'Natural Hair'],
+      ['hair_plain', 'Plain Hair'],
+      ['face_neutral', 'Neutral Expression'],
+    ] as const;
+
+    const records = loadRecords([
+      'weapons/ranged/bow/weapon_ranged_bow_normal.json',
+      'weapons/ranged/bow/weapon_ranged_bow_great.json',
+      'weapons/ranged/bow/weapon_ranged_bow_recurve.json',
+      'weapons/ranged/bow/weapon_ranged_bow_arrow.json',
+      'hair/afro/hair_natural.json',
+      'hair/short/hair_plain.json',
+      'head/faces/face_neutral.json',
+    ]);
+    const { catalog, warnings } = createCatalog(records);
+
+    expect(warnings).toEqual([]);
+
+    for (const [itemId, displayName] of expected) {
+      expect(catalog.byItemId.get(itemId)?.display_name).toBe(displayName);
+    }
+  });
 });
 
 describe('createCatalog with synthetic records', () => {
@@ -156,6 +187,24 @@ describe('createCatalog with synthetic records', () => {
     );
   });
 
+  it('preserves display_name and itemId on compiled catalog entry', () => {
+    const { catalog, warnings } = createCatalog({
+      'weapons/ranged/bow/weapon_ranged_bow_normal.json': mkItem({
+        name: 'Normal',
+        display_name: 'Normal Bow',
+        type_name: 'weapon',
+      }),
+    });
+
+    expect(warnings).toEqual([]);
+    expect(catalog.byItemId.get('weapon_ranged_bow_normal')).toMatchObject({
+      name: 'Normal',
+      display_name: 'Normal Bow',
+      itemId: 'weapon_ranged_bow_normal',
+    });
+  });
+
+
   it('warns on duplicate itemId and applies last-write-wins', () => {
     const first = mkItem({ name: 'First' });
     const second = mkItem({ name: 'Second' });
@@ -170,10 +219,11 @@ describe('createCatalog with synthetic records', () => {
     expect(warnings[0]!.message).toMatch(/duplicate itemId "foo"/);
     expect(catalog.byItemId.get('foo')).toEqual({
       ...second,
+      itemId: 'foo',
       sourcePath: 'b/foo.json',
     });
     expect(catalog.byTypeName.get('shoes')).toEqual([
-      { ...second, sourcePath: 'b/foo.json' },
+      { ...second, itemId: 'foo', sourcePath: 'b/foo.json' },
     ]);
   });
 

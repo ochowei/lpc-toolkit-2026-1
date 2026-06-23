@@ -121,8 +121,12 @@ export type RawRecolors = RecolorConfig | MultiRecolorConfig;
 export interface ItemDefinition {
   /** The human-readable name of the item. */
   readonly name: string;
+  /** Optional standalone English label for presentation; identity remains name. */
+  readonly display_name?: string;
   /** The slot/category type this item belongs to. */
   readonly type_name: TypeName;
+  /** Stable ID derived from the definition filename by createCatalog. */
+  readonly itemId?: ItemId;
   /** The path to the source JSON file where this item was defined. */
   readonly sourcePath?: FilePath;
   /** The list of animations supported by this item. */

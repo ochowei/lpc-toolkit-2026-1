@@ -140,7 +140,7 @@ export function AttributionPopover({
               >
                 <div className="font-semibold">{tl.category(r.typeName)}</div>
                 <div className="font-mono text-[10px] text-text-mute">
-                  {r.item.name} · {r.authors.join(', ') || '?'} · {r.effective}
+                  {tl.catalogItemName(r.item)} · {r.authors.join(', ') || '?'} · {r.effective}
                 </div>
                 {r.licenseIncompatible && (
                   <div className="text-[10px]">{t('attribution.licenseIncompatibleShort')}</div>

@@ -296,7 +296,7 @@ export function createCatalog(
     }
 
     // Capture file path provenance within the resolved item definition
-    const item: ItemDefinition = { ...def, sourcePath: filePath };
+    const item: ItemDefinition = { ...def, itemId, sourcePath: filePath };
 
     // Register primary mappings
     byItemId.set(itemId, item);

@@ -12,6 +12,7 @@ export interface PaletteSearchArgs {
   readonly bodyType: BodyType;
   readonly query: string;
   readonly shownTypeNames: readonly TypeName[];
+  readonly itemLabel?: (item: ItemDefinition) => string;
 }
 
 /** One searchable catalog row plus compatibility for the active body type. */
@@ -33,8 +34,10 @@ export function filterAndRankPaletteItems(args: PaletteSearchArgs): PaletteResul
   for (const typeName of args.shownTypeNames) {
     const defs = args.catalog.byTypeName.get(typeName) ?? [];
     for (const item of defs) {
+      const label = args.itemLabel?.(item) ?? item.display_name ?? item.name;
       const matches =
         !term ||
+        label.toLowerCase().includes(term) ||
         item.name.toLowerCase().includes(term) ||
         typeName.toLowerCase().includes(term) ||
         item.credits.some((c) =>
@@ -52,7 +55,9 @@ export function filterAndRankPaletteItems(args: PaletteSearchArgs): PaletteResul
   out.sort((a, b) => {
     if (a.supports !== b.supports) return a.supports ? -1 : 1;
     if (a.typeName !== b.typeName) return a.typeName.localeCompare(b.typeName);
-    return a.item.name.localeCompare(b.item.name);
+    const labelA = args.itemLabel?.(a.item) ?? a.item.display_name ?? a.item.name;
+    const labelB = args.itemLabel?.(b.item) ?? b.item.display_name ?? b.item.name;
+    return labelA.localeCompare(labelB);
   });
 
   return out;
