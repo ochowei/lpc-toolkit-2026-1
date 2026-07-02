@@ -175,7 +175,7 @@ rtk git commit -m "feat(web): add random profile model"
 ```
 
 Implementation note: Added the web-only normal random profile model and English/zh-TW label key.
-Commit: pending controller hash fill-in
+Commit: 81b1e9b7e24f622c3e25687dc7a92f09b09b62a8
 Verification: `rtk pnpm --filter @lpc-toolkit/web typecheck` reported no TypeScript errors but exited 1 due the rtk pnpm filter warning; `rtk pnpm --dir packages/web typecheck` PASS.
 
 ### Task 2: Make `pickRandomOutfit` Profile-Aware
