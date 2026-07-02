@@ -393,7 +393,7 @@ Verification: `rtk pnpm --dir packages/web exec playwright test e2e/random-scope
 - [x] **Review follow-up: Commit interactive e2e coverage and metadata**
 
 Implementation note: Added this follow-up metadata update after the follow-up commit hash was known.
-Commit: fefc5a12e
+Commit: 1b5d17f5a
 Verification: docs metadata update committed.
 
 ## Task 3: Final Verification and Browser Smoke
