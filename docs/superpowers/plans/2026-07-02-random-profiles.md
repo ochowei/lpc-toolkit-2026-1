@@ -434,7 +434,7 @@ Verification: RED `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/rando
 - Modify: `packages/web/src/components/layer-stack/popovers/preset-menu-popover.tsx`
 - Modify: `packages/web/src/i18n.ts`
 
-- [ ] **Step 1: Add i18n labels**
+- [x] **Step 1: Add i18n labels**
 
 In `packages/web/src/i18n.ts`, add these English keys near `randomize.title`:
 
@@ -456,7 +456,7 @@ Add these Traditional Chinese keys in the `zh` translation object near the exist
     'randomScope.colors': '顏色',
 ```
 
-- [ ] **Step 2: Extend `PresetMenuPopover` props**
+- [x] **Step 2: Extend `PresetMenuPopover` props**
 
 In `packages/web/src/components/layer-stack/popovers/preset-menu-popover.tsx`, add this prop to the `Props` interface:
 
@@ -480,7 +480,7 @@ setOpen(false);
 
 Keep the existing fixed preset apply behavior unchanged.
 
-- [ ] **Step 3: Update `PresetBar` state and dice call**
+- [x] **Step 3: Update `PresetBar` state and dice call**
 
 In `packages/web/src/components/layer-stack/preset-bar.tsx`, add imports:
 
@@ -521,7 +521,7 @@ Pass the style callback to `PresetMenuPopover`:
 onStyleSelected={setActiveStyleId}
 ```
 
-- [ ] **Step 4: Render coarse random toggles**
+- [x] **Step 4: Render coarse random toggles**
 
 In `PresetBar`, below the button row and before the popovers, add:
 
@@ -552,7 +552,7 @@ In `PresetBar`, below the button row and before the popovers, add:
       </div>
 ```
 
-- [ ] **Step 5: Run i18n tests**
+- [x] **Step 5: Run i18n tests**
 
 Run:
 
@@ -562,7 +562,7 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/i18n.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 6: Run typecheck**
+- [x] **Step 6: Run typecheck**
 
 Run:
 
@@ -572,12 +572,16 @@ rtk pnpm --filter @lpc-toolkit/web typecheck
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 rtk git add packages/web/src/components/layer-stack/preset-bar.tsx packages/web/src/components/layer-stack/popovers/preset-menu-popover.tsx packages/web/src/i18n.ts docs/superpowers/plans/2026-07-02-random-profiles.md
 rtk git commit -m "feat(web): add random scope controls"
 ```
+
+Implementation note: Added random scope labels, tracked the most recently applied preset style in `PresetBar`, routed dice randomization through `randomProfileForStyle` and `randomScope`, and rendered coarse randomization toggles.
+Commit: PENDING_TASK_3_HASH
+Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/i18n.test.ts` PASS (18 tests). `rtk pnpm --filter @lpc-toolkit/web typecheck` reported no TypeScript errors but exited 1 due the rtk pnpm filter warning; `rtk pnpm --dir packages/web typecheck` PASS.
 
 ### Task 4: Final Verification
 

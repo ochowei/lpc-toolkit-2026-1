@@ -3,6 +3,11 @@ import type { Catalog, PaletteMetadata } from '@lpc-toolkit/core';
 import type { SliceState, SliceAction } from '../../slice/selection';
 import type { Translator } from '../../i18n';
 import { pickRandomOutfit } from '../../slice/random-outfit';
+import {
+  DEFAULT_RANDOM_SCOPE,
+  randomProfileForStyle,
+  type RandomScope,
+} from '../../slice/random-profiles';
 import { PresetMenuPopover } from './popovers/preset-menu-popover';
 import { ResetMenuPopover } from './popovers/reset-menu-popover';
 
@@ -21,6 +26,8 @@ interface Props {
 export function PresetBar({ disabled, catalog, palettes, state, dispatch, t, onApplied, onReset }: Props) {
   const [presetOpen, setPresetOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
+  const [activeStyleId, setActiveStyleId] = useState<string | null>(null);
+  const [randomScope, setRandomScope] = useState<RandomScope>(DEFAULT_RANDOM_SCOPE);
   const presetTriggerRef = useRef<HTMLButtonElement>(null);
   const resetTriggerRef = useRef<HTMLButtonElement>(null);
 
@@ -37,6 +44,9 @@ export function PresetBar({ disabled, catalog, palettes, state, dispatch, t, onA
                 catalog,
                 palettes,
                 bodyType: state.bodyType,
+                profile: randomProfileForStyle(activeStyleId),
+                scope: randomScope,
+                currentSelections: state.selections,
               }),
             })
           }
@@ -69,6 +79,30 @@ export function PresetBar({ disabled, catalog, palettes, state, dispatch, t, onA
           <span aria-hidden>▼</span>
         </button>
       </div>
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-text-dim">
+        <span>{t('randomScope.title')}</span>
+        {([
+          ['appearance', t('randomScope.appearance')],
+          ['clothing', t('randomScope.clothing')],
+          ['equipment', t('randomScope.equipment')],
+          ['colors', t('randomScope.colors')],
+        ] as const).map(([key, label]) => (
+          <label key={key} className="inline-flex items-center gap-1">
+            <input
+              type="checkbox"
+              checked={randomScope[key]}
+              onChange={(event) =>
+                setRandomScope((current) => ({
+                  ...current,
+                  [key]: event.currentTarget.checked,
+                }))
+              }
+              className="h-3 w-3"
+            />
+            <span>{label}</span>
+          </label>
+        ))}
+      </div>
       <PresetMenuPopover
         disabled={disabled}
         open={presetOpen}
@@ -80,6 +114,7 @@ export function PresetBar({ disabled, catalog, palettes, state, dispatch, t, onA
         dispatch={dispatch}
         t={t}
         onApplied={onApplied}
+        onStyleSelected={setActiveStyleId}
       />
       <ResetMenuPopover
         disabled={disabled}
