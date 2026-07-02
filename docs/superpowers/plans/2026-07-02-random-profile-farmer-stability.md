@@ -387,14 +387,14 @@ Verification: Commit created with `rtk git commit -m "test(web): cover random sc
 - [x] **Review follow-up: Add interactive random scope checkbox e2e coverage**
 
 Implementation note: Added `packages/web/e2e/random-scope-options.spec.ts` to click Appearance, Clothing, Equipment, and Colors off/on twice each while asserting the random controls remain visible, the loading overlay stays hidden, and collected page/console errors stay empty.
-Commit: BLOCKED - git metadata writes require escalation, and the approval system rejected escalation due usage limit before the follow-up commit could be created.
-Verification: `rtk pnpm --dir packages/web exec playwright test e2e/random-scope-options.spec.ts` was attempted and failed with sandbox `listen EPERM: operation not permitted 127.0.0.1:5173`; escalated rerun was rejected by the approval system due usage limit. `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/stack-panel.test.tsx test/random-outfit.test.ts` PASS, 28 tests passed; `rtk pnpm --dir packages/web typecheck` PASS.
+Commit: d30454a4a
+Verification: `rtk pnpm --dir packages/web exec playwright test e2e/random-scope-options.spec.ts` was attempted but blocked by pnpm network resolution (`ENOTFOUND registry.npmjs.org`), so test execution did not proceed.
 
-- [ ] **Review follow-up: Commit interactive e2e coverage and metadata**
+- [x] **Review follow-up: Commit interactive e2e coverage and metadata**
 
-Implementation note: Pending because `rtk git add packages/web/e2e/random-scope-options.spec.ts` required escalation and the approval system rejected the escalation due usage limit.
-Commit:
-Verification:
+Implementation note: Added this follow-up metadata update after the follow-up commit hash was known.
+Commit: fefc5a12e
+Verification: docs metadata update committed.
 
 ## Task 3: Final Verification and Browser Smoke
 
@@ -410,6 +410,7 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts te
 ```
 
 Expected: PASS.
+Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts test/stack-panel.test.tsx` was attempted but blocked by pnpm network resolution (`ENOTFOUND registry.npmjs.org`), so test execution did not proceed.
 
 - [ ] **Step 2: Run typecheck**
 
@@ -420,6 +421,7 @@ rtk pnpm --dir packages/web typecheck
 ```
 
 Expected: PASS.
+Verification: `rtk pnpm --dir packages/web typecheck` was attempted but blocked by pnpm network resolution (`ENOTFOUND registry.npmjs.org`), so typecheck did not run.
 
 - [ ] **Step 3: Run the full web test suite if available**
 
@@ -430,6 +432,7 @@ rtk pnpm --filter @lpc-toolkit/web test
 ```
 
 Expected: PASS. If sandboxing blocks the `tsx` IPC pipe with `listen EPERM`, rerun the same command with escalation and record both results in the verification note.
+Verification: Not run; toolchain remains blocked at registry resolution (`ENOTFOUND registry.npmjs.org`) before command startup.
 
 - [ ] **Step 4: Manual smoke the reported UI path**
 
@@ -445,6 +448,7 @@ Open `http://localhost:5173/` or the port Vite reports, then verify:
 - Applying the Farmer preset and pressing random does not add wings, armour, weapons, shields, magic crystals, quiver, or `fx` selections.
 
 Stop the dev server after the smoke check.
+Verification: Not run; web dependency resolution remains blocked by registry access (`ENOTFOUND registry.npmjs.org`).
 
 - [ ] **Step 5: Commit verification note**
 
@@ -455,6 +459,6 @@ rtk git add docs/superpowers/plans/2026-07-02-random-profile-farmer-stability.md
 rtk git commit -m "docs: record farmer random verification"
 ```
 
-Implementation note:
+Implementation note: Verification note update deferred while tests/typecheck/dev remain blocked by registry access in this environment.
 Commit:
-Verification:
+Verification: deferred.
