@@ -384,6 +384,18 @@ Implementation note: Created an independent Task 2 commit for the StackPanel ran
 Commit: 1323b0d63804ecc20a82e01627533f1556895686
 Verification: Commit created with `rtk git commit -m "test(web): cover random scope controls"`; plan metadata recorded separately to avoid a self-referential commit hash.
 
+- [x] **Review follow-up: Add interactive random scope checkbox e2e coverage**
+
+Implementation note: Added `packages/web/e2e/random-scope-options.spec.ts` to click Appearance, Clothing, Equipment, and Colors off/on twice each while asserting the random controls remain visible, the loading overlay stays hidden, and collected page/console errors stay empty.
+Commit: BLOCKED - git metadata writes require escalation, and the approval system rejected escalation due usage limit before the follow-up commit could be created.
+Verification: `rtk pnpm --dir packages/web exec playwright test e2e/random-scope-options.spec.ts` was attempted and failed with sandbox `listen EPERM: operation not permitted 127.0.0.1:5173`; escalated rerun was rejected by the approval system due usage limit. `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/stack-panel.test.tsx test/random-outfit.test.ts` PASS, 28 tests passed; `rtk pnpm --dir packages/web typecheck` PASS.
+
+- [ ] **Review follow-up: Commit interactive e2e coverage and metadata**
+
+Implementation note: Pending because `rtk git add packages/web/e2e/random-scope-options.spec.ts` required escalation and the approval system rejected the escalation due usage limit.
+Commit:
+Verification:
+
 ## Task 3: Final Verification and Browser Smoke
 
 **Files:**
