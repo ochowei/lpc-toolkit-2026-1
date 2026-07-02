@@ -588,7 +588,7 @@ Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/i18n.test
 **Files:**
 - Modify: `docs/superpowers/plans/2026-07-02-random-profiles.md`
 
-- [ ] **Step 1: Run random tests**
+- [x] **Step 1: Run random tests**
 
 Run:
 
@@ -598,7 +598,7 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 2: Run component-adjacent tests**
+- [x] **Step 2: Run component-adjacent tests**
 
 Run:
 
@@ -608,7 +608,7 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/i18n.test.ts test/stack-
 
 Expected: PASS.
 
-- [ ] **Step 3: Run typecheck**
+- [x] **Step 3: Run typecheck**
 
 Run:
 
@@ -618,7 +618,7 @@ rtk pnpm --filter @lpc-toolkit/web typecheck
 
 Expected: PASS.
 
-- [ ] **Step 4: Run full web test suite**
+- [x] **Step 4: Run full web test suite**
 
 Run:
 
@@ -628,12 +628,16 @@ rtk pnpm --filter @lpc-toolkit/web test
 
 Expected: PASS. If it fails, record the exact failure in this plan file and in the final handoff before continuing.
 
-- [ ] **Step 5: Commit plan verification update**
+- [x] **Step 5: Commit plan verification update**
 
 ```bash
 rtk git add docs/superpowers/plans/2026-07-02-random-profiles.md
 rtk git commit -m "docs: record random profiles verification"
 ```
+
+Implementation note: Ran the Task 4 final verification commands fresh and recorded the exact outcomes. The full suite initially failed before tests in sandbox because `tsx` could not create its IPC pipe; rerunning the same command with approved escalation passed.
+Commit: pending controller hash fill-in
+Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS (1 file, 17 tests). `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/i18n.test.ts test/stack-panel.test.tsx` PASS (2 files, 25 tests). `rtk pnpm --filter @lpc-toolkit/web typecheck` reported `TypeScript: No errors found` but exited 1 due the RTK filter warning; `rtk pnpm --dir packages/web typecheck` PASS. `rtk pnpm --filter @lpc-toolkit/web test` initially failed in sandbox during pretest with `listen EPERM` for the `tsx` IPC pipe; escalated rerun PASS (58 files, 446 tests).
 
 ## Manual Smoke Check
 
