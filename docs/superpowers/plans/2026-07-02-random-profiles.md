@@ -664,5 +664,5 @@ Open the local Vite URL and verify:
   - Verification: RED `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` failed with `wound_arm` preserved. GREEN `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS (18 tests). Typecheck: `rtk pnpm --filter @lpc-toolkit/web typecheck` reported no TypeScript errors but exited 1 due the RTK filter warning; `rtk pnpm --dir packages/web typecheck` PASS.
 - [x] Re-run final verification after the scoped preservation fix.
   - Implementation note: Re-ran the final verification commands after the regression fix changed random profile behavior and added one test.
-  - Commit: pending controller hash fill-in
+  - Commit: 383e066c59904330725aa198cb1849f4c0442f66
   - Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS (1 file, 18 tests). `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/i18n.test.ts test/stack-panel.test.tsx` PASS (2 files, 25 tests). `rtk pnpm --filter @lpc-toolkit/web typecheck` reported `TypeScript: No errors found` but exited 1 due the RTK filter warning; `rtk pnpm --dir packages/web typecheck` PASS. `rtk pnpm --filter @lpc-toolkit/web test` initially failed in sandbox during pretest with `listen EPERM` for the `tsx` IPC pipe; escalated rerun PASS (58 files, 447 tests).
