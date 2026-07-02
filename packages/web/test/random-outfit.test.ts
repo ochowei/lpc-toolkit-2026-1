@@ -5,6 +5,7 @@ import {
   type ItemDefinition,
 } from '@lpc-toolkit/core';
 import { pickRandomOutfit } from '../src/slice/random-outfit';
+import { randomProfileForStyle } from '../src/slice/random-profiles';
 
 function makeItem(
   name: string,
@@ -339,5 +340,68 @@ describe('pickRandomOutfit', () => {
       typeName: 'weapon',
       name: 'Staff',
     });
+  });
+
+  it('resolves farmer as a dedicated random profile', () => {
+    expect(randomProfileForStyle('farmer').id).toBe('farmer');
+  });
+
+  it('farmer profile excludes fantasy, combat, and fx categories', () => {
+    const { catalog: farmerCatalog } = createCatalog({
+      'body/light.json': makeItem('Light', 'body'),
+      'head/human.json': makeItem('Human Male', 'head'),
+      'expression/neutral.json': makeItem('Neutral', 'expression'),
+      'hair/messy.json': makeItem('Messy3', 'hair'),
+      'clothes/shortsleeve.json': makeItem('Shortsleeve', 'clothes'),
+      'overalls/brown.json': makeItem('Overalls', 'overalls', 'male', ['brown']),
+      'shoes/basic-boots.json': makeItem('Basic Boots', 'shoes', 'male', ['brown']),
+      'wings/feather.json': makeItem('Wings', 'wings'),
+      'horns/basic.json': makeItem('Horns', 'horns'),
+      'armour/plate.json': makeItem('Plate', 'armour'),
+      'chainmail/steel.json': makeItem('Chainmail', 'chainmail'),
+      'weapon/sword.json': makeItem('Sword', 'weapon'),
+      'weapon/crystal.json': makeItem('Crystal', 'weapon_magic_crystal'),
+      'shield/kite.json': makeItem('Kite', 'shield'),
+      'quiver/quiver.json': makeItem('Quiver', 'quiver'),
+      'wound/arm.json': makeItem('Bleeding', 'wound_arm'),
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: farmerCatalog,
+      bodyType: 'male',
+      rng: () => 0,
+      optionalProb: 1.0,
+      profile: 'farmer',
+    });
+
+    expect(sel.items['body']).toBeDefined();
+    expect(sel.items['clothes']).toEqual({
+      typeName: 'clothes',
+      name: 'Shortsleeve',
+    });
+    expect(sel.items['overalls']).toEqual({
+      typeName: 'overalls',
+      name: 'Overalls',
+      variant: 'brown',
+    });
+    expect(sel.items['shoes']).toEqual({
+      typeName: 'shoes',
+      name: 'Basic Boots',
+      variant: 'brown',
+    });
+
+    for (const typeName of [
+      'wings',
+      'horns',
+      'armour',
+      'chainmail',
+      'weapon',
+      'weapon_magic_crystal',
+      'shield',
+      'quiver',
+      'wound_arm',
+    ] as const) {
+      expect(sel.items[typeName]).toBeUndefined();
+    }
   });
 });

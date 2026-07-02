@@ -13,6 +13,7 @@ export interface RandomProfile {
   readonly optionalGroups: readonly GroupId[];
   readonly excludeGroups: readonly GroupId[];
   readonly optionalProb: number;
+  readonly typeNames?: readonly TypeName[];
   readonly itemPools?: Partial<Record<TypeName, readonly string[]>>;
 }
 
@@ -39,8 +40,24 @@ export const NORMAL_RANDOM_PROFILE: RandomProfile = {
   optionalProb: 0.5,
 };
 
+export const FARMER_RANDOM_PROFILE: RandomProfile = {
+  id: 'farmer',
+  labelKey: 'preset.farmer',
+  requiredGroups: ['body'],
+  optionalGroups: ['face', 'clothing', 'accessories'],
+  excludeGroups: ['fantasy', 'weapons', 'fx'],
+  optionalProb: 0.5,
+  typeNames: ['body', 'head', 'expression', 'hair', 'clothes', 'overalls', 'shoes'],
+  itemPools: {
+    clothes: ['Shortsleeve'],
+    overalls: ['Overalls'],
+    shoes: ['Basic Boots'],
+  },
+};
+
 export const RANDOM_PROFILES: readonly RandomProfile[] = [
   NORMAL_RANDOM_PROFILE,
+  FARMER_RANDOM_PROFILE,
 ];
 
 const RANDOM_PROFILE_BY_ID: ReadonlyMap<string, RandomProfile> = new Map(
@@ -57,6 +74,8 @@ export function randomProfileForStyle(styleId: string | null | undefined): Rando
 }
 
 export function profileTypeNames(profile: RandomProfile): readonly TypeName[] {
+  if (profile.typeNames) return profile.typeNames;
+
   const included = new Set<GroupId>([
     ...profile.requiredGroups,
     ...profile.optionalGroups,
