@@ -231,4 +231,93 @@ describe('pickRandomOutfit', () => {
       expect(sel.items['wings']).toBeDefined();
     });
   });
+
+  it('normal profile preserves current default random behavior', () => {
+    const rngValues = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9];
+    const legacy = pickRandomOutfit({
+      catalog,
+      bodyType: 'male',
+      rng: seqRng(rngValues),
+    });
+    const profiled = pickRandomOutfit({
+      catalog,
+      bodyType: 'male',
+      rng: seqRng(rngValues),
+      profile: 'normal',
+    });
+    expect(profiled).toEqual(legacy);
+  });
+
+  it('unknown profile ids fall back to normal', () => {
+    const rngValues = [0.2, 0.3, 0.4, 0.5, 0.6];
+    const normal = pickRandomOutfit({
+      catalog,
+      bodyType: 'male',
+      rng: seqRng(rngValues),
+      profile: 'normal',
+    });
+    const unknown = pickRandomOutfit({
+      catalog,
+      bodyType: 'male',
+      rng: seqRng(rngValues),
+      profile: 'missing-style',
+    });
+    expect(unknown).toEqual(normal);
+  });
+
+  it('preserves disabled scope selections from the current outfit', () => {
+    const sel = pickRandomOutfit({
+      catalog,
+      bodyType: 'male',
+      rng: () => 0,
+      optionalProb: 1.0,
+      currentSelections: {
+        weapon: { typeName: 'weapon', name: 'Existing Sword' },
+        hair: { typeName: 'hair', name: 'Existing Hair' },
+      },
+      scope: {
+        appearance: false,
+        clothing: true,
+        equipment: false,
+        colors: true,
+      },
+    });
+    expect(sel.items['weapon']).toEqual({
+      typeName: 'weapon',
+      name: 'Existing Sword',
+    });
+    expect(sel.items['hair']).toEqual({
+      typeName: 'hair',
+      name: 'Existing Hair',
+    });
+  });
+
+  it('profile itemPools constrain choices to allowed names', () => {
+    const { catalog: poolCatalog } = createCatalog({
+      'body/light.json': makeItem('Light', 'body'),
+      'weapon/sword.json': makeItem('Sword', 'weapon'),
+      'weapon/staff.json': makeItem('Staff', 'weapon'),
+    });
+    const sel = pickRandomOutfit({
+      catalog: poolCatalog,
+      bodyType: 'male',
+      rng: () => 0,
+      optionalProb: 1.0,
+      profile: {
+        id: 'mage-test',
+        labelKey: 'randomProfile.normal',
+        requiredGroups: ['body'],
+        optionalGroups: ['weapons'],
+        excludeGroups: [],
+        optionalProb: 1.0,
+        itemPools: {
+          weapon: ['Staff'],
+        },
+      },
+    });
+    expect(sel.items['weapon']).toEqual({
+      typeName: 'weapon',
+      name: 'Staff',
+    });
+  });
 });

@@ -184,7 +184,7 @@ Verification: `rtk pnpm --filter @lpc-toolkit/web typecheck` reported no TypeScr
 - Modify: `packages/web/src/slice/random-outfit.ts`
 - Test: `packages/web/test/random-outfit.test.ts`
 
-- [ ] **Step 1: Add failing tests for profile and scope behavior**
+- [x] **Step 1: Add failing tests for profile and scope behavior**
 
 Append these tests inside the existing `describe('pickRandomOutfit', () => { ... })` block in `packages/web/test/random-outfit.test.ts`, before the final closing brace:
 
@@ -279,7 +279,7 @@ Append these tests inside the existing `describe('pickRandomOutfit', () => { ...
   });
 ```
 
-- [ ] **Step 2: Run the focused test and verify failure**
+- [x] **Step 2: Run the focused test and verify failure**
 
 Run:
 
@@ -289,7 +289,7 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts
 
 Expected: FAIL because `profile`, `scope`, and `currentSelections` are not accepted yet.
 
-- [ ] **Step 3: Update `random-outfit.ts`**
+- [x] **Step 3: Update `random-outfit.ts`**
 
 Replace `packages/web/src/slice/random-outfit.ts` with:
 
@@ -396,7 +396,7 @@ export function pickRandomOutfit(args: PickRandomOutfitArgs): Selections {
 }
 ```
 
-- [ ] **Step 4: Run focused tests**
+- [x] **Step 4: Run focused tests**
 
 Run:
 
@@ -406,7 +406,7 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 5: Run typecheck**
+- [x] **Step 5: Run typecheck**
 
 Run:
 
@@ -416,12 +416,16 @@ rtk pnpm --filter @lpc-toolkit/web typecheck
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 rtk git add packages/web/src/slice/random-outfit.ts packages/web/test/random-outfit.test.ts docs/superpowers/plans/2026-07-02-random-profiles.md
 rtk git commit -m "feat(web): make random outfit profile aware"
 ```
+
+Implementation note: Added profile/scope/current selection support to `pickRandomOutfit`, including item pool filtering and disabled-scope preservation. Kept legacy explicit `excludeGroups` behavior for existing callers so `excludeGroups: []` can still re-enable fx.
+Commit: pending controller hash fill-in
+Verification: RED `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` failed as expected on missing scope/itemPool behavior (2 failing assertions). GREEN initially exposed a legacy `excludeGroups` regression; after the compatibility adjustment, `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS. Typecheck: `rtk pnpm --filter @lpc-toolkit/web typecheck` reported no TypeScript errors but exited 1 due the rtk pnpm filter warning; `rtk pnpm --dir packages/web typecheck` PASS.
 
 ### Task 3: Add Random Scope UI State
 
