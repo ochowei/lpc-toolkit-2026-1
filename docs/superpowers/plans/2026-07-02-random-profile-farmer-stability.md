@@ -250,7 +250,11 @@ Verification:
 - Modify: `packages/web/test/stack-panel.test.tsx`
 - Modify: `docs/superpowers/plans/2026-07-02-random-profile-farmer-stability.md`
 
-- [ ] **Step 1: Add server-render coverage for random scope controls**
+- [x] **Step 1: Add server-render coverage for random scope controls**
+
+Implementation note: Added server-render coverage for random scope controls and asserted rendering does not dispatch selection changes.
+Commit: 1323b0d63804ecc20a82e01627533f1556895686
+Verification: Covered by the focused StackPanel test run in Step 2.
 
 In `packages/web/test/stack-panel.test.tsx`, add `vi` to the Vitest import:
 
@@ -317,7 +321,11 @@ Add this test to the existing `describe('StackPanel upstream selected-layer grou
   });
 ```
 
-- [ ] **Step 2: Run the focused stack panel test**
+- [x] **Step 2: Run the focused stack panel test**
+
+Implementation note: Ran the focused StackPanel suite after adding the random scope server-render test.
+Commit: 1323b0d63804ecc20a82e01627533f1556895686
+Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/stack-panel.test.tsx` PASS, 8 tests passed.
 
 Run:
 
@@ -327,7 +335,11 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/stack-panel.test.tsx
 
 Expected: PASS if the black-screen cause is not reproducible in server render. If it fails, fix the direct render error before continuing.
 
-- [ ] **Step 3: Inspect the checkbox state update for partial-state risk**
+- [x] **Step 3: Inspect the checkbox state update for partial-state risk**
+
+Implementation note: Confirmed `preset-bar.tsx` already spreads the current `RandomScope` before updating a keyed checkbox value, so no production change was needed.
+Commit: 1323b0d63804ecc20a82e01627533f1556895686
+Verification: Source inspection confirmed the complete-object `setRandomScope((current) => ({ ...current, [key]: event.currentTarget.checked }))` shape.
 
 Open `packages/web/src/components/layer-stack/preset-bar.tsx` and verify the checkbox update keeps a complete `RandomScope` object:
 
@@ -342,7 +354,11 @@ onChange={(event) =>
 
 If the code still matches this shape, do not change it in this task. If a failing test or browser console error points to a direct cause, apply only that focused fix.
 
-- [ ] **Step 4: Run focused verification**
+- [x] **Step 4: Run focused verification**
+
+Implementation note: Ran the required focused regression suite and web typecheck after confirming no production fix was needed.
+Commit: 1323b0d63804ecc20a82e01627533f1556895686
+Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/stack-panel.test.tsx test/random-outfit.test.ts` PASS, 28 tests passed; `rtk pnpm --dir packages/web typecheck` PASS.
 
 Run:
 
@@ -353,7 +369,7 @@ rtk pnpm --dir packages/web typecheck
 
 Expected: both PASS.
 
-- [ ] **Step 5: Commit Task 2**
+- [x] **Step 5: Commit Task 2**
 
 Run:
 
@@ -364,9 +380,9 @@ rtk git commit -m "test(web): cover random scope controls"
 
 If `preset-bar.tsx` was not changed, omit it from `git add`.
 
-Implementation note:
-Commit:
-Verification:
+Implementation note: Created an independent Task 2 commit for the StackPanel random scope coverage. `preset-bar.tsx` was inspected but not changed.
+Commit: 1323b0d63804ecc20a82e01627533f1556895686
+Verification: Commit created with `rtk git commit -m "test(web): cover random scope controls"`; plan metadata recorded separately to avoid a self-referential commit hash.
 
 ## Task 3: Final Verification and Browser Smoke
 
