@@ -580,7 +580,7 @@ rtk git commit -m "feat(web): add random scope controls"
 ```
 
 Implementation note: Added random scope labels, tracked the most recently applied preset style in `PresetBar`, routed dice randomization through `randomProfileForStyle` and `randomScope`, and rendered coarse randomization toggles.
-Commit: PENDING_TASK_3_HASH
+Commit: 200434da37a5fb8cf5172076f36995de3065db68
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/i18n.test.ts` PASS (18 tests). `rtk pnpm --filter @lpc-toolkit/web typecheck` reported no TypeScript errors but exited 1 due the rtk pnpm filter warning; `rtk pnpm --dir packages/web typecheck` PASS.
 
 ### Task 4: Final Verification
