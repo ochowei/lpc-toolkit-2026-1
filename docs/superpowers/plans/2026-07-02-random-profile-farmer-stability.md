@@ -450,7 +450,7 @@ Open `http://localhost:5173/` or the port Vite reports, then verify:
 Stop the dev server after the smoke check.
 Verification: Not run; web dependency resolution remains blocked by registry access (`ENOTFOUND registry.npmjs.org`).
 
-- [ ] **Step 5: Commit verification note**
+- [x] **Step 5: Commit verification note**
 
 Run:
 
@@ -460,5 +460,5 @@ rtk git commit -m "docs: record farmer random verification"
 ```
 
 Implementation note: Task 3 verification commands were attempted but could not proceed because `pnpm` in this environment cannot resolve `registry.npmjs.org`.
-Commit:  (in progress)
+Commit: ff1658d6a
 Verification: `Step 1/2/3/4` blocked by ENOTFOUND; no execution completed.
