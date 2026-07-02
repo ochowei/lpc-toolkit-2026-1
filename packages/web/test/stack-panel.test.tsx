@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createCatalog, createPaletteCatalog, type ItemDefinition, type TypeName } from '@lpc-toolkit/core';
 import { StackPanel } from '../src/components/layer-stack/stack-panel';
@@ -204,5 +204,60 @@ describe('StackPanel upstream selected-layer groups', () => {
     expect(html).toContain('Swap clothes');
     expect(html).toContain('Short Sleeve');
     expect(html).toContain('border-accent bg-accent/10 text-text');
+  });
+
+  it('renders random scope controls without dispatching selection changes', () => {
+    const dispatch = vi.fn();
+    const html = renderToStaticMarkup(
+      <StackPanel
+        disabled={false}
+        catalog={catalog}
+        palettes={palettes}
+        state={state}
+        dispatch={dispatch}
+        shownTypeNames={[
+          'body',
+          'head',
+          'hair',
+          'hat',
+          'gloves',
+          'clothes',
+          'legs',
+          'shoes',
+          'tools',
+          'weapon',
+        ]}
+        licenseFilter={ALL_LICENSE_GROUPS}
+        toggleLicenseGroup={() => {}}
+        licenseIncompatibleCount={0}
+        removeLicenseIncompatibleSelections={() => {}}
+        animationFilter={new Set()}
+        toggleAnimation={() => {}}
+        animationIncompatibleCount={0}
+        removeAnimationIncompatibleSelections={() => {}}
+        customOverlay={null}
+        customOverlayZPos={95}
+        onCustomOverlayUpload={() => {}}
+        onCustomOverlayZPosChange={() => {}}
+        onClearCustomOverlay={() => {}}
+        t={createTranslator('en')}
+        tl={createLabelTranslator('en')}
+        onPresetApplied={() => {}}
+        onReset={() => {}}
+        status={null}
+        searchInputRef={{ current: null }}
+        expanded={null}
+        setExpanded={() => {}}
+        replacementCardDisplayMode="overlay"
+        onReplacementCardDisplayModeChange={() => {}}
+      />
+    );
+
+    expect(html).toContain('Random options');
+    expect(html).toContain('Appearance');
+    expect(html).toContain('Clothing');
+    expect(html).toContain('Equipment');
+    expect(html).toContain('Colors');
+    expect(dispatch).not.toHaveBeenCalled();
   });
 });

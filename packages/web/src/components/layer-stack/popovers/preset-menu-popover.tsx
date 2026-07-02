@@ -18,6 +18,7 @@ interface Props {
   dispatch: (a: SliceAction) => void;
   t: Translator;
   onApplied: (name: string, skippedCount: number, skippedTypes: string[]) => void;
+  onStyleSelected: (styleId: string) => void;
 }
 
 /** Popover menu that applies curated presets and reports skipped incompatible items. */
@@ -32,6 +33,7 @@ export function PresetMenuPopover({
   dispatch,
   t,
   onApplied,
+  onStyleSelected,
 }: Props) {
   const { panelRef, pos } = usePopover(open, () => setOpen(false), anchorRef);
 
@@ -72,6 +74,7 @@ export function PresetMenuPopover({
                 willSkip,
                 preview.skipped.map((s) => s.typeName),
               );
+              onStyleSelected(preset.id);
               setOpen(false);
             }}
             className={cn(
