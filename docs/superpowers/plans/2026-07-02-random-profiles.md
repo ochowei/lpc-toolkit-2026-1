@@ -424,7 +424,7 @@ rtk git commit -m "feat(web): make random outfit profile aware"
 ```
 
 Implementation note: Added profile/scope/current selection support to `pickRandomOutfit`, including item pool filtering and disabled-scope preservation. Kept legacy explicit `excludeGroups` behavior for existing callers so `excludeGroups: []` can still re-enable fx.
-Commit: pending controller hash fill-in
+Commit: 8d89ad6268893a1c481ce4e64c1c1dd397994405
 Verification: RED `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` failed as expected on missing scope/itemPool behavior (2 failing assertions). GREEN initially exposed a legacy `excludeGroups` regression; after the compatibility adjustment, `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS. Typecheck: `rtk pnpm --filter @lpc-toolkit/web typecheck` reported no TypeScript errors but exited 1 due the rtk pnpm filter warning; `rtk pnpm --dir packages/web typecheck` PASS.
 
 ### Task 3: Add Random Scope UI State
