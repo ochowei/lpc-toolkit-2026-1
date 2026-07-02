@@ -399,7 +399,7 @@ Verification: docs metadata update committed.
 - [x] **Review follow-up: Fix random scope checkbox event lifetime crash**
 
 Implementation note: Captured `event.currentTarget.checked` synchronously before the `setRandomScope` functional updater so React does not read a nulled event target during the later state update.
-Commit: pending
+Commit: c2e544425
 Verification: `rtk env CI=true pnpm --dir packages/web exec playwright test e2e/random-scope-options.spec.ts` PASS, 1 test passed; `rtk env CI=true pnpm --filter @lpc-toolkit/web exec vitest run test/stack-panel.test.tsx test/random-outfit.test.ts` PASS, 28 tests passed; `rtk env CI=true pnpm --dir packages/web typecheck` PASS.
 
 ## Task 3: Final Verification and Browser Smoke
@@ -466,5 +466,5 @@ rtk git commit -m "docs: record farmer random verification"
 ```
 
 Implementation note: Task 3 verification was rerun after approving existing `esbuild` build scripts for pnpm 11; focused tests, typecheck, and browser smoke passed, while full web test remains blocked by external asset-release download.
-Commit: pending
+Commit: c2e544425
 Verification: focused tests PASS; typecheck PASS; browser smoke PASS; full web test blocked by external GitHub release fetch.
