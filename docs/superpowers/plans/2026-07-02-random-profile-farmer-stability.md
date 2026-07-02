@@ -48,7 +48,7 @@
 - [x] **Step 1: Add failing farmer profile tests**
 
 Implementation note: Added farmer profile regression coverage for dedicated profile resolution and exclusion of fantasy, combat, and fx categories.
-Commit: 7a421a4a5e57c9ba2963886452ce5e0e158989ad
+Commit: 044fe09ac92c62ac71aeb577328c4c60eaa37d2c
 Verification: RED run confirmed expected failure before implementation.
 
 In `packages/web/test/random-outfit.test.ts`, update the import:
@@ -128,7 +128,7 @@ Append these tests inside the existing `describe('pickRandomOutfit', () => { ...
 - [x] **Step 2: Run the focused random tests and verify failure**
 
 Implementation note: Ran the focused random outfit suite after adding tests and before production changes.
-Commit: 7a421a4a5e57c9ba2963886452ce5e0e158989ad
+Commit: 044fe09ac92c62ac71aeb577328c4c60eaa37d2c
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` FAIL, with `farmer` resolving to `normal` and `wings` selected.
 
 Run:
@@ -142,7 +142,7 @@ Expected: FAIL because `randomProfileForStyle('farmer')` currently returns `norm
 - [x] **Step 3: Extend `RandomProfile` with explicit type names**
 
 Implementation note: Added optional `typeNames` to `RandomProfile` and made `profileTypeNames` honor explicit profile type lists before group expansion.
-Commit: 7a421a4a5e57c9ba2963886452ce5e0e158989ad
+Commit: 044fe09ac92c62ac71aeb577328c4c60eaa37d2c
 Verification: Covered by focused random outfit suite and web typecheck.
 
 In `packages/web/src/slice/random-profiles.ts`, add `typeNames` to the interface:
@@ -180,7 +180,7 @@ export function profileTypeNames(profile: RandomProfile): readonly TypeName[] {
 - [x] **Step 4: Add `FARMER_RANDOM_PROFILE`**
 
 Implementation note: Added a farmer profile with a civilian slot allow-list and item pools for Shortsleeve, Overalls, and Basic Boots, then registered it in `RANDOM_PROFILES`.
-Commit: 7a421a4a5e57c9ba2963886452ce5e0e158989ad
+Commit: 044fe09ac92c62ac71aeb577328c4c60eaa37d2c
 Verification: Covered by focused random outfit suite and web typecheck.
 
 In `packages/web/src/slice/random-profiles.ts`, add this profile after `NORMAL_RANDOM_PROFILE`:
@@ -214,7 +214,7 @@ export const RANDOM_PROFILES: readonly RandomProfile[] = [
 - [x] **Step 5: Run focused verification**
 
 Implementation note: Ran the required focused verification commands after implementation.
-Commit: 7a421a4a5e57c9ba2963886452ce5e0e158989ad
+Commit: 044fe09ac92c62ac71aeb577328c4c60eaa37d2c
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS; `rtk pnpm --dir packages/web typecheck` PASS.
 
 Run:
@@ -229,7 +229,7 @@ Expected: both PASS.
 - [x] **Step 6: Commit Task 1**
 
 Implementation note: Created an independent Task 1 commit containing the farmer random profile, regression tests, and plan updates.
-Commit: 7a421a4a5e57c9ba2963886452ce5e0e158989ad
+Commit: 044fe09ac92c62ac71aeb577328c4c60eaa37d2c
 Verification: Commit created with `rtk git commit -m "feat(web): add farmer random profile"`.
 
 Run:
