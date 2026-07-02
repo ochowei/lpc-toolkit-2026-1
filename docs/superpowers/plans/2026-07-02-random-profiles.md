@@ -662,3 +662,7 @@ Open the local Vite URL and verify:
   - Implementation note: Added a regression test for an existing `wound_arm` selection and changed preservation to keep only known appearance, clothing, or equipment groups whose scope flag is disabled.
   - Commit: bb6d89524315da0f179e8b9459bbe2904f01f75e
   - Verification: RED `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` failed with `wound_arm` preserved. GREEN `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS (18 tests). Typecheck: `rtk pnpm --filter @lpc-toolkit/web typecheck` reported no TypeScript errors but exited 1 due the RTK filter warning; `rtk pnpm --dir packages/web typecheck` PASS.
+- [x] Re-run final verification after the scoped preservation fix.
+  - Implementation note: Re-ran the final verification commands after the regression fix changed random profile behavior and added one test.
+  - Commit: pending controller hash fill-in
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS (1 file, 18 tests). `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/i18n.test.ts test/stack-panel.test.tsx` PASS (2 files, 25 tests). `rtk pnpm --filter @lpc-toolkit/web typecheck` reported `TypeScript: No errors found` but exited 1 due the RTK filter warning; `rtk pnpm --dir packages/web typecheck` PASS. `rtk pnpm --filter @lpc-toolkit/web test` initially failed in sandbox during pretest with `listen EPERM` for the `tsx` IPC pipe; escalated rerun PASS (58 files, 447 tests).
