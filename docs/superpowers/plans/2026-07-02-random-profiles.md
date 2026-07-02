@@ -636,7 +636,7 @@ rtk git commit -m "docs: record random profiles verification"
 ```
 
 Implementation note: Ran the Task 4 final verification commands fresh and recorded the exact outcomes. The full suite initially failed before tests in sandbox because `tsx` could not create its IPC pipe; rerunning the same command with approved escalation passed.
-Commit: pending controller hash fill-in
+Commit: 60c44720a1ab43f657c7c69009b2ae4313a1d4ed
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS (1 file, 17 tests). `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/i18n.test.ts test/stack-panel.test.tsx` PASS (2 files, 25 tests). `rtk pnpm --filter @lpc-toolkit/web typecheck` reported `TypeScript: No errors found` but exited 1 due the RTK filter warning; `rtk pnpm --dir packages/web typecheck` PASS. `rtk pnpm --filter @lpc-toolkit/web test` initially failed in sandbox during pretest with `listen EPERM` for the `tsx` IPC pipe; escalated rerun PASS (58 files, 446 tests).
 
 ## Manual Smoke Check
