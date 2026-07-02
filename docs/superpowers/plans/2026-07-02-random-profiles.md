@@ -43,7 +43,7 @@ Use `rtk` for all terminal commands.
 - Create: `packages/web/src/slice/random-profiles.ts`
 - Modify: `packages/web/src/i18n.ts`
 
-- [ ] **Step 1: Add the normal profile label**
+- [x] **Step 1: Add the normal profile label**
 
 In `packages/web/src/i18n.ts`, add this English key near `randomize.title`:
 
@@ -57,7 +57,7 @@ Add this Traditional Chinese key in the `zh` translation object near the existin
     'randomProfile.normal': '一般',
 ```
 
-- [ ] **Step 2: Create the model file**
+- [x] **Step 2: Create the model file**
 
 Create `packages/web/src/slice/random-profiles.ts`:
 
@@ -157,7 +157,7 @@ export function preserveDisabledScopeSelections(
 }
 ```
 
-- [ ] **Step 3: Run typecheck**
+- [x] **Step 3: Run typecheck**
 
 Run:
 
@@ -167,12 +167,16 @@ rtk pnpm --filter @lpc-toolkit/web typecheck
 
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 rtk git add packages/web/src/slice/random-profiles.ts packages/web/src/i18n.ts docs/superpowers/plans/2026-07-02-random-profiles.md
 rtk git commit -m "feat(web): add random profile model"
 ```
+
+Implementation note: Added the web-only normal random profile model and English/zh-TW label key.
+Commit: pending controller hash fill-in
+Verification: `rtk pnpm --filter @lpc-toolkit/web typecheck` reported no TypeScript errors but exited 1 due the rtk pnpm filter warning; `rtk pnpm --dir packages/web typecheck` PASS.
 
 ### Task 2: Make `pickRandomOutfit` Profile-Aware
 
