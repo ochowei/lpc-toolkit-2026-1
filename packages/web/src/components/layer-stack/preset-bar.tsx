@@ -91,12 +91,13 @@ export function PresetBar({ disabled, catalog, palettes, state, dispatch, t, onA
             <input
               type="checkbox"
               checked={randomScope[key]}
-              onChange={(event) =>
+              onChange={(event) => {
+                const checked = event.currentTarget.checked;
                 setRandomScope((current) => ({
                   ...current,
-                  [key]: event.currentTarget.checked,
-                }))
-              }
+                  [key]: checked,
+                }));
+              }}
               className="h-3 w-3"
             />
             <span>{label}</span>

@@ -388,7 +388,7 @@ Verification: Commit created with `rtk git commit -m "test(web): cover random sc
 
 Implementation note: Added `packages/web/e2e/random-scope-options.spec.ts` to click Appearance, Clothing, Equipment, and Colors off/on twice each while asserting the random controls remain visible, the loading overlay stays hidden, and collected page/console errors stay empty.
 Commit: d30454a4a
-Verification: `rtk pnpm --dir packages/web exec playwright test e2e/random-scope-options.spec.ts` was attempted but blocked by pnpm network resolution (`ENOTFOUND registry.npmjs.org`), so test execution did not proceed.
+Verification: `rtk env CI=true pnpm --dir packages/web exec playwright test e2e/random-scope-options.spec.ts` initially FAIL after surfacing the reported black-screen crash; trace showed `TypeError: Cannot read properties of null (reading 'checked')` in `preset-bar.tsx`.
 
 - [x] **Review follow-up: Commit interactive e2e coverage and metadata**
 
@@ -396,12 +396,18 @@ Implementation note: Added this follow-up metadata update after the follow-up co
 Commit: 1b5d17f5a
 Verification: docs metadata update committed.
 
+- [x] **Review follow-up: Fix random scope checkbox event lifetime crash**
+
+Implementation note: Captured `event.currentTarget.checked` synchronously before the `setRandomScope` functional updater so React does not read a nulled event target during the later state update.
+Commit: pending
+Verification: `rtk env CI=true pnpm --dir packages/web exec playwright test e2e/random-scope-options.spec.ts` PASS, 1 test passed; `rtk env CI=true pnpm --filter @lpc-toolkit/web exec vitest run test/stack-panel.test.tsx test/random-outfit.test.ts` PASS, 28 tests passed; `rtk env CI=true pnpm --dir packages/web typecheck` PASS.
+
 ## Task 3: Final Verification and Browser Smoke
 
 **Files:**
 - Modify: `docs/superpowers/plans/2026-07-02-random-profile-farmer-stability.md`
 
-- [ ] **Step 1: Run focused tests**
+- [x] **Step 1: Run focused tests**
 
 Run:
 
@@ -410,9 +416,9 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts te
 ```
 
 Expected: PASS.
-Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts test/stack-panel.test.tsx` was attempted but blocked by pnpm network resolution (`ENOTFOUND registry.npmjs.org`), so test execution did not proceed.
+Verification: `rtk env CI=true pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts test/stack-panel.test.tsx` PASS, 28 tests passed.
 
-- [ ] **Step 2: Run typecheck**
+- [x] **Step 2: Run typecheck**
 
 Run:
 
@@ -421,7 +427,7 @@ rtk pnpm --dir packages/web typecheck
 ```
 
 Expected: PASS.
-Verification: `rtk pnpm --dir packages/web typecheck` was attempted but blocked by pnpm network resolution (`ENOTFOUND registry.npmjs.org`), so typecheck did not run.
+Verification: `rtk env CI=true pnpm --dir packages/web typecheck` PASS.
 
 - [ ] **Step 3: Run the full web test suite if available**
 
@@ -432,9 +438,9 @@ rtk pnpm --filter @lpc-toolkit/web test
 ```
 
 Expected: PASS. If sandboxing blocks the `tsx` IPC pipe with `listen EPERM`, rerun the same command with escalation and record both results in the verification note.
-Verification: Not run; toolchain remains blocked at registry resolution (`ENOTFOUND registry.npmjs.org`) before command startup.
+Verification: `rtk env CI=true pnpm --filter @lpc-toolkit/web test` sandbox run failed with `listen EPERM` on the `tsx` IPC pipe; escalated rerun reached `prepare-assets` but failed downloading the external GitHub release `asset-manifest.json` (`fetch failed`). No app test failure was observed before the asset download blocker.
 
-- [ ] **Step 4: Manual smoke the reported UI path**
+- [x] **Step 4: Manual smoke the reported UI path**
 
 Run the dev server:
 
@@ -448,7 +454,7 @@ Open `http://localhost:5173/` or the port Vite reports, then verify:
 - Applying the Farmer preset and pressing random does not add wings, armour, weapons, shields, magic crystals, quiver, or `fx` selections.
 
 Stop the dev server after the smoke check.
-Verification: Not run; web dependency resolution remains blocked by registry access (`ENOTFOUND registry.npmjs.org`).
+Verification: `rtk env CI=true pnpm --filter @lpc-toolkit/web dev` sandbox run failed with `listen EPERM ::1:5173`; escalated dev server started at `http://localhost:5173/`. Browser smoke via Playwright passed for repeated random scope toggles and a temporary Farmer preset random check confirmed the hash did not include wings, armour, weapons, shields, magic crystals, quiver, or wound selections.
 
 - [x] **Step 5: Commit verification note**
 
@@ -459,6 +465,6 @@ rtk git add docs/superpowers/plans/2026-07-02-random-profile-farmer-stability.md
 rtk git commit -m "docs: record farmer random verification"
 ```
 
-Implementation note: Task 3 verification commands were attempted but could not proceed because `pnpm` in this environment cannot resolve `registry.npmjs.org`.
-Commit: ac1fffc77
-Verification: `Step 1/2/3/4` blocked by ENOTFOUND; no execution completed.
+Implementation note: Task 3 verification was rerun after approving existing `esbuild` build scripts for pnpm 11; focused tests, typecheck, and browser smoke passed, while full web test remains blocked by external asset-release download.
+Commit: pending
+Verification: focused tests PASS; typecheck PASS; browser smoke PASS; full web test blocked by external GitHub release fetch.
