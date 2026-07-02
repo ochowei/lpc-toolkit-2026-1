@@ -655,3 +655,10 @@ Open the local Vite URL and verify:
 - Turning off Appearance preserves hair/face/body selections when pressing dice.
 - Applying a fixed preset still changes the outfit as before.
 - Pressing dice after applying a preset still produces a valid rendered character.
+
+## Final Review Follow-Up
+
+- [x] Fix scoped preservation so excluded `fx` selections are not retained when all random scopes are enabled.
+  - Implementation note: Added a regression test for an existing `wound_arm` selection and changed preservation to keep only known appearance, clothing, or equipment groups whose scope flag is disabled.
+  - Commit: PENDING
+  - Verification: RED `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` failed with `wound_arm` preserved. GREEN `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS (18 tests). Typecheck: `rtk pnpm --filter @lpc-toolkit/web typecheck` reported no TypeScript errors but exited 1 due the RTK filter warning; `rtk pnpm --dir packages/web typecheck` PASS.

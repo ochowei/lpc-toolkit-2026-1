@@ -230,6 +230,26 @@ describe('pickRandomOutfit', () => {
       expect(sel.items['wound_arm']).toBeDefined();
       expect(sel.items['wings']).toBeDefined();
     });
+
+    it('does not preserve fx selections when all random scopes are enabled', () => {
+      const sel = pickRandomOutfit({
+        catalog: cWithFx,
+        bodyType: 'male',
+        rng: () => 0,
+        optionalProb: 1.0,
+        currentSelections: {
+          wound_arm: { typeName: 'wound_arm', name: 'Existing Wound' },
+        },
+        scope: {
+          appearance: true,
+          clothing: true,
+          equipment: true,
+          colors: true,
+        },
+      });
+
+      expect(sel.items['wound_arm']).toBeUndefined();
+    });
   });
 
   it('normal profile preserves current default random behavior', () => {

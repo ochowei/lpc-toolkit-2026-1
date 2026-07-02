@@ -79,13 +79,25 @@ export function isTypeEnabledByRandomScope(
   return false;
 }
 
+function isTypeInDisabledRandomScope(
+  typeName: TypeName,
+  scope: RandomScope,
+): boolean {
+  const group = groupForType(typeName);
+  if (!group) return false;
+  if (APPEARANCE_GROUPS.has(group)) return !scope.appearance;
+  if (CLOTHING_GROUPS.has(group)) return !scope.clothing;
+  if (EQUIPMENT_GROUPS.has(group)) return !scope.equipment;
+  return false;
+}
+
 export function preserveDisabledScopeSelections(
   currentSelections: Readonly<Record<TypeName, Selection>>,
   scope: RandomScope,
 ): Record<TypeName, Selection> {
   const preserved: Record<TypeName, Selection> = {};
   for (const [typeName, selection] of Object.entries(currentSelections)) {
-    if (!isTypeEnabledByRandomScope(typeName, scope)) {
+    if (isTypeInDisabledRandomScope(typeName, scope)) {
       preserved[typeName] = selection;
     }
   }
