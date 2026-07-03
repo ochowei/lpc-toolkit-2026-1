@@ -932,7 +932,7 @@ rtk git commit -m "feat(web): add preset menu random actions"
 ```
 
 Implementation note: Added preset menu Apply/Random row actions, exported the menu row helpers/component for tests, added Random translations, widened the popover, and removed the obsolete `onStyleSelected` prop from `PresetBar` while leaving the standalone dice/random-scope UI for Task 5.
-Commit: Pending until commit is created.
+Commit: b8448d2637c118d3f316ad4c772a765dcd199e28.
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/stack-panel.test.tsx` did not reach Vitest because pnpm aborted a non-TTY modules purge. Rerun with `rtk env CI=true pnpm --filter @lpc-toolkit/web exec vitest run test/stack-panel.test.tsx` still FAILS (2 failed, 9 passed): expected Task 5 dice/random-scope UI failure remains, and the direct Random helper test still fails because the knight random profile's item pool does not match the test catalog's `Sword A` weapon fixture.
 
 ## Task 5: Remove Standalone Dice and Global Random Scope UI
