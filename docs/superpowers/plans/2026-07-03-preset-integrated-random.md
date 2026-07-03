@@ -670,8 +670,8 @@ rtk git add packages/web/test/stack-panel.test.tsx docs/superpowers/plans/2026-0
 rtk git commit -m "test(web): cover preset menu random actions"
 ```
 
-Implementation note: Added RED stack panel coverage for removing standalone random controls, rendering preset menu Apply/Random rows, and direct Apply/Random action dispatch wiring without implementing Task 4 helpers.
-Commit: 376925f7568e120a9e5e861dfe873aa447013ce2.
+Implementation note: Added RED stack panel coverage for removing standalone random controls, rendering preset menu Apply/Random rows, and direct Apply/Random action dispatch wiring without implementing Task 4 helpers. During code review, aligned the farmer clothes fixture to the exact preset name and derived static menu labels from `PRESETS`.
+Commit: Original Task 3 RED test commit 376925f7568e120a9e5e861dfe873aa447013ce2.
 Verification: RED `rtk env CI=true pnpm --filter @lpc-toolkit/web exec vitest run test/stack-panel.test.tsx` FAIL as expected (4 failed, 7 passed) because the toolbar still renders the dice/random scope UI and `PresetMenuRows`, `applyPresetMenuRow`, and `randomizePresetMenuRow` are not exported yet. The exact requested command `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/stack-panel.test.tsx` did not reach Vitest because pnpm aborted a non-TTY modules purge.
 
 ## Task 4: Preset Menu Apply/Random Wiring

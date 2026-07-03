@@ -34,7 +34,7 @@ const { catalog } = createCatalog({
   'headwear/hats/hat_a.json': defn('Hat A', 'hat'),
   'arms/gloves/gloves_a.json': defn('Gloves A', 'gloves'),
   'torso/clothes/long_sleeve.json': defn('Long Sleeve', 'clothes'),
-  'torso/clothes/short_sleeve.json': defn('Short Sleeve', 'clothes'),
+  'torso/clothes/short_sleeve.json': defn('Shortsleeve', 'clothes'),
   'legs/pants/pants_a.json': defn('Pants A', 'legs'),
   'feet/shoes/shoes_a.json': defn('Shoes A', 'shoes'),
   'tools/tool_a.json': defn('Tool A', 'tools'),
@@ -197,7 +197,7 @@ describe('StackPanel upstream selected-layer groups', () => {
 
     expect(html).toContain('Long Sleeve');
     expect(html).toContain('Swap clothes');
-    expect(html).toContain('Short Sleeve');
+    expect(html).toContain('Shortsleeve');
     expect(html).not.toContain('clothes: Long Sleeve - Replace');
   });
 
@@ -213,7 +213,7 @@ describe('StackPanel upstream selected-layer groups', () => {
     const html = renderPanel({ state: selectedClothesState, expanded: 'clothes' });
 
     expect(html).toContain('Swap clothes');
-    expect(html).toContain('Short Sleeve');
+    expect(html).toContain('Shortsleeve');
     expect(html).toContain('border-accent bg-accent/10 text-text');
   });
 
@@ -289,7 +289,8 @@ describe('StackPanel upstream selected-layer groups', () => {
       />
     );
 
-    for (const label of ['Farmer', 'Mage', 'Knight', 'Ranger', 'Noble']) {
+    const t = createTranslator('en');
+    for (const label of PRESETS.map((preset) => t(preset.labelKey))) {
       expect(html).toContain(label);
     }
     expect(html.match(/>Apply</g)?.length).toBe(PRESETS.length);
