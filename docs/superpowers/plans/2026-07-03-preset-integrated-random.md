@@ -574,7 +574,8 @@ Append this test after the removal test:
       />
     );
 
-    for (const label of ['Farmer', 'Mage', 'Knight', 'Ranger', 'Noble']) {
+    const t = createTranslator('en');
+    for (const label of PRESETS.map((preset) => t(preset.labelKey))) {
       expect(html).toContain(label);
     }
     expect(html.match(/>Apply</g)?.length).toBe(PRESETS.length);
@@ -592,6 +593,7 @@ Append this test:
     const onApplied = vi.fn();
     const setOpen = vi.fn();
     const farmer = PRESETS.find((preset) => preset.id === 'farmer');
+    const t = createTranslator('en');
     expect(farmer).toBeDefined();
 
     applyPresetMenuRow({
@@ -600,7 +602,7 @@ Append this test:
       palettes,
       state,
       dispatch,
-      t: createTranslator('en'),
+      t,
       onApplied,
       setOpen,
     });
@@ -614,7 +616,7 @@ Append this test:
         }),
       }),
     });
-    expect(onApplied).toHaveBeenCalledWith('Farmer', expect.any(Number), expect.any(Array));
+    expect(onApplied).toHaveBeenCalledWith(t(farmer!.labelKey), expect.any(Number), expect.any(Array));
     expect(setOpen).toHaveBeenCalledWith(false);
   });
 ```
@@ -670,7 +672,7 @@ rtk git add packages/web/test/stack-panel.test.tsx docs/superpowers/plans/2026-0
 rtk git commit -m "test(web): cover preset menu random actions"
 ```
 
-Implementation note: Added RED stack panel coverage for removing standalone random controls, rendering preset menu Apply/Random rows, and direct Apply/Random action dispatch wiring without implementing Task 4 helpers. During code review, aligned the farmer clothes fixture to the exact preset name and derived static menu labels from `PRESETS`.
+Implementation note: Added RED stack panel coverage for removing standalone random controls, rendering preset menu Apply/Random rows, and direct Apply/Random action dispatch wiring without implementing Task 4 helpers. During code review, aligned the farmer clothes fixture to the exact preset name and derived preset labels from `PRESETS` for both static menu and Apply callback assertions.
 Commit: Original Task 3 RED test commit 376925f7568e120a9e5e861dfe873aa447013ce2.
 Verification: RED `rtk env CI=true pnpm --filter @lpc-toolkit/web exec vitest run test/stack-panel.test.tsx` FAIL as expected (4 failed, 7 passed) because the toolbar still renders the dice/random scope UI and `PresetMenuRows`, `applyPresetMenuRow`, and `randomizePresetMenuRow` are not exported yet. The exact requested command `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/stack-panel.test.tsx` did not reach Vitest because pnpm aborted a non-TTY modules purge.
 

@@ -302,6 +302,7 @@ describe('StackPanel upstream selected-layer groups', () => {
     const onApplied = vi.fn();
     const setOpen = vi.fn();
     const farmer = PRESETS.find((preset) => preset.id === 'farmer');
+    const t = createTranslator('en');
     expect(farmer).toBeDefined();
 
     applyPresetMenuRow({
@@ -310,7 +311,7 @@ describe('StackPanel upstream selected-layer groups', () => {
       palettes,
       state,
       dispatch,
-      t: createTranslator('en'),
+      t,
       onApplied,
       setOpen,
     });
@@ -324,7 +325,7 @@ describe('StackPanel upstream selected-layer groups', () => {
         }),
       }),
     });
-    expect(onApplied).toHaveBeenCalledWith('Farmer', expect.any(Number), expect.any(Array));
+    expect(onApplied).toHaveBeenCalledWith(t(farmer!.labelKey), expect.any(Number), expect.any(Array));
     expect(setOpen).toHaveBeenCalledWith(false);
   });
 
