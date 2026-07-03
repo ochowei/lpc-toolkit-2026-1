@@ -45,6 +45,75 @@ sprites, plus a modern React web UI and a CLI built on top of it.
 - `packages/web/` — React + Vite browser UI
 - `packages/cli/` — Node CLI (built later)
 
+## Architecture boundaries
+
+Read `docs/ARCHITECTURE.md` before broad changes to:
+
+- `packages/core/`
+- `packages/web/src/components/layer-stack/`
+- `packages/web/src/hooks/`
+- `packages/web/src/slice/`
+- `packages/web/src/adapter/`
+- `packages/web/src/lib/`
+- `packages/web/scripts/`
+
+Follow these dependency rules:
+
+- `packages/core/` must remain environment-agnostic.
+  It must not import React, DOM APIs, browser globals, Node filesystem APIs,
+  node-canvas, JSZip, Vite-only modules, or web package modules.
+- Browser image loading, canvas creation, ZIP loading, downloads, URL sync,
+  and other runtime browser behavior belong in `packages/web/src/adapter/`
+  or `packages/web/src/lib/`.
+- React components should not own core composition, attribution, catalog
+  normalization, or selection-transition rules.
+- Prefer pure helpers in `packages/web/src/slice/` for selection decisions,
+  catalog-derived behavior, filters, ordering, and compatibility checks.
+- Prefer hooks in `packages/web/src/hooks/` for React effects and async
+  orchestration.
+- Attribution is product logic, not decoration. Do not bypass credit metadata
+  when rendering, previewing, downloading, or exporting sprites.
+
+## Boundary verification
+
+Run `rtk pnpm check:boundaries` after changes that touch architecture-sensitive
+areas, especially `packages/core/`, `packages/web/src/`, or
+`packages/web/scripts/`.
+
+Boundary checks do not replace typecheck or tests. Pair them with the narrowest
+relevant verification for the change, such as `rtk pnpm typecheck`,
+`rtk pnpm test`, or a package-scoped command.
+
+If a boundary check fails, fix the architecture violation. Do not disable the
+check, weaken `scripts/check-boundaries.mjs`, or route around the boundary
+without explicit approval.
+
+## Large React file local extraction guidance
+
+Do not perform broad refactors just because a React file is large. Extract only
+when there is a clear reusable responsibility, an independently testable unit,
+or a JSX region with a stable visual purpose.
+
+For `packages/web/src/components/layer-stack/harness.tsx`:
+
+- keep it as the top-level editor orchestrator
+- extract hooks for reusable or independently testable UI/effect state
+- extract components for JSX regions with clear visual responsibility
+- keep domain decisions in core, `slice/`, hooks, or focused helpers
+- keep browser adapter logic in `adapter/` or `lib/`
+
+For `packages/web/src/components/layer-stack/layer-row.tsx`:
+
+- keep it focused on one selected layer row
+- extract subcomponents for row header, actions, style controls, replacement
+  picker, and compatibility notes when those regions need their own names
+- keep item compatibility, ordering, pick/clear decisions, and color option
+  resolution in pure helpers where possible
+
+Prefer small, local extractions over architectural reshuffles. A good extraction
+should make the next change easier without changing public selection behavior,
+composition output, attribution, or export semantics.
+
 ## When in doubt, stop and ask
 
 Before doing any of these, ask first:
