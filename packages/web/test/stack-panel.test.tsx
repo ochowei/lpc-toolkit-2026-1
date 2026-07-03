@@ -38,7 +38,14 @@ const { catalog } = createCatalog({
   'legs/pants/pants_a.json': defn('Pants A', 'legs'),
   'feet/shoes/shoes_a.json': defn('Shoes A', 'shoes'),
   'tools/tool_a.json': defn('Tool A', 'tools'),
-  'weapons/sword_a.json': defn('Sword A', 'weapon'),
+  'weapons/longsword.json': defn('Longsword', 'weapon'),
+  'shield/kite.json': defn('Kite', 'shield'),
+  'torso/armour/plate.json': defn('Plate', 'armour'),
+  'legs/armour/armour.json': defn('Armour', 'legs'),
+  'feet/armour/armour.json': defn('Armour', 'shoes'),
+  'headwear/armet.json': defn('Armet', 'hat'),
+  'arms/armour.json': defn('Armour', 'arms'),
+  'arms/gloves/gloves.json': defn('Gloves', 'gloves'),
 });
 
 const palettes = createPaletteCatalog({}).palettes;
@@ -47,7 +54,7 @@ const state: SliceState = {
   bodyType: 'male',
   selections: {
     body: { typeName: 'body', name: 'Body Color' },
-    weapon: { typeName: 'weapon', name: 'Sword A' },
+    weapon: { typeName: 'weapon', name: 'Longsword' },
   },
   anim: 'walk',
   dir: 'down',
@@ -125,7 +132,7 @@ describe('StackPanel upstream selected-layer groups', () => {
       expect(html).toContain(`>${label}<`);
     }
     expect(html).toContain('Body Color');
-    expect(html).toContain('Sword A');
+    expect(html).toContain('Longsword');
     expect(html).toContain('Show 1 slot');
     expect(html).not.toContain('+ head');
     expect(html).not.toContain('+ hair');
@@ -161,11 +168,11 @@ describe('StackPanel upstream selected-layer groups', () => {
     const html = renderPanel();
 
     expect(html).toContain('Body Color');
-    expect(html).toContain('Sword A');
+    expect(html).toContain('Longsword');
     expect(html).toContain('Clear body');
     expect(html).toContain('Clear weapon');
     expect(html).not.toContain('body: Body Color - Replace');
-    expect(html).not.toContain('weapon: Sword A - Replace');
+    expect(html).not.toContain('weapon: Longsword - Replace');
   });
 
   it('shows selected item fallback names in replace entries when catalog lookup is missing', () => {
