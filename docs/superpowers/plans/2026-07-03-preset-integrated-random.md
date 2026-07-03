@@ -1021,6 +1021,7 @@ rtk git commit -m "feat(web): move random into preset menu"
 ```
 
 Implementation note: Removed the standalone dice/random-scope controls and obsolete random imports/state from `PresetBar`, verified no `onStyleSelected` prop remained, and updated the stack-panel fixture to use the knight profile's pooled `Longsword` equipment set.
+Code-review note: Tightened the random wiring test to assert knight-specific pooled output (`Longsword` and `Kite`) so it catches regressions that ignore the selected preset id.
 Commit: cd9f79adde4e825e7891f031e002ff6dfd20783b.
 Verification: PASS `rtk env CI=true pnpm --filter @lpc-toolkit/web exec vitest run test/stack-panel.test.tsx` (11 passed). The exact requested command `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/stack-panel.test.tsx` did not reach Vitest because pnpm aborted a non-TTY modules purge.
 

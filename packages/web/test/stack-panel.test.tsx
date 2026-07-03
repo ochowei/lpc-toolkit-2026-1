@@ -357,7 +357,8 @@ describe('StackPanel upstream selected-layer groups', () => {
       selections: expect.objectContaining({
         bodyType: 'male',
         items: expect.objectContaining({
-          weapon: expect.objectContaining({ typeName: 'weapon' }),
+          weapon: expect.objectContaining({ typeName: 'weapon', name: 'Longsword' }),
+          shield: expect.objectContaining({ typeName: 'shield', name: 'Kite' }),
         }),
       }),
     });
