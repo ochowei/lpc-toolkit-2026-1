@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { attachConsoleCollector } from './helpers/console-collector';
+import { clickPresetMenuAction } from './helpers/preset-menu';
 
 const RANDOM_CLICKS = 20;
 
@@ -8,11 +9,12 @@ test('clicking random 20 times produces no console errors', async ({ page }) => 
 
   await page.goto('/?assetSource=zip');
 
-  const randomBtn = page.getByTitle('Randomize outfit');
-  await expect(randomBtn).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('button', { name: 'Presets' })).toBeVisible({
+    timeout: 30_000,
+  });
 
   for (let i = 0; i < RANDOM_CLICKS; i++) {
-    await randomBtn.click({ force: true });
+    await clickPresetMenuAction(page, 'Farmer', 'Random');
     await page.waitForTimeout(150);
   }
 

@@ -15,6 +15,7 @@ import {
   type ToolkitProbeSnapshot,
   type UpstreamSnapshot,
 } from './helpers/parity-pages';
+import { clickPresetMenuAction } from './helpers/preset-menu';
 
 interface ToolkitBrowserProbe {
   readonly hash: string;
@@ -74,7 +75,7 @@ async function makeSeededRandomHash(
       .toBe('ready');
 
     const beforeHash = await readToolkitHash(page);
-    await page.getByTitle('Randomize outfit').click();
+    await clickPresetMenuAction(page, 'Farmer', 'Random');
     await page.waitForFunction(
       (previousHash: string) => {
         const win = window as Window & {
