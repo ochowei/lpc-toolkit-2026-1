@@ -558,7 +558,7 @@ describe('pickRandomOutfit', () => {
   it('noble profile excludes weapons, shields, armor, workwear, and fantasy parts', () => {
     const { catalog: nobleCatalog } = createCatalog({
       'body/light.json': makeItem('Light', 'body'),
-      'clothes/formal.json': makeItem('Collared/Formal Longsleeve', 'clothes'),
+      'clothes/formal-longsleeve.json': makeItem('Collared/Formal Longsleeve', 'clothes'),
       'legs/formal.json': makeItem('Formal Pants', 'legs'),
       'shoes/basic.json': makeItem('Basic Shoes', 'shoes'),
       'hat/tophat.json': makeItem('Formal Tophat', 'hat'),

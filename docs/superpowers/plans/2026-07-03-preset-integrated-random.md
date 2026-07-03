@@ -308,7 +308,7 @@ Verification: RED `rtk env CI=true pnpm --filter @lpc-toolkit/web exec vitest ru
 - Modify: `packages/web/src/slice/random-profiles.ts`
 - Modify: `docs/superpowers/plans/2026-07-03-preset-integrated-random.md`
 
-- [ ] **Step 1: Add preset random profiles**
+- [x] **Step 1: Add preset random profiles**
 
 In `packages/web/src/slice/random-profiles.ts`, add these exports after `FARMER_RANDOM_PROFILE`:
 
@@ -422,7 +422,7 @@ export const NOBLE_RANDOM_PROFILE: RandomProfile = {
 };
 ```
 
-- [ ] **Step 2: Register preset profiles**
+- [x] **Step 2: Register preset profiles**
 
 Replace `RANDOM_PROFILES` with:
 
@@ -437,7 +437,7 @@ export const RANDOM_PROFILES: readonly RandomProfile[] = [
 ];
 ```
 
-- [ ] **Step 3: Run focused random tests**
+- [x] **Step 3: Run focused random tests**
 
 Run:
 
@@ -447,16 +447,16 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 4: Commit profile implementation**
+- [x] **Step 4: Commit profile implementation**
 
 ```bash
 rtk git add packages/web/src/slice/random-profiles.ts docs/superpowers/plans/2026-07-03-preset-integrated-random.md
 rtk git commit -m "feat(web): add preset random profiles"
 ```
 
-Implementation note: Pending.
-Commit: Pending.
-Verification: Pending.
+Implementation note: Added mage, knight, ranger, and noble random profiles; registered them with the random profile resolver; and made the narrow noble test fixture basename correction discovered during verification so `createCatalog` no longer overwrites its clothes entry.
+Commit: This implementation commit (`feat(web): add preset random profiles`).
+Verification: GREEN `rtk env CI=true pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS (26 passed). The exact requested command `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` did not reach Vitest because pnpm aborted a non-TTY modules purge.
 
 ## Task 3: Preset Menu UI and Wiring Tests
 
