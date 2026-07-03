@@ -942,7 +942,7 @@ Verification: `rtk env CI=true pnpm --filter @lpc-toolkit/web exec tsc --noEmit`
 - Modify: `packages/web/test/stack-panel.test.tsx`
 - Modify: `docs/superpowers/plans/2026-07-03-preset-integrated-random.md`
 
-- [ ] **Step 1: Simplify `PresetBar` imports**
+- [x] **Step 1: Simplify `PresetBar` imports**
 
 In `packages/web/src/components/layer-stack/preset-bar.tsx`, remove:
 
@@ -961,7 +961,7 @@ Keep:
 import { useRef, useState } from 'react';
 ```
 
-- [ ] **Step 2: Remove local random state**
+- [x] **Step 2: Remove local random state**
 
 Delete these state declarations:
 
@@ -970,15 +970,15 @@ Delete these state declarations:
   const [randomScope, setRandomScope] = useState<RandomScope>(DEFAULT_RANDOM_SCOPE);
 ```
 
-- [ ] **Step 3: Remove standalone dice button**
+- [x] **Step 3: Remove standalone dice button**
 
 Delete the first toolbar `<button>` whose title is `t('randomize.title')` and whose contents are `🎲`.
 
-- [ ] **Step 4: Remove global random options row**
+- [x] **Step 4: Remove global random options row**
 
 Delete the entire `<div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-text-dim">...</div>` that renders `t('randomScope.title')` and the four checkboxes.
 
-- [ ] **Step 5: Stop passing `onStyleSelected`**
+- [x] **Step 5: Stop passing `onStyleSelected`**
 
 In the `PresetMenuPopover` usage, delete:
 
@@ -986,7 +986,7 @@ In the `PresetMenuPopover` usage, delete:
         onStyleSelected={setActiveStyleId}
 ```
 
-- [ ] **Step 6: Update the Random wiring test catalog if needed**
+- [x] **Step 6: Update the Random wiring test catalog if needed**
 
 If the `Random menu action dispatches random selections through the matching preset profile` test does not pick a knight weapon because profile item pools are stricter than the test catalog, change the test catalog item names at the top of `packages/web/test/stack-panel.test.tsx` to include the pooled names:
 
@@ -1003,7 +1003,7 @@ If the `Random menu action dispatches random selections through the matching pre
 
 Keep existing unrelated catalog entries unless the duplicate type/name makes assertions ambiguous.
 
-- [ ] **Step 7: Run component tests**
+- [x] **Step 7: Run component tests**
 
 Run:
 
@@ -1013,16 +1013,16 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/stack-panel.test.tsx
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit UI removal**
+- [x] **Step 8: Commit UI removal**
 
 ```bash
 rtk git add packages/web/src/components/layer-stack/preset-bar.tsx packages/web/test/stack-panel.test.tsx docs/superpowers/plans/2026-07-03-preset-integrated-random.md
 rtk git commit -m "feat(web): move random into preset menu"
 ```
 
-Implementation note: Pending.
-Commit: Pending.
-Verification: Pending.
+Implementation note: Removed the standalone dice/random-scope controls and obsolete random imports/state from `PresetBar`, verified no `onStyleSelected` prop remained, and updated the stack-panel fixture to use the knight profile's pooled `Longsword` equipment set.
+Commit: cd9f79adde4e825e7891f031e002ff6dfd20783b.
+Verification: PASS `rtk env CI=true pnpm --filter @lpc-toolkit/web exec vitest run test/stack-panel.test.tsx` (11 passed). The exact requested command `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/stack-panel.test.tsx` did not reach Vitest because pnpm aborted a non-TTY modules purge.
 
 ## Task 6: Final Verification
 
