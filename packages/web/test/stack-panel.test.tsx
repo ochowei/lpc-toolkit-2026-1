@@ -1,7 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { createCatalog, createPaletteCatalog, type ItemDefinition, type TypeName } from '@lpc-toolkit/core';
+import {
+  createCatalog,
+  createPaletteCatalog,
+  type ItemDefinition,
+  type TypeName,
+} from '@lpc-toolkit/core';
 import { StackPanel } from '../src/components/layer-stack/stack-panel';
+import {
+  applyPresetMenuRow,
+  PresetMenuRows,
+  randomizePresetMenuRow,
+} from '../src/components/layer-stack/popovers/preset-menu-popover';
+import { PRESETS } from '../src/presets';
 import { createLabelTranslator, createTranslator } from '../src/i18n';
 import { ALL_LICENSE_GROUPS } from '../src/slice/license-filter';
 import type { SliceState } from '../src/slice/selection';
@@ -23,11 +34,18 @@ const { catalog } = createCatalog({
   'headwear/hats/hat_a.json': defn('Hat A', 'hat'),
   'arms/gloves/gloves_a.json': defn('Gloves A', 'gloves'),
   'torso/clothes/long_sleeve.json': defn('Long Sleeve', 'clothes'),
-  'torso/clothes/short_sleeve.json': defn('Short Sleeve', 'clothes'),
+  'torso/clothes/short_sleeve.json': defn('Shortsleeve', 'clothes'),
   'legs/pants/pants_a.json': defn('Pants A', 'legs'),
   'feet/shoes/shoes_a.json': defn('Shoes A', 'shoes'),
   'tools/tool_a.json': defn('Tool A', 'tools'),
-  'weapons/sword_a.json': defn('Sword A', 'weapon'),
+  'weapons/longsword.json': defn('Longsword', 'weapon'),
+  'shield/kite.json': defn('Kite', 'shield'),
+  'torso/armour/plate.json': defn('Plate', 'armour'),
+  'legs/armour/armour.json': defn('Armour', 'legs'),
+  'feet/armour/armour.json': defn('Armour', 'shoes'),
+  'headwear/armet.json': defn('Armet', 'hat'),
+  'arms/armour.json': defn('Armour', 'arms'),
+  'arms/gloves/gloves.json': defn('Gloves', 'gloves'),
 });
 
 const palettes = createPaletteCatalog({}).palettes;
@@ -36,7 +54,7 @@ const state: SliceState = {
   bodyType: 'male',
   selections: {
     body: { typeName: 'body', name: 'Body Color' },
-    weapon: { typeName: 'weapon', name: 'Sword A' },
+    weapon: { typeName: 'weapon', name: 'Longsword' },
   },
   anim: 'walk',
   dir: 'down',
@@ -114,7 +132,7 @@ describe('StackPanel upstream selected-layer groups', () => {
       expect(html).toContain(`>${label}<`);
     }
     expect(html).toContain('Body Color');
-    expect(html).toContain('Sword A');
+    expect(html).toContain('Longsword');
     expect(html).toContain('Show 1 slot');
     expect(html).not.toContain('+ head');
     expect(html).not.toContain('+ hair');
@@ -150,11 +168,11 @@ describe('StackPanel upstream selected-layer groups', () => {
     const html = renderPanel();
 
     expect(html).toContain('Body Color');
-    expect(html).toContain('Sword A');
+    expect(html).toContain('Longsword');
     expect(html).toContain('Clear body');
     expect(html).toContain('Clear weapon');
     expect(html).not.toContain('body: Body Color - Replace');
-    expect(html).not.toContain('weapon: Sword A - Replace');
+    expect(html).not.toContain('weapon: Longsword - Replace');
   });
 
   it('shows selected item fallback names in replace entries when catalog lookup is missing', () => {
@@ -186,7 +204,7 @@ describe('StackPanel upstream selected-layer groups', () => {
 
     expect(html).toContain('Long Sleeve');
     expect(html).toContain('Swap clothes');
-    expect(html).toContain('Short Sleeve');
+    expect(html).toContain('Shortsleeve');
     expect(html).not.toContain('clothes: Long Sleeve - Replace');
   });
 
@@ -202,11 +220,11 @@ describe('StackPanel upstream selected-layer groups', () => {
     const html = renderPanel({ state: selectedClothesState, expanded: 'clothes' });
 
     expect(html).toContain('Swap clothes');
-    expect(html).toContain('Short Sleeve');
+    expect(html).toContain('Shortsleeve');
     expect(html).toContain('border-accent bg-accent/10 text-text');
   });
 
-  it('renders random scope controls without dispatching selection changes', () => {
+  it('removes the standalone random dice and global random scope controls', () => {
     const dispatch = vi.fn();
     const html = renderToStaticMarkup(
       <StackPanel
@@ -253,11 +271,116 @@ describe('StackPanel upstream selected-layer groups', () => {
       />
     );
 
-    expect(html).toContain('Random options');
-    expect(html).toContain('Appearance');
-    expect(html).toContain('Clothing');
-    expect(html).toContain('Equipment');
-    expect(html).toContain('Colors');
+    expect(html).toContain('Presets');
+    expect(html).toContain('Reset');
+    expect(html).not.toContain('🎲');
+    expect(html).not.toContain('Random options');
+    expect(html).not.toContain('Appearance');
+    expect(html).not.toContain('Clothing');
+    expect(html).not.toContain('Equipment');
+    expect(html).not.toContain('Colors');
     expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('renders Apply and Random actions for each preset row when the menu is open', () => {
+    const html = renderToStaticMarkup(
+      <PresetMenuRows
+        disabled={false}
+        catalog={catalog}
+        palettes={palettes}
+        state={state}
+        dispatch={() => {}}
+        t={createTranslator('en')}
+        onApplied={() => {}}
+        setOpen={() => {}}
+      />
+    );
+
+    const t = createTranslator('en');
+    for (const label of PRESETS.map((preset) => t(preset.labelKey))) {
+      expect(html).toContain(label);
+    }
+    expect(html.match(/>Apply</g)?.length).toBe(PRESETS.length);
+    expect(html.match(/>Random</g)?.length).toBe(PRESETS.length);
+  });
+
+  it('scopes skipped preset warnings to the Apply action', () => {
+    const html = renderToStaticMarkup(
+      <PresetMenuRows
+        disabled={false}
+        catalog={catalog}
+        palettes={palettes}
+        state={state}
+        dispatch={() => {}}
+        t={createTranslator('en')}
+        onApplied={() => {}}
+        setOpen={() => {}}
+      />
+    );
+
+    expect(html).not.toMatch(/title="Farmer — Skips \d+"/);
+    expect(html).not.toMatch(/<div role="none" class="[^"]*opacity-80/);
+    expect(html).toMatch(/<button[^>]*title="Apply — Skips \d+"[^>]*>.*⚠.*Apply/s);
+  });
+
+  it('Apply menu action dispatches fixed preset selections and reports skipped items', () => {
+    const dispatch = vi.fn();
+    const onApplied = vi.fn();
+    const setOpen = vi.fn();
+    const farmer = PRESETS.find((preset) => preset.id === 'farmer');
+    const t = createTranslator('en');
+    expect(farmer).toBeDefined();
+
+    applyPresetMenuRow({
+      preset: farmer!,
+      catalog,
+      palettes,
+      state,
+      dispatch,
+      t,
+      onApplied,
+      setOpen,
+    });
+
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'apply_selections',
+      selections: expect.objectContaining({
+        bodyType: 'male',
+        items: expect.objectContaining({
+          clothes: expect.objectContaining({ name: 'Shortsleeve' }),
+        }),
+      }),
+    });
+    expect(onApplied).toHaveBeenCalledWith(t(farmer!.labelKey), expect.any(Number), expect.any(Array));
+    expect(setOpen).toHaveBeenCalledWith(false);
+  });
+
+  it('Random menu action dispatches random selections through the matching preset profile', () => {
+    const dispatch = vi.fn();
+    const setOpen = vi.fn();
+    const knight = PRESETS.find((preset) => preset.id === 'knight');
+    expect(knight).toBeDefined();
+
+    randomizePresetMenuRow({
+      preset: knight!,
+      catalog,
+      palettes,
+      state,
+      dispatch,
+      setOpen,
+      rng: () => 0,
+    });
+
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'apply_selections',
+      selections: expect.objectContaining({
+        bodyType: 'male',
+        items: expect.objectContaining({
+          weapon: expect.objectContaining({ typeName: 'weapon', name: 'Longsword' }),
+          shield: expect.objectContaining({ typeName: 'shield', name: 'Kite' }),
+        }),
+      }),
+    });
+    expect(setOpen).toHaveBeenCalledWith(false);
   });
 });

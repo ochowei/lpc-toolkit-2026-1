@@ -1,9 +1,10 @@
 import { expect, test } from '@playwright/test';
 import { attachConsoleCollector } from './helpers/console-collector';
+import { clickPresetMenuAction } from './helpers/preset-menu';
 
-const RANDOM_SCOPE_LABELS = ['Appearance', 'Clothing', 'Equipment', 'Colors'] as const;
+const PRESET_LABELS = ['Farmer', 'Mage', 'Knight', 'Ranger', 'Noble'] as const;
 
-test('random scope checkboxes can be toggled repeatedly without page errors', async ({
+test('preset random actions can be triggered repeatedly without page errors', async ({
   page,
 }) => {
   const errors = attachConsoleCollector(page);
@@ -11,24 +12,16 @@ test('random scope checkboxes can be toggled repeatedly without page errors', as
   await page.goto('/?assetSource=zip');
 
   const overlay = page.getByTestId('composition-loading-overlay');
-  const randomBtn = page.getByTitle('Randomize outfit');
-  await expect(randomBtn).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('button', { name: 'Presets' })).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(page.getByText('Random options')).toHaveCount(0);
   await expect(overlay).toBeHidden({ timeout: 30_000 });
 
-  for (const label of RANDOM_SCOPE_LABELS) {
-    const checkbox = page.getByLabel(label, { exact: true });
-    await expect(checkbox).toBeVisible();
-
+  for (const label of PRESET_LABELS) {
     for (let i = 0; i < 2; i++) {
-      await checkbox.click();
-      await expect(page.getByText('Random options')).toBeVisible();
-      await expect(randomBtn).toBeVisible();
-      await expect(overlay).toBeHidden();
-
-      await checkbox.click();
-      await expect(page.getByText('Random options')).toBeVisible();
-      await expect(randomBtn).toBeVisible();
-      await expect(overlay).toBeHidden();
+      await clickPresetMenuAction(page, label, 'Random');
+      await expect(overlay).toBeHidden({ timeout: 30_000 });
     }
   }
 

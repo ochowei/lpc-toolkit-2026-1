@@ -1,5 +1,6 @@
 import { expect, test, type Route } from '@playwright/test';
 import { attachConsoleCollector } from './helpers/console-collector';
+import { clickPresetMenuAction } from './helpers/preset-menu';
 
 interface ZipGate {
   handler(route: Route): Promise<void>;
@@ -50,13 +51,13 @@ test.describe('composition loading lock', () => {
     await expect(overlay).toContainText('Loading character');
     await expect(overlay).toContainText(/\d+%/);
     await expect(page.getByRole('searchbox', { name: 'Search all assets…' })).toBeDisabled();
-    await expect(page.getByTitle('Randomize outfit')).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Presets' })).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Pause' })).toBeEnabled();
 
     await gate.release();
     await expect(overlay).toBeHidden({ timeout: 30_000 });
     await expect(page.getByRole('searchbox', { name: 'Search all assets…' })).toBeEnabled();
-    await expect(page.getByTitle('Randomize outfit')).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Presets' })).toBeEnabled();
     expect(errors).toEqual([]);
   });
 
@@ -73,20 +74,17 @@ test.describe('composition loading lock', () => {
     const gate = createZipGate();
     await page.route('**/zips/*.zip', (route) => gate.handler(route));
 
-    await page.getByRole('button', { name: 'Presets' }).click();
-    await page.getByRole('menuitem', { name: /Farmer/ }).click();
+    await clickPresetMenuAction(page, 'Farmer', 'Apply');
 
     await gate.waitUntilBlocked();
     await expect(overlay).toBeVisible();
     await expect(page.getByRole('button', { name: 'Presets' })).toBeDisabled();
-    await expect(page.getByTitle('Randomize outfit')).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Play' })).toBeEnabled();
     expect(await previewCanvas.evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL())).toBe(before);
 
     await gate.release();
     await expect(overlay).toBeHidden({ timeout: 30_000 });
     await expect(page.getByRole('button', { name: 'Presets' })).toBeEnabled();
-    await expect(page.getByTitle('Randomize outfit')).toBeEnabled();
     expect(errors).toEqual([]);
   });
 
@@ -97,15 +95,13 @@ test.describe('composition loading lock', () => {
     const overlay = page.getByTestId('composition-loading-overlay');
     await expect(overlay).toBeHidden({ timeout: 30_000 });
 
-    await page.getByRole('button', { name: 'Presets' }).click();
-    await page.getByRole('menuitem', { name: /Farmer/ }).click();
+    await clickPresetMenuAction(page, 'Farmer', 'Apply');
     await expect(overlay).toBeHidden({ timeout: 30_000 });
     const farmerUrl = page.url();
 
     const gate = createZipGate();
     await page.route('**/zips/*.zip', (route) => gate.handler(route));
-    await page.getByRole('button', { name: 'Presets' }).click();
-    await page.getByRole('menuitem', { name: /Mage/ }).click();
+    await clickPresetMenuAction(page, 'Mage', 'Apply');
     await gate.waitUntilBlocked();
     const mageUrl = page.url();
     const mageStateHash = await page.evaluate(() => window.__LPC_E2E__?.hash);
@@ -136,16 +132,14 @@ test.describe('composition loading lock', () => {
     const defaultUrl = page.url();
     const defaultHash = await page.evaluate(() => window.__LPC_E2E__?.hash);
 
-    await page.getByRole('button', { name: 'Presets' }).click();
-    await page.getByRole('menuitem', { name: /Farmer/ }).click();
+    await clickPresetMenuAction(page, 'Farmer', 'Apply');
     await expect(overlay).toBeHidden({ timeout: 30_000 });
     const farmerUrl = page.url();
     const farmerHash = await page.evaluate(() => window.__LPC_E2E__?.hash);
 
     const gate = createZipGate();
     await page.route('**/zips/*.zip', (route) => gate.handler(route));
-    await page.getByRole('button', { name: 'Presets' }).click();
-    await page.getByRole('menuitem', { name: /Mage/ }).click();
+    await clickPresetMenuAction(page, 'Mage', 'Apply');
     await gate.waitUntilBlocked();
 
     await page.evaluate(() => window.history.go(-2));

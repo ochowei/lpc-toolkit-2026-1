@@ -55,9 +55,121 @@ export const FARMER_RANDOM_PROFILE: RandomProfile = {
   },
 };
 
+export const MAGE_RANDOM_PROFILE: RandomProfile = {
+  id: 'mage',
+  labelKey: 'preset.mage',
+  requiredGroups: ['body'],
+  optionalGroups: ['face', 'clothing', 'accessories', 'weapons'],
+  excludeGroups: ['fantasy', 'fx'],
+  optionalProb: 0.65,
+  typeNames: [
+    'body',
+    'head',
+    'expression',
+    'hair',
+    'clothes',
+    'legs',
+    'shoes',
+    'cape',
+    'hat',
+    'weapon',
+    'weapon_magic_crystal',
+  ],
+  itemPools: {
+    clothes: ['Longsleeve laced'],
+    legs: ['Pants'],
+    shoes: ['Basic Shoes'],
+    cape: ['Solid'],
+    hat: ['Wizard Hat Base'],
+    weapon: ['Gnarled staff'],
+    weapon_magic_crystal: ['Crystal'],
+  },
+};
+
+export const KNIGHT_RANDOM_PROFILE: RandomProfile = {
+  id: 'knight',
+  labelKey: 'preset.knight',
+  requiredGroups: ['body'],
+  optionalGroups: ['face', 'clothing', 'accessories', 'weapons'],
+  excludeGroups: ['fantasy', 'fx'],
+  optionalProb: 0.75,
+  typeNames: [
+    'body',
+    'head',
+    'expression',
+    'armour',
+    'legs',
+    'shoes',
+    'hat',
+    'weapon',
+    'shield',
+    'arms',
+    'gloves',
+  ],
+  itemPools: {
+    armour: ['Plate'],
+    legs: ['Armour'],
+    shoes: ['Armour'],
+    hat: ['Armet'],
+    weapon: ['Longsword'],
+    shield: ['Kite'],
+    arms: ['Armour'],
+    gloves: ['Gloves'],
+  },
+};
+
+export const RANGER_RANDOM_PROFILE: RandomProfile = {
+  id: 'ranger',
+  labelKey: 'preset.ranger',
+  requiredGroups: ['body'],
+  optionalGroups: ['face', 'clothing', 'accessories', 'weapons'],
+  excludeGroups: ['fantasy', 'fx'],
+  optionalProb: 0.7,
+  typeNames: [
+    'body',
+    'head',
+    'expression',
+    'hair',
+    'armour',
+    'legs',
+    'shoes',
+    'hat',
+    'weapon',
+    'quiver',
+  ],
+  itemPools: {
+    armour: ['Leather'],
+    legs: ['Pants'],
+    shoes: ['Basic Boots'],
+    hat: ['Hood'],
+    weapon: ['Normal'],
+    quiver: ['Quiver'],
+  },
+};
+
+export const NOBLE_RANDOM_PROFILE: RandomProfile = {
+  id: 'noble',
+  labelKey: 'preset.noble',
+  requiredGroups: ['body'],
+  optionalGroups: ['face', 'clothing', 'accessories'],
+  excludeGroups: ['fantasy', 'weapons', 'fx'],
+  optionalProb: 0.6,
+  typeNames: ['body', 'head', 'expression', 'hair', 'clothes', 'legs', 'shoes', 'hat'],
+  itemPools: {
+    clothes: ['Collared/Formal Longsleeve'],
+    legs: ['Formal Pants'],
+    shoes: ['Basic Shoes'],
+    hat: ['Formal Tophat'],
+  },
+};
+
 export const RANDOM_PROFILES: readonly RandomProfile[] = [
   NORMAL_RANDOM_PROFILE,
   FARMER_RANDOM_PROFILE,
+  MAGE_RANDOM_PROFILE,
+  KNIGHT_RANDOM_PROFILE,
+  RANGER_RANDOM_PROFILE,
+  NOBLE_RANDOM_PROFILE,
 ];
 
 const RANDOM_PROFILE_BY_ID: ReadonlyMap<string, RandomProfile> = new Map(
