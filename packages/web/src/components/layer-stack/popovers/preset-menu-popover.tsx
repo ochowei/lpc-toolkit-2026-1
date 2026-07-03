@@ -126,30 +126,31 @@ export function PresetMenuRows({
           catalog,
           palettes,
         );
-        const willSkip = preview.skipped.length;
+        const skippedCount = preview.skipped.length;
         const label = t(preset.labelKey);
+        const applyLabel = t('token.apply');
+        const skipPreview = t('preset.skipPreview').replace('{n}', String(skippedCount));
         return (
           <div
             key={preset.id}
             role="none"
             className={cn(
               'grid grid-cols-[1fr_auto_auto] items-center gap-1 rounded px-2 py-1.5 text-[12px]',
-              willSkip && 'opacity-80',
               disabled && 'opacity-50',
             )}
           >
             <span
-              title={willSkip ? `${label} — ${t('preset.skipPreview').replace('{n}', String(willSkip))}` : label}
+              title={label}
               className="flex min-w-0 items-center gap-2"
             >
               <span>{preset.emoji}</span>
               <span className="truncate">{label}</span>
-              {willSkip > 0 && <span className="text-danger">⚠</span>}
             </span>
             <button
               type="button"
               disabled={disabled}
               role="menuitem"
+              title={skippedCount > 0 ? `${applyLabel} — ${skipPreview}` : applyLabel}
               onClick={() =>
                 applyPresetMenuRow({
                   preset,
@@ -163,11 +164,13 @@ export function PresetMenuRows({
                 })
               }
               className={cn(
-                'rounded px-2 py-1 text-[11px] hover:bg-surface-2',
+                'flex items-center gap-1 rounded px-2 py-1 text-[11px] hover:bg-surface-2',
+                skippedCount > 0 && 'opacity-80',
                 disabled && 'cursor-not-allowed hover:bg-transparent',
               )}
             >
-              {t('token.apply')}
+              {skippedCount > 0 && <span className="text-danger">⚠</span>}
+              {applyLabel}
             </button>
             <button
               type="button"

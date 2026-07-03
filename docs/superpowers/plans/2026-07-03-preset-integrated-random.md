@@ -1081,6 +1081,12 @@ Implementation note: Ran the final focused random outfit tests, preset stack pan
 Commit: This verification commit; final hash reported by the completing agent because a commit cannot contain its own hash.
 Verification: PASS `rtk env CI=true pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` (26 passed), PASS `rtk env CI=true pnpm --filter @lpc-toolkit/web exec vitest run test/stack-panel.test.tsx` (11 passed), PASS `rtk env CI=true pnpm --dir packages/web typecheck`, and PASS `rtk git status --short` after removing `.pnpm-store/`. The exact requested pnpm commands were attempted first and each aborted before Vitest/typecheck due `[ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY]`.
 
+## Final Review Fix
+
+Implementation note: Scoped skipped-preset warning title, icon, and opacity to the Apply action so the shared preset label and Random action no longer imply Random has fixed-preset skipped items. Added static markup regression coverage for the Apply-specific warning placement.
+Commit: Final review fix commit; hash reported by the completing agent because a commit cannot contain its own hash.
+Verification: PASS `rtk env CI=true pnpm --filter @lpc-toolkit/web exec vitest run test/stack-panel.test.tsx` (12 passed), PASS `rtk env CI=true pnpm --dir packages/web typecheck`, PASS `rtk git diff --check`.
+
 ## Self-Review
 
 - Spec coverage: The plan covers pure random profile tests, preset menu UI/component tests, random profile implementation, Apply/Random row wiring, removal of standalone dice/global random scope UI, and the three requested verification commands.

@@ -304,6 +304,25 @@ describe('StackPanel upstream selected-layer groups', () => {
     expect(html.match(/>Random</g)?.length).toBe(PRESETS.length);
   });
 
+  it('scopes skipped preset warnings to the Apply action', () => {
+    const html = renderToStaticMarkup(
+      <PresetMenuRows
+        disabled={false}
+        catalog={catalog}
+        palettes={palettes}
+        state={state}
+        dispatch={() => {}}
+        t={createTranslator('en')}
+        onApplied={() => {}}
+        setOpen={() => {}}
+      />
+    );
+
+    expect(html).not.toMatch(/title="Farmer — Skips \d+"/);
+    expect(html).not.toMatch(/<div role="none" class="[^"]*opacity-80/);
+    expect(html).toMatch(/<button[^>]*title="Apply — Skips \d+"[^>]*>.*⚠.*Apply/s);
+  });
+
   it('Apply menu action dispatches fixed preset selections and reports skipped items', () => {
     const dispatch = vi.fn();
     const onApplied = vi.fn();
