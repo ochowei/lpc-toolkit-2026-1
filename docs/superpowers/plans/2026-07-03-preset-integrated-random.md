@@ -455,7 +455,7 @@ rtk git commit -m "feat(web): add preset random profiles"
 ```
 
 Implementation note: Added mage, knight, ranger, and noble random profiles; registered them with the random profile resolver; and made the narrow noble test fixture basename correction discovered during verification so `createCatalog` no longer overwrites its clothes entry.
-Commit: This implementation commit (`feat(web): add preset random profiles`).
+Commit: e05edbb8af4ea61890d81d7d3f8eb8e6bef47836.
 Verification: GREEN `rtk env CI=true pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS (26 passed). The exact requested command `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` did not reach Vitest because pnpm aborted a non-TTY modules purge.
 
 ## Task 3: Preset Menu UI and Wiring Tests
