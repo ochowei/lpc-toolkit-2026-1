@@ -4,8 +4,13 @@ import {
   createPaletteCatalog,
   type ItemDefinition,
 } from '@lpc-toolkit/core';
+import { PRESETS } from '../src/presets';
 import { pickRandomOutfit } from '../src/slice/random-outfit';
-import { randomProfileForStyle } from '../src/slice/random-profiles';
+import {
+  NORMAL_RANDOM_PROFILE,
+  profileTypeNames,
+  randomProfileForStyle,
+} from '../src/slice/random-profiles';
 
 function makeItem(
   name: string,
@@ -269,7 +274,15 @@ describe('pickRandomOutfit', () => {
     expect(profiled).toEqual(legacy);
   });
 
-  it('unknown profile ids fall back to normal', () => {
+  it('resolves every current preset id to a dedicated non-normal random profile', () => {
+    for (const preset of PRESETS) {
+      const profile = randomProfileForStyle(preset.id);
+      expect(profile.id).toBe(preset.id);
+      expect(profile).not.toBe(NORMAL_RANDOM_PROFILE);
+    }
+  });
+
+  it('unknown profile ids still fall back to normal', () => {
     const rngValues = [0.2, 0.3, 0.4, 0.5, 0.6];
     const normal = pickRandomOutfit({
       catalog,
@@ -284,6 +297,55 @@ describe('pickRandomOutfit', () => {
       profile: 'missing-style',
     });
     expect(unknown).toEqual(normal);
+  });
+
+  it('preset random profiles only expose their intended type names', () => {
+    const expected: Readonly<Record<string, readonly string[]>> = {
+      farmer: ['body', 'head', 'expression', 'hair', 'clothes', 'overalls', 'shoes'],
+      mage: [
+        'body',
+        'head',
+        'expression',
+        'hair',
+        'clothes',
+        'legs',
+        'shoes',
+        'cape',
+        'hat',
+        'weapon',
+        'weapon_magic_crystal',
+      ],
+      knight: [
+        'body',
+        'head',
+        'expression',
+        'armour',
+        'legs',
+        'shoes',
+        'hat',
+        'weapon',
+        'shield',
+        'arms',
+        'gloves',
+      ],
+      ranger: [
+        'body',
+        'head',
+        'expression',
+        'hair',
+        'armour',
+        'legs',
+        'shoes',
+        'hat',
+        'weapon',
+        'quiver',
+      ],
+      noble: ['body', 'head', 'expression', 'hair', 'clothes', 'legs', 'shoes', 'hat'],
+    };
+
+    for (const [styleId, typeNames] of Object.entries(expected)) {
+      expect(profileTypeNames(randomProfileForStyle(styleId))).toEqual(typeNames);
+    }
   });
 
   it('preserves disabled scope selections from the current outfit', () => {
@@ -403,5 +465,126 @@ describe('pickRandomOutfit', () => {
     ] as const) {
       expect(sel.items[typeName]).toBeUndefined();
     }
+  });
+
+  it('mage profile excludes heavy armor while allowing staff and crystal slots', () => {
+    const { catalog: mageCatalog } = createCatalog({
+      'body/light.json': makeItem('Light', 'body'),
+      'clothes/laced.json': makeItem('Longsleeve laced', 'clothes'),
+      'legs/pants.json': makeItem('Pants', 'legs'),
+      'shoes/basic.json': makeItem('Basic Shoes', 'shoes'),
+      'cape/solid.json': makeItem('Solid', 'cape'),
+      'hat/wizard.json': makeItem('Wizard Hat Base', 'hat'),
+      'weapon/staff.json': makeItem('Gnarled staff', 'weapon'),
+      'weapon/crystal.json': makeItem('Crystal', 'weapon_magic_crystal'),
+      'armour/plate.json': makeItem('Plate', 'armour'),
+      'chainmail/steel.json': makeItem('Chainmail', 'chainmail'),
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: mageCatalog,
+      bodyType: 'male',
+      rng: () => 0,
+      optionalProb: 1.0,
+      profile: 'mage',
+    });
+
+    expect(sel.items['weapon']).toBeDefined();
+    expect(sel.items['weapon_magic_crystal']).toBeDefined();
+    expect(sel.items['armour']).toBeUndefined();
+    expect(sel.items['chainmail']).toBeUndefined();
+  });
+
+  it('knight profile excludes farmer workwear and mage crystal parts', () => {
+    const { catalog: knightCatalog } = createCatalog({
+      'body/light.json': makeItem('Light', 'body'),
+      'armour/plate.json': makeItem('Plate', 'armour'),
+      'legs/armour.json': makeItem('Armour', 'legs'),
+      'shoes/armour.json': makeItem('Armour', 'shoes'),
+      'hat/armet.json': makeItem('Armet', 'hat'),
+      'weapon/sword.json': makeItem('Longsword', 'weapon'),
+      'shield/kite.json': makeItem('Kite', 'shield'),
+      'arms/armour.json': makeItem('Armour', 'arms'),
+      'gloves/gloves.json': makeItem('Gloves', 'gloves'),
+      'overalls/brown.json': makeItem('Overalls', 'overalls'),
+      'apron/plain.json': makeItem('Plain Apron', 'apron'),
+      'weapon/crystal.json': makeItem('Crystal', 'weapon_magic_crystal'),
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: knightCatalog,
+      bodyType: 'male',
+      rng: () => 0,
+      optionalProb: 1.0,
+      profile: 'knight',
+    });
+
+    expect(sel.items['armour']).toBeDefined();
+    expect(sel.items['weapon']).toBeDefined();
+    expect(sel.items['shield']).toBeDefined();
+    expect(sel.items['overalls']).toBeUndefined();
+    expect(sel.items['apron']).toBeUndefined();
+    expect(sel.items['weapon_magic_crystal']).toBeUndefined();
+  });
+
+  it('ranger profile excludes heavy plate and formal noble clothing', () => {
+    const { catalog: rangerCatalog } = createCatalog({
+      'body/light.json': makeItem('Light', 'body'),
+      'armour/leather.json': makeItem('Leather', 'armour'),
+      'legs/pants.json': makeItem('Pants', 'legs'),
+      'shoes/boots.json': makeItem('Basic Boots', 'shoes'),
+      'hat/hood.json': makeItem('Hood', 'hat'),
+      'weapon/bow.json': makeItem('Normal', 'weapon'),
+      'quiver/quiver.json': makeItem('Quiver', 'quiver'),
+      'chainmail/steel.json': makeItem('Chainmail', 'chainmail'),
+      'clothes/formal.json': makeItem('Collared/Formal Longsleeve', 'clothes'),
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: rangerCatalog,
+      bodyType: 'male',
+      rng: () => 0,
+      optionalProb: 1.0,
+      profile: 'ranger',
+    });
+
+    expect(sel.items['armour']).toEqual({ typeName: 'armour', name: 'Leather' });
+    expect(sel.items['weapon']).toBeDefined();
+    expect(sel.items['quiver']).toBeDefined();
+    expect(sel.items['chainmail']).toBeUndefined();
+    expect(sel.items['clothes']).toBeUndefined();
+  });
+
+  it('noble profile excludes weapons, shields, armor, workwear, and fantasy parts', () => {
+    const { catalog: nobleCatalog } = createCatalog({
+      'body/light.json': makeItem('Light', 'body'),
+      'clothes/formal.json': makeItem('Collared/Formal Longsleeve', 'clothes'),
+      'legs/formal.json': makeItem('Formal Pants', 'legs'),
+      'shoes/basic.json': makeItem('Basic Shoes', 'shoes'),
+      'hat/tophat.json': makeItem('Formal Tophat', 'hat'),
+      'weapon/sword.json': makeItem('Sword', 'weapon'),
+      'shield/kite.json': makeItem('Kite', 'shield'),
+      'armour/plate.json': makeItem('Plate', 'armour'),
+      'overalls/brown.json': makeItem('Overalls', 'overalls'),
+      'wings/feather.json': makeItem('Wings', 'wings'),
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: nobleCatalog,
+      bodyType: 'male',
+      rng: () => 0,
+      optionalProb: 1.0,
+      profile: 'noble',
+    });
+
+    expect(sel.items['clothes']).toBeDefined();
+    expect(sel.items['legs']).toBeDefined();
+    expect(sel.items['shoes']).toBeDefined();
+    expect(sel.items['hat']).toBeDefined();
+    expect(sel.items['weapon']).toBeUndefined();
+    expect(sel.items['shield']).toBeUndefined();
+    expect(sel.items['armour']).toBeUndefined();
+    expect(sel.items['overalls']).toBeUndefined();
+    expect(sel.items['wings']).toBeUndefined();
   });
 });
