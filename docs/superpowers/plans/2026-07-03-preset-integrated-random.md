@@ -683,7 +683,7 @@ Verification: RED `rtk env CI=true pnpm --filter @lpc-toolkit/web exec vitest ru
 - Modify: `packages/web/src/i18n.ts`
 - Modify: `docs/superpowers/plans/2026-07-03-preset-integrated-random.md`
 
-- [ ] **Step 1: Add Random action translation**
+- [x] **Step 1: Add Random action translation**
 
 In `packages/web/src/i18n.ts`, add this English key near the preset keys:
 
@@ -697,7 +697,7 @@ Add this Traditional Chinese key near the zh-TW preset keys:
     'preset.random': '隨機',
 ```
 
-- [ ] **Step 2: Update preset menu imports and props**
+- [x] **Step 2: Update preset menu imports and props**
 
 In `packages/web/src/components/layer-stack/popovers/preset-menu-popover.tsx`, add imports:
 
@@ -708,7 +708,7 @@ import { randomProfileForStyle } from '../../../slice/random-profiles';
 
 Remove `onStyleSelected` from `Props` and from the component parameter list.
 
-- [ ] **Step 3: Add exported row action helpers**
+- [x] **Step 3: Add exported row action helpers**
 
 Add these interfaces and functions above `PresetMenuPopover`:
 
@@ -796,7 +796,7 @@ export function randomizePresetMenuRow({
 }
 ```
 
-- [ ] **Step 4: Render each preset row with Apply and Random buttons**
+- [x] **Step 4: Render each preset row with Apply and Random buttons**
 
 Add this exported row component below the helper functions:
 
@@ -914,7 +914,7 @@ Change the popover width class from `w-44` to `w-64` so the row actions fit:
       className="w-64 rounded-md border border-border bg-surface p-1 shadow-lg"
 ```
 
-- [ ] **Step 5: Run component tests**
+- [x] **Step 5: Run component tests**
 
 Run:
 
@@ -924,16 +924,16 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/stack-panel.test.tsx
 
 Expected: still FAIL until `PresetBar` removes the old dice/scope props and stops passing `onStyleSelected`.
 
-- [ ] **Step 6: Commit preset menu wiring**
+- [x] **Step 6: Commit preset menu wiring**
 
 ```bash
 rtk git add packages/web/src/components/layer-stack/popovers/preset-menu-popover.tsx packages/web/src/i18n.ts docs/superpowers/plans/2026-07-03-preset-integrated-random.md
 rtk git commit -m "feat(web): add preset menu random actions"
 ```
 
-Implementation note: Pending.
-Commit: Pending.
-Verification: Pending.
+Implementation note: Added preset menu Apply/Random row actions, exported the menu row helpers/component for tests, added Random translations, widened the popover, and removed the obsolete `onStyleSelected` prop from `PresetBar` while leaving the standalone dice/random-scope UI for Task 5.
+Commit: Pending until commit is created.
+Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/stack-panel.test.tsx` did not reach Vitest because pnpm aborted a non-TTY modules purge. Rerun with `rtk env CI=true pnpm --filter @lpc-toolkit/web exec vitest run test/stack-panel.test.tsx` still FAILS (2 failed, 9 passed): expected Task 5 dice/random-scope UI failure remains, and the direct Random helper test still fails because the knight random profile's item pool does not match the test catalog's `Sword A` weapon fixture.
 
 ## Task 5: Remove Standalone Dice and Global Random Scope UI
 

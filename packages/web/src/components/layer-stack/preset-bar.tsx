@@ -26,7 +26,6 @@ interface Props {
 export function PresetBar({ disabled, catalog, palettes, state, dispatch, t, onApplied, onReset }: Props) {
   const [presetOpen, setPresetOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
-  const [activeStyleId, setActiveStyleId] = useState<string | null>(null);
   const [randomScope, setRandomScope] = useState<RandomScope>(DEFAULT_RANDOM_SCOPE);
   const presetTriggerRef = useRef<HTMLButtonElement>(null);
   const resetTriggerRef = useRef<HTMLButtonElement>(null);
@@ -44,7 +43,7 @@ export function PresetBar({ disabled, catalog, palettes, state, dispatch, t, onA
                 catalog,
                 palettes,
                 bodyType: state.bodyType,
-                profile: randomProfileForStyle(activeStyleId),
+                profile: randomProfileForStyle(null),
                 scope: randomScope,
                 currentSelections: state.selections,
               }),
@@ -115,7 +114,6 @@ export function PresetBar({ disabled, catalog, palettes, state, dispatch, t, onA
         dispatch={dispatch}
         t={t}
         onApplied={onApplied}
-        onStyleSelected={setActiveStyleId}
       />
       <ResetMenuPopover
         disabled={disabled}
