@@ -1,0 +1,295 @@
+# Architecture
+
+`lpc-toolkit` uses a core-first architecture with Clean Architecture /
+Hexagonal Architecture style boundaries. The reusable sprite engine lives in
+`packages/core/`; the React web app adapts browser state, assets, canvas, ZIP,
+download, and URL behavior around that engine.
+
+This is not an MVC codebase. Do not reorganize it into
+`models/views/controllers`. The important boundary is dependency direction:
+domain and composition logic stay in core, application decisions stay in pure
+web helpers, React effects coordinate runtime work, and browser APIs stay in
+web adapters and libs.
+
+## Architecture Shape
+
+### `packages/core/`
+
+`packages/core/` is the domain/core engine. It owns reusable, environment-free
+LPC behavior:
+
+- catalog modeling and lookup
+- composition and layer resolution
+- recolor and palette swap execution
+- animation extraction and frame slicing
+- credits and attribution manifests
+- hash/token serialization and parsing
+- static asset validation
+- adapter contracts such as `CanvasAdapter`
+
+Core can define abstract ports and domain types. It must not know whether the
+caller is React, a browser, Node, Vite, a test, or a future CLI.
+
+### `packages/web/src/slice/`
+
+`slice/` owns pure web application logic:
+
+- reducers and immutable state transitions
+- selectors and decision helpers
+- catalog-derived UI behavior
+- selection transitions
+- filters, ordering, compatibility, and default choices
+
+These files may depend on core types and pure core helpers. They should avoid
+React effects, DOM APIs, fetch, storage, ZIP handling, and canvas plumbing.
+
+### `packages/web/src/hooks/`
+
+`hooks/` owns React effects and async orchestration:
+
+- composition lifecycle
+- stale async request handling
+- animation playback
+- thumbnail orchestration
+- observing reducer state and calling core through adapters
+
+Hooks are the bridge between pure app state and runtime work. For example,
+`use-composed-character.ts` observes `SliceState`, builds core `Selections`,
+calls `composeSelections`, extracts the active animation, and exposes loading,
+ready, and error states to the UI.
+
+### `packages/web/src/components/`
+
+`components/` own presentation and interaction UI:
+
+- rendering controls, previews, popovers, panels, and rows
+- dispatching user intent
+- showing derived status, errors, attribution, and export controls
+
+Components should delegate domain decisions to `slice/` helpers, hooks, or core.
+They should not grow their own composition engine or browser export pipeline.
+
+### `packages/web/src/adapter/`
+
+`adapter/` owns concrete runtime bridges to core contracts and browser asset
+loading:
+
+- browser `CanvasAdapter` implementation
+- image loading through browser APIs
+- ZIP-backed sprite materialization
+- runtime asset-source selection
+
+Browser-only APIs such as `document`, `fetch`, `createImageBitmap`, `URL`, and
+ZIP object URLs belong here or in `lib/`, not in core.
+
+### `packages/web/src/lib/`
+
+`lib/` owns browser-only workflows and focused helpers:
+
+- ZIP export
+- download helpers
+- URL/hash sync
+- full-sheet render helpers
+- composition lock helpers
+- object URL and browser storage helpers
+
+Use `lib/` when the behavior is reusable browser workflow code rather than a
+React component, reducer decision, or core domain rule.
+
+### `packages/web/scripts/`
+
+`scripts/` own asset preparation, validation, release snapshots, audit, and
+generation tooling. Script-only code may use Node APIs when the script is not
+part of browser runtime or core runtime source.
+
+Scripts may read generated asset paths and materialize local assets. They must
+not modify `upstream/`.
+
+### `docs/`, `AGENTS.md`, `CLAUDE.md`
+
+These files are governance and contributor guidance:
+
+- `docs/` explains architecture, onboarding, decisions, and workflows.
+- `AGENTS.md` contains repository rules for AI agents and contributors.
+- `CLAUDE.md` mirrors `AGENTS.md` when maintained as a mirror.
+
+Do not treat docs as permission to bypass the hard rules in `AGENTS.md`.
+
+## Dependency Direction
+
+Allowed dependency direction:
+
+- `packages/web` -> `packages/core`
+- web components -> hooks, `slice/`, and `lib/`
+- hooks -> core, `slice/`, `adapter/`, and `lib/`
+- `adapter/` -> core adapter contracts
+- `lib/` -> core types/functions when implementing browser workflows
+- scripts -> Node APIs and generated asset paths, when script-only
+- tests -> Node adapters or test-only concrete canvas implementations
+
+Forbidden dependency direction:
+
+- core -> web
+- core -> React
+- core -> DOM, `window`, or `document`
+- core -> `fetch`, `createImageBitmap`, or `localStorage`
+- core -> Node `fs`, `node-canvas`, or `@napi-rs/canvas` in runtime source
+- components -> direct `composeSelections` orchestration when a hook should own
+  the lifecycle
+- components -> ZIP, download, object URL, or canvas plumbing when a lib, hook,
+  or adapter should own it
+- scripts or runtime code modifying `upstream/`
+
+The intended flow is inward for policy and outward for implementation details:
+web depends on core contracts; core never depends on web implementations.
+
+## Core Package Rules
+
+`packages/core/src/**` must stay environment-agnostic. It can work with canvas
+and image-like objects only through injected contracts such as `CanvasAdapter`.
+
+Core may define abstract types, contracts, data models, and pure behavior. It
+must not import concrete browser or Node APIs. In particular, do not import or
+reference `window`, `document`, `fetch`, `localStorage`, `fs`, `node-canvas`, or
+`@napi-rs/canvas` from core runtime source.
+
+Attribution is product and domain logic, not optional UI decoration. Core
+composition returns credit metadata because every rendered sprite needs it.
+Future cleanup must preserve that expectation.
+
+Public selection, hash, and token compatibility are user-facing behavior. Do
+not change serialized identity, parsed selection meaning, or token compatibility
+just to make architecture cleanup look neater.
+
+## Web Package Rules
+
+Use these responsibilities when choosing where code belongs:
+
+- `slice/` owns pure app decisions.
+- `hooks/` own effects and async lifecycle.
+- `components/` render and dispatch.
+- `adapter/` owns concrete runtime bridges to core contracts.
+- `lib/` owns browser workflows such as ZIP export, download, URL hash sync,
+  full sheet render support, composition lock behavior, and storage helpers.
+
+React components can compose these pieces, but they should not absorb all of
+them. If a component starts deciding compatibility rules, resolving catalog
+defaults, managing object URLs, and composing canvases directly, move those
+concerns back to the appropriate layer.
+
+## React Data Flow
+
+```text
+user event
+  -> component dispatch
+  -> slice reducer/helper updates state
+  -> hook observes state
+  -> hook calls core compose/extract through adapters
+  -> result returns with credits
+  -> component renders preview/layers/attribution/export controls
+```
+
+This is a React + reducer / MVU-style application flow. Components emit actions,
+the reducer produces state, hooks react to state changes, and core performs the
+domain work through injected browser adapters.
+
+## Attribution and Licensing
+
+Every rendered or exported sprite must preserve attribution metadata derived
+from `assets/CREDITS.csv` or the upstream credits data.
+
+UI preview, download, ZIP export, and the future CLI must not bypass credits.
+Any workflow that creates pixels for users must include or preserve the
+required credits and license output. ZIP exports should continue writing credit
+files, previews should continue exposing attribution, and new export paths must
+carry the same metadata expectations.
+
+Because the project is GPL-3.0-or-later and inherits upstream LPC licensing
+requirements, attribution behavior is part of correctness.
+
+## Browser and Asset Boundary
+
+Browser/runtime concerns belong in `packages/web`, not in `packages/core`.
+Examples include:
+
+- ZIP loading
+- downloads
+- URL/hash sync
+- image loading
+- canvas creation
+- object URL lifecycle
+- local/generated asset materialization
+- browser storage
+- Vite/dev-server behavior such as fetch concurrency limits
+
+`packages/web/src/adapter/browser-canvas-adapter.ts` is the concrete browser
+implementation of core's canvas and image loading port. `zip-loader.ts`,
+`zip-export.ts`, `download.ts`, and URL/hash helpers are browser workflows
+around the core engine.
+
+If the future CLI needs equivalent behavior, implement CLI-specific adapters and
+export workflows outside core. Do not put CLI filesystem or canvas dependencies
+into `packages/core/src/**`.
+
+## Testing and Verification Expectations
+
+Use the RTK prefix for repository commands. Common verification commands:
+
+```bash
+rtk pnpm typecheck
+rtk pnpm test
+rtk pnpm build
+```
+
+Target package commands when the change is scoped:
+
+```bash
+rtk pnpm --filter @lpc-toolkit/core test
+rtk pnpm --filter @lpc-toolkit/web test
+rtk pnpm --filter @lpc-toolkit/web typecheck
+```
+
+For architecture-boundary changes, verify the specific boundary being touched:
+
+- core changes should typecheck and test without browser or Node runtime imports
+  in `packages/core/src/**`
+- web composition changes should cover stale async composition, attribution, and
+  export behavior where relevant
+- asset-tooling changes should validate generated assets and preserve credits
+
+## Local Extraction Guidance
+
+Do not perform broad refactors just because a file is large. Extract only when
+there is a clear reusable responsibility, an independently testable unit, or a
+JSX region with a stable visual purpose.
+
+For `packages/web/src/components/layer-stack/harness.tsx`:
+
+- keep it as the top-level editor orchestrator
+- extract hooks for reusable or independently testable UI/effect state
+- extract components for JSX regions with clear visual responsibility
+- do not move domain decisions into it
+- do not move browser adapter logic into it
+
+For `packages/web/src/components/layer-stack/layer-row.tsx`:
+
+- keep it focused on one selected layer row
+- extract subcomponents for row header, actions, style controls, replacement
+  picker, and compatibility notes when those regions need their own names
+- keep item compatibility, ordering, pick/clear decisions, and color option
+  resolution in pure helpers where possible
+
+Prefer small, local extractions over architectural reshuffles. A good extraction
+should make the next change easier without changing public selection behavior,
+composition output, attribution, or export semantics.
+
+## Anti-Patterns
+
+Do not:
+
+- introduce MVC folders for the sake of MVC
+- move core compose logic into web
+- move browser APIs into core
+- bypass attribution metadata
+- change public selection/hash/token identity just for architecture cleanliness
+- modify `upstream/`
