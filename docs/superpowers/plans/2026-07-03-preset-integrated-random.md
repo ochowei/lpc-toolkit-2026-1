@@ -1030,7 +1030,7 @@ Verification: PASS `rtk env CI=true pnpm --filter @lpc-toolkit/web exec vitest r
 **Files:**
 - Modify: `docs/superpowers/plans/2026-07-03-preset-integrated-random.md`
 
-- [ ] **Step 1: Run focused random profile tests**
+- [x] **Step 1: Run focused random profile tests**
 
 Run:
 
@@ -1040,7 +1040,7 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 2: Run preset menu/component tests**
+- [x] **Step 2: Run preset menu/component tests**
 
 Run:
 
@@ -1050,7 +1050,7 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/stack-panel.test.tsx
 
 Expected: PASS.
 
-- [ ] **Step 3: Run web typecheck**
+- [x] **Step 3: Run web typecheck**
 
 Run:
 
@@ -1060,7 +1060,7 @@ rtk pnpm --dir packages/web typecheck
 
 Expected: PASS.
 
-- [ ] **Step 4: Inspect git status**
+- [x] **Step 4: Inspect git status**
 
 Run:
 
@@ -1070,16 +1070,16 @@ rtk git status --short
 
 Expected: only intentional files are modified, or clean after the verification commit.
 
-- [ ] **Step 5: Commit final plan verification update**
+- [x] **Step 5: Commit final plan verification update**
 
 ```bash
 rtk git add docs/superpowers/plans/2026-07-03-preset-integrated-random.md
 rtk git commit -m "docs: record preset random verification"
 ```
 
-Implementation note: Pending.
-Commit: Pending.
-Verification: Pending.
+Implementation note: Ran the final focused random outfit tests, preset stack panel tests, web typecheck, and status inspection; removed the generated untracked `.pnpm-store/` before committing this plan-only verification update.
+Commit: This verification commit; final hash reported by the completing agent because a commit cannot contain its own hash.
+Verification: PASS `rtk env CI=true pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` (26 passed), PASS `rtk env CI=true pnpm --filter @lpc-toolkit/web exec vitest run test/stack-panel.test.tsx` (11 passed), PASS `rtk env CI=true pnpm --dir packages/web typecheck`, and PASS `rtk git status --short` after removing `.pnpm-store/`. The exact requested pnpm commands were attempted first and each aborted before Vitest/typecheck due `[ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY]`.
 
 ## Self-Review
 
