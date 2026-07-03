@@ -36,6 +36,12 @@ describe('package scripts', () => {
     );
   });
 
+  it('exposes the architecture boundary check at the workspace root', () => {
+    expect(rootPackageJson.scripts?.['check:boundaries']).toBe(
+      'node scripts/check-boundaries.mjs',
+    );
+  });
+
   it('prepares release assets before production builds', () => {
     expect(packageJson.scripts?.prebuild).toBe(
       'pnpm prepare-assets && pnpm --filter @lpc-toolkit/core build',
