@@ -91,15 +91,17 @@ export function randomizePresetMenuRow({
   setOpen,
   rng,
 }: RandomizePresetMenuRowArgs): void {
+  const randomArgs = {
+    catalog,
+    palettes,
+    bodyType: state.bodyType,
+    profile: randomProfileForStyle(preset.id),
+    ...(rng === undefined ? {} : { rng }),
+  };
+
   dispatch({
     type: 'apply_selections',
-    selections: pickRandomOutfit({
-      catalog,
-      palettes,
-      bodyType: state.bodyType,
-      profile: randomProfileForStyle(preset.id),
-      rng,
-    }),
+    selections: pickRandomOutfit(randomArgs),
   });
   setOpen(false);
 }
