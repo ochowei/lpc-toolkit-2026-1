@@ -299,7 +299,7 @@ rtk git commit -m "test(web): cover preset random profiles"
 ```
 
 Implementation note: Added pure preset random profile coverage for all current presets, fallback resolution, profile type-name allow-lists, and style exclusion behavior without implementing the missing profiles.
-Commit: b2e7b8d98869d0a749e135c046a0b464b32391e3.
+Commit: b9eb1d1a638b4b210cb886ac0df954cd7fac2ffa.
 Verification: RED `rtk env CI=true pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` FAIL as expected (6 failed, 20 passed) because mage, knight, ranger, and noble still resolve through normal behavior. The exact requested command without `CI=true` did not reach Vitest because pnpm aborted a non-TTY modules purge.
 
 ## Task 2: Random Profile Implementation
