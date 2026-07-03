@@ -1,7 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { createCatalog, createPaletteCatalog, type ItemDefinition, type TypeName } from '@lpc-toolkit/core';
+import {
+  createCatalog,
+  createPaletteCatalog,
+  type ItemDefinition,
+  type TypeName,
+} from '@lpc-toolkit/core';
 import { StackPanel } from '../src/components/layer-stack/stack-panel';
+import {
+  applyPresetMenuRow,
+  PresetMenuRows,
+  randomizePresetMenuRow,
+} from '../src/components/layer-stack/popovers/preset-menu-popover';
+import { PRESETS } from '../src/presets';
 import { createLabelTranslator, createTranslator } from '../src/i18n';
 import { ALL_LICENSE_GROUPS } from '../src/slice/license-filter';
 import type { SliceState } from '../src/slice/selection';
@@ -206,7 +217,7 @@ describe('StackPanel upstream selected-layer groups', () => {
     expect(html).toContain('border-accent bg-accent/10 text-text');
   });
 
-  it('renders random scope controls without dispatching selection changes', () => {
+  it('removes the standalone random dice and global random scope controls', () => {
     const dispatch = vi.fn();
     const html = renderToStaticMarkup(
       <StackPanel
@@ -253,11 +264,94 @@ describe('StackPanel upstream selected-layer groups', () => {
       />
     );
 
-    expect(html).toContain('Random options');
-    expect(html).toContain('Appearance');
-    expect(html).toContain('Clothing');
-    expect(html).toContain('Equipment');
-    expect(html).toContain('Colors');
+    expect(html).toContain('Presets');
+    expect(html).toContain('Reset');
+    expect(html).not.toContain('🎲');
+    expect(html).not.toContain('Random options');
+    expect(html).not.toContain('Appearance');
+    expect(html).not.toContain('Clothing');
+    expect(html).not.toContain('Equipment');
+    expect(html).not.toContain('Colors');
     expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('renders Apply and Random actions for each preset row when the menu is open', () => {
+    const html = renderToStaticMarkup(
+      <PresetMenuRows
+        disabled={false}
+        catalog={catalog}
+        palettes={palettes}
+        state={state}
+        dispatch={() => {}}
+        t={createTranslator('en')}
+        onApplied={() => {}}
+        setOpen={() => {}}
+      />
+    );
+
+    for (const label of ['Farmer', 'Mage', 'Knight', 'Ranger', 'Noble']) {
+      expect(html).toContain(label);
+    }
+    expect(html.match(/>Apply</g)?.length).toBe(PRESETS.length);
+    expect(html.match(/>Random</g)?.length).toBe(PRESETS.length);
+  });
+
+  it('Apply menu action dispatches fixed preset selections and reports skipped items', () => {
+    const dispatch = vi.fn();
+    const onApplied = vi.fn();
+    const setOpen = vi.fn();
+    const farmer = PRESETS.find((preset) => preset.id === 'farmer');
+    expect(farmer).toBeDefined();
+
+    applyPresetMenuRow({
+      preset: farmer!,
+      catalog,
+      palettes,
+      state,
+      dispatch,
+      t: createTranslator('en'),
+      onApplied,
+      setOpen,
+    });
+
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'apply_selections',
+      selections: expect.objectContaining({
+        bodyType: 'male',
+        items: expect.objectContaining({
+          clothes: expect.objectContaining({ name: 'Shortsleeve' }),
+        }),
+      }),
+    });
+    expect(onApplied).toHaveBeenCalledWith('Farmer', expect.any(Number), expect.any(Array));
+    expect(setOpen).toHaveBeenCalledWith(false);
+  });
+
+  it('Random menu action dispatches random selections through the matching preset profile', () => {
+    const dispatch = vi.fn();
+    const setOpen = vi.fn();
+    const knight = PRESETS.find((preset) => preset.id === 'knight');
+    expect(knight).toBeDefined();
+
+    randomizePresetMenuRow({
+      preset: knight!,
+      catalog,
+      palettes,
+      state,
+      dispatch,
+      setOpen,
+      rng: () => 0,
+    });
+
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'apply_selections',
+      selections: expect.objectContaining({
+        bodyType: 'male',
+        items: expect.objectContaining({
+          weapon: expect.objectContaining({ typeName: 'weapon' }),
+        }),
+      }),
+    });
+    expect(setOpen).toHaveBeenCalledWith(false);
   });
 });

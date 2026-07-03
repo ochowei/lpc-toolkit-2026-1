@@ -464,7 +464,7 @@ Verification: GREEN `rtk env CI=true pnpm --filter @lpc-toolkit/web exec vitest 
 - Modify: `packages/web/test/stack-panel.test.tsx`
 - Modify: `docs/superpowers/plans/2026-07-03-preset-integrated-random.md`
 
-- [ ] **Step 1: Expand test imports**
+- [x] **Step 1: Expand test imports**
 
 In `packages/web/test/stack-panel.test.tsx`, update imports:
 
@@ -489,7 +489,7 @@ import { ALL_LICENSE_GROUPS } from '../src/slice/license-filter';
 import type { SliceState } from '../src/slice/selection';
 ```
 
-- [ ] **Step 2: Replace the old random scope render test**
+- [x] **Step 2: Replace the old random scope render test**
 
 Delete the existing test named `renders random scope controls without dispatching selection changes`.
 
@@ -555,7 +555,7 @@ Add these tests in its place:
   });
 ```
 
-- [ ] **Step 3: Add preset menu static markup test**
+- [x] **Step 3: Add preset menu static markup test**
 
 Append this test after the removal test:
 
@@ -582,7 +582,7 @@ Append this test after the removal test:
   });
 ```
 
-- [ ] **Step 4: Add direct Apply wiring test**
+- [x] **Step 4: Add direct Apply wiring test**
 
 Append this test:
 
@@ -619,7 +619,7 @@ Append this test:
   });
 ```
 
-- [ ] **Step 5: Add direct Random wiring test**
+- [x] **Step 5: Add direct Random wiring test**
 
 Append this test:
 
@@ -653,7 +653,7 @@ Append this test:
   });
 ```
 
-- [ ] **Step 6: Run component tests and verify failure**
+- [x] **Step 6: Run component tests and verify failure**
 
 Run:
 
@@ -663,16 +663,16 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/stack-panel.test.tsx
 
 Expected: FAIL because `applyPresetMenuRow` and `randomizePresetMenuRow` do not exist yet, and the current toolbar still renders the dice/random scope UI.
 
-- [ ] **Step 7: Commit the failing component tests**
+- [x] **Step 7: Commit the failing component tests**
 
 ```bash
 rtk git add packages/web/test/stack-panel.test.tsx docs/superpowers/plans/2026-07-03-preset-integrated-random.md
 rtk git commit -m "test(web): cover preset menu random actions"
 ```
 
-Implementation note: Pending.
+Implementation note: Added RED stack panel coverage for removing standalone random controls, rendering preset menu Apply/Random rows, and direct Apply/Random action dispatch wiring without implementing Task 4 helpers.
 Commit: Pending.
-Verification: Pending.
+Verification: RED `rtk env CI=true pnpm --filter @lpc-toolkit/web exec vitest run test/stack-panel.test.tsx` FAIL as expected (4 failed, 7 passed) because the toolbar still renders the dice/random scope UI and `PresetMenuRows`, `applyPresetMenuRow`, and `randomizePresetMenuRow` are not exported yet. The exact requested command `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/stack-panel.test.tsx` did not reach Vitest because pnpm aborted a non-TTY modules purge.
 
 ## Task 4: Preset Menu Apply/Random Wiring
 
