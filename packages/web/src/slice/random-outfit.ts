@@ -41,6 +41,8 @@ function resolveProfile(profile: RandomProfile | string | undefined): RandomProf
 }
 
 function isRequiredType(profile: RandomProfile, typeName: TypeName): boolean {
+  if (profile.requiredTypeNames?.includes(typeName)) return true;
+
   const requiredGroups = new Set<GroupId>(profile.requiredGroups);
   return CATEGORY_GROUPS.some(
     (group) => requiredGroups.has(group.id) && group.typeNames.includes(typeName),
@@ -75,6 +77,7 @@ function typeNamesForRandomOutfit(
 export function pickRandomOutfit(args: PickRandomOutfitArgs): Selections {
   const rng = args.rng ?? Math.random;
   const profile = resolveProfile(args.profile);
+  const bodyType = profile.bodyType ?? args.bodyType;
   const scope = args.scope ?? DEFAULT_RANDOM_SCOPE;
   const optionalProb = args.optionalProb ?? profile.optionalProb;
   const excluded = new Set<GroupId>(args.excludeGroups ?? profile.excludeGroups);
@@ -104,7 +107,7 @@ export function pickRandomOutfit(args: PickRandomOutfitArgs): Selections {
 
     const defs = args.catalog.byTypeName.get(typeName) ?? [];
     const pooled = filterByProfilePool(defs, profile.itemPools?.[typeName]);
-    const compatible = pooled.filter((d) => itemSupportsBodyType(d, args.bodyType));
+    const compatible = pooled.filter((d) => itemSupportsBodyType(d, bodyType));
     if (compatible.length === 0) continue;
 
     const pick = compatible[Math.floor(rng() * compatible.length)]!;
@@ -115,5 +118,5 @@ export function pickRandomOutfit(args: PickRandomOutfitArgs): Selections {
     );
   }
 
-  return { bodyType: args.bodyType, items };
+  return { bodyType, items };
 }

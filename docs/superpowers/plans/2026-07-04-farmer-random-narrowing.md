@@ -152,7 +152,7 @@ Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-ou
 - Modify: `packages/web/src/slice/random-outfit.ts`
 - Modify: `docs/superpowers/plans/2026-07-04-farmer-random-narrowing.md`
 
-- [ ] **Step 1: Extend the RandomProfile interface**
+- [x] **Step 1: Extend the RandomProfile interface**
 
 In `packages/web/src/slice/random-profiles.ts`, change the core type import from:
 
@@ -183,7 +183,7 @@ export interface RandomProfile {
 }
 ```
 
-- [ ] **Step 2: Tighten FARMER_RANDOM_PROFILE**
+- [x] **Step 2: Tighten FARMER_RANDOM_PROFILE**
 
 In `packages/web/src/slice/random-profiles.ts`, replace `FARMER_RANDOM_PROFILE` with:
 
@@ -207,7 +207,7 @@ export const FARMER_RANDOM_PROFILE: RandomProfile = {
 };
 ```
 
-- [ ] **Step 3: Honor profile required type names**
+- [x] **Step 3: Honor profile required type names**
 
 In `packages/web/src/slice/random-outfit.ts`, replace `isRequiredType` with:
 
@@ -222,7 +222,7 @@ function isRequiredType(profile: RandomProfile, typeName: TypeName): boolean {
 }
 ```
 
-- [ ] **Step 4: Honor profile body type**
+- [x] **Step 4: Honor profile body type**
 
 In `packages/web/src/slice/random-outfit.ts`, inside `pickRandomOutfit`, add an effective body type after `profile` is resolved:
 
@@ -256,7 +256,7 @@ to:
   return { bodyType, items };
 ```
 
-- [ ] **Step 5: Run the focused random outfit test**
+- [x] **Step 5: Run the focused random outfit test**
 
 Run:
 
@@ -266,7 +266,7 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 6: Run typecheck**
+- [x] **Step 6: Run typecheck**
 
 Run:
 
@@ -276,7 +276,7 @@ rtk pnpm --filter @lpc-toolkit/web typecheck
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit the implementation**
+- [x] **Step 7: Commit the implementation**
 
 Run:
 
@@ -292,6 +292,10 @@ Implementation note: Added profile-level body type and required type names, then
 Commit: record the actual short commit hash for `fix(web): narrow farmer preset random profile`.
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS; `rtk pnpm --filter @lpc-toolkit/web typecheck` PASS.
 ```
+
+Implementation note: Added profile-level body type and required type names, then used them to make Farmer random male, Neutral, and fully dressed.
+Commit: pending.
+Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS (29 tests); `rtk pnpm --filter @lpc-toolkit/web typecheck` reported `TypeScript: No errors found` but exited 1 with an RTK warning that `--filter` is not yet supported for pnpm tsc; `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS; `rtk pnpm --dir packages/web typecheck` PASS.
 
 ## Task 3: Boundary Verification and Final Plan Update
 

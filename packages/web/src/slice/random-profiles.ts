@@ -1,4 +1,4 @@
-import type { Selection, TypeName } from '@lpc-toolkit/core';
+import type { BodyType, Selection, TypeName } from '@lpc-toolkit/core';
 import type { TranslationKey } from '../i18n';
 import {
   CATEGORY_GROUPS,
@@ -13,7 +13,9 @@ export interface RandomProfile {
   readonly optionalGroups: readonly GroupId[];
   readonly excludeGroups: readonly GroupId[];
   readonly optionalProb: number;
+  readonly bodyType?: BodyType;
   readonly typeNames?: readonly TypeName[];
+  readonly requiredTypeNames?: readonly TypeName[];
   readonly itemPools?: Partial<Record<TypeName, readonly string[]>>;
 }
 
@@ -47,8 +49,11 @@ export const FARMER_RANDOM_PROFILE: RandomProfile = {
   optionalGroups: ['face', 'clothing', 'accessories'],
   excludeGroups: ['fantasy', 'weapons', 'fx'],
   optionalProb: 0.5,
+  bodyType: 'male',
   typeNames: ['body', 'head', 'expression', 'hair', 'clothes', 'overalls', 'shoes'],
+  requiredTypeNames: ['body', 'head', 'expression', 'clothes', 'overalls', 'shoes'],
   itemPools: {
+    expression: ['Neutral'],
     clothes: ['Shortsleeve'],
     overalls: ['Overalls'],
     shoes: ['Basic Boots'],
