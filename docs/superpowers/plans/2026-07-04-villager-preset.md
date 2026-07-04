@@ -147,7 +147,7 @@ test/presets.test.ts` PASS (6 tests).
 - Modify: `packages/web/src/slice/random-profiles.ts`
 - Modify: `docs/superpowers/plans/2026-07-04-villager-preset.md`
 
-- [ ] **Step 1: Update the expected preset profile type names**
+- [x] **Step 1: Update the expected preset profile type names**
 
 In `packages/web/test/random-outfit.test.ts`, in the `preset random profiles only expose their intended type names` test, add `villager` after `farmer` in the `expected` object:
 
@@ -164,7 +164,7 @@ The start of the `expected` object should become:
       mage: [
 ```
 
-- [ ] **Step 2: Add a focused villager profile behavior test**
+- [x] **Step 2: Add a focused villager profile behavior test**
 
 In `packages/web/test/random-outfit.test.ts`, add this test after the existing `farmer profile excludes fantasy, combat, and fx categories` test:
 
@@ -221,7 +221,7 @@ In `packages/web/test/random-outfit.test.ts`, add this test after the existing `
   });
 ```
 
-- [ ] **Step 3: Run the random outfit test to verify it fails**
+- [x] **Step 3: Run the random outfit test to verify it fails**
 
 Run:
 
@@ -231,7 +231,7 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts
 
 Expected: FAIL because `randomProfileForStyle('villager')` still falls back to `normal`.
 
-- [ ] **Step 4: Add `VILLAGER_RANDOM_PROFILE`**
+- [x] **Step 4: Add `VILLAGER_RANDOM_PROFILE`**
 
 In `packages/web/src/slice/random-profiles.ts`, add this export after `FARMER_RANDOM_PROFILE`:
 
@@ -266,7 +266,7 @@ export const RANDOM_PROFILES: readonly RandomProfile[] = [
 ];
 ```
 
-- [ ] **Step 5: Run the random outfit test to verify it passes**
+- [x] **Step 5: Run the random outfit test to verify it passes**
 
 Run:
 

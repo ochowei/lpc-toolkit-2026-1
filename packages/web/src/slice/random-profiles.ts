@@ -55,6 +55,21 @@ export const FARMER_RANDOM_PROFILE: RandomProfile = {
   },
 };
 
+export const VILLAGER_RANDOM_PROFILE: RandomProfile = {
+  id: 'villager',
+  labelKey: 'preset.villager',
+  requiredGroups: ['body'],
+  optionalGroups: ['face', 'clothing', 'accessories'],
+  excludeGroups: ['fantasy', 'weapons', 'fx'],
+  optionalProb: 0.6,
+  typeNames: ['body', 'head', 'expression', 'hair', 'clothes', 'legs', 'shoes'],
+  itemPools: {
+    clothes: ['Longsleeve', 'Shortsleeve'],
+    legs: ['Pants'],
+    shoes: ['Basic Shoes', 'Basic Boots'],
+  },
+};
+
 export const MAGE_RANDOM_PROFILE: RandomProfile = {
   id: 'mage',
   labelKey: 'preset.mage',
@@ -166,6 +181,7 @@ export const NOBLE_RANDOM_PROFILE: RandomProfile = {
 export const RANDOM_PROFILES: readonly RandomProfile[] = [
   NORMAL_RANDOM_PROFILE,
   FARMER_RANDOM_PROFILE,
+  VILLAGER_RANDOM_PROFILE,
   MAGE_RANDOM_PROFILE,
   KNIGHT_RANDOM_PROFILE,
   RANGER_RANDOM_PROFILE,
