@@ -23,7 +23,7 @@
 - Modify: `packages/web/test/random-outfit.test.ts`
 - Modify: `docs/superpowers/plans/2026-07-04-farmer-random-body-head-colors.md`
 
-- [ ] **Step 1: Add a helper for recolor-backed test items**
+- [x] **Step 1: Add a helper for recolor-backed test items**
 
 In `packages/web/test/random-outfit.test.ts`, add this helper immediately after `makeItem`:
 
@@ -41,7 +41,7 @@ function makeRecolorItem(
 }
 ```
 
-- [ ] **Step 2: Add the focused Farmer body/head/color test**
+- [x] **Step 2: Add the focused Farmer body/head/color test**
 
 In `packages/web/test/random-outfit.test.ts`, add this test immediately after the existing `farmer profile fixes male neutral required workwear while keeping skin random` test:
 
@@ -114,7 +114,7 @@ In `packages/web/test/random-outfit.test.ts`, add this test immediately after th
   });
 ```
 
-- [ ] **Step 3: Add the colors-disabled Farmer test**
+- [x] **Step 3: Add the colors-disabled Farmer test**
 
 Add this test immediately after the test from Step 2:
 
@@ -168,7 +168,7 @@ Add this test immediately after the test from Step 2:
   });
 ```
 
-- [ ] **Step 4: Run the focused random outfit test and verify it fails**
+- [x] **Step 4: Run the focused random outfit test and verify it fails**
 
 Run:
 
@@ -194,6 +194,10 @@ Implementation note: Added failing Farmer random coverage for Body Color-only bo
 Commit: record the actual short commit hash for `test(web): cover farmer human body and random colors`.
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` FAIL as expected before implementation.
 ```
+
+Implementation note: Added failing Farmer random coverage for Body Color-only bodies, Human Male-only head, randomized Farmer clothing colors, and colors-disabled defaults.
+Commit: pending commit creation.
+Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` FAIL as expected before implementation. Focused failure: expected Farmer `body` recolor `red`, received `c0`.
 
 ## Task 2: Implement Farmer Body Head Color Constraints
 

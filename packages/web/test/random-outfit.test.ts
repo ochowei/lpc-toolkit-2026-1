@@ -28,6 +28,18 @@ function makeItem(
   } as unknown as ItemDefinition;
 }
 
+function makeRecolorItem(
+  name: string,
+  typeName: string,
+  palettesForItem: readonly string[] = ['v1'],
+  layerKey: 'male' | 'female' = 'male',
+): ItemDefinition {
+  return {
+    ...makeItem(name, typeName, layerKey),
+    recolors: { material: 'm', palettes: palettesForItem },
+  } as unknown as ItemDefinition;
+}
+
 const palettes = createPaletteCatalog({
   'm/meta_m.json': { type: 'material', default: 'v1', base: 'c0' },
   'm/m_v1.json': {
@@ -499,6 +511,121 @@ describe('pickRandomOutfit', () => {
       name: 'Neutral',
     });
     expect(sel.items['hair']).toBeUndefined();
+    expect(sel.items['clothes']).toEqual({
+      typeName: 'clothes',
+      name: 'Shortsleeve',
+    });
+    expect(sel.items['overalls']).toEqual({
+      typeName: 'overalls',
+      name: 'Overalls',
+      variant: 'brown',
+    });
+    expect(sel.items['shoes']).toEqual({
+      typeName: 'shoes',
+      name: 'Basic Boots',
+      variant: 'brown',
+    });
+  });
+
+  it('farmer profile uses human body and adult male head while randomizing farmer colors', () => {
+    const { catalog: farmerCatalog } = createCatalog({
+      'body/body-color.json': makeRecolorItem('Body Color', 'body'),
+      'body/skeleton.json': makeItem('Skeleton', 'body', 'male', ['skeleton']),
+      'body/zombie.json': makeItem('Zombie', 'body', 'male', ['zombie']),
+      'head/human-male.json': makeItem('Human Male', 'head'),
+      'head/skeleton.json': makeItem('Skeleton', 'head'),
+      'head/zombie.json': makeItem('Zombie', 'head'),
+      'expression/neutral.json': makeItem('Neutral', 'expression'),
+      'hair/messy.json': makeItem('Messy3', 'hair'),
+      'clothes/shortsleeve.json': makeRecolorItem('Shortsleeve', 'clothes'),
+      'overalls/brown.json': makeItem('Overalls', 'overalls', 'male', [
+        'brown',
+        'blue',
+      ]),
+      'shoes/basic-boots.json': makeItem('Basic Boots', 'shoes', 'male', [
+        'brown',
+        'tan',
+      ]),
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: farmerCatalog,
+      palettes,
+      bodyType: 'female',
+      rng: seqRng([
+        0, 0.99,
+        0,
+        0,
+        0, 0,
+        0, 0.99,
+        0, 0.99,
+        0, 0.99,
+      ]),
+      optionalProb: 1,
+      profile: 'farmer',
+    });
+
+    expect(sel.bodyType).toBe('male');
+    expect(sel.items['body']).toEqual({
+      typeName: 'body',
+      name: 'Body Color',
+      recolor: 'red',
+    });
+    expect(sel.items['head']).toEqual({ typeName: 'head', name: 'Human Male' });
+    expect(sel.items['expression']).toEqual({
+      typeName: 'expression',
+      name: 'Neutral',
+    });
+    expect(sel.items['hair']).toEqual({ typeName: 'hair', name: 'Messy3' });
+    expect(sel.items['clothes']).toEqual({
+      typeName: 'clothes',
+      name: 'Shortsleeve',
+      recolor: 'red',
+    });
+    expect(sel.items['overalls']).toEqual({
+      typeName: 'overalls',
+      name: 'Overalls',
+      variant: 'blue',
+    });
+    expect(sel.items['shoes']).toEqual({
+      typeName: 'shoes',
+      name: 'Basic Boots',
+      variant: 'tan',
+    });
+  });
+
+  it('farmer profile keeps default farmer colors when random colors are disabled', () => {
+    const { catalog: farmerCatalog } = createCatalog({
+      'body/body-color.json': makeRecolorItem('Body Color', 'body'),
+      'head/human-male.json': makeItem('Human Male', 'head'),
+      'expression/neutral.json': makeItem('Neutral', 'expression'),
+      'clothes/shortsleeve.json': makeRecolorItem('Shortsleeve', 'clothes'),
+      'overalls/brown.json': makeItem('Overalls', 'overalls', 'male', [
+        'brown',
+        'blue',
+      ]),
+      'shoes/basic-boots.json': makeItem('Basic Boots', 'shoes', 'male', [
+        'brown',
+        'tan',
+      ]),
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: farmerCatalog,
+      palettes,
+      bodyType: 'male',
+      rng: () => 0.99,
+      optionalProb: 0,
+      profile: 'farmer',
+      scope: {
+        appearance: true,
+        clothing: true,
+        equipment: true,
+        colors: false,
+      },
+    });
+
+    expect(sel.items['body']).toEqual({ typeName: 'body', name: 'Body Color' });
     expect(sel.items['clothes']).toEqual({
       typeName: 'clothes',
       name: 'Shortsleeve',
