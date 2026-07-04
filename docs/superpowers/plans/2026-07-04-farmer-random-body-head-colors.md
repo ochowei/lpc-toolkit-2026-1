@@ -376,7 +376,7 @@ Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-ou
 **Files:**
 - Modify: `docs/superpowers/plans/2026-07-04-farmer-random-body-head-colors.md`
 
-- [ ] **Step 1: Run architecture boundary checks**
+- [x] **Step 1: Run architecture boundary checks**
 
 Run:
 
@@ -386,7 +386,7 @@ rtk pnpm check:boundaries
 
 Expected: PASS.
 
-- [ ] **Step 2: Check final git status**
+- [x] **Step 2: Check final git status**
 
 Run:
 
@@ -396,7 +396,7 @@ rtk git status --short
 
 Expected: only this plan file is modified for final task notes, or a clean tree after the final docs commit.
 
-- [ ] **Step 3: Commit final plan notes**
+- [x] **Step 3: Commit final plan notes**
 
 If Task 3 notes changed this file, run:
 
@@ -422,3 +422,7 @@ rtk git push
 ```
 
 Expected: PASS. The existing draft PR updates with the new commits.
+
+Implementation note: Ran boundary verification and recorded final verification status.
+Commit: final docs commit hash reported in the response.
+Verification: `rtk pnpm check:boundaries` PASS; `rtk git status --short` clean before final plan notes.
