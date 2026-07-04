@@ -69,6 +69,31 @@ function typeNamesForRandomOutfit(
     .flatMap((group) => group.typeNames);
 }
 
+function selectionSupportsBodyType(
+  catalog: Catalog,
+  selection: Selection,
+  bodyType: BodyType,
+): boolean {
+  const defs = catalog.byTypeName.get(selection.typeName) ?? [];
+  return defs.some(
+    (item) => item.name === selection.name && itemSupportsBodyType(item, bodyType),
+  );
+}
+
+function filterSelectionsByBodyType(
+  selections: Readonly<Record<TypeName, Selection>>,
+  catalog: Catalog,
+  bodyType: BodyType,
+): Record<TypeName, Selection> {
+  const compatible: Record<TypeName, Selection> = {};
+  for (const [typeName, selection] of Object.entries(selections)) {
+    if (selectionSupportsBodyType(catalog, selection, bodyType)) {
+      compatible[typeName] = selection;
+    }
+  }
+  return compatible;
+}
+
 /**
  * Generate a Feeling Lucky outfit. Required profile groups always get an item
  * when compatible art exists. Optional groups are included with probability
@@ -85,11 +110,16 @@ export function pickRandomOutfit(args: PickRandomOutfitArgs): Selections {
     args.profile === undefined &&
     args.excludeGroups !== undefined &&
     profile === NORMAL_RANDOM_PROFILE;
+  const preserved = args.currentSelections
+    ? preserveDisabledScopeSelections(args.currentSelections, scope)
+    : {};
+  const compatiblePreserved =
+    profile.bodyType && profile.bodyType !== args.bodyType
+      ? filterSelectionsByBodyType(preserved, args.catalog, bodyType)
+      : preserved;
 
   const items: Record<TypeName, Selection> = {
-    ...(args.currentSelections
-      ? preserveDisabledScopeSelections(args.currentSelections, scope)
-      : {}),
+    ...compatiblePreserved,
   };
 
   for (const typeName of typeNamesForRandomOutfit(

@@ -297,6 +297,10 @@ Implementation note: Added profile-level body type and required type names, then
 Commit: fce732056.
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS (29 tests); `rtk pnpm --filter @lpc-toolkit/web typecheck` reported `TypeScript: No errors found` but exited 1 with an RTK warning that `--filter` is not yet supported for pnpm tsc; `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS; `rtk pnpm --dir packages/web typecheck` PASS.
 
+Review fix note: Added regression coverage for Farmer random with a profile body-type override and disabled appearance scope, then filtered preserved disabled-scope selections against the effective profile body type only when the profile overrides the caller body type.
+Commit: pending.
+Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS (30 tests); `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS.
+
 ## Task 3: Boundary Verification and Final Plan Update
 
 **Files:**

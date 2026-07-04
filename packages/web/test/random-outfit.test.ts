@@ -547,6 +547,36 @@ describe('pickRandomOutfit', () => {
     });
   });
 
+  it('farmer profile drops incompatible preserved appearance selections when forcing male body type', () => {
+    const { catalog: farmerCatalog } = createCatalog({
+      'body/light.json': makeItem('Light', 'body'),
+      'head/human-female.json': makeItem('Human Female', 'head', 'female'),
+      'hair/long.json': makeItem('Long Hair', 'hair', 'female'),
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: farmerCatalog,
+      bodyType: 'female',
+      rng: () => 0,
+      optionalProb: 1,
+      profile: 'farmer',
+      scope: {
+        appearance: false,
+        clothing: true,
+        equipment: true,
+        colors: true,
+      },
+      currentSelections: {
+        head: { typeName: 'head', name: 'Human Female' },
+        hair: { typeName: 'hair', name: 'Long Hair' },
+      },
+    });
+
+    expect(sel.bodyType).toBe('male');
+    expect(sel.items['head']).toBeUndefined();
+    expect(sel.items['hair']).toBeUndefined();
+  });
+
   it('villager profile keeps random outfits mundane and clothing-only', () => {
     const { catalog: villagerCatalog } = createCatalog({
       'body/light.json': makeItem('Light', 'body'),
