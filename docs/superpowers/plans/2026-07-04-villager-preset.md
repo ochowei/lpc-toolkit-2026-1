@@ -421,3 +421,6 @@ Verification: final `rtk git status --short` expected clean after commit.
 - Spec coverage: Task 1 covers the fixed clothing-only preset and i18n labels. Task 2 covers the matching random profile. Task 3 covers the requested focused verification and architecture boundary check.
 - Placeholder scan: The plan contains concrete file paths, code snippets, commands, and expected outcomes.
 - Type consistency: The new preset id is consistently `villager`, the translation key is consistently `preset.villager`, and the random profile id matches the preset id.
+- Final review fix: Added `preset.villager` to the i18n preset-key coverage so missing English or Traditional Chinese villager labels are caught by `packages/web/test/i18n.test.ts`.
+  Commit: `17033a55c` (`test(web): cover villager preset i18n key`).
+  Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/i18n.test.ts` PASS (18 tests); `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/presets.test.ts` PASS (6 tests).
