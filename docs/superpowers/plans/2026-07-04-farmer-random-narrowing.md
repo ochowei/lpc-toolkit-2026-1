@@ -294,7 +294,7 @@ Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-ou
 ```
 
 Implementation note: Added profile-level body type and required type names, then used them to make Farmer random male, Neutral, and fully dressed.
-Commit: pending.
+Commit: fce732056.
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS (29 tests); `rtk pnpm --filter @lpc-toolkit/web typecheck` reported `TypeScript: No errors found` but exited 1 with an RTK warning that `--filter` is not yet supported for pnpm tsc; `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS; `rtk pnpm --dir packages/web typecheck` PASS.
 
 ## Task 3: Boundary Verification and Final Plan Update
