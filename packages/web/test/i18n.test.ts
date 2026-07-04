@@ -102,6 +102,7 @@ describe('i18n', () => {
     const presetKeys = [
       'preset.title',
       'preset.farmer',
+      'preset.villager',
       'preset.mage',
       'preset.knight',
       'preset.ranger',
