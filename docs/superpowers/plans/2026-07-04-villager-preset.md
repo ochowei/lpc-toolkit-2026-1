@@ -302,6 +302,12 @@ Commit: `2a493949c` (`feat(web): add villager random profile`).
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run
 test/random-outfit.test.ts` failed before implementation with `villager`
 falling back to `normal`, then PASS after implementation (27 tests).
+Review fix: Moved the disallowed formal clothing candidate before allowed
+villager clothes in the focused random profile test so `rng: () => 0` proves
+`itemPools.clothes` filters before selection.
+Commit: `8852292d2` (`test(web): tighten villager random profile coverage`).
+Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run
+test/random-outfit.test.ts` PASS (27 tests); `rtk git diff --check` PASS.
 
 ## Task 3: Final Verification
 
