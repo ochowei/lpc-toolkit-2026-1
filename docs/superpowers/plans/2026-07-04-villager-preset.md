@@ -135,7 +135,7 @@ and the preset test verification result.
 Implementation note: Added the clothing-only `villager` fixed preset after
 `farmer`, added English and Traditional Chinese preset labels, and updated the
 preset count test to expect six unique presets.
-Commit: recorded in worker final report after commit creation.
+Commit: `08ae4bbe8` (`feat(web): add villager preset`).
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run
 test/presets.test.ts` PASS (6 tests).
 
