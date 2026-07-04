@@ -178,7 +178,7 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts
 
 Expected: FAIL before implementation. The failure should show Farmer selecting a non-`Body Color` body or non-`Human Male` head, or using first/default colors instead of the requested random color fields.
 
-- [ ] **Step 5: Commit the failing tests**
+- [x] **Step 5: Commit the failing tests**
 
 Run:
 
@@ -196,7 +196,7 @@ Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-ou
 ```
 
 Implementation note: Added failing Farmer random coverage for Body Color-only bodies, Human Male-only head, randomized Farmer clothing colors, and colors-disabled defaults.
-Commit: pending commit creation.
+Commit: 566c7d693 (`test(web): cover farmer human body and random colors`).
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` FAIL as expected before implementation. Focused failure: expected Farmer `body` recolor `red`, received `c0`.
 
 ## Task 2: Implement Farmer Body Head Color Constraints
