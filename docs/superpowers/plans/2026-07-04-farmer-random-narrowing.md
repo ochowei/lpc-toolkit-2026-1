@@ -23,7 +23,7 @@
 - Modify: `packages/web/test/random-outfit.test.ts`
 - Modify: `docs/superpowers/plans/2026-07-04-farmer-random-narrowing.md`
 
-- [ ] **Step 1: Add a focused Farmer random test**
+- [x] **Step 1: Add a focused Farmer random test**
 
 In `packages/web/test/random-outfit.test.ts`, add this test immediately after the existing `farmer profile excludes fantasy, combat, and fx categories` test:
 
@@ -76,7 +76,7 @@ In `packages/web/test/random-outfit.test.ts`, add this test immediately after th
   });
 ```
 
-- [ ] **Step 2: Add a hair variation assertion test**
+- [x] **Step 2: Add a hair variation assertion test**
 
 Add this test immediately after the test from Step 1:
 
@@ -114,7 +114,7 @@ Add this test immediately after the test from Step 1:
   });
 ```
 
-- [ ] **Step 3: Run the focused test file and verify the new tests fail**
+- [x] **Step 3: Run the focused test file and verify the new tests fail**
 
 Run:
 
@@ -124,7 +124,7 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts
 
 Expected: FAIL. The failure should show that Farmer random still returns the caller-provided `bodyType` or omits `overalls` when `optionalProb: 0`.
 
-- [ ] **Step 4: Commit the failing tests**
+- [x] **Step 4: Commit the failing tests**
 
 Run:
 
@@ -140,6 +140,10 @@ Implementation note: Added focused failing coverage for Farmer random male body 
 Commit: record the actual short commit hash for `test(web): cover narrowed farmer random profile`.
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` FAIL as expected before implementation.
 ```
+
+Implementation note: Added focused failing coverage for Farmer random male body type, Neutral expression, required farmer workwear, and retained hair variation.
+Commit: pending.
+Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` FAIL as expected before implementation. Key failure: `expected 'female' to be 'male'` at `test/random-outfit.test.ts:494`.
 
 ## Task 2: Implement Profile Body Type and Required Slots
 
