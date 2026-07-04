@@ -210,7 +210,7 @@ Review follow-up verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest r
 - Modify: `packages/web/src/slice/random-outfit.ts`
 - Modify: `docs/superpowers/plans/2026-07-04-farmer-random-body-head-colors.md`
 
-- [ ] **Step 1: Extend RandomProfile with randomColorTypeNames**
+- [x] **Step 1: Extend RandomProfile with randomColorTypeNames**
 
 In `packages/web/src/slice/random-profiles.ts`, change the `RandomProfile` interface to include `randomColorTypeNames` immediately after `requiredTypeNames`:
 
@@ -230,7 +230,7 @@ export interface RandomProfile {
 }
 ```
 
-- [ ] **Step 2: Tighten FARMER_RANDOM_PROFILE pools and random color slots**
+- [x] **Step 2: Tighten FARMER_RANDOM_PROFILE pools and random color slots**
 
 In `packages/web/src/slice/random-profiles.ts`, replace `FARMER_RANDOM_PROFILE` with:
 
@@ -257,7 +257,7 @@ export const FARMER_RANDOM_PROFILE: RandomProfile = {
 };
 ```
 
-- [ ] **Step 3: Import getColorOptions**
+- [x] **Step 3: Import getColorOptions**
 
 In `packages/web/src/slice/random-outfit.ts`, add:
 
@@ -267,7 +267,7 @@ import { getColorOptions } from './color-options';
 
 Place it with the other local imports.
 
-- [ ] **Step 4: Add random color helpers**
+- [x] **Step 4: Add random color helpers**
 
 In `packages/web/src/slice/random-outfit.ts`, add these helpers after `filterSelectionsByBodyType`:
 
@@ -301,7 +301,7 @@ function shouldRandomizeColor(profile: RandomProfile, typeName: TypeName): boole
 }
 ```
 
-- [ ] **Step 5: Apply random color fields for profile-enabled slots**
+- [x] **Step 5: Apply random color fields for profile-enabled slots**
 
 In `packages/web/src/slice/random-outfit.ts`, replace the current assignment:
 
@@ -330,7 +330,7 @@ with:
         : selection;
 ```
 
-- [ ] **Step 6: Run the focused random outfit test**
+- [x] **Step 6: Run the focused random outfit test**
 
 Run:
 
@@ -340,7 +340,7 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 7: Run typecheck**
+- [x] **Step 7: Run typecheck**
 
 Run:
 
@@ -350,7 +350,7 @@ rtk pnpm --filter @lpc-toolkit/web run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit the implementation**
+- [x] **Step 8: Commit the implementation**
 
 Run:
 
@@ -366,6 +366,10 @@ Implementation note: Added profile-level random color slots, constrained Farmer 
 Commit: record the actual short commit hash for `fix(web): constrain farmer random body head colors`.
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS; `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS.
 ```
+
+Implementation note: Added profile-level random color slots, constrained Farmer body/head pools to Body Color/Human Male, randomized Farmer skin/clothing colors through existing color options, and aligned existing Farmer tests with the new Body Color/Human Male/random-color contract.
+Commit: pending (`fix(web): constrain farmer random body head colors`).
+Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS; `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS.
 
 ## Task 3: Boundary Verification and PR Update
 

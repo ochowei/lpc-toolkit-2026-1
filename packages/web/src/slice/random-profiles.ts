@@ -16,6 +16,7 @@ export interface RandomProfile {
   readonly bodyType?: BodyType;
   readonly typeNames?: readonly TypeName[];
   readonly requiredTypeNames?: readonly TypeName[];
+  readonly randomColorTypeNames?: readonly TypeName[];
   readonly itemPools?: Partial<Record<TypeName, readonly string[]>>;
 }
 
@@ -52,7 +53,10 @@ export const FARMER_RANDOM_PROFILE: RandomProfile = {
   bodyType: 'male',
   typeNames: ['body', 'head', 'expression', 'hair', 'clothes', 'overalls', 'shoes'],
   requiredTypeNames: ['body', 'head', 'expression', 'clothes', 'overalls', 'shoes'],
+  randomColorTypeNames: ['body', 'clothes', 'overalls', 'shoes'],
   itemPools: {
+    body: ['Body Color'],
+    head: ['Human Male'],
     expression: ['Neutral'],
     clothes: ['Shortsleeve'],
     overalls: ['Overalls'],

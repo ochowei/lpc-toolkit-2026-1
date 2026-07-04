@@ -423,7 +423,7 @@ describe('pickRandomOutfit', () => {
 
   it('farmer profile excludes fantasy, combat, and fx categories', () => {
     const { catalog: farmerCatalog } = createCatalog({
-      'body/light.json': makeItem('Light', 'body'),
+      'body/body-color.json': makeRecolorItem('Body Color', 'body'),
       'head/human.json': makeItem('Human Male', 'head'),
       'expression/neutral.json': makeItem('Neutral', 'expression'),
       'hair/messy.json': makeItem('Messy3', 'hair'),
@@ -648,7 +648,7 @@ describe('pickRandomOutfit', () => {
 
   it('farmer profile can still randomize hair when appearance optional slots are included', () => {
     const { catalog: farmerCatalog } = createCatalog({
-      'body/light.json': makeItem('Light', 'body'),
+      'body/body-color.json': makeRecolorItem('Body Color', 'body'),
       'head/human-male.json': makeItem('Human Male', 'head'),
       'expression/neutral.json': makeItem('Neutral', 'expression'),
       'hair/messy.json': makeItem('Messy3', 'hair'),

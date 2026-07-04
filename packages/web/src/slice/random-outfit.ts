@@ -9,6 +9,7 @@ import type {
 } from '@lpc-toolkit/core';
 import { itemSupportsBodyType } from './catalog-tree';
 import { CATEGORY_GROUPS, type GroupId } from './category-groups';
+import { getColorOptions } from './color-options';
 import {
   DEFAULT_RANDOM_SCOPE,
   NORMAL_RANDOM_PROFILE,
@@ -94,6 +95,34 @@ function filterSelectionsByBodyType(
   return compatible;
 }
 
+function randomColorFieldsForItem(
+  item: ItemDefinition,
+  palettes: PaletteMetadata | undefined,
+  rng: () => number,
+): { variant?: string; recolor?: string } {
+  if (!palettes && (!item.variants || item.variants.length === 0)) return {};
+
+  if (palettes) {
+    const colors = getColorOptions(item, palettes);
+    if (colors.mode === 'recolors') {
+      const pick = colors.options[Math.floor(rng() * colors.options.length)];
+      return pick ? { recolor: pick.value } : {};
+    }
+    if (colors.mode === 'variants') {
+      const pick = colors.options[Math.floor(rng() * colors.options.length)];
+      return pick ? { variant: pick.value } : {};
+    }
+  }
+
+  const variants = item.variants ?? [];
+  const pick = variants[Math.floor(rng() * variants.length)];
+  return pick ? { variant: pick } : {};
+}
+
+function shouldRandomizeColor(profile: RandomProfile, typeName: TypeName): boolean {
+  return profile.randomColorTypeNames?.includes(typeName) ?? false;
+}
+
 /**
  * Generate a Feeling Lucky outfit. Required profile groups always get an item
  * when compatible art exists. Optional groups are included with probability
@@ -141,11 +170,18 @@ export function pickRandomOutfit(args: PickRandomOutfitArgs): Selections {
     if (compatible.length === 0) continue;
 
     const pick = compatible[Math.floor(rng() * compatible.length)]!;
-    items[typeName] = selectionForItem(
+    const selection = selectionForItem(
       typeName,
       pick,
       scope.colors ? args.palettes : undefined,
     );
+    items[typeName] =
+      scope.colors && shouldRandomizeColor(profile, typeName)
+        ? {
+            ...selection,
+            ...randomColorFieldsForItem(pick, args.palettes, rng),
+          }
+        : selection;
   }
 
   return { bodyType, items };
