@@ -315,7 +315,7 @@ test/random-outfit.test.ts` PASS (27 tests); `rtk git diff --check` PASS.
 
 - Modify: `docs/superpowers/plans/2026-07-04-villager-preset.md`
 
-- [ ] **Step 1: Run focused preset tests**
+- [x] **Step 1: Run focused preset tests**
 
 Run:
 
@@ -325,7 +325,13 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/presets.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 2: Run focused random profile tests**
+Implementation note: Re-ran the focused preset test for the completed villager
+preset implementation.
+Commit under verification: `ea71ad83f`.
+Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run
+test/presets.test.ts` PASS (1 file, 6 tests).
+
+- [x] **Step 2: Run focused random profile tests**
 
 Run:
 
@@ -335,7 +341,13 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 3: Run web typecheck**
+Implementation note: Re-ran the focused random outfit profile test, including
+the tightened villager `itemPools` coverage.
+Commit under verification: `ea71ad83f`.
+Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run
+test/random-outfit.test.ts` PASS (1 file, 27 tests).
+
+- [x] **Step 3: Run web typecheck**
 
 Run:
 
@@ -345,7 +357,12 @@ rtk pnpm --dir packages/web typecheck
 
 Expected: PASS.
 
-- [ ] **Step 4: Run architecture boundary check**
+Implementation note: Ran the web package TypeScript check after the focused
+tests.
+Commit under verification: `ea71ad83f`.
+Verification: `rtk pnpm --dir packages/web typecheck` PASS.
+
+- [x] **Step 4: Run architecture boundary check**
 
 Run:
 
@@ -355,7 +372,12 @@ rtk pnpm check:boundaries
 
 Expected: PASS.
 
-- [ ] **Step 5: Inspect final git status**
+Implementation note: Ran the repository architecture boundary check required
+for web source changes.
+Commit under verification: `ea71ad83f`.
+Verification: `rtk pnpm check:boundaries` PASS.
+
+- [x] **Step 5: Inspect final git status**
 
 Run:
 
@@ -365,7 +387,11 @@ rtk git status --short
 
 Expected: only the plan file may be modified from recording task status and verification notes.
 
-- [ ] **Step 6: Commit final plan notes**
+Implementation note: Checked the working tree before recording Task 3 notes.
+Commit under verification: `ea71ad83f`.
+Verification: `rtk git status --short` PASS (clean before plan-note update).
+
+- [x] **Step 6: Commit final plan notes**
 
 If the plan file changed while recording implementation notes and verification status, run:
 
@@ -383,6 +409,12 @@ rtk git status --short
 ```
 
 Expected: clean working tree.
+
+Implementation note: Recorded final verification notes for Task 3 and committed
+the plan-only bookkeeping update.
+Commit under verification: `ea71ad83f`; final plan-note commit hash is reported
+after commit creation.
+Verification: final `rtk git status --short` expected clean after commit.
 
 ## Self-Review
 
