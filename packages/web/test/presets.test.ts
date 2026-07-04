@@ -31,9 +31,9 @@ function walkJson(dir: string, base = dir): Record<FilePath, ItemDefinition> {
 }
 
 describe('PRESETS data', () => {
-  it('has 5 presets with unique ids', () => {
-    expect(PRESETS).toHaveLength(5);
-    expect(new Set(PRESETS.map((p) => p.id)).size).toBe(5);
+  it('has 6 presets with unique ids', () => {
+    expect(PRESETS).toHaveLength(6);
+    expect(new Set(PRESETS.map((p) => p.id)).size).toBe(6);
   });
 
   it('every preset item type is a clearable clothing category or allowed personal appearance', () => {

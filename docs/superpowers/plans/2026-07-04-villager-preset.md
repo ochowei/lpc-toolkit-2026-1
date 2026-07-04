@@ -28,7 +28,7 @@
 - Modify: `packages/web/src/i18n.ts`
 - Modify: `docs/superpowers/plans/2026-07-04-villager-preset.md`
 
-- [ ] **Step 1: Update the preset count test first**
+- [x] **Step 1: Update the preset count test first**
 
 In `packages/web/test/presets.test.ts`, change the first test from:
 
@@ -48,7 +48,7 @@ to:
   });
 ```
 
-- [ ] **Step 2: Run the preset test to verify the count fails**
+- [x] **Step 2: Run the preset test to verify the count fails**
 
 Run:
 
@@ -58,7 +58,7 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/presets.test.ts
 
 Expected: FAIL because `PRESETS` still has length 5.
 
-- [ ] **Step 3: Add the fixed villager preset**
+- [x] **Step 3: Add the fixed villager preset**
 
 In `packages/web/src/presets.ts`, add the new preset after the `farmer` preset and before `mage`:
 
@@ -77,7 +77,7 @@ In `packages/web/src/presets.ts`, add the new preset after the `farmer` preset a
 
 Do not add `bodyType`, `body`, `head`, `expression`, or `hair` to this preset.
 
-- [ ] **Step 4: Add the villager translations**
+- [x] **Step 4: Add the villager translations**
 
 In `packages/web/src/i18n.ts`, add the English key near the other `preset.*` labels:
 
@@ -103,7 +103,7 @@ Place it after:
     'preset.farmer': '農民',
 ```
 
-- [ ] **Step 5: Run the preset test to verify the fixed preset passes**
+- [x] **Step 5: Run the preset test to verify the fixed preset passes**
 
 Run:
 
@@ -113,7 +113,7 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/presets.test.ts
 
 Expected: PASS. The catalog validation should confirm `Longsleeve`, `Pants`, `Basic Shoes`, and the `tan` shoe variant resolve.
 
-- [ ] **Step 6: Commit the fixed preset task**
+- [x] **Step 6: Commit the fixed preset task**
 
 Run:
 
@@ -131,6 +131,13 @@ rtk git rev-parse --short HEAD
 
 Update this task checkbox with an implementation note, the printed commit hash,
 and the preset test verification result.
+
+Implementation note: Added the clothing-only `villager` fixed preset after
+`farmer`, added English and Traditional Chinese preset labels, and updated the
+preset count test to expect six unique presets.
+Commit: recorded in worker final report after commit creation.
+Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run
+test/presets.test.ts` PASS (6 tests).
 
 ## Task 2: Add Villager Random Profile
 
