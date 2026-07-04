@@ -368,7 +368,7 @@ Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-ou
 ```
 
 Implementation note: Added profile-level random color slots, constrained Farmer body/head pools to Body Color/Human Male, randomized Farmer skin/clothing colors through existing color options, and aligned existing Farmer tests with the new Body Color/Human Male/random-color contract.
-Commit: pending (`fix(web): constrain farmer random body head colors`).
+Commit: 940f3b6da (`fix(web): constrain farmer random body head colors`).
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS; `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS.
 
 ## Task 3: Boundary Verification and PR Update
