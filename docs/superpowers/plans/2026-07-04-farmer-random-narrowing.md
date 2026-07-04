@@ -142,7 +142,7 @@ Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-ou
 ```
 
 Implementation note: Added focused failing coverage for Farmer random male body type, Neutral expression, required farmer workwear, and retained hair variation.
-Commit: pending.
+Commit: 86b619b77.
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` FAIL as expected before implementation. Key failure: `expected 'female' to be 'male'` at `test/random-outfit.test.ts:494`.
 
 ## Task 2: Implement Profile Body Type and Required Slots
