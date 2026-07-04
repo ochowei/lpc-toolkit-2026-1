@@ -199,6 +199,10 @@ Implementation note: Added failing Farmer random coverage for Body Color-only bo
 Commit: 566c7d693 (`test(web): cover farmer human body and random colors`).
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` FAIL as expected before implementation. Focused failure: expected Farmer `body` recolor `red`, received `c0`.
 
+Review follow-up note: Tightened Farmer body color coverage so the existing Farmer test expects `Body Color` with randomized skin recolor instead of legacy `Dark`, and the focused allow-list test uses high body/head RNG with distinct body fixture IDs so it selects `Zombie Body` before the Farmer body pool implementation.
+Review follow-up commit: recorded in the Task 1 review-fix worker response.
+Review follow-up verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` FAIL as expected before implementation. Key focused failure: expected Farmer `body` `Body Color` with recolor `red`, received `Zombie Body`.
+
 ## Task 2: Implement Farmer Body Head Color Constraints
 
 **Files:**

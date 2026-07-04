@@ -482,8 +482,7 @@ describe('pickRandomOutfit', () => {
 
   it('farmer profile fixes male neutral required workwear while keeping skin random', () => {
     const { catalog: farmerCatalog } = createCatalog({
-      'body/light.json': makeItem('Light', 'body'),
-      'body/dark.json': makeItem('Dark', 'body'),
+      'body/body-color.json': makeRecolorItem('Body Color', 'body'),
       'head/human-male.json': makeItem('Human Male', 'head'),
       'head/human-female.json': makeItem('Human Female', 'head', 'female'),
       'expression/neutral.json': makeItem('Neutral', 'expression'),
@@ -497,14 +496,19 @@ describe('pickRandomOutfit', () => {
 
     const sel = pickRandomOutfit({
       catalog: farmerCatalog,
+      palettes,
       bodyType: 'female',
-      rng: seqRng([0.99, 0.99, 0, 0.99, 0, 0, 0]),
+      rng: seqRng([0, 0.99, 0.99, 0, 0.99, 0, 0, 0]),
       optionalProb: 0,
       profile: 'farmer',
     });
 
     expect(sel.bodyType).toBe('male');
-    expect(sel.items['body']).toEqual({ typeName: 'body', name: 'Dark' });
+    expect(sel.items['body']).toEqual({
+      typeName: 'body',
+      name: 'Body Color',
+      recolor: 'red',
+    });
     expect(sel.items['head']).toEqual({ typeName: 'head', name: 'Human Male' });
     expect(sel.items['expression']).toEqual({
       typeName: 'expression',
@@ -530,8 +534,8 @@ describe('pickRandomOutfit', () => {
   it('farmer profile uses human body and adult male head while randomizing farmer colors', () => {
     const { catalog: farmerCatalog } = createCatalog({
       'body/body-color.json': makeRecolorItem('Body Color', 'body'),
-      'body/skeleton.json': makeItem('Skeleton', 'body', 'male', ['skeleton']),
-      'body/zombie.json': makeItem('Zombie', 'body', 'male', ['zombie']),
+      'body/skeleton-body.json': makeItem('Skeleton Body', 'body'),
+      'body/zombie-body.json': makeItem('Zombie Body', 'body'),
       'head/human-male.json': makeItem('Human Male', 'head'),
       'head/skeleton.json': makeItem('Skeleton', 'head'),
       'head/zombie.json': makeItem('Zombie', 'head'),
@@ -553,8 +557,8 @@ describe('pickRandomOutfit', () => {
       palettes,
       bodyType: 'female',
       rng: seqRng([
-        0, 0.99,
-        0,
+        0.99, 0.99,
+        0.99,
         0,
         0, 0,
         0, 0.99,
