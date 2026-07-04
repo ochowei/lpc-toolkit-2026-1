@@ -302,6 +302,7 @@ describe('pickRandomOutfit', () => {
   it('preset random profiles only expose their intended type names', () => {
     const expected: Readonly<Record<string, readonly string[]>> = {
       farmer: ['body', 'head', 'expression', 'hair', 'clothes', 'overalls', 'shoes'],
+      villager: ['body', 'head', 'expression', 'hair', 'clothes', 'legs', 'shoes'],
       mage: [
         'body',
         'head',
@@ -461,6 +462,57 @@ describe('pickRandomOutfit', () => {
       'weapon_magic_crystal',
       'shield',
       'quiver',
+      'wound_arm',
+    ] as const) {
+      expect(sel.items[typeName]).toBeUndefined();
+    }
+  });
+
+  it('villager profile keeps random outfits mundane and clothing-only', () => {
+    const { catalog: villagerCatalog } = createCatalog({
+      'body/light.json': makeItem('Light', 'body'),
+      'head/human.json': makeItem('Human Male', 'head'),
+      'expression/neutral.json': makeItem('Neutral', 'expression'),
+      'hair/messy.json': makeItem('Messy3', 'hair'),
+      'clothes/formal.json': makeItem('Collared/Formal Longsleeve', 'clothes'),
+      'clothes/longsleeve.json': makeItem('Longsleeve', 'clothes'),
+      'clothes/shortsleeve.json': makeItem('Shortsleeve', 'clothes'),
+      'legs/pants.json': makeItem('Pants', 'legs'),
+      'shoes/basic-shoes.json': makeItem('Basic Shoes', 'shoes', 'male', ['tan']),
+      'shoes/basic-boots.json': makeItem('Basic Boots', 'shoes', 'male', ['brown']),
+      'overalls/brown.json': makeItem('Overalls', 'overalls', 'male', ['brown']),
+      'apron/plain.json': makeItem('Apron', 'apron'),
+      'hat/hood.json': makeItem('Hood', 'hat'),
+      'weapon/sword.json': makeItem('Sword', 'weapon'),
+      'shield/kite.json': makeItem('Kite', 'shield'),
+      'wings/feather.json': makeItem('Wings', 'wings'),
+      'wound/arm.json': makeItem('Bleeding', 'wound_arm'),
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: villagerCatalog,
+      bodyType: 'male',
+      rng: () => 0,
+      optionalProb: 1.0,
+      profile: 'villager',
+    });
+
+    expect(sel.items['body']).toBeDefined();
+    expect(sel.items['clothes']?.name).toBe('Longsleeve');
+    expect(sel.items['legs']).toEqual({ typeName: 'legs', name: 'Pants' });
+    expect(sel.items['shoes']).toEqual({
+      typeName: 'shoes',
+      name: 'Basic Shoes',
+      variant: 'tan',
+    });
+
+    for (const typeName of [
+      'overalls',
+      'apron',
+      'hat',
+      'weapon',
+      'shield',
+      'wings',
       'wound_arm',
     ] as const) {
       expect(sel.items[typeName]).toBeUndefined();

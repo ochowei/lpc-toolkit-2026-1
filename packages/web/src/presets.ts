@@ -72,6 +72,16 @@ export const PRESETS: readonly Preset[] = [
     ],
   },
   {
+    id: 'villager',
+    labelKey: 'preset.villager',
+    emoji: '🏘️',
+    items: [
+      { typeName: 'clothes', name: 'Longsleeve', recolor: 'brown' },
+      { typeName: 'legs', name: 'Pants', recolor: 'brown' },
+      { typeName: 'shoes', name: 'Basic Shoes', variant: 'tan' },
+    ],
+  },
+  {
     id: 'mage',
     labelKey: 'preset.mage',
     emoji: '🔮',
