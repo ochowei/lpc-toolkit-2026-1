@@ -276,7 +276,7 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit the villager random profile task**
+- [x] **Step 6: Commit the villager random profile task**
 
 Run:
 
@@ -294,6 +294,14 @@ rtk git rev-parse --short HEAD
 
 Update this task checkbox with an implementation note, the printed commit hash,
 and the random outfit test verification result.
+
+Implementation note: Added the dedicated `villager` random profile after
+`farmer`, constrained it to everyday clothing slots and mundane clothing pools,
+and covered the profile with type-name and clothing-only behavior tests.
+Commit: `2a493949c` (`feat(web): add villager random profile`).
+Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run
+test/random-outfit.test.ts` failed before implementation with `villager`
+falling back to `normal`, then PASS after implementation (27 tests).
 
 ## Task 3: Final Verification
 
