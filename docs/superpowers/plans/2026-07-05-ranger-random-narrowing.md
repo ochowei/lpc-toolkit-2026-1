@@ -497,6 +497,10 @@ rtk git commit -m "docs: record ranger random verification"
 
 After committing, update Step 4's `Commit:` line with the produced short hash.
 
+Implementation note: Recorded the final verification commit hash in the plan.
+Commit: 98b67ce9d (`docs: record ranger verification commit hash`).
+Verification: Not rerun; documentation-only hash bookkeeping.
+
 ## Self-Review
 
 - Spec coverage: The plan covers human identity, caller body type preservation, Neutral expression, required Ranger kit, avoidance of incomplete Rangers, random color slots, colors-disabled behavior, off-theme exclusions, and verification commands from the approved spec.
