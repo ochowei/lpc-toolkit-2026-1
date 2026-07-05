@@ -390,6 +390,11 @@ After committing, run `rtk git log -1 --format=%h` and update this task with:
 - the verification status from Step 5, including the first focused Mage failure
   line from the Vitest output
 
+  - Implementation note:
+    `Added failing Mage random coverage for human identity, required mage equipment, female compatibility, randomized Mage colors, and colors-disabled defaults.`
+  - Commit: `69c7fdd16`
+  - Verification status: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` `FAIL` — first focused Mage failure: expected `{ typeName: 'head', name: 'Orc Male' }` to deeply equal `{ typeName: 'head', name: 'Human Male' }`.
+
 ## Task 2: Tighten Mage Random Profile
 
 **Files:**
