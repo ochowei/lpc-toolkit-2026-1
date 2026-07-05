@@ -347,7 +347,7 @@ Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-ou
 ```
 
 Implementation note: Added focused failing coverage for Knight human identity, required core equipment, optional arms/gloves, and profile-level color randomization.
-Commit: pending commit for this task.
+Commit: 7facb7913.
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` FAIL as expected before implementation. Key failures: Knight type names missing `hair`; expected human male head but received `Zombie`; expected randomized body recolor `red` but received `c0`; expected required `armour` selection but received `undefined`.
 
 ## Task 2: Tighten the Knight Random Profile
