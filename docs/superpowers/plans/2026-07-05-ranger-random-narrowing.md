@@ -309,7 +309,7 @@ Expected: FAIL before implementation. The first new Ranger test should fail beca
 Implementation note: Added focused failing Ranger random coverage for human identity, Neutral expression, required leather/hood/bow/quiver kit, color randomization, colors-disabled defaults, female body type preservation, and off-theme exclusions.
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` FAIL as expected before implementation; key failures included body recolor remaining `c0` instead of Ranger random color `red`, female head selecting `Skeleton` instead of `Human Female`, and required `armour` omitted when `optionalProb: 0`.
 
-- [ ] **Step 6: Commit the failing tests**
+- [x] **Step 6: Commit the failing tests**
 
 Run:
 
@@ -322,7 +322,7 @@ After the commit succeeds, update this task with:
 
 ```md
 Implementation note: Added focused failing Ranger random coverage for human identity, Neutral expression, required leather/hood/bow/quiver kit, color randomization, colors-disabled defaults, female body type preservation, and off-theme exclusions.
-Commit: paste the short hash produced by `rtk git log -1 --oneline` for `test(web): cover narrowed ranger random profile`.
+Commit: 99bb0caf0 (`test(web): cover narrowed ranger random profile`).
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` FAIL as expected before implementation, with the key Ranger narrowing failure recorded.
 ```
 
