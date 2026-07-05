@@ -499,7 +499,7 @@ rtk git commit -m "fix(web): narrow mage random profile"
 **Files:**
 - Modify: `docs/superpowers/plans/2026-07-05-mage-random-narrowing.md`
 
-- [ ] **Step 1: Run web typecheck**
+- [x] **Step 1: Run web typecheck**
 
 Run:
 
@@ -509,7 +509,7 @@ rtk pnpm --filter @lpc-toolkit/web run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 2: Run architecture boundary check**
+- [x] **Step 2: Run architecture boundary check**
 
 Run:
 
@@ -519,7 +519,7 @@ rtk pnpm check:boundaries
 
 Expected: PASS.
 
-- [ ] **Step 3: Run focused random outfit tests one final time**
+- [x] **Step 3: Run focused random outfit tests one final time**
 
 Run:
 
@@ -529,7 +529,7 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 4: Commit the verification record**
+- [x] **Step 4: Commit the verification record**
 
 Run:
 
@@ -542,11 +542,11 @@ After committing, run `rtk git log -1 --format=%h` and update this task with:
 
 - the implementation note:
   `Recorded final Mage random narrowing verification.`
-- the actual short commit hash for `docs: record mage random verification`
+- Commit: `61c832cac`
 - the verification status:
-  `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS;
-  `rtk pnpm check:boundaries` PASS;
-  `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS
+  - `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS
+  - `rtk pnpm check:boundaries` PASS
+  - `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS
 
 ## Completion Criteria
 
