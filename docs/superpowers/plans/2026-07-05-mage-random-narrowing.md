@@ -31,7 +31,7 @@
 - Modify: `packages/web/test/random-outfit.test.ts`
 - Modify: `docs/superpowers/plans/2026-07-05-mage-random-narrowing.md`
 
-- [ ] **Step 1: Add the Mage identity and required equipment test**
+- [x] **Step 1: Add the Mage identity and required equipment test**
 
 In `packages/web/test/random-outfit.test.ts`, add this test immediately after
 the existing test named
@@ -126,7 +126,7 @@ the existing test named
   });
 ```
 
-- [ ] **Step 2: Add the female-compatible Mage identity test**
+- [x] **Step 2: Add the female-compatible Mage identity test**
 
 Add this test immediately after the test from Step 1:
 
@@ -179,7 +179,7 @@ Add this test immediately after the test from Step 1:
   });
 ```
 
-- [ ] **Step 3: Add the Mage random color test**
+- [x] **Step 3: Add the Mage random color test**
 
 Add this test immediately after the test from Step 2:
 
@@ -277,7 +277,7 @@ Add this test immediately after the test from Step 2:
   });
 ```
 
-- [ ] **Step 4: Add the Mage colors-disabled test**
+- [x] **Step 4: Add the Mage colors-disabled test**
 
 Add this test immediately after the test from Step 3:
 
@@ -360,7 +360,7 @@ Add this test immediately after the test from Step 3:
   });
 ```
 
-- [ ] **Step 5: Run the focused test file and confirm the new tests fail**
+- [x] **Step 5: Run the focused test file and confirm the new tests fail**
 
 Run:
 
@@ -373,7 +373,7 @@ that the current profile can select non-human identity, omit required Mage
 equipment with `optionalProb: 0`, or keep first/default colors instead of
 profile-level random colors.
 
-- [ ] **Step 6: Commit the failing Mage tests**
+- [x] **Step 6: Commit the failing Mage tests**
 
 Run:
 
