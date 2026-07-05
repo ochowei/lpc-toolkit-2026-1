@@ -24,7 +24,7 @@ Do not modify `packages/web/src/slice/random-outfit.ts` unless an existing `Rand
 - Modify: `packages/web/test/random-outfit.test.ts`
 - Modify: `docs/superpowers/plans/2026-07-05-knight-random-narrowing.md`
 
-- [ ] **Step 1: Update expected Knight type names**
+- [x] **Step 1: Update expected Knight type names**
 
 In `packages/web/test/random-outfit.test.ts`, find the `preset random profiles only expose their intended type names` test and update only the `knight` expected array to include optional `hair` after `expression`:
 
@@ -45,7 +45,7 @@ In `packages/web/test/random-outfit.test.ts`, find the `preset random profiles o
       ],
 ```
 
-- [ ] **Step 2: Add required core equipment and optional arm/glove coverage**
+- [x] **Step 2: Add required core equipment and optional arm/glove coverage**
 
 In `packages/web/test/random-outfit.test.ts`, add this test immediately after the existing `knight profile excludes farmer workwear and mage crystal parts` test:
 
@@ -120,7 +120,7 @@ In `packages/web/test/random-outfit.test.ts`, add this test immediately after th
   });
 ```
 
-- [ ] **Step 3: Add female identity compatibility coverage**
+- [x] **Step 3: Add female identity compatibility coverage**
 
 Add this test immediately after the test from Step 2:
 
@@ -169,7 +169,7 @@ Add this test immediately after the test from Step 2:
   });
 ```
 
-- [ ] **Step 4: Add optional arms/gloves and color randomization coverage**
+- [x] **Step 4: Add optional arms/gloves and color randomization coverage**
 
 Add this test immediately after the test from Step 3:
 
@@ -256,7 +256,7 @@ Add this test immediately after the test from Step 3:
   });
 ```
 
-- [ ] **Step 5: Add color-disabled coverage**
+- [x] **Step 5: Add color-disabled coverage**
 
 Add this test immediately after the test from Step 4:
 
@@ -314,7 +314,7 @@ Add this test immediately after the test from Step 4:
   });
 ```
 
-- [ ] **Step 6: Run the focused test file and verify the new tests fail**
+- [x] **Step 6: Run the focused test file and verify the new tests fail**
 
 Run:
 
@@ -329,7 +329,7 @@ Expected: FAIL. The failure should show at least one of these current gaps:
 - Knight required equipment is omitted with `optionalProb: 0`.
 - Knight colors are not randomized through `randomColorTypeNames`.
 
-- [ ] **Step 7: Commit the failing tests**
+- [x] **Step 7: Commit the failing tests**
 
 Run:
 
@@ -345,6 +345,10 @@ Implementation note: Added focused failing coverage for Knight human identity, r
 Commit: paste the output of `rtk git log -1 --format=%h`.
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` FAIL as expected before implementation.
 ```
+
+Implementation note: Added focused failing coverage for Knight human identity, required core equipment, optional arms/gloves, and profile-level color randomization.
+Commit: pending commit for this task.
+Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` FAIL as expected before implementation. Key failures: Knight type names missing `hair`; expected human male head but received `Zombie`; expected randomized body recolor `red` but received `c0`; expected required `armour` selection but received `undefined`.
 
 ## Task 2: Tighten the Knight Random Profile
 
