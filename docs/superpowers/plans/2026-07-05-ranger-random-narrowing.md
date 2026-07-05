@@ -472,21 +472,21 @@ Append a final status note under this task:
 
 ```md
 Implementation note: Recorded final Ranger random narrowing verification.
-Commit: paste the short hash produced by `rtk git log -1 --oneline` for the docs verification commit.
+Commit: 9f31910ab (`docs: record ranger random verification`).
 Verification:
 - `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS.
-- `rtk pnpm --filter @lpc-toolkit/web typecheck` PASS.
+- `rtk pnpm --filter @lpc-toolkit/web typecheck` hit an `rtk` wrapper limitation despite no TypeScript errors; supported equivalent `rtk pnpm --dir packages/web typecheck` PASS.
 - `rtk pnpm check:boundaries` PASS.
 ```
 
 Implementation note: Recorded final Ranger random narrowing verification.
-Commit: pending docs verification commit hash.
+Commit: 9f31910ab (`docs: record ranger random verification`).
 Verification:
 - `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS.
 - `rtk pnpm --filter @lpc-toolkit/web typecheck` hit an `rtk` wrapper limitation despite no TypeScript errors; supported equivalent `rtk pnpm --dir packages/web typecheck` PASS.
 - `rtk pnpm check:boundaries` PASS.
 
-- [ ] **Step 5: Commit the verification note**
+- [x] **Step 5: Commit the verification note**
 
 Run:
 
