@@ -24,7 +24,7 @@ No changes are planned for `packages/core/`, `packages/web/src/components/`, `pa
 - Modify: `packages/web/test/random-outfit.test.ts`
 - Modify: `docs/superpowers/plans/2026-07-05-ranger-random-narrowing.md`
 
-- [ ] **Step 1: Add a focused Ranger identity, required kit, and color test**
+- [x] **Step 1: Add a focused Ranger identity, required kit, and color test**
 
 In `packages/web/test/random-outfit.test.ts`, add this test immediately after the existing `ranger profile excludes heavy plate and formal noble clothing` test:
 
@@ -114,7 +114,7 @@ In `packages/web/test/random-outfit.test.ts`, add this test immediately after th
 
 This test proves all core Ranger kit slots bypass `optionalProb`, identity is human-only, expression is fixed, caller body type remains male, and `randomColorTypeNames` drives color variation.
 
-- [ ] **Step 2: Add a female body type compatibility test**
+- [x] **Step 2: Add a female body type compatibility test**
 
 Add this test immediately after the test from Step 1:
 
@@ -167,7 +167,7 @@ Add this test immediately after the test from Step 1:
 
 This test proves Ranger does not force `bodyType: 'male'` and that the `Human Male` / `Human Female` head pool still respects catalog compatibility filtering.
 
-- [ ] **Step 3: Add a colors-disabled default test**
+- [x] **Step 3: Add a colors-disabled default test**
 
 Add this test immediately after the test from Step 2:
 
@@ -241,7 +241,7 @@ Add this test immediately after the test from Step 2:
 
 This test proves `scope.colors: false` does not use Ranger `randomColorTypeNames`, while required kit slots still appear.
 
-- [ ] **Step 4: Tighten the existing Ranger exclusion test**
+- [x] **Step 4: Tighten the existing Ranger exclusion test**
 
 Replace the existing `ranger profile excludes heavy plate and formal noble clothing` test with this broader version:
 
@@ -296,7 +296,7 @@ Replace the existing `ranger profile excludes heavy plate and formal noble cloth
 
 This keeps the existing exclusion coverage and expands it to the off-theme categories from the approved design.
 
-- [ ] **Step 5: Run the focused test file and verify the new tests fail**
+- [x] **Step 5: Run the focused test file and verify the new tests fail**
 
 Run:
 
@@ -305,6 +305,9 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts
 ```
 
 Expected: FAIL before implementation. The first new Ranger test should fail because the current Ranger profile can select a non-`Body Color` body and omits required kit slots when `optionalProb: 0`.
+
+Implementation note: Added focused failing Ranger random coverage for human identity, Neutral expression, required leather/hood/bow/quiver kit, color randomization, colors-disabled defaults, female body type preservation, and off-theme exclusions.
+Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` FAIL as expected before implementation; key failures included body recolor remaining `c0` instead of Ranger random color `red`, female head selecting `Skeleton` instead of `Human Female`, and required `armour` omitted when `optionalProb: 0`.
 
 - [ ] **Step 6: Commit the failing tests**
 
