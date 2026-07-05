@@ -332,7 +332,7 @@ Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-ou
 - Modify: `packages/web/src/slice/random-profiles.ts`
 - Modify: `docs/superpowers/plans/2026-07-05-ranger-random-narrowing.md`
 
-- [ ] **Step 1: Replace `RANGER_RANDOM_PROFILE`**
+- [x] **Step 1: Replace `RANGER_RANDOM_PROFILE`**
 
 In `packages/web/src/slice/random-profiles.ts`, replace the existing `RANGER_RANDOM_PROFILE` object with:
 
@@ -392,7 +392,7 @@ export const RANGER_RANDOM_PROFILE: RandomProfile = {
 
 Do not add `bodyType` to Ranger. The caller/current body type must remain effective.
 
-- [ ] **Step 2: Run the focused test file and verify it passes**
+- [x] **Step 2: Run the focused test file and verify it passes**
 
 Run:
 
@@ -401,6 +401,9 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts
 ```
 
 Expected: PASS.
+
+Implementation note: Tightened Ranger random with human identity pools, Neutral expression, required leather/hood/bow/quiver kit, and Ranger random color slots.
+Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS.
 
 - [ ] **Step 3: Commit the implementation**
 
