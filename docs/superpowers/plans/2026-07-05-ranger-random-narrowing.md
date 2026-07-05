@@ -427,7 +427,7 @@ Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-ou
 **Files:**
 - Modify: `docs/superpowers/plans/2026-07-05-ranger-random-narrowing.md`
 
-- [ ] **Step 1: Run focused random outfit tests**
+- [x] **Step 1: Run focused random outfit tests**
 
 Run:
 
@@ -437,7 +437,10 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 2: Run web typecheck**
+Implementation note: Ran focused random outfit regression coverage for final Ranger verification.
+Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS.
+
+- [x] **Step 2: Run web typecheck**
 
 Run:
 
@@ -447,7 +450,10 @@ rtk pnpm --filter @lpc-toolkit/web typecheck
 
 Expected: PASS.
 
-- [ ] **Step 3: Run architecture boundary check**
+Implementation note: The requested `rtk pnpm --filter @lpc-toolkit/web typecheck` command hit an `rtk` wrapper limitation and exited 1 despite printing `TypeScript: No errors found`; final web package typecheck verification used the supported equivalent command.
+Verification: `rtk pnpm --dir packages/web typecheck` PASS.
+
+- [x] **Step 3: Run architecture boundary check**
 
 Run:
 
@@ -457,7 +463,10 @@ rtk pnpm check:boundaries
 
 Expected: PASS.
 
-- [ ] **Step 4: Record verification in this plan**
+Implementation note: Ran the architecture boundary check after focused tests and web typecheck.
+Verification: `rtk pnpm check:boundaries` PASS.
+
+- [x] **Step 4: Record verification in this plan**
 
 Append a final status note under this task:
 
@@ -469,6 +478,13 @@ Verification:
 - `rtk pnpm --filter @lpc-toolkit/web typecheck` PASS.
 - `rtk pnpm check:boundaries` PASS.
 ```
+
+Implementation note: Recorded final Ranger random narrowing verification.
+Commit: pending docs verification commit hash.
+Verification:
+- `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS.
+- `rtk pnpm --filter @lpc-toolkit/web typecheck` hit an `rtk` wrapper limitation despite no TypeScript errors; supported equivalent `rtk pnpm --dir packages/web typecheck` PASS.
+- `rtk pnpm check:boundaries` PASS.
 
 - [ ] **Step 5: Commit the verification note**
 
