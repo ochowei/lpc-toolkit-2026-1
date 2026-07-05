@@ -542,7 +542,7 @@ After committing, run `rtk git log -1 --format=%h` and update this task with:
 
 - the implementation note:
   `Recorded final Mage random narrowing verification.`
-- Commit: `61c832cac`
+- Commit: `c772fc26a`
 - the verification status:
   - `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS
   - `rtk pnpm check:boundaries` PASS
