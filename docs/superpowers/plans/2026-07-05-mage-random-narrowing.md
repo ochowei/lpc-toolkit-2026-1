@@ -401,7 +401,7 @@ After committing, run `rtk git log -1 --format=%h` and update this task with:
 - Modify: `packages/web/src/slice/random-profiles.ts`
 - Modify: `docs/superpowers/plans/2026-07-05-mage-random-narrowing.md`
 
-- [ ] **Step 1: Update `MAGE_RANDOM_PROFILE`**
+- [x] **Step 1: Update `MAGE_RANDOM_PROFILE`**
 
 In `packages/web/src/slice/random-profiles.ts`, replace the current
 `MAGE_RANDOM_PROFILE` definition with this version:
@@ -464,10 +464,12 @@ export const MAGE_RANDOM_PROFILE: RandomProfile = {
 };
 ```
 
+Implementation note: `Tightened Mage random through profile-level body/head/expression pools, required Mage slots, and Mage random color slots without UI or core changes.`
+
 Do not add `bodyType` to the Mage profile. Mage should preserve the effective
 body type passed to `pickRandomOutfit`.
 
-- [ ] **Step 2: Run the focused test file and confirm it passes**
+- [x] **Step 2: Run the focused test file and confirm it passes**
 
 Run:
 
@@ -475,7 +477,7 @@ Run:
 rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts
 ```
 
-Expected: PASS.
+Verification status: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS.
 
 - [ ] **Step 3: Commit the profile implementation**
 
@@ -485,14 +487,6 @@ Run:
 rtk git add packages/web/src/slice/random-profiles.ts docs/superpowers/plans/2026-07-05-mage-random-narrowing.md
 rtk git commit -m "fix(web): narrow mage random profile"
 ```
-
-After committing, run `rtk git log -1 --format=%h` and update this task with:
-
-- the implementation note:
-  `Tightened Mage random through profile-level body/head/expression pools, required Mage slots, and Mage random color slots without UI or core changes.`
-- the actual short commit hash for `fix(web): narrow mage random profile`
-- the verification status:
-  `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS
 
 ## Task 3: Final Verification
 
