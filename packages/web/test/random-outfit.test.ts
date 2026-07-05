@@ -834,8 +834,8 @@ describe('pickRandomOutfit', () => {
       'expression/happy.json': makeItem('Happy', 'expression'),
       'hair/messy.json': makeItem('Messy3', 'hair'),
       'armour/plate.json': makeRecolorItem('Plate', 'armour'),
-      'legs/armour.json': makeRecolorItem('Armour', 'legs'),
-      'shoes/armour.json': makeItem('Armour', 'shoes', 'male', [
+      'legs/knight-legs-armour.json': makeRecolorItem('Armour', 'legs'),
+      'shoes/knight-shoes-armour.json': makeItem('Armour', 'shoes', 'male', [
         'steel',
         'gold',
       ]),
@@ -847,14 +847,14 @@ describe('pickRandomOutfit', () => {
         'kite blue gray',
         'kite red gray',
       ]),
-      'arms/armour.json': makeRecolorItem('Armour', 'arms'),
+      'arms/knight-arms-armour.json': makeRecolorItem('Armour', 'arms'),
       'gloves/gloves.json': makeRecolorItem('Gloves', 'gloves'),
     });
 
     const sel = pickRandomOutfit({
       catalog: knightCatalog,
       bodyType: 'male',
-      rng: () => 0.5,
+      rng: seqRng([0, 0, 0, 0.5, 0, 0, 0, 0, 0, 0, 0, 0, 0.5, 0.5]),
       optionalProb: 0,
       profile: 'knight',
     });
@@ -896,8 +896,8 @@ describe('pickRandomOutfit', () => {
       'head/human-female.json': makeItem('Human Female', 'head', 'female'),
       'expression/neutral.json': makeItem('Neutral', 'expression', 'female'),
       'armour/plate.json': makeRecolorItem('Plate', 'armour', ['v1'], 'female'),
-      'legs/armour.json': makeRecolorItem('Armour', 'legs', ['v1'], 'female'),
-      'shoes/armour.json': makeItem('Armour', 'shoes', 'female', ['steel']),
+      'legs/knight-legs-armour.json': makeRecolorItem('Armour', 'legs', ['v1'], 'female'),
+      'shoes/knight-shoes-armour.json': makeItem('Armour', 'shoes', 'female', ['steel']),
       'hat/armet.json': makeRecolorItem('Armet', 'hat', ['v1'], 'female'),
       'weapon/longsword.json': makeItem('Longsword', 'weapon', 'female', [
         'longsword',
@@ -939,8 +939,8 @@ describe('pickRandomOutfit', () => {
       'expression/neutral.json': makeItem('Neutral', 'expression'),
       'hair/messy.json': makeItem('Messy3', 'hair'),
       'armour/plate.json': makeRecolorItem('Plate', 'armour'),
-      'legs/armour.json': makeRecolorItem('Armour', 'legs'),
-      'shoes/armour.json': makeItem('Armour', 'shoes', 'male', [
+      'legs/knight-legs-armour.json': makeRecolorItem('Armour', 'legs'),
+      'shoes/knight-shoes-armour.json': makeItem('Armour', 'shoes', 'male', [
         'steel',
         'gold',
       ]),
@@ -952,7 +952,7 @@ describe('pickRandomOutfit', () => {
         'kite blue gray',
         'kite red gray',
       ]),
-      'arms/armour.json': makeRecolorItem('Armour', 'arms'),
+      'arms/knight-arms-armour.json': makeRecolorItem('Armour', 'arms'),
       'gloves/gloves.json': makeRecolorItem('Gloves', 'gloves'),
     });
 
@@ -1019,8 +1019,8 @@ describe('pickRandomOutfit', () => {
       'head/human-male.json': makeItem('Human Male', 'head'),
       'expression/neutral.json': makeItem('Neutral', 'expression'),
       'armour/plate.json': makeRecolorItem('Plate', 'armour'),
-      'legs/armour.json': makeRecolorItem('Armour', 'legs'),
-      'shoes/armour.json': makeItem('Armour', 'shoes', 'male', [
+      'legs/knight-legs-armour.json': makeRecolorItem('Armour', 'legs'),
+      'shoes/knight-shoes-armour.json': makeItem('Armour', 'shoes', 'male', [
         'steel',
         'gold',
       ]),

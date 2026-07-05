@@ -356,7 +356,7 @@ Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-ou
 - Modify: `packages/web/src/slice/random-profiles.ts`
 - Modify: `docs/superpowers/plans/2026-07-05-knight-random-narrowing.md`
 
-- [ ] **Step 1: Update KNIGHT_RANDOM_PROFILE type names**
+- [x] **Step 1: Update KNIGHT_RANDOM_PROFILE type names**
 
 In `packages/web/src/slice/random-profiles.ts`, find `KNIGHT_RANDOM_PROFILE` and add `hair` immediately after `expression` in `typeNames`:
 
@@ -377,7 +377,7 @@ In `packages/web/src/slice/random-profiles.ts`, find `KNIGHT_RANDOM_PROFILE` and
   ],
 ```
 
-- [ ] **Step 2: Add required core Knight slots**
+- [x] **Step 2: Add required core Knight slots**
 
 Still in `KNIGHT_RANDOM_PROFILE`, add `requiredTypeNames` after `typeNames`:
 
@@ -397,7 +397,7 @@ Still in `KNIGHT_RANDOM_PROFILE`, add `requiredTypeNames` after `typeNames`:
 
 Do not include `hair`, `arms`, or `gloves` in `requiredTypeNames`.
 
-- [ ] **Step 3: Constrain Knight item pools to human identity and fixed equipment**
+- [x] **Step 3: Constrain Knight item pools to human identity and fixed equipment**
 
 Replace the existing `itemPools` block in `KNIGHT_RANDOM_PROFILE` with:
 
@@ -417,7 +417,7 @@ Replace the existing `itemPools` block in `KNIGHT_RANDOM_PROFILE` with:
   },
 ```
 
-- [ ] **Step 4: Add Knight random color slots**
+- [x] **Step 4: Add Knight random color slots**
 
 Add `randomColorTypeNames` immediately before `itemPools`:
 
@@ -436,7 +436,7 @@ Add `randomColorTypeNames` immediately before `itemPools`:
 
 Do not include `weapon` because the current `Longsword` item has only the `longsword` variant.
 
-- [ ] **Step 5: Run the focused random outfit test**
+- [x] **Step 5: Run the focused random outfit test**
 
 Run:
 
@@ -446,7 +446,7 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit the implementation**
+- [x] **Step 6: Commit the implementation**
 
 Run:
 
@@ -462,6 +462,10 @@ Implementation note: Tightened Knight random profile with human identity pools, 
 Commit: paste the output of `rtk git log -1 --format=%h`.
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS.
 ```
+
+Implementation note: Tightened Knight random profile with human identity pools, required core equipment, optional hair/arms/gloves, and random color slots. Also fixed synthetic Knight test catalog paths so repeated `Armour` fixtures use unique JSON basenames and adjusted the first Knight identity/equipment test to use a deterministic RNG sequence that skips optional slots while preserving first required variants.
+Commit: pending commit for this task.
+Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS.
 
 ## Task 3: Run Final Verification
 
