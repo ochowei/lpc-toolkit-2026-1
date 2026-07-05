@@ -472,7 +472,7 @@ Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-ou
 **Files:**
 - Modify: `docs/superpowers/plans/2026-07-05-knight-random-narrowing.md`
 
-- [ ] **Step 1: Run the focused test**
+- [x] **Step 1: Run the focused test**
 
 Run:
 
@@ -482,7 +482,7 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 2: Run web typecheck**
+- [x] **Step 2: Run web typecheck**
 
 Run:
 
@@ -492,7 +492,7 @@ rtk pnpm --filter @lpc-toolkit/web run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 3: Run architecture boundary check**
+- [x] **Step 3: Run architecture boundary check**
 
 Run:
 
@@ -502,7 +502,7 @@ rtk pnpm check:boundaries
 
 Expected: PASS.
 
-- [ ] **Step 4: Commit verification notes**
+- [x] **Step 4: Commit verification notes**
 
 Update this task with the exact verification results, then run:
 
@@ -515,6 +515,6 @@ After committing, update this task with:
 
 ```md
 Implementation note: Recorded final focused test, typecheck, and boundary verification.
-Commit: paste the output of `rtk git log -1 --format=%h`.
-Verification: focused random outfit test PASS; web typecheck PASS; boundary check PASS.
+Commit: pending commit for this task.
+Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS; `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS; `rtk pnpm check:boundaries` PASS.
 ```
