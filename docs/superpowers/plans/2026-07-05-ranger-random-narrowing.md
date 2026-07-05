@@ -405,7 +405,7 @@ Expected: PASS.
 Implementation note: Tightened Ranger random with human identity pools, Neutral expression, required leather/hood/bow/quiver kit, and Ranger random color slots.
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS.
 
-- [ ] **Step 3: Commit the implementation**
+- [x] **Step 3: Commit the implementation**
 
 Run:
 
@@ -418,7 +418,7 @@ After the commit succeeds, update this task with:
 
 ```md
 Implementation note: Tightened Ranger random with human identity pools, Neutral expression, required leather/hood/bow/quiver kit, and Ranger random color slots.
-Commit: paste the short hash produced by `rtk git log -1 --oneline` for `fix(web): narrow ranger preset random profile`.
+Commit: b32377075 (`fix(web): narrow ranger preset random profile`).
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS.
 ```
 
