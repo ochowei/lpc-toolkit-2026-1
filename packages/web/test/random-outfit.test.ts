@@ -1368,9 +1368,11 @@ describe('pickRandomOutfit', () => {
     });
   });
 
-  it('ranger profile excludes heavy plate and formal noble clothing', () => {
+  it('ranger profile excludes heavy, formal, farmer, mage, fantasy, and fx items', () => {
     const { catalog: rangerCatalog } = createCatalog({
-      'body/light.json': makeItem('Light', 'body'),
+      'body/body-color.json': makeItem('Body Color', 'body'),
+      'head/human-male.json': makeItem('Human Male', 'head'),
+      'expression/neutral.json': makeItem('Neutral', 'expression'),
       'armour/leather.json': makeItem('Leather', 'armour'),
       'legs/pants.json': makeItem('Pants', 'legs'),
       'shoes/boots.json': makeItem('Basic Boots', 'shoes'),
@@ -1379,6 +1381,12 @@ describe('pickRandomOutfit', () => {
       'quiver/quiver.json': makeItem('Quiver', 'quiver'),
       'chainmail/steel.json': makeItem('Chainmail', 'chainmail'),
       'clothes/formal.json': makeItem('Collared/Formal Longsleeve', 'clothes'),
+      'overalls/brown.json': makeItem('Overalls', 'overalls'),
+      'apron/plain.json': makeItem('Plain Apron', 'apron'),
+      'weapon/crystal.json': makeItem('Crystal', 'weapon_magic_crystal'),
+      'shield/kite.json': makeItem('Kite', 'shield'),
+      'wings/feather.json': makeItem('Wings', 'wings'),
+      'wound/arm.json': makeItem('Bleeding', 'wound_arm'),
     });
 
     const sel = pickRandomOutfit({
@@ -1390,10 +1398,214 @@ describe('pickRandomOutfit', () => {
     });
 
     expect(sel.items['armour']).toEqual({ typeName: 'armour', name: 'Leather' });
-    expect(sel.items['weapon']).toBeDefined();
-    expect(sel.items['quiver']).toBeDefined();
-    expect(sel.items['chainmail']).toBeUndefined();
-    expect(sel.items['clothes']).toBeUndefined();
+    expect(sel.items['weapon']).toEqual({ typeName: 'weapon', name: 'Normal' });
+    expect(sel.items['quiver']).toEqual({ typeName: 'quiver', name: 'Quiver' });
+
+    for (const typeName of [
+      'chainmail',
+      'clothes',
+      'overalls',
+      'apron',
+      'weapon_magic_crystal',
+      'shield',
+      'wings',
+      'wound_arm',
+    ] as const) {
+      expect(sel.items[typeName]).toBeUndefined();
+    }
+  });
+
+  it('ranger profile fixes human neutral required kit while preserving body type and random colors', () => {
+    const { catalog: rangerCatalog } = createCatalog({
+      'body/body-color.json': makeRecolorItem('Body Color', 'body'),
+      'body/skeleton.json': makeItem('Skeleton Body', 'body'),
+      'body/zombie.json': makeItem('Zombie Body', 'body'),
+      'head/human-male.json': makeItem('Human Male', 'head'),
+      'head/human-female.json': makeItem('Human Female', 'head', 'female'),
+      'head/skeleton.json': makeItem('Skeleton', 'head'),
+      'head/zombie.json': makeItem('Zombie', 'head'),
+      'expression/neutral.json': makeItem('Neutral', 'expression'),
+      'expression/happy.json': makeItem('Happy', 'expression'),
+      'hair/messy.json': makeItem('Messy3', 'hair'),
+      'armour/leather.json': makeItem('Leather', 'armour', 'male', [
+        'brown',
+        'green',
+      ]),
+      'legs/pants.json': makeRecolorItem('Pants', 'legs'),
+      'shoes/basic-boots.json': makeItem('Basic Boots', 'shoes', 'male', [
+        'brown',
+        'black',
+      ]),
+      'hat/hood.json': makeItem('Hood', 'hat', 'male', ['brown', 'green']),
+      'weapon/bow.json': makeItem('Normal', 'weapon', 'male', ['dark', 'light']),
+      'quiver/quiver.json': makeItem('Quiver', 'quiver', 'male', [
+        'quiver',
+        'green',
+      ]),
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: rangerCatalog,
+      palettes,
+      bodyType: 'male',
+      rng: () => 0.99,
+      optionalProb: 0,
+      profile: 'ranger',
+    });
+
+    expect(sel.bodyType).toBe('male');
+    expect(sel.items['body']).toEqual({
+      typeName: 'body',
+      name: 'Body Color',
+      recolor: 'red',
+    });
+    expect(sel.items['head']).toEqual({ typeName: 'head', name: 'Human Male' });
+    expect(sel.items['expression']).toEqual({
+      typeName: 'expression',
+      name: 'Neutral',
+    });
+    expect(sel.items['hair']).toBeUndefined();
+    expect(sel.items['armour']).toEqual({
+      typeName: 'armour',
+      name: 'Leather',
+      variant: 'green',
+    });
+    expect(sel.items['legs']).toEqual({
+      typeName: 'legs',
+      name: 'Pants',
+      recolor: 'red',
+    });
+    expect(sel.items['shoes']).toEqual({
+      typeName: 'shoes',
+      name: 'Basic Boots',
+      variant: 'black',
+    });
+    expect(sel.items['hat']).toEqual({
+      typeName: 'hat',
+      name: 'Hood',
+      variant: 'green',
+    });
+    expect(sel.items['weapon']).toEqual({
+      typeName: 'weapon',
+      name: 'Normal',
+      variant: 'light',
+    });
+    expect(sel.items['quiver']).toEqual({
+      typeName: 'quiver',
+      name: 'Quiver',
+      variant: 'green',
+    });
+  });
+
+  it('ranger profile keeps female body type and selects the compatible human head', () => {
+    const { catalog: rangerCatalog } = createCatalog({
+      'body/body-color.json': makeRecolorItem('Body Color', 'body', ['v1'], 'female'),
+      'head/human-male.json': makeItem('Human Male', 'head'),
+      'head/human-female.json': makeItem('Human Female', 'head', 'female'),
+      'head/skeleton.json': makeItem('Skeleton', 'head', 'female'),
+      'expression/neutral.json': makeItem('Neutral', 'expression', 'female'),
+      'armour/leather.json': makeItem('Leather', 'armour', 'female'),
+      'legs/pants.json': makeItem('Pants', 'legs', 'female'),
+      'shoes/basic-boots.json': makeItem('Basic Boots', 'shoes', 'female', [
+        'brown',
+      ]),
+      'hat/hood.json': makeItem('Hood', 'hat', 'female'),
+      'weapon/bow.json': makeItem('Normal', 'weapon', 'female', ['dark']),
+      'quiver/quiver.json': makeItem('Quiver', 'quiver', 'female', ['quiver']),
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: rangerCatalog,
+      bodyType: 'female',
+      rng: () => 0.99,
+      optionalProb: 0,
+      profile: 'ranger',
+    });
+
+    expect(sel.bodyType).toBe('female');
+    expect(sel.items['body']).toEqual({ typeName: 'body', name: 'Body Color' });
+    expect(sel.items['head']).toEqual({ typeName: 'head', name: 'Human Female' });
+    expect(sel.items['expression']).toEqual({
+      typeName: 'expression',
+      name: 'Neutral',
+    });
+    expect(sel.items['armour']).toEqual({ typeName: 'armour', name: 'Leather' });
+    expect(sel.items['weapon']).toEqual({
+      typeName: 'weapon',
+      name: 'Normal',
+      variant: 'dark',
+    });
+    expect(sel.items['quiver']).toEqual({
+      typeName: 'quiver',
+      name: 'Quiver',
+      variant: 'quiver',
+    });
+  });
+
+  it('ranger profile keeps default ranger colors when random colors are disabled', () => {
+    const { catalog: rangerCatalog } = createCatalog({
+      'body/body-color.json': makeRecolorItem('Body Color', 'body'),
+      'head/human-male.json': makeItem('Human Male', 'head'),
+      'expression/neutral.json': makeItem('Neutral', 'expression'),
+      'armour/leather.json': makeItem('Leather', 'armour', 'male', [
+        'brown',
+        'green',
+      ]),
+      'legs/pants.json': makeRecolorItem('Pants', 'legs'),
+      'shoes/basic-boots.json': makeItem('Basic Boots', 'shoes', 'male', [
+        'brown',
+        'black',
+      ]),
+      'hat/hood.json': makeItem('Hood', 'hat', 'male', ['brown', 'green']),
+      'weapon/bow.json': makeItem('Normal', 'weapon', 'male', ['dark', 'light']),
+      'quiver/quiver.json': makeItem('Quiver', 'quiver', 'male', [
+        'quiver',
+        'green',
+      ]),
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: rangerCatalog,
+      palettes,
+      bodyType: 'male',
+      rng: () => 0.99,
+      optionalProb: 0,
+      profile: 'ranger',
+      scope: {
+        appearance: true,
+        clothing: true,
+        equipment: true,
+        colors: false,
+      },
+    });
+
+    expect(sel.items['body']).toEqual({ typeName: 'body', name: 'Body Color' });
+    expect(sel.items['armour']).toEqual({
+      typeName: 'armour',
+      name: 'Leather',
+      variant: 'brown',
+    });
+    expect(sel.items['legs']).toEqual({ typeName: 'legs', name: 'Pants' });
+    expect(sel.items['shoes']).toEqual({
+      typeName: 'shoes',
+      name: 'Basic Boots',
+      variant: 'brown',
+    });
+    expect(sel.items['hat']).toEqual({
+      typeName: 'hat',
+      name: 'Hood',
+      variant: 'brown',
+    });
+    expect(sel.items['weapon']).toEqual({
+      typeName: 'weapon',
+      name: 'Normal',
+      variant: 'dark',
+    });
+    expect(sel.items['quiver']).toEqual({
+      typeName: 'quiver',
+      name: 'Quiver',
+      variant: 'quiver',
+    });
   });
 
   it('noble profile excludes weapons, shields, armor, workwear, and fantasy parts', () => {
