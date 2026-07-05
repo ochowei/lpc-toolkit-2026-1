@@ -515,6 +515,6 @@ After committing, update this task with:
 
 ```md
 Implementation note: Recorded final focused test, typecheck, and boundary verification.
-Commit: pending commit for this task.
+Commit: f4b0d57e1.
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS; `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS; `rtk pnpm check:boundaries` PASS.
 ```
