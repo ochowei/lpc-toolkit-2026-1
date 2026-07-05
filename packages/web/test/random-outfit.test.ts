@@ -28,6 +28,18 @@ function makeItem(
   } as unknown as ItemDefinition;
 }
 
+function makeRecolorItem(
+  name: string,
+  typeName: string,
+  palettesForItem: readonly string[] = ['v1'],
+  layerKey: 'male' | 'female' = 'male',
+): ItemDefinition {
+  return {
+    ...makeItem(name, typeName, layerKey),
+    recolors: { material: 'm', palettes: palettesForItem },
+  } as unknown as ItemDefinition;
+}
+
 const palettes = createPaletteCatalog({
   'm/meta_m.json': { type: 'material', default: 'v1', base: 'c0' },
   'm/m_v1.json': {
@@ -411,7 +423,7 @@ describe('pickRandomOutfit', () => {
 
   it('farmer profile excludes fantasy, combat, and fx categories', () => {
     const { catalog: farmerCatalog } = createCatalog({
-      'body/light.json': makeItem('Light', 'body'),
+      'body/body-color.json': makeRecolorItem('Body Color', 'body'),
       'head/human.json': makeItem('Human Male', 'head'),
       'expression/neutral.json': makeItem('Neutral', 'expression'),
       'hair/messy.json': makeItem('Messy3', 'hair'),
@@ -466,6 +478,234 @@ describe('pickRandomOutfit', () => {
     ] as const) {
       expect(sel.items[typeName]).toBeUndefined();
     }
+  });
+
+  it('farmer profile fixes male neutral required workwear while keeping skin random', () => {
+    const { catalog: farmerCatalog } = createCatalog({
+      'body/body-color.json': makeRecolorItem('Body Color', 'body'),
+      'head/human-male.json': makeItem('Human Male', 'head'),
+      'head/human-female.json': makeItem('Human Female', 'head', 'female'),
+      'expression/neutral.json': makeItem('Neutral', 'expression'),
+      'expression/happy.json': makeItem('Happy', 'expression'),
+      'hair/messy.json': makeItem('Messy3', 'hair'),
+      'hair/curly.json': makeItem('Curly', 'hair'),
+      'clothes/shortsleeve.json': makeItem('Shortsleeve', 'clothes'),
+      'overalls/brown.json': makeItem('Overalls', 'overalls', 'male', ['brown']),
+      'shoes/basic-boots.json': makeItem('Basic Boots', 'shoes', 'male', ['brown']),
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: farmerCatalog,
+      palettes,
+      bodyType: 'female',
+      rng: seqRng([0, 0.99, 0.99, 0, 0.99, 0, 0, 0]),
+      optionalProb: 0,
+      profile: 'farmer',
+    });
+
+    expect(sel.bodyType).toBe('male');
+    expect(sel.items['body']).toEqual({
+      typeName: 'body',
+      name: 'Body Color',
+      recolor: 'red',
+    });
+    expect(sel.items['head']).toEqual({ typeName: 'head', name: 'Human Male' });
+    expect(sel.items['expression']).toEqual({
+      typeName: 'expression',
+      name: 'Neutral',
+    });
+    expect(sel.items['hair']).toBeUndefined();
+    expect(sel.items['clothes']).toEqual({
+      typeName: 'clothes',
+      name: 'Shortsleeve',
+    });
+    expect(sel.items['overalls']).toEqual({
+      typeName: 'overalls',
+      name: 'Overalls',
+      variant: 'brown',
+    });
+    expect(sel.items['shoes']).toEqual({
+      typeName: 'shoes',
+      name: 'Basic Boots',
+      variant: 'brown',
+    });
+  });
+
+  it('farmer profile uses human body and adult male head while randomizing farmer colors', () => {
+    const { catalog: farmerCatalog } = createCatalog({
+      'body/body-color.json': makeRecolorItem('Body Color', 'body'),
+      'body/skeleton-body.json': makeItem('Skeleton Body', 'body'),
+      'body/zombie-body.json': makeItem('Zombie Body', 'body'),
+      'head/human-male.json': makeItem('Human Male', 'head'),
+      'head/skeleton.json': makeItem('Skeleton', 'head'),
+      'head/zombie.json': makeItem('Zombie', 'head'),
+      'expression/neutral.json': makeItem('Neutral', 'expression'),
+      'hair/messy.json': makeItem('Messy3', 'hair'),
+      'clothes/shortsleeve.json': makeRecolorItem('Shortsleeve', 'clothes'),
+      'overalls/brown.json': makeItem('Overalls', 'overalls', 'male', [
+        'brown',
+        'blue',
+      ]),
+      'shoes/basic-boots.json': makeItem('Basic Boots', 'shoes', 'male', [
+        'brown',
+        'tan',
+      ]),
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: farmerCatalog,
+      palettes,
+      bodyType: 'female',
+      rng: seqRng([
+        0.99, 0.99,
+        0.99,
+        0,
+        0, 0,
+        0, 0.99,
+        0, 0.99,
+        0, 0.99,
+      ]),
+      optionalProb: 1,
+      profile: 'farmer',
+    });
+
+    expect(sel.bodyType).toBe('male');
+    expect(sel.items['body']).toEqual({
+      typeName: 'body',
+      name: 'Body Color',
+      recolor: 'red',
+    });
+    expect(sel.items['head']).toEqual({ typeName: 'head', name: 'Human Male' });
+    expect(sel.items['expression']).toEqual({
+      typeName: 'expression',
+      name: 'Neutral',
+    });
+    expect(sel.items['hair']).toEqual({ typeName: 'hair', name: 'Messy3' });
+    expect(sel.items['clothes']).toEqual({
+      typeName: 'clothes',
+      name: 'Shortsleeve',
+      recolor: 'red',
+    });
+    expect(sel.items['overalls']).toEqual({
+      typeName: 'overalls',
+      name: 'Overalls',
+      variant: 'blue',
+    });
+    expect(sel.items['shoes']).toEqual({
+      typeName: 'shoes',
+      name: 'Basic Boots',
+      variant: 'tan',
+    });
+  });
+
+  it('farmer profile keeps default farmer colors when random colors are disabled', () => {
+    const { catalog: farmerCatalog } = createCatalog({
+      'body/body-color.json': makeRecolorItem('Body Color', 'body'),
+      'head/human-male.json': makeItem('Human Male', 'head'),
+      'expression/neutral.json': makeItem('Neutral', 'expression'),
+      'clothes/shortsleeve.json': makeRecolorItem('Shortsleeve', 'clothes'),
+      'overalls/brown.json': makeItem('Overalls', 'overalls', 'male', [
+        'brown',
+        'blue',
+      ]),
+      'shoes/basic-boots.json': makeItem('Basic Boots', 'shoes', 'male', [
+        'brown',
+        'tan',
+      ]),
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: farmerCatalog,
+      palettes,
+      bodyType: 'male',
+      rng: () => 0.99,
+      optionalProb: 0,
+      profile: 'farmer',
+      scope: {
+        appearance: true,
+        clothing: true,
+        equipment: true,
+        colors: false,
+      },
+    });
+
+    expect(sel.items['body']).toEqual({ typeName: 'body', name: 'Body Color' });
+    expect(sel.items['clothes']).toEqual({
+      typeName: 'clothes',
+      name: 'Shortsleeve',
+    });
+    expect(sel.items['overalls']).toEqual({
+      typeName: 'overalls',
+      name: 'Overalls',
+      variant: 'brown',
+    });
+    expect(sel.items['shoes']).toEqual({
+      typeName: 'shoes',
+      name: 'Basic Boots',
+      variant: 'brown',
+    });
+  });
+
+  it('farmer profile can still randomize hair when appearance optional slots are included', () => {
+    const { catalog: farmerCatalog } = createCatalog({
+      'body/body-color.json': makeRecolorItem('Body Color', 'body'),
+      'head/human-male.json': makeItem('Human Male', 'head'),
+      'expression/neutral.json': makeItem('Neutral', 'expression'),
+      'hair/messy.json': makeItem('Messy3', 'hair'),
+      'hair/curly.json': makeItem('Curly', 'hair'),
+      'clothes/shortsleeve.json': makeItem('Shortsleeve', 'clothes'),
+      'overalls/brown.json': makeItem('Overalls', 'overalls', 'male', ['brown']),
+      'shoes/basic-boots.json': makeItem('Basic Boots', 'shoes', 'male', ['brown']),
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: farmerCatalog,
+      bodyType: 'male',
+      rng: seqRng([0, 0, 0, 0, 0.99, 0.99, 0, 0, 0]),
+      optionalProb: 1,
+      profile: 'farmer',
+    });
+
+    expect(sel.items['hair']).toEqual({ typeName: 'hair', name: 'Curly' });
+    expect(sel.items['expression']).toEqual({
+      typeName: 'expression',
+      name: 'Neutral',
+    });
+    expect(sel.items['overalls']).toEqual({
+      typeName: 'overalls',
+      name: 'Overalls',
+      variant: 'brown',
+    });
+  });
+
+  it('farmer profile drops incompatible preserved appearance selections when forcing male body type', () => {
+    const { catalog: farmerCatalog } = createCatalog({
+      'body/light.json': makeItem('Light', 'body'),
+      'head/human-female.json': makeItem('Human Female', 'head', 'female'),
+      'hair/long.json': makeItem('Long Hair', 'hair', 'female'),
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: farmerCatalog,
+      bodyType: 'female',
+      rng: () => 0,
+      optionalProb: 1,
+      profile: 'farmer',
+      scope: {
+        appearance: false,
+        clothing: true,
+        equipment: true,
+        colors: true,
+      },
+      currentSelections: {
+        head: { typeName: 'head', name: 'Human Female' },
+        hair: { typeName: 'hair', name: 'Long Hair' },
+      },
+    });
+
+    expect(sel.bodyType).toBe('male');
+    expect(sel.items['head']).toBeUndefined();
+    expect(sel.items['hair']).toBeUndefined();
   });
 
   it('villager profile keeps random outfits mundane and clothing-only', () => {

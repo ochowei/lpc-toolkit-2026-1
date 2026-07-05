@@ -9,6 +9,7 @@ import type {
 } from '@lpc-toolkit/core';
 import { itemSupportsBodyType } from './catalog-tree';
 import { CATEGORY_GROUPS, type GroupId } from './category-groups';
+import { getColorOptions } from './color-options';
 import {
   DEFAULT_RANDOM_SCOPE,
   NORMAL_RANDOM_PROFILE,
@@ -41,6 +42,8 @@ function resolveProfile(profile: RandomProfile | string | undefined): RandomProf
 }
 
 function isRequiredType(profile: RandomProfile, typeName: TypeName): boolean {
+  if (profile.requiredTypeNames?.includes(typeName)) return true;
+
   const requiredGroups = new Set<GroupId>(profile.requiredGroups);
   return CATEGORY_GROUPS.some(
     (group) => requiredGroups.has(group.id) && group.typeNames.includes(typeName),
@@ -67,6 +70,59 @@ function typeNamesForRandomOutfit(
     .flatMap((group) => group.typeNames);
 }
 
+function selectionSupportsBodyType(
+  catalog: Catalog,
+  selection: Selection,
+  bodyType: BodyType,
+): boolean {
+  const defs = catalog.byTypeName.get(selection.typeName) ?? [];
+  return defs.some(
+    (item) => item.name === selection.name && itemSupportsBodyType(item, bodyType),
+  );
+}
+
+function filterSelectionsByBodyType(
+  selections: Readonly<Record<TypeName, Selection>>,
+  catalog: Catalog,
+  bodyType: BodyType,
+): Record<TypeName, Selection> {
+  const compatible: Record<TypeName, Selection> = {};
+  for (const [typeName, selection] of Object.entries(selections)) {
+    if (selectionSupportsBodyType(catalog, selection, bodyType)) {
+      compatible[typeName] = selection;
+    }
+  }
+  return compatible;
+}
+
+function randomColorFieldsForItem(
+  item: ItemDefinition,
+  palettes: PaletteMetadata | undefined,
+  rng: () => number,
+): { variant?: string; recolor?: string } {
+  if (!palettes && (!item.variants || item.variants.length === 0)) return {};
+
+  if (palettes) {
+    const colors = getColorOptions(item, palettes);
+    if (colors.mode === 'recolors') {
+      const pick = colors.options[Math.floor(rng() * colors.options.length)];
+      return pick ? { recolor: pick.value } : {};
+    }
+    if (colors.mode === 'variants') {
+      const pick = colors.options[Math.floor(rng() * colors.options.length)];
+      return pick ? { variant: pick.value } : {};
+    }
+  }
+
+  const variants = item.variants ?? [];
+  const pick = variants[Math.floor(rng() * variants.length)];
+  return pick ? { variant: pick } : {};
+}
+
+function shouldRandomizeColor(profile: RandomProfile, typeName: TypeName): boolean {
+  return profile.randomColorTypeNames?.includes(typeName) ?? false;
+}
+
 /**
  * Generate a Feeling Lucky outfit. Required profile groups always get an item
  * when compatible art exists. Optional groups are included with probability
@@ -75,6 +131,7 @@ function typeNamesForRandomOutfit(
 export function pickRandomOutfit(args: PickRandomOutfitArgs): Selections {
   const rng = args.rng ?? Math.random;
   const profile = resolveProfile(args.profile);
+  const bodyType = profile.bodyType ?? args.bodyType;
   const scope = args.scope ?? DEFAULT_RANDOM_SCOPE;
   const optionalProb = args.optionalProb ?? profile.optionalProb;
   const excluded = new Set<GroupId>(args.excludeGroups ?? profile.excludeGroups);
@@ -82,11 +139,16 @@ export function pickRandomOutfit(args: PickRandomOutfitArgs): Selections {
     args.profile === undefined &&
     args.excludeGroups !== undefined &&
     profile === NORMAL_RANDOM_PROFILE;
+  const preserved = args.currentSelections
+    ? preserveDisabledScopeSelections(args.currentSelections, scope)
+    : {};
+  const compatiblePreserved =
+    profile.bodyType && profile.bodyType !== args.bodyType
+      ? filterSelectionsByBodyType(preserved, args.catalog, bodyType)
+      : preserved;
 
   const items: Record<TypeName, Selection> = {
-    ...(args.currentSelections
-      ? preserveDisabledScopeSelections(args.currentSelections, scope)
-      : {}),
+    ...compatiblePreserved,
   };
 
   for (const typeName of typeNamesForRandomOutfit(
@@ -104,16 +166,23 @@ export function pickRandomOutfit(args: PickRandomOutfitArgs): Selections {
 
     const defs = args.catalog.byTypeName.get(typeName) ?? [];
     const pooled = filterByProfilePool(defs, profile.itemPools?.[typeName]);
-    const compatible = pooled.filter((d) => itemSupportsBodyType(d, args.bodyType));
+    const compatible = pooled.filter((d) => itemSupportsBodyType(d, bodyType));
     if (compatible.length === 0) continue;
 
     const pick = compatible[Math.floor(rng() * compatible.length)]!;
-    items[typeName] = selectionForItem(
+    const selection = selectionForItem(
       typeName,
       pick,
       scope.colors ? args.palettes : undefined,
     );
+    items[typeName] =
+      scope.colors && shouldRandomizeColor(profile, typeName)
+        ? {
+            ...selection,
+            ...randomColorFieldsForItem(pick, args.palettes, rng),
+          }
+        : selection;
   }
 
-  return { bodyType: args.bodyType, items };
+  return { bodyType, items };
 }
