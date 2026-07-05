@@ -464,7 +464,7 @@ Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-ou
 ```
 
 Implementation note: Tightened Knight random profile with human identity pools, required core equipment, optional hair/arms/gloves, and random color slots. Also fixed synthetic Knight test catalog paths so repeated `Armour` fixtures use unique JSON basenames and adjusted the first Knight identity/equipment test to use a deterministic RNG sequence that skips optional slots while preserving first required variants.
-Commit: pending commit for this task.
+Commit: 2ba7e8381.
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS.
 
 ## Task 3: Run Final Verification
