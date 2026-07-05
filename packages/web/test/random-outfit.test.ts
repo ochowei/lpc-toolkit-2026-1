@@ -332,6 +332,7 @@ describe('pickRandomOutfit', () => {
         'body',
         'head',
         'expression',
+        'hair',
         'armour',
         'legs',
         'shoes',
@@ -1120,6 +1121,251 @@ describe('pickRandomOutfit', () => {
     expect(sel.items['overalls']).toBeUndefined();
     expect(sel.items['apron']).toBeUndefined();
     expect(sel.items['weapon_magic_crystal']).toBeUndefined();
+  });
+
+  it('knight profile requires human identity and core equipment while leaving arms and gloves optional', () => {
+    const { catalog: knightCatalog } = createCatalog({
+      'body/body-color.json': makeRecolorItem('Body Color', 'body'),
+      'body/skeleton.json': makeItem('Skeleton', 'body'),
+      'body/zombie.json': makeItem('Zombie', 'body'),
+      'head/human-male.json': makeItem('Human Male', 'head'),
+      'head/human-female.json': makeItem('Human Female', 'head', 'female'),
+      'head/skeleton.json': makeItem('Skeleton', 'head'),
+      'head/zombie.json': makeItem('Zombie', 'head'),
+      'head/wolf.json': makeItem('Wolf male', 'head'),
+      'expression/neutral.json': makeItem('Neutral', 'expression'),
+      'expression/happy.json': makeItem('Happy', 'expression'),
+      'hair/messy.json': makeItem('Messy3', 'hair'),
+      'armour/plate.json': makeRecolorItem('Plate', 'armour'),
+      'legs/knight-legs-armour.json': makeRecolorItem('Armour', 'legs'),
+      'shoes/knight-shoes-armour.json': makeItem('Armour', 'shoes', 'male', [
+        'steel',
+        'gold',
+      ]),
+      'hat/armet.json': makeRecolorItem('Armet', 'hat'),
+      'weapon/longsword.json': makeItem('Longsword', 'weapon', 'male', [
+        'longsword',
+      ]),
+      'shield/kite.json': makeItem('Kite', 'shield', 'male', [
+        'kite blue gray',
+        'kite red gray',
+      ]),
+      'arms/knight-arms-armour.json': makeRecolorItem('Armour', 'arms'),
+      'gloves/gloves.json': makeRecolorItem('Gloves', 'gloves'),
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: knightCatalog,
+      bodyType: 'male',
+      rng: seqRng([0, 0, 0, 0.5, 0, 0, 0, 0, 0, 0, 0, 0, 0.5, 0.5]),
+      optionalProb: 0,
+      profile: 'knight',
+    });
+
+    expect(sel.bodyType).toBe('male');
+    expect(sel.items['body']).toEqual({ typeName: 'body', name: 'Body Color' });
+    expect(sel.items['head']).toEqual({ typeName: 'head', name: 'Human Male' });
+    expect(sel.items['expression']).toEqual({
+      typeName: 'expression',
+      name: 'Neutral',
+    });
+    expect(sel.items['hair']).toBeUndefined();
+    expect(sel.items['armour']).toEqual({ typeName: 'armour', name: 'Plate' });
+    expect(sel.items['legs']).toEqual({ typeName: 'legs', name: 'Armour' });
+    expect(sel.items['shoes']).toEqual({
+      typeName: 'shoes',
+      name: 'Armour',
+      variant: 'steel',
+    });
+    expect(sel.items['hat']).toEqual({ typeName: 'hat', name: 'Armet' });
+    expect(sel.items['weapon']).toEqual({
+      typeName: 'weapon',
+      name: 'Longsword',
+      variant: 'longsword',
+    });
+    expect(sel.items['shield']).toEqual({
+      typeName: 'shield',
+      name: 'Kite',
+      variant: 'kite blue gray',
+    });
+    expect(sel.items['arms']).toBeUndefined();
+    expect(sel.items['gloves']).toBeUndefined();
+  });
+
+  it('knight profile keeps female body type and selects the compatible human head', () => {
+    const { catalog: knightCatalog } = createCatalog({
+      'body/body-color.json': makeRecolorItem('Body Color', 'body', ['v1'], 'female'),
+      'head/human-male.json': makeItem('Human Male', 'head'),
+      'head/human-female.json': makeItem('Human Female', 'head', 'female'),
+      'expression/neutral.json': makeItem('Neutral', 'expression', 'female'),
+      'armour/plate.json': makeRecolorItem('Plate', 'armour', ['v1'], 'female'),
+      'legs/knight-legs-armour.json': makeRecolorItem('Armour', 'legs', ['v1'], 'female'),
+      'shoes/knight-shoes-armour.json': makeItem('Armour', 'shoes', 'female', ['steel']),
+      'hat/armet.json': makeRecolorItem('Armet', 'hat', ['v1'], 'female'),
+      'weapon/longsword.json': makeItem('Longsword', 'weapon', 'female', [
+        'longsword',
+      ]),
+      'shield/kite.json': makeItem('Kite', 'shield', 'female', [
+        'kite blue gray',
+      ]),
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: knightCatalog,
+      bodyType: 'female',
+      rng: () => 0,
+      optionalProb: 0,
+      profile: 'knight',
+    });
+
+    expect(sel.bodyType).toBe('female');
+    expect(sel.items['head']).toEqual({
+      typeName: 'head',
+      name: 'Human Female',
+    });
+    expect(sel.items['weapon']).toEqual({
+      typeName: 'weapon',
+      name: 'Longsword',
+      variant: 'longsword',
+    });
+    expect(sel.items['shield']).toEqual({
+      typeName: 'shield',
+      name: 'Kite',
+      variant: 'kite blue gray',
+    });
+  });
+
+  it('knight profile can randomize armor and shield colors when optional arms and gloves are included', () => {
+    const { catalog: knightCatalog } = createCatalog({
+      'body/body-color.json': makeRecolorItem('Body Color', 'body'),
+      'head/human-male.json': makeItem('Human Male', 'head'),
+      'expression/neutral.json': makeItem('Neutral', 'expression'),
+      'hair/messy.json': makeItem('Messy3', 'hair'),
+      'armour/plate.json': makeRecolorItem('Plate', 'armour'),
+      'legs/knight-legs-armour.json': makeRecolorItem('Armour', 'legs'),
+      'shoes/knight-shoes-armour.json': makeItem('Armour', 'shoes', 'male', [
+        'steel',
+        'gold',
+      ]),
+      'hat/armet.json': makeRecolorItem('Armet', 'hat'),
+      'weapon/longsword.json': makeItem('Longsword', 'weapon', 'male', [
+        'longsword',
+      ]),
+      'shield/kite.json': makeItem('Kite', 'shield', 'male', [
+        'kite blue gray',
+        'kite red gray',
+      ]),
+      'arms/knight-arms-armour.json': makeRecolorItem('Armour', 'arms'),
+      'gloves/gloves.json': makeRecolorItem('Gloves', 'gloves'),
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: knightCatalog,
+      palettes,
+      bodyType: 'male',
+      rng: () => 0.99,
+      optionalProb: 1,
+      profile: 'knight',
+    });
+
+    expect(sel.items['body']).toEqual({
+      typeName: 'body',
+      name: 'Body Color',
+      recolor: 'red',
+    });
+    expect(sel.items['hair']).toEqual({ typeName: 'hair', name: 'Messy3' });
+    expect(sel.items['armour']).toEqual({
+      typeName: 'armour',
+      name: 'Plate',
+      recolor: 'red',
+    });
+    expect(sel.items['legs']).toEqual({
+      typeName: 'legs',
+      name: 'Armour',
+      recolor: 'red',
+    });
+    expect(sel.items['shoes']).toEqual({
+      typeName: 'shoes',
+      name: 'Armour',
+      variant: 'gold',
+    });
+    expect(sel.items['hat']).toEqual({
+      typeName: 'hat',
+      name: 'Armet',
+      recolor: 'red',
+    });
+    expect(sel.items['weapon']).toEqual({
+      typeName: 'weapon',
+      name: 'Longsword',
+      variant: 'longsword',
+    });
+    expect(sel.items['shield']).toEqual({
+      typeName: 'shield',
+      name: 'Kite',
+      variant: 'kite red gray',
+    });
+    expect(sel.items['arms']).toEqual({
+      typeName: 'arms',
+      name: 'Armour',
+      recolor: 'red',
+    });
+    expect(sel.items['gloves']).toEqual({
+      typeName: 'gloves',
+      name: 'Gloves',
+      recolor: 'red',
+    });
+  });
+
+  it('knight profile keeps default colors when random colors are disabled', () => {
+    const { catalog: knightCatalog } = createCatalog({
+      'body/body-color.json': makeRecolorItem('Body Color', 'body'),
+      'head/human-male.json': makeItem('Human Male', 'head'),
+      'expression/neutral.json': makeItem('Neutral', 'expression'),
+      'armour/plate.json': makeRecolorItem('Plate', 'armour'),
+      'legs/knight-legs-armour.json': makeRecolorItem('Armour', 'legs'),
+      'shoes/knight-shoes-armour.json': makeItem('Armour', 'shoes', 'male', [
+        'steel',
+        'gold',
+      ]),
+      'hat/armet.json': makeRecolorItem('Armet', 'hat'),
+      'weapon/longsword.json': makeItem('Longsword', 'weapon', 'male', [
+        'longsword',
+      ]),
+      'shield/kite.json': makeItem('Kite', 'shield', 'male', [
+        'kite blue gray',
+        'kite red gray',
+      ]),
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: knightCatalog,
+      palettes,
+      bodyType: 'male',
+      rng: () => 0.99,
+      optionalProb: 0,
+      profile: 'knight',
+      scope: {
+        appearance: true,
+        clothing: true,
+        equipment: true,
+        colors: false,
+      },
+    });
+
+    expect(sel.items['body']).toEqual({ typeName: 'body', name: 'Body Color' });
+    expect(sel.items['armour']).toEqual({ typeName: 'armour', name: 'Plate' });
+    expect(sel.items['legs']).toEqual({ typeName: 'legs', name: 'Armour' });
+    expect(sel.items['shoes']).toEqual({
+      typeName: 'shoes',
+      name: 'Armour',
+      variant: 'steel',
+    });
+    expect(sel.items['hat']).toEqual({ typeName: 'hat', name: 'Armet' });
+    expect(sel.items['shield']).toEqual({
+      typeName: 'shield',
+      name: 'Kite',
+      variant: 'kite blue gray',
+    });
   });
 
   it('ranger profile excludes heavy plate and formal noble clothing', () => {
