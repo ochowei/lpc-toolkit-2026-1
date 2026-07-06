@@ -9,7 +9,7 @@
     "prepare-assets": "tsx scripts/prepare-assets.ts",
     "verify-upstream-parity": "tsx scripts/verify-upstream-parity.ts",
     "zip-assets": "tsx scripts/zip-assets.ts",
-    "prebuild": "pnpm prepare-assets && pnpm --filter @lpc-toolkit/core build",
+    "prebuild": "pnpm prepare-assets && pnpm --filter @lpc-toolkit/core build && pnpm --filter @lpc-toolkit/presets build",
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
