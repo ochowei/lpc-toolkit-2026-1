@@ -456,5 +456,5 @@ Verification: `rtk pnpm check:boundaries` PASS; `rtk git status --short` clean b
 - Villager random can vary body, shirt, pants, and shoe colors when colors are enabled.
 - Villager random keeps default colors and variants when colors are disabled.
 - `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` passes.
-- `rtk pnpm --filter @lpc-toolkit/web typecheck` passes.
+- `rtk pnpm --filter @lpc-toolkit/web run typecheck` passes.
 - `rtk pnpm check:boundaries` passes.
