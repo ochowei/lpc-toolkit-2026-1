@@ -439,7 +439,7 @@ Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-ou
 - Modify: `packages/web/src/slice/random-outfit.ts`
 - Modify: `docs/superpowers/plans/2026-07-06-noble-random-narrowing.md`
 
-- [ ] **Step 1: Add the profile item set type**
+- [x] **Step 1: Add the profile item set type**
 
 In `packages/web/src/slice/random-profiles.ts`, insert this interface immediately before `export interface RandomProfile`:
 
@@ -475,7 +475,7 @@ export interface RandomProfile {
 }
 ```
 
-- [ ] **Step 2: Tighten `NOBLE_RANDOM_PROFILE`**
+- [x] **Step 2: Tighten `NOBLE_RANDOM_PROFILE`**
 
 In `packages/web/src/slice/random-profiles.ts`, replace `NOBLE_RANDOM_PROFILE` with:
 
@@ -517,7 +517,7 @@ export const NOBLE_RANDOM_PROFILE: RandomProfile = {
 };
 ```
 
-- [ ] **Step 3: Add helpers for compatible profile item sets**
+- [x] **Step 3: Add helpers for compatible profile item sets**
 
 In `packages/web/src/slice/random-outfit.ts`, add these helper functions immediately after `shouldRandomizeColor`:
 
@@ -640,7 +640,7 @@ function pickProfileItemSetSelections(args: {
 }
 ```
 
-- [ ] **Step 4: Use profile item sets before the per-slot loop**
+- [x] **Step 4: Use profile item sets before the per-slot loop**
 
 In `packages/web/src/slice/random-outfit.ts`, replace the current initialization:
 
@@ -683,7 +683,7 @@ with:
     if (hasSelectionForType(items, typeName)) continue;
 ```
 
-- [ ] **Step 5: Run the focused random-outfit tests**
+- [x] **Step 5: Run the focused random-outfit tests**
 
 Run:
 
@@ -693,7 +693,7 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 6: Run typecheck**
+- [x] **Step 6: Run typecheck**
 
 Run:
 
@@ -703,7 +703,7 @@ rtk pnpm --filter @lpc-toolkit/web typecheck
 
 Expected: PASS.
 
-- [ ] **Step 7: Run boundary checks**
+- [x] **Step 7: Run boundary checks**
 
 Run:
 
@@ -713,7 +713,7 @@ rtk pnpm check:boundaries
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit the implementation**
+- [x] **Step 8: Commit the implementation**
 
 Run:
 
@@ -729,6 +729,10 @@ Implementation note: Added profile-level item sets, used them to keep Noble form
 Commit: output of `rtk git rev-parse --short HEAD` after `fix(web): narrow noble preset random profile`.
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS; `rtk pnpm --filter @lpc-toolkit/web typecheck` PASS; `rtk pnpm check:boundaries` PASS.
 ```
+
+Implementation note: Added profile-level item sets, used them to keep Noble formal tops and pants paired, tightened Noble identity, required slots, item pools, and random color slots, and kept zero-probability optional slots out of the result.
+Commit: pending until `fix(web): narrow noble preset random profile` is created.
+Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS; `rtk pnpm --filter @lpc-toolkit/web typecheck` reported `TypeScript: No errors found` but exited 1 via the rtk shorthand; `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS; `rtk pnpm check:boundaries` PASS.
 
 ## Task 3: Final Verification and Plan Bookkeeping
 

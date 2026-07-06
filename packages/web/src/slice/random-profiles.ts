@@ -6,6 +6,11 @@ import {
   type GroupId,
 } from './category-groups';
 
+export interface RandomItemSet {
+  readonly requiredTypeNames: readonly TypeName[];
+  readonly items: Partial<Record<TypeName, string>>;
+}
+
 export interface RandomProfile {
   readonly id: string;
   readonly labelKey: TranslationKey;
@@ -18,6 +23,7 @@ export interface RandomProfile {
   readonly requiredTypeNames?: readonly TypeName[];
   readonly randomColorTypeNames?: readonly TypeName[];
   readonly itemPools?: Partial<Record<TypeName, readonly string[]>>;
+  readonly itemSets?: readonly RandomItemSet[];
 }
 
 export interface RandomScope {
@@ -251,13 +257,33 @@ export const NOBLE_RANDOM_PROFILE: RandomProfile = {
   optionalGroups: ['face', 'clothing', 'accessories'],
   excludeGroups: ['fantasy', 'weapons', 'fx'],
   optionalProb: 0.6,
+  bodyType: 'male',
   typeNames: ['body', 'head', 'expression', 'hair', 'clothes', 'legs', 'shoes', 'hat'],
+  requiredTypeNames: ['body', 'head', 'expression', 'clothes', 'legs', 'shoes', 'hat'],
+  randomColorTypeNames: ['body', 'legs', 'shoes', 'hat'],
   itemPools: {
-    clothes: ['Collared/Formal Longsleeve'],
-    legs: ['Formal Pants'],
+    body: ['Body Color'],
+    head: ['Human Male'],
+    expression: ['Neutral'],
     shoes: ['Basic Shoes'],
     hat: ['Formal Tophat'],
   },
+  itemSets: [
+    {
+      requiredTypeNames: ['clothes', 'legs'],
+      items: {
+        clothes: 'Collared/Formal Longsleeve',
+        legs: 'Formal Pants',
+      },
+    },
+    {
+      requiredTypeNames: ['clothes', 'legs'],
+      items: {
+        clothes: 'Striped Collared/Formal Longsleeve',
+        legs: 'Striped Formal Pants',
+      },
+    },
+  ],
 };
 
 export const RANDOM_PROFILES: readonly RandomProfile[] = [

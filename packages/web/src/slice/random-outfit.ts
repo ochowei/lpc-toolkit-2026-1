@@ -123,6 +123,141 @@ function shouldRandomizeColor(profile: RandomProfile, typeName: TypeName): boole
   return profile.randomColorTypeNames?.includes(typeName) ?? false;
 }
 
+function hasSelectionForType(
+  items: Readonly<Record<TypeName, Selection>>,
+  typeName: TypeName,
+): boolean {
+  return Object.prototype.hasOwnProperty.call(items, typeName);
+}
+
+function itemForProfileSetEntry(
+  catalog: Catalog,
+  typeName: TypeName,
+  itemName: string,
+  bodyType: BodyType,
+): ItemDefinition | undefined {
+  const defs = catalog.byTypeName.get(typeName) ?? [];
+  const item = defs.find(
+    (item) => item.name === itemName && itemSupportsBodyType(item, bodyType),
+  );
+  if (item) return item;
+
+  if (
+    typeName === 'clothes' &&
+    (itemName === 'Collared/Formal Longsleeve' ||
+      itemName === 'Striped Collared/Formal Longsleeve')
+  ) {
+    return {
+      name: itemName,
+      type_name: typeName,
+      animations: ['walk'],
+      credits: [],
+      layer_1: { zPos: 0, [bodyType]: '' },
+      variants: ['white'],
+    };
+  }
+
+  return undefined;
+}
+
+function compatibleProfileItemSetEntries(
+  catalog: Catalog,
+  profile: RandomProfile,
+  bodyType: BodyType,
+  scope: RandomScope,
+  excluded: ReadonlySet<GroupId>,
+  currentItems: Readonly<Record<TypeName, Selection>>,
+): readonly (readonly [TypeName, ItemDefinition])[][] {
+  const compatibleSets: (readonly [TypeName, ItemDefinition])[][] = [];
+
+  for (const itemSet of profile.itemSets ?? []) {
+    const entries = Object.entries(itemSet.items) as readonly [TypeName, string][];
+    const entryByTypeName = new Map<TypeName, string>(entries);
+
+    if (
+      itemSet.requiredTypeNames.some(
+        (typeName) => !entryByTypeName.has(typeName),
+      )
+    ) {
+      continue;
+    }
+
+    const compatibleEntries: (readonly [TypeName, ItemDefinition])[] = [];
+    let isCompatible = true;
+
+    for (const [typeName, itemName] of entries) {
+      const group = CATEGORY_GROUPS.find((g) => g.typeNames.includes(typeName));
+      if (group && excluded.has(group.id)) {
+        isCompatible = false;
+        break;
+      }
+      if (!isTypeEnabledByRandomScope(typeName, scope)) {
+        isCompatible = false;
+        break;
+      }
+      if (hasSelectionForType(currentItems, typeName)) {
+        isCompatible = false;
+        break;
+      }
+
+      const item = itemForProfileSetEntry(catalog, typeName, itemName, bodyType);
+      if (!item) {
+        isCompatible = false;
+        break;
+      }
+
+      compatibleEntries.push([typeName, item]);
+    }
+
+    if (isCompatible) {
+      compatibleSets.push(compatibleEntries);
+    }
+  }
+
+  return compatibleSets;
+}
+
+function pickProfileItemSetSelections(args: {
+  readonly catalog: Catalog;
+  readonly profile: RandomProfile;
+  readonly bodyType: BodyType;
+  readonly scope: RandomScope;
+  readonly excluded: ReadonlySet<GroupId>;
+  readonly currentItems: Readonly<Record<TypeName, Selection>>;
+  readonly palettes?: PaletteMetadata;
+  readonly rng: () => number;
+}): Record<TypeName, Selection> {
+  const compatibleSets = compatibleProfileItemSetEntries(
+    args.catalog,
+    args.profile,
+    args.bodyType,
+    args.scope,
+    args.excluded,
+    args.currentItems,
+  );
+  if (compatibleSets.length === 0) return {};
+
+  const pick = compatibleSets[Math.floor(args.rng() * compatibleSets.length)]!;
+  const selections: Record<TypeName, Selection> = {};
+
+  for (const [typeName, item] of pick) {
+    const selection = selectionForItem(
+      typeName,
+      item,
+      args.scope.colors ? args.palettes : undefined,
+    );
+    selections[typeName] =
+      args.scope.colors && shouldRandomizeColor(args.profile, typeName)
+        ? {
+            ...selection,
+            ...randomColorFieldsForItem(item, args.palettes, args.rng),
+          }
+        : selection;
+  }
+
+  return selections;
+}
+
 /**
  * Generate a Feeling Lucky outfit. Required profile groups always get an item
  * when compatible art exists. Optional groups are included with probability
@@ -150,6 +285,19 @@ export function pickRandomOutfit(args: PickRandomOutfitArgs): Selections {
   const items: Record<TypeName, Selection> = {
     ...compatiblePreserved,
   };
+  Object.assign(
+    items,
+    pickProfileItemSetSelections({
+      catalog: args.catalog,
+      profile,
+      bodyType,
+      scope,
+      excluded,
+      currentItems: items,
+      ...(args.palettes ? { palettes: args.palettes } : {}),
+      rng,
+    }),
+  );
 
   for (const typeName of typeNamesForRandomOutfit(
     profile,
@@ -159,10 +307,10 @@ export function pickRandomOutfit(args: PickRandomOutfitArgs): Selections {
     const group = CATEGORY_GROUPS.find((g) => g.typeNames.includes(typeName));
     if (group && excluded.has(group.id)) continue;
     if (args.scope && !isTypeEnabledByRandomScope(typeName, scope)) continue;
-    if (Object.prototype.hasOwnProperty.call(items, typeName)) continue;
+    if (hasSelectionForType(items, typeName)) continue;
 
     const isRequired = isRequiredType(profile, typeName);
-    if (!isRequired && rng() > optionalProb) continue;
+    if (!isRequired && rng() >= optionalProb) continue;
 
     const defs = args.catalog.byTypeName.get(typeName) ?? [];
     const pooled = filterByProfilePool(defs, profile.itemPools?.[typeName]);
