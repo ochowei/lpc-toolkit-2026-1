@@ -49,7 +49,7 @@
 - Create: `packages/cli/src/main.ts`
 - Test: `packages/cli/test/smoke.test.ts`
 
-- [ ] **Step 1: Write the failing smoke test**
+- [x] **Step 1: Write the failing smoke test**
 
 Create `packages/cli/test/smoke.test.ts`:
 
@@ -75,7 +75,7 @@ describe('runCli', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -85,7 +85,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- smoke.test.ts
 
 Expected: FAIL because `@lpc-toolkit/cli` and `packages/cli/src/main.ts` do not exist.
 
-- [ ] **Step 3: Add package files**
+- [x] **Step 3: Add package files**
 
 Create `packages/cli/package.json`:
 
@@ -145,7 +145,7 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 4: Add minimal executable and dispatcher**
+- [x] **Step 4: Add minimal executable and dispatcher**
 
 Create `packages/cli/src/main.ts`:
 
@@ -196,7 +196,7 @@ const code = await runCli(process.argv.slice(2), {
 process.exitCode = code;
 ```
 
-- [ ] **Step 5: Run smoke test**
+- [x] **Step 5: Run smoke test**
 
 Run:
 
@@ -206,7 +206,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- smoke.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 6: Run CLI typecheck**
+- [x] **Step 6: Run CLI typecheck**
 
 Run:
 
@@ -216,18 +216,27 @@ rtk pnpm --filter @lpc-toolkit/cli typecheck
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 rtk git add packages/cli
 rtk git commit -m "feat(cli): scaffold package"
 ```
 
-Implementation note: record test/typecheck result here.
+Implementation note: Scaffolded `@lpc-toolkit/cli` with the smoke-tested
+`runCli` help path, executable entrypoint, Vitest config, Node TypeScript
+config, approved CLI runtime dependencies, and the required workspace lockfile
+update. Code-quality review found that the initial single tsconfig caused
+production builds to emit tests/config into `dist`, so a follow-up build config
+split keeps `typecheck` covering tests while `build` emits runtime files only.
 
-Commit: record resulting hash here.
+Commit: a4a0c357123ad0f49a99ae979ef8831819c03dd3,
+2f9e6e1e7260bd74f9f195ca34e56af556825b49
 
-Verification: record PASS/FAIL here.
+Verification: `rtk env CI=true pnpm --filter @lpc-toolkit/cli test -- smoke.test.ts`
+PASS; `rtk env CI=true pnpm --filter @lpc-toolkit/cli typecheck` PASS;
+`rtk env CI=true pnpm --filter @lpc-toolkit/cli build` PASS; spec compliance
+review PASS; code quality review PASS.
 
 ## Task 2: Add Argument Parser And Response Envelope
 
