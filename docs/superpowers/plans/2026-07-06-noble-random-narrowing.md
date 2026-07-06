@@ -23,7 +23,7 @@
 - Modify: `packages/web/test/random-outfit.test.ts`
 - Modify: `docs/superpowers/plans/2026-07-06-noble-random-narrowing.md`
 
-- [ ] **Step 1: Add a Noble identity and complete outfit test**
+- [x] **Step 1: Add a Noble identity and complete outfit test**
 
 In `packages/web/test/random-outfit.test.ts`, add this test immediately after the existing `noble profile excludes weapons, shields, armor, workwear, and fantasy parts` test:
 
@@ -102,7 +102,7 @@ In `packages/web/test/random-outfit.test.ts`, add this test immediately after th
   });
 ```
 
-- [ ] **Step 2: Replace the existing Noble exclusion test with stricter coverage**
+- [x] **Step 2: Replace the existing Noble exclusion test with stricter coverage**
 
 Replace the existing `noble profile excludes weapons, shields, armor, workwear, and fantasy parts` test with this version:
 
@@ -194,7 +194,7 @@ Replace the existing `noble profile excludes weapons, shields, armor, workwear, 
   });
 ```
 
-- [ ] **Step 3: Add paired formal set coverage**
+- [x] **Step 3: Add paired formal set coverage**
 
 Add this test after the stricter Noble exclusion test:
 
@@ -258,7 +258,7 @@ Add this test after the stricter Noble exclusion test:
   });
 ```
 
-- [ ] **Step 4: Add Noble random color coverage**
+- [x] **Step 4: Add Noble random color coverage**
 
 Add this test after the paired formal set test:
 
@@ -329,7 +329,7 @@ Add this test after the paired formal set test:
   });
 ```
 
-- [ ] **Step 5: Add Noble colors-disabled coverage**
+- [x] **Step 5: Add Noble colors-disabled coverage**
 
 Add this test after the random color coverage test:
 
@@ -401,7 +401,7 @@ Add this test after the random color coverage test:
   });
 ```
 
-- [ ] **Step 6: Run the focused test file and verify the new tests fail**
+- [x] **Step 6: Run the focused test file and verify the new tests fail**
 
 Run:
 
@@ -411,7 +411,7 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts
 
 Expected: FAIL before implementation. The failure should show Noble random returning the caller body type, omitting required formal slots when `optionalProb: 0`, mixing or not selecting the intended paired formal set, or not applying the intended random colors.
 
-- [ ] **Step 7: Commit the failing tests**
+- [x] **Step 7: Commit the failing tests**
 
 Run:
 
@@ -427,6 +427,10 @@ Implementation note: Added focused failing coverage for Noble random identity, r
 Commit: output of `rtk git rev-parse --short HEAD` after `test(web): cover narrowed noble random profile`.
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` FAIL as expected before implementation.
 ```
+
+Implementation note: Added focused failing coverage for Noble random identity, required formalwear, paired formal sets, non-noble exclusions, and Noble color behavior.
+Commit: ad96f953e
+Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` FAIL as expected before implementation.
 
 ## Task 2: Implement Profile Item Sets and Tighten Noble Profile
 
