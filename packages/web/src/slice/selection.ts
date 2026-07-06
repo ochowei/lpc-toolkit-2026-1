@@ -252,7 +252,7 @@ export function pickInitialSelections(catalog: Catalog): {
       dir: 'down',
       playing: true,
       zoom: DEFAULT_ZOOM,
-      layout: 'single',
+      layout: 'grid',
     },
     shownTypeNames,
   };
