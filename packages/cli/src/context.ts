@@ -17,13 +17,17 @@ export interface RuntimeContext {
   readonly spritesheetsBaseUrl: string;
 }
 
+function resolveSpritesheetsBaseUrl(baseUrl: string): string {
+  return /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(baseUrl) ? baseUrl : path.resolve(baseUrl);
+}
+
 export function createRuntimeContext(options: RuntimeContextOptions): RuntimeContext {
   const repoRoot = path.resolve(options.cwd);
   const assetsRoot = path.resolve(options.assetsRoot ?? path.join(repoRoot, 'assets'));
   const customAssetsRoot = path.resolve(
     options.customAssetsRoot ?? path.join(repoRoot, 'assets_custom'),
   );
-  const spritesheetsBaseUrl = path.resolve(options.spritesheetsBaseUrl ?? assetsRoot);
+  const spritesheetsBaseUrl = resolveSpritesheetsBaseUrl(options.spritesheetsBaseUrl ?? assetsRoot);
 
   return {
     repoRoot,

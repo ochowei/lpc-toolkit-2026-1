@@ -2,7 +2,11 @@ import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { loadJsonRecords } from '../src/loaders.js';
+import {
+  loadCatalogFromRoots,
+  loadJsonRecords,
+  loadPalettesFromRoot,
+} from '../src/loaders.js';
 
 describe('loadJsonRecords', () => {
   it('loads nested json records with normalized keys', () => {
@@ -31,5 +35,54 @@ describe('loadJsonRecords', () => {
 
     expect(result.records).toEqual({});
     expect(result.warnings[0]?.code).toBe('invalid_json');
+  });
+});
+
+describe('loadCatalogFromRoots', () => {
+  it('reports malformed valid json records as warnings', () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'lpc-loader-'));
+    const customRoot = path.join(root, 'custom');
+    mkdirSync(root, { recursive: true });
+    writeFileSync(path.join(root, 'null.json'), 'null');
+    writeFileSync(path.join(root, 'array.json'), '[]');
+
+    const result = loadCatalogFromRoots(root, customRoot);
+
+    expect(result.warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'catalog_warning',
+          path: 'null.json',
+        }),
+        expect.objectContaining({
+          code: 'catalog_warning',
+          path: 'array.json',
+        }),
+      ]),
+    );
+  });
+});
+
+describe('loadPalettesFromRoot', () => {
+  it('reports malformed valid json records as warnings', () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'lpc-loader-'));
+    mkdirSync(root, { recursive: true });
+    writeFileSync(path.join(root, 'null.json'), 'null');
+    writeFileSync(path.join(root, 'array.json'), '[]');
+
+    const result = loadPalettesFromRoot(root);
+
+    expect(result.warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'palette_warning',
+          path: 'null.json',
+        }),
+        expect.objectContaining({
+          code: 'palette_warning',
+          path: 'array.json',
+        }),
+      ]),
+    );
   });
 });

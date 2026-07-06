@@ -22,4 +22,13 @@ describe('createRuntimeContext', () => {
     expect(context.assetsRoot).toBe('/game/lpc-assets');
     expect(context.spritesheetsBaseUrl).toBe('/game/lpc-assets');
   });
+
+  it('preserves URL-like spritesheet base overrides', () => {
+    const context = createRuntimeContext({
+      cwd: '/repo',
+      spritesheetsBaseUrl: 'https://example.com/assets',
+    });
+
+    expect(context.spritesheetsBaseUrl).toBe('https://example.com/assets');
+  });
 });

@@ -15,6 +15,10 @@ export interface JsonRecordsResult {
   readonly warnings: readonly CliIssue[];
 }
 
+function isJsonObjectRecord(record: unknown): record is Record<string, unknown> {
+  return typeof record === 'object' && record !== null && !Array.isArray(record);
+}
+
 function walkJsonFiles(root: string): readonly string[] {
   if (!existsSync(root)) return [];
   const out: string[] = [];
@@ -49,15 +53,53 @@ export function loadJsonRecords(root: string): JsonRecordsResult {
   return { records, warnings };
 }
 
+function filterJsonObjectRecords(
+  records: Record<string, unknown>,
+  warningCode: 'catalog_warning' | 'palette_warning',
+): { readonly records: Record<FilePath, Record<string, unknown>>; readonly warnings: readonly CliIssue[] } {
+  const filtered: Record<FilePath, Record<string, unknown>> = {};
+  const warnings: CliIssue[] = [];
+
+  for (const [recordPath, record] of Object.entries(records)) {
+    if (isJsonObjectRecord(record)) {
+      filtered[recordPath as FilePath] = record;
+      continue;
+    }
+
+    warnings.push({
+      code: warningCode,
+      message: 'not a JSON object; skipped',
+      path: recordPath,
+    });
+  }
+
+  return { records: filtered, warnings };
+}
+
+function filterCatalogRecords(
+  records: Record<string, unknown>,
+): { readonly records: Record<FilePath, ItemDefinition>; readonly warnings: readonly CliIssue[] } {
+  const result = filterJsonObjectRecords(records, 'catalog_warning');
+  const catalogRecords: Record<FilePath, ItemDefinition> = {};
+
+  for (const [recordPath, record] of Object.entries(result.records)) {
+    catalogRecords[recordPath as FilePath] = record as unknown as ItemDefinition;
+  }
+
+  return { records: catalogRecords, warnings: result.warnings };
+}
+
 export function loadCatalogFromRoots(
   sheetDefinitionsRoot: string,
   customSheetDefinitionsRoot: string,
 ): { readonly catalog: Catalog; readonly warnings: readonly CliIssue[] } {
   const base = loadJsonRecords(sheetDefinitionsRoot);
   const custom = loadJsonRecords(customSheetDefinitionsRoot);
+  const baseRecords = filterCatalogRecords(base.records);
+  const customRecords = filterCatalogRecords(custom.records);
   const records = {
-    ...(base.records as Record<FilePath, ItemDefinition>),
-    ...(custom.records as Record<FilePath, ItemDefinition>),
+    ...baseRecords.records,
+    ...customRecords.records,
   };
   const result = createCatalog(records);
   return {
@@ -65,6 +107,8 @@ export function loadCatalogFromRoots(
     warnings: [
       ...base.warnings,
       ...custom.warnings,
+      ...baseRecords.warnings,
+      ...customRecords.warnings,
       ...result.warnings.map((warning) => ({
         code: 'catalog_warning',
         message: warning.message,
@@ -78,11 +122,13 @@ export function loadPalettesFromRoot(
   paletteDefinitionsRoot: string,
 ): { readonly palettes: PaletteMetadata; readonly warnings: readonly CliIssue[] } {
   const loaded = loadJsonRecords(paletteDefinitionsRoot);
-  const result = createPaletteCatalog(loaded.records);
+  const paletteRecords = filterJsonObjectRecords(loaded.records, 'palette_warning');
+  const result = createPaletteCatalog(paletteRecords.records);
   return {
     palettes: result.palettes,
     warnings: [
       ...loaded.warnings,
+      ...paletteRecords.warnings,
       ...result.warnings.map((warning) => ({
         code: 'palette_warning',
         message: warning.message,
