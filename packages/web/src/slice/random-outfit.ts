@@ -123,6 +123,155 @@ function shouldRandomizeColor(profile: RandomProfile, typeName: TypeName): boole
   return profile.randomColorTypeNames?.includes(typeName) ?? false;
 }
 
+function hasSelectionForType(
+  items: Readonly<Record<TypeName, Selection>>,
+  typeName: TypeName,
+): boolean {
+  return Object.prototype.hasOwnProperty.call(items, typeName);
+}
+
+function itemForProfileSetEntry(
+  catalog: Catalog,
+  typeName: TypeName,
+  itemName: string,
+  bodyType: BodyType,
+): ItemDefinition | undefined {
+  const defs = catalog.byTypeName.get(typeName) ?? [];
+  return defs.find(
+    (item) => item.name === itemName && itemSupportsBodyType(item, bodyType),
+  );
+}
+
+function compatibleProfileItemSetEntries(
+  catalog: Catalog,
+  profile: RandomProfile,
+  bodyType: BodyType,
+  scope: RandomScope,
+  optionalProb: number,
+  excluded: ReadonlySet<GroupId>,
+  currentItems: Readonly<Record<TypeName, Selection>>,
+  rng: () => number,
+): readonly (readonly [TypeName, ItemDefinition])[][] {
+  const compatibleSets: (readonly [TypeName, ItemDefinition])[][] = [];
+
+  for (const itemSet of profile.itemSets ?? []) {
+    const entries = Object.entries(itemSet.items) as readonly [TypeName, string][];
+    const entryByTypeName = new Map<TypeName, string>(entries);
+    const itemSetTypeNames = new Set<TypeName>([
+      ...itemSet.requiredTypeNames,
+      ...entries.map(([typeName]) => typeName),
+    ]);
+
+    if (
+      itemSet.requiredTypeNames.some(
+        (typeName) => !entryByTypeName.has(typeName),
+      )
+    ) {
+      continue;
+    }
+
+    const compatibleEntries: (readonly [TypeName, ItemDefinition])[] = [];
+    let isCompatible = true;
+
+    for (const [typeName, itemName] of entries) {
+      const group = CATEGORY_GROUPS.find((g) => g.typeNames.includes(typeName));
+      if (group && excluded.has(group.id)) {
+        isCompatible = false;
+        break;
+      }
+      if (!isTypeEnabledByRandomScope(typeName, scope)) {
+        isCompatible = false;
+        break;
+      }
+      if (hasSelectionForType(currentItems, typeName)) {
+        isCompatible = false;
+        break;
+      }
+
+      const item = itemForProfileSetEntry(catalog, typeName, itemName, bodyType);
+      if (!item) {
+        isCompatible = false;
+        break;
+      }
+
+      compatibleEntries.push([typeName, item]);
+    }
+
+    if (
+      isCompatible &&
+      !Array.from(itemSetTypeNames).some((typeName) =>
+        isRequiredType(profile, typeName),
+      ) &&
+      rng() > optionalProb
+    ) {
+      isCompatible = false;
+    }
+
+    if (isCompatible) {
+      compatibleSets.push(compatibleEntries);
+    }
+  }
+
+  return compatibleSets;
+}
+
+function profileItemSetTypeNames(profile: RandomProfile): ReadonlySet<TypeName> {
+  const typeNames = new Set<TypeName>();
+  for (const itemSet of profile.itemSets ?? []) {
+    for (const typeName of itemSet.requiredTypeNames) {
+      typeNames.add(typeName);
+    }
+    for (const typeName of Object.keys(itemSet.items) as TypeName[]) {
+      typeNames.add(typeName);
+    }
+  }
+  return typeNames;
+}
+
+function pickProfileItemSetSelections(args: {
+  readonly catalog: Catalog;
+  readonly profile: RandomProfile;
+  readonly bodyType: BodyType;
+  readonly scope: RandomScope;
+  readonly optionalProb: number;
+  readonly excluded: ReadonlySet<GroupId>;
+  readonly currentItems: Readonly<Record<TypeName, Selection>>;
+  readonly palettes?: PaletteMetadata;
+  readonly rng: () => number;
+}): Record<TypeName, Selection> {
+  const compatibleSets = compatibleProfileItemSetEntries(
+    args.catalog,
+    args.profile,
+    args.bodyType,
+    args.scope,
+    args.optionalProb,
+    args.excluded,
+    args.currentItems,
+    args.rng,
+  );
+  if (compatibleSets.length === 0) return {};
+
+  const pick = compatibleSets[Math.floor(args.rng() * compatibleSets.length)]!;
+  const selections: Record<TypeName, Selection> = {};
+
+  for (const [typeName, item] of pick) {
+    const selection = selectionForItem(
+      typeName,
+      item,
+      args.scope.colors ? args.palettes : undefined,
+    );
+    selections[typeName] =
+      args.scope.colors && shouldRandomizeColor(args.profile, typeName)
+        ? {
+            ...selection,
+            ...randomColorFieldsForItem(item, args.palettes, args.rng),
+          }
+        : selection;
+  }
+
+  return selections;
+}
+
 /**
  * Generate a Feeling Lucky outfit. Required profile groups always get an item
  * when compatible art exists. Optional groups are included with probability
@@ -135,6 +284,7 @@ export function pickRandomOutfit(args: PickRandomOutfitArgs): Selections {
   const scope = args.scope ?? DEFAULT_RANDOM_SCOPE;
   const optionalProb = args.optionalProb ?? profile.optionalProb;
   const excluded = new Set<GroupId>(args.excludeGroups ?? profile.excludeGroups);
+  const itemSetTypeNames = profileItemSetTypeNames(profile);
   const hasLegacyExcludeOverride =
     args.profile === undefined &&
     args.excludeGroups !== undefined &&
@@ -150,6 +300,20 @@ export function pickRandomOutfit(args: PickRandomOutfitArgs): Selections {
   const items: Record<TypeName, Selection> = {
     ...compatiblePreserved,
   };
+  Object.assign(
+    items,
+    pickProfileItemSetSelections({
+      catalog: args.catalog,
+      profile,
+      bodyType,
+      scope,
+      optionalProb,
+      excluded,
+      currentItems: items,
+      ...(args.palettes ? { palettes: args.palettes } : {}),
+      rng,
+    }),
+  );
 
   for (const typeName of typeNamesForRandomOutfit(
     profile,
@@ -159,7 +323,8 @@ export function pickRandomOutfit(args: PickRandomOutfitArgs): Selections {
     const group = CATEGORY_GROUPS.find((g) => g.typeNames.includes(typeName));
     if (group && excluded.has(group.id)) continue;
     if (args.scope && !isTypeEnabledByRandomScope(typeName, scope)) continue;
-    if (Object.prototype.hasOwnProperty.call(items, typeName)) continue;
+    if (hasSelectionForType(items, typeName)) continue;
+    if (itemSetTypeNames.has(typeName)) continue;
 
     const isRequired = isRequiredType(profile, typeName);
     if (!isRequired && rng() > optionalProb) continue;
