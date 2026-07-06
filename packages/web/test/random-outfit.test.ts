@@ -744,11 +744,17 @@ describe('pickRandomOutfit', () => {
     expect(sel.items['hair']).toBeUndefined();
   });
 
-  it('villager profile keeps random outfits mundane and clothing-only', () => {
+  it('villager profile keeps random outfits human, neutral, mundane, and clothing-only', () => {
     const { catalog: villagerCatalog } = createCatalog({
-      'body/light.json': makeItem('Light', 'body'),
-      'head/human.json': makeItem('Human Male', 'head'),
+      'body/body-color.json': makeItem('Body Color', 'body'),
+      'body/skeleton.json': makeItem('Skeleton Body', 'body'),
+      'body/zombie.json': makeItem('Zombie Body', 'body'),
+      'head/human-male.json': makeItem('Human Male', 'head'),
+      'head/skeleton.json': makeItem('Skeleton', 'head'),
+      'head/zombie.json': makeItem('Zombie', 'head'),
+      'head/orc.json': makeItem('Orc', 'head'),
       'expression/neutral.json': makeItem('Neutral', 'expression'),
+      'expression/happy.json': makeItem('Happy', 'expression'),
       'hair/messy.json': makeItem('Messy3', 'hair'),
       'clothes/formal.json': makeItem('Collared/Formal Longsleeve', 'clothes'),
       'clothes/longsleeve.json': makeItem('Longsleeve', 'clothes'),
@@ -759,8 +765,15 @@ describe('pickRandomOutfit', () => {
       'overalls/brown.json': makeItem('Overalls', 'overalls', 'male', ['brown']),
       'apron/plain.json': makeItem('Apron', 'apron'),
       'hat/hood.json': makeItem('Hood', 'hat'),
+      'cape/solid.json': makeItem('Solid', 'cape'),
+      'armour/plate.json': makeItem('Plate', 'armour'),
+      'chainmail/steel.json': makeItem('Chainmail', 'chainmail'),
       'weapon/sword.json': makeItem('Sword', 'weapon'),
+      'weapon/crystal.json': makeItem('Crystal', 'weapon_magic_crystal'),
       'shield/kite.json': makeItem('Kite', 'shield'),
+      'quiver/quiver.json': makeItem('Quiver', 'quiver'),
+      'arms/armour.json': makeItem('Armour', 'arms'),
+      'gloves/gloves.json': makeItem('Gloves', 'gloves'),
       'wings/feather.json': makeItem('Wings', 'wings'),
       'wound/arm.json': makeItem('Bleeding', 'wound_arm'),
     });
@@ -768,31 +781,200 @@ describe('pickRandomOutfit', () => {
     const sel = pickRandomOutfit({
       catalog: villagerCatalog,
       bodyType: 'male',
-      rng: () => 0,
+      rng: () => 0.99,
       optionalProb: 1.0,
       profile: 'villager',
     });
 
-    expect(sel.items['body']).toBeDefined();
-    expect(sel.items['clothes']?.name).toBe('Longsleeve');
+    expect(sel.bodyType).toBe('male');
+    expect(sel.items['body']).toEqual({ typeName: 'body', name: 'Body Color' });
+    expect(sel.items['head']).toEqual({ typeName: 'head', name: 'Human Male' });
+    expect(sel.items['expression']).toEqual({
+      typeName: 'expression',
+      name: 'Neutral',
+    });
+    expect(sel.items['clothes']).toEqual({
+      typeName: 'clothes',
+      name: 'Shortsleeve',
+    });
     expect(sel.items['legs']).toEqual({ typeName: 'legs', name: 'Pants' });
     expect(sel.items['shoes']).toEqual({
       typeName: 'shoes',
-      name: 'Basic Shoes',
-      variant: 'tan',
+      name: 'Basic Boots',
+      variant: 'brown',
     });
 
     for (const typeName of [
       'overalls',
       'apron',
       'hat',
+      'cape',
+      'armour',
+      'chainmail',
       'weapon',
+      'weapon_magic_crystal',
       'shield',
+      'quiver',
+      'arms',
+      'gloves',
       'wings',
       'wound_arm',
     ] as const) {
       expect(sel.items[typeName]).toBeUndefined();
     }
+  });
+
+  it('villager profile requires human neutral outfit while preserving body type and random colors', () => {
+    const { catalog: villagerCatalog } = createCatalog({
+      'body/body-color.json': makeRecolorItem('Body Color', 'body'),
+      'body/skeleton.json': makeItem('Skeleton Body', 'body'),
+      'body/zombie.json': makeItem('Zombie Body', 'body'),
+      'head/human-male.json': makeItem('Human Male', 'head'),
+      'head/human-female.json': makeItem('Human Female', 'head', 'female'),
+      'head/skeleton.json': makeItem('Skeleton', 'head'),
+      'head/zombie.json': makeItem('Zombie', 'head'),
+      'expression/neutral.json': makeItem('Neutral', 'expression'),
+      'expression/happy.json': makeItem('Happy', 'expression'),
+      'hair/messy.json': makeItem('Messy3', 'hair'),
+      'clothes/longsleeve.json': makeRecolorItem('Longsleeve', 'clothes'),
+      'clothes/shortsleeve.json': makeRecolorItem('Shortsleeve', 'clothes'),
+      'legs/pants.json': makeRecolorItem('Pants', 'legs'),
+      'shoes/basic-shoes.json': makeItem('Basic Shoes', 'shoes', 'male', [
+        'tan',
+        'black',
+      ]),
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: villagerCatalog,
+      palettes,
+      bodyType: 'male',
+      rng: seqRng([
+        0.99,
+        0.99,
+        0.99,
+        0.99,
+        0.99,
+        0.99,
+        0.99,
+        0.99,
+        0.99,
+        0,
+        0.99,
+      ]),
+      optionalProb: 0,
+      profile: 'villager',
+    });
+
+    expect(sel.bodyType).toBe('male');
+    expect(sel.items['body']).toEqual({
+      typeName: 'body',
+      name: 'Body Color',
+      recolor: 'red',
+    });
+    expect(sel.items['head']).toEqual({ typeName: 'head', name: 'Human Male' });
+    expect(sel.items['expression']).toEqual({
+      typeName: 'expression',
+      name: 'Neutral',
+    });
+    expect(sel.items['hair']).toBeUndefined();
+    expect(sel.items['clothes']).toEqual({
+      typeName: 'clothes',
+      name: 'Shortsleeve',
+      recolor: 'red',
+    });
+    expect(sel.items['legs']).toEqual({
+      typeName: 'legs',
+      name: 'Pants',
+      recolor: 'red',
+    });
+    expect(sel.items['shoes']).toEqual({
+      typeName: 'shoes',
+      name: 'Basic Shoes',
+      variant: 'black',
+    });
+  });
+
+  it('villager profile keeps female body type and selects the compatible human head', () => {
+    const { catalog: villagerCatalog } = createCatalog({
+      'body/body-color.json': makeRecolorItem('Body Color', 'body', ['v1'], 'female'),
+      'head/human-male.json': makeItem('Human Male', 'head'),
+      'head/human-female.json': makeItem('Human Female', 'head', 'female'),
+      'head/skeleton.json': makeItem('Skeleton', 'head', 'female'),
+      'expression/neutral.json': makeItem('Neutral', 'expression', 'female'),
+      'clothes/longsleeve.json': makeItem('Longsleeve', 'clothes', 'female'),
+      'legs/pants.json': makeItem('Pants', 'legs', 'female'),
+      'shoes/basic-shoes.json': makeItem('Basic Shoes', 'shoes', 'female', [
+        'tan',
+      ]),
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: villagerCatalog,
+      bodyType: 'female',
+      rng: () => 0.99,
+      optionalProb: 0,
+      profile: 'villager',
+    });
+
+    expect(sel.bodyType).toBe('female');
+    expect(sel.items['body']).toEqual({ typeName: 'body', name: 'Body Color' });
+    expect(sel.items['head']).toEqual({ typeName: 'head', name: 'Human Female' });
+    expect(sel.items['expression']).toEqual({
+      typeName: 'expression',
+      name: 'Neutral',
+    });
+    expect(sel.items['clothes']).toEqual({
+      typeName: 'clothes',
+      name: 'Longsleeve',
+    });
+    expect(sel.items['legs']).toEqual({ typeName: 'legs', name: 'Pants' });
+    expect(sel.items['shoes']).toEqual({
+      typeName: 'shoes',
+      name: 'Basic Shoes',
+      variant: 'tan',
+    });
+  });
+
+  it('villager profile keeps default villager colors when random colors are disabled', () => {
+    const { catalog: villagerCatalog } = createCatalog({
+      'body/body-color.json': makeRecolorItem('Body Color', 'body'),
+      'head/human-male.json': makeItem('Human Male', 'head'),
+      'expression/neutral.json': makeItem('Neutral', 'expression'),
+      'clothes/longsleeve.json': makeRecolorItem('Longsleeve', 'clothes'),
+      'legs/pants.json': makeRecolorItem('Pants', 'legs'),
+      'shoes/basic-shoes.json': makeItem('Basic Shoes', 'shoes', 'male', [
+        'tan',
+        'black',
+      ]),
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: villagerCatalog,
+      palettes,
+      bodyType: 'male',
+      rng: () => 0.99,
+      optionalProb: 0,
+      profile: 'villager',
+      scope: {
+        appearance: true,
+        clothing: true,
+        equipment: true,
+        colors: false,
+      },
+    });
+
+    expect(sel.items['body']).toEqual({ typeName: 'body', name: 'Body Color' });
+    expect(sel.items['clothes']).toEqual({
+      typeName: 'clothes',
+      name: 'Longsleeve',
+    });
+    expect(sel.items['legs']).toEqual({ typeName: 'legs', name: 'Pants' });
+    expect(sel.items['shoes']).toEqual({
+      typeName: 'shoes',
+      name: 'Basic Shoes',
+      variant: 'tan',
+    });
   });
 
   it('mage profile excludes heavy armor while allowing staff and crystal slots', () => {

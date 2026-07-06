@@ -24,7 +24,7 @@ No changes are planned for `packages/core/`, `packages/web/src/components/`, `pa
 - Modify: `packages/web/test/random-outfit.test.ts`
 - Modify: `docs/superpowers/plans/2026-07-06-villager-random-narrowing.md`
 
-- [ ] **Step 1: Replace the current Villager exclusion test with stricter human Villager coverage**
+- [x] **Step 1: Replace the current Villager exclusion test with stricter human Villager coverage**
 
 In `packages/web/test/random-outfit.test.ts`, replace the existing `villager profile keeps random outfits mundane and clothing-only` test with this version:
 
@@ -112,7 +112,7 @@ In `packages/web/test/random-outfit.test.ts`, replace the existing `villager pro
 
 This test proves Villager excludes non-human identities and non-villager slots while staying inside the existing Villager type-name surface.
 
-- [ ] **Step 2: Add required outfit and random color coverage**
+- [x] **Step 2: Add required outfit and random color coverage**
 
 Add this test immediately after the stricter Villager exclusion test:
 
@@ -191,7 +191,7 @@ Add this test immediately after the stricter Villager exclusion test:
 
 This test proves `body`, `head`, `expression`, `clothes`, `legs`, and `shoes` bypass `optionalProb`, optional hair can remain absent, and `randomColorTypeNames` drives Villager skin, shirt, pants, and shoe color variation.
 
-- [ ] **Step 3: Add female body type compatibility coverage**
+- [x] **Step 3: Add female body type compatibility coverage**
 
 Add this test immediately after the random color coverage test:
 
@@ -240,7 +240,7 @@ Add this test immediately after the random color coverage test:
 
 This test proves Villager does not force `bodyType: 'male'` and that the `Human Male` / `Human Female` head pool respects catalog compatibility filtering.
 
-- [ ] **Step 4: Add colors-disabled default coverage**
+- [x] **Step 4: Add colors-disabled default coverage**
 
 Add this test immediately after the female body type compatibility test:
 
@@ -289,7 +289,7 @@ Add this test immediately after the female body type compatibility test:
 
 This test proves disabling random colors keeps the existing default selection behavior for newly selected Villager items.
 
-- [ ] **Step 5: Run the focused random outfit test and verify it fails**
+- [x] **Step 5: Run the focused random outfit test and verify it fails**
 
 Run:
 
@@ -299,7 +299,7 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts
 
 Expected: FAIL before implementation. The failure should show Villager selecting a non-`Body Color` body, non-human head, non-`Neutral` expression, missing required clothing at `optionalProb: 0`, or default colors instead of the expected random color fields.
 
-- [ ] **Step 6: Commit the failing tests**
+- [x] **Step 6: Commit the failing tests**
 
 Run:
 
@@ -316,6 +316,10 @@ Implementation note: Added focused failing coverage for Villager human identity,
 Commit: paste the exact short hash printed by `rtk git rev-parse --short HEAD`.
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` FAIL as expected before implementation.
 ```
+
+Implementation note: Added focused failing coverage for Villager human identity, Neutral expression, complete everyday outfit requirements, female body type compatibility, color randomization, colors-disabled defaults, and off-theme exclusions.
+Commit: pending
+Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` FAIL as expected before implementation.
 
 ## Task 2: Tighten the Villager Random Profile
 
