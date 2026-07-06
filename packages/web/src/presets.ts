@@ -75,10 +75,15 @@ export const PRESETS: readonly Preset[] = [
     id: 'villager',
     labelKey: 'preset.villager',
     emoji: '🏘️',
+    bodyType: 'male',
     items: [
-      { typeName: 'clothes', name: 'Longsleeve', recolor: 'brown' },
-      { typeName: 'legs', name: 'Pants', recolor: 'brown' },
-      { typeName: 'shoes', name: 'Basic Shoes', variant: 'tan' },
+      { typeName: 'body', name: 'Body Color', recolor: 'light' },
+      { typeName: 'head', name: 'Human Male', recolor: 'light' },
+      { typeName: 'expression', name: 'Neutral', recolor: 'light' },
+      { typeName: 'clothes', name: 'Longsleeve Polo', recolor: 'white' },
+      { typeName: 'legs', name: 'Pants', recolor: 'black' },
+      { typeName: 'shoes', name: 'Basic Shoes', variant: 'gray' },
+      { typeName: 'hair', name: 'Side Parted w/Bangs 2', recolor: 'sandy' },
     ],
   },
   {
