@@ -1,5 +1,6 @@
 import { flagBoolean, parseArgs } from './args.js';
-import { commandError, formatJsonResponse } from './response.js';
+import { commandError, formatJsonResponse, humanIssue } from './response.js';
+import { runSelectionCommand } from './selection-commands.js';
 
 export interface CliIo {
   readonly stdout: (text: string) => void;
@@ -29,6 +30,18 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<number
   }
 
   const parsed = parseArgs(argv);
+  if (parsed.command[0] === 'selection') {
+    const response = runSelectionCommand(parsed, io.cwd);
+    if (flagBoolean(parsed.flags, 'json')) {
+      io.stdout(formatJsonResponse(response));
+    } else if (response.ok) {
+      io.stdout('Selection is valid.\n');
+    } else {
+      io.stderr(`${response.errors.map(humanIssue).join('\n')}\n`);
+    }
+    return response.ok ? 0 : 1;
+  }
+
   const commandName = parsed.command.join(' ');
   const error = commandError(commandName || 'unknown', {
     code: 'unknown_command',
