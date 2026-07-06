@@ -1978,7 +1978,7 @@ quality review PASS.
 - Modify: `packages/cli/src/main.ts`
 - Test: `packages/cli/test/preset-commands.test.ts`
 
-- [ ] **Step 1: Write preset tests**
+- [x] **Step 1: Write preset tests**
 
 Create `packages/cli/test/preset-commands.test.ts`:
 
@@ -2001,7 +2001,14 @@ describe('preset commands', () => {
 });
 ```
 
-- [ ] **Step 2: Run preset tests to verify they fail**
+Implementation note: Added focused preset command tests for listing,
+materializing, missing ids, unknown ids, and `--out` pretty JSON output.
+Commit: 808180f32.
+Verification: RED verified by
+`rtk env CI=true pnpm --filter @lpc-toolkit/cli test -- preset-commands.test.ts`
+failing because `preset-commands.ts` did not exist.
+
+- [x] **Step 2: Run preset tests to verify they fail**
 
 Run:
 
@@ -2011,7 +2018,11 @@ rtk pnpm --filter @lpc-toolkit/cli test -- preset-commands.test.ts
 
 Expected: FAIL because `preset-commands.ts` does not exist.
 
-- [ ] **Step 3: Implement preset command module**
+Implementation note: Confirmed expected RED failure before production code.
+Commit: 808180f32.
+Verification: RED PASS; the failure was the missing preset command module.
+
+- [x] **Step 3: Implement preset command module**
 
 Create `packages/cli/src/preset-commands.ts`:
 
@@ -2095,7 +2106,15 @@ export function runPresetCommand(
 }
 ```
 
-- [ ] **Step 4: Wire preset dispatch**
+Implementation note: Implemented built-in preset listing, preset
+materialization to selection JSON, CLI response envelopes for missing/unknown
+presets, and pretty JSON file writing with a trailing newline.
+Commit: 808180f32.
+Verification:
+`rtk env CI=true pnpm --filter @lpc-toolkit/cli test -- preset-commands.test.ts`
+PASS.
+
+- [x] **Step 4: Wire preset dispatch**
 
 Modify `packages/cli/src/main.ts`:
 
@@ -2112,7 +2131,14 @@ Dispatch:
   }
 ```
 
-- [ ] **Step 5: Run tests**
+Implementation note: Routed `preset` commands through `runPresetCommand` using
+the existing `writeResponse` pattern.
+Commit: 808180f32.
+Verification:
+`rtk env CI=true pnpm --filter @lpc-toolkit/cli test -- preset-commands.test.ts`
+PASS.
+
+- [x] **Step 5: Run tests**
 
 Run:
 
@@ -2123,18 +2149,32 @@ rtk pnpm --filter @lpc-toolkit/cli typecheck
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+Implementation note: Focused preset tests and CLI typecheck passed after adding
+the internal `@lpc-toolkit/presets` workspace dependency.
+Commit: 808180f32.
+Verification:
+`rtk env CI=true pnpm --filter @lpc-toolkit/cli test -- preset-commands.test.ts`
+PASS; `rtk env CI=true pnpm --filter @lpc-toolkit/cli typecheck` PASS.
+
+- [x] **Step 6: Commit**
 
 ```bash
 rtk git add packages/cli/src packages/cli/test
 rtk git commit -m "feat(cli): add preset materialization"
 ```
 
-Implementation note: record preset behavior here.
+Implementation note: Committed Task 7 preset list/materialize implementation;
+review fixes route CLI tests/typecheck through source aliases for
+`@lpc-toolkit/presets`, build core/presets before CLI build, use shared preset
+resolution when runtime catalog/palettes are available, and report `--out`
+write failures as `preset_write_failed`. `preset render` remains for Task 8.
 
-Commit: record resulting hash here.
+Commit: 808180f32e1679981faccc487853fb40c2907fda,
+9925cfe8cc0ca88b21b7aacf45cd4cbe2c5b56f4.
 
-Verification: record PASS/FAIL here.
+Verification: RED test run PASS (expected failure observed); focused preset
+test PASS; CLI typecheck PASS; CLI build PASS; spec compliance review PASS;
+code quality review PASS; `rtk env CI=true pnpm check:boundaries` PASS.
 
 ## Task 8: Node Canvas Adapter And Render Export
 
