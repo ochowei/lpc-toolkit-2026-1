@@ -1605,7 +1605,7 @@ code quality review PASS.
 - Test: `packages/cli/test/catalog-commands.test.ts`
 - Test: `packages/cli/test/token-commands.test.ts`
 
-- [ ] **Step 1: Write catalog command tests**
+- [x] **Step 1: Write catalog command tests**
 
 Create `packages/cli/test/catalog-commands.test.ts`:
 
@@ -1662,7 +1662,7 @@ describe('catalog commands', () => {
 });
 ```
 
-- [ ] **Step 2: Write token tests**
+- [x] **Step 2: Write token tests**
 
 Create `packages/cli/test/token-commands.test.ts`:
 
@@ -1695,7 +1695,7 @@ describe('token commands', () => {
 });
 ```
 
-- [ ] **Step 3: Run tests to verify they fail**
+- [x] **Step 3: Run tests to verify they fail**
 
 Run:
 
@@ -1705,7 +1705,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- catalog-commands.test.ts token-comman
 
 Expected: FAIL because modules do not exist.
 
-- [ ] **Step 4: Implement catalog helpers and command runner**
+- [x] **Step 4: Implement catalog helpers and command runner**
 
 Create `packages/cli/src/catalog-commands.ts`:
 
@@ -1819,7 +1819,7 @@ export function runCatalogCommand(
 }
 ```
 
-- [ ] **Step 5: Implement token helpers and command runner**
+- [x] **Step 5: Implement token helpers and command runner**
 
 Create `packages/cli/src/token-commands.ts`:
 
@@ -1906,7 +1906,7 @@ export function runTokenCommand(
 }
 ```
 
-- [ ] **Step 6: Wire command dispatch**
+- [x] **Step 6: Wire command dispatch**
 
 Modify `packages/cli/src/main.ts` to import and dispatch:
 
@@ -1937,7 +1937,7 @@ function writeResponse(
 
 Use it for `catalog`, `selection`, and `token`.
 
-- [ ] **Step 7: Run focused tests**
+- [x] **Step 7: Run focused tests**
 
 Run:
 
@@ -1948,18 +1948,28 @@ rtk pnpm --filter @lpc-toolkit/cli typecheck
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 rtk git add packages/cli/src packages/cli/test
 rtk git commit -m "feat(cli): add catalog and token commands"
 ```
 
-Implementation note: record command behavior here.
+Implementation note: Added catalog type/item listing and detail commands,
+token encode/decode helpers, and `catalog`/`token` CLI dispatch. Review fixes
+completed `catalog item`, added `--license` filtering, hardened catalog
+summaries against malformed local records, preserved token/hash decode warnings
+in the CLI envelope, and trimmed copied tokens before version detection.
 
-Commit: record resulting hash here.
+Commit: ef12c2820b0a75b16139a94a7815e478eb7bc80b7,
+f66e92b4505518bd2c8b43945b339e5af226ec88,
+537b43b28879950df860f8ac7a706857387a270c
 
-Verification: record PASS/FAIL here.
+Verification: `rtk env CI=true pnpm --filter @lpc-toolkit/cli test -- catalog-commands.test.ts token-commands.test.ts`
+PASS; `rtk env CI=true pnpm --filter @lpc-toolkit/cli typecheck` PASS;
+`rtk env CI=true pnpm --filter @lpc-toolkit/cli test` PASS;
+`rtk env CI=true pnpm typecheck` PASS; spec compliance review PASS; code
+quality review PASS.
 
 ## Task 7: Preset Commands
 
