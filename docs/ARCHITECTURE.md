@@ -2,8 +2,9 @@
 
 `lpc-toolkit` uses a core-first architecture with Clean Architecture /
 Hexagonal Architecture style boundaries. The reusable sprite engine lives in
-`packages/core/`; the React web app adapts browser state, assets, canvas, ZIP,
-download, and URL behavior around that engine.
+`packages/core/`; shared presets live in `packages/presets/`; the React web app
+and Node CLI adapt their runtime state, assets, canvas, ZIP, download, and
+filesystem behavior around that engine.
 
 This is not an MVC codebase. Do not reorganize it into
 `models/views/controllers`. The important boundary is dependency direction:
@@ -28,7 +29,21 @@ LPC behavior:
 - adapter contracts such as `CanvasAdapter`
 
 Core can define abstract ports and domain types. It must not know whether the
-caller is React, a browser, Node, Vite, a test, or a future CLI.
+caller is React, a browser, Node, Vite, a test, the web app, or the CLI.
+
+### `packages/presets/`
+
+`packages/presets/` owns shared preset definitions and pure preset-application
+logic:
+
+- themed outfit preset metadata
+- clothing-slot clearing rules for applying presets
+- catalog-backed preset item resolution
+- default variant and recolor selection for preset items
+
+Presets may depend on core types and pure catalog/palette helpers. They must
+not own React UI, browser APIs, filesystem access, canvas creation, image
+loading, ZIP creation, downloads, or CLI command parsing.
 
 ### `packages/web/src/slice/`
 
@@ -105,6 +120,21 @@ part of browser runtime or core runtime source.
 Scripts may read generated asset paths and materialize local assets. They must
 not modify `upstream/`.
 
+### `packages/cli/`
+
+`packages/cli/` owns Node runtime behavior around the core engine:
+
+- agent-first command parsing and JSON/human responses
+- filesystem-backed catalog, palette, custom asset, and selection loading
+- Node `CanvasAdapter` wiring through `@napi-rs/canvas`
+- render output staging and atomic publishing
+- metadata, credits, animation, frame, and ZIP artifact writing
+- token and preset commands for automation
+
+CLI code may use Node APIs, `@napi-rs/canvas` (MIT), and `jszip` (MIT) because
+it is a Node runtime package. Those dependencies must not move into
+`packages/core/src/**`.
+
 ### `docs/`, `AGENTS.md`, `CLAUDE.md`
 
 These files are governance and contributor guidance:
@@ -120,6 +150,10 @@ Do not treat docs as permission to bypass the hard rules in `AGENTS.md`.
 Allowed dependency direction:
 
 - `packages/web` -> `packages/core`
+- `packages/web` -> `packages/presets`
+- `packages/cli` -> `packages/core`
+- `packages/cli` -> `packages/presets`
+- `packages/presets` -> `packages/core`
 - web components -> hooks, `slice/`, and `lib/`
 - hooks -> core, `slice/`, `adapter/`, and `lib/`
 - `adapter/` -> core adapter contracts
@@ -130,6 +164,8 @@ Allowed dependency direction:
 Forbidden dependency direction:
 
 - core -> web
+- core -> presets
+- core -> CLI
 - core -> React
 - core -> DOM, `window`, or `document`
 - core -> `fetch`, `createImageBitmap`, or `localStorage`
@@ -141,7 +177,8 @@ Forbidden dependency direction:
 - scripts or runtime code modifying `upstream/`
 
 The intended flow is inward for policy and outward for implementation details:
-web depends on core contracts; core never depends on web implementations.
+web and CLI depend on core contracts; presets depends on core; core never
+depends on web, CLI, or preset implementations.
 
 ## Core Package Rules
 
@@ -177,6 +214,24 @@ them. If a component starts deciding compatibility rules, resolving catalog
 defaults, managing object URLs, and composing canvases directly, move those
 concerns back to the appropriate layer.
 
+## CLI Package Rules
+
+`packages/cli/` is the only package that should own command-line runtime
+behavior. Keep CLI-specific filesystem access, Node canvas loading, ZIP writing,
+process IO, and output publishing there.
+
+CLI commands should continue to call core through injected adapter contracts and
+shared package APIs. Do not add CLI conveniences by importing Node APIs into
+`packages/core/src/**`, and do not bypass attribution files when rendering or
+bundling output.
+
+## Presets Package Rules
+
+`packages/presets/` is shared product logic, not a web component and not a CLI
+command layer. It should stay pure enough for both web and CLI to consume.
+Preset changes should preserve catalog-backed validation, skipped-item reporting,
+and body-type compatibility behavior.
+
 ## React Data Flow
 
 ```text
@@ -198,7 +253,7 @@ domain work through injected browser adapters.
 Every rendered or exported sprite must preserve attribution metadata derived
 from `assets/CREDITS.csv` or the upstream credits data.
 
-UI preview, download, ZIP export, and the future CLI must not bypass credits.
+UI preview, download, ZIP export, and CLI rendering must not bypass credits.
 Any workflow that creates pixels for users must include or preserve the
 required credits and license output. ZIP exports should continue writing credit
 files, previews should continue exposing attribution, and new export paths must
@@ -227,8 +282,8 @@ implementation of core's canvas and image loading port. `zip-loader.ts`,
 `zip-export.ts`, `download.ts`, and URL/hash helpers are browser workflows
 around the core engine.
 
-If the future CLI needs equivalent behavior, implement CLI-specific adapters and
-export workflows outside core. Do not put CLI filesystem or canvas dependencies
+The CLI has equivalent Node behavior through CLI-specific adapters and export
+workflows outside core. Do not put CLI filesystem, ZIP, or canvas dependencies
 into `packages/core/src/**`.
 
 ## Testing and Verification Expectations
@@ -245,16 +300,23 @@ Target package commands when the change is scoped:
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/core test
+rtk pnpm --filter @lpc-toolkit/presets test
 rtk pnpm --filter @lpc-toolkit/web test
 rtk pnpm --filter @lpc-toolkit/web typecheck
+rtk pnpm --filter @lpc-toolkit/cli test
+rtk pnpm --filter @lpc-toolkit/cli typecheck
 ```
 
 For architecture-boundary changes, verify the specific boundary being touched:
 
 - core changes should typecheck and test without browser or Node runtime imports
   in `packages/core/src/**`
+- preset changes should verify both preset behavior and at least one consuming
+  surface when behavior changes
 - web composition changes should cover stale async composition, attribution, and
   export behavior where relevant
+- CLI render changes should verify required metadata/credit artifacts and
+  no-partial-output behavior
 - asset-tooling changes should validate generated assets and preserve credits
 
 ## Local Extraction Guidance
