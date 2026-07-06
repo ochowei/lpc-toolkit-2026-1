@@ -78,7 +78,12 @@ export const VILLAGER_RANDOM_PROFILE: RandomProfile = {
   excludeGroups: ['fantasy', 'weapons', 'fx'],
   optionalProb: 0.6,
   typeNames: ['body', 'head', 'expression', 'hair', 'clothes', 'legs', 'shoes'],
+  requiredTypeNames: ['body', 'head', 'expression', 'clothes', 'legs', 'shoes'],
+  randomColorTypeNames: ['body', 'clothes', 'legs', 'shoes'],
   itemPools: {
+    body: ['Body Color'],
+    head: ['Human Male', 'Human Female'],
+    expression: ['Neutral'],
     clothes: ['Longsleeve', 'Shortsleeve'],
     legs: ['Pants'],
     shoes: ['Basic Shoes', 'Basic Boots'],
