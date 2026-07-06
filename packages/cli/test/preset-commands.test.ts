@@ -1,4 +1,5 @@
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { createCatalog, type ItemDefinition, type PaletteMetadata } from '@lpc-toolkit/core';
+import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -20,6 +21,40 @@ describe('preset commands', () => {
     expect(selection.schema).toBe('lpc-toolkit.selection.v1');
     expect(selection.name).toBe('farmer');
     expect(selection.items.body?.name).toBe('Body Color');
+  });
+
+  it('fills omitted preset color fields from catalog and palette defaults', () => {
+    const leather: ItemDefinition = {
+      name: 'Leather',
+      type_name: 'armour',
+      animations: ['walk'],
+      credits: [],
+      recolors: { material: 'cloth', palettes: ['ulpc'] },
+      layer_1: { zPos: 40, male: 'armour/leather/' },
+    };
+    const catalog = createCatalog({ 'armour/leather.json': leather }).catalog;
+    const palettes: PaletteMetadata = {
+      materials: {
+        cloth: {
+          default: 'ulpc',
+          base: 'brown',
+          palettes: {
+            ulpc: {
+              brown: ['#5c4033'],
+              green: ['#2f6f3e'],
+            },
+          },
+        },
+      },
+      versions: { ulpc: {} },
+    };
+
+    const selection = materializePreset('ranger', { catalog, palettes });
+
+    expect(selection.items.armour).toEqual({
+      name: 'Leather',
+      recolor: 'brown',
+    });
   });
 
   it('requires a preset id for materialize', () => {
@@ -51,5 +86,22 @@ describe('preset commands', () => {
     expect(response.ok).toBe(true);
     const written = readFileSync(path.join(cwd, 'farmer.json'), 'utf8');
     expect(written).toBe(`${JSON.stringify(materializePreset('farmer'), null, 2)}\n`);
+  });
+
+  it('reports write failures separately from unknown presets', () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-preset-'));
+    mkdirSync(path.join(cwd, 'blocked'));
+
+    const response = runPresetCommand(
+      parseArgs(['preset', 'materialize', 'farmer', '--out', 'blocked']),
+      cwd,
+    );
+
+    expect(response.ok).toBe(false);
+    expect(response.command).toBe('preset materialize');
+    expect(response.errors[0]).toMatchObject({
+      code: 'preset_write_failed',
+      path: 'blocked',
+    });
   });
 });

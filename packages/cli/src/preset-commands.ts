@@ -1,7 +1,14 @@
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { PRESETS } from '@lpc-toolkit/presets';
+import {
+  computePresetSelection,
+  PRESETS,
+  type Preset,
+} from '@lpc-toolkit/presets';
+import type { BodyType, Catalog, PaletteMetadata } from '@lpc-toolkit/core';
 import { flagString, type ParsedArgs } from './args.js';
+import { createRuntimeContext } from './context.js';
+import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
 import { commandError, commandOk, type CliResponse } from './response.js';
 import { selectionJsonFromCore, type SelectionJson } from './selection.js';
 
@@ -23,10 +30,19 @@ export function listPresets(): {
   };
 }
 
-export function materializePreset(id: string): SelectionJson {
+export interface MaterializePresetOptions {
+  readonly catalog?: Catalog;
+  readonly palettes?: PaletteMetadata;
+  readonly bodyType?: BodyType;
+}
+
+function findPreset(id: string): Preset {
   const preset = PRESETS.find((candidate) => candidate.id === id);
   if (!preset) throw new Error(`Unknown preset: ${id}`);
+  return preset;
+}
 
+function materializePresetRaw(preset: Preset): SelectionJson {
   return selectionJsonFromCore(
     {
       bodyType: preset.bodyType ?? 'male',
@@ -46,6 +62,31 @@ export function materializePreset(id: string): SelectionJson {
   );
 }
 
+export function materializePreset(
+  id: string,
+  options: MaterializePresetOptions = {},
+): SelectionJson {
+  const preset = findPreset(id);
+  if (options.catalog && options.palettes) {
+    const selection = computePresetSelection(
+      preset,
+      {},
+      options.bodyType ?? 'male',
+      options.catalog,
+      options.palettes,
+    );
+    if (selection.skipped.length === preset.items.length) {
+      return materializePresetRaw(preset);
+    }
+    return selectionJsonFromCore(
+      { bodyType: selection.bodyType, items: selection.selections },
+      preset.id,
+    );
+  }
+
+  return materializePresetRaw(preset);
+}
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -60,6 +101,7 @@ export function runPresetCommand(
 
   if (parsed.command[1] === 'materialize') {
     const id = parsed.positionals[0];
+    const out = flagString(parsed.flags, 'out');
     if (!id) {
       return commandError('preset materialize', {
         code: 'missing_argument',
@@ -67,19 +109,47 @@ export function runPresetCommand(
       });
     }
 
+    const context = createRuntimeContext({ cwd });
+    const catalog = loadCatalogFromRoots(
+      context.sheetDefinitionsRoot,
+      context.customSheetDefinitionsRoot,
+    );
+    const palettes = loadPalettesFromRoot(context.paletteDefinitionsRoot);
+    const warnings = [...catalog.warnings, ...palettes.warnings];
+    let selection: SelectionJson;
     try {
-      const selection = materializePreset(id);
-      const out = flagString(parsed.flags, 'out');
-      if (out) {
-        writeFileSync(path.resolve(cwd, out), `${JSON.stringify(selection, null, 2)}\n`);
-      }
-      return commandOk('preset materialize', { selection, out: out ?? null });
-    } catch (error) {
-      return commandError('preset materialize', {
-        code: 'unknown_preset',
-        message: errorMessage(error),
+      selection = materializePreset(id, {
+        catalog: catalog.catalog,
+        palettes: palettes.palettes,
       });
+    } catch (error) {
+      return commandError(
+        'preset materialize',
+        {
+          code: 'unknown_preset',
+          message: errorMessage(error),
+        },
+        warnings,
+      );
     }
+
+    if (out) {
+      try {
+        writeFileSync(path.resolve(cwd, out), `${JSON.stringify(selection, null, 2)}\n`);
+      } catch (error) {
+        return commandError(
+          'preset materialize',
+          {
+            code: 'preset_write_failed',
+            message: errorMessage(error),
+            path: out,
+          },
+          warnings,
+        );
+      }
+    }
+
+    return commandOk('preset materialize', { selection, out: out ?? null }, warnings);
   }
 
   return commandError(parsed.command.join(' '), {

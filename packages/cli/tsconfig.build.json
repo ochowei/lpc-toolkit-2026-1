@@ -1,7 +1,11 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "rootDir": "./src"
+    "rootDir": "./src",
+    "paths": {
+      "@lpc-toolkit/core": ["../core/dist/index.d.ts"],
+      "@lpc-toolkit/presets": ["../presets/dist/index.d.ts"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["dist", "node_modules", "test", "vitest.config.ts"]

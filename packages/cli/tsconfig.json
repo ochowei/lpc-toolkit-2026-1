@@ -1,11 +1,15 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "rootDir": ".",
     "outDir": "./dist",
     "tsBuildInfoFile": "./dist/.tsbuildinfo",
     "types": ["node"],
-    "lib": ["ES2022"]
+    "lib": ["ES2022"],
+    "baseUrl": ".",
+    "paths": {
+      "@lpc-toolkit/core": ["../core/src/index.ts"],
+      "@lpc-toolkit/presets": ["../presets/src/index.ts"]
+    }
   },
   "include": ["src/**/*", "test/**/*", "vitest.config.ts"],
   "exclude": ["dist", "node_modules"]
