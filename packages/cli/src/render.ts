@@ -1,4 +1,14 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import {
   composeSelections,
@@ -80,6 +90,78 @@ function canvasDimensions(canvas: CanvasLike): { readonly width: number; readonl
   return { width: canvas.width, height: canvas.height };
 }
 
+function finalToStagedPath(stagingRoot: string, outDir: string, finalPath: string): string {
+  return path.join(stagingRoot, path.relative(outDir, finalPath));
+}
+
+function ensurePublishablePath(finalPath: string): void {
+  if (!existsSync(finalPath)) return;
+  if (statSync(finalPath).isDirectory()) {
+    throw new Error(`Cannot write artifact over directory: ${finalPath}`);
+  }
+}
+
+function ensurePublishableDirectory(dirPath: string): void {
+  if (!existsSync(dirPath)) return;
+  if (!statSync(dirPath).isDirectory()) {
+    throw new Error(`Cannot create output directory because a file already exists: ${dirPath}`);
+  }
+}
+
+function preflightPublishPaths(outDir: string, artifacts: readonly RenderArtifact[]): void {
+  ensurePublishableDirectory(outDir);
+  const dirs = new Set<string>();
+  for (const artifact of artifacts) {
+    ensurePublishablePath(artifact.path);
+    let dir = path.dirname(artifact.path);
+    while (dir.startsWith(outDir) && !dirs.has(dir)) {
+      dirs.add(dir);
+      if (dir === outDir) break;
+      dir = path.dirname(dir);
+    }
+  }
+  for (const dir of dirs) ensurePublishableDirectory(dir);
+}
+
+function publishStagedFiles(
+  stagingRoot: string,
+  outDir: string,
+  artifacts: readonly RenderArtifact[],
+): void {
+  const changes: Array<{
+    readonly finalPath: string;
+    readonly backupPath?: string;
+  }> = [];
+  try {
+    mkdirSync(outDir, { recursive: true });
+    for (const artifact of artifacts) {
+      const stagedPath = finalToStagedPath(stagingRoot, outDir, artifact.path);
+      const backupPath = existsSync(artifact.path)
+        ? path.join(stagingRoot, '.backup', path.relative(outDir, artifact.path))
+        : undefined;
+      if (backupPath) {
+        mkdirSync(path.dirname(backupPath), { recursive: true });
+        renameSync(artifact.path, backupPath);
+      }
+      changes.push({
+        finalPath: artifact.path,
+        ...(backupPath ? { backupPath } : {}),
+      });
+      mkdirSync(path.dirname(artifact.path), { recursive: true });
+      renameSync(stagedPath, artifact.path);
+    }
+  } catch (error) {
+    for (const change of changes.reverse()) {
+      rmSync(change.finalPath, { force: true });
+      if (change.backupPath && existsSync(change.backupPath)) {
+        mkdirSync(path.dirname(change.finalPath), { recursive: true });
+        renameSync(change.backupPath, change.finalPath);
+      }
+    }
+    throw error;
+  }
+}
+
 export async function renderSelection(
   options: RenderSelectionOptions,
 ): Promise<RenderSelectionResult> {
@@ -122,6 +204,7 @@ export async function renderSelection(
   });
 
   const baseName = safeName(options.selectionName);
+  const partialValidationWarnings = options.allowPartial ? validation.errors : [];
   const animationMetadata: Record<string, AnimationMetadata> = {};
   const sheetPath = path.join(options.outDir, `${baseName}.sheet.png`);
   const creditsTxtPath = path.join(options.outDir, `${baseName}.credits.txt`);
@@ -196,6 +279,7 @@ export async function renderSelection(
     ...catalog.warnings,
     ...palettes.warnings,
     ...validation.warnings,
+    ...partialValidationWarnings,
     ...recolorWarnings,
     ...(sheet.missingPaths ?? []).map((missingPath) => ({
       code: 'missing_sprite_path',
@@ -237,31 +321,52 @@ export async function renderSelection(
     skippedLayers: options.allowPartial ? validation.errors : [],
   };
 
-  mkdirSync(options.outDir, { recursive: true });
-  const writtenFiles: string[] = [];
-  await writeCanvasPng(sheet.canvas, sheetPath);
-  writtenFiles.push(sheetPath);
-  writeFileSync(creditsTxtPath, creditsTxt);
-  writeFileSync(creditsCsvPath, creditsCsv);
-  writtenFiles.push(creditsTxtPath, creditsCsvPath);
+  preflightPublishPaths(options.outDir, artifacts);
 
-  for (const output of animationOutputs) {
-    mkdirSync(path.dirname(output.artifact.path), { recursive: true });
-    await writeCanvasPng(output.canvas, output.artifact.path);
-    writtenFiles.push(output.artifact.path);
-  }
+  const stagingParent = existsSync(path.dirname(options.outDir))
+    ? path.dirname(options.outDir)
+    : os.tmpdir();
+  const stagingRoot = mkdtempSync(path.join(stagingParent, `.${baseName}.render-`));
+  const stagedFiles: string[] = [];
+  try {
+    const stagedSheetPath = finalToStagedPath(stagingRoot, options.outDir, sheetPath);
+    mkdirSync(path.dirname(stagedSheetPath), { recursive: true });
+    await writeCanvasPng(sheet.canvas, stagedSheetPath);
+    stagedFiles.push(stagedSheetPath);
 
-  for (const output of frameOutputs) {
-    mkdirSync(path.dirname(output.artifact.path), { recursive: true });
-    await writeCanvasPng(output.canvas, output.artifact.path);
-    writtenFiles.push(output.artifact.path);
-  }
+    const stagedCreditsTxtPath = finalToStagedPath(stagingRoot, options.outDir, creditsTxtPath);
+    const stagedCreditsCsvPath = finalToStagedPath(stagingRoot, options.outDir, creditsCsvPath);
+    writeFileSync(stagedCreditsTxtPath, creditsTxt);
+    writeFileSync(stagedCreditsCsvPath, creditsCsv);
+    stagedFiles.push(stagedCreditsTxtPath, stagedCreditsCsvPath);
 
-  writeFileSync(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`);
-  writtenFiles.push(metadataPath);
+    for (const output of animationOutputs) {
+      const stagedPath = finalToStagedPath(stagingRoot, options.outDir, output.artifact.path);
+      mkdirSync(path.dirname(stagedPath), { recursive: true });
+      await writeCanvasPng(output.canvas, stagedPath);
+      stagedFiles.push(stagedPath);
+    }
 
-  if (options.bundleZip) {
-    await writeZipBundle(zipPath, writtenFiles, options.outDir);
+    for (const output of frameOutputs) {
+      const stagedPath = finalToStagedPath(stagingRoot, options.outDir, output.artifact.path);
+      mkdirSync(path.dirname(stagedPath), { recursive: true });
+      await writeCanvasPng(output.canvas, stagedPath);
+      stagedFiles.push(stagedPath);
+    }
+
+    const stagedMetadataPath = finalToStagedPath(stagingRoot, options.outDir, metadataPath);
+    writeFileSync(stagedMetadataPath, `${JSON.stringify(metadata, null, 2)}\n`);
+    stagedFiles.push(stagedMetadataPath);
+
+    if (options.bundleZip) {
+      const stagedZipPath = finalToStagedPath(stagingRoot, options.outDir, zipPath);
+      await writeZipBundle(stagedZipPath, stagedFiles, stagingRoot);
+      stagedFiles.push(stagedZipPath);
+    }
+
+    publishStagedFiles(stagingRoot, options.outDir, artifacts);
+  } finally {
+    rmSync(stagingRoot, { recursive: true, force: true });
   }
 
   return {

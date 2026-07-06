@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -84,5 +84,77 @@ describe('renderSelection', () => {
     ).rejects.toThrow(/not-real/);
 
     expect(listFiles(outDir)).toEqual([]);
+  }, 30000);
+
+  it('does not leave partial artifacts when an output path collides with a file', async () => {
+    const outDir = mkdtempSync(path.join(os.tmpdir(), 'lpc-render-'));
+    writeFileSync(path.join(outDir, 'animations'), 'not a directory');
+
+    await expect(
+      renderSelection({
+        cwd: repoRoot,
+        outDir,
+        selectionName: 'body-only',
+        selectionJson: bodyOnlySelection,
+        animations: ['walk'],
+        frames: [],
+        bundleZip: false,
+        allowPartial: false,
+      }),
+    ).rejects.toThrow(/animations/);
+
+    expect(listFiles(outDir)).toEqual(['animations']);
+    expect(readFileSync(path.join(outDir, 'animations'), 'utf8')).toBe('not a directory');
+  }, 30000);
+
+  it('reports skipped validation errors as warnings when partial render is allowed', async () => {
+    const outDir = mkdtempSync(path.join(os.tmpdir(), 'lpc-render-'));
+    const result = await renderSelection({
+      cwd: repoRoot,
+      outDir,
+      selectionName: 'body-only',
+      selectionJson: {
+        ...bodyOnlySelection,
+        items: {
+          ...bodyOnlySelection.items,
+          missing_type: { name: 'Missing Item' },
+        },
+      },
+      animations: [],
+      frames: [],
+      bundleZip: false,
+      allowPartial: true,
+    });
+
+    expect(result.warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'unknown_type_name',
+          path: 'missing_type',
+        }),
+      ]),
+    );
+    const metadata = JSON.parse(
+      readFileSync(path.join(outDir, 'body-only.metadata.json'), 'utf8'),
+    ) as {
+      readonly warnings: readonly { readonly code: string; readonly path?: string }[];
+      readonly skippedLayers: readonly { readonly code: string; readonly path?: string }[];
+    };
+    expect(metadata.warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'unknown_type_name',
+          path: 'missing_type',
+        }),
+      ]),
+    );
+    expect(metadata.skippedLayers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'unknown_type_name',
+          path: 'missing_type',
+        }),
+      ]),
+    );
   }, 30000);
 });
