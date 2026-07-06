@@ -40,11 +40,20 @@ importers:
         specifier: ^1.0.0
         version: 1.0.0
 
+  packages/presets:
+    dependencies:
+      '@lpc-toolkit/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/web:
     dependencies:
       '@lpc-toolkit/core':
         specifier: workspace:*
         version: link:../core
+      '@lpc-toolkit/presets':
+        specifier: workspace:*
+        version: link:../presets
       '@radix-ui/react-slot':
         specifier: ^1.1.1
         version: 1.2.4(@types/react@18.3.28)(react@18.3.1)
