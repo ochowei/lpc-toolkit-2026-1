@@ -1618,20 +1618,20 @@ describe('pickRandomOutfit', () => {
       'head/zombie.json': makeItem('Zombie', 'head'),
       'head/orc.json': makeItem('Orc', 'head'),
       'expression/neutral.json': makeItem('Neutral', 'expression'),
-      'clothes/formal.json': makeItem(
+      'clothes/formal-longsleeve.json': makeItem(
         'Collared/Formal Longsleeve',
         'clothes',
         'male',
         ['white'],
       ),
-      'clothes/formal-striped.json': makeItem(
+      'clothes/formal-striped-longsleeve.json': makeItem(
         'Striped Collared/Formal Longsleeve',
         'clothes',
         'male',
         ['white'],
       ),
-      'legs/formal.json': makeItem('Formal Pants', 'legs'),
-      'legs/formal-striped.json': makeItem('Striped Formal Pants', 'legs'),
+      'legs/formal-pants.json': makeItem('Formal Pants', 'legs'),
+      'legs/formal-striped-pants.json': makeItem('Striped Formal Pants', 'legs'),
       'shoes/basic.json': makeItem('Basic Shoes', 'shoes'),
       'hat/tophat.json': makeItem('Formal Tophat', 'hat'),
       'overalls/brown.json': makeItem('Overalls', 'overalls'),
@@ -1706,20 +1706,23 @@ describe('pickRandomOutfit', () => {
       'expression/neutral.json': makeItem('Neutral', 'expression'),
       'expression/happy.json': makeItem('Happy', 'expression'),
       'hair/parted.json': makeItem('Parted', 'hair'),
-      'clothes/formal.json': makeItem(
+      'clothes/formal-longsleeve.json': makeItem(
         'Collared/Formal Longsleeve',
         'clothes',
         'male',
         ['white'],
       ),
-      'clothes/formal-striped.json': makeItem(
+      'clothes/formal-striped-longsleeve.json': makeItem(
         'Striped Collared/Formal Longsleeve',
         'clothes',
         'male',
         ['white'],
       ),
-      'legs/formal.json': makeRecolorItem('Formal Pants', 'legs'),
-      'legs/formal-striped.json': makeRecolorItem('Striped Formal Pants', 'legs'),
+      'legs/formal-pants.json': makeRecolorItem('Formal Pants', 'legs'),
+      'legs/formal-striped-pants.json': makeRecolorItem(
+        'Striped Formal Pants',
+        'legs',
+      ),
       'shoes/basic-shoes.json': makeItem('Basic Shoes', 'shoes', 'male', [
         'black',
         'blue',
@@ -1733,7 +1736,7 @@ describe('pickRandomOutfit', () => {
     const sel = pickRandomOutfit({
       catalog: nobleCatalog,
       bodyType: 'female',
-      rng: () => 0,
+      rng: seqRng([0, 0, 0, 0, 0.99, 0, 0]),
       optionalProb: 0,
       profile: 'noble',
     });
@@ -1772,20 +1775,20 @@ describe('pickRandomOutfit', () => {
       'body/body-color.json': makeItem('Body Color', 'body'),
       'head/human-male.json': makeItem('Human Male', 'head'),
       'expression/neutral.json': makeItem('Neutral', 'expression'),
-      'clothes/formal.json': makeItem(
+      'clothes/formal-longsleeve.json': makeItem(
         'Collared/Formal Longsleeve',
         'clothes',
         'male',
         ['white'],
       ),
-      'clothes/formal-striped.json': makeItem(
+      'clothes/formal-striped-longsleeve.json': makeItem(
         'Striped Collared/Formal Longsleeve',
         'clothes',
         'male',
         ['white'],
       ),
-      'legs/formal.json': makeItem('Formal Pants', 'legs'),
-      'legs/formal-striped.json': makeItem('Striped Formal Pants', 'legs'),
+      'legs/formal-pants.json': makeItem('Formal Pants', 'legs'),
+      'legs/formal-striped-pants.json': makeItem('Striped Formal Pants', 'legs'),
       'shoes/basic-shoes.json': makeItem('Basic Shoes', 'shoes', 'male', ['black']),
       'hat/tophat.json': makeItem('Formal Tophat', 'hat', 'male', ['black']),
     });
@@ -1830,20 +1833,23 @@ describe('pickRandomOutfit', () => {
       'body/body-color.json': makeRecolorItem('Body Color', 'body'),
       'head/human-male.json': makeItem('Human Male', 'head'),
       'expression/neutral.json': makeItem('Neutral', 'expression'),
-      'clothes/formal.json': makeItem(
+      'clothes/formal-longsleeve.json': makeItem(
         'Collared/Formal Longsleeve',
         'clothes',
         'male',
         ['white'],
       ),
-      'clothes/formal-striped.json': makeItem(
+      'clothes/formal-striped-longsleeve.json': makeItem(
         'Striped Collared/Formal Longsleeve',
         'clothes',
         'male',
         ['white'],
       ),
-      'legs/formal.json': makeRecolorItem('Formal Pants', 'legs'),
-      'legs/formal-striped.json': makeRecolorItem('Striped Formal Pants', 'legs'),
+      'legs/formal-pants.json': makeRecolorItem('Formal Pants', 'legs'),
+      'legs/formal-striped-pants.json': makeRecolorItem(
+        'Striped Formal Pants',
+        'legs',
+      ),
       'shoes/basic-shoes.json': makeItem('Basic Shoes', 'shoes', 'male', [
         'black',
         'blue',
@@ -1895,20 +1901,23 @@ describe('pickRandomOutfit', () => {
       'body/body-color.json': makeRecolorItem('Body Color', 'body'),
       'head/human-male.json': makeItem('Human Male', 'head'),
       'expression/neutral.json': makeItem('Neutral', 'expression'),
-      'clothes/formal.json': makeItem(
+      'clothes/formal-longsleeve.json': makeItem(
         'Collared/Formal Longsleeve',
         'clothes',
         'male',
         ['white'],
       ),
-      'clothes/formal-striped.json': makeItem(
+      'clothes/formal-striped-longsleeve.json': makeItem(
         'Striped Collared/Formal Longsleeve',
         'clothes',
         'male',
         ['white'],
       ),
-      'legs/formal.json': makeRecolorItem('Formal Pants', 'legs'),
-      'legs/formal-striped.json': makeRecolorItem('Striped Formal Pants', 'legs'),
+      'legs/formal-pants.json': makeRecolorItem('Formal Pants', 'legs'),
+      'legs/formal-striped-pants.json': makeRecolorItem(
+        'Striped Formal Pants',
+        'legs',
+      ),
       'shoes/basic-shoes.json': makeItem('Basic Shoes', 'shoes', 'male', [
         'black',
         'blue',

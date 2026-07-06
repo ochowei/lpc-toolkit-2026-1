@@ -734,6 +734,10 @@ Implementation note: Added profile-level item sets, used them to keep Noble form
 Commit: 92bd4119c
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS; `rtk pnpm --filter @lpc-toolkit/web typecheck` reported `TypeScript: No errors found` but exited 1 via the rtk shorthand; `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS; `rtk pnpm check:boundaries` PASS.
 
+Correction note: Removed the synthetic Noble formal clothes fallback so profile item sets only select real catalog items, restored the original optional probability check, and fixed Noble test fixture basenames/RNG instead.
+Correction commit: pending until `fix(web): remove noble random test fallback` is created.
+Correction verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS; `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS; `rtk pnpm check:boundaries` PASS.
+
 ## Task 3: Final Verification and Plan Bookkeeping
 
 **Files:**

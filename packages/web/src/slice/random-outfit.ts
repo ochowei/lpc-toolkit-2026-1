@@ -137,27 +137,9 @@ function itemForProfileSetEntry(
   bodyType: BodyType,
 ): ItemDefinition | undefined {
   const defs = catalog.byTypeName.get(typeName) ?? [];
-  const item = defs.find(
+  return defs.find(
     (item) => item.name === itemName && itemSupportsBodyType(item, bodyType),
   );
-  if (item) return item;
-
-  if (
-    typeName === 'clothes' &&
-    (itemName === 'Collared/Formal Longsleeve' ||
-      itemName === 'Striped Collared/Formal Longsleeve')
-  ) {
-    return {
-      name: itemName,
-      type_name: typeName,
-      animations: ['walk'],
-      credits: [],
-      layer_1: { zPos: 0, [bodyType]: '' },
-      variants: ['white'],
-    };
-  }
-
-  return undefined;
 }
 
 function compatibleProfileItemSetEntries(
@@ -310,7 +292,7 @@ export function pickRandomOutfit(args: PickRandomOutfitArgs): Selections {
     if (hasSelectionForType(items, typeName)) continue;
 
     const isRequired = isRequiredType(profile, typeName);
-    if (!isRequired && rng() >= optionalProb) continue;
+    if (!isRequired && rng() > optionalProb) continue;
 
     const defs = args.catalog.byTypeName.get(typeName) ?? [];
     const pooled = filterByProfilePool(defs, profile.itemPools?.[typeName]);
