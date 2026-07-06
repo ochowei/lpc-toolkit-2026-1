@@ -441,7 +441,7 @@ Verification: `rtk pnpm check:boundaries` PASS.
 ```
 
 Implementation note: Recorded final Villager random narrowing verification.
-Commit: pending final hash update after bookkeeping commit.
+Commit: 1affc3d9b
 Verification: `rtk pnpm check:boundaries` PASS; `rtk git status --short` clean before bookkeeping.
 
 ## Final Acceptance Criteria
