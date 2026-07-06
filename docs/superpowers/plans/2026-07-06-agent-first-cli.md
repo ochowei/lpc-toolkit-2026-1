@@ -247,7 +247,7 @@ review PASS; code quality review PASS.
 - Test: `packages/cli/test/args.test.ts`
 - Test: `packages/cli/test/response.test.ts`
 
-- [ ] **Step 1: Write parser tests**
+- [x] **Step 1: Write parser tests**
 
 Create `packages/cli/test/args.test.ts`:
 
@@ -285,7 +285,7 @@ describe('parseArgs', () => {
 });
 ```
 
-- [ ] **Step 2: Write response tests**
+- [x] **Step 2: Write response tests**
 
 Create `packages/cli/test/response.test.ts`:
 
@@ -337,7 +337,7 @@ describe('response envelope', () => {
 });
 ```
 
-- [ ] **Step 3: Run tests to verify they fail**
+- [x] **Step 3: Run tests to verify they fail**
 
 Run:
 
@@ -347,7 +347,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- args.test.ts response.test.ts
 
 Expected: FAIL because `args.ts` and `response.ts` do not exist.
 
-- [ ] **Step 4: Implement `args.ts`**
+- [x] **Step 4: Implement `args.ts`**
 
 Create `packages/cli/src/args.ts`:
 
@@ -436,7 +436,7 @@ export function flagBoolean(
 }
 ```
 
-- [ ] **Step 5: Implement `response.ts`**
+- [x] **Step 5: Implement `response.ts`**
 
 Create `packages/cli/src/response.ts`:
 
@@ -482,7 +482,7 @@ export function humanIssue(issue: CliIssue): string {
 }
 ```
 
-- [ ] **Step 6: Wire parser into `main.ts`**
+- [x] **Step 6: Wire parser into `main.ts`**
 
 Modify `packages/cli/src/main.ts` so unknown command errors honor `--json`:
 
@@ -533,7 +533,7 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<number
 }
 ```
 
-- [ ] **Step 7: Run parser and response tests**
+- [x] **Step 7: Run parser and response tests**
 
 Run:
 
@@ -543,18 +543,25 @@ rtk pnpm --filter @lpc-toolkit/cli test -- args.test.ts response.test.ts smoke.t
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 rtk git add packages/cli/src packages/cli/test
 rtk git commit -m "feat(cli): add argument and response primitives"
 ```
 
-Implementation note: record parser/envelope behavior here.
+Implementation note: Added the dependency-free argument parser, response
+envelope helpers, and unknown-command JSON output path while preserving help
+behavior. Parser tests cover command path, boolean flags, valued flags,
+positionals, and repeated flags; response tests cover success and error JSON
+envelopes.
 
-Commit: record resulting hash here.
+Commit: 03cbfd4e9
 
-Verification: record PASS/FAIL here.
+Verification: `rtk env CI=true pnpm --filter @lpc-toolkit/cli test -- args.test.ts response.test.ts smoke.test.ts`
+PASS; `rtk env CI=true pnpm --filter @lpc-toolkit/cli typecheck` PASS;
+`rtk env CI=true pnpm --filter @lpc-toolkit/cli build` PASS; spec compliance
+review PASS; code quality review PASS.
 
 ## Task 3: Extract Shared Presets Package
 
