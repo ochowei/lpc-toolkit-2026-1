@@ -746,7 +746,7 @@ describe('pickRandomOutfit', () => {
 
   it('villager profile keeps random outfits mundane and clothing-only', () => {
     const { catalog: villagerCatalog } = createCatalog({
-      'body/light.json': makeItem('Light', 'body'),
+      'body/body-color.json': makeItem('Body Color', 'body'),
       'head/human.json': makeItem('Human Male', 'head'),
       'expression/neutral.json': makeItem('Neutral', 'expression'),
       'hair/messy.json': makeItem('Messy3', 'hair'),
@@ -793,6 +793,68 @@ describe('pickRandomOutfit', () => {
     ] as const) {
       expect(sel.items[typeName]).toBeUndefined();
     }
+  });
+
+  it('villager profile uses human male body parts while randomizing villager colors', () => {
+    const { catalog: villagerCatalog } = createCatalog({
+      'body/body-color.json': makeRecolorItem('Body Color', 'body'),
+      'body/skeleton.json': makeItem('Skeleton', 'body'),
+      'body/zombie.json': makeItem('Zombie', 'body'),
+      'head/human-male.json': makeItem('Human Male', 'head'),
+      'head/minotaur.json': makeItem('Minotaur', 'head'),
+      'head/zombie.json': makeItem('Zombie', 'head'),
+      'expression/neutral.json': makeItem('Neutral', 'expression'),
+      'expression/angry.json': makeItem('Angry', 'expression'),
+      'hair/messy.json': makeItem('Messy3', 'hair'),
+      'clothes/longsleeve.json': makeRecolorItem('Longsleeve', 'clothes'),
+      'clothes/shortsleeve.json': makeRecolorItem('Shortsleeve', 'clothes'),
+      'legs/pants.json': makeRecolorItem('Pants', 'legs'),
+      'shoes/basic-shoes.json': makeItem('Basic Shoes', 'shoes', 'male', [
+        'tan',
+        'black',
+      ]),
+      'shoes/basic-boots.json': makeItem('Basic Boots', 'shoes', 'male', [
+        'brown',
+        'gray',
+      ]),
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: villagerCatalog,
+      palettes,
+      bodyType: 'female',
+      rng: () => 0.99,
+      optionalProb: 1,
+      profile: 'villager',
+    });
+
+    expect(sel.bodyType).toBe('male');
+    expect(sel.items['body']).toEqual({
+      typeName: 'body',
+      name: 'Body Color',
+      recolor: 'red',
+    });
+    expect(sel.items['head']).toEqual({ typeName: 'head', name: 'Human Male' });
+    expect(sel.items['expression']).toEqual({
+      typeName: 'expression',
+      name: 'Neutral',
+    });
+    expect(sel.items['hair']).toEqual({ typeName: 'hair', name: 'Messy3' });
+    expect(sel.items['clothes']).toEqual({
+      typeName: 'clothes',
+      name: 'Shortsleeve',
+      recolor: 'red',
+    });
+    expect(sel.items['legs']).toEqual({
+      typeName: 'legs',
+      name: 'Pants',
+      recolor: 'red',
+    });
+    expect(sel.items['shoes']).toEqual({
+      typeName: 'shoes',
+      name: 'Basic Boots',
+      variant: 'gray',
+    });
   });
 
   it('mage profile excludes heavy armor while allowing staff and crystal slots', () => {
