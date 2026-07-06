@@ -751,7 +751,7 @@ Second code-review fix verification: `rtk pnpm --filter @lpc-toolkit/web exec vi
 **Files:**
 - Modify: `docs/superpowers/plans/2026-07-06-noble-random-narrowing.md`
 
-- [ ] **Step 1: Re-run focused random-outfit tests**
+- [x] **Step 1: Re-run focused random-outfit tests**
 
 Run:
 
@@ -761,7 +761,7 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 2: Re-run typecheck**
+- [x] **Step 2: Re-run typecheck**
 
 Run:
 
@@ -771,7 +771,7 @@ rtk pnpm --filter @lpc-toolkit/web typecheck
 
 Expected: PASS.
 
-- [ ] **Step 3: Re-run boundary checks**
+- [x] **Step 3: Re-run boundary checks**
 
 Run:
 
@@ -781,7 +781,7 @@ rtk pnpm check:boundaries
 
 Expected: PASS.
 
-- [ ] **Step 4: Record final verification**
+- [x] **Step 4: Record final verification**
 
 Append this note under Task 3 after the checkbox list, replacing the command result words with the observed result:
 
@@ -791,7 +791,7 @@ Commit: output of `rtk git rev-parse --short HEAD` after `docs: record noble ran
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS; `rtk pnpm --filter @lpc-toolkit/web typecheck` PASS; `rtk pnpm check:boundaries` PASS.
 ```
 
-- [ ] **Step 5: Commit the verification note**
+- [x] **Step 5: Commit the verification note**
 
 Run:
 
@@ -801,6 +801,10 @@ rtk git commit -m "docs: record noble random verification"
 ```
 
 Expected: commit succeeds.
+
+Implementation note: Recorded final Noble random narrowing verification.
+Commit: See final report for the `rtk git rev-parse --short HEAD` output after `docs: record noble random verification`; Git commit hashes cannot be embedded in the same commit without changing that commit hash.
+Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS; `rtk pnpm --filter @lpc-toolkit/web typecheck` reported `TypeScript: No errors found` but exited 1 via the rtk shorthand; `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS; `rtk pnpm check:boundaries` PASS.
 
 ## Self-Review
 
