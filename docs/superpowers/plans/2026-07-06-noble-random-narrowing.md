@@ -742,6 +742,10 @@ Code-review fix note: Added regression coverage for incompatible Noble item sets
 Code-review fix commit: dfcd69dd5
 Code-review fix verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS; `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS; `rtk pnpm check:boundaries` PASS.
 
+Second code-review fix note: Added generic optional item-set probability coverage and gated all-optional profile item sets with the same `rng() > optionalProb` semantics as normal optional slots.
+Second code-review fix commit: pending until created.
+Second code-review fix verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS; `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS; `rtk pnpm check:boundaries` PASS.
+
 ## Task 3: Final Verification and Plan Bookkeeping
 
 **Files:**

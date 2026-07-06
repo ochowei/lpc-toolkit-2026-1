@@ -418,6 +418,41 @@ describe('pickRandomOutfit', () => {
     });
   });
 
+  it('optional profile item sets respect optional probability', () => {
+    const { catalog: itemSetCatalog } = createCatalog({
+      'body/light.json': makeItem('Light', 'body'),
+      'clothes/jacket.json': makeItem('Jacket', 'clothes'),
+      'legs/trousers.json': makeItem('Trousers', 'legs'),
+    });
+    const sel = pickRandomOutfit({
+      catalog: itemSetCatalog,
+      bodyType: 'male',
+      rng: () => 0.5,
+      profile: {
+        id: 'optional-set-test',
+        labelKey: 'randomProfile.normal',
+        requiredGroups: ['body'],
+        optionalGroups: ['clothing'],
+        excludeGroups: [],
+        optionalProb: 0,
+        typeNames: ['body', 'clothes', 'legs'],
+        itemSets: [
+          {
+            requiredTypeNames: ['clothes', 'legs'],
+            items: {
+              clothes: 'Jacket',
+              legs: 'Trousers',
+            },
+          },
+        ],
+      },
+    });
+
+    expect(sel.items['body']).toEqual({ typeName: 'body', name: 'Light' });
+    expect(sel.items['clothes']).toBeUndefined();
+    expect(sel.items['legs']).toBeUndefined();
+  });
+
   it('resolves farmer as a dedicated random profile', () => {
     expect(randomProfileForStyle('farmer').id).toBe('farmer');
   });

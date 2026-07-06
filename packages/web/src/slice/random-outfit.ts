@@ -147,14 +147,20 @@ function compatibleProfileItemSetEntries(
   profile: RandomProfile,
   bodyType: BodyType,
   scope: RandomScope,
+  optionalProb: number,
   excluded: ReadonlySet<GroupId>,
   currentItems: Readonly<Record<TypeName, Selection>>,
+  rng: () => number,
 ): readonly (readonly [TypeName, ItemDefinition])[][] {
   const compatibleSets: (readonly [TypeName, ItemDefinition])[][] = [];
 
   for (const itemSet of profile.itemSets ?? []) {
     const entries = Object.entries(itemSet.items) as readonly [TypeName, string][];
     const entryByTypeName = new Map<TypeName, string>(entries);
+    const itemSetTypeNames = new Set<TypeName>([
+      ...itemSet.requiredTypeNames,
+      ...entries.map(([typeName]) => typeName),
+    ]);
 
     if (
       itemSet.requiredTypeNames.some(
@@ -191,6 +197,16 @@ function compatibleProfileItemSetEntries(
       compatibleEntries.push([typeName, item]);
     }
 
+    if (
+      isCompatible &&
+      !Array.from(itemSetTypeNames).some((typeName) =>
+        isRequiredType(profile, typeName),
+      ) &&
+      rng() > optionalProb
+    ) {
+      isCompatible = false;
+    }
+
     if (isCompatible) {
       compatibleSets.push(compatibleEntries);
     }
@@ -217,6 +233,7 @@ function pickProfileItemSetSelections(args: {
   readonly profile: RandomProfile;
   readonly bodyType: BodyType;
   readonly scope: RandomScope;
+  readonly optionalProb: number;
   readonly excluded: ReadonlySet<GroupId>;
   readonly currentItems: Readonly<Record<TypeName, Selection>>;
   readonly palettes?: PaletteMetadata;
@@ -227,8 +244,10 @@ function pickProfileItemSetSelections(args: {
     args.profile,
     args.bodyType,
     args.scope,
+    args.optionalProb,
     args.excluded,
     args.currentItems,
+    args.rng,
   );
   if (compatibleSets.length === 0) return {};
 
@@ -288,6 +307,7 @@ export function pickRandomOutfit(args: PickRandomOutfitArgs): Selections {
       profile,
       bodyType,
       scope,
+      optionalProb,
       excluded,
       currentItems: items,
       ...(args.palettes ? { palettes: args.palettes } : {}),
