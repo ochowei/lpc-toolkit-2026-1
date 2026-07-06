@@ -74,6 +74,23 @@ describe('PRESETS data', () => {
       expect(covers(FEET), `${preset.id}: no feet item`).toBe(true);
     }
   });
+
+  it('villager preset matches the requested fixed configuration', () => {
+    const villager = PRESETS.find((preset) => preset.id === 'villager');
+
+    expect(villager).toMatchObject({
+      bodyType: 'male',
+      items: [
+        { typeName: 'body', name: 'Body Color', recolor: 'light' },
+        { typeName: 'head', name: 'Human Male', recolor: 'light' },
+        { typeName: 'expression', name: 'Neutral', recolor: 'light' },
+        { typeName: 'clothes', name: 'Longsleeve Polo', recolor: 'white' },
+        { typeName: 'legs', name: 'Pants', recolor: 'black' },
+        { typeName: 'shoes', name: 'Basic Shoes', variant: 'gray' },
+        { typeName: 'hair', name: 'Side Parted w/Bangs 2', recolor: 'sandy' },
+      ],
+    });
+  });
 });
 
 describe.runIf(haveUpstream)('PRESETS catalog validation', () => {
