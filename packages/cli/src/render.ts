@@ -113,7 +113,6 @@ export async function renderSelection(
     },
   );
 
-  mkdirSync(options.outDir, { recursive: true });
   const adapter = createNodeCanvasAdapter();
   const sheet = await composeSelections(parsed.selections, {
     catalog: catalog.catalog,
@@ -123,38 +122,44 @@ export async function renderSelection(
   });
 
   const baseName = safeName(options.selectionName);
-  const artifacts: RenderArtifact[] = [];
-  const writtenFiles: string[] = [];
   const animationMetadata: Record<string, AnimationMetadata> = {};
-
   const sheetPath = path.join(options.outDir, `${baseName}.sheet.png`);
-  await writeCanvasPng(sheet.canvas, sheetPath);
-  writtenFiles.push(sheetPath);
-  artifacts.push({ type: 'sheet', path: sheetPath, width: sheet.width, height: sheet.height });
-
   const creditsTxtPath = path.join(options.outDir, `${baseName}.credits.txt`);
   const creditsCsvPath = path.join(options.outDir, `${baseName}.credits.csv`);
+  const metadataPath = path.join(options.outDir, `${baseName}.metadata.json`);
+  const zipPath = path.join(options.outDir, `${baseName}.bundle.zip`);
   const creditsAnimation = options.animations[0] ?? sheet.animations[0] ?? 'walk';
-  writeFileSync(creditsTxtPath, creditsToTxt(sheet.credits, creditsAnimation));
-  writeFileSync(creditsCsvPath, creditsToCsv(sheet.credits, creditsAnimation));
-  writtenFiles.push(creditsTxtPath, creditsCsvPath);
-  artifacts.push({ type: 'credits_txt', path: creditsTxtPath });
-  artifacts.push({ type: 'credits_csv', path: creditsCsvPath });
+  const creditsTxt = creditsToTxt(sheet.credits, creditsAnimation);
+  const creditsCsv = creditsToCsv(sheet.credits, creditsAnimation);
+  const effectiveLicense = computeEffectiveLicense(sheet.credits);
+
+  const artifacts: RenderArtifact[] = [
+    { type: 'sheet', path: sheetPath, width: sheet.width, height: sheet.height },
+    { type: 'credits_txt', path: creditsTxtPath },
+    { type: 'credits_csv', path: creditsCsvPath },
+  ];
+  const animationOutputs: Array<{
+    readonly artifact: RenderArtifact;
+    readonly canvas: CanvasLike;
+  }> = [];
+  const frameOutputs: Array<{
+    readonly artifact: RenderArtifact;
+    readonly canvas: CanvasLike;
+  }> = [];
 
   const animationDir = path.join(options.outDir, 'animations');
   for (const animationName of options.animations) {
-    mkdirSync(animationDir, { recursive: true });
     const animation = extractAnimation(sheet, animationName, { adapter });
     const animationPath = path.join(animationDir, `${animationName}.png`);
-    await writeCanvasPng(animation.canvas, animationPath);
-    writtenFiles.push(animationPath);
-    artifacts.push({
+    const artifact: RenderArtifact = {
       type: 'animation',
       path: animationPath,
       width: animation.width,
       height: animation.height,
       animation: animationName,
-    });
+    };
+    artifacts.push(artifact);
+    animationOutputs.push({ artifact, canvas: animation.canvas });
     animationMetadata[animationName] = {
       width: animation.width,
       height: animation.height,
@@ -167,23 +172,22 @@ export async function renderSelection(
   for (const animationName of frameAnimations) {
     const frames = extractAnimationFrames(sheet, animationName, { adapter });
     const frameDir = path.join(options.outDir, 'frames', animationName);
-    mkdirSync(frameDir, { recursive: true });
     for (const [direction, slices] of frames.entries()) {
       for (const frame of slices) {
         const framePath = path.join(
           frameDir,
           `${direction}-${String(frame.frameNumber).padStart(3, '0')}.png`,
         );
-        await writeCanvasPng(frame.canvas, framePath);
-        writtenFiles.push(framePath);
-        artifacts.push({
+        const artifact: RenderArtifact = {
           type: 'frame',
           path: framePath,
           ...canvasDimensions(frame.canvas),
           animation: animationName,
           direction,
           frameNumber: frame.frameNumber,
-        });
+        };
+        artifacts.push(artifact);
+        frameOutputs.push({ artifact, canvas: frame.canvas });
       }
     }
   }
@@ -199,9 +203,7 @@ export async function renderSelection(
       path: missingPath,
     })),
   ];
-  const metadataPath = path.join(options.outDir, `${baseName}.metadata.json`);
   artifacts.push({ type: 'metadata', path: metadataPath });
-  const zipPath = path.join(options.outDir, `${baseName}.bundle.zip`);
   if (options.bundleZip) {
     artifacts.push({ type: 'zip', path: zipPath });
   }
@@ -218,7 +220,7 @@ export async function renderSelection(
     },
     animations: animationMetadata,
     frames: frameAnimations,
-    effectiveLicense: computeEffectiveLicense(sheet.credits),
+    effectiveLicense,
     credits: {
       txt: creditsTxtPath,
       csv: creditsCsvPath,
@@ -234,6 +236,27 @@ export async function renderSelection(
     warnings,
     skippedLayers: options.allowPartial ? validation.errors : [],
   };
+
+  mkdirSync(options.outDir, { recursive: true });
+  const writtenFiles: string[] = [];
+  await writeCanvasPng(sheet.canvas, sheetPath);
+  writtenFiles.push(sheetPath);
+  writeFileSync(creditsTxtPath, creditsTxt);
+  writeFileSync(creditsCsvPath, creditsCsv);
+  writtenFiles.push(creditsTxtPath, creditsCsvPath);
+
+  for (const output of animationOutputs) {
+    mkdirSync(path.dirname(output.artifact.path), { recursive: true });
+    await writeCanvasPng(output.canvas, output.artifact.path);
+    writtenFiles.push(output.artifact.path);
+  }
+
+  for (const output of frameOutputs) {
+    mkdirSync(path.dirname(output.artifact.path), { recursive: true });
+    await writeCanvasPng(output.canvas, output.artifact.path);
+    writtenFiles.push(output.artifact.path);
+  }
+
   writeFileSync(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`);
   writtenFiles.push(metadataPath);
 
