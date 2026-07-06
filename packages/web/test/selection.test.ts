@@ -440,9 +440,9 @@ describe('sliceReducer set_zoom', () => {
 describe('selection slice layout', () => {
   it('sets layout correctly', () => {
     const { state: init } = pickInitialSelections(makeFullCatalog());
-    expect(init.layout).toBe('single');
-    const next = sliceReducer(init, { type: 'set_layout', layout: 'grid' });
-    expect(next.layout).toBe('grid');
+    expect(init.layout).toBe('grid');
+    const next = sliceReducer(init, { type: 'set_layout', layout: 'single' });
+    expect(next.layout).toBe('single');
   });
 
   it('resets layout to init layout on reset view scope', () => {
@@ -453,6 +453,6 @@ describe('selection slice layout', () => {
       scopes: { outfit: false, view: true },
       init,
     });
-    expect(resetState.layout).toBe('single');
+    expect(resetState.layout).toBe('grid');
   });
 });
