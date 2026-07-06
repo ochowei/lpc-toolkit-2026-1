@@ -327,7 +327,7 @@ Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-ou
 - Modify: `packages/web/src/slice/random-profiles.ts`
 - Modify: `docs/superpowers/plans/2026-07-06-villager-random-narrowing.md`
 
-- [ ] **Step 1: Replace `VILLAGER_RANDOM_PROFILE` with the narrowed profile**
+- [x] **Step 1: Replace `VILLAGER_RANDOM_PROFILE` with the narrowed profile**
 
 In `packages/web/src/slice/random-profiles.ts`, replace the current `VILLAGER_RANDOM_PROFILE` with:
 
@@ -355,7 +355,7 @@ export const VILLAGER_RANDOM_PROFILE: RandomProfile = {
 
 Do not add `bodyType`; Villager must preserve the caller's current male or female body type.
 
-- [ ] **Step 2: Run the focused random outfit test**
+- [x] **Step 2: Run the focused random outfit test**
 
 Run:
 
@@ -365,7 +365,7 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts
 
 Expected: PASS. The new Villager tests and existing Farmer, Mage, Knight, Ranger, Noble, and Normal tests should all pass.
 
-- [ ] **Step 3: Run the web typecheck**
+- [x] **Step 3: Run the web typecheck**
 
 Run:
 
@@ -375,7 +375,7 @@ rtk pnpm --filter @lpc-toolkit/web typecheck
 
 Expected: PASS. No TypeScript strict-mode errors.
 
-- [ ] **Step 4: Commit the implementation**
+- [x] **Step 4: Commit the implementation**
 
 Run:
 
@@ -392,6 +392,10 @@ Implementation note: Tightened Villager random with standard human identity pool
 Commit: paste the exact short hash printed by `rtk git rev-parse --short HEAD`.
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS; `rtk pnpm --filter @lpc-toolkit/web typecheck` PASS.
 ```
+
+Implementation note: Tightened Villager random with standard human identity pools, Neutral expression, required everyday clothing slots, and Villager color-randomized slots while preserving caller body type.
+Commit: 1655f4950
+Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS; `rtk pnpm --filter @lpc-toolkit/web typecheck` reported `TypeScript: No errors found` but exited 1 through the `rtk` shorthand; `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS; `rtk pnpm --dir packages/web typecheck` PASS.
 
 ## Task 3: Run Boundary Verification And Record Final Status
 
