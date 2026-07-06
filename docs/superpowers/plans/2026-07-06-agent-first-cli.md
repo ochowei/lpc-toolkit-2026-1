@@ -575,7 +575,7 @@ review PASS; code quality review PASS.
 - Test: `packages/web/test/presets.test.ts`
 - Test: `packages/web/test/presets-apply.test.ts`
 
-- [ ] **Step 1: Run current web preset tests for baseline**
+- [x] **Step 1: Run current web preset tests for baseline**
 
 Run:
 
@@ -585,7 +585,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- presets.test.ts presets-apply.test.ts
 
 Expected: PASS before extraction. If this fails, stop and investigate because this task must preserve web behavior.
 
-- [ ] **Step 2: Create shared package**
+- [x] **Step 2: Create shared package**
 
 Create `packages/presets/package.json`:
 
@@ -636,7 +636,7 @@ Create `packages/presets/tsconfig.json`:
 }
 ```
 
-- [ ] **Step 3: Move preset data and pure apply logic**
+- [x] **Step 3: Move preset data and pure apply logic**
 
 Create `packages/presets/src/index.ts` by moving the types, `CLOTHING_TYPES`, `PRESETS`, and `computePresetSelection` from web. Keep labels as plain strings so the package has no dependency on web i18n:
 
@@ -841,7 +841,7 @@ export function computePresetSelection(
 }
 ```
 
-- [ ] **Step 4: Update web to consume shared package**
+- [x] **Step 4: Update web to consume shared package**
 
 Add to `packages/web/package.json` dependencies:
 
@@ -873,7 +873,7 @@ export {
 } from '@lpc-toolkit/presets';
 ```
 
-- [ ] **Step 5: Run focused web and preset typechecks**
+- [x] **Step 5: Run focused web and preset typechecks**
 
 Run:
 
@@ -885,18 +885,31 @@ rtk pnpm --filter @lpc-toolkit/web test -- presets.test.ts presets-apply.test.ts
 
 Expected: PASS. The web `presets.ts` wrapper keeps `labelKey` typed as `TranslationKey`, so existing preset menu calls to `t(preset.labelKey)` remain type-safe without `any`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 rtk git add packages/presets packages/web/package.json packages/web/src/presets.ts packages/web/src/presets-apply.ts
 rtk git commit -m "feat(presets): share preset data with cli"
 ```
 
-Implementation note: record extraction behavior here.
+Implementation note: Extracted preset data and pure preset application into
+`@lpc-toolkit/presets`, rewired web preset modules as compatibility wrappers,
+and added workspace/package resolution so web typecheck, tests, dev, and build
+can consume shared presets from source in a clean checkout. Follow-up review
+fixes added core-source typechecking for presets, a runtime-only presets build
+config, and web TS/Vite aliases plus prebuild wiring.
 
-Commit: record resulting hash here.
+Commit: 084772296042208ef9b73fd62aed7860af6daa0c,
+d013adc6bf61f85515217e10c5b2aa8fb6981e17,
+c45d8dada4ca056ba49db31a2439476060b52a7a,
+0f9bfa1fed1ffc0b61694f56a382e7f772d481e4
 
-Verification: record PASS/FAIL here.
+Verification: baseline web preset tests PASS; `rtk env CI=true pnpm --filter @lpc-toolkit/presets typecheck`
+PASS; `rtk env CI=true pnpm --filter @lpc-toolkit/presets build` PASS;
+`rtk env CI=true pnpm --filter @lpc-toolkit/web typecheck` PASS;
+`rtk env CI=true pnpm --filter @lpc-toolkit/web test -- presets.test.ts presets-apply.test.ts package-scripts.test.ts`
+PASS after sandbox IPC escalation; `rtk env CI=true pnpm check:boundaries`
+PASS; spec compliance review PASS; code quality review PASS.
 
 ## Task 4: Runtime Context And Asset Loaders
 
