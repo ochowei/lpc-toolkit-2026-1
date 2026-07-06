@@ -32,6 +32,7 @@ export interface CatalogItemsOptions {
   readonly search?: string;
   readonly bodyType?: BodyType;
   readonly animation?: AnimationName;
+  readonly license?: string;
   readonly palettes?: PaletteMetadata;
 }
 
@@ -48,6 +49,36 @@ function itemSupportsBodyType(item: ItemDefinition, bodyType: BodyType): boolean
   return false;
 }
 
+function itemMatchesLicense(item: ItemDefinition, licenseFilter: string): boolean {
+  const normalizedFilter = licenseFilter.trim().toLowerCase();
+  if (!normalizedFilter) return true;
+
+  return item.credits.some((credit) =>
+    credit.licenses.some((license) => {
+      const normalizedLicense = license.toLowerCase();
+      return (
+        normalizedLicense === normalizedFilter ||
+        normalizedLicense.startsWith(`${normalizedFilter} `)
+      );
+    }),
+  );
+}
+
+function toCatalogItemSummary(
+  item: ItemDefinition,
+  palettes?: PaletteMetadata,
+): CatalogItemSummary | undefined {
+  if (!item.itemId) return undefined;
+  return {
+    itemId: item.itemId,
+    typeName: item.type_name,
+    name: item.name,
+    variants: item.variants ?? [],
+    recolors: palettes ? getRecolorVariants(item, palettes) : [],
+    animations: item.animations,
+  };
+}
+
 export function listCatalogItems(
   catalog: Catalog,
   options: CatalogItemsOptions,
@@ -62,19 +93,32 @@ export function listCatalogItems(
     if (search && !item.name.toLowerCase().includes(search)) continue;
     if (options.bodyType && !itemSupportsBodyType(item, options.bodyType)) continue;
     if (options.animation && !item.animations.includes(options.animation)) continue;
-    if (!item.itemId) continue;
+    if (options.license && !itemMatchesLicense(item, options.license)) continue;
 
-    items.push({
-      itemId: item.itemId,
-      typeName: item.type_name,
-      name: item.name,
-      variants: item.variants ?? [],
-      recolors: options.palettes ? getRecolorVariants(item, options.palettes) : [],
-      animations: item.animations,
-    });
+    const summary = toCatalogItemSummary(item, options.palettes);
+    if (summary) items.push(summary);
   }
 
   return { items };
+}
+
+export function getCatalogItem(
+  catalog: Catalog,
+  itemIdOrTypeName: string,
+  palettes?: PaletteMetadata,
+): CatalogItemSummary | undefined {
+  const byItemId = catalog.byItemId.get(itemIdOrTypeName);
+  if (byItemId) return toCatalogItemSummary(byItemId, palettes);
+
+  const slash = itemIdOrTypeName.indexOf('/');
+  if (slash < 0) return undefined;
+
+  const typeName = itemIdOrTypeName.slice(0, slash);
+  const nameOrItemId = itemIdOrTypeName.slice(slash + 1);
+  const item = catalog.byTypeName
+    .get(typeName)
+    ?.find((candidate) => candidate.itemId === nameOrItemId || candidate.name === nameOrItemId);
+  return item ? toCatalogItemSummary(item, palettes) : undefined;
 }
 
 export function runCatalogCommand(
@@ -98,6 +142,7 @@ export function runCatalogCommand(
     const search = flagString(parsed.flags, 'search');
     const bodyType = flagString(parsed.flags, 'body-type');
     const animation = flagString(parsed.flags, 'animation');
+    const license = flagString(parsed.flags, 'license');
 
     return commandOk(
       'catalog items',
@@ -106,10 +151,40 @@ export function runCatalogCommand(
         ...(search ? { search } : {}),
         ...(bodyType ? { bodyType } : {}),
         ...(animation ? { animation } : {}),
+        ...(license ? { license } : {}),
         palettes: palettes.palettes,
       }),
       warnings,
     );
+  }
+
+  if (parsed.command[1] === 'item') {
+    const itemIdOrTypeName = parsed.positionals[0];
+    if (!itemIdOrTypeName) {
+      return commandError(
+        'catalog item',
+        {
+          code: 'missing_argument',
+          message: 'catalog item requires an item id or type/name.',
+        },
+        warnings,
+      );
+    }
+
+    const item = getCatalogItem(catalog.catalog, itemIdOrTypeName, palettes.palettes);
+    if (!item) {
+      return commandError(
+        'catalog item',
+        {
+          code: 'unknown_item',
+          message: `Unknown catalog item: ${itemIdOrTypeName}`,
+          path: itemIdOrTypeName,
+        },
+        warnings,
+      );
+    }
+
+    return commandOk('catalog item', { item }, warnings);
   }
 
   return commandError(
