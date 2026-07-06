@@ -2186,7 +2186,7 @@ code quality review PASS; `rtk env CI=true pnpm check:boundaries` PASS.
 - Modify: `packages/cli/src/main.ts`
 - Test: `packages/cli/test/render.test.ts`
 
-- [ ] **Step 1: Write render integration test**
+- [x] **Step 1: Write render integration test**
 
 Create `packages/cli/test/render.test.ts`:
 
@@ -2231,7 +2231,7 @@ describe('renderSelection', () => {
 });
 ```
 
-- [ ] **Step 2: Run render test to verify it fails**
+- [x] **Step 2: Run render test to verify it fails**
 
 Run:
 
@@ -2241,7 +2241,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- render.test.ts
 
 Expected: FAIL because render modules do not exist.
 
-- [ ] **Step 3: Implement Node canvas adapter**
+- [x] **Step 3: Implement Node canvas adapter**
 
 Create `packages/cli/src/node-canvas-adapter.ts`:
 
@@ -2277,7 +2277,7 @@ export async function writeCanvasPng(canvas: CanvasLike, filePath: string): Prom
 }
 ```
 
-- [ ] **Step 4: Implement ZIP helper**
+- [x] **Step 4: Implement ZIP helper**
 
 Create `packages/cli/src/zip.ts`:
 
@@ -2300,7 +2300,7 @@ export async function writeZipBundle(
 }
 ```
 
-- [ ] **Step 5: Implement render workflow**
+- [x] **Step 5: Implement render workflow**
 
 Create `packages/cli/src/render.ts`:
 
@@ -2491,7 +2491,7 @@ export function readSelectionJsonFile(cwd: string, selectionPath: string): Selec
 }
 ```
 
-- [ ] **Step 6: Wire render command and preset render**
+- [x] **Step 6: Wire render command and preset render**
 
 In `packages/cli/src/main.ts`, add render dispatch:
 
@@ -2579,7 +2579,7 @@ Dispatch `preset render` before the generic `preset` dispatch:
   }
 ```
 
-- [ ] **Step 7: Run render integration test**
+- [x] **Step 7: Run render integration test**
 
 Run:
 
@@ -2590,18 +2590,32 @@ rtk pnpm --filter @lpc-toolkit/cli typecheck
 
 Expected: PASS. If `@napi-rs/canvas` cannot encode with `encode('png')`, inspect its installed API and change only `writeCanvasPng` to the correct PNG buffer method.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 rtk git add packages/cli/src packages/cli/test
 rtk git commit -m "feat(cli): render sprite artifacts"
 ```
 
-Implementation note: record render artifacts created here.
+Implementation note: Added CLI Node canvas and ZIP adapters, `renderSelection`,
+`render --selection`, and `preset render`. Successful renders publish sheet PNG,
+metadata JSON, credits TXT/CSV, requested animation strips, requested frames,
+and optional ZIP bundles. Review fixes prevent strict render failures from
+leaving partial artifacts by staging/publishing transactionally, and surface
+`allowPartial` validation errors in returned warnings, metadata warnings, and
+`skippedLayers`.
 
-Commit: record resulting hash here.
+Commit: 6de48f056225598aedf3575212fe970242d98309,
+0599a5601da6fb55fcfafc2bc8a150d05dd55650,
+668b0e1b13ead4c97f08315ad26198fafc115a9d
 
-Verification: record PASS/FAIL here.
+Verification: RED test run PASS (expected missing render module failure
+observed); `rtk env CI=true pnpm --filter @lpc-toolkit/cli test -- render.test.ts`
+PASS; `rtk env CI=true pnpm --filter @lpc-toolkit/cli typecheck` PASS;
+`rtk env CI=true pnpm --filter @lpc-toolkit/cli build` PASS;
+`rtk env CI=true pnpm --filter @lpc-toolkit/cli test` PASS;
+`rtk env CI=true pnpm check:boundaries` PASS; spec compliance review PASS;
+code quality review PASS.
 
 ## Task 9: Boundary, Integration, And CLI Polish
 
