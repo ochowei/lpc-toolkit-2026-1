@@ -89,6 +89,37 @@ function filterCatalogRecords(
   return { records: catalogRecords, warnings: result.warnings };
 }
 
+function isCatalogRecordLoadable(recordPath: FilePath, record: ItemDefinition): CliIssue | null {
+  try {
+    createCatalog({ [recordPath]: record });
+    return null;
+  } catch (error) {
+    return {
+      code: 'catalog_warning',
+      message: error instanceof Error ? error.message : 'could not load catalog record',
+      path: recordPath,
+    };
+  }
+}
+
+function filterLoadableCatalogRecords(
+  records: Record<FilePath, ItemDefinition>,
+): { readonly records: Record<FilePath, ItemDefinition>; readonly warnings: readonly CliIssue[] } {
+  const loadableRecords: Record<FilePath, ItemDefinition> = {};
+  const warnings: CliIssue[] = [];
+
+  for (const [recordPath, record] of Object.entries(records)) {
+    const warning = isCatalogRecordLoadable(recordPath as FilePath, record);
+    if (warning) {
+      warnings.push(warning);
+      continue;
+    }
+    loadableRecords[recordPath as FilePath] = record;
+  }
+
+  return { records: loadableRecords, warnings };
+}
+
 export function loadCatalogFromRoots(
   sheetDefinitionsRoot: string,
   customSheetDefinitionsRoot: string,
@@ -101,7 +132,8 @@ export function loadCatalogFromRoots(
     ...baseRecords.records,
     ...customRecords.records,
   };
-  const result = createCatalog(records);
+  const loadableRecords = filterLoadableCatalogRecords(records);
+  const result = createCatalog(loadableRecords.records);
   return {
     catalog: result.catalog,
     warnings: [
@@ -109,6 +141,7 @@ export function loadCatalogFromRoots(
       ...custom.warnings,
       ...baseRecords.warnings,
       ...customRecords.warnings,
+      ...loadableRecords.warnings,
       ...result.warnings.map((warning) => ({
         code: 'catalog_warning',
         message: warning.message,

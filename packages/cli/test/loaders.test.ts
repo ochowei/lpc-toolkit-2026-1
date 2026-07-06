@@ -61,6 +61,31 @@ describe('loadCatalogFromRoots', () => {
       ]),
     );
   });
+
+  it('reports malformed object records as warnings without throwing', () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'lpc-loader-'));
+    const customRoot = path.join(root, 'custom');
+    mkdirSync(root, { recursive: true });
+    writeFileSync(
+      path.join(root, 'bad_alias.json'),
+      JSON.stringify({
+        name: 'Bad Alias',
+        type_name: 'hair',
+        aliases: { plain: 1 },
+      }),
+    );
+
+    const result = loadCatalogFromRoots(root, customRoot);
+
+    expect(result.warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'catalog_warning',
+          path: 'bad_alias.json',
+        }),
+      ]),
+    );
+  });
 });
 
 describe('loadPalettesFromRoot', () => {
