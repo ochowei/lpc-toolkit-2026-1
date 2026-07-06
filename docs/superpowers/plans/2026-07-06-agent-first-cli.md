@@ -2625,7 +2625,7 @@ code quality review PASS.
 - Modify: `packages/cli/src/render.ts`
 - Test: `packages/cli/test/main-json.test.ts`
 
-- [ ] **Step 1: Write JSON command behavior tests**
+- [x] **Step 1: Write JSON command behavior tests**
 
 Create `packages/cli/test/main-json.test.ts`:
 
@@ -2655,7 +2655,7 @@ describe('main json behavior', () => {
 });
 ```
 
-- [ ] **Step 2: Run all CLI tests**
+- [x] **Step 2: Run all CLI tests**
 
 Run:
 
@@ -2665,7 +2665,7 @@ rtk pnpm --filter @lpc-toolkit/cli test
 
 Expected: PASS.
 
-- [ ] **Step 3: Run typechecks**
+- [x] **Step 3: Run typechecks**
 
 Run:
 
@@ -2677,7 +2677,7 @@ rtk pnpm --filter @lpc-toolkit/web typecheck
 
 Expected: PASS.
 
-- [ ] **Step 4: Run boundary check**
+- [x] **Step 4: Run boundary check**
 
 Run:
 
@@ -2687,7 +2687,7 @@ rtk pnpm check:boundaries
 
 Expected: PASS. If the boundary script flags CLI Node imports, update `scripts/check-boundaries.mjs` to include `packages/cli/src/**` as a Node-permitted package while keeping all existing `packages/core/src/**` restrictions.
 
-- [ ] **Step 5: Run core tests**
+- [x] **Step 5: Run core tests**
 
 Run:
 
@@ -2697,18 +2697,25 @@ rtk pnpm --filter @lpc-toolkit/core test
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit final polish**
+- [x] **Step 6: Commit final polish**
 
 ```bash
 rtk git add packages/cli packages/presets packages/web scripts/check-boundaries.mjs package.json pnpm-lock.yaml
 rtk git commit -m "test(cli): verify agent-first cli"
 ```
 
-Implementation note: record final verification summary here.
+Implementation note: Added JSON behavior coverage for unknown commands and
+confirmed existing CLI dispatch writes machine-readable `--json` errors to
+stdout without stderr. No boundary script changes were needed.
 
-Commit: record resulting hash here.
+Commit: 69a057725d17516cc4c8c44276cfb6b6e32a23d1
 
-Verification: record PASS/FAIL here.
+Verification: `rtk env CI=true pnpm --filter @lpc-toolkit/cli test` PASS;
+`rtk env CI=true pnpm --filter @lpc-toolkit/presets typecheck` PASS;
+`rtk env CI=true pnpm --filter @lpc-toolkit/cli typecheck` PASS;
+`rtk env CI=true pnpm --filter @lpc-toolkit/web typecheck` PASS;
+`rtk env CI=true pnpm check:boundaries` PASS;
+`rtk env CI=true pnpm --filter @lpc-toolkit/core test` PASS.
 
 ## Task 10: End-To-End Manual Smoke
 
