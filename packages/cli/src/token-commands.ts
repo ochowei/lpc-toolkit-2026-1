@@ -5,12 +5,14 @@ import {
   encodeSelectionToken,
   parseHash,
   type Catalog,
+  type HashWarning,
   type PaletteMetadata,
+  type ParseHashResult,
 } from '@lpc-toolkit/core';
 import { flagString, type ParsedArgs } from './args.js';
 import { createRuntimeContext } from './context.js';
 import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
-import { commandError, commandOk, type CliResponse } from './response.js';
+import { commandError, commandOk, type CliIssue, type CliResponse } from './response.js';
 import {
   parseSelectionJson,
   selectionJsonFromCore,
@@ -25,15 +27,43 @@ export function encodeSelectionJsonToToken(selectionJson: SelectionJson): string
   return encodeSelectionToken(parseSelectionJson(selectionJson).selections);
 }
 
+function tokenWarningsToCliIssues(warnings: readonly HashWarning[]): readonly CliIssue[] {
+  return warnings.map((warning) => ({
+    code: `token_warning_${warning.reason}`,
+    message: `Token ignored ${warning.key}=${warning.value}: ${warning.reason}.`,
+    path: warning.key,
+  }));
+}
+
+function decodeTokenOrHash(
+  tokenOrHash: string,
+  catalog: Catalog,
+  palettes?: PaletteMetadata,
+): ParseHashResult {
+  const trimmed = tokenOrHash.trim();
+  return trimmed.startsWith('v1.')
+    ? decodeSelectionToken(trimmed, catalog, palettes)
+    : parseHash(trimmed, catalog, palettes);
+}
+
+export function decodeTokenToSelectionJsonWithWarnings(
+  tokenOrHash: string,
+  catalog: Catalog,
+  palettes?: PaletteMetadata,
+): { readonly selection: SelectionJson; readonly warnings: readonly CliIssue[] } {
+  const decoded = decodeTokenOrHash(tokenOrHash, catalog, palettes);
+  return {
+    selection: selectionJsonFromCore(decoded.selections),
+    warnings: tokenWarningsToCliIssues(decoded.warnings),
+  };
+}
+
 export function decodeTokenToSelectionJson(
   tokenOrHash: string,
   catalog: Catalog,
   palettes?: PaletteMetadata,
 ): SelectionJson {
-  const decoded = tokenOrHash.startsWith('v1.')
-    ? decodeSelectionToken(tokenOrHash, catalog, palettes).selections
-    : parseHash(tokenOrHash, catalog, palettes).selections;
-  return selectionJsonFromCore(decoded);
+  return decodeTokenToSelectionJsonWithWarnings(tokenOrHash, catalog, palettes).selection;
 }
 
 export function runTokenCommand(
@@ -82,8 +112,15 @@ export function runTokenCommand(
     );
     const palettes = loadPalettesFromRoot(context.paletteDefinitionsRoot);
     let selection: SelectionJson;
+    let tokenWarnings: readonly CliIssue[] = [];
     try {
-      selection = decodeTokenToSelectionJson(token, catalog.catalog, palettes.palettes);
+      const decoded = decodeTokenToSelectionJsonWithWarnings(
+        token,
+        catalog.catalog,
+        palettes.palettes,
+      );
+      selection = decoded.selection;
+      tokenWarnings = decoded.warnings;
     } catch (error) {
       return commandError(
         'token decode',
@@ -107,7 +144,7 @@ export function runTokenCommand(
             message: errorMessage(error),
             path: out,
           },
-          [...catalog.warnings, ...palettes.warnings],
+          [...catalog.warnings, ...palettes.warnings, ...tokenWarnings],
         );
       }
     }
@@ -115,6 +152,7 @@ export function runTokenCommand(
     return commandOk('token decode', { selection, out: out ?? null }, [
       ...catalog.warnings,
       ...palettes.warnings,
+      ...tokenWarnings,
     ]);
   }
 

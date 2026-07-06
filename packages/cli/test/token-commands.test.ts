@@ -1,5 +1,5 @@
 import { createCatalog } from '@lpc-toolkit/core';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -30,6 +30,9 @@ describe('token commands', () => {
     });
 
     expect(decodeTokenToSelectionJson(token, catalog).bodyType).toBe('male');
+    expect(decodeTokenToSelectionJson(` ${token}\n`, catalog).items.body?.name).toBe(
+      'Body Color',
+    );
   });
 
   it('reports malformed selection files as command errors', () => {
@@ -43,5 +46,36 @@ describe('token commands', () => {
 
     expect(response.ok).toBe(false);
     expect(response.errors[0]?.code).toBe('invalid_selection_json');
+  });
+
+  it('preserves decode warnings in command responses', () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-token-'));
+    const definitionsRoot = path.join(cwd, 'assets', 'sheet_definitions', 'body');
+    mkdirSync(definitionsRoot, { recursive: true });
+    writeFileSync(
+      path.join(definitionsRoot, 'body.json'),
+      JSON.stringify({
+        name: 'Body Color',
+        type_name: 'body',
+        animations: ['walk'],
+        credits: [],
+        layer_1: { zPos: 10, male: 'body/bodies/male/' },
+      }),
+    );
+
+    const response = runTokenCommand(
+      parseArgs(['token', 'decode', '--token', 'sex=male&hat=Missing']),
+      cwd,
+    );
+
+    expect(response.ok).toBe(true);
+    expect(response.warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'token_warning_unknown_type_name',
+          path: 'hat',
+        }),
+      ]),
+    );
   });
 });

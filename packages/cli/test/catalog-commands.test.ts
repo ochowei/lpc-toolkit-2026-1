@@ -1,4 +1,7 @@
 import { createCatalog, type ItemDefinition } from '@lpc-toolkit/core';
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   getCatalogItem,
@@ -92,5 +95,45 @@ describe('catalog commands', () => {
     expect(response.ok).toBe(false);
     expect(response.command).toBe('catalog item');
     expect(response.errors[0]?.code).toBe('unknown_item');
+  });
+
+  it('returns a catalog items response for malformed loadable records', () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-catalog-'));
+    const definitionsRoot = path.join(cwd, 'assets', 'sheet_definitions', 'hair');
+    mkdirSync(definitionsRoot, { recursive: true });
+    writeFileSync(
+      path.join(definitionsRoot, 'missing_credits.json'),
+      JSON.stringify({
+        name: 'Missing Credits',
+        type_name: 'hair',
+        animations: ['walk'],
+        layer_1: { zPos: 50, male: 'hair/missing-credits/' },
+      }),
+    );
+    writeFileSync(
+      path.join(definitionsRoot, 'missing_animations.json'),
+      JSON.stringify({
+        name: 'Missing Animations',
+        type_name: 'hair',
+        credits: [
+          {
+            file: 'hair/missing-animations',
+            notes: '',
+            authors: ['Artist'],
+            licenses: ['GPL 3.0'],
+            urls: [],
+          },
+        ],
+        layer_1: { zPos: 50, male: 'hair/missing-animations/' },
+      }),
+    );
+
+    const response = runCatalogCommand(
+      parseArgs(['catalog', 'items', '--license', 'GPL', '--animation', 'walk']),
+      cwd,
+    );
+
+    expect(response.ok).toBe(true);
+    expect(response.command).toBe('catalog items');
   });
 });

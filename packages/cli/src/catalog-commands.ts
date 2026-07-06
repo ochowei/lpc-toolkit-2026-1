@@ -49,19 +49,36 @@ function itemSupportsBodyType(item: ItemDefinition, bodyType: BodyType): boolean
   return false;
 }
 
+function stringArray(value: unknown): readonly string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function itemAnimations(item: ItemDefinition): readonly AnimationName[] {
+  return stringArray(item.animations);
+}
+
+function itemLicenses(item: ItemDefinition): readonly string[] {
+  const credits: unknown = item.credits;
+  if (!Array.isArray(credits)) return [];
+
+  return credits.flatMap((credit) => {
+    if (typeof credit !== 'object' || credit === null) return [];
+    if (!('licenses' in credit)) return [];
+    return stringArray(credit.licenses);
+  });
+}
+
 function itemMatchesLicense(item: ItemDefinition, licenseFilter: string): boolean {
   const normalizedFilter = licenseFilter.trim().toLowerCase();
   if (!normalizedFilter) return true;
 
-  return item.credits.some((credit) =>
-    credit.licenses.some((license) => {
+  return itemLicenses(item).some((license) => {
       const normalizedLicense = license.toLowerCase();
       return (
         normalizedLicense === normalizedFilter ||
         normalizedLicense.startsWith(`${normalizedFilter} `)
       );
-    }),
-  );
+    });
 }
 
 function toCatalogItemSummary(
@@ -73,9 +90,9 @@ function toCatalogItemSummary(
     itemId: item.itemId,
     typeName: item.type_name,
     name: item.name,
-    variants: item.variants ?? [],
+    variants: stringArray(item.variants),
     recolors: palettes ? getRecolorVariants(item, palettes) : [],
-    animations: item.animations,
+    animations: itemAnimations(item),
   };
 }
 
@@ -92,7 +109,7 @@ export function listCatalogItems(
   for (const item of haystack) {
     if (search && !item.name.toLowerCase().includes(search)) continue;
     if (options.bodyType && !itemSupportsBodyType(item, options.bodyType)) continue;
-    if (options.animation && !item.animations.includes(options.animation)) continue;
+    if (options.animation && !itemAnimations(item).includes(options.animation)) continue;
     if (options.license && !itemMatchesLicense(item, options.license)) continue;
 
     const summary = toCatalogItemSummary(item, options.palettes);
