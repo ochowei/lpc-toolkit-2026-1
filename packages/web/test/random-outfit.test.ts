@@ -857,6 +857,29 @@ describe('pickRandomOutfit', () => {
     });
   });
 
+  it('villager profile always includes pants even when optional clothing is skipped', () => {
+    const { catalog: villagerCatalog } = createCatalog({
+      'body/body-color.json': makeItem('Body Color', 'body'),
+      'head/human-male.json': makeItem('Human Male', 'head'),
+      'expression/neutral.json': makeItem('Neutral', 'expression'),
+      'clothes/longsleeve.json': makeItem('Longsleeve', 'clothes'),
+      'legs/pants.json': makeItem('Pants', 'legs'),
+      'shoes/basic-shoes.json': makeItem('Basic Shoes', 'shoes'),
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: villagerCatalog,
+      bodyType: 'male',
+      rng: () => 0.99,
+      optionalProb: 0,
+      profile: 'villager',
+    });
+
+    expect(sel.items['legs']).toEqual({ typeName: 'legs', name: 'Pants' });
+    expect(sel.items['clothes']).toBeUndefined();
+    expect(sel.items['shoes']).toBeUndefined();
+  });
+
   it('mage profile excludes heavy armor while allowing staff and crystal slots', () => {
     const { catalog: mageCatalog } = createCatalog({
       'body/light.json': makeItem('Light', 'body'),

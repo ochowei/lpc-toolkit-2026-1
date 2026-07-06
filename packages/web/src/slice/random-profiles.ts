@@ -79,7 +79,7 @@ export const VILLAGER_RANDOM_PROFILE: RandomProfile = {
   optionalProb: 0.6,
   bodyType: 'male',
   typeNames: ['body', 'head', 'expression', 'hair', 'clothes', 'legs', 'shoes'],
-  requiredTypeNames: ['body', 'head', 'expression'],
+  requiredTypeNames: ['body', 'head', 'expression', 'legs'],
   randomColorTypeNames: ['body', 'clothes', 'legs', 'shoes'],
   itemPools: {
     body: ['Body Color'],
