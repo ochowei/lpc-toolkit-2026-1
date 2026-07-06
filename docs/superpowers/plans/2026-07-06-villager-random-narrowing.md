@@ -402,7 +402,7 @@ Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-ou
 **Files:**
 - Modify: `docs/superpowers/plans/2026-07-06-villager-random-narrowing.md`
 
-- [ ] **Step 1: Run the architecture boundary check**
+- [x] **Step 1: Run the architecture boundary check**
 
 Run:
 
@@ -412,7 +412,7 @@ rtk pnpm check:boundaries
 
 Expected: PASS. The change stays inside `packages/web/src/slice/` and focused web tests, with no `packages/core/`, browser adapter, asset, or `upstream/` changes.
 
-- [ ] **Step 2: Confirm the final git status**
+- [x] **Step 2: Confirm the final git status**
 
 Run:
 
@@ -422,7 +422,7 @@ rtk git status --short
 
 Expected: Only this plan file should be modified for final verification bookkeeping, or the worktree should be clean after the bookkeeping commit.
 
-- [ ] **Step 3: Commit final verification bookkeeping**
+- [x] **Step 3: Commit final verification bookkeeping**
 
 After marking Task 3 complete and recording the verification result in this plan file, run:
 
@@ -439,6 +439,10 @@ Implementation note: Recorded final Villager random narrowing verification.
 Commit: paste the exact short hash printed by `rtk git rev-parse --short HEAD`.
 Verification: `rtk pnpm check:boundaries` PASS.
 ```
+
+Implementation note: Recorded final Villager random narrowing verification.
+Commit: pending final hash update after bookkeeping commit.
+Verification: `rtk pnpm check:boundaries` PASS; `rtk git status --short` clean before bookkeeping.
 
 ## Final Acceptance Criteria
 
