@@ -1,6 +1,13 @@
 import { flagBoolean, parseArgs } from './args.js';
-import { commandError, formatJsonResponse, humanIssue } from './response.js';
+import { runCatalogCommand } from './catalog-commands.js';
+import {
+  commandError,
+  formatJsonResponse,
+  humanIssue,
+  type CliResponse,
+} from './response.js';
 import { runSelectionCommand } from './selection-commands.js';
+import { runTokenCommand } from './token-commands.js';
 
 export interface CliIo {
   readonly stdout: (text: string) => void;
@@ -23,6 +30,22 @@ Commands:
   lpc preset render <preset-id> --out <dir>
 `;
 
+function writeResponse(
+  response: CliResponse<unknown>,
+  parsed: ReturnType<typeof parseArgs>,
+  io: CliIo,
+  humanSuccess: string,
+): number {
+  if (flagBoolean(parsed.flags, 'json')) {
+    io.stdout(formatJsonResponse(response));
+  } else if (response.ok) {
+    io.stdout(humanSuccess);
+  } else {
+    io.stderr(`${response.errors.map(humanIssue).join('\n')}\n`);
+  }
+  return response.ok ? 0 : 1;
+}
+
 export async function runCli(argv: readonly string[], io: CliIo): Promise<number> {
   if (argv.length === 0 || argv[0] === '--help' || argv[0] === '-h') {
     io.stdout(HELP);
@@ -30,16 +53,31 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<number
   }
 
   const parsed = parseArgs(argv);
+  if (parsed.command[0] === 'catalog') {
+    return writeResponse(
+      runCatalogCommand(parsed, io.cwd),
+      parsed,
+      io,
+      'Catalog command completed.\n',
+    );
+  }
+
   if (parsed.command[0] === 'selection') {
-    const response = runSelectionCommand(parsed, io.cwd);
-    if (flagBoolean(parsed.flags, 'json')) {
-      io.stdout(formatJsonResponse(response));
-    } else if (response.ok) {
-      io.stdout('Selection is valid.\n');
-    } else {
-      io.stderr(`${response.errors.map(humanIssue).join('\n')}\n`);
-    }
-    return response.ok ? 0 : 1;
+    return writeResponse(
+      runSelectionCommand(parsed, io.cwd),
+      parsed,
+      io,
+      'Selection is valid.\n',
+    );
+  }
+
+  if (parsed.command[0] === 'token') {
+    return writeResponse(
+      runTokenCommand(parsed, io.cwd),
+      parsed,
+      io,
+      'Token command completed.\n',
+    );
   }
 
   const commandName = parsed.command.join(' ');
