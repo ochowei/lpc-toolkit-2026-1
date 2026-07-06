@@ -1,0 +1,24 @@
+{
+  "name": "@lpc-toolkit/cli",
+  "version": "0.0.0",
+  "private": true,
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "bin": {
+    "lpc": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@lpc-toolkit/core": "workspace:*",
+    "@napi-rs/canvas": "^1.0.0",
+    "jszip": "^3.10.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.8.0",
+    "tsx": "^4.19.2"
+  }
+}
