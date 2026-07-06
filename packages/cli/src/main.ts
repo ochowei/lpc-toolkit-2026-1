@@ -1,3 +1,6 @@
+import { flagBoolean, parseArgs } from './args.js';
+import { commandError, formatJsonResponse } from './response.js';
+
 export interface CliIo {
   readonly stdout: (text: string) => void;
   readonly stderr: (text: string) => void;
@@ -24,6 +27,18 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<number
     io.stdout(HELP);
     return 0;
   }
-  io.stderr(`Unknown command: ${argv.join(' ')}\n`);
+
+  const parsed = parseArgs(argv);
+  const commandName = parsed.command.join(' ');
+  const error = commandError(commandName || 'unknown', {
+    code: 'unknown_command',
+    message: `Unknown command: ${argv.join(' ')}`,
+  });
+
+  if (flagBoolean(parsed.flags, 'json')) {
+    io.stdout(formatJsonResponse(error));
+  } else {
+    io.stderr(`${error.errors[0]!.message}\n`);
+  }
   return 1;
 }
