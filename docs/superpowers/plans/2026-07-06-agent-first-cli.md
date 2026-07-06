@@ -2722,7 +2722,7 @@ Verification: `rtk env CI=true pnpm --filter @lpc-toolkit/cli test` PASS;
 **Files:**
 - Modify: `docs/superpowers/plans/2026-07-06-agent-first-cli.md`
 
-- [ ] **Step 1: Build packages**
+- [x] **Step 1: Build packages**
 
 Run:
 
@@ -2734,7 +2734,7 @@ rtk pnpm --filter @lpc-toolkit/cli build
 
 Expected: PASS.
 
-- [ ] **Step 2: Materialize a preset**
+- [x] **Step 2: Materialize a preset**
 
 Run:
 
@@ -2744,7 +2744,7 @@ rtk pnpm --filter @lpc-toolkit/cli exec lpc preset materialize farmer --out /tmp
 
 Expected: JSON response with `ok: true`, and `/tmp/lpc-farmer.json` exists.
 
-- [ ] **Step 3: Validate materialized preset**
+- [x] **Step 3: Validate materialized preset**
 
 Run:
 
@@ -2754,7 +2754,7 @@ rtk pnpm --filter @lpc-toolkit/cli exec lpc selection validate --selection /tmp/
 
 Expected: JSON response with `ok: true`.
 
-- [ ] **Step 4: Render materialized preset**
+- [x] **Step 4: Render materialized preset**
 
 Run:
 
@@ -2764,7 +2764,7 @@ rtk pnpm --filter @lpc-toolkit/cli exec lpc render --selection /tmp/lpc-farmer.j
 
 Expected: JSON response with `ok: true`; `/tmp/lpc-farmer` contains sheet PNG, metadata JSON, credits TXT, credits CSV, `animations/walk.png`, frame PNGs, and bundle ZIP.
 
-- [ ] **Step 5: Record final verification in this plan**
+- [x] **Step 5: Record final verification in this plan**
 
 Append under this task:
 
@@ -2774,18 +2774,41 @@ Commit: <hash>
 Verification: build PASS, preset materialize PASS, selection validate PASS, render PASS
 ```
 
-- [ ] **Step 6: Commit plan updates**
+- [x] **Step 6: Commit plan updates**
 
 ```bash
 rtk git add docs/superpowers/plans/2026-07-06-agent-first-cli.md
 rtk git commit -m "docs: record cli implementation verification"
 ```
 
-Implementation note: record the completed plan bookkeeping here.
+Implementation note: Manual CLI smoke completed against the built CLI
+entrypoint from the repository root. The original plan command
+`rtk env CI=true pnpm --filter @lpc-toolkit/cli exec lpc preset materialize farmer --out /tmp/lpc-farmer-plan-command.json --json`
+resolved to the system `/usr/sbin/lpc` on this machine and printed a localized
+CUPS-version message instead of CLI JSON, so it was not
+counted as the passing smoke command. The successful materialize, validate, and
+render checks used `rtk node packages/cli/dist/index.js ...` from the repository
+root so the CLI discovered `assets/` correctly. The smoke verified the Task 9
+CLI/code commit `69a057725d17516cc4c8c44276cfb6b6e32a23d1`; this docs
+bookkeeping commit is recorded by the commit containing this note and by the
+final response.
 
-Commit: record resulting hash here.
+Commit: smoke/code commit verified:
+`69a057725d17516cc4c8c44276cfb6b6e32a23d1`. Docs bookkeeping commit: recorded
+by this commit/final response.
 
-Verification: record PASS/FAIL here.
+Verification: `rtk env CI=true pnpm --filter @lpc-toolkit/core build` PASS;
+`rtk env CI=true pnpm --filter @lpc-toolkit/presets build` PASS;
+`rtk env CI=true pnpm --filter @lpc-toolkit/cli build` PASS;
+`rtk node packages/cli/dist/index.js preset materialize farmer --out /tmp/lpc-farmer.json --json`
+PASS with `ok: true` and `/tmp/lpc-farmer.json` present;
+`rtk node packages/cli/dist/index.js selection validate --selection /tmp/lpc-farmer.json --json`
+PASS with `ok: true` and `valid: true`;
+`rtk node packages/cli/dist/index.js render --selection /tmp/lpc-farmer.json --out /tmp/lpc-farmer --animation walk --frames walk --bundle zip --json`
+PASS with `ok: true`. Artifact check PASS: `/tmp/lpc-farmer` contains
+`farmer.sheet.png`, `farmer.metadata.json`, `farmer.credits.txt`,
+`farmer.credits.csv`, `animations/walk.png`, 36 `frames/walk/*.png` files, and
+`farmer.bundle.zip`.
 
 ## Self-Review
 
