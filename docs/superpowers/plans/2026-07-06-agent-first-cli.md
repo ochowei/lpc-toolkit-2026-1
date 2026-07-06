@@ -919,7 +919,7 @@ PASS; spec compliance review PASS; code quality review PASS.
 - Test: `packages/cli/test/context.test.ts`
 - Test: `packages/cli/test/loaders.test.ts`
 
-- [ ] **Step 1: Write context tests**
+- [x] **Step 1: Write context tests**
 
 Create `packages/cli/test/context.test.ts`:
 
@@ -951,7 +951,7 @@ describe('createRuntimeContext', () => {
 });
 ```
 
-- [ ] **Step 2: Write loader tests**
+- [x] **Step 2: Write loader tests**
 
 Create `packages/cli/test/loaders.test.ts`:
 
@@ -993,7 +993,7 @@ describe('loadJsonRecords', () => {
 });
 ```
 
-- [ ] **Step 3: Run tests to verify they fail**
+- [x] **Step 3: Run tests to verify they fail**
 
 Run:
 
@@ -1003,7 +1003,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- context.test.ts loaders.test.ts
 
 Expected: FAIL because modules do not exist.
 
-- [ ] **Step 4: Implement `context.ts`**
+- [x] **Step 4: Implement `context.ts`**
 
 Create `packages/cli/src/context.ts`:
 
@@ -1047,7 +1047,7 @@ export function createRuntimeContext(options: RuntimeContextOptions): RuntimeCon
 }
 ```
 
-- [ ] **Step 5: Implement `loaders.ts`**
+- [x] **Step 5: Implement `loaders.ts`**
 
 Create `packages/cli/src/loaders.ts`:
 
@@ -1147,7 +1147,7 @@ export function loadPalettesFromRoot(
 }
 ```
 
-- [ ] **Step 6: Run loader tests**
+- [x] **Step 6: Run loader tests**
 
 Run:
 
@@ -1157,18 +1157,25 @@ rtk pnpm --filter @lpc-toolkit/cli test -- context.test.ts loaders.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 rtk git add packages/cli/src/context.ts packages/cli/src/loaders.ts packages/cli/test/context.test.ts packages/cli/test/loaders.test.ts
 rtk git commit -m "feat(cli): load runtime assets"
 ```
 
-Implementation note: record context/loader behavior here.
+Implementation note: Added CLI runtime context resolution and Node JSON asset
+loaders for catalog and palette data. Review fixes preserve URL-like
+spritesheet bases and isolate malformed catalog/palette records into structured
+warnings so bad asset files do not crash future CLI commands.
 
-Commit: record resulting hash here.
+Commit: 1fd1f4dc2, b43554ec7, 23fd81c04
 
-Verification: record PASS/FAIL here.
+Verification: `rtk env CI=true pnpm --filter @lpc-toolkit/cli test -- context.test.ts loaders.test.ts args.test.ts response.test.ts smoke.test.ts`
+PASS; `rtk env CI=true pnpm --filter @lpc-toolkit/cli typecheck` PASS;
+`rtk env CI=true pnpm --filter @lpc-toolkit/cli build` PASS;
+`rtk env CI=true pnpm check:boundaries` PASS; spec compliance review PASS;
+code quality review PASS.
 
 ## Task 5: Selection JSON And Validation
 
