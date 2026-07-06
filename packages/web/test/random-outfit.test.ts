@@ -1608,36 +1608,351 @@ describe('pickRandomOutfit', () => {
     });
   });
 
-  it('noble profile excludes weapons, shields, armor, workwear, and fantasy parts', () => {
+  it('noble profile excludes undead, non-human, workwear, combat, fantasy, and fx items', () => {
     const { catalog: nobleCatalog } = createCatalog({
-      'body/light.json': makeItem('Light', 'body'),
-      'clothes/formal-longsleeve.json': makeItem('Collared/Formal Longsleeve', 'clothes'),
+      'body/body-color.json': makeItem('Body Color', 'body'),
+      'body/skeleton.json': makeItem('Skeleton Body', 'body'),
+      'body/zombie.json': makeItem('Zombie Body', 'body'),
+      'head/human-male.json': makeItem('Human Male', 'head'),
+      'head/skeleton.json': makeItem('Skeleton', 'head'),
+      'head/zombie.json': makeItem('Zombie', 'head'),
+      'head/orc.json': makeItem('Orc', 'head'),
+      'expression/neutral.json': makeItem('Neutral', 'expression'),
+      'clothes/formal.json': makeItem(
+        'Collared/Formal Longsleeve',
+        'clothes',
+        'male',
+        ['white'],
+      ),
+      'clothes/formal-striped.json': makeItem(
+        'Striped Collared/Formal Longsleeve',
+        'clothes',
+        'male',
+        ['white'],
+      ),
       'legs/formal.json': makeItem('Formal Pants', 'legs'),
+      'legs/formal-striped.json': makeItem('Striped Formal Pants', 'legs'),
       'shoes/basic.json': makeItem('Basic Shoes', 'shoes'),
       'hat/tophat.json': makeItem('Formal Tophat', 'hat'),
-      'weapon/sword.json': makeItem('Sword', 'weapon'),
-      'shield/kite.json': makeItem('Kite', 'shield'),
-      'armour/plate.json': makeItem('Plate', 'armour'),
       'overalls/brown.json': makeItem('Overalls', 'overalls'),
+      'apron/plain.json': makeItem('Apron', 'apron'),
+      'cape/solid.json': makeItem('Solid', 'cape'),
+      'armour/plate.json': makeItem('Plate', 'armour'),
+      'chainmail/steel.json': makeItem('Chainmail', 'chainmail'),
+      'weapon/sword.json': makeItem('Sword', 'weapon'),
+      'weapon/crystal.json': makeItem('Crystal', 'weapon_magic_crystal'),
+      'shield/kite.json': makeItem('Kite', 'shield'),
+      'quiver/quiver.json': makeItem('Quiver', 'quiver'),
+      'arms/armour.json': makeItem('Armour', 'arms'),
+      'gloves/gloves.json': makeItem('Gloves', 'gloves'),
       'wings/feather.json': makeItem('Wings', 'wings'),
+      'wound/arm.json': makeItem('Bleeding', 'wound_arm'),
     });
 
     const sel = pickRandomOutfit({
       catalog: nobleCatalog,
       bodyType: 'male',
-      rng: () => 0,
+      rng: () => 0.99,
       optionalProb: 1.0,
       profile: 'noble',
     });
 
-    expect(sel.items['clothes']).toBeDefined();
-    expect(sel.items['legs']).toBeDefined();
-    expect(sel.items['shoes']).toBeDefined();
-    expect(sel.items['hat']).toBeDefined();
-    expect(sel.items['weapon']).toBeUndefined();
-    expect(sel.items['shield']).toBeUndefined();
-    expect(sel.items['armour']).toBeUndefined();
-    expect(sel.items['overalls']).toBeUndefined();
-    expect(sel.items['wings']).toBeUndefined();
+    expect(sel.items['body']).toEqual({ typeName: 'body', name: 'Body Color' });
+    expect(sel.items['head']).toEqual({ typeName: 'head', name: 'Human Male' });
+    expect(sel.items['expression']).toEqual({
+      typeName: 'expression',
+      name: 'Neutral',
+    });
+    expect(sel.items['clothes']).toEqual({
+      typeName: 'clothes',
+      name: 'Striped Collared/Formal Longsleeve',
+      variant: 'white',
+    });
+    expect(sel.items['legs']).toEqual({
+      typeName: 'legs',
+      name: 'Striped Formal Pants',
+    });
+    expect(sel.items['shoes']?.name).toBe('Basic Shoes');
+    expect(sel.items['hat']?.name).toBe('Formal Tophat');
+
+    for (const typeName of [
+      'overalls',
+      'apron',
+      'cape',
+      'armour',
+      'chainmail',
+      'weapon',
+      'weapon_magic_crystal',
+      'shield',
+      'quiver',
+      'arms',
+      'gloves',
+      'wings',
+      'wound_arm',
+    ] as const) {
+      expect(sel.items[typeName]).toBeUndefined();
+    }
+  });
+
+  it('noble profile fixes male human neutral identity and complete formalwear', () => {
+    const { catalog: nobleCatalog } = createCatalog({
+      'body/body-color.json': makeRecolorItem('Body Color', 'body'),
+      'body/skeleton.json': makeItem('Skeleton Body', 'body'),
+      'body/zombie.json': makeItem('Zombie Body', 'body'),
+      'head/human-male.json': makeItem('Human Male', 'head'),
+      'head/human-female.json': makeItem('Human Female', 'head', 'female'),
+      'head/skeleton.json': makeItem('Skeleton', 'head'),
+      'head/zombie.json': makeItem('Zombie', 'head'),
+      'expression/neutral.json': makeItem('Neutral', 'expression'),
+      'expression/happy.json': makeItem('Happy', 'expression'),
+      'hair/parted.json': makeItem('Parted', 'hair'),
+      'clothes/formal.json': makeItem(
+        'Collared/Formal Longsleeve',
+        'clothes',
+        'male',
+        ['white'],
+      ),
+      'clothes/formal-striped.json': makeItem(
+        'Striped Collared/Formal Longsleeve',
+        'clothes',
+        'male',
+        ['white'],
+      ),
+      'legs/formal.json': makeRecolorItem('Formal Pants', 'legs'),
+      'legs/formal-striped.json': makeRecolorItem('Striped Formal Pants', 'legs'),
+      'shoes/basic-shoes.json': makeItem('Basic Shoes', 'shoes', 'male', [
+        'black',
+        'blue',
+      ]),
+      'hat/tophat.json': makeItem('Formal Tophat', 'hat', 'male', [
+        'black',
+        'blue',
+      ]),
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: nobleCatalog,
+      bodyType: 'female',
+      rng: () => 0,
+      optionalProb: 0,
+      profile: 'noble',
+    });
+
+    expect(sel.bodyType).toBe('male');
+    expect(sel.items['body']).toEqual({ typeName: 'body', name: 'Body Color' });
+    expect(sel.items['head']).toEqual({ typeName: 'head', name: 'Human Male' });
+    expect(sel.items['expression']).toEqual({
+      typeName: 'expression',
+      name: 'Neutral',
+    });
+    expect(sel.items['hair']).toBeUndefined();
+    expect(sel.items['clothes']).toEqual({
+      typeName: 'clothes',
+      name: 'Collared/Formal Longsleeve',
+      variant: 'white',
+    });
+    expect(sel.items['legs']).toEqual({
+      typeName: 'legs',
+      name: 'Formal Pants',
+    });
+    expect(sel.items['shoes']).toEqual({
+      typeName: 'shoes',
+      name: 'Basic Shoes',
+      variant: 'black',
+    });
+    expect(sel.items['hat']).toEqual({
+      typeName: 'hat',
+      name: 'Formal Tophat',
+      variant: 'black',
+    });
+  });
+
+  it('noble profile keeps plain and striped formal tops paired with matching pants', () => {
+    const { catalog: nobleCatalog } = createCatalog({
+      'body/body-color.json': makeItem('Body Color', 'body'),
+      'head/human-male.json': makeItem('Human Male', 'head'),
+      'expression/neutral.json': makeItem('Neutral', 'expression'),
+      'clothes/formal.json': makeItem(
+        'Collared/Formal Longsleeve',
+        'clothes',
+        'male',
+        ['white'],
+      ),
+      'clothes/formal-striped.json': makeItem(
+        'Striped Collared/Formal Longsleeve',
+        'clothes',
+        'male',
+        ['white'],
+      ),
+      'legs/formal.json': makeItem('Formal Pants', 'legs'),
+      'legs/formal-striped.json': makeItem('Striped Formal Pants', 'legs'),
+      'shoes/basic-shoes.json': makeItem('Basic Shoes', 'shoes', 'male', ['black']),
+      'hat/tophat.json': makeItem('Formal Tophat', 'hat', 'male', ['black']),
+    });
+
+    const plain = pickRandomOutfit({
+      catalog: nobleCatalog,
+      bodyType: 'male',
+      rng: () => 0,
+      optionalProb: 1,
+      profile: 'noble',
+    });
+    const striped = pickRandomOutfit({
+      catalog: nobleCatalog,
+      bodyType: 'male',
+      rng: () => 0.99,
+      optionalProb: 1,
+      profile: 'noble',
+    });
+
+    expect(plain.items['clothes']).toEqual({
+      typeName: 'clothes',
+      name: 'Collared/Formal Longsleeve',
+      variant: 'white',
+    });
+    expect(plain.items['legs']).toEqual({
+      typeName: 'legs',
+      name: 'Formal Pants',
+    });
+    expect(striped.items['clothes']).toEqual({
+      typeName: 'clothes',
+      name: 'Striped Collared/Formal Longsleeve',
+      variant: 'white',
+    });
+    expect(striped.items['legs']).toEqual({
+      typeName: 'legs',
+      name: 'Striped Formal Pants',
+    });
+  });
+
+  it('noble profile randomizes skin, pants, shoes, and tophat colors', () => {
+    const { catalog: nobleCatalog } = createCatalog({
+      'body/body-color.json': makeRecolorItem('Body Color', 'body'),
+      'head/human-male.json': makeItem('Human Male', 'head'),
+      'expression/neutral.json': makeItem('Neutral', 'expression'),
+      'clothes/formal.json': makeItem(
+        'Collared/Formal Longsleeve',
+        'clothes',
+        'male',
+        ['white'],
+      ),
+      'clothes/formal-striped.json': makeItem(
+        'Striped Collared/Formal Longsleeve',
+        'clothes',
+        'male',
+        ['white'],
+      ),
+      'legs/formal.json': makeRecolorItem('Formal Pants', 'legs'),
+      'legs/formal-striped.json': makeRecolorItem('Striped Formal Pants', 'legs'),
+      'shoes/basic-shoes.json': makeItem('Basic Shoes', 'shoes', 'male', [
+        'black',
+        'blue',
+      ]),
+      'hat/tophat.json': makeItem('Formal Tophat', 'hat', 'male', [
+        'black',
+        'blue',
+      ]),
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: nobleCatalog,
+      palettes,
+      bodyType: 'male',
+      rng: () => 0.99,
+      optionalProb: 0,
+      profile: 'noble',
+    });
+
+    expect(sel.items['body']).toEqual({
+      typeName: 'body',
+      name: 'Body Color',
+      recolor: 'red',
+    });
+    expect(sel.items['clothes']).toEqual({
+      typeName: 'clothes',
+      name: 'Striped Collared/Formal Longsleeve',
+      variant: 'white',
+    });
+    expect(sel.items['legs']).toEqual({
+      typeName: 'legs',
+      name: 'Striped Formal Pants',
+      recolor: 'red',
+    });
+    expect(sel.items['shoes']).toEqual({
+      typeName: 'shoes',
+      name: 'Basic Shoes',
+      variant: 'blue',
+    });
+    expect(sel.items['hat']).toEqual({
+      typeName: 'hat',
+      name: 'Formal Tophat',
+      variant: 'blue',
+    });
+  });
+
+  it('noble profile keeps default colors when random colors are disabled', () => {
+    const { catalog: nobleCatalog } = createCatalog({
+      'body/body-color.json': makeRecolorItem('Body Color', 'body'),
+      'head/human-male.json': makeItem('Human Male', 'head'),
+      'expression/neutral.json': makeItem('Neutral', 'expression'),
+      'clothes/formal.json': makeItem(
+        'Collared/Formal Longsleeve',
+        'clothes',
+        'male',
+        ['white'],
+      ),
+      'clothes/formal-striped.json': makeItem(
+        'Striped Collared/Formal Longsleeve',
+        'clothes',
+        'male',
+        ['white'],
+      ),
+      'legs/formal.json': makeRecolorItem('Formal Pants', 'legs'),
+      'legs/formal-striped.json': makeRecolorItem('Striped Formal Pants', 'legs'),
+      'shoes/basic-shoes.json': makeItem('Basic Shoes', 'shoes', 'male', [
+        'black',
+        'blue',
+      ]),
+      'hat/tophat.json': makeItem('Formal Tophat', 'hat', 'male', [
+        'black',
+        'blue',
+      ]),
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: nobleCatalog,
+      palettes,
+      bodyType: 'male',
+      rng: () => 0.99,
+      optionalProb: 0,
+      profile: 'noble',
+      scope: {
+        appearance: true,
+        clothing: true,
+        equipment: true,
+        colors: false,
+      },
+    });
+
+    expect(sel.items['body']).toEqual({ typeName: 'body', name: 'Body Color' });
+    expect(sel.items['clothes']).toEqual({
+      typeName: 'clothes',
+      name: 'Striped Collared/Formal Longsleeve',
+      variant: 'white',
+    });
+    expect(sel.items['legs']).toEqual({
+      typeName: 'legs',
+      name: 'Striped Formal Pants',
+    });
+    expect(sel.items['shoes']).toEqual({
+      typeName: 'shoes',
+      name: 'Basic Shoes',
+      variant: 'black',
+    });
+    expect(sel.items['hat']).toEqual({
+      typeName: 'hat',
+      name: 'Formal Tophat',
+      variant: 'black',
+    });
   });
 });
