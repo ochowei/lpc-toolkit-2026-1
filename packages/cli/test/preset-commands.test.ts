@@ -1,0 +1,55 @@
+import { mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { parseArgs } from '../src/args.js';
+import {
+  listPresets,
+  materializePreset,
+  runPresetCommand,
+} from '../src/preset-commands.js';
+
+describe('preset commands', () => {
+  it('lists built-in presets', () => {
+    expect(listPresets().presets.map((preset) => preset.id)).toContain('farmer');
+  });
+
+  it('materializes a preset to selection json', () => {
+    const selection = materializePreset('farmer');
+
+    expect(selection.schema).toBe('lpc-toolkit.selection.v1');
+    expect(selection.name).toBe('farmer');
+    expect(selection.items.body?.name).toBe('Body Color');
+  });
+
+  it('requires a preset id for materialize', () => {
+    const response = runPresetCommand(parseArgs(['preset', 'materialize']), '/tmp');
+
+    expect(response.ok).toBe(false);
+    expect(response.command).toBe('preset materialize');
+    expect(response.errors[0]?.code).toBe('missing_argument');
+  });
+
+  it('reports unknown preset ids through the response envelope', () => {
+    const response = runPresetCommand(
+      parseArgs(['preset', 'materialize', 'missing']),
+      '/tmp',
+    );
+
+    expect(response.ok).toBe(false);
+    expect(response.command).toBe('preset materialize');
+    expect(response.errors[0]?.code).toBe('unknown_preset');
+  });
+
+  it('writes materialized selections as pretty json with a trailing newline', () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-preset-'));
+    const response = runPresetCommand(
+      parseArgs(['preset', 'materialize', 'farmer', '--out', 'farmer.json']),
+      cwd,
+    );
+
+    expect(response.ok).toBe(true);
+    const written = readFileSync(path.join(cwd, 'farmer.json'), 'utf8');
+    expect(written).toBe(`${JSON.stringify(materializePreset('farmer'), null, 2)}\n`);
+  });
+});

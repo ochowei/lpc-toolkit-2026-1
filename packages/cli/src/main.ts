@@ -1,5 +1,6 @@
 import { flagBoolean, parseArgs } from './args.js';
 import { runCatalogCommand } from './catalog-commands.js';
+import { runPresetCommand } from './preset-commands.js';
 import {
   commandError,
   formatJsonResponse,
@@ -77,6 +78,15 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<number
       parsed,
       io,
       'Token command completed.\n',
+    );
+  }
+
+  if (parsed.command[0] === 'preset') {
+    return writeResponse(
+      runPresetCommand(parsed, io.cwd),
+      parsed,
+      io,
+      'Preset command completed.\n',
     );
   }
 

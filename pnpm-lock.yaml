@@ -20,6 +20,9 @@ importers:
       '@lpc-toolkit/core':
         specifier: workspace:*
         version: link:../core
+      '@lpc-toolkit/presets':
+        specifier: workspace:*
+        version: link:../presets
       '@napi-rs/canvas':
         specifier: ^1.0.0
         version: 1.0.0
