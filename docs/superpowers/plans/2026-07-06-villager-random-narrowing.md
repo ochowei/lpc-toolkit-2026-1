@@ -318,7 +318,7 @@ Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-ou
 ```
 
 Implementation note: Added focused failing coverage for Villager human identity, Neutral expression, complete everyday outfit requirements, female body type compatibility, color randomization, colors-disabled defaults, and off-theme exclusions.
-Commit: pending
+Commit: bc4c83fb9
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` FAIL as expected before implementation.
 
 ## Task 2: Tighten the Villager Random Profile
