@@ -44,6 +44,12 @@ export function parseSelectionJson(value: unknown): ParsedSelectionJson {
     if (!isRecord(raw) || typeof raw.name !== 'string') {
       throw new Error(`Selection item ${typeName} must include a string name.`);
     }
+    if (raw.variant !== undefined && typeof raw.variant !== 'string') {
+      throw new Error(`Selection item ${typeName} variant must be a string.`);
+    }
+    if (raw.recolor !== undefined && typeof raw.recolor !== 'string') {
+      throw new Error(`Selection item ${typeName} recolor must be a string.`);
+    }
     items[typeName] = {
       typeName,
       name: raw.name,

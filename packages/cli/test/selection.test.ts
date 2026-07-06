@@ -23,6 +23,30 @@ describe('selection json', () => {
     });
   });
 
+  it('rejects non-string variants when present', () => {
+    expect(() =>
+      parseSelectionJson({
+        schema: 'lpc-toolkit.selection.v1',
+        bodyType: 'male',
+        items: {
+          body: { name: 'Body Color', variant: {} },
+        },
+      }),
+    ).toThrow('Selection item body variant must be a string.');
+  });
+
+  it('rejects non-string recolors when present', () => {
+    expect(() =>
+      parseSelectionJson({
+        schema: 'lpc-toolkit.selection.v1',
+        bodyType: 'male',
+        items: {
+          body: { name: 'Body Color', recolor: 123 },
+        },
+      }),
+    ).toThrow('Selection item body recolor must be a string.');
+  });
+
   it('serializes core selections with metadata', () => {
     expect(
       selectionJsonFromCore(

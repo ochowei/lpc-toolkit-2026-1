@@ -8,6 +8,10 @@ import { commandError, commandOk, type CliResponse } from './response.js';
 import { parseSelectionJson } from './selection.js';
 import { validateSelections } from './validation.js';
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export function runSelectionCommand(
   parsed: ParsedArgs,
   cwd: string,
@@ -32,9 +36,28 @@ export function runSelectionCommand(
     context.customSheetDefinitionsRoot,
   );
   const palettes = loadPalettesFromRoot(context.paletteDefinitionsRoot);
-  const parsedSelection = parseSelectionJson(
-    JSON.parse(readFileSync(path.resolve(cwd, selectionPath), 'utf8')) as unknown,
-  );
+  let selectionSource: string;
+  try {
+    selectionSource = readFileSync(path.resolve(cwd, selectionPath), 'utf8');
+  } catch (error) {
+    return commandError('selection validate', {
+      code: 'selection_read_failed',
+      message: errorMessage(error),
+      path: selectionPath,
+    });
+  }
+
+  let parsedSelection;
+  try {
+    parsedSelection = parseSelectionJson(JSON.parse(selectionSource) as unknown);
+  } catch (error) {
+    return commandError('selection validate', {
+      code: 'invalid_selection_json',
+      message: errorMessage(error),
+      path: selectionPath,
+    });
+  }
+
   const validation = validateSelections(parsedSelection.selections, {
     catalog: catalog.catalog,
     palettes: palettes.palettes,
