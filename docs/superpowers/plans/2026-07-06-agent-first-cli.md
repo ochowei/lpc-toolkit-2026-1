@@ -1187,7 +1187,7 @@ code quality review PASS.
 - Test: `packages/cli/test/selection.test.ts`
 - Test: `packages/cli/test/validation.test.ts`
 
-- [ ] **Step 1: Write selection tests**
+- [x] **Step 1: Write selection tests**
 
 Create `packages/cli/test/selection.test.ts`:
 
@@ -1236,7 +1236,7 @@ describe('selection json', () => {
 });
 ```
 
-- [ ] **Step 2: Write validation tests**
+- [x] **Step 2: Write validation tests**
 
 Create `packages/cli/test/validation.test.ts`:
 
@@ -1285,7 +1285,7 @@ describe('validateSelections', () => {
 });
 ```
 
-- [ ] **Step 3: Run tests to verify they fail**
+- [x] **Step 3: Run tests to verify they fail**
 
 Run:
 
@@ -1295,7 +1295,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- selection.test.ts validation.test.ts
 
 Expected: FAIL because selection and validation modules do not exist.
 
-- [ ] **Step 4: Implement `selection.ts`**
+- [x] **Step 4: Implement `selection.ts`**
 
 Create `packages/cli/src/selection.ts`:
 
@@ -1387,7 +1387,7 @@ export function selectionJsonFromCore(
 }
 ```
 
-- [ ] **Step 5: Implement `validation.ts`**
+- [x] **Step 5: Implement `validation.ts`**
 
 Create `packages/cli/src/validation.ts`:
 
@@ -1477,7 +1477,7 @@ export function validateSelections(
 }
 ```
 
-- [ ] **Step 6: Implement selection command**
+- [x] **Step 6: Implement selection command**
 
 Create `packages/cli/src/selection-commands.ts`:
 
@@ -1563,7 +1563,7 @@ Inside `runCli`, after `const parsed = parseArgs(argv);`:
   }
 ```
 
-- [ ] **Step 7: Run selection tests**
+- [x] **Step 7: Run selection tests**
 
 Run:
 
@@ -1574,18 +1574,27 @@ rtk pnpm --filter @lpc-toolkit/cli typecheck
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 rtk git add packages/cli/src packages/cli/test
 rtk git commit -m "feat(cli): validate selection json"
 ```
 
-Implementation note: record validation behavior here.
+Implementation note: Added selection JSON parse/serialize helpers, shared
+selection validation, and `selection validate` command dispatch with JSON and
+human output. Review fixes ensure unreadable or malformed selection files return
+stable envelope errors and non-string optional `variant`/`recolor` fields fail
+parsing instead of being silently dropped.
 
-Commit: record resulting hash here.
+Commit: 6df35eec919eb91039a1ffd721e7f3ade891954e,
+61c2ca2428d40feabbe4643e58a397f1f585afc5
 
-Verification: record PASS/FAIL here.
+Verification: `rtk env CI=true pnpm --filter @lpc-toolkit/cli test -- selection.test.ts validation.test.ts context.test.ts loaders.test.ts args.test.ts response.test.ts smoke.test.ts`
+PASS; `rtk env CI=true pnpm --filter @lpc-toolkit/cli typecheck` PASS;
+`rtk env CI=true pnpm --filter @lpc-toolkit/cli build` PASS;
+`rtk env CI=true pnpm check:boundaries` PASS; spec compliance review PASS;
+code quality review PASS.
 
 ## Task 6: Catalog And Token Commands
 
