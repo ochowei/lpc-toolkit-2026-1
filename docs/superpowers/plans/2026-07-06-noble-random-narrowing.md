@@ -738,6 +738,10 @@ Correction note: Removed the synthetic Noble formal clothes fallback so profile 
 Correction commit: aed4a87df
 Correction verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS; `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS; `rtk pnpm check:boundaries` PASS.
 
+Code-review fix note: Added regression coverage for incompatible Noble item sets and skipped independent per-slot randomization for type names governed by profile item sets unless preserved or item-set-selected.
+Code-review fix commit: pending until created.
+Code-review fix verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS; `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS; `rtk pnpm check:boundaries` PASS.
+
 ## Task 3: Final Verification and Plan Bookkeeping
 
 **Files:**

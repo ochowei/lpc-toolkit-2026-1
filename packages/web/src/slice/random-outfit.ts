@@ -199,6 +199,19 @@ function compatibleProfileItemSetEntries(
   return compatibleSets;
 }
 
+function profileItemSetTypeNames(profile: RandomProfile): ReadonlySet<TypeName> {
+  const typeNames = new Set<TypeName>();
+  for (const itemSet of profile.itemSets ?? []) {
+    for (const typeName of itemSet.requiredTypeNames) {
+      typeNames.add(typeName);
+    }
+    for (const typeName of Object.keys(itemSet.items) as TypeName[]) {
+      typeNames.add(typeName);
+    }
+  }
+  return typeNames;
+}
+
 function pickProfileItemSetSelections(args: {
   readonly catalog: Catalog;
   readonly profile: RandomProfile;
@@ -252,6 +265,7 @@ export function pickRandomOutfit(args: PickRandomOutfitArgs): Selections {
   const scope = args.scope ?? DEFAULT_RANDOM_SCOPE;
   const optionalProb = args.optionalProb ?? profile.optionalProb;
   const excluded = new Set<GroupId>(args.excludeGroups ?? profile.excludeGroups);
+  const itemSetTypeNames = profileItemSetTypeNames(profile);
   const hasLegacyExcludeOverride =
     args.profile === undefined &&
     args.excludeGroups !== undefined &&
@@ -290,6 +304,7 @@ export function pickRandomOutfit(args: PickRandomOutfitArgs): Selections {
     if (group && excluded.has(group.id)) continue;
     if (args.scope && !isTypeEnabledByRandomScope(typeName, scope)) continue;
     if (hasSelectionForType(items, typeName)) continue;
+    if (itemSetTypeNames.has(typeName)) continue;
 
     const isRequired = isRequiredType(profile, typeName);
     if (!isRequired && rng() > optionalProb) continue;

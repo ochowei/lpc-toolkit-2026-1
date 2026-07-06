@@ -1828,6 +1828,45 @@ describe('pickRandomOutfit', () => {
     });
   });
 
+  it('noble profile does not fall back to unrelated clothes or legs when no formal set is compatible', () => {
+    const { catalog: nobleCatalog } = createCatalog({
+      'body/body-color.json': makeItem('Body Color', 'body'),
+      'head/human-male.json': makeItem('Human Male', 'head'),
+      'expression/neutral.json': makeItem('Neutral', 'expression'),
+      'clothes/tunic.json': makeItem('Tunic', 'clothes', 'male', ['blue']),
+      'legs/plain-pants.json': makeItem('Plain Pants', 'legs'),
+      'shoes/basic-shoes.json': makeItem('Basic Shoes', 'shoes', 'male', ['black']),
+      'hat/tophat.json': makeItem('Formal Tophat', 'hat', 'male', ['black']),
+    });
+
+    const sel = pickRandomOutfit({
+      catalog: nobleCatalog,
+      bodyType: 'male',
+      rng: () => 0,
+      optionalProb: 1,
+      profile: 'noble',
+    });
+
+    expect(sel.items['body']).toEqual({ typeName: 'body', name: 'Body Color' });
+    expect(sel.items['head']).toEqual({ typeName: 'head', name: 'Human Male' });
+    expect(sel.items['expression']).toEqual({
+      typeName: 'expression',
+      name: 'Neutral',
+    });
+    expect(sel.items['clothes']).toBeUndefined();
+    expect(sel.items['legs']).toBeUndefined();
+    expect(sel.items['shoes']).toEqual({
+      typeName: 'shoes',
+      name: 'Basic Shoes',
+      variant: 'black',
+    });
+    expect(sel.items['hat']).toEqual({
+      typeName: 'hat',
+      name: 'Formal Tophat',
+      variant: 'black',
+    });
+  });
+
   it('noble profile randomizes skin, pants, shoes, and tophat colors', () => {
     const { catalog: nobleCatalog } = createCatalog({
       'body/body-color.json': makeRecolorItem('Body Color', 'body'),
