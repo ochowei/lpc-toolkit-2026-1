@@ -730,7 +730,7 @@ Commit: output of `rtk git rev-parse --short HEAD` after `fix(web): narrow noble
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS; `rtk pnpm --filter @lpc-toolkit/web typecheck` PASS; `rtk pnpm check:boundaries` PASS.
 ```
 
-Implementation note: Added profile-level item sets, used them to keep Noble formal tops and pants paired, tightened Noble identity, required slots, item pools, and random color slots, and kept zero-probability optional slots out of the result.
+Implementation note: Added profile-level item sets, used them to keep Noble formal tops and pants paired, and tightened Noble identity, required slots, item pools, and random color slots.
 Commit: 92bd4119c
 Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/random-outfit.test.ts` PASS; `rtk pnpm --filter @lpc-toolkit/web typecheck` reported `TypeScript: No errors found` but exited 1 via the rtk shorthand; `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS; `rtk pnpm check:boundaries` PASS.
 
