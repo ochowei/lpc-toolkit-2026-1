@@ -1,12 +1,58 @@
-import {
-  getRecolorSwatches,
-  type BodyType,
-  type Catalog,
-  type ItemDefinition,
-  type PaletteMetadata,
-  type Selection,
-  type TypeName,
-} from '@lpc-toolkit/core';
+type TypeName = string;
+type BodyType = string;
+
+interface Selection {
+  readonly typeName: TypeName;
+  readonly name: string;
+  readonly variant?: string;
+  readonly recolor?: string;
+}
+
+interface RecolorConfig {
+  readonly material: string;
+  readonly palettes: readonly string[];
+  readonly type_name?: TypeName;
+  readonly base?: string;
+  readonly source?: readonly string[];
+  readonly label?: string;
+}
+
+interface MultiRecolorConfig {
+  readonly [colorKey: `color_${number}`]: RecolorConfig | undefined;
+}
+
+type RawRecolors = RecolorConfig | MultiRecolorConfig;
+
+interface RawLayer {
+  readonly zPos: number;
+  readonly custom_animation?: string;
+  readonly [bodyType: string]: number | string | undefined;
+}
+
+interface ItemDefinition {
+  readonly name: string;
+  readonly type_name: TypeName;
+  readonly recolors?: RawRecolors;
+  readonly variants?: readonly string[];
+  readonly [layerKey: `layer_${number}`]: RawLayer | undefined;
+}
+
+interface Catalog {
+  readonly byTypeName: ReadonlyMap<TypeName, readonly ItemDefinition[]>;
+}
+
+type PaletteVersionColors = Readonly<Record<string, readonly string[]>>;
+type PaletteMap = Readonly<Record<string, PaletteVersionColors>>;
+
+interface PaletteMaterialMeta {
+  readonly palettes: PaletteMap;
+  readonly default?: string;
+  readonly base?: string;
+}
+
+interface PaletteMetadata {
+  readonly materials: Readonly<Record<string, PaletteMaterialMeta>>;
+}
 
 /** One item slot in a preset: a catalog item plus an optional variant. */
 export interface PresetItem {
@@ -182,11 +228,68 @@ function pickDefaults(
   palettes: PaletteMetadata,
 ): { variant?: string; recolor?: string } {
   if (!item) return {};
-  const swatches = getRecolorSwatches(item, palettes);
-  const firstSwatch = swatches[0];
-  if (firstSwatch) return { recolor: firstSwatch.recolor };
+  const firstRecolor = getFirstRecolorVariant(item, palettes);
+  if (firstRecolor) return { recolor: firstRecolor };
   const firstVariant = item.variants?.[0];
   return firstVariant ? { variant: firstVariant } : {};
+}
+
+function collectRecolorEntries(
+  recolors: ItemDefinition['recolors'],
+): RecolorConfig[] {
+  if (!recolors) return [];
+  const entries: RecolorConfig[] = [];
+  const multi = recolors as {
+    readonly [key: `color_${number}`]: RecolorConfig | undefined;
+  };
+  for (let n = 1; n < 10; n++) {
+    const entry = multi[`color_${n}`];
+    if (entry) entries.push(entry);
+    else break;
+  }
+  return entries.length > 0 ? entries : [recolors as RecolorConfig];
+}
+
+function resolvePaletteToken(
+  token: string,
+  fallbackMaterial: string,
+): { material: string; version: string } {
+  const parts = token.split('.');
+  let material = parts[0] ?? '';
+  let version = parts[1] ?? '';
+  if (!version) {
+    version = material;
+    material = fallbackMaterial;
+  }
+  return { material, version };
+}
+
+function getFirstRecolorVariant(
+  item: ItemDefinition,
+  palettes: PaletteMetadata,
+): string | undefined {
+  const entry = collectRecolorEntries(item.recolors)[0];
+  if (!entry) return undefined;
+  const material = palettes.materials[entry.material];
+  if (!material) return undefined;
+  const defaultVersion = material.default ?? '';
+
+  for (const token of entry.palettes) {
+    const { material: tokenMaterial, version } = resolvePaletteToken(
+      token,
+      entry.material,
+    );
+    const variantMap = palettes.materials[tokenMaterial]?.palettes[version];
+    if (!variantMap) continue;
+    const firstColor = Object.keys(variantMap)[0];
+    if (!firstColor) continue;
+    const materialPrefix =
+      entry.material !== tokenMaterial ? `${tokenMaterial}.` : '';
+    const versionPrefix = defaultVersion !== version ? `${version}.` : '';
+    return `${materialPrefix}${versionPrefix}${firstColor}`;
+  }
+
+  return undefined;
 }
 
 /**
