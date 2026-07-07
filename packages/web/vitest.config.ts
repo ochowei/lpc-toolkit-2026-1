@@ -8,6 +8,9 @@ export default defineConfig({
       '@lpc-toolkit/core': fileURLToPath(
         new URL('../core/src/index.ts', import.meta.url),
       ),
+      '@lpc-toolkit/presets': fileURLToPath(
+        new URL('../presets/src/index.ts', import.meta.url),
+      ),
     },
   },
   test: {

@@ -44,7 +44,7 @@ describe('package scripts', () => {
 
   it('prepares release assets before production builds', () => {
     expect(packageJson.scripts?.prebuild).toBe(
-      'pnpm prepare-assets && pnpm --filter @lpc-toolkit/core build',
+      'pnpm prepare-assets && pnpm --filter @lpc-toolkit/core build && pnpm --filter @lpc-toolkit/presets build',
     );
   });
 

@@ -2,7 +2,7 @@
 
 A monorepo providing an **environment-agnostic core library for composing
 [LPC](https://lpc.opengameart.org/) character spritesheets**, plus a modern
-React web UI and a planned CLI built on top of it.
+React web UI and an agent-first Node CLI built on top of it.
 
 LPC (Liberated Pixel Cup) art ships as many layered spritesheets — body,
 hair, clothing, weapons, expressions, and so on. The
@@ -17,10 +17,11 @@ CLI can share one engine.
 | Package             | State        | What it is                                          |
 | ------------------- | ------------ | --------------------------------------------------- |
 | `packages/core/`    | **Working**  | Pure TypeScript composition logic (catalog, compose, recolor, hash, credits) |
+| `packages/presets/` | **Working**  | Shared themed outfit presets and preset-application logic |
 | `packages/web/`     | **Working**  | React 18 + Vite + Tailwind CSS v4 + shadcn-style UI with a full three-region grid desktop editor and mobile responsive layout |
-| `packages/cli/`     | _Planned_    | Node CLI                                             |
+| `packages/cli/`     | **Working**  | Agent-first Node CLI for catalog exploration, selection validation, token conversion, presets, and rendering |
 
-The core composition pipeline and the web UI are fully working and tested. The CLI package has not been started yet.
+The core composition pipeline, shared presets, web UI, and CLI are working and tested.
 
 ## Stack
 
@@ -36,13 +37,14 @@ The core composition pipeline and the web UI are fully working and tested. The C
 assets/            LPC art assets (spritesheets, sheet definitions, palette definitions, CREDITS.csv) migrated from upstream
 upstream/          git submodule, read-only — LPC source (reference material only)
 packages/core/     pure TypeScript composition logic (no DOM, no fs)
+packages/presets/  shared preset definitions and pure preset-application helpers
 packages/web/      React + Vite browser UI
-packages/cli/      planned Node CLI
+packages/cli/      Node CLI with filesystem, canvas, ZIP, and agent-friendly JSON output
 ```
 
 ## Hard rules
 
-These constraints are load-bearing — see `CLAUDE.md` for the authoritative list.
+These constraints are load-bearing — see `AGENTS.md` for the authoritative list.
 
 1. **`upstream/` is a read-only git submodule.** Never modify it, never
    commit inside it, never run a package manager inside it. It is now legacy/reference,
@@ -82,6 +84,13 @@ To start the web UI development server locally:
 
 ```bash
 pnpm --filter @lpc-toolkit/web dev
+```
+
+To build and inspect the CLI locally:
+
+```bash
+pnpm --filter @lpc-toolkit/cli build
+pnpm --filter @lpc-toolkit/cli exec lpc --help
 ```
 
 ## `@lpc-toolkit/core`
@@ -128,7 +137,7 @@ const selections: Selections = {
 const sheet = await composeSelections(selections, {
   catalog,
   adapter,
-  spritesheetsBaseUrl: '/path/to/upstream',
+  spritesheetsBaseUrl: '/path/to/repo/assets',
 });
 
 // 4. Crop one animation out of the master sheet.
@@ -153,6 +162,35 @@ Exported from `@lpc-toolkit/core` (see `API.md` for full signatures):
 - **Constants** — `FRAME_SIZE` (64), `SHEET_WIDTH` (832), `SHEET_HEIGHT`
   (3456), `ANIMATIONS`, `ANIMATION_OFFSETS`, `LICENSE_CONFIG`, … plus the
   shared `types.ts` definitions (`Selections`, `ComposedSheet`, etc.)
+
+## `@lpc-toolkit/presets`
+
+`packages/presets/` contains shared themed outfit presets and pure helper logic
+for applying those presets to existing selections. It depends on
+`@lpc-toolkit/core` types and catalog helpers, but does not own rendering,
+canvas creation, filesystem access, downloads, or browser UI behavior.
+
+Both the web UI and CLI consume this package so preset behavior stays
+consistent across surfaces.
+
+## `@lpc-toolkit/cli`
+
+`packages/cli/` is the Node runtime surface for agents and scripts. It provides
+commands for:
+
+- catalog exploration: `lpc catalog types`, `lpc catalog items --type <typeName>`
+- selection validation: `lpc selection validate --selection <file>`
+- token conversion: `lpc token encode --selection <file>`, `lpc token decode --token <hash-or-token> --out <file>`
+- presets: `lpc preset list`, `lpc preset materialize <preset-id> --out <file>`, `lpc preset render <preset-id> --out <dir>`
+- rendering: `lpc render --selection <file> --out <dir>`
+
+CLI rendering writes the composed sheet plus required metadata and credit files,
+with optional animation strips, frame exports, and ZIP bundles.
+
+The CLI owns Node-specific runtime dependencies such as `@napi-rs/canvas`
+(MIT) and `jszip` (MIT). These dependencies are GPL-compatible and must remain
+outside `packages/core/src/**`; core continues to receive image loading and
+canvas creation through injected adapter contracts.
 
 ## Web UI design reference
 
