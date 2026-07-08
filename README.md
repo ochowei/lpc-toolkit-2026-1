@@ -97,7 +97,7 @@ To install the CLI for local development:
 
 ```bash
 pnpm build
-pnpm --filter @lpc-toolkit/cli link --global
+pnpm add -g "$PWD/packages/cli"
 lpc-toolkit --help
 ```
 
@@ -109,6 +109,10 @@ pnpm --filter @lpc-toolkit/cli pack --pack-destination /tmp
 pnpm add -g /tmp/lpc-toolkit-cli-0.0.0.tgz
 lpc-toolkit --help
 ```
+
+The CLI build vendors the local `@lpc-toolkit/core` and
+`@lpc-toolkit/presets` runtime output into the CLI `dist/` folder, so the CLI
+tarball does not require those workspace packages to be published first.
 
 ## `@lpc-toolkit/core`
 

@@ -5,7 +5,9 @@ import { describe, expect, it } from 'vitest';
 
 interface CliPackageJson {
   readonly bin?: Record<string, string>;
+  readonly dependencies?: Record<string, string>;
   readonly files?: readonly string[];
+  readonly devDependencies?: Record<string, string>;
   readonly scripts?: Record<string, string>;
 }
 
@@ -35,6 +37,17 @@ describe('CLI package metadata', () => {
     expect(packageJson.files).not.toContain('tsconfig.build.json');
   });
 
+  it('vendors workspace runtime dependencies for local tarball installs', () => {
+    const packageJson = readCliPackageJson();
+
+    expect(packageJson.dependencies).not.toHaveProperty('@lpc-toolkit/core');
+    expect(packageJson.dependencies).not.toHaveProperty('@lpc-toolkit/presets');
+    expect(packageJson.devDependencies).toMatchObject({
+      '@lpc-toolkit/core': 'workspace:*',
+      '@lpc-toolkit/presets': 'workspace:*',
+    });
+  });
+
   it('cleans dist before building package output', () => {
     const packageJson = readCliPackageJson();
 
@@ -42,5 +55,6 @@ describe('CLI package metadata', () => {
     expect(packageJson.scripts?.build).toContain('rmSync');
     expect(packageJson.scripts?.build).toContain('dist');
     expect(packageJson.scripts?.build).toContain('tsc -p tsconfig.build.json');
+    expect(packageJson.scripts?.build).toContain('node scripts/vendor-workspace-deps.mjs');
   });
 });

@@ -424,10 +424,10 @@ package/tsconfig.build.json
 
 - [x] **Step 6: Try one global install workflow when allowed**
 
-Prefer local development link first:
+Prefer local development install first:
 
 ```bash
-rtk pnpm --filter @lpc-toolkit/cli link --global
+rtk pnpm add -g "$PWD/packages/cli"
 rtk lpc-toolkit --help
 ```
 
@@ -444,9 +444,9 @@ Expected: `lpc-toolkit --help` exits 0 and prints `lpc-toolkit catalog types`.
 
 If both global workflows are blocked, do not invent another install path. Record the blocker under this step and rely on Steps 1-5 plus direct Node execution as fallback verification.
 
-  - Implementation note: Attempted both specified global workflows. The preferred filtered global link was rejected by pnpm before linking. The tarball global install was retried with escalation after an initial sandbox write failure, then pnpm refused the install because `/Users/william/Library/pnpm/bin` is not in PATH.
+  - Implementation note: Attempted the originally planned global workflows. The filtered global link was rejected by pnpm before linking. The tarball global install was retried with escalation after an initial sandbox write failure, then pnpm refused the install because `/Users/william/Library/pnpm/bin` is not in PATH. A final review found the single CLI tarball still depended on unpublished workspace packages, so a post-review correction vendors the built `@lpc-toolkit/core` and `@lpc-toolkit/presets` runtime output into the CLI `dist/` and verifies local-directory and single-tarball global installs in temporary PNPM_HOME directories.
   - Commit: 92e86cd28d0db3234795b7e3414cb5bb68ae4632
-  - Verification: `rtk pnpm --filter @lpc-toolkit/cli link --global` BLOCKED with `Unknown option: 'recursive'`; sandboxed `rtk pnpm add -g /tmp/lpc-toolkit-cli-0.0.0.tgz` BLOCKED with `EPERM: operation not permitted, mkdir '/Users/william/Library/pnpm/bin'`; escalated `rtk pnpm add -g /tmp/lpc-toolkit-cli-0.0.0.tgz` BLOCKED with `The configured global bin directory "/Users/william/Library/pnpm/bin" is not in PATH`; fallback direct Node execution from Step 2 PASS
+  - Verification: original `rtk pnpm --filter @lpc-toolkit/cli link --global` BLOCKED with `Unknown option: 'recursive'`; sandboxed `rtk pnpm add -g /tmp/lpc-toolkit-cli-0.0.0.tgz` BLOCKED with `EPERM: operation not permitted, mkdir '/Users/william/Library/pnpm/bin'`; escalated `rtk pnpm add -g /tmp/lpc-toolkit-cli-0.0.0.tgz` BLOCKED with `The configured global bin directory "/Users/william/Library/pnpm/bin" is not in PATH`; post-review temporary global install `rtk env PNPM_HOME=/tmp/lpc-toolkit-pnpm-home-cli-dir2 ... pnpm add -g /Users/william/gitRepo/lpc-toolkit-2026-1/packages/cli --global-dir /tmp/lpc-toolkit-pnpm-global-cli-dir2` PASS and `lpc-toolkit --help` PASS; post-review temporary tarball install `rtk env PNPM_HOME=/tmp/lpc-toolkit-pnpm-home-cli-tgz2 ... pnpm add -g /tmp/lpc-toolkit-cli-0.0.0.tgz --global-dir /tmp/lpc-toolkit-pnpm-global-cli-tgz2` PASS and `lpc-toolkit --help` PASS
 
 - [x] **Step 7: Run boundary check**
 
@@ -480,4 +480,26 @@ Add the implementation note under this step after committing:
 
   - Implementation note: Recorded Task 3 verification results, including the sandbox blocker for global install, in this plan file.
   - Commit: 92e86cd28d0db3234795b7e3414cb5bb68ae4632
-  - Verification: build PASS; direct CLI help PASS; CLI tests PASS; pack PASS; pack contents PASS; boundary check PASS; global install BLOCKED by pnpm global bin PATH configuration and documented
+  - Verification: build PASS; direct CLI help PASS; CLI tests PASS; pack PASS; pack contents PASS; boundary check PASS; original global install BLOCKED by pnpm global bin PATH configuration and documented; post-review temporary local-directory and tarball global installs PASS
+
+## Post-Review Fix: Self-Contained CLI Tarball
+
+Final review found that the CLI tarball was not actually self-installable
+because the packed manifest rewrote workspace dependencies to unpublished
+`@lpc-toolkit/core@0.0.0` and `@lpc-toolkit/presets@0.0.0` registry
+dependencies.
+
+- [x] Vendor workspace runtime output into CLI package output
+  - Implementation note: Added `packages/cli/scripts/vendor-workspace-deps.mjs`, updated the CLI build to copy built core/presets output into `packages/cli/dist/vendor/@lpc-toolkit`, rewrote compiled runtime imports to relative vendored imports, and moved workspace packages from CLI runtime dependencies to devDependencies.
+  - Commit: ffd9f3fee4cc0331e9a2269b389678bb3ef15263
+  - Verification: `rtk env CI=true pnpm --filter @lpc-toolkit/cli build` PASS; `rtk node packages/cli/dist/index.js --help` PASS
+
+- [x] Verify single CLI tarball install
+  - Implementation note: Packed the corrected CLI package and installed `/tmp/lpc-toolkit-cli-0.0.0.tgz` into a temporary PNPM_HOME/global-dir, then ran the installed `lpc-toolkit --help` shim successfully.
+  - Commit: ffd9f3fee4cc0331e9a2269b389678bb3ef15263
+  - Verification: `rtk env CI=true pnpm --filter @lpc-toolkit/cli pack --pack-destination /tmp --json` PASS; `rtk env PNPM_HOME=/tmp/lpc-toolkit-pnpm-home-cli-tgz2 ... pnpm add -g /tmp/lpc-toolkit-cli-0.0.0.tgz --global-dir /tmp/lpc-toolkit-pnpm-global-cli-tgz2` PASS; `rtk env PNPM_HOME=/tmp/lpc-toolkit-pnpm-home-cli-tgz2 ... lpc-toolkit --help` PASS
+
+- [x] Verify local directory global install
+  - Implementation note: Replaced the invalid filtered global link workflow with a local directory install using the absolute CLI package path, verified in a temporary PNPM_HOME/global-dir.
+  - Commit: ffd9f3fee4cc0331e9a2269b389678bb3ef15263
+  - Verification: `rtk env PNPM_HOME=/tmp/lpc-toolkit-pnpm-home-cli-dir2 ... pnpm add -g /Users/william/gitRepo/lpc-toolkit-2026-1/packages/cli --global-dir /tmp/lpc-toolkit-pnpm-global-cli-dir2` PASS; `rtk env PNPM_HOME=/tmp/lpc-toolkit-pnpm-home-cli-dir2 ... lpc-toolkit --help` PASS
