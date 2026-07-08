@@ -491,15 +491,15 @@ dependencies.
 
 - [x] Vendor workspace runtime output into CLI package output
   - Implementation note: Added `packages/cli/scripts/vendor-workspace-deps.mjs`, updated the CLI build to copy built core/presets output into `packages/cli/dist/vendor/@lpc-toolkit`, rewrote compiled runtime imports to relative vendored imports, and moved workspace packages from CLI runtime dependencies to devDependencies.
-  - Commit: ffd9f3fee4cc0331e9a2269b389678bb3ef15263
+  - Commit: 4f61fcd7f0e2fb47c3a7c61df1291d4bff62f3ee
   - Verification: `rtk env CI=true pnpm --filter @lpc-toolkit/cli build` PASS; `rtk node packages/cli/dist/index.js --help` PASS
 
 - [x] Verify single CLI tarball install
   - Implementation note: Packed the corrected CLI package and installed `/tmp/lpc-toolkit-cli-0.0.0.tgz` into a temporary PNPM_HOME/global-dir, then ran the installed `lpc-toolkit --help` shim successfully.
-  - Commit: ffd9f3fee4cc0331e9a2269b389678bb3ef15263
+  - Commit: 4f61fcd7f0e2fb47c3a7c61df1291d4bff62f3ee
   - Verification: `rtk env CI=true pnpm --filter @lpc-toolkit/cli pack --pack-destination /tmp --json` PASS; `rtk env PNPM_HOME=/tmp/lpc-toolkit-pnpm-home-cli-tgz2 ... pnpm add -g /tmp/lpc-toolkit-cli-0.0.0.tgz --global-dir /tmp/lpc-toolkit-pnpm-global-cli-tgz2` PASS; `rtk env PNPM_HOME=/tmp/lpc-toolkit-pnpm-home-cli-tgz2 ... lpc-toolkit --help` PASS
 
 - [x] Verify local directory global install
   - Implementation note: Replaced the invalid filtered global link workflow with a local directory install using the absolute CLI package path, verified in a temporary PNPM_HOME/global-dir.
-  - Commit: ffd9f3fee4cc0331e9a2269b389678bb3ef15263
+  - Commit: 4f61fcd7f0e2fb47c3a7c61df1291d4bff62f3ee
   - Verification: `rtk env PNPM_HOME=/tmp/lpc-toolkit-pnpm-home-cli-dir2 ... pnpm add -g /Users/william/gitRepo/lpc-toolkit-2026-1/packages/cli --global-dir /tmp/lpc-toolkit-pnpm-global-cli-dir2` PASS; `rtk env PNPM_HOME=/tmp/lpc-toolkit-pnpm-home-cli-dir2 ... lpc-toolkit --help` PASS
