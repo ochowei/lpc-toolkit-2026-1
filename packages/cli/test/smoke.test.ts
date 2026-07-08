@@ -15,8 +15,11 @@ describe('runCli', () => {
       cwd: '/tmp',
     });
 
+    const staleShortCommand = ['  ', 'lpc catalog types'].join('');
+
     expect(code).toBe(0);
-    expect(writes.join('')).toContain('lpc catalog types');
+    expect(writes.join('')).toContain('lpc-toolkit catalog types');
+    expect(writes.join('')).not.toContain(staleShortCommand);
     expect(errors).toEqual([]);
   });
 

@@ -90,7 +90,24 @@ To build and inspect the CLI locally:
 
 ```bash
 pnpm --filter @lpc-toolkit/cli build
-pnpm --filter @lpc-toolkit/cli exec lpc --help
+node packages/cli/dist/index.js --help
+```
+
+To install the CLI for local development:
+
+```bash
+pnpm build
+pnpm --filter @lpc-toolkit/cli link --global
+lpc-toolkit --help
+```
+
+To verify the package as an installable tarball:
+
+```bash
+pnpm build
+pnpm --filter @lpc-toolkit/cli pack --pack-destination /tmp
+pnpm add -g /tmp/lpc-toolkit-cli-0.0.0.tgz
+lpc-toolkit --help
 ```
 
 ## `@lpc-toolkit/core`
@@ -178,11 +195,11 @@ consistent across surfaces.
 `packages/cli/` is the Node runtime surface for agents and scripts. It provides
 commands for:
 
-- catalog exploration: `lpc catalog types`, `lpc catalog items --type <typeName>`
-- selection validation: `lpc selection validate --selection <file>`
-- token conversion: `lpc token encode --selection <file>`, `lpc token decode --token <hash-or-token> --out <file>`
-- presets: `lpc preset list`, `lpc preset materialize <preset-id> --out <file>`, `lpc preset render <preset-id> --out <dir>`
-- rendering: `lpc render --selection <file> --out <dir>`
+- catalog exploration: `lpc-toolkit catalog types`, `lpc-toolkit catalog items --type <typeName>`
+- selection validation: `lpc-toolkit selection validate --selection <file>`
+- token conversion: `lpc-toolkit token encode --selection <file>`, `lpc-toolkit token decode --token <hash-or-token> --out <file>`
+- presets: `lpc-toolkit preset list`, `lpc-toolkit preset materialize <preset-id> --out <file>`, `lpc-toolkit preset render <preset-id> --out <dir>`
+- rendering: `lpc-toolkit render --selection <file> --out <dir>`
 
 CLI rendering writes the composed sheet plus required metadata and credit files,
 with optional animation strips, frame exports, and ZIP bundles.
