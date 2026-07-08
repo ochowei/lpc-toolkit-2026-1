@@ -162,7 +162,7 @@ Add the implementation note under this step after committing:
 - Modify: `packages/cli/src/main.ts`
 - Modify: `README.md`
 
-- [ ] **Step 1: Update the help smoke test first**
+- [x] **Step 1: Update the help smoke test first**
 
 In `packages/cli/test/smoke.test.ts`, change the help assertion from:
 
@@ -177,7 +177,11 @@ expect(writes.join('')).toContain('lpc-toolkit catalog types');
 expect(writes.join('')).not.toContain('  lpc catalog types');
 ```
 
-- [ ] **Step 2: Run the smoke test to verify it fails**
+  - Implementation note: Updated the CLI help smoke assertion to require the displayed `lpc-toolkit` command and reject the stale indented `lpc` example without leaving a stale displayed literal in test source.
+  - Commit: 8a48676f6a4c88943dd7eeb2c0d33899bcc49e74
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- smoke.test.ts` FAIL as expected before help update
+
+- [x] **Step 2: Run the smoke test to verify it fails**
 
 Run:
 
@@ -187,7 +191,11 @@ rtk pnpm --filter @lpc-toolkit/cli test -- smoke.test.ts
 
 Expected: FAIL because help still displays `lpc catalog types`.
 
-- [ ] **Step 3: Update CLI help text**
+  - Implementation note: Confirmed the updated smoke assertion fails against the old displayed `lpc` help examples.
+  - Commit: 8a48676f6a4c88943dd7eeb2c0d33899bcc49e74
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- smoke.test.ts` FAIL as expected
+
+- [x] **Step 3: Update CLI help text**
 
 In `packages/cli/src/main.ts`, replace the `HELP` block with:
 
@@ -208,7 +216,11 @@ Commands:
 `;
 ```
 
-- [ ] **Step 4: Update README CLI usage**
+  - Implementation note: Replaced all displayed command names in the CLI help block with `lpc-toolkit` while leaving argument parsing untouched.
+  - Commit: 8a48676f6a4c88943dd7eeb2c0d33899bcc49e74
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- smoke.test.ts package-metadata.test.ts` PASS
+
+- [x] **Step 4: Update README CLI usage**
 
 In `README.md`, replace the current CLI inspection block:
 
@@ -269,7 +281,11 @@ with:
 - rendering: `lpc-toolkit render --selection <file> --out <dir>`
 ```
 
-- [ ] **Step 5: Search for stale user-facing `lpc` CLI examples**
+  - Implementation note: Updated README CLI inspection, local link, tarball verification, and package command examples to use the installable `lpc-toolkit` command.
+  - Commit: 8a48676f6a4c88943dd7eeb2c0d33899bcc49e74
+  - Verification: stale-example search returned no matches; `rtk pnpm --filter @lpc-toolkit/cli test -- smoke.test.ts package-metadata.test.ts` PASS
+
+- [x] **Step 5: Search for stale user-facing `lpc` CLI examples**
 
 Run:
 
@@ -279,7 +295,11 @@ rtk rg -n "exec lpc|`lpc |  lpc |lpc --help" README.md packages/cli/src packages
 
 Expected: no matches for stale displayed examples. The package metadata test may still contain the string `'lpc'` in `not.toHaveProperty('lpc')`, which is intentional and outside this search pattern.
 
-- [ ] **Step 6: Run focused CLI tests**
+  - Implementation note: Searched README, CLI source, and CLI tests for stale displayed `lpc` examples after the rename.
+  - Commit: 8a48676f6a4c88943dd7eeb2c0d33899bcc49e74
+  - Verification: ``rtk rg -n 'exec lpc|`lpc |  lpc |lpc --help' README.md packages/cli/src packages/cli/test`` returned no matches
+
+- [x] **Step 6: Run focused CLI tests**
 
 Run:
 
@@ -289,7 +309,11 @@ rtk pnpm --filter @lpc-toolkit/cli test -- smoke.test.ts package-metadata.test.t
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit displayed command rename**
+  - Implementation note: Ran the focused CLI test command after the help/docs rename.
+  - Commit: 8a48676f6a4c88943dd7eeb2c0d33899bcc49e74
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- smoke.test.ts package-metadata.test.ts` PASS
+
+- [x] **Step 7: Commit displayed command rename**
 
 Run:
 
@@ -304,6 +328,10 @@ Add the implementation note under this step after committing:
   - Commit: <hash>
   - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- smoke.test.ts package-metadata.test.ts` PASS
 ```
+
+  - Implementation note: Created the displayed command rename implementation commit.
+  - Commit: 8a48676f6a4c88943dd7eeb2c0d33899bcc49e74
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- smoke.test.ts package-metadata.test.ts` PASS
 
 ## Task 3: Verify Build, Pack, And Install Path
 
