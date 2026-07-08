@@ -5,10 +5,13 @@
   "license": "GPL-3.0-or-later",
   "type": "module",
   "bin": {
-    "lpc": "./dist/index.js"
+    "lpc-toolkit": "./dist/index.js"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "build": "pnpm --filter @lpc-toolkit/core build && pnpm --filter @lpc-toolkit/presets build && tsc -p tsconfig.build.json",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && pnpm --filter @lpc-toolkit/core build && pnpm --filter @lpc-toolkit/presets build && tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },
