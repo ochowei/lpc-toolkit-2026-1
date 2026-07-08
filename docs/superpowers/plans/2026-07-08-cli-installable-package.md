@@ -349,7 +349,7 @@ rtk pnpm --filter @lpc-toolkit/cli build
 Expected: PASS. `packages/cli/dist/index.js` exists and starts with `#!/usr/bin/env node`.
 
   - Implementation note: Built the CLI package and confirmed `packages/cli/dist/index.js` exists with the expected Node shebang.
-  - Commit: NEEDS_CONTEXT (git add blocked by sandbox: unable to create `.git/index.lock`)
+  - Commit: 92e86cd28d0db3234795b7e3414cb5bb68ae4632
   - Verification: `rtk pnpm --filter @lpc-toolkit/cli build` PASS; `rtk ls -l packages/cli/dist/index.js` PASS; `rtk sed -n '1p' packages/cli/dist/index.js` returned `#!/usr/bin/env node`
 
 - [x] **Step 2: Verify direct built CLI execution**
@@ -363,7 +363,7 @@ rtk node packages/cli/dist/index.js --help
 Expected: PASS and stdout contains `lpc-toolkit catalog types`.
 
   - Implementation note: Ran the built CLI entrypoint directly through Node and confirmed the help text advertises the installable `lpc-toolkit` command.
-  - Commit: NEEDS_CONTEXT (git add blocked by sandbox: unable to create `.git/index.lock`)
+  - Commit: 92e86cd28d0db3234795b7e3414cb5bb68ae4632
   - Verification: `rtk node packages/cli/dist/index.js --help` PASS; stdout contained `lpc-toolkit catalog types`
 
 - [x] **Step 3: Run CLI tests**
@@ -377,7 +377,7 @@ rtk pnpm --filter @lpc-toolkit/cli test
 Expected: PASS.
 
   - Implementation note: Ran the full CLI Vitest suite after the package build.
-  - Commit: NEEDS_CONTEXT (git add blocked by sandbox: unable to create `.git/index.lock`)
+  - Commit: 92e86cd28d0db3234795b7e3414cb5bb68ae4632
   - Verification: `rtk pnpm --filter @lpc-toolkit/cli test` PASS; 13 test files and 46 tests passed
 
 - [x] **Step 4: Pack the CLI tarball**
@@ -391,7 +391,7 @@ rtk pnpm --filter @lpc-toolkit/cli pack --pack-destination /tmp
 Expected: PASS and output includes `/tmp/lpc-toolkit-cli-0.0.0.tgz`.
 
   - Implementation note: Packed the CLI package to `/tmp` and confirmed pnpm produced the expected tarball path.
-  - Commit: NEEDS_CONTEXT (git add blocked by sandbox: unable to create `.git/index.lock`)
+  - Commit: 92e86cd28d0db3234795b7e3414cb5bb68ae4632
   - Verification: `rtk pnpm --filter @lpc-toolkit/cli pack --pack-destination /tmp` PASS; output included `/tmp/lpc-toolkit-cli-0.0.0.tgz`
 
 - [x] **Step 5: Inspect packed contents**
@@ -419,7 +419,7 @@ package/tsconfig.build.json
 ```
 
   - Implementation note: Inspected the packed tarball and confirmed it includes runtime package metadata and the executable entrypoint while excluding source, tests, and TypeScript config files.
-  - Commit: NEEDS_CONTEXT (git add blocked by sandbox: unable to create `.git/index.lock`)
+  - Commit: 92e86cd28d0db3234795b7e3414cb5bb68ae4632
   - Verification: `rtk tar -tf /tmp/lpc-toolkit-cli-0.0.0.tgz` PASS; include check found `package/package.json` and `package/dist/index.js`; exclude check found no matches for `package/src/`, `package/test/`, `package/tsconfig.json`, or `package/tsconfig.build.json`
 
 - [x] **Step 6: Try one global install workflow when allowed**
@@ -445,7 +445,7 @@ Expected: `lpc-toolkit --help` exits 0 and prints `lpc-toolkit catalog types`.
 If both global workflows are blocked, do not invent another install path. Record the blocker under this step and rely on Steps 1-5 plus direct Node execution as fallback verification.
 
   - Implementation note: Attempted both specified global workflows. The preferred filtered global link was rejected by pnpm before linking. The tarball global install was retried with escalation after an initial sandbox write failure, then pnpm refused the install because `/Users/william/Library/pnpm/bin` is not in PATH.
-  - Commit: NEEDS_CONTEXT (git add blocked by sandbox: unable to create `.git/index.lock`)
+  - Commit: 92e86cd28d0db3234795b7e3414cb5bb68ae4632
   - Verification: `rtk pnpm --filter @lpc-toolkit/cli link --global` BLOCKED with `Unknown option: 'recursive'`; sandboxed `rtk pnpm add -g /tmp/lpc-toolkit-cli-0.0.0.tgz` BLOCKED with `EPERM: operation not permitted, mkdir '/Users/william/Library/pnpm/bin'`; escalated `rtk pnpm add -g /tmp/lpc-toolkit-cli-0.0.0.tgz` BLOCKED with `The configured global bin directory "/Users/william/Library/pnpm/bin" is not in PATH`; fallback direct Node execution from Step 2 PASS
 
 - [x] **Step 7: Run boundary check**
@@ -459,7 +459,7 @@ rtk pnpm check:boundaries
 Expected: PASS. This change touches CLI and README only, but the repository rules request boundary verification for architecture-sensitive areas.
 
   - Implementation note: Ran the repository architecture boundary check after CLI packaging verification.
-  - Commit: NEEDS_CONTEXT (git add blocked by sandbox: unable to create `.git/index.lock`)
+  - Commit: 92e86cd28d0db3234795b7e3414cb5bb68ae4632
   - Verification: `rtk pnpm check:boundaries` PASS
 
 - [x] **Step 8: Commit final verification note if the plan file was updated**
@@ -479,5 +479,5 @@ Add the implementation note under this step after committing:
 ```
 
   - Implementation note: Recorded Task 3 verification results, including the sandbox blocker for global install, in this plan file.
-  - Commit: NEEDS_CONTEXT (git add blocked by sandbox: unable to create `.git/index.lock`)
+  - Commit: 92e86cd28d0db3234795b7e3414cb5bb68ae4632
   - Verification: build PASS; direct CLI help PASS; CLI tests PASS; pack PASS; pack contents PASS; boundary check PASS; global install BLOCKED by pnpm global bin PATH configuration and documented
