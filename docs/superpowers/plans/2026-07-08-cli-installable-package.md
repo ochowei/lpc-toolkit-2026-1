@@ -25,7 +25,7 @@
 - Create: `packages/cli/test/package-metadata.test.ts`
 - Modify: `packages/cli/package.json`
 
-- [ ] **Step 1: Write the failing metadata test**
+- [x] **Step 1: Write the failing metadata test**
 
 Create `packages/cli/test/package-metadata.test.ts`:
 
@@ -78,7 +78,7 @@ describe('CLI package metadata', () => {
 });
 ```
 
-- [ ] **Step 2: Run the metadata test to verify it fails**
+- [x] **Step 2: Run the metadata test to verify it fails**
 
 Run:
 
@@ -88,7 +88,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- package-metadata.test.ts
 
 Expected: FAIL. The current `bin` still exposes `lpc`, `files` is missing, and the build script does not clean `dist/`.
 
-- [ ] **Step 3: Update `packages/cli/package.json`**
+- [x] **Step 3: Update `packages/cli/package.json`**
 
 Replace the current `bin` and `scripts.build`, and add `files`:
 
@@ -125,7 +125,7 @@ Replace the current `bin` and `scripts.build`, and add `files`:
 
 This uses Node's built-in `fs.rmSync`, so no cleanup dependency is added.
 
-- [ ] **Step 4: Run the metadata test to verify it passes**
+- [x] **Step 4: Run the metadata test to verify it passes**
 
 Run:
 
@@ -135,7 +135,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- package-metadata.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit package metadata guard**
+- [x] **Step 5: Commit package metadata guard**
 
 Run:
 
@@ -150,6 +150,10 @@ Add the implementation note under this step after committing:
   - Commit: <hash>
   - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- package-metadata.test.ts` PASS
 ```
+
+  - Implementation note: Added a Vitest guard for CLI package metadata and updated the package to expose only `lpc-toolkit`, pack `dist`, and clean `dist` before build.
+  - Commit: 5b1e7581ac3d5bd5a081ac6057d1a6ff4bb6705d
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- package-metadata.test.ts` PASS
 
 ## Task 2: Rename Displayed CLI Command
 
