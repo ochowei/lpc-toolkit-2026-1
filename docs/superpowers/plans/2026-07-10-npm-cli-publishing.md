@@ -86,7 +86,7 @@
 - Produces: built `dist/asset-release.json`, consumed by Task 2.
 - Preserves: `dist/vendor/@lpc-toolkit/{core,presets}` vendoring and the `lpc-toolkit` bin.
 
-- [ ] **Step 1: Extend the package metadata test first**
+- [x] **Step 1: Extend the package metadata test first**
 
 Add these fields to `CliPackageJson` in `packages/cli/test/package-metadata.test.ts`:
 
@@ -134,7 +134,7 @@ it('packs the npm readme and copied release pin', () => {
 });
 ```
 
-- [ ] **Step 2: Run the metadata test and confirm the intended failure**
+- [x] **Step 2: Run the metadata test and confirm the intended failure**
 
 Run:
 
@@ -144,7 +144,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- package-metadata.test.ts
 
 Expected: FAIL because the package is still private, version `0.0.0`, lacks public metadata, and packs only `dist`.
 
-- [ ] **Step 3: Add the package-version test**
+- [x] **Step 3: Add the package-version test**
 
 Create `packages/cli/test/package-info.test.ts`:
 
@@ -175,7 +175,7 @@ describe('readCliPackageVersion', () => {
 });
 ```
 
-- [ ] **Step 4: Run the package-version test and confirm the intended failure**
+- [x] **Step 4: Run the package-version test and confirm the intended failure**
 
 Run:
 
@@ -185,7 +185,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- package-info.test.ts
 
 Expected: FAIL because `packages/cli/src/package-info.ts` does not exist.
 
-- [ ] **Step 5: Implement public metadata, version loading, and release-pin copying**
+- [x] **Step 5: Implement public metadata, version loading, and release-pin copying**
 
 Create `packages/cli/src/package-info.ts`:
 
@@ -252,7 +252,7 @@ Append `&& node scripts/copy-release-config.mjs` to `scripts.build` after `vendo
 
 Create `packages/cli/README.md` with these exact user-facing facts: Node 22+, `npm install -g @lpc-toolkit/cli`, the `lpc-toolkit` binary, the first asset-dependent command downloads about 205 MB of compressed assets, cache reuse is offline, rendered output always includes attribution, and the package is GPL-3.0-or-later.
 
-- [ ] **Step 6: Run focused tests and build**
+- [x] **Step 6: Run focused tests and build**
 
 Run:
 
@@ -265,7 +265,7 @@ rtk ls -l packages/cli/dist/asset-release.json
 
 Expected: all Vitest cases PASS, typecheck/build exit 0, and the copied release pin exists.
 
-- [ ] **Step 7: Commit Task 1**
+- [x] **Step 7: Commit Task 1**
 
 ```bash
 rtk git add packages/cli/package.json packages/cli/README.md packages/cli/scripts/copy-release-config.mjs packages/cli/src/package-info.ts packages/cli/src/render.ts packages/cli/test/package-info.test.ts packages/cli/test/package-metadata.test.ts
@@ -273,6 +273,12 @@ rtk git commit -m "feat(cli): prepare public npm package"
 ```
 
 After committing, record the exact hash and Step 6 results under Task 1, mark its checkboxes complete, and commit that record separately as required by Global Constraints.
+
+**Implementation record:** Public npm metadata, package-local GPL license, runtime package-version loading, npm README, and release-pin copying were implemented while preserving the `lpc-toolkit` binary and vendored core/presets output.
+
+- Implementation commit: `5fca9d6c7fa7aa3a1b53e28c7c4a48161701c7ea`
+- Verification: focused tests 14/14 PASS; build PASS; `packages/cli/dist/asset-release.json` exists; `rtk proxy pnpm --filter @lpc-toolkit/cli typecheck` PASS.
+- Tooling note: direct `rtk pnpm --filter @lpc-toolkit/cli typecheck` reported no TypeScript errors but returned exit 1 because this RTK version does not support filtered pnpm-to-tsc optimization; raw-proxy mode preserved the same pnpm command and returned exit 0.
 
 ---
 
