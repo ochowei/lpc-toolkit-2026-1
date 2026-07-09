@@ -29,7 +29,7 @@ test.describe('replacement card display modes', () => {
         window.sessionStorage.setItem(initializedKey, 'true');
       }
     }, STORAGE_KEY);
-    await page.goto('/?assetSource=zip');
+    await page.goto('/compose?assetSource=zip');
     await expect(page.getByTestId('composition-loading-overlay'))
       .toBeHidden({ timeout: 30_000 });
   });

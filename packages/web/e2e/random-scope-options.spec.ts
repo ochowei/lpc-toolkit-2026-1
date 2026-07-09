@@ -9,7 +9,7 @@ test('preset random actions can be triggered repeatedly without page errors', as
 }) => {
   const errors = attachConsoleCollector(page);
 
-  await page.goto('/?assetSource=zip');
+  await page.goto('/compose?assetSource=zip');
 
   const overlay = page.getByTestId('composition-loading-overlay');
   await expect(page.getByRole('button', { name: 'Presets' })).toBeVisible({

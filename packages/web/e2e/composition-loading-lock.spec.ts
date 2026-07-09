@@ -43,7 +43,7 @@ test.describe('composition loading lock', () => {
     const errors = attachConsoleCollector(page);
     const gate = createZipGate();
     await page.route('**/zips/*.zip', (route) => gate.handler(route));
-    await page.goto('/');
+    await page.goto('/compose');
 
     const overlay = page.getByTestId('composition-loading-overlay');
     await gate.waitUntilBlocked();
@@ -63,7 +63,7 @@ test.describe('composition loading lock', () => {
 
   test('retains the old preview and locks presets during replacement composition', async ({ page }) => {
     const errors = attachConsoleCollector(page);
-    await page.goto('/');
+    await page.goto('/compose');
 
     const overlay = page.getByTestId('composition-loading-overlay');
     await expect(overlay).toBeHidden({ timeout: 30_000 });
@@ -90,7 +90,7 @@ test.describe('composition loading lock', () => {
 
   test('defers Back selection until composition unlocks without replacing history', async ({ page }) => {
     const errors = attachConsoleCollector(page);
-    await page.goto('/?e2eProbe=1');
+    await page.goto('/compose?e2eProbe=1');
 
     const overlay = page.getByTestId('composition-loading-overlay');
     await expect(overlay).toBeHidden({ timeout: 30_000 });
@@ -125,7 +125,7 @@ test.describe('composition loading lock', () => {
 
   test('defers Back to the default empty hash until composition unlocks', async ({ page }) => {
     const errors = attachConsoleCollector(page);
-    await page.goto('/?e2eProbe=1');
+    await page.goto('/compose?e2eProbe=1');
 
     const overlay = page.getByTestId('composition-loading-overlay');
     await expect(overlay).toBeHidden({ timeout: 30_000 });
