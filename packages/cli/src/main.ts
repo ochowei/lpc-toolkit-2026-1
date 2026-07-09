@@ -24,16 +24,16 @@ export interface CliIo {
 const HELP = `lpc-toolkit CLI
 
 Commands:
-  lpc catalog types
-  lpc catalog items --type <typeName>
-  lpc catalog item <item-id-or-type/name>
-  lpc selection validate --selection <file>
-  lpc render --selection <file> --out <dir>
-  lpc token decode --token <hash-or-token> --out <file>
-  lpc token encode --selection <file>
-  lpc preset list
-  lpc preset materialize <preset-id> --out <file>
-  lpc preset render <preset-id> --out <dir>
+  lpc-toolkit catalog types
+  lpc-toolkit catalog items --type <typeName>
+  lpc-toolkit catalog item <item-id-or-type/name>
+  lpc-toolkit selection validate --selection <file>
+  lpc-toolkit render --selection <file> --out <dir>
+  lpc-toolkit token decode --token <hash-or-token> --out <file>
+  lpc-toolkit token encode --selection <file>
+  lpc-toolkit preset list
+  lpc-toolkit preset materialize <preset-id> --out <file>
+  lpc-toolkit preset render <preset-id> --out <dir>
 `;
 
 function writeResponse(

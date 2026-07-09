@@ -17,12 +17,6 @@ importers:
 
   packages/cli:
     dependencies:
-      '@lpc-toolkit/core':
-        specifier: workspace:*
-        version: link:../core
-      '@lpc-toolkit/presets':
-        specifier: workspace:*
-        version: link:../presets
       '@napi-rs/canvas':
         specifier: ^1.0.0
         version: 1.0.0
@@ -30,6 +24,12 @@ importers:
         specifier: ^3.10.1
         version: 3.10.1
     devDependencies:
+      '@lpc-toolkit/core':
+        specifier: workspace:*
+        version: link:../core
+      '@lpc-toolkit/presets':
+        specifier: workspace:*
+        version: link:../presets
       '@types/node':
         specifier: ^25.8.0
         version: 25.8.0
