@@ -33,6 +33,10 @@
 
 ## Task 1: Add Pure Route Helper
 
+- [x] Implemented pure route helper and focused tests.
+  - Commit: 4160398663e58e6042a530e665bb49695fdff971
+  - Verification: route helper test PASS; spec review PASS; code quality review PASS
+
 **Files:**
 - Create: `packages/web/src/lib/app-route.ts`
 - Create: `packages/web/test/app-route.test.ts`
@@ -125,6 +129,10 @@ After commit, update this task checkbox with:
 ```
 
 ## Task 2: Add Landing and 404 Components
+
+- [x] Implemented landing and 404 components with focused render tests.
+  - Commit: 0a4ba066c480f75af9ff51191b7fc46a3c5b9f88
+  - Verification: landing and 404 component tests PASS; spec review PASS; code quality review PASS
 
 **Files:**
 - Create: `packages/web/src/components/landing-page.tsx`
@@ -352,6 +360,10 @@ After commit, update this task checkbox with:
 
 ## Task 3: Wire Routes in App and Update Vercel Fallback
 
+- [x] Wired App routes and updated Vercel fallback.
+  - Commit: 8cff438d59d74c0753042cdbdb64cbaa1efff572
+  - Verification: focused route/page tests PASS; web typecheck PASS; spec review PASS; code quality review PASS
+
 **Files:**
 - Modify: `packages/web/src/App.tsx`
 - Modify: `packages/web/vercel.json`
@@ -536,6 +548,10 @@ After commit, update this task checkbox with:
 ```
 
 ## Task 4: Full Verification
+
+- [x] Ran final verification and recorded implementation notes.
+  - Commit: 008e05c07f091b9b923d448aa213cf7849ee62d1
+  - Verification: web build PASS; boundary check PASS
 
 **Files:**
 - Modify: `docs/superpowers/plans/2026-07-09-local-landing-page.md`
