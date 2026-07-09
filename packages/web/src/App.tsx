@@ -1,4 +1,4 @@
-import { useMemo, useReducer, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 import { loadCatalogFromUpstream } from './catalog/load-catalog';
 import { loadPalettesFromUpstream } from './catalog/load-palettes';
 import {
@@ -12,13 +12,39 @@ import {
   type Locale,
 } from './i18n';
 import { LayerStackHarness } from './components/layer-stack/harness';
+import { LandingPage } from './components/landing-page';
+import { NotFoundPage } from './components/not-found-page';
 import {
   bootstrapStateFromHash,
   readWindowHash,
 } from './lib/url-hash-sync';
+import {
+  pathForRoute,
+  routeFromPathname,
+  type AppPath,
+  type NavigableAppRoute,
+} from './lib/app-route';
 
-/** Root application shell that loads upstream data and owns global UI state. */
-export default function App() {
+function useAppPathname(): [string, (path: AppPath) => void] {
+  const [pathname, setPathname] = useState(() => window.location.pathname);
+
+  useEffect(() => {
+    const handlePopState = () => setPathname(window.location.pathname);
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const navigate = useCallback((path: AppPath) => {
+    if (window.location.pathname !== path) {
+      window.history.pushState(null, '', path);
+    }
+    setPathname(window.location.pathname);
+  }, []);
+
+  return [pathname, navigate];
+}
+
+function ComposerApp() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE);
 
@@ -67,4 +93,26 @@ export default function App() {
       }
     />
   );
+}
+
+/** Root application shell that routes between landing, composer, and 404 pages. */
+export default function App() {
+  const [pathname, navigate] = useAppPathname();
+  const route = routeFromPathname(pathname);
+
+  document.documentElement.className = 'lpc dark';
+
+  const navigateToRoute = (routeName: NavigableAppRoute) => {
+    navigate(pathForRoute(routeName));
+  };
+
+  if (route === 'compose') {
+    return <ComposerApp />;
+  }
+
+  if (route === 'not-found') {
+    return <NotFoundPage onNavigate={navigate} />;
+  }
+
+  return <LandingPage onNavigate={navigateToRoute} />;
 }
