@@ -24,6 +24,7 @@ import {
 import { createRuntimeContext } from './context.js';
 import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
 import { createNodeCanvasAdapter, writeCanvasPng } from './node-canvas-adapter.js';
+import { CLI_VERSION } from './package-info.js';
 import type { CliIssue } from './response.js';
 import { parseSelectionJson, type SelectionJson } from './selection.js';
 import { validateSelections } from './validation.js';
@@ -293,7 +294,7 @@ export async function renderSelection(
   }
   const metadata = {
     schema: 'lpc-toolkit.render-metadata.v1',
-    cliVersion: '0.0.0',
+    cliVersion: CLI_VERSION,
     selection: options.selectionJson,
     artifacts,
     sheet: {

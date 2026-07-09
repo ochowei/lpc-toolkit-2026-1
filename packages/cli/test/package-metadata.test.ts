@@ -4,6 +4,16 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 interface CliPackageJson {
+  readonly name?: string;
+  readonly version?: string;
+  readonly private?: boolean;
+  readonly description?: string;
+  readonly engines?: Readonly<Record<string, string>>;
+  readonly license?: string;
+  readonly publishConfig?: Readonly<Record<string, string>>;
+  readonly repository?: Readonly<{ readonly type: string; readonly url: string }>;
+  readonly homepage?: string;
+  readonly bugs?: Readonly<{ readonly url: string }>;
   readonly bin?: Record<string, string>;
   readonly dependencies?: Record<string, string>;
   readonly files?: readonly string[];
@@ -18,6 +28,26 @@ function readCliPackageJson(): CliPackageJson {
 }
 
 describe('CLI package metadata', () => {
+  it('declares public npm release metadata', () => {
+    const packageJson = readCliPackageJson();
+
+    expect(packageJson).toMatchObject({
+      name: '@lpc-toolkit/cli',
+      version: '0.1.0',
+      description: expect.stringContaining('LPC'),
+      engines: { node: '>=22' },
+      license: 'GPL-3.0-or-later',
+      publishConfig: { access: 'public' },
+      repository: {
+        type: 'git',
+        url: 'https://github.com/ochowei/lpc-toolkit-2026-1',
+      },
+      homepage: 'https://github.com/ochowei/lpc-toolkit-2026-1#readme',
+      bugs: { url: 'https://github.com/ochowei/lpc-toolkit-2026-1/issues' },
+    });
+    expect(packageJson.private).not.toBe(true);
+  });
+
   it('exposes only the lpc-toolkit command', () => {
     const packageJson = readCliPackageJson();
 
@@ -30,11 +60,26 @@ describe('CLI package metadata', () => {
   it('packs only runtime artifacts and required metadata', () => {
     const packageJson = readCliPackageJson();
 
-    expect(packageJson.files).toEqual(['dist']);
+    expect(packageJson.files).toEqual(['dist', 'README.md']);
     expect(packageJson.files).not.toContain('src');
     expect(packageJson.files).not.toContain('test');
     expect(packageJson.files).not.toContain('tsconfig.json');
     expect(packageJson.files).not.toContain('tsconfig.build.json');
+  });
+
+  it('packs the npm readme and copied release pin', () => {
+    const packageJson = readCliPackageJson();
+
+    expect(packageJson.files).toEqual(['dist', 'README.md']);
+    expect(packageJson.scripts?.build).toContain('node scripts/copy-release-config.mjs');
+  });
+
+  it('includes a package-local copy of the GPL license', () => {
+    const testDir = path.dirname(fileURLToPath(import.meta.url));
+    const packageLicense = readFileSync(path.resolve(testDir, '../LICENSE'), 'utf8');
+    const rootLicense = readFileSync(path.resolve(testDir, '../../../LICENSE'), 'utf8');
+
+    expect(packageLicense).toBe(rootLicense);
   });
 
   it('vendors workspace runtime dependencies for local tarball installs', () => {
