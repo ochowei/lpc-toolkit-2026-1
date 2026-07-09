@@ -7,7 +7,7 @@ const RANDOM_CLICKS = 20;
 test('clicking random 20 times produces no console errors', async ({ page }) => {
   const errors = attachConsoleCollector(page);
 
-  await page.goto('/?assetSource=zip');
+  await page.goto('/compose?assetSource=zip');
 
   await expect(page.getByRole('button', { name: 'Presets' })).toBeVisible({
     timeout: 30_000,

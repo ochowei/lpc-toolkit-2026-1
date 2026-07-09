@@ -21,7 +21,7 @@ test.describe('responsive layout', () => {
   test('mobile opens to preview and can switch to layers', async ({ page }) => {
     const errors = attachConsoleCollector(page);
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/?assetSource=zip');
+    await page.goto('/compose?assetSource=zip');
 
     await expect(page.getByRole('navigation', { name: 'Mobile view' })).toBeVisible();
     await expect(page.getByRole('separator', { name: 'Resize sidebar' })).toBeHidden();
@@ -46,7 +46,7 @@ test.describe('responsive layout', () => {
   test('desktop keeps the two-column editor and hides mobile nav', async ({ page }) => {
     const errors = attachConsoleCollector(page);
     await page.setViewportSize({ width: 1280, height: 900 });
-    await page.goto('/?assetSource=zip');
+    await page.goto('/compose?assetSource=zip');
 
     await expect(page.getByRole('navigation', { name: 'Mobile view' })).toBeHidden();
     await expect(page.getByText('Your layers')).toBeVisible();
@@ -69,7 +69,7 @@ test.describe('responsive layout', () => {
       }
     }, SIDEBAR_STORAGE_KEY);
     await page.setViewportSize({ width: 1280, height: 900 });
-    await page.goto('/?assetSource=zip');
+    await page.goto('/compose?assetSource=zip');
 
     const separator = page.getByRole('separator', { name: 'Resize sidebar' });
     const box = await separator.boundingBox();
@@ -101,7 +101,7 @@ test.describe('responsive layout', () => {
   test('desktop drag cleanup restores body styles when switching to mobile', async ({ page }) => {
     const errors = attachConsoleCollector(page);
     await page.setViewportSize({ width: 1280, height: 900 });
-    await page.goto('/?assetSource=zip');
+    await page.goto('/compose?assetSource=zip');
 
     const separator = page.getByRole('separator', { name: 'Resize sidebar' });
     const box = await separator.boundingBox();
@@ -125,7 +125,7 @@ test.describe('responsive layout', () => {
       window.localStorage.removeItem(storageKey);
     }, SIDEBAR_STORAGE_KEY);
     await page.setViewportSize({ width: 1280, height: 900 });
-    await page.goto('/?assetSource=zip');
+    await page.goto('/compose?assetSource=zip');
 
     const separator = page.getByRole('separator', { name: 'Resize sidebar' });
     await separator.focus();
@@ -156,7 +156,7 @@ test.describe('responsive layout', () => {
       window.localStorage.setItem(storageKey, '640');
     }, SIDEBAR_STORAGE_KEY);
     await page.setViewportSize({ width: 900, height: 900 });
-    await page.goto('/?assetSource=zip');
+    await page.goto('/compose?assetSource=zip');
 
     await expectSidebarWidth(page, 574);
     await expect(page.locator('main')).toBeVisible();
@@ -172,7 +172,7 @@ test.describe('responsive layout', () => {
       window.localStorage.setItem(storageKey, '640');
     }, SIDEBAR_STORAGE_KEY);
     await page.setViewportSize({ width: 900, height: 900 });
-    await page.goto('/?assetSource=zip');
+    await page.goto('/compose?assetSource=zip');
 
     const separator = page.getByRole('separator', { name: 'Resize sidebar' });
     await expectSidebarWidth(page, 574);
@@ -199,7 +199,7 @@ test.describe('responsive layout', () => {
       window.localStorage.setItem(storageKey, '640');
     }, SIDEBAR_STORAGE_KEY);
     await page.setViewportSize({ width: 900, height: 900 });
-    await page.goto('/?assetSource=zip');
+    await page.goto('/compose?assetSource=zip');
 
     const separator = page.getByRole('separator', { name: 'Resize sidebar' });
     await expectSidebarWidth(page, 574);
@@ -229,7 +229,7 @@ test.describe('responsive layout', () => {
       window.localStorage.setItem(storageKey, '640');
     }, SIDEBAR_STORAGE_KEY);
     await page.setViewportSize({ width: 900, height: 900 });
-    await page.goto('/?assetSource=zip');
+    await page.goto('/compose?assetSource=zip');
 
     const separator = page.getByRole('separator', { name: 'Resize sidebar' });
     await expectSidebarWidth(page, 574);
@@ -278,7 +278,7 @@ test.describe('responsive layout', () => {
       window.localStorage.setItem(storageKey, '520');
     }, SIDEBAR_STORAGE_KEY);
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/?assetSource=zip');
+    await page.goto('/compose?assetSource=zip');
 
     const separator = page.getByRole('separator', { name: 'Resize sidebar' });
     await expect(separator).toBeHidden();
@@ -292,7 +292,7 @@ test.describe('responsive layout', () => {
   test('mobile download popover fits within the viewport', async ({ page }) => {
     const errors = attachConsoleCollector(page);
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/?assetSource=zip');
+    await page.goto('/compose?assetSource=zip');
 
     await page.getByRole('button', { name: /Download/ }).click();
     const panel = page.getByTestId('download-popover');

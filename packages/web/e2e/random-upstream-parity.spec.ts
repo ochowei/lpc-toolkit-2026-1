@@ -57,7 +57,7 @@ async function makeSeededRandomHash(
 
   try {
     await installSeededRandom(page, randomCase.seed);
-    await page.goto('/?assetSource=zip&e2eProbe=1');
+    await page.goto('/compose?assetSource=zip&e2eProbe=1');
     await expect
       .poll(
         () =>
