@@ -613,3 +613,9 @@ After commit, update this task checkbox with:
   includes concrete file content or concrete replacements.
 - Type consistency: `AppRoute`, `NavigableAppRoute`, and `AppPath` are defined
   in Task 1 and used consistently by Tasks 2 and 3.
+
+## Final Review Follow-up
+
+- [x] Added App shell route coverage after final review.
+  - Commit: 94f956fd5d234ecbd19ca6ca064b4cb089f58be1
+  - Verification: focused route/page tests PASS; web typecheck PASS; web build PASS; boundary check PASS
