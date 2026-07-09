@@ -550,7 +550,7 @@ After commit, update this task checkbox with:
 ## Task 4: Full Verification
 
 - [x] Ran final verification and recorded implementation notes.
-  - Commit: 008e05c07f091b9b923d448aa213cf7849ee62d1
+  - Commit: 58caa618540cccbd6dc161115dae51733aa1fe64
   - Verification: web build PASS; boundary check PASS
 
 **Files:**
