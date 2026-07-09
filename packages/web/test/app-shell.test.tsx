@@ -1,0 +1,127 @@
+import { renderToStaticMarkup } from 'react-dom/server';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import App from '../src/App';
+
+const mocks = vi.hoisted(() => ({
+  loadCatalogFromUpstream: vi.fn(),
+  loadPalettesFromUpstream: vi.fn(),
+  pickInitialSelections: vi.fn(),
+  sliceReducer: vi.fn(),
+  bootstrapStateFromHash: vi.fn(),
+  readWindowHash: vi.fn(),
+}));
+
+vi.mock('../src/catalog/load-catalog', () => ({
+  loadCatalogFromUpstream: mocks.loadCatalogFromUpstream,
+}));
+
+vi.mock('../src/catalog/load-palettes', () => ({
+  loadPalettesFromUpstream: mocks.loadPalettesFromUpstream,
+}));
+
+vi.mock('../src/slice/selection', () => ({
+  pickInitialSelections: mocks.pickInitialSelections,
+  sliceReducer: mocks.sliceReducer,
+}));
+
+vi.mock('../src/lib/url-hash-sync', () => ({
+  bootstrapStateFromHash: mocks.bootstrapStateFromHash,
+  readWindowHash: mocks.readWindowHash,
+}));
+
+vi.mock('../src/components/layer-stack/harness', () => ({
+  LayerStackHarness: () => <div>Composer Harness</div>,
+}));
+
+interface MockWindow {
+  location: {
+    pathname: string;
+    hash: string;
+  };
+  history: {
+    pushState: ReturnType<typeof vi.fn>;
+  };
+  addEventListener: ReturnType<typeof vi.fn>;
+  removeEventListener: ReturnType<typeof vi.fn>;
+}
+
+function setLocation(pathname: string): void {
+  const mockWindow: MockWindow = {
+    location: { pathname, hash: '' },
+    history: {
+      pushState: vi.fn((_state: unknown, _title: string, path: string) => {
+        mockWindow.location.pathname = path;
+      }),
+    },
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  };
+
+  vi.stubGlobal('window', mockWindow);
+  vi.stubGlobal('document', { documentElement: { className: '' } });
+}
+
+describe('App shell routing', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+
+    const defaultState = {
+      bodyType: 'male',
+      selections: {},
+      anim: 'walk',
+      dir: 'down',
+      playing: true,
+      zoom: 4,
+      layout: 'single',
+    };
+    const catalog = { types: new Map(), items: new Map() };
+    const palettes = {};
+
+    mocks.loadCatalogFromUpstream.mockReturnValue(catalog);
+    mocks.loadPalettesFromUpstream.mockReturnValue(palettes);
+    mocks.pickInitialSelections.mockReturnValue({
+      state: defaultState,
+      shownTypeNames: [],
+    });
+    mocks.bootstrapStateFromHash.mockReturnValue({
+      state: defaultState,
+      warnings: [],
+    });
+    mocks.readWindowHash.mockReturnValue('');
+    mocks.sliceReducer.mockImplementation((state) => state);
+  });
+
+  it('renders the landing page without initializing composer data on /', () => {
+    setLocation('/');
+
+    const html = renderToStaticMarkup(<App />);
+
+    expect(html).toContain('LPC Toolkit');
+    expect(html).toContain('CLI quick start');
+    expect(html).not.toContain('Composer Harness');
+    expect(mocks.loadCatalogFromUpstream).not.toHaveBeenCalled();
+    expect(mocks.loadPalettesFromUpstream).not.toHaveBeenCalled();
+  });
+
+  it('renders the composer and initializes composer data on /compose', () => {
+    setLocation('/compose');
+
+    const html = renderToStaticMarkup(<App />);
+
+    expect(html).toContain('Composer Harness');
+    expect(mocks.loadCatalogFromUpstream).toHaveBeenCalledTimes(1);
+    expect(mocks.loadPalettesFromUpstream).toHaveBeenCalledTimes(1);
+    expect(mocks.bootstrapStateFromHash).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders a 404 page without initializing composer data on unknown paths', () => {
+    setLocation('/missing');
+
+    const html = renderToStaticMarkup(<App />);
+
+    expect(html).toContain('Page not found');
+    expect(html).not.toContain('Composer Harness');
+    expect(mocks.loadCatalogFromUpstream).not.toHaveBeenCalled();
+    expect(mocks.loadPalettesFromUpstream).not.toHaveBeenCalled();
+  });
+});
