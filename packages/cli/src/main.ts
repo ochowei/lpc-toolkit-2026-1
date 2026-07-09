@@ -8,8 +8,8 @@ import { readSelectionJsonFile, renderSelection } from './render.js';
 import {
   commandError,
   commandOk,
+  formatHumanResponse,
   formatJsonResponse,
-  humanIssue,
   type CliResponse,
 } from './response.js';
 import { runSelectionCommand } from './selection-commands.js';
@@ -45,9 +45,9 @@ function writeResponse(
   if (flagBoolean(parsed.flags, 'json')) {
     io.stdout(formatJsonResponse(response));
   } else if (response.ok) {
-    io.stdout(humanSuccess);
+    io.stdout(formatHumanResponse(response, humanSuccess));
   } else {
-    io.stderr(`${response.errors.map(humanIssue).join('\n')}\n`);
+    io.stderr(formatHumanResponse(response, humanSuccess));
   }
   return response.ok ? 0 : 1;
 }
