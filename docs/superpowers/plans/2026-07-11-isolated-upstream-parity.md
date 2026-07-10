@@ -178,7 +178,7 @@ from that validated checkout.
 - Parity config retains `testMatch: /random-upstream-parity\.spec\.ts/`, resolves the source through `requireIsolatedParityDir`, and starts upstream with its npm script from that absolute directory.
 - Both configs retain the current browser project, timeouts, reporter, trace, screenshot, video, and ports.
 
-- [ ] **Step 1: Add failing static configuration contracts**
+- [x] **Step 1: Add failing static configuration contracts**
 
 Extend `packages/web/test/package-scripts.test.ts` to read both config files and assert:
 
@@ -195,13 +195,13 @@ expect(parityPlaywrightConfig).not.toContain('../../upstream');
 
 Also assert the ordinary config contains only one `command:` occurrence and the parity config contains two.
 
-- [ ] **Step 2: Run the package-script test and verify RED**
+- [x] **Step 2: Run the package-script test and verify RED**
 
 Run: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/package-scripts.test.ts`
 
 Expected: FAIL because the general config still starts `../../upstream` and does not ignore the parity spec.
 
-- [ ] **Step 3: Make general E2E toolkit-only**
+- [x] **Step 3: Make general E2E toolkit-only**
 
 In `playwright.config.ts`, add:
 
@@ -211,7 +211,7 @@ testIgnore: /random-upstream-parity\.spec\.ts/,
 
 Replace the `webServer` array with the existing toolkit server as a single object. Do not change the toolkit command or port.
 
-- [ ] **Step 4: Point parity E2E at the isolated directory**
+- [x] **Step 4: Point parity E2E at the isolated directory**
 
 In `playwright.parity.config.ts`, compute `repoRoot` from `import.meta.url`, call `requireIsolatedParityDir(repoRoot)`, and construct the upstream entry as:
 
@@ -228,7 +228,7 @@ In `playwright.parity.config.ts`, compute `repoRoot` from `import.meta.url`, cal
 
 Include a nearby comment containing `LPC_UPSTREAM_PARITY_DIR` so the config's required source is discoverable. Do not weaken `testMatch`.
 
-- [ ] **Step 5: Run focused tests, typecheck, and ordinary E2E**
+- [x] **Step 5: Run focused tests, typecheck, and ordinary E2E**
 
 Run:
 
@@ -240,7 +240,7 @@ rtk pnpm --filter @lpc-toolkit/web test:e2e
 
 Expected: PASS; ordinary E2E starts only port `5173` and does not run `random-upstream-parity.spec.ts`.
 
-- [ ] **Step 6: Commit the Playwright split**
+- [x] **Step 6: Commit the Playwright split**
 
 ```bash
 rtk git add packages/web/playwright.config.ts packages/web/playwright.parity.config.ts packages/web/test/package-scripts.test.ts
@@ -248,6 +248,13 @@ rtk git commit -m "test(web): isolate upstream parity config"
 ```
 
 After committing, mark this task complete and add its implementation note, commit hash, and focused verification result below the checkbox list.
+
+Implementation note: Split ordinary Playwright execution from upstream parity so the
+default config starts only the toolkit server and ignores the parity spec, while the
+parity config validates and starts the isolated `LPC_UPSTREAM_PARITY_DIR` checkout.
+
+- Commit: `71a3192e16bb0ddc5ac725fa6bab4a2dad797c7d`
+- Verification: focused Vitest (`11 passed`), web typecheck PASS, ordinary Playwright E2E (`24 passed`) with no parity spec executed.
 
 ## Task 3: Materialize and run isolated parity in CI
 
