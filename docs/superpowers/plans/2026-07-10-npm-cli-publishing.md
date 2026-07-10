@@ -443,6 +443,8 @@ After committing, record the exact hash and Step 4 results under Task 2, mark it
 - Implementation commit: `2e95e3721e11b46877fec15a902e1e02e584b8f4`
 - Verification: focused release tests 9/9 PASS; equivalent package-scoped CLI typecheck PASS.
 - Tooling note: direct `rtk pnpm --filter @lpc-toolkit/cli typecheck` reported no TypeScript errors but returned exit 1 because this RTK version does not support filtered pnpm-to-tsc optimization; `rtk pnpm -C packages/cli typecheck` ran the equivalent CLI package typecheck and returned exit 0.
+- Review-fix commit: `95a500d4c7a10d5994c3f982880a11d087bf1a2f`
+- Review-fix verification: focused release tests 13/13 PASS; equivalent package-scoped CLI typecheck PASS with exit 0.
 
 ---
 
