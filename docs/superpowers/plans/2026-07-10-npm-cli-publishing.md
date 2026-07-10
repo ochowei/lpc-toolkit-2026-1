@@ -1149,7 +1149,7 @@ its checkboxes complete, and commit that record separately.
 - Produces: `pnpm --filter @lpc-toolkit/cli test:package`, a cross-platform install smoke command.
 - Does not download production LPC assets.
 
-- [ ] **Step 1: Add package-script metadata expectations**
+- [x] **Step 1: Add package-script metadata expectations**
 
 Extend the existing package metadata test:
 
@@ -1160,7 +1160,7 @@ it('defines the cross-platform packed install smoke command', () => {
 });
 ```
 
-- [ ] **Step 2: Run the metadata test and confirm the intended failure**
+- [x] **Step 2: Run the metadata test and confirm the intended failure**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/cli test -- package-metadata.test.ts
@@ -1168,7 +1168,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- package-metadata.test.ts
 
 Expected: FAIL because `test:package` is not defined.
 
-- [ ] **Step 3: Implement the isolated packed-install smoke script**
+- [x] **Step 3: Implement the isolated packed-install smoke script**
 
 Create `packages/cli/scripts/smoke-packed-cli.mjs`. It must:
 
@@ -1192,7 +1192,7 @@ Add to `packages/cli/package.json`:
 "test:package": "node scripts/smoke-packed-cli.mjs"
 ```
 
-- [ ] **Step 4: Run the package smoke locally**
+- [x] **Step 4: Run the package smoke locally**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/cli build
@@ -1201,7 +1201,7 @@ rtk pnpm --filter @lpc-toolkit/cli test:package
 
 Expected: the tarball is installed into a temporary prefix, help exits 0, package contents pass, and the script exits 0.
 
-- [ ] **Step 5: Add the CLI CI matrix**
+- [x] **Step 5: Add the CLI CI matrix**
 
 Extend the `changes` job with a `cli` output and filter covering:
 
@@ -1245,7 +1245,7 @@ cli-package:
     - run: pnpm --filter @lpc-toolkit/cli test:package
 ```
 
-- [ ] **Step 6: Run workflow and boundary verification**
+- [x] **Step 6: Run workflow and boundary verification**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/cli test -- package-metadata.test.ts
@@ -1256,7 +1256,7 @@ rtk pnpm check:boundaries
 Expected: PASS. Also inspect `.github/workflows/ci.yml` to confirm no `npm install`
 or `pnpm install` command runs inside `upstream/` for the new CLI job.
 
-- [ ] **Step 7: Commit Task 6**
+- [x] **Step 7: Commit Task 6**
 
 ```bash
 rtk git add .github/workflows/ci.yml packages/cli/package.json packages/cli/scripts/smoke-packed-cli.mjs packages/cli/test/package-metadata.test.ts
@@ -1264,6 +1264,14 @@ rtk git commit -m "ci(cli): test packed installs across platforms"
 ```
 
 After committing, record the exact hash and Step 6 results under Task 6, mark its checkboxes complete, and commit that record separately.
+
+**Implementation record:**
+
+- Implementation: `659c1db22cf11b88c6cfb62619a199585214fdbb` (`ci(cli): test packed installs across platforms`).
+- Verification: package metadata tests 10/10 PASS; full CLI tests 124 PASS / 1 Windows-only platform skip on the non-Windows host; CLI typecheck PASS via RTK's documented raw proxy because the filtered TypeScript optimizer returned a false nonzero status; architecture boundaries PASS; CLI build PASS; isolated packed install PASS.
+- Package verification: the tarball contained the bundled asset release pin, vendored core and presets, README, GPL license, and package metadata; it excluded `src/`, `test/`, and TypeScript configuration files; installed help exited 0 and contained `lpc-toolkit catalog types` without downloading production LPC assets.
+- Workflow verification: the CLI change filter and Ubuntu/macOS/Windows matrix are present; the new CLI job installs only at the repository root and does not install inside `upstream/`; YAML parsing and diff checks PASS.
+- Platform note: the packed-install smoke passed locally on macOS; actual Linux, macOS, and Windows executions are provided by the added CI matrix.
 
 ---
 
