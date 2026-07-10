@@ -461,7 +461,7 @@ After committing, record the exact hash and Step 4 results under Task 2, mark it
 - Produces cache files: verified `asset-manifest.json`, `CREDITS.csv`, `zips/*.zip`, expanded definitions, derived `sprite-index.json`, and `metadata-index.json` containing hashes for every expanded definition.
 - Used by: Task 4 ZIP store and Task 5 runtime orchestration.
 
-- [ ] **Step 1: Create deterministic release fixture helpers**
+- [x] **Step 1: Create deterministic release fixture helpers**
 
 Create `packages/cli/test/helpers/asset-release-fixture.ts` exporting:
 
@@ -486,7 +486,7 @@ JSON file. It must include `CREDITS.csv`, compute every SHA-256 using
 buffer. The injected `readTarEntry` returns buffers from `tarEntries`, allowing
 unit tests to avoid the system `tar` executable.
 
-- [ ] **Step 2: Write cache lifecycle tests**
+- [x] **Step 2: Write cache lifecycle tests**
 
 Create `packages/cli/test/asset-cache.test.ts` covering these exact outcomes:
 
@@ -515,7 +515,7 @@ expect(existsSync(result.layout.metadataIndexPath)).toBe(true);
 expect(existsSync(path.join(cacheRoot, 'assets.tar.gz'))).toBe(false);
 ```
 
-- [ ] **Step 3: Run the cache tests and confirm the intended failure**
+- [x] **Step 3: Run the cache tests and confirm the intended failure**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-cache.test.ts
@@ -523,7 +523,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- asset-cache.test.ts
 
 Expected: FAIL because the cache manager does not exist.
 
-- [ ] **Step 4: Implement typed cache contracts and integrity helpers**
+- [x] **Step 4: Implement typed cache contracts and integrity helpers**
 
 Start `packages/cli/src/asset-cache.ts` with these exact contracts:
 
@@ -591,7 +591,7 @@ export function validateAssetCache(
 
 Use `createHash('sha256')`, strict manifest object checks, `ensureInsideDirectory`, and `AssetCacheError` for all expected failures. `assetCacheErrorIssue(error)` must return `{ code, message, path? }` for `AssetCacheError` and `{ code: 'asset_cache_failed', message }` otherwise.
 
-- [ ] **Step 5: Implement staged preparation and safe extraction**
+- [x] **Step 5: Implement staged preparation and safe extraction**
 
 Implement `ensureAssetCache` in this order:
 
@@ -646,7 +646,7 @@ When publishing, if the final directory already exists, validate it. Keep the
 valid winner and discard staging; remove and replace only an invalid final
 directory. Use `renameSync` only after staging validation.
 
-- [ ] **Step 6: Run focused cache verification**
+- [x] **Step 6: Run focused cache verification**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-cache.test.ts
@@ -655,7 +655,7 @@ rtk pnpm --filter @lpc-toolkit/cli typecheck
 
 Expected: PASS and exit 0.
 
-- [ ] **Step 7: Commit Task 3**
+- [x] **Step 7: Commit Task 3**
 
 ```bash
 rtk git add packages/cli/src/asset-cache.ts packages/cli/test/asset-cache.test.ts packages/cli/test/helpers/asset-release-fixture.ts
@@ -663,6 +663,14 @@ rtk git commit -m "feat(cli): cache verified compressed assets"
 ```
 
 After committing, record the exact hash and Step 6 results under Task 3, mark its checkboxes complete, and commit that record separately.
+
+**Implementation record:**
+
+- Implementation: `040967ddcb4da3e87a7bca5a38be3191df5a2913` (`feat(cli): cache verified compressed assets`)
+- Verification: focused asset-cache tests PASS (13/13); full CLI tests PASS (84/84); CLI typecheck PASS via `rtk pnpm --filter @lpc-toolkit/cli run typecheck`.
+- RTK note: the shorthand `rtk pnpm --filter @lpc-toolkit/cli typecheck` reported no TypeScript errors but returned exit 1 because RTK does not support that filtered shorthand; the explicit `run` form exited 0.
+- Implementation note: added deterministic release fixtures, verified retained ZIP/credits/manifest caching, safe metadata expansion, definition and recomputed sprite-index validation, typed issue mapping, staged cleanup, and atomic quarantine publication for concurrent corrupt-cache replacement.
+- Internal review: fixed tar link/hardlink/special-entry extraction safety, sprite-index mutation acceptance, raw staging-directory errors, stale-check winner deletion, and abandoned persistent-lock/stale-reclamation designs. Final focused re-review: APPROVED with no unresolved Critical or Important findings.
 
 ---
 
