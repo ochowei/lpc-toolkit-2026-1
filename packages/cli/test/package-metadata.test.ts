@@ -102,4 +102,33 @@ describe('CLI package metadata', () => {
     expect(packageJson.scripts?.build).toContain('tsc -p tsconfig.build.json');
     expect(packageJson.scripts?.build).toContain('node scripts/vendor-workspace-deps.mjs');
   });
+
+  it('defines the cross-platform packed install smoke command', () => {
+    const packageJson = readCliPackageJson();
+
+    expect(packageJson.scripts?.['test:package']).toBe('node scripts/smoke-packed-cli.mjs');
+  });
+
+  it('keeps the packed install smoke command free of shell reparsing', () => {
+    const testDir = path.dirname(fileURLToPath(import.meta.url));
+    const smokeScript = readFileSync(
+      path.resolve(testDir, '../scripts/smoke-packed-cli.mjs'),
+      'utf8',
+    );
+
+    expect(smokeScript).toContain('process.execPath');
+    expect(smokeScript).not.toContain('ComSpec');
+    expect(smokeScript).not.toContain("'/c'");
+  });
+
+  it('creates packed install temporary directories inside the cleanup guard', () => {
+    const testDir = path.dirname(fileURLToPath(import.meta.url));
+    const smokeScript = readFileSync(
+      path.resolve(testDir, '../scripts/smoke-packed-cli.mjs'),
+      'utf8',
+    );
+
+    expect(smokeScript.indexOf('try {')).toBeLessThan(smokeScript.indexOf('mkdtempSync('));
+    expect(smokeScript).toContain('finally {');
+  });
 });
