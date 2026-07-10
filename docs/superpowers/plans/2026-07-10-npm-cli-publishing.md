@@ -1289,7 +1289,7 @@ After committing, record the exact hash and Step 6 results under Task 6, mark it
 - Consumes: public GitHub asset URLs pinned in bundled `asset-release.json`.
 - Publication gate: the `v0.1.0` tag is manually published; later matching tags use OIDC.
 
-- [ ] **Step 1: Guard release scripts in package metadata tests**
+- [x] **Step 1: Guard release scripts in package metadata tests**
 
 Add:
 
@@ -1303,7 +1303,7 @@ it('defines release verification and real-asset smoke scripts', () => {
 });
 ```
 
-- [ ] **Step 2: Run the metadata test and confirm the intended failure**
+- [x] **Step 2: Run the metadata test and confirm the intended failure**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/cli test -- package-metadata.test.ts
@@ -1311,7 +1311,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- package-metadata.test.ts
 
 Expected: FAIL because both scripts are absent.
 
-- [ ] **Step 3: Implement release-tag verification**
+- [x] **Step 3: Implement release-tag verification**
 
 Create `packages/cli/scripts/verify-release-tag.mjs`:
 
@@ -1341,7 +1341,7 @@ rtk env GITHUB_REF_NAME=v9.9.9 pnpm --filter @lpc-toolkit/cli verify:release-tag
 
 Expected: the first exits 0; the second exits 1 with `Release tag mismatch`.
 
-- [ ] **Step 4: Implement the real pinned-asset smoke script**
+- [x] **Step 4: Implement the real pinned-asset smoke script**
 
 Create `packages/cli/scripts/smoke-real-assets.mjs`. It must build isolated
 temporary `cwd`, cache, and output directories; spawn
@@ -1363,7 +1363,7 @@ Add:
 "verify:release-tag": "node scripts/verify-release-tag.mjs"
 ```
 
-- [ ] **Step 5: Run the real smoke once with network permission**
+- [x] **Step 5: Run the real smoke once with network permission**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/cli build
@@ -1375,7 +1375,7 @@ credits; second run reports no download progress phases and succeeds from the
 same cache. This command transfers about 205 MB and may require sandbox network
 approval.
 
-- [ ] **Step 6: Create the publish workflow**
+- [x] **Step 6: Create the publish workflow**
 
 Create `.github/workflows/publish.yml`:
 
@@ -1421,7 +1421,7 @@ configure npm Trusted Publisher for `ochowei/lpc-toolkit-2026-1`, filename
 `publish.yml`, allowed action `npm publish`. Later tags publish through OIDC and
 receive provenance.
 
-- [ ] **Step 7: Run release workflow checks locally**
+- [x] **Step 7: Run release workflow checks locally**
 
 ```bash
 rtk env GITHUB_REF_NAME=v0.1.0 pnpm --filter @lpc-toolkit/cli verify:release-tag
@@ -1434,7 +1434,7 @@ Expected: PASS and exit 0. Review the workflow to confirm `id-token: write`,
 exact repository package directory, npm 11.5.1+, Node 22.14.0+, and the first
 release skip condition.
 
-- [ ] **Step 8: Commit Task 7**
+- [x] **Step 8: Commit Task 7**
 
 ```bash
 rtk git add .github/workflows/publish.yml packages/cli/package.json packages/cli/scripts/smoke-real-assets.mjs packages/cli/scripts/verify-release-tag.mjs packages/cli/src/asset-cache.ts packages/cli/test/package-metadata.test.ts
@@ -1443,6 +1443,16 @@ rtk git commit -m "ci(cli): add trusted npm release workflow"
 
 After committing, record the exact hash and Steps 5/7 results under Task 7,
 mark its checkboxes complete, and commit that record separately.
+
+**Implementation record:**
+
+- Implementation: `d8a1d57f24d3fee48216d9e28988e577607799cb` (`ci(cli): add trusted npm release workflow`).
+- Verification: CLI build PASS; focused package metadata, asset-cache, and main-assets tests 49/49 PASS; explicit CLI typecheck PASS; architecture boundaries PASS.
+- Tag verification: matching `v0.1.0` exited 0; mismatching `v9.9.9` produced the expected release-tag mismatch and exited 1.
+- Real asset smoke: PASS against the exact bundled pin and checksums; the attributed render reported 8 credit entries with effective license `GPL 3.0`; the second production render reused the same cache with no manifest or tarball download phases.
+- Archive regression: the real release tarball's safe `lpc-runtime-zips/` wrapper exposed the cache reader's root-level path assumption; a RED/GREEN regression test now covers single-root-directory archives, and the reader preserves direct-root lookup before resolving manifest-relative paths under the validated wrapper.
+- Workflow verification: the tag workflow has `id-token: write`, Node 22.14.0, npm 11.5.1, the exact `packages/cli` publish working directory, and deliberately skips OIDC publication for `v0.1.0` while running all release checks.
+- Bootstrap note: the owner must still manually publish `v0.1.0` with 2FA and configure npm Trusted Publisher afterward; that external setup was intentionally not performed in Task 7.
 
 ---
 
