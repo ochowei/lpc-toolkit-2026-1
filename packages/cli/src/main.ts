@@ -70,6 +70,7 @@ function writeResponse(
 }
 
 export function commandNeedsAssets(parsed: ParsedArgs): boolean {
+  if (parsed.flags.has('help')) return false;
   if (parsed.command[0] === 'catalog') return true;
   if (parsed.command[0] === 'selection') return true;
   if (parsed.command[0] === 'render') return true;
@@ -88,6 +89,11 @@ export async function runCli(
   }
 
   const parsed = parseArgs(argv);
+  if (parsed.flags.has('help')) {
+    io.stdout(HELP);
+    return 0;
+  }
+
   let runtime: RuntimeAssets | undefined;
   if (commandNeedsAssets(parsed)) {
     try {

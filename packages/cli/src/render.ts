@@ -315,7 +315,7 @@ export async function renderSelection(
       runtimeSource: runtime.source,
       description: runtime.store.description,
       releaseTag: runtime.releaseTag ?? null,
-      baseDefinitionsRoot: context.assetsRoot,
+      baseDefinitionsRoot: context.sheetDefinitionsRoot,
       customOverlayRoot: context.customAssetsRoot,
       spritesheetsBaseUrl: runtime.store.baseUrl,
     },

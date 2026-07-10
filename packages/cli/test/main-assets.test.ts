@@ -56,6 +56,9 @@ describe('asset preparation dispatch', () => {
     [['token', 'encode', '--selection', 'selection.json']],
     [['token', 'decode', '--token', 'v1.example']],
     [['preset', 'list']],
+    [['catalog', '--help']],
+    [['render', '--help']],
+    [['preset', 'render', '--help']],
   ])('classifies %j as asset-independent', (argv) => {
     expect(commandNeedsAssets(parseArgs(argv))).toBe(false);
   });
@@ -85,6 +88,20 @@ describe('asset preparation dispatch', () => {
     const capture = captureIo(runtime.context.repoRoot);
     expect(await runCli(['--help'], capture.io, { prepareRuntimeAssets: prepare })).toBe(0);
     expect(prepare).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [['catalog', '--help']],
+    [['render', '--help']],
+    [['preset', 'render', '--help']],
+  ])('does not prepare assets for nested help: %j', async (argv) => {
+    const prepare = vi.fn(async (_options: PrepareRuntimeAssetsOptions) => runtime);
+    const capture = captureIo(runtime.context.repoRoot);
+
+    expect(await runCli(argv, capture.io, { prepareRuntimeAssets: prepare })).toBe(0);
+    expect(prepare).not.toHaveBeenCalled();
+    expect(capture.stdout.join('')).toContain('Commands:');
+    expect(capture.stderr).toEqual([]);
   });
 
   it('keeps JSON stdout parseable while progress goes to stderr', async () => {
