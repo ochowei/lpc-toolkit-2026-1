@@ -546,3 +546,18 @@ After both task records are complete:
    publish npm, or configure Trusted Publisher.
 5. Record that GitHub-hosted macOS and Windows validation remains pending until
    an authorized manual workflow run or RC tag is created after merge.
+
+**Final review record:**
+
+- Initial whole-branch review found two Important runtime error-contract gaps
+  and one Minor pre-download validation gap.
+- Fix commit: `0e509e474898afc4be63038d162432839fd46ce0`
+  adds release/cache/retry diagnostic context, preserves typed
+  `asset_image_missing` issues through direct and preset renders, and preflights
+  invalid asset commands before preparation.
+- Fix verification: CLI tests 153 PASS with 1 existing skip; CLI and workspace
+  typechecks, CLI build/package smoke, boundaries, and workspace tests PASS;
+  focused TDD evidence is recorded in `.superpowers/sdd/cli-rc-final-fix-report.md`.
+- Re-review verdict: `Ready to merge? Yes`; no Critical, Important, or Minor
+  findings remain. Hosted macOS/Windows validation remains the authorized
+  post-merge RC/manual gate and was not dispatched.
