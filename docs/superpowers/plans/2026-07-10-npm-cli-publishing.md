@@ -1572,3 +1572,33 @@ release actions:
 These are external mutations and require explicit authorization at execution
 time. The implementation tasks prepare and verify them but do not silently
 perform them.
+
+## Final Whole-Branch Review Fixes
+
+- [x] Build-enforce clean publication, remove release-version coupling, and
+  preserve no-download token decoding in packed installs.
+  - Implementation: `c42a2b231ebdf775293279aca3f158169880c339`
+    (`fix(cli): harden release portability`).
+  - Root causes: package lifecycle scripts did not connect plain `npm publish`
+    to the ignored `dist/` build; package smoke and metadata assertions embedded
+    `0.1.0`; token decode skipped asset preparation but loaded its catalog only
+    from `<cwd>/assets`.
+  - Fix: `prepack` now runs the production build; package smoke derives the
+    archive name from package metadata and covers simulated `0.2.0`; the build
+    emits a strict, stripped 144.1K token-decode catalog containing item decode
+    fields and palette names only, with no spritesheets or color ramps.
+  - RED/GREEN: clean pack first omitted `dist/asset-release.json`; simulated
+    next-version import first failed with `ERR_MODULE_NOT_FOUND`; packed offline
+    metadata first was absent, and the original empty-cwd decode returned
+    `items: {}` plus `unknown_type_name`. Each focused regression passed after
+    its corresponding minimal fix. Strict metadata validation also exposed a
+    legacy optional `base: null`, normalized by the generator without weakening
+    runtime types.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test` PASS (130 passed,
+    1 skipped); CLI typecheck PASS; CLI build PASS; clean/prepack packed install
+    smoke PASS after installing 16 packages, including empty-cwd
+    `sex=male&hair=Braid` decode with exit 0 and empty stderr;
+    `rtk pnpm check:boundaries` PASS; workspace typecheck PASS; full workspace
+    tests PASS (core 162, presets 2, CLI 130 with 1 skip, web 499 with 1 skip);
+    `rtk git diff --check` PASS. npm-cache and `tsx` IPC sandbox denials were
+    rerun unchanged with approval and passed.
