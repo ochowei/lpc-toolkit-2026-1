@@ -19,6 +19,14 @@ const changesJob = ciWorkflow.slice(
   ciWorkflow.indexOf('  changes:'),
   ciWorkflow.indexOf('  unit:'),
 );
+const e2eJobStart = ciWorkflow.indexOf('  e2e:');
+const parityJobStart = ciWorkflow.indexOf('  e2e-parity:');
+const e2eJob = ciWorkflow.slice(
+  e2eJobStart,
+  parityJobStart === -1 ? undefined : parityJobStart,
+);
+const parityJob =
+  parityJobStart === -1 ? '' : ciWorkflow.slice(parityJobStart);
 const generalPlaywrightConfig = readFileSync(
   path.join(here, '../playwright.config.ts'),
   'utf8',
@@ -78,5 +86,28 @@ describe('package scripts', () => {
     expect(parityPlaywrightConfig).toContain('LPC_UPSTREAM_PARITY_DIR');
     expect(parityPlaywrightConfig).not.toContain('../../upstream');
     expect(parityPlaywrightConfig.match(/command:/g)).toHaveLength(2);
+  });
+
+  it('runs upstream parity only from an isolated CI checkout', () => {
+    expect(e2eJob).not.toContain('submodules: recursive');
+    expect(e2eJob).not.toContain('working-directory: upstream');
+    expect(e2eJob).not.toContain('npm ci');
+    expect(e2eJob).not.toContain('test:e2e:parity');
+
+    expect(parityJob).toContain(
+      'LPC_UPSTREAM_PARITY_DIR: ${{ runner.temp }}/lpc-toolkit-upstream-parity',
+    );
+    expect(parityJob).toContain(
+      "require('./asset-release.json').sourceRepository",
+    );
+    expect(parityJob).toContain("require('./asset-release.json').sourceSha");
+    expect(parityJob).toContain(
+      'npm ci --prefix "$LPC_UPSTREAM_PARITY_DIR"',
+    );
+    expect(parityJob).toContain(
+      'pnpm --filter @lpc-toolkit/web test:e2e:parity',
+    );
+    expect(ciWorkflow).not.toContain('working-directory: upstream');
+    expect(ciWorkflow).not.toContain('../../upstream');
   });
 });

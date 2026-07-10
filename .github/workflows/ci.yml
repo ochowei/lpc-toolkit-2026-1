@@ -76,16 +76,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: npm ci
-        working-directory: upstream
 
       - uses: actions/cache@v4
         id: playwright-cache
@@ -101,5 +97,51 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
+          path: packages/web/playwright-report/
+          retention-days: 7
+
+  e2e-parity:
+    name: E2E parity (web)
+    needs: [unit, changes]
+    if: needs.changes.outputs.web == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    env:
+      LPC_UPSTREAM_PARITY_DIR: ${{ runner.temp }}/lpc-toolkit-upstream-parity
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Materialize pinned upstream parity checkout
+        shell: bash
+        run: |
+          SOURCE_REPOSITORY="$(node -p "require('./asset-release.json').sourceRepository")"
+          SOURCE_SHA="$(node -p "require('./asset-release.json').sourceSha")"
+          git init "$LPC_UPSTREAM_PARITY_DIR"
+          git -C "$LPC_UPSTREAM_PARITY_DIR" remote add origin "https://github.com/${SOURCE_REPOSITORY}.git"
+          git -C "$LPC_UPSTREAM_PARITY_DIR" fetch --depth=1 origin "$SOURCE_SHA"
+          git -C "$LPC_UPSTREAM_PARITY_DIR" checkout --detach FETCH_HEAD
+          ACTUAL_SHA="$(git -C "$LPC_UPSTREAM_PARITY_DIR" rev-parse HEAD)"
+          test "$ACTUAL_SHA" = "$SOURCE_SHA"
+      - name: Install isolated upstream dependencies from lockfile
+        run: npm ci --prefix "$LPC_UPSTREAM_PARITY_DIR"
+
+      - uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm --filter @lpc-toolkit/web exec playwright install --with-deps chromium
+
+      - run: pnpm --filter @lpc-toolkit/web test:e2e:parity
+
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-parity-report
           path: packages/web/playwright-report/
           retention-days: 7
