@@ -293,7 +293,7 @@ After committing, record the exact hash and Step 6 results under Task 1, mark it
 - Consumes: the copied `dist/asset-release.json` from Task 1.
 - Used by: Task 3 cache preparation and Task 5 runtime orchestration.
 
-- [ ] **Step 1: Write release parsing and cache-path tests**
+- [x] **Step 1: Write release parsing and cache-path tests**
 
 Create `packages/cli/test/asset-release.test.ts` with cases equivalent to:
 
@@ -382,7 +382,7 @@ describe('asset cache paths', () => {
 });
 ```
 
-- [ ] **Step 2: Run the tests and confirm the intended failure**
+- [x] **Step 2: Run the tests and confirm the intended failure**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-release.test.ts
@@ -390,7 +390,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- asset-release.test.ts
 
 Expected: FAIL because `packages/cli/src/asset-release.ts` does not exist.
 
-- [ ] **Step 3: Implement the release and path API**
+- [x] **Step 3: Implement the release and path API**
 
 Create `packages/cli/src/asset-release.ts` with this public surface:
 
@@ -420,7 +420,7 @@ export function releaseCachePath(cacheRoot: string, tag: string): string;
 
 Implement `parseAssetReleaseConfig` with one `requireString` helper, `/^[0-9a-f]{40}$/` for `sourceSha`, `/^[0-9a-f]{64}$/` for both SHA-256 fields, `new URL` plus `protocol === 'https:'` for URLs, and `/^[a-zA-Z0-9._-]+$/` for the tag. Use `fileURLToPath(new URL('./asset-release.json', moduleUrl))` for the bundled path. Use `path.win32` when the injected platform is `win32` and `path.posix` otherwise so platform-path tests behave consistently on every CI host.
 
-- [ ] **Step 4: Run focused verification**
+- [x] **Step 4: Run focused verification**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-release.test.ts
@@ -429,7 +429,7 @@ rtk pnpm --filter @lpc-toolkit/cli typecheck
 
 Expected: PASS and exit 0.
 
-- [ ] **Step 5: Commit Task 2**
+- [x] **Step 5: Commit Task 2**
 
 ```bash
 rtk git add packages/cli/src/asset-release.ts packages/cli/test/asset-release.test.ts
@@ -437,6 +437,12 @@ rtk git commit -m "feat(cli): define pinned asset cache paths"
 ```
 
 After committing, record the exact hash and Step 4 results under Task 2, mark its checkboxes complete, and commit that record separately.
+
+**Implementation record:** Strict bundled release parsing and cross-platform cache path resolution were implemented with safe release-tag validation and host-independent injected platform semantics.
+
+- Implementation commit: `2e95e3721e11b46877fec15a902e1e02e584b8f4`
+- Verification: focused release tests 9/9 PASS; equivalent package-scoped CLI typecheck PASS.
+- Tooling note: direct `rtk pnpm --filter @lpc-toolkit/cli typecheck` reported no TypeScript errors but returned exit 1 because this RTK version does not support filtered pnpm-to-tsc optimization; `rtk pnpm -C packages/cli typecheck` ran the equivalent CLI package typecheck and returned exit 0.
 
 ---
 
