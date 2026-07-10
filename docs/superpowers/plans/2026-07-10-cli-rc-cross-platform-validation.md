@@ -250,7 +250,7 @@ verification result, then commit that plan record separately.
 - Produces: `CLI Release Candidate` workflow triggered by `v*.*.*-rc.*` or `workflow_dispatch`, with `CLI RC (macos-latest)` and `CLI RC (windows-latest)` jobs.
 - Produces: stable publish tag filters that include `v*` and exclude `v*-*`.
 
-- [ ] **Step 1: Write failing workflow-contract tests**
+- [x] **Step 1: Write failing workflow-contract tests**
 
 Create `packages/cli/test/release-workflows.test.ts`:
 
@@ -328,7 +328,7 @@ describe('CLI release workflows', () => {
 });
 ```
 
-- [ ] **Step 2: Run the workflow-contract tests and verify RED**
+- [x] **Step 2: Run the workflow-contract tests and verify RED**
 
 Run:
 
@@ -340,7 +340,7 @@ Expected: FAIL because the RC workflow does not exist, routine CI still has a
 three-OS matrix, stable publishing accepts all `v*` tags, and the README lacks
 the RC gate.
 
-- [ ] **Step 3: Make routine CLI CI Ubuntu-only**
+- [x] **Step 3: Make routine CLI CI Ubuntu-only**
 
 Replace the existing `cli-package` job in `.github/workflows/ci.yml` with:
 
@@ -374,7 +374,7 @@ job:
               - '.github/workflows/publish.yml'
 ```
 
-- [ ] **Step 4: Add the isolated RC workflow**
+- [x] **Step 4: Add the isolated RC workflow**
 
 Create `.github/workflows/cli-release-candidate.yml`:
 
@@ -414,7 +414,7 @@ jobs:
       - run: pnpm --filter @lpc-toolkit/cli test:package
 ```
 
-- [ ] **Step 5: Exclude prerelease tags from stable publishing and fail mismatches early**
+- [x] **Step 5: Exclude prerelease tags from stable publishing and fail mismatches early**
 
 Replace the publish trigger in `.github/workflows/publish.yml` with:
 
@@ -443,7 +443,7 @@ install:
 Keep `permissions: id-token: write`, real-asset verification, npm OIDC publish,
 and the `v0.1.0` publish skip only in this stable workflow.
 
-- [ ] **Step 6: Document the tagged gate and advisory manual workflow**
+- [x] **Step 6: Document the tagged gate and advisory manual workflow**
 
 Replace the `Maintainers: npm bootstrap and later releases` subsection in
 `README.md` with:
@@ -484,7 +484,7 @@ and Trusted Publisher configuration are external release operations and must
 not be run as ordinary implementation verification.
 ```
 
-- [ ] **Step 7: Run focused workflow tests and required repository verification**
+- [x] **Step 7: Run focused workflow tests and required repository verification**
 
 Run:
 
@@ -506,7 +506,7 @@ boundary checks PASS; `git diff --check` reports no errors. The first real
 macOS/Windows evidence remains intentionally deferred to a GitHub-hosted RC or
 manual workflow run.
 
-- [ ] **Step 8: Commit Task 2**
+- [x] **Step 8: Commit Task 2**
 
 ```bash
 rtk git add .github/workflows/ci.yml .github/workflows/cli-release-candidate.yml .github/workflows/publish.yml packages/cli/test/release-workflows.test.ts README.md
@@ -516,6 +516,21 @@ rtk git commit -m "ci(cli): gate macos and windows checks on release candidates"
 Expected: one focused workflow/documentation commit. After task review passes,
 update this task checkbox with an implementation note, the commit hash, and the
 exact verification result, then commit that plan record separately.
+
+**Implementation record:**
+
+- Implementation: Made routine CLI package CI Ubuntu-only; added read-only,
+  non-publishing tagged/manual RC validation on macOS and Windows; excluded
+  prerelease tags from stable publishing; documented the manual gate; and
+  added workflow contract tests.
+- Commit: `ebe1fe3e90bd4e201149faf709c0417eec347d9f`
+- Verification: workflow RED 4/4 as expected, then GREEN 4/4; focused tests
+  27/27 PASS; full CLI tests 140 PASS with 1 existing skip; CLI and workspace
+  typechecks, CLI build/package smoke, boundaries, and workspace tests (803
+  PASS with 2 existing skips) PASS; task review spec compliant and task quality
+  approved with no findings. Package smoke and workspace tests passed on exact
+  sandbox-permission retries. Hosted macOS/Windows evidence remains the
+  authorized post-merge RC/manual gate.
 
 ---
 
