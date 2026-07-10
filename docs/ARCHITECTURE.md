@@ -259,6 +259,17 @@ required credits and license output. ZIP exports should continue writing credit
 files, previews should continue exposing attribution, and new export paths must
 carry the same metadata expectations.
 
+Catalog picker thumbnails are editor-internal previews and do not require their
+own credit sidecar. The editor must keep the active composition's attribution
+surface reachable. The attribution popover consumes the active
+`ComposedSheet.credits`; catalog filter warnings are compatibility information,
+not additional attribution.
+
+Any downloadable pixel artifact must be built from one frozen `ComposedSheet`
+and include credits derived from that sheet's `credits` manifest. Catalog
+filters may report compatibility warnings, but must not broaden the attribution
+manifest.
+
 Because the project is GPL-3.0-or-later and inherits upstream LPC licensing
 requirements, attribution behavior is part of correctness.
 
