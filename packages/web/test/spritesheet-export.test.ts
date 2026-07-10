@@ -5,10 +5,11 @@ import type {
 } from '@lpc-toolkit/core';
 import { createCanvas } from '@napi-rs/canvas';
 import JSZip from 'jszip';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   assertExportableCredits,
   exportSpritesheetBundle,
+  isMissingCreditsError,
 } from '../src/lib/spritesheet-export';
 
 function makeCredits(author: string): CreditsManifest {
@@ -45,6 +46,33 @@ function makeSheet(color: string, credits: CreditsManifest): ComposedSheet {
 }
 
 describe('exportSpritesheetBundle', () => {
+  it('encodes the passed canvas exactly once', async () => {
+    const toBlob = vi.fn((callback: BlobCallback) => {
+      callback(new Blob(['png'], { type: 'image/png' }));
+    });
+    const sheet = {
+      ...makeSheet('#ff0000', makeCredits('Artist')),
+      canvas: { toBlob } as unknown as CanvasLike,
+    };
+
+    await exportSpritesheetBundle(sheet, 'walk');
+
+    expect(toBlob).toHaveBeenCalledOnce();
+  });
+
+  it('rejects when canvas encoding returns null', async () => {
+    const toBlob = vi.fn((callback: BlobCallback) => callback(null));
+    const sheet = {
+      ...makeSheet('#ff0000', makeCredits('Artist')),
+      canvas: { toBlob } as unknown as CanvasLike,
+    };
+
+    await expect(exportSpritesheetBundle(sheet, 'walk')).rejects.toThrow(
+      'toBlob returned null',
+    );
+    expect(toBlob).toHaveBeenCalledOnce();
+  });
+
   it('bundles only the passed sheet pixels and credits', async () => {
     const redSheet = makeSheet('#ff0000', makeCredits('Red Artist'));
     const blueSheet = makeSheet('#0000ff', makeCredits('Blue Artist'));
@@ -97,5 +125,17 @@ describe('exportSpritesheetBundle', () => {
 describe('assertExportableCredits', () => {
   it('accepts a non-empty credits manifest', () => {
     expect(() => assertExportableCredits(makeCredits('Artist'))).not.toThrow();
+  });
+
+  it('exposes a shared predicate for its empty-credit error', () => {
+    let guardError: unknown;
+    try {
+      assertExportableCredits({ entries: [], resolvedPaths: [], licenses: [] });
+    } catch (error) {
+      guardError = error;
+    }
+
+    expect(isMissingCreditsError(guardError)).toBe(true);
+    expect(isMissingCreditsError(new Error('encoding failed'))).toBe(false);
   });
 });

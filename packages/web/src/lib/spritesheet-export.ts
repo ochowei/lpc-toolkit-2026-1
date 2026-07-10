@@ -5,6 +5,15 @@ import {
   type CreditsManifest,
 } from '@lpc-toolkit/core';
 
+/** Stable guard message shared by export workflows and UI error mapping. */
+export const MISSING_CREDITS_ERROR_MESSAGE =
+  'Cannot export pixels without resolved credits.';
+
+/** Identify the error emitted by the required export-credit guard. */
+export function isMissingCreditsError(error: unknown): error is Error {
+  return error instanceof Error && error.message === MISSING_CREDITS_ERROR_MESSAGE;
+}
+
 function encodePng(canvas: ComposedSheet['canvas']): Promise<ArrayBuffer> {
   const browserCanvas = canvas as unknown as HTMLCanvasElement;
 
@@ -22,7 +31,7 @@ function encodePng(canvas: ComposedSheet['canvas']): Promise<ArrayBuffer> {
 
 export function assertExportableCredits(credits: CreditsManifest): void {
   if (credits.entries.length === 0) {
-    throw new Error('Cannot export pixels without resolved credits.');
+    throw new Error(MISSING_CREDITS_ERROR_MESSAGE);
   }
 }
 

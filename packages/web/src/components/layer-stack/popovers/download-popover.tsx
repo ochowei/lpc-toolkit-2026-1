@@ -24,17 +24,21 @@ import type { CustomOverlay } from '../../../lib/custom-overlay';
 import {
   assertExportableCredits,
   exportSpritesheetBundle,
+  isMissingCreditsError,
 } from '../../../lib/spritesheet-export';
-
-const EMPTY_CREDIT_ERROR_MESSAGE = 'Cannot export pixels without resolved credits.';
 
 /** Map export failures to user-facing copy without exposing implementation errors. */
 export function downloadErrorTranslationKey(
   error: unknown,
 ): 'download.noCredits' | 'download.failed' {
-  return error instanceof Error && error.message === EMPTY_CREDIT_ERROR_MESSAGE
+  return isMissingCreditsError(error)
     ? 'download.noCredits'
     : 'download.failed';
+}
+
+/** Expose exports only after composition has settled for the current inputs. */
+export function readyDownloadSheet(result: ComposedResult): ComposedSheet | null {
+  return result.status === 'ready' ? result.sheet : null;
 }
 
 interface ZipRunning {
@@ -90,7 +94,7 @@ export function DownloadPopover({
   onStatus,
 }: Props) {
   const { anchorRef, panelRef, pos } = usePopover(open, () => setOpen(false));
-  const sheet: ComposedSheet | null = result.sheet;
+  const sheet = readyDownloadSheet(result);
   const disabled = sheet === null;
   const disabledReason =
     result.status === 'error' ? t('download.failed') : t('download.loading');
@@ -185,6 +189,7 @@ export function DownloadPopover({
         ref={anchorRef}
         size="sm"
         variant={open ? 'primary' : 'default'}
+        disabled={disabled}
         onClick={() => setOpen(!open)}
         title={disabled ? disabledReason : undefined}
       >

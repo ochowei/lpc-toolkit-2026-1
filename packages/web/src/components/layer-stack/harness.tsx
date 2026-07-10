@@ -423,6 +423,29 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     composeResult.status === 'loading' ? composeResult.progress : null;
   const e2eProbeEnabled =
     typeof window !== 'undefined' && e2eProbeFromUrl(window.location.search);
+  const emptyDownloadCreditsProbeEnabled =
+    e2eProbeEnabled &&
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('emptyDownloadCredits') ===
+      '1';
+  const downloadResult = useMemo<ComposedResult>(() => {
+    if (
+      !emptyDownloadCreditsProbeEnabled ||
+      composeResult.status !== 'ready' ||
+      !composeResult.sheet
+    ) {
+      return composeResult;
+    }
+
+    // E2E-only: exercise the real download controls without mutating composition.
+    return {
+      ...composeResult,
+      sheet: {
+        ...composeResult.sheet,
+        credits: { entries: [], resolvedPaths: [], licenses: [] },
+      },
+    };
+  }, [composeResult, emptyDownloadCreditsProbeEnabled]);
   const canonicalHash = useMemo(
     () => serializeHash(toSelections(props.state)),
     [props.state.bodyType, props.state.selections],
@@ -671,7 +694,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
         <DownloadPopover
           open={popover === 'download'}
           setOpen={(v) => setPopover(v ? 'download' : null)}
-          result={composeResult}
+          result={downloadResult}
           anim={props.state.anim}
           selections={toSelections(props.state)}
           catalog={props.catalog}
