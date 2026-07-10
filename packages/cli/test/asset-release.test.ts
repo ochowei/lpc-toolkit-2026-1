@@ -38,6 +38,10 @@ describe('asset release configuration', () => {
     ).toThrow(/tarballUrl/);
   });
 
+  it.each(['.', '..'])('rejects unsafe dot-segment tag %s', (tag) => {
+    expect(() => parseAssetReleaseConfig({ ...valid, tag })).toThrow(/tag/);
+  });
+
   it('loads a config file', () => {
     const root = mkdtempSync(path.join(tmpdir(), 'lpc-release-'));
     const file = path.join(root, 'asset-release.json');
@@ -99,5 +103,9 @@ describe('asset cache paths', () => {
       path.join('/cache', 'assets-v1'),
     );
     expect(() => releaseCachePath('/cache', '../escape')).toThrow(/tag/);
+  });
+
+  it.each(['.', '..'])('rejects unsafe cache dot-segment tag %s', (tag) => {
+    expect(() => releaseCachePath('/cache', tag)).toThrow(/tag/);
   });
 });

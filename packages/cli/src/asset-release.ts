@@ -44,7 +44,7 @@ export function parseAssetReleaseConfig(value: unknown): AssetReleaseConfig {
   const tarballUrl = requireString(fields, 'tarballUrl');
   const tarballSha256 = requireString(fields, 'tarballSha256');
 
-  if (!/^[a-zA-Z0-9._-]+$/.test(tag)) {
+  if (tag === '.' || tag === '..' || !/^[a-zA-Z0-9._-]+$/.test(tag)) {
     throw new Error('Asset release tag is invalid.');
   }
   if (!/^[0-9a-f]{40}$/.test(sourceSha)) {
@@ -112,7 +112,7 @@ export function resolveAssetCacheRoot(options: Partial<CacheRootOptions> = {}): 
 }
 
 export function releaseCachePath(cacheRoot: string, tag: string): string {
-  if (!/^[a-zA-Z0-9._-]+$/.test(tag)) {
+  if (tag === '.' || tag === '..' || !/^[a-zA-Z0-9._-]+$/.test(tag)) {
     throw new Error('Asset release tag is invalid.');
   }
   return path.join(cacheRoot, tag);
