@@ -157,6 +157,7 @@ describe('CLI package metadata', () => {
     const packageJson = readCliPackageJson();
     expect(packageJson.scripts).toMatchObject({
       'test:assets:real': 'node scripts/smoke-real-assets.mjs',
+      'verify:rc-tag': 'node scripts/verify-rc-tag.mjs',
       'verify:release-tag': 'node scripts/verify-release-tag.mjs',
     });
   });

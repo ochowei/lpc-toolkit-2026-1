@@ -14,13 +14,14 @@ describe('createRuntimeContext', () => {
   });
 
   it('accepts asset root override', () => {
+    const assetsRoot = path.resolve('/game/lpc-assets');
     const context = createRuntimeContext({
-      cwd: '/repo',
-      assetsRoot: '/game/lpc-assets',
+      cwd: path.resolve('/repo'),
+      assetsRoot,
     });
 
-    expect(context.assetsRoot).toBe('/game/lpc-assets');
-    expect(context.spritesheetsBaseUrl).toBe('/game/lpc-assets');
+    expect(context.assetsRoot).toBe(assetsRoot);
+    expect(context.spritesheetsBaseUrl).toBe(assetsRoot);
   });
 
   it('preserves URL-like spritesheet base overrides', () => {
