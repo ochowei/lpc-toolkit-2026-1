@@ -50,7 +50,7 @@ No production source file is created or modified.
 - Produces: a README example using caller-provided `records`, `paletteRecords`, and `adapter`, with precise recolor and attribution behavior.
 - Produces: a regression test that fails if the example loses palette loading, uses the wrong catalog identity, returns to file variants, points readers at the upstream checkout, fails to render visible recolored pixels, or loses credits.
 
-- [ ] **Step 1: Add the failing README and composition contract test**
+- [x] **Step 1: Add the failing README and composition contract test**
 
 Create `packages/core/test/readme-example.test.ts` with this complete content:
 
@@ -249,7 +249,7 @@ describe('README core example', () => {
 });
 ```
 
-- [ ] **Step 2: Run the new test and verify the documentation assertion fails**
+- [x] **Step 2: Run the new test and verify the documentation assertion fails**
 
 Run:
 
@@ -262,7 +262,7 @@ current README does not contain `createPaletteCatalog`; the executable
 composition test should pass, proving the fixture and intended API flow are
 valid before changing the documentation.
 
-- [ ] **Step 3: Replace the broken README example with the palette-aware version**
+- [x] **Step 3: Replace the broken README example with the palette-aware version**
 
 In `README.md`, replace only the TypeScript code block under `### Example` with:
 
@@ -319,7 +319,7 @@ console.log(sheet.credits.licenses, walk.credits.licenses);
 Do not update the adjacent Public API list in this task; finding 6 is owned by
 the later documentation-alignment plan.
 
-- [ ] **Step 4: Run the focused contract test and verify both cases pass**
+- [x] **Step 4: Run the focused contract test and verify both cases pass**
 
 Run:
 
@@ -330,7 +330,7 @@ rtk pnpm --filter @lpc-toolkit/core test -- readme-example.test.ts
 Expected: PASS with 2 tests. The actual count may be reported within the core
 Vitest summary, but there must be no skipped or failed test in this file.
 
-- [ ] **Step 5: Run the complete core test suite**
+- [x] **Step 5: Run the complete core test suite**
 
 Run:
 
@@ -340,7 +340,7 @@ rtk pnpm --filter @lpc-toolkit/core test
 
 Expected: PASS for all core tests, including `readme-example.test.ts`.
 
-- [ ] **Step 6: Run workspace type and architecture verification**
+- [x] **Step 6: Run workspace type and architecture verification**
 
 Run:
 
@@ -352,7 +352,7 @@ rtk pnpm check:boundaries
 Expected: both commands exit 0. `check:boundaries` must report
 `Architecture boundary check passed.`
 
-- [ ] **Step 7: Review the surgical diff**
+- [x] **Step 7: Review the surgical diff**
 
 Run:
 
@@ -366,7 +366,7 @@ Expected: no whitespace errors; only `README.md`, the new contract test, and
 the already-tracked plan file may be involved. The temporary
 `docs/README-ARCHITECTURE-AUDIT.tmp.md` remains untracked and must not be staged.
 
-- [ ] **Step 8: Commit the tested implementation**
+- [x] **Step 8: Commit the tested implementation**
 
 Run:
 
@@ -379,7 +379,14 @@ rtk git rev-parse HEAD
 Expected: the commit contains exactly the README example and its executable
 contract test. Save the exact 40-character hash printed by the final command.
 
-- [ ] **Step 9: Record completion in this plan and commit the record**
+- [x] **Step 9: Record completion in this plan and commit the record**
+
+  - Implementation: `48cae47ae638e1e71d67682c9f39e27f82a60577` (`docs: fix core composition example`)
+  - Focused contract test: PASS, 2 tests
+  - Full core test suite: PASS, 164 tests
+  - Workspace typecheck: PASS
+  - Boundary check: PASS (`Architecture boundary check passed.`)
+  - Temporary `docs/README-ARCHITECTURE-AUDIT.tmp.md` was not staged.
 
 Use `apply_patch` to mark Steps 1 through 9 complete. Directly below this step,
 add an implementation record containing:
