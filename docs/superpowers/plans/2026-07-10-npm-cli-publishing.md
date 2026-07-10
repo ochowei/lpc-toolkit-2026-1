@@ -671,6 +671,9 @@ After committing, record the exact hash and Step 6 results under Task 3, mark it
 - RTK note: the shorthand `rtk pnpm --filter @lpc-toolkit/cli typecheck` reported no TypeScript errors but returned exit 1 because RTK does not support that filtered shorthand; the explicit `run` form exited 0.
 - Implementation note: added deterministic release fixtures, verified retained ZIP/credits/manifest caching, safe metadata expansion, definition and recomputed sprite-index validation, typed issue mapping, staged cleanup, and atomic quarantine publication for concurrent corrupt-cache replacement.
 - Internal review: fixed tar link/hardlink/special-entry extraction safety, sprite-index mutation acceptance, raw staging-directory errors, stale-check winner deletion, and abandoned persistent-lock/stale-reclamation designs. Final focused re-review: APPROVED with no unresolved Critical or Important findings.
+- Formal review fix: `33e3c8195d8b78eda1f5dc9a522a32a31bd95272` (`fix(cli): anchor cache validation to release manifest`).
+- Formal review verification: focused asset-cache tests PASS (19/19); full CLI tests PASS (90/90); CLI typecheck PASS via `rtk pnpm --filter @lpc-toolkit/cli run typecheck`.
+- Formal review note: cache ZIP inventory and sprite paths are anchored to the verified manifest; expanded definition paths, sizes, and hashes are synchronously derived from the verified metadata ZIPs with STORE/DEFLATE support; dot components, normalized manifest destinations, coherent metadata tampering, extra ZIPs, and non-file ZIP entries are rejected. Focused re-review: APPROVED with no unresolved Critical or Important findings.
 
 ---
 
