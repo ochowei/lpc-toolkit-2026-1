@@ -32,13 +32,11 @@ test('spritesheet download bundles pixels and attribution', async ({ page }) => 
   const savedPath = await download.path();
   expect(savedPath).not.toBeNull();
   const archive = await JSZip.loadAsync(await readFile(savedPath!));
-  expect(Object.keys(archive.files)).toEqual(
-    expect.arrayContaining([
-      'character-spritesheet.png',
-      'credits/credits.txt',
-      'credits/credits.csv',
-    ]),
-  );
+  expect(Object.keys(archive.files).sort()).toEqual([
+    'character-spritesheet.png',
+    'credits/credits.csv',
+    'credits/credits.txt',
+  ]);
 
   await page.getByRole('button', { name: 'More' }).click();
   await page.getByRole('menuitem', { name: /Attribution/ }).click();

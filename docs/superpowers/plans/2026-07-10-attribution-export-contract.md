@@ -30,6 +30,7 @@
 - `packages/web/src/components/layer-stack/popovers/download-popover.tsx` — invokes the basic bundle helper, freezes inputs, blocks empty manifests, and uses localized image-and-credits copy.
 - `packages/web/src/components/layer-stack/harness.tsx` — supplies `composeResult.sheet?.credits` to the attribution popover without recomputing credits.
 - `packages/web/src/i18n.ts` — localized labels for the bundle action and empty-credit error/state.
+- `packages/web/playwright.download.config.ts` — focused browser controller that starts only the toolkit web server and never starts tracked `upstream/`.
 - `packages/web/test/spritesheet-export.test.ts` — ZIP contents, frozen sheet provenance, and empty-credit rejection.
 - `packages/web/test/attribution-manifest.test.ts` — precise manifest rows, effective license, filter incompatibility, and no-credit state.
 - `packages/web/test/zip-export.test.ts` — empty-credit rejection for each existing pixel ZIP layout.
@@ -221,7 +222,7 @@ Run:
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/web exec vitest run test/attribution-manifest.test.ts test/attribution-summary.test.ts
-rtk pnpm --filter @lpc-toolkit/web typecheck
+rtk pnpm --filter @lpc-toolkit/web run typecheck
 ```
 
 Expected: both commands PASS.
@@ -245,6 +246,7 @@ entries while catalog-derived filter incompatibilities remain a separate signal.
 **Files:**
 - Modify: `packages/web/src/components/layer-stack/popovers/download-popover.tsx`
 - Modify: `packages/web/src/i18n.ts`
+- Create: `packages/web/playwright.download.config.ts`
 - Create: `packages/web/e2e/download-attribution.spec.ts`
 
 **Interfaces:**
@@ -255,11 +257,11 @@ entries while catalog-derived filter incompatibilities remain a separate signal.
 
 - [x] **Step 1: Write the browser test before UI implementation**
 
-Create an E2E spec that opens `/compose?assetSource=zip`, waits for composition readiness, clicks the localized download control, and captures the browser download. Assert the suggested filename ends in `.zip`, then parse the saved archive with JSZip in Node and assert the three required paths. Open Attribution and assert that a resolved credit filename is visible. Add a deterministic empty-credit route/probe only if the existing E2E fixture machinery cannot produce one; the probe must not alter production behavior.
+Create an E2E spec that opens `/compose?assetSource=zip`, waits for composition readiness, clicks the localized download control, and captures the browser download. Assert the suggested filename ends in `.zip`, then parse the saved archive with JSZip in Node and assert exact sorted equality with the three required paths. Open Attribution and assert that a resolved credit filename is visible. Add a deterministic empty-credit route/probe only if the existing E2E fixture machinery cannot produce one; the probe must not alter production behavior.
 
 - [x] **Step 2: Run the E2E spec and verify the old PNG behavior fails the assertion**
 
-Run: `rtk pnpm --filter @lpc-toolkit/web exec playwright test e2e/download-attribution.spec.ts`
+Run: `rtk pnpm --filter @lpc-toolkit/web exec playwright test -c playwright.download.config.ts e2e/download-attribution.spec.ts`
 
 Expected: FAIL because the current action downloads `character-spritesheet.png`.
 
@@ -275,8 +277,8 @@ Run:
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/web exec vitest run test/spritesheet-export.test.ts test/zip-export.test.ts test/attribution-manifest.test.ts
-rtk pnpm --filter @lpc-toolkit/web typecheck
-rtk pnpm --filter @lpc-toolkit/web exec playwright test e2e/download-attribution.spec.ts e2e/responsive-layout.spec.ts
+rtk pnpm --filter @lpc-toolkit/web run typecheck
+rtk pnpm --filter @lpc-toolkit/web exec playwright test -c playwright.download.config.ts e2e/download-attribution.spec.ts e2e/responsive-layout.spec.ts
 ```
 
 Expected: all commands PASS; the responsive test continues to verify popover containment.
@@ -284,7 +286,7 @@ Expected: all commands PASS; the responsive test continues to verify popover con
 - [x] **Step 5: Commit the UI contract**
 
 ```bash
-rtk git add packages/web/src/components/layer-stack/popovers/download-popover.tsx packages/web/src/i18n.ts packages/web/e2e/download-attribution.spec.ts
+rtk git add packages/web/src/components/layer-stack/popovers/download-popover.tsx packages/web/src/i18n.ts packages/web/playwright.download.config.ts packages/web/e2e/download-attribution.spec.ts
 rtk git commit -m "fix(web): bundle credits with spritesheet download"
 ```
 
@@ -322,9 +324,9 @@ Run:
 
 ```bash
 rtk pnpm check:boundaries
-rtk pnpm --filter @lpc-toolkit/web typecheck
+rtk pnpm --filter @lpc-toolkit/web run typecheck
 rtk pnpm --filter @lpc-toolkit/web test
-rtk pnpm --filter @lpc-toolkit/web exec playwright test e2e/download-attribution.spec.ts e2e/responsive-layout.spec.ts
+rtk pnpm --filter @lpc-toolkit/web exec playwright test -c playwright.download.config.ts e2e/download-attribution.spec.ts e2e/responsive-layout.spec.ts
 rtk git diff --check
 ```
 
@@ -351,17 +353,36 @@ Plan 3.
 - Task 2 commit: `bf854bca0` (`fix(web): block uncredited ZIP exports`)
 - Task 3 commit: `e534731a5` (`fix(web): render exact composition credits`)
 - Task 4 commit: `4c5bbc535` (`fix(web): bundle credits with spritesheet download`)
+- Task 5 documentation commit: `e7c831530e5f9db918469789664a96415bfcfe83`
+  (`docs: define browser attribution contract`)
 - Verification: `rtk pnpm check:boundaries` PASS.
-- Verification: `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS. The
-  equivalent command without `run` reported no TypeScript errors but RTK 0.22.2
-  returned exit 1 because its pnpm filter optimization is not supported; the
-  package script itself exited 0 via both `run` and `rtk proxy`.
+- Verification: `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS.
 - Verification: `rtk pnpm --filter @lpc-toolkit/web test` PASS (65 files, 507
   tests). The known 35 catalog alias warnings remain baseline noise.
 - Verification: `rtk pnpm --filter @lpc-toolkit/web exec playwright test -c
-  .task4-playwright.config.ts e2e/download-attribution.spec.ts
+  playwright.download.config.ts e2e/download-attribution.spec.ts
   e2e/responsive-layout.spec.ts` PASS (13 tests).
 - Verification: `rtk git diff --check` PASS.
+
+Follow-up review implementation note: promoted the toolkit-only Playwright
+controller into tracked configuration, tightened the bundle assertion to exact
+three-entry equality, and corrected every required typecheck/browser command to
+its reproducible spelling. The duplicated empty-credit error classification is
+recorded as a Minor and deliberately remains unchanged; introducing a new error
+hierarchy is outside this focused review fix. These corrections are committed
+separately from `e7c831530e5f9db918469789664a96415bfcfe83` as the follow-up
+review-fix commit `test(web): make attribution browser checks reproducible`.
+
+- Review-fix verification: `rtk pnpm --filter @lpc-toolkit/web run typecheck`
+  PASS.
+- Review-fix verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run
+  test/spritesheet-export.test.ts test/zip-export.test.ts
+  test/attribution-manifest.test.ts` PASS (3 files, 29 tests).
+- Review-fix verification: `rtk pnpm --filter @lpc-toolkit/web exec playwright
+  test -c playwright.download.config.ts e2e/download-attribution.spec.ts
+  e2e/responsive-layout.spec.ts` PASS (13 tests).
+- Review-fix verification: `rtk pnpm check:boundaries` PASS.
+- Review-fix verification: `rtk git diff --check` PASS.
 
 ## Plan Self-Review
 
