@@ -690,7 +690,7 @@ After committing, record the exact hash and Step 6 results under Task 3, mark it
 - Produces: `AssetStore`, `createDirectoryAssetStore`, `createZipAssetStore`, and `createNodeCanvasAdapter({ assetStore })`.
 - `AssetStore.has` remains synchronous so existing core path resolution and CLI validation do not change contracts.
 
-- [ ] **Step 1: Write asset-store tests first**
+- [x] **Step 1: Write asset-store tests first**
 
 Create `packages/cli/test/asset-store.test.ts` covering:
 
@@ -714,7 +714,7 @@ const image = await adapter.loadImage('lpc-zip:/spritesheets/body/bodies/male/wa
 expect({ width: image.width, height: image.height }).toEqual({ width: 64, height: 64 });
 ```
 
-- [ ] **Step 2: Run the test and confirm the intended failure**
+- [x] **Step 2: Run the test and confirm the intended failure**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-store.test.ts
@@ -722,7 +722,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- asset-store.test.ts
 
 Expected: FAIL because `asset-store.ts` and the adapter option do not exist.
 
-- [ ] **Step 3: Implement the common asset-store contract**
+- [x] **Step 3: Implement the common asset-store contract**
 
 Create `packages/cli/src/asset-store.ts` with:
 
@@ -758,7 +758,7 @@ category and entry, load `<zipsRoot>/<category>.zip` through one cached
 `Promise<JSZip>` per category, and return `await file.async('nodebuffer')`.
 Reject path traversal before reading a ZIP.
 
-- [ ] **Step 4: Update the Node canvas adapter**
+- [x] **Step 4: Update the Node canvas adapter**
 
 Change `packages/cli/src/node-canvas-adapter.ts` to:
 
@@ -787,7 +787,7 @@ export function createNodeCanvasAdapter(
 Keep `writeCanvasPng` unchanged. Existing directory-based render tests must
 still pass without specifying an asset store.
 
-- [ ] **Step 5: Run focused verification**
+- [x] **Step 5: Run focused verification**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-store.test.ts render.test.ts validation.test.ts
@@ -796,7 +796,7 @@ rtk pnpm --filter @lpc-toolkit/cli typecheck
 
 Expected: PASS and exit 0.
 
-- [ ] **Step 6: Commit Task 4**
+- [x] **Step 6: Commit Task 4**
 
 ```bash
 rtk git add packages/cli/src/asset-store.ts packages/cli/src/node-canvas-adapter.ts packages/cli/test/asset-store.test.ts packages/cli/test/render.test.ts
@@ -804,6 +804,13 @@ rtk git commit -m "feat(cli): render sprites from cached zips"
 ```
 
 After committing, record the exact hash and Step 5 results under Task 4, mark its checkboxes complete, and commit that record separately.
+
+**Implementation record:**
+
+- Implementation: `9814c0a6fe2381b48cc4a01eeda8876b49ef8ec4` (`feat(cli): render sprites from cached zips`)
+- Verification: focused asset-store, render, and validation tests PASS (11/11); package-directory CLI typecheck PASS via `rtk pnpm typecheck` from `packages/cli`.
+- RTK note: the shorthand `rtk pnpm --filter @lpc-toolkit/cli typecheck` reported no TypeScript errors but returned exit 1 because RTK does not support that filtered shorthand; running `rtk pnpm typecheck` from `packages/cli` exited 0.
+- Implementation note: added directory and index-backed ZIP asset stores with traversal and scheme rejection, synchronous existence checks, cached per-category ZIP parsing, buffer-backed Node canvas loading, and preserved default directory rendering.
 
 ---
 
