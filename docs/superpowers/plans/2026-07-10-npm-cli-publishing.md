@@ -1584,8 +1584,8 @@ perform them.
     `0.1.0`; token decode skipped asset preparation but loaded its catalog only
     from `<cwd>/assets`.
   - Fix: `prepack` now runs the production build; package smoke derives the
-    archive name from package metadata and covers simulated `0.2.0`; the build
-    emits a strict, stripped 144.1K token-decode catalog containing item decode
+    archive name from package metadata and covers simulated `0.2.0`; the package
+    includes strict, stripped token-decode metadata containing item decode
     fields and palette names only, with no spritesheets or color ramps.
   - RED/GREEN: clean pack first omitted `dist/asset-release.json`; simulated
     next-version import first failed with `ERR_MODULE_NOT_FOUND`; packed offline
@@ -1595,10 +1595,40 @@ perform them.
     legacy optional `base: null`, normalized by the generator without weakening
     runtime types.
   - Verification: `rtk pnpm --filter @lpc-toolkit/cli test` PASS (130 passed,
-    1 skipped); CLI typecheck PASS; CLI build PASS; clean/prepack packed install
-    smoke PASS after installing 16 packages, including empty-cwd
+    1 skipped); CLI typecheck PASS; CLI build PASS; dist-clean prepack packed
+    install smoke PASS after installing 16 packages, including empty-cwd
     `sex=male&hair=Braid` decode with exit 0 and empty stderr;
     `rtk pnpm check:boundaries` PASS; workspace typecheck PASS; full workspace
     tests PASS (core 162, presets 2, CLI 130 with 1 skip, web 499 with 1 skip);
     `rtk git diff --check` PASS. npm-cache and `tsx` IPC sandbox denials were
     rerun unchanged with approval and passed.
+  - Initial verification limitation: this smoke deleted `dist/` but retained
+    the local gitignored `assets/`; the clean-checkout dependency and corrected
+    evidence are recorded below.
+
+- [x] Remove the ordinary build's dependency on gitignored prepared assets.
+  - Implementation: `76fd56d7a5a166d4e0960cbea94d191c21703682`
+    (`fix(cli): remove clean-build asset dependency`).
+  - Root cause: ordinary build invoked the maintenance metadata generator,
+    which unconditionally scanned gitignored `assets/sheet_definitions` and
+    `assets/palette_definitions`; the earlier smoke removed only `dist/`.
+  - RED: package smoke atomically moved local `assets/` to a unique
+    same-filesystem backup, then prepack failed with `ENOENT` scanning
+    `assets/sheet_definitions`; `finally` restored the directory. The tracked
+    snapshot assertion separately failed because no snapshot existed. A
+    no-ramp assertion then failed on retained recolor `source` hex values.
+  - Fix: ordinary build copies the tracked deterministic 141.5K
+    `token-decode-metadata.snapshot.json` to `dist/`, invokes the compiled strict
+    loader to validate it, and asserts the catalog plus hair/Braid. Only the
+    maintenance generator reads prepared assets; it now emits material/palette
+    names without source ramps. Repeated refreshes produced identical SHA-256
+    `aa5dc13e5ca75f11dcecc035f9749d29040c0f631c9b5f9446d7042bae4acd3f`.
+  - GREEN: the same smoke passed with repo `assets/` absent throughout prepack,
+    restored it afterward, installed 16 packages, and decoded
+    `sex=male&hair=Braid` from an empty cwd with exit 0 and empty stderr.
+  - Verification: package metadata 15/15 PASS; focused release/package tests
+    53/53 PASS; full CLI tests 131 PASS with 1 skip; CLI typecheck PASS; CLI
+    build PASS; assets-absent `test:package` PASS; boundaries PASS; simulated
+    `v0.1.0` release-tag verification PASS; workflow invariants rechecked;
+    snapshot/dist byte comparison PASS; no-ramp scan PASS; `git diff --check`
+    PASS. The npm-cache package smoke ran unchanged with approval.
