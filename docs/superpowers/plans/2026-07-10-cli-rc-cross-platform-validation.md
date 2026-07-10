@@ -39,7 +39,7 @@
 - Produces: package script `verify:rc-tag`, implemented by `node scripts/verify-rc-tag.mjs`; exit code `0` means an exact matching RC tag, and exit code `1` means malformed or mismatched input.
 - Produces: platform-aware context override assertions using `path.resolve()` rather than a POSIX-only literal.
 
-- [ ] **Step 1: Write failing RC verifier and package-script tests**
+- [x] **Step 1: Write failing RC verifier and package-script tests**
 
 Create `packages/cli/test/release-tag.test.ts`:
 
@@ -122,7 +122,7 @@ expect(packageJson.scripts).toMatchObject({
 });
 ```
 
-- [ ] **Step 2: Run the focused tests and verify RED**
+- [x] **Step 2: Run the focused tests and verify RED**
 
 Run:
 
@@ -133,7 +133,7 @@ rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/release-tag.test.ts test
 Expected: FAIL because `scripts/verify-rc-tag.mjs` and the
 `verify:rc-tag` package script do not exist.
 
-- [ ] **Step 3: Implement the minimal RC verifier and package command**
+- [x] **Step 3: Implement the minimal RC verifier and package command**
 
 Create `packages/cli/scripts/verify-rc-tag.mjs`:
 
@@ -177,7 +177,7 @@ tag verifier:
 "verify:release-tag": "node scripts/verify-release-tag.mjs"
 ```
 
-- [ ] **Step 4: Replace the POSIX-only context expectation**
+- [x] **Step 4: Replace the POSIX-only context expectation**
 
 Replace the `accepts asset root override` test in
 `packages/cli/test/context.test.ts` with:
@@ -199,7 +199,7 @@ This change uses the observed Windows CI failure as the RED evidence:
 Windows correctly resolved the literal to a drive-letter path while the old
 test incorrectly expected the POSIX source string.
 
-- [ ] **Step 5: Run focused and full CLI verification**
+- [x] **Step 5: Run focused and full CLI verification**
 
 Run:
 
@@ -212,7 +212,7 @@ rtk pnpm --filter @lpc-toolkit/cli run typecheck
 Expected: all focused tests PASS, the full CLI suite PASS with only its existing
 documented skips, and TypeScript exits `0`.
 
-- [ ] **Step 6: Commit Task 1**
+- [x] **Step 6: Commit Task 1**
 
 ```bash
 rtk git add packages/cli/package.json packages/cli/scripts/verify-rc-tag.mjs packages/cli/test/release-tag.test.ts packages/cli/test/package-metadata.test.ts packages/cli/test/context.test.ts
@@ -222,6 +222,16 @@ rtk git commit -m "test(cli): add release candidate tag verification"
 Expected: one focused implementation commit. After task review passes, update
 this task checkbox with an implementation note, the commit hash, and the exact
 verification result, then commit that plan record separately.
+
+**Implementation record:**
+
+- Implementation: Added the exact RC tag verifier/package command and real
+  subprocess coverage, then made the asset-root override expectation use
+  platform-resolved paths.
+- Commit: `22642c01670bd6769c6df3dbc128bdf3233456ae`
+- Verification: focused tests 23/23 PASS; full CLI tests 136 PASS with 1
+  existing skip; CLI typecheck PASS; task review spec compliant and task
+  quality approved with no findings.
 
 ---
 
