@@ -86,34 +86,6 @@ To start the web UI development server locally:
 pnpm --filter @lpc-toolkit/web dev
 ```
 
-To build and inspect the CLI locally:
-
-```bash
-pnpm --filter @lpc-toolkit/cli build
-node packages/cli/dist/index.js --help
-```
-
-To install the CLI for local development:
-
-```bash
-pnpm build
-pnpm add -g "$PWD/packages/cli"
-lpc-toolkit --help
-```
-
-To verify the package as an installable tarball:
-
-```bash
-pnpm build
-pnpm --filter @lpc-toolkit/cli pack --pack-destination /tmp
-pnpm add -g /tmp/lpc-toolkit-cli-0.0.0.tgz
-lpc-toolkit --help
-```
-
-The CLI build vendors the local `@lpc-toolkit/core` and
-`@lpc-toolkit/presets` runtime output into the CLI `dist/` folder, so the CLI
-tarball does not require those workspace packages to be published first.
-
 ## `@lpc-toolkit/core`
 
 The core is pure logic. It does not load files or create canvases itself —
@@ -205,6 +177,19 @@ commands for:
 - presets: `lpc-toolkit preset list`, `lpc-toolkit preset materialize <preset-id> --out <file>`, `lpc-toolkit preset render <preset-id> --out <dir>`
 - rendering: `lpc-toolkit render --selection <file> --out <dir>`
 
+Node.js 22 or newer is required. Install the public CLI package from npm:
+
+```bash
+npm install -g @lpc-toolkit/cli
+lpc-toolkit --help
+```
+
+See [`packages/cli/README.md`](packages/cli/README.md) for `npx` usage, command
+examples, cache locations and offline behavior, local asset precedence,
+troubleshooting, attribution, and licensing. The CLI is the public npm package;
+`@lpc-toolkit/core` and `@lpc-toolkit/presets` remain workspace packages and are
+not published separately.
+
 CLI rendering writes the composed sheet plus required metadata and credit files,
 with optional animation strips, frame exports, and ZIP bundles.
 
@@ -212,6 +197,48 @@ The CLI owns Node-specific runtime dependencies such as `@napi-rs/canvas`
 (MIT) and `jszip` (MIT). These dependencies are GPL-compatible and must remain
 outside `packages/core/src/**`; core continues to receive image loading and
 canvas creation through injected adapter contracts.
+
+### Maintainers: local package and tarball verification
+
+These commands exercise the unpublished workspace build. They are not public
+installation instructions:
+
+```bash
+pnpm --filter @lpc-toolkit/cli build
+node packages/cli/dist/index.js --help
+pnpm --filter @lpc-toolkit/cli test:package
+pnpm --filter @lpc-toolkit/cli pack --pack-destination /tmp
+pnpm add -g /tmp/lpc-toolkit-cli-0.1.0.tgz
+lpc-toolkit --help
+```
+
+The CLI build vendors the local core and presets runtime output into `dist/`, so
+the tarball does not require `@lpc-toolkit/core` or `@lpc-toolkit/presets` to be
+published.
+
+### Maintainers: npm bootstrap and later releases
+
+The first publication is a deliberate manual gate. After all implementation
+verification passes and the release is explicitly authorized:
+
+1. Merge the implementation, then create and push tag `v0.1.0`.
+2. Confirm the **Publish CLI** workflow passes all verification and skips only
+   its publish step for `v0.1.0`.
+3. From `packages/cli`, use the npm owner account and 2FA to run
+   `npm publish --access public`.
+4. Install `@lpc-toolkit/cli@0.1.0` from the public npm registry into a clean
+   prefix and verify `lpc-toolkit --help` and a real asset-dependent command.
+5. Configure npm Trusted Publisher for repository
+   `ochowei/lpc-toolkit-2026-1`, workflow `publish.yml`, with `npm publish` as
+   the allowed action.
+
+For later releases, update `packages/cli/package.json` to the intended version
+and push the matching `v<version>` tag. The tag workflow verifies the version,
+boundaries, types, tests, packed install, and real assets before publishing via
+npm OIDC. After one later OIDC release succeeds, restrict traditional token
+publishing. Creating tags, publishing, registry verification, and Trusted
+Publisher configuration are external release operations and must not be run as
+ordinary implementation verification.
 
 ## Web UI design reference
 

@@ -27,6 +27,11 @@ function readCliPackageJson(): CliPackageJson {
   return JSON.parse(readFileSync(packageJsonPath, 'utf8')) as CliPackageJson;
 }
 
+function readCliReadme(): string {
+  const testDir = path.dirname(fileURLToPath(import.meta.url));
+  return readFileSync(path.resolve(testDir, '../README.md'), 'utf8');
+}
+
 describe('CLI package metadata', () => {
   it('declares public npm release metadata', () => {
     const packageJson = readCliPackageJson();
@@ -138,5 +143,15 @@ describe('CLI package metadata', () => {
 
     expect(smokeScript.indexOf('try {')).toBeLessThan(smokeScript.indexOf('mkdtempSync('));
     expect(smokeScript).toContain('finally {');
+  });
+
+  it('documents the public installation and asset-cache contract', () => {
+    const readme = readCliReadme();
+
+    expect(readme).toContain('npm install -g @lpc-toolkit/cli');
+    expect(readme).toContain('Node.js 22');
+    expect(readme).toContain('LPC_TOOLKIT_CACHE_DIR');
+    expect(readme).toContain('CREDITS.csv');
+    expect(readme).toContain('GPL-3.0-or-later');
   });
 });
