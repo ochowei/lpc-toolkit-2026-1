@@ -108,36 +108,51 @@ never be imported from `packages/core/src/`.
 ```ts
 import {
   createCatalog,
+  createPaletteCatalog,
   composeSelections,
   extractAnimation,
+  makeResolvePalette,
+  type CanvasAdapter,
+  type FilePath,
+  type ItemDefinition,
   type Selections,
 } from '@lpc-toolkit/core';
 
-// 1. Build a catalog from sheet_definitions JSON, keyed by file path.
-const { catalog, warnings } = createCatalog(records);
+// The caller loads sheet_definitions and palette_definitions JSON records and
+// supplies an environment-specific canvas adapter.
+declare const records: Readonly<Record<FilePath, ItemDefinition>>;
+declare const paletteRecords: Readonly<Record<FilePath, unknown>>;
+declare const adapter: CanvasAdapter;
 
-// 2. Describe the character.
+// 1. Build the item and palette catalogs from records keyed by file path.
+const { catalog, warnings: catalogWarnings } = createCatalog(records);
+const { palettes, warnings: paletteWarnings } =
+  createPaletteCatalog(paletteRecords);
+console.warn(...catalogWarnings, ...paletteWarnings);
+
+// 2. Recolor-backed assets use `recolor`, not a filename `variant`.
 const selections: Selections = {
   bodyType: 'male',
   items: {
-    body: { typeName: 'body', name: 'Body color', variant: 'light' },
-    hair: { typeName: 'hair', name: 'Afro', variant: 'black' },
+    body: { typeName: 'body', name: 'Body Color', recolor: 'brown' },
+    hair: { typeName: 'hair', name: 'Afro', recolor: 'black' },
   },
 };
 
-// 3. Compose the 832×3456 master sheet. `spritesheetsBaseUrl` points at
-//    the directory that contains `spritesheets/` (e.g. the upstream checkout).
+// 3. Compose the standard 832×3456 master sheet. The base URL/path is the
+//    directory that contains `spritesheets/`, such as the prepared `assets/`.
 const sheet = await composeSelections(selections, {
   catalog,
   adapter,
   spritesheetsBaseUrl: '/path/to/repo/assets',
+  resolvePalette: makeResolvePalette(catalog, palettes, selections),
 });
 
 // 4. Crop one animation out of the master sheet.
 const walk = extractAnimation(sheet, 'walk', { adapter });
 
-// Attribution is always available alongside the pixels.
-console.log(sheet.credits.licenses);
+// Attribution is always available alongside both outputs.
+console.log(sheet.credits.licenses, walk.credits.licenses);
 ```
 
 ### Public API
