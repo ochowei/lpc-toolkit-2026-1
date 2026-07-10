@@ -269,7 +269,7 @@ parity config validates and starts the isolated `LPC_UPSTREAM_PARITY_DIR` checko
 - The parity job reads `sourceRepository` and `sourceSha` from `asset-release.json`, fetches that exact commit into the environment directory, asserts actual `HEAD` equality, runs `npm ci --prefix "$LPC_UPSTREAM_PARITY_DIR"`, then invokes `pnpm --filter @lpc-toolkit/web test:e2e:parity`.
 - `pretest:e2e:parity` remains `pnpm prepare-assets && pnpm verify-upstream-parity`, so Playwright cannot start before the isolated source and materialized asset manifest pass SHA verification.
 
-- [ ] **Step 1: Add failing workflow contract assertions**
+- [x] **Step 1: Add failing workflow contract assertions**
 
 Extend `packages/web/test/package-scripts.test.ts` with slices for `e2e` and `e2e-parity`. Assert:
 
@@ -292,13 +292,13 @@ expect(ciWorkflow).not.toContain('working-directory: upstream');
 expect(ciWorkflow).not.toContain('../../upstream');
 ```
 
-- [ ] **Step 2: Run the workflow contract and verify RED**
+- [x] **Step 2: Run the workflow contract and verify RED**
 
 Run: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/package-scripts.test.ts`
 
 Expected: FAIL because the current ordinary E2E job checks out submodules and installs in `upstream/`, and no isolated parity job exists.
 
-- [ ] **Step 3: Remove upstream from the ordinary E2E job**
+- [x] **Step 3: Remove upstream from the ordinary E2E job**
 
 In `.github/workflows/ci.yml`, remove `submodules: recursive` from the `e2e` checkout and delete:
 
@@ -309,7 +309,7 @@ In `.github/workflows/ci.yml`, remove `submodules: recursive` from the `e2e` che
 
 Keep the ordinary Playwright browser cache, install, test, and failure artifact upload intact.
 
-- [ ] **Step 4: Add the isolated parity job**
+- [x] **Step 4: Add the isolated parity job**
 
 Add `e2e-parity` with the same `needs`, change filter, Node/pnpm setup, browser cache strategy, and failure report behavior as ordinary E2E. Set the job-level environment and materialize the exact source with:
 
@@ -343,7 +343,7 @@ steps:
 
 This npm command is limited to the isolated upstream repository because its committed lockfile is `package-lock.json`; all toolkit installation and scripts remain pnpm-based.
 
-- [ ] **Step 5: Run workflow/package contracts and inspect forbidden references**
+- [x] **Step 5: Run workflow/package contracts and inspect forbidden references**
 
 Run:
 
@@ -354,7 +354,7 @@ rtk rg -n "working-directory: upstream|\.\./\.\./upstream|--prefix ../../upstrea
 
 Expected: tests PASS; `rg` exits with status 1 and prints no matches.
 
-- [ ] **Step 6: Commit the CI isolation**
+- [x] **Step 6: Commit the CI isolation**
 
 ```bash
 rtk git add .github/workflows/ci.yml packages/web/test/package-scripts.test.ts
@@ -362,6 +362,14 @@ rtk git commit -m "ci: run parity from isolated upstream checkout"
 ```
 
 After committing, mark this task complete and add its implementation note, commit hash, and focused verification result below the checkbox list.
+
+Implementation note: Removed recursive submodule checkout and upstream installation from
+ordinary web E2E, and added a dedicated parity job that materializes the repository and
+exact SHA from `asset-release.json` under runner temp, verifies `HEAD`, installs from the
+isolated lockfile, and runs the parity-only Playwright lifecycle.
+
+- Commit: `45e1b6b9236befde1e1e6a5aa23dcb25673304e7`
+- Verification: workflow/package Vitest (`31 passed`), forbidden-reference scan returned no matches, and `git diff --check` PASS.
 
 ## Task 4: Verify Plan 3 and record evidence
 
