@@ -78,4 +78,26 @@ describe('token commands', () => {
       ]),
     );
   });
+
+  it('preserves catalog warnings when token decoding fails', () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-token-'));
+    const definitionsRoot = path.join(cwd, 'assets', 'sheet_definitions');
+    mkdirSync(definitionsRoot, { recursive: true });
+    writeFileSync(
+      path.join(definitionsRoot, 'broken.json'),
+      JSON.stringify({ name: 'Broken' }),
+    );
+
+    const response = runTokenCommand(
+      parseArgs(['token', 'decode', '--token', 'v1.A']),
+      cwd,
+    );
+
+    expect(response.ok).toBe(false);
+    expect(response.warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'catalog_warning', path: 'broken.json' }),
+      ]),
+    );
+  });
 });

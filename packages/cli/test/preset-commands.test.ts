@@ -9,6 +9,24 @@ import {
   materializePreset,
   runPresetCommand,
 } from '../src/preset-commands.js';
+import { createDirectoryAssetStore } from '../src/asset-store.js';
+import { createRuntimeContext } from '../src/context.js';
+import type { RuntimeAssets } from '../src/runtime-assets.js';
+
+function createRuntime(cwd: string): RuntimeAssets {
+  const assetsRoot = path.join(cwd, 'assets');
+  mkdirSync(assetsRoot, { recursive: true });
+  const store = createDirectoryAssetStore(assetsRoot);
+  return {
+    context: createRuntimeContext({
+      cwd,
+      assetsRoot,
+      spritesheetsBaseUrl: store.baseUrl,
+    }),
+    store,
+    source: 'working-directory',
+  };
+}
 
 describe('preset commands', () => {
   it('lists built-in presets', () => {
@@ -66,9 +84,11 @@ describe('preset commands', () => {
   });
 
   it('reports unknown preset ids through the response envelope', () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-preset-'));
     const response = runPresetCommand(
       parseArgs(['preset', 'materialize', 'missing']),
-      '/tmp',
+      cwd,
+      createRuntime(cwd),
     );
 
     expect(response.ok).toBe(false);
@@ -81,6 +101,7 @@ describe('preset commands', () => {
     const response = runPresetCommand(
       parseArgs(['preset', 'materialize', 'farmer', '--out', 'farmer.json']),
       cwd,
+      createRuntime(cwd),
     );
 
     expect(response.ok).toBe(true);
@@ -95,6 +116,7 @@ describe('preset commands', () => {
     const response = runPresetCommand(
       parseArgs(['preset', 'materialize', 'farmer', '--out', 'blocked']),
       cwd,
+      createRuntime(cwd),
     );
 
     expect(response.ok).toBe(false);

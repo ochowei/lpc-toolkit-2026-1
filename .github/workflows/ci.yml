@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       web: ${{ steps.filter.outputs.web }}
+      cli: ${{ steps.filter.outputs.cli }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -24,6 +25,15 @@ jobs:
               - 'packages/web/**'
               - 'packages/core/**'
               - 'pnpm-lock.yaml'
+            cli:
+              - 'packages/cli/**'
+              - 'packages/core/**'
+              - 'packages/presets/**'
+              - 'asset-release.json'
+              - 'pnpm-lock.yaml'
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/cli-release-candidate.yml'
+              - '.github/workflows/publish.yml'
 
   unit:
     name: Unit tests
@@ -40,6 +50,24 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test
+
+  cli-package:
+    name: CLI package (ubuntu-latest)
+    needs: [unit, changes]
+    if: needs.changes.outputs.cli == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @lpc-toolkit/cli typecheck
+      - run: pnpm --filter @lpc-toolkit/cli test
+      - run: pnpm --filter @lpc-toolkit/cli build
+      - run: pnpm --filter @lpc-toolkit/cli test:package
 
   e2e:
     name: E2E (web)

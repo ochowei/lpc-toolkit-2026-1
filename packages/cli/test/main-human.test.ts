@@ -6,9 +6,13 @@ import { runCli } from '../src/main.js';
 
 function makeCatalogCwd(): string {
   const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-human-'));
-  const root = path.join(cwd, 'assets', 'sheet_definitions');
+  const assetsRoot = path.join(cwd, 'assets');
+  const root = path.join(assetsRoot, 'sheet_definitions');
   mkdirSync(path.join(root, 'body'), { recursive: true });
   mkdirSync(path.join(root, 'hair'), { recursive: true });
+  mkdirSync(path.join(assetsRoot, 'palette_definitions'), { recursive: true });
+  mkdirSync(path.join(assetsRoot, 'spritesheets'), { recursive: true });
+  writeFileSync(path.join(assetsRoot, 'CREDITS.csv'), 'file,authors,licenses\n');
   writeFileSync(
     path.join(root, 'body', 'body.json'),
     JSON.stringify({

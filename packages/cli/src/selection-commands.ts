@@ -1,10 +1,10 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { ParsedArgs } from './args.js';
 import { flagString } from './args.js';
-import { createRuntimeContext } from './context.js';
 import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
 import { commandError, commandOk, type CliResponse } from './response.js';
+import type { RuntimeAssets } from './runtime-assets.js';
 import { parseSelectionJson } from './selection.js';
 import { validateSelections } from './validation.js';
 
@@ -14,7 +14,7 @@ function errorMessage(error: unknown): string {
 
 export function runSelectionCommand(
   parsed: ParsedArgs,
-  cwd: string,
+  runtime: RuntimeAssets,
 ): CliResponse<unknown> {
   if (parsed.command[1] !== 'validate') {
     return commandError(parsed.command.join(' '), {
@@ -30,7 +30,7 @@ export function runSelectionCommand(
     });
   }
 
-  const context = createRuntimeContext({ cwd });
+  const context = runtime.context;
   const catalog = loadCatalogFromRoots(
     context.sheetDefinitionsRoot,
     context.customSheetDefinitionsRoot,
@@ -38,7 +38,7 @@ export function runSelectionCommand(
   const palettes = loadPalettesFromRoot(context.paletteDefinitionsRoot);
   let selectionSource: string;
   try {
-    selectionSource = readFileSync(path.resolve(cwd, selectionPath), 'utf8');
+    selectionSource = readFileSync(path.resolve(context.repoRoot, selectionPath), 'utf8');
   } catch (error) {
     return commandError('selection validate', {
       code: 'selection_read_failed',
@@ -61,7 +61,7 @@ export function runSelectionCommand(
   const validation = validateSelections(parsedSelection.selections, {
     catalog: catalog.catalog,
     palettes: palettes.palettes,
-    pathExists: (spritePath) => existsSync(path.join(context.spritesheetsBaseUrl, spritePath)),
+    pathExists: (spritePath) => runtime.store.has(spritePath),
   });
 
   const warnings = [...catalog.warnings, ...palettes.warnings, ...validation.warnings];

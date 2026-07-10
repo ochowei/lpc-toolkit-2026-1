@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import {
   decodeSelectionToken,
@@ -18,6 +18,10 @@ import {
   selectionJsonFromCore,
   type SelectionJson,
 } from './selection.js';
+import {
+  loadBundledTokenDecodeData,
+  type TokenDecodeData,
+} from './token-decode-metadata.js';
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -66,6 +70,24 @@ export function decodeTokenToSelectionJson(
   return decodeTokenToSelectionJsonWithWarnings(tokenOrHash, catalog, palettes).selection;
 }
 
+function loadTokenDecodeData(cwd: string): TokenDecodeData {
+  const context = createRuntimeContext({ cwd });
+  if (!existsSync(context.sheetDefinitionsRoot)) {
+    return loadBundledTokenDecodeData();
+  }
+
+  const catalog = loadCatalogFromRoots(
+    context.sheetDefinitionsRoot,
+    context.customSheetDefinitionsRoot,
+  );
+  const palettes = loadPalettesFromRoot(context.paletteDefinitionsRoot);
+  return {
+    catalog: catalog.catalog,
+    palettes: palettes.palettes,
+    warnings: [...catalog.warnings, ...palettes.warnings],
+  };
+}
+
 export function runTokenCommand(
   parsed: ParsedArgs,
   cwd: string,
@@ -105,19 +127,17 @@ export function runTokenCommand(
       });
     }
 
-    const context = createRuntimeContext({ cwd });
-    const catalog = loadCatalogFromRoots(
-      context.sheetDefinitionsRoot,
-      context.customSheetDefinitionsRoot,
-    );
-    const palettes = loadPalettesFromRoot(context.paletteDefinitionsRoot);
+    let decodeData: TokenDecodeData;
+    let decodeWarnings: readonly CliIssue[] = [];
     let selection: SelectionJson;
     let tokenWarnings: readonly CliIssue[] = [];
     try {
+      decodeData = loadTokenDecodeData(cwd);
+      decodeWarnings = decodeData.warnings;
       const decoded = decodeTokenToSelectionJsonWithWarnings(
         token,
-        catalog.catalog,
-        palettes.palettes,
+        decodeData.catalog,
+        decodeData.palettes,
       );
       selection = decoded.selection;
       tokenWarnings = decoded.warnings;
@@ -128,7 +148,7 @@ export function runTokenCommand(
           code: 'invalid_token',
           message: errorMessage(error),
         },
-        [...catalog.warnings, ...palettes.warnings],
+        decodeWarnings,
       );
     }
 
@@ -144,14 +164,13 @@ export function runTokenCommand(
             message: errorMessage(error),
             path: out,
           },
-          [...catalog.warnings, ...palettes.warnings, ...tokenWarnings],
+          [...decodeData.warnings, ...tokenWarnings],
         );
       }
     }
 
     return commandOk('token decode', { selection, out: out ?? null }, [
-      ...catalog.warnings,
-      ...palettes.warnings,
+      ...decodeData.warnings,
       ...tokenWarnings,
     ]);
   }

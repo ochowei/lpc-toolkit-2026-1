@@ -56,6 +56,8 @@ export interface ComposeOptions {
   readonly animations?: readonly AnimationName[];
   /** Optional progress callback invoked as spritesheets are fetched and loaded. */
   readonly onProgress?: (loaded: number, total: number) => void;
+  /** Optional observer that may rethrow caller-specific image loading errors. */
+  readonly onImageLoadError?: (error: unknown, logicalPath: string) => void;
   /** Optional extra static layers to compose onto the standard sheet, respecting their zPos. */
   readonly extraStandardLayers?: readonly ExtraStandardLayer[];
   /** Optional 1-based item layer filter, used by split-by-item ZIP parity exports. */
@@ -542,6 +544,7 @@ export async function composeSelections(
           );
           return { d, img };
         } catch (error) {
+          options.onImageLoadError?.(error, d.path);
           missingPaths.add(d.path);
           console.warn(`[LPC Composer] Missing optional spritesheet: ${d.path}`, error);
           return { d, img: null };
@@ -612,6 +615,7 @@ export async function composeSelections(
             );
             return { c, img };
           } catch (error) {
+            options.onImageLoadError?.(error, c.path);
             missingPaths.add(c.path);
             console.warn(`[LPC Composer] Missing custom spritesheet: ${c.path}`, error);
             return { c, img: null };

@@ -8,9 +8,17 @@ import {
 } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createCanvas } from '@napi-rs/canvas';
+import { createCanvas, loadImage } from '@napi-rs/canvas';
+import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
 import { renderSelection } from '../src/render.js';
+import type { AssetCacheLayout } from '../src/asset-cache.js';
+import {
+  createDirectoryAssetStore,
+  createZipAssetStore,
+} from '../src/asset-store.js';
+import { createRuntimeContext } from '../src/context.js';
+import type { RuntimeAssets } from '../src/runtime-assets.js';
 
 const sheetDefinition = {
   name: 'Body Color',
@@ -60,6 +68,69 @@ async function createFixtureRepo(): Promise<string> {
   return cwd;
 }
 
+function createRuntime(cwd: string): RuntimeAssets {
+  const assetsRoot = path.join(cwd, 'assets');
+  const store = createDirectoryAssetStore(assetsRoot);
+  return {
+    context: createRuntimeContext({
+      cwd,
+      assetsRoot,
+      spritesheetsBaseUrl: store.baseUrl,
+    }),
+    store,
+    source: 'working-directory',
+  };
+}
+
+async function createManagedRuntime(): Promise<RuntimeAssets> {
+  const cwd = mkdtempSync(path.join(os.tmpdir(), 'lpc-render-managed-'));
+  const releaseRoot = path.join(cwd, 'cache', 'assets-v1');
+  const layout: AssetCacheLayout = {
+    releaseRoot,
+    zipsRoot: path.join(releaseRoot, 'zips'),
+    sheetDefinitionsRoot: path.join(releaseRoot, 'sheet_definitions'),
+    paletteDefinitionsRoot: path.join(releaseRoot, 'palette_definitions'),
+    creditsPath: path.join(releaseRoot, 'CREDITS.csv'),
+    manifestPath: path.join(releaseRoot, 'asset-manifest.json'),
+    spriteIndexPath: path.join(releaseRoot, 'sprite-index.json'),
+    metadataIndexPath: path.join(releaseRoot, 'metadata-index.json'),
+  };
+  writeJson(path.join(layout.sheetDefinitionsRoot, 'body/body.json'), sheetDefinition);
+  mkdirSync(layout.paletteDefinitionsRoot, { recursive: true });
+  mkdirSync(layout.zipsRoot, { recursive: true });
+  writeFileSync(
+    layout.creditsPath,
+    'file,authors,licenses\nbody/bodies/male,Fixture Artist,GPL 3.0\n',
+  );
+  writeFileSync(
+    layout.spriteIndexPath,
+    `${JSON.stringify(['spritesheets/body/bodies/male/walk.png'])}\n`,
+  );
+
+  const spriteCanvas = createCanvas(832, 4 * 64);
+  const spriteContext = spriteCanvas.getContext('2d');
+  spriteContext.fillStyle = '#00ff00';
+  spriteContext.fillRect(0, 0, 64, 64);
+  const zip = new JSZip();
+  zip.file('bodies/male/walk.png', await spriteCanvas.encode('png'));
+  writeFileSync(
+    path.join(layout.zipsRoot, 'body.zip'),
+    await zip.generateAsync({ type: 'nodebuffer' }),
+  );
+
+  const store = createZipAssetStore(layout);
+  return {
+    context: createRuntimeContext({
+      cwd,
+      assetsRoot: layout.releaseRoot,
+      spritesheetsBaseUrl: store.baseUrl,
+    }),
+    store,
+    source: 'managed-cache',
+    releaseTag: 'assets-v1',
+  };
+}
+
 const bodyOnlySelection = {
   schema: 'lpc-toolkit.selection.v1',
   name: 'body-only',
@@ -70,10 +141,12 @@ const bodyOnlySelection = {
 } as const;
 
 describe('renderSelection', () => {
-  it('writes sheet, metadata, and credits for a body-only selection', async () => {
+  it('keeps default directory rendering for a body-only selection', async () => {
     const cwd = await createFixtureRepo();
     const outDir = mkdtempSync(path.join(os.tmpdir(), 'lpc-render-'));
+    const runtime = createRuntime(cwd);
     const result = await renderSelection({
+      runtime,
       cwd,
       outDir,
       selectionName: 'body-only',
@@ -89,10 +162,72 @@ describe('renderSelection', () => {
     expect(existsSync(path.join(outDir, 'body-only.metadata.json'))).toBe(true);
     expect(existsSync(path.join(outDir, 'body-only.credits.txt'))).toBe(true);
     expect(existsSync(path.join(outDir, 'body-only.credits.csv'))).toBe(true);
-    expect(
-      JSON.parse(readFileSync(path.join(outDir, 'body-only.metadata.json'), 'utf8')).selection
-        .name,
-    ).toBe('body-only');
+    const metadata = JSON.parse(
+      readFileSync(path.join(outDir, 'body-only.metadata.json'), 'utf8'),
+    ) as {
+      readonly selection: { readonly name: string };
+      readonly source: Readonly<Record<string, unknown>>;
+    };
+    expect(metadata.selection.name).toBe('body-only');
+    expect(metadata.source).toEqual({
+      runtimeSource: 'working-directory',
+      description: runtime.store.description,
+      releaseTag: null,
+      baseDefinitionsRoot: runtime.context.sheetDefinitionsRoot,
+      customOverlayRoot: runtime.context.customAssetsRoot,
+      spritesheetsBaseUrl: runtime.store.baseUrl,
+    });
+  }, 30000);
+
+  it('renders and attributes a managed ZIP runtime through core composition', async () => {
+    const runtime = await createManagedRuntime();
+    const outDir = mkdtempSync(path.join(os.tmpdir(), 'lpc-render-zip-'));
+
+    await renderSelection({
+      runtime,
+      cwd: runtime.context.repoRoot,
+      outDir,
+      selectionName: 'managed-body',
+      selectionJson: bodyOnlySelection,
+      animations: [],
+      frames: [],
+      bundleZip: false,
+      allowPartial: false,
+    });
+
+    const sheetPath = path.join(outDir, 'managed-body.sheet.png');
+    const sheetImage = await loadImage(sheetPath);
+    const pixelCanvas = createCanvas(sheetImage.width, sheetImage.height);
+    const pixelContext = pixelCanvas.getContext('2d');
+    pixelContext.drawImage(sheetImage, 0, 0);
+    expect(pixelContext.getImageData(0, 8 * 64, 1, 1).data[3]).toBeGreaterThan(0);
+
+    expect(readFileSync(path.join(outDir, 'managed-body.credits.txt'), 'utf8')).toContain(
+      'Fixture Artist',
+    );
+    expect(readFileSync(path.join(outDir, 'managed-body.credits.csv'), 'utf8')).toContain(
+      'GPL 3.0',
+    );
+    const metadata = JSON.parse(
+      readFileSync(path.join(outDir, 'managed-body.metadata.json'), 'utf8'),
+    ) as {
+      readonly effectiveLicense: string;
+      readonly credits: {
+        readonly entries: number;
+        readonly licenses: readonly string[];
+      };
+      readonly source: Readonly<Record<string, unknown>>;
+    };
+    expect(metadata.effectiveLicense).toBe('GPL 3.0');
+    expect(metadata.credits).toMatchObject({ entries: 1, licenses: ['GPL 3.0'] });
+    expect(metadata.source).toEqual({
+      runtimeSource: 'managed-cache',
+      description: runtime.store.description,
+      releaseTag: 'assets-v1',
+      baseDefinitionsRoot: runtime.context.sheetDefinitionsRoot,
+      customOverlayRoot: runtime.context.customAssetsRoot,
+      spritesheetsBaseUrl: 'lpc-zip:',
+    });
   }, 30000);
 
   it('does not leave artifacts when a requested animation is invalid', async () => {
@@ -101,6 +236,7 @@ describe('renderSelection', () => {
 
     await expect(
       renderSelection({
+        runtime: createRuntime(cwd),
         cwd,
         outDir,
         selectionName: 'body-only',
@@ -121,6 +257,7 @@ describe('renderSelection', () => {
 
     await expect(
       renderSelection({
+        runtime: createRuntime(cwd),
         cwd,
         outDir,
         selectionName: 'body-only',
@@ -142,6 +279,7 @@ describe('renderSelection', () => {
 
     await expect(
       renderSelection({
+        runtime: createRuntime(cwd),
         cwd,
         outDir,
         selectionName: 'body-only',
@@ -161,6 +299,7 @@ describe('renderSelection', () => {
     const cwd = await createFixtureRepo();
     const outDir = mkdtempSync(path.join(os.tmpdir(), 'lpc-render-'));
     const result = await renderSelection({
+      runtime: createRuntime(cwd),
       cwd,
       outDir,
       selectionName: 'body-only',

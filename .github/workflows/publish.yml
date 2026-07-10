@@ -1,0 +1,35 @@
+name: Publish CLI
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - '!v*-*'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  verify-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+          registry-url: https://registry.npmjs.org
+      - run: pnpm --filter @lpc-toolkit/cli verify:release-tag
+      - run: npm install --global npm@11.5.1
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check:boundaries
+      - run: pnpm --filter @lpc-toolkit/cli typecheck
+      - run: pnpm --filter @lpc-toolkit/cli test
+      - run: pnpm --filter @lpc-toolkit/cli build
+      - run: pnpm --filter @lpc-toolkit/cli test:package
+      - run: pnpm --filter @lpc-toolkit/cli test:assets:real
+      - name: Publish through npm OIDC
+        if: github.ref_name != 'v0.1.0'
+        run: npm publish --access public
+        working-directory: packages/cli

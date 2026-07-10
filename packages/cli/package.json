@@ -1,19 +1,46 @@
 {
   "name": "@lpc-toolkit/cli",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
+  "description": "Node 22+ CLI for cataloging, validating, and rendering attributed LPC character sprites.",
   "license": "GPL-3.0-or-later",
   "type": "module",
   "bin": {
     "lpc-toolkit": "./dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ochowei/lpc-toolkit-2026-1"
+  },
+  "homepage": "https://github.com/ochowei/lpc-toolkit-2026-1#readme",
+  "bugs": {
+    "url": "https://github.com/ochowei/lpc-toolkit-2026-1/issues"
+  },
+  "keywords": [
+    "lpc",
+    "spritesheet",
+    "pixel-art",
+    "cli",
+    "character-generator"
   ],
   "scripts": {
-    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && pnpm --filter @lpc-toolkit/core build && pnpm --filter @lpc-toolkit/presets build && tsc -p tsconfig.build.json && node scripts/vendor-workspace-deps.mjs",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && pnpm --filter @lpc-toolkit/core build && pnpm --filter @lpc-toolkit/presets build && tsc -p tsconfig.build.json && node scripts/copy-token-decode-metadata.mjs && node scripts/vendor-workspace-deps.mjs && node scripts/copy-release-config.mjs",
+    "prepack": "pnpm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:package": "node scripts/smoke-packed-cli.mjs",
+    "test:assets:real": "node scripts/smoke-real-assets.mjs",
+    "verify:rc-tag": "node scripts/verify-rc-tag.mjs",
+    "verify:release-tag": "node scripts/verify-release-tag.mjs"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.0.0",

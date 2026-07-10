@@ -38,6 +38,10 @@ export function humanIssue(issue: CliIssue): string {
     : `${issue.code}: ${issue.message}`;
 }
 
+export function formatProgress(phase: string, message: string): string {
+  return `${phase}: ${message}\n`;
+}
+
 type JsonRecord = Readonly<Record<string, unknown>>;
 
 function isRecord(value: unknown): value is JsonRecord {

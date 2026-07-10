@@ -9,9 +9,9 @@ import {
   type TypeName,
 } from '@lpc-toolkit/core';
 import { flagString, type ParsedArgs } from './args.js';
-import { createRuntimeContext } from './context.js';
 import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
 import { commandError, commandOk, type CliResponse } from './response.js';
+import type { RuntimeAssets } from './runtime-assets.js';
 
 export interface CatalogTypesData {
   readonly typeNames: readonly TypeName[];
@@ -140,9 +140,9 @@ export function getCatalogItem(
 
 export function runCatalogCommand(
   parsed: ParsedArgs,
-  cwd: string,
+  runtime: RuntimeAssets,
 ): CliResponse<unknown> {
-  const context = createRuntimeContext({ cwd });
+  const context = runtime.context;
   const catalog = loadCatalogFromRoots(
     context.sheetDefinitionsRoot,
     context.customSheetDefinitionsRoot,
