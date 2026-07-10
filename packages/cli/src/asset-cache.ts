@@ -341,11 +341,13 @@ function createSafeTarReader(
   mkdirSync(extractRoot);
   const tarballPath = path.join(extractRoot, 'assets.tar.gz');
   writeFileSync(tarballPath, tarball);
+  let listingEntries: readonly string[] = [];
   try {
     const listing = execFileSync('tar', ['-tzf', tarballPath], {
       encoding: 'utf8',
     });
-    for (const entryName of listing.split(/\r?\n/u).filter(Boolean)) {
+    listingEntries = listing.split(/\r?\n/u).filter(Boolean);
+    for (const entryName of listingEntries) {
       ensureInsideDirectory(extractRoot, entryName);
     }
     const verboseListing = execFileSync('tar', ['-tvzf', tarballPath], {
@@ -381,7 +383,21 @@ function createSafeTarReader(
     rmSync(tarballPath, { force: true });
   }
 
-  return async (entryName) => readFileSync(ensureInsideDirectory(extractRoot, entryName));
+  const topLevelEntries = new Set(
+    listingEntries.map((entryName) => entryName.split('/')[0]!).filter(Boolean),
+  );
+  const archiveRoot = topLevelEntries.size === 1
+    ? ensureInsideDirectory(extractRoot, [...topLevelEntries][0]!)
+    : extractRoot;
+
+  return async (entryName) => {
+    const directPath = ensureInsideDirectory(extractRoot, entryName);
+    return readFileSync(
+      existsSync(directPath)
+        ? directPath
+        : ensureInsideDirectory(archiveRoot, entryName),
+    );
+  };
 }
 
 function retainedEntries(manifest: AssetManifest): readonly AssetManifestEntry[] {

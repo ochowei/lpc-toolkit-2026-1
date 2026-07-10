@@ -109,6 +109,14 @@ describe('CLI package metadata', () => {
     expect(packageJson.scripts?.['test:package']).toBe('node scripts/smoke-packed-cli.mjs');
   });
 
+  it('defines release verification and real-asset smoke scripts', () => {
+    const packageJson = readCliPackageJson();
+    expect(packageJson.scripts).toMatchObject({
+      'test:assets:real': 'node scripts/smoke-real-assets.mjs',
+      'verify:release-tag': 'node scripts/verify-release-tag.mjs',
+    });
+  });
+
   it('keeps the packed install smoke command free of shell reparsing', () => {
     const testDir = path.dirname(fileURLToPath(import.meta.url));
     const smokeScript = readFileSync(

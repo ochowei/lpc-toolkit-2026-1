@@ -396,6 +396,36 @@ describe('verified compressed asset cache', () => {
   });
 
   it.skipIf(process.platform === 'win32')(
+    'reads manifest entries from a single-root-directory tarball',
+    async () => {
+      const fixture = await createAssetReleaseFixture();
+      const archiveRoot = cacheRoot();
+      const sourceRoot = path.join(archiveRoot, 'source');
+      const releaseRoot = path.join(sourceRoot, 'lpc-runtime-zips');
+      mkdirSync(releaseRoot, { recursive: true });
+      for (const [entryName, contents] of Object.entries(fixture.tarEntries)) {
+        const filePath = path.join(releaseRoot, entryName);
+        mkdirSync(path.dirname(filePath), { recursive: true });
+        writeFileSync(filePath, contents);
+      }
+      const archivePath = path.join(archiveRoot, 'release.tar.gz');
+      execFileSync('tar', ['-czf', archivePath, '-C', sourceRoot, 'lpc-runtime-zips']);
+      const tarball = readFileSync(archivePath);
+      const config = { ...fixture.config, tarballSha256: sha256(tarball) };
+
+      const result = await ensureAssetCache({
+        config,
+        cacheRoot: path.join(archiveRoot, 'cache'),
+        download: async (url) =>
+          url === config.tarballUrl ? tarball : fixture.download(url),
+      });
+
+      expect(result.status).toBe('prepared');
+      expect(validateAssetCache(result.layout, config)).toBe(true);
+    },
+  );
+
+  it.skipIf(process.platform === 'win32')(
     'rejects link entries before default tar extraction',
     async () => {
       const fixture = await createAssetReleaseFixture();
