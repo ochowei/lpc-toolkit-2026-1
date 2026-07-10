@@ -1548,6 +1548,7 @@ its checkboxes complete, and commit that record separately.
 - Workspace verification: architecture boundaries PASS; explicit workspace typecheck PASS; full workspace test PASS with asset preparation cache-hit — core 162 PASS, presets 2 PASS, CLI 127 PASS with 1 skip, and web 499 PASS with 1 skip (790 PASS and 2 skips total); `git diff --check` PASS.
 - Verification environment: RTK's typecheck shortcuts printed `TypeScript: No errors found` but returned the documented wrapper false exit, so both typechecks were rerun with explicit `run` forms and exited 0. The packed smoke and full workspace test were rerun unchanged with approval after sandbox-only npm-cache and `tsx` IPC denials, then exited 0.
 - Bootstrap note: the `v0.1.0` tag, manual 2FA publication, clean public-registry installation, npm Trusted Publisher configuration, and later OIDC release remain external manual steps and were intentionally not executed.
+- Review fix: `f41952d6f4bc80bcd7fa63e1f0a5a062f9f0fca4` (`docs(cli): correct catalog examples`) replaced invalid `braids`/`Braids` copy-paste values with shipped item ID `hair_braid` and name `Braid`. The focused README assertion produced the intended RED, then passed 12/12; the built CLI returned `Catalog item: hair/Braid [hair_braid]` from the local asset tree and token decoding selected hair name `Braid` with no token error; `git diff --check` PASS.
 
 ---
 
