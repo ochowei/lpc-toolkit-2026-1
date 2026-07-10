@@ -1,4 +1,9 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createCanvas } from '@napi-rs/canvas';
@@ -86,6 +91,46 @@ describe('directory asset store', () => {
     await expect(store.load(spritePath)).resolves.toBe(spritePath);
     await expect(store.load(path.join(assetsRoot, '..', 'outside.png'))).rejects.toThrow();
     await expect(store.load('lpc-zip:/spritesheets/body/walk.png')).rejects.toThrow();
+  });
+
+  it.skipIf(process.platform !== 'win32')(
+    'loads absolute Windows drive paths instead of treating the drive as a URI scheme',
+    async () => {
+      const assetsRoot = mkdtempSync(path.join(os.tmpdir(), 'lpc-directory-store-'));
+      const spritePath = path.join(assetsRoot, logicalSpritePath);
+      mkdirSync(path.dirname(spritePath), { recursive: true });
+      writeFileSync(spritePath, 'fixture');
+      const store = createDirectoryAssetStore(assetsRoot);
+
+      expect(path.win32.isAbsolute(spritePath)).toBe(true);
+      await expect(store.load(spritePath)).resolves.toBe(spritePath);
+    },
+  );
+
+  it('rejects symlinked files that resolve outside the asset root', async () => {
+    const assetsRoot = mkdtempSync(path.join(os.tmpdir(), 'lpc-directory-store-'));
+    const outsideRoot = mkdtempSync(path.join(os.tmpdir(), 'lpc-outside-store-'));
+    const outsideSpritePath = path.join(outsideRoot, 'outside.png');
+    writeFileSync(outsideSpritePath, 'fixture');
+    const linkedLogicalPath = 'spritesheets/body/linked.png';
+    const linkedSpritePath = path.join(assetsRoot, linkedLogicalPath);
+    mkdirSync(path.dirname(linkedSpritePath), { recursive: true });
+    symlinkSync(outsideSpritePath, linkedSpritePath, 'file');
+    const store = createDirectoryAssetStore(assetsRoot);
+
+    expect(store.has(linkedLogicalPath)).toBe(false);
+    await expect(store.load(linkedSpritePath)).rejects.toThrow();
+  });
+
+  it('rejects directories that occupy an image asset path', async () => {
+    const assetsRoot = mkdtempSync(path.join(os.tmpdir(), 'lpc-directory-store-'));
+    const directoryLogicalPath = 'spritesheets/body/not-an-image.png';
+    const directoryPath = path.join(assetsRoot, directoryLogicalPath);
+    mkdirSync(directoryPath, { recursive: true });
+    const store = createDirectoryAssetStore(assetsRoot);
+
+    expect(store.has(directoryLogicalPath)).toBe(false);
+    await expect(store.load(directoryPath)).rejects.toThrow();
   });
 });
 

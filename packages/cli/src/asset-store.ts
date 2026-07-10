@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync, realpathSync, statSync } from 'node:fs';
 import path from 'node:path';
 import JSZip from 'jszip';
 import type { AssetCacheLayout } from './asset-cache.js';
@@ -14,6 +14,10 @@ export interface AssetStore {
 }
 
 const urlSchemePattern = /^[a-zA-Z][a-zA-Z\d+.-]*:/;
+
+function hasUrlScheme(sourcePath: string): boolean {
+  return urlSchemePattern.test(sourcePath) && !path.win32.isAbsolute(sourcePath);
+}
 
 function isSafeLogicalPath(logicalPath: string): boolean {
   const components = logicalPath.split('/');
@@ -40,8 +44,20 @@ function isInsideRoot(root: string, candidate: string): boolean {
   );
 }
 
+function isRegularFileInsideRoot(root: string, candidate: string): boolean {
+  try {
+    const canonicalCandidate = realpathSync.native(candidate);
+    return (
+      isInsideRoot(root, canonicalCandidate) && statSync(canonicalCandidate).isFile()
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function createDirectoryAssetStore(assetsRoot: string): AssetStore {
   const resolvedRoot = path.resolve(assetsRoot);
+  const canonicalRoot = realpathSync.native(resolvedRoot);
 
   return {
     kind: 'directory',
@@ -50,19 +66,27 @@ export function createDirectoryAssetStore(assetsRoot: string): AssetStore {
     has(logicalPath) {
       if (!isSafeLogicalPath(logicalPath)) return false;
       const candidate = path.resolve(resolvedRoot, logicalPath);
-      return isInsideRoot(resolvedRoot, candidate) && existsSync(candidate);
+      return (
+        isInsideRoot(resolvedRoot, candidate) &&
+        isRegularFileInsideRoot(canonicalRoot, candidate)
+      );
     },
     async load(sourcePath) {
       if (
         sourcePath.includes('\0') ||
-        urlSchemePattern.test(sourcePath) ||
+        hasUrlScheme(sourcePath) ||
         !path.isAbsolute(sourcePath)
       ) {
         throw new Error(`Invalid directory asset path: ${sourcePath}`);
       }
       const candidate = path.resolve(sourcePath);
-      if (!isInsideRoot(resolvedRoot, candidate) || !existsSync(candidate)) {
-        throw new Error(`Directory asset is outside the asset root or missing: ${sourcePath}`);
+      if (
+        !isInsideRoot(resolvedRoot, candidate) ||
+        !isRegularFileInsideRoot(canonicalRoot, candidate)
+      ) {
+        throw new Error(
+          `Directory asset is outside the asset root, missing, or not a regular file: ${sourcePath}`,
+        );
       }
       return candidate;
     },
