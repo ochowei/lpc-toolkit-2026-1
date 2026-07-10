@@ -1,4 +1,14 @@
 import { defineConfig, devices } from '@playwright/test';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { requireIsolatedParityDir } from './scripts/parity-source';
+
+const repoRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../..',
+);
+// LPC_UPSTREAM_PARITY_DIR identifies the isolated upstream checkout.
+const parityDir = requireIsolatedParityDir(repoRoot);
 
 export default defineConfig({
   testDir: './e2e',
@@ -25,7 +35,7 @@ export default defineConfig({
       stderr: 'pipe',
     },
     {
-      command: 'pnpm --dir ../../upstream dev --host 127.0.0.1 --port 5174',
+      command: `npm run dev --prefix ${JSON.stringify(parityDir)} -- --host 127.0.0.1 --port 5174`,
       url: 'http://127.0.0.1:5174',
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,

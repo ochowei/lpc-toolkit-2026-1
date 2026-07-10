@@ -19,6 +19,14 @@ const changesJob = ciWorkflow.slice(
   ciWorkflow.indexOf('  changes:'),
   ciWorkflow.indexOf('  unit:'),
 );
+const generalPlaywrightConfig = readFileSync(
+  path.join(here, '../playwright.config.ts'),
+  'utf8',
+);
+const parityPlaywrightConfig = readFileSync(
+  path.join(here, '../playwright.parity.config.ts'),
+  'utf8',
+);
 
 describe('package scripts', () => {
   it('detects pull request changes with local git instead of the files API', () => {
@@ -54,5 +62,21 @@ describe('package scripts', () => {
     expect(packageJson.scripts?.['pretest:e2e:parity']).toBe(
       'pnpm prepare-assets && pnpm verify-upstream-parity',
     );
+  });
+
+  it('separates ordinary and parity Playwright servers', () => {
+    expect(generalPlaywrightConfig).toContain(
+      'testIgnore: /random-upstream-parity\\.spec\\.ts/',
+    );
+    expect(generalPlaywrightConfig).not.toContain('../../upstream');
+    expect(generalPlaywrightConfig).not.toContain('5174');
+    expect(generalPlaywrightConfig.match(/command:/g)).toHaveLength(1);
+
+    expect(parityPlaywrightConfig).toContain(
+      'requireIsolatedParityDir(repoRoot)',
+    );
+    expect(parityPlaywrightConfig).toContain('LPC_UPSTREAM_PARITY_DIR');
+    expect(parityPlaywrightConfig).not.toContain('../../upstream');
+    expect(parityPlaywrightConfig.match(/command:/g)).toHaveLength(2);
   });
 });
