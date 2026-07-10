@@ -7,6 +7,7 @@ import {
   loadReleaseConfig,
   verifyUpstreamParity,
 } from './asset-release';
+import { requireIsolatedParityDir } from './parity-source';
 
 const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -29,18 +30,19 @@ try {
   );
 }
 
+const parityDir = requireIsolatedParityDir(repoRoot);
 let upstreamHead: string;
 
 try {
   upstreamHead = execFileSync(
     'git',
-    ['-C', path.join(repoRoot, 'upstream'), 'rev-parse', 'HEAD'],
+    ['-C', parityDir, 'rev-parse', 'HEAD'],
     { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
   ).trim();
 } catch (error) {
   const detail = error instanceof Error ? `: ${error.message}` : '';
   throw new Error(
-    `Failed to read upstream HEAD${detail}. Ensure upstream/ is checked out at ${config.sourceSha}.`,
+    `Failed to read upstream HEAD from LPC_UPSTREAM_PARITY_DIR parityDir ${parityDir}${detail}. Expected ${config.sourceSha}.`,
   );
 }
 
