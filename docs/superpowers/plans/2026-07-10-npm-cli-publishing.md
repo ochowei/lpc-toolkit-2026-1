@@ -1130,6 +1130,9 @@ its checkboxes complete, and commit that record separately.
 - Verification: focused runtime, command, render, and output tests 46/46 PASS; full CLI tests 113 PASS / 1 Windows-only platform skip on the non-Windows host; package-directory CLI typecheck PASS via `rtk pnpm typecheck` from `packages/cli`; architecture boundary check PASS.
 - Implementation note: selected complete current-directory assets before the managed cache, preserved the current-directory custom overlay, prepared one runtime only for asset-dependent commands, routed cache progress/errors without contaminating JSON stdout, and passed one store/context through validation, preset materialization, composition, rendering, attribution, and metadata.
 - Context note: the existing `RuntimeContextOptions` already exposed explicit `assetsRoot`, `customAssetsRoot`, and `spritesheetsBaseUrl` inputs with direct-caller defaults, so `context.ts` required no Task 5 change.
+- Formal review fix: `c3495a29ed7fca9fe9150be4ba58ffd6e59f8b9e` (`fix(cli): verify managed zip rendering`).
+- Formal review verification: focused Task 5, render, and asset-store tests PASS (59 passed, with one Windows-only platform regression skipped on the non-Windows host); full CLI tests PASS (121 passed, with the same platform skip); package-directory CLI typecheck PASS; architecture boundary check PASS.
+- Formal review note: render metadata now reports the actual `sheetDefinitionsRoot`; a deterministic managed-cache fixture exercises real category-ZIP loading through core composition and verifies visible pixel output, attribution artifacts, effective license, `lpc-zip:` metadata, release tag, and definition root; nested catalog/render/preset-render help short-circuits before asset preparation while retaining help output semantics.
 
 ---
 
