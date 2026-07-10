@@ -6,6 +6,8 @@ import { createCatalog, createPaletteCatalog } from '../../core/dist/index.js';
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = path.resolve(packageRoot, '../..');
 
+// Maintenance-only snapshot refresh. Ordinary build/prepack must not read repo assets.
+
 function walkJsonFiles(root) {
   const files = [];
   for (const entry of readdirSync(root).sort()) {
@@ -39,13 +41,6 @@ function compactRecolorConfig(config) {
   return {
     material: config.material,
     palettes: config.palettes,
-    ...(typeof config.type_name === 'string' ? { type_name: config.type_name } : {}),
-    ...(typeof config.base === 'string' ? { base: config.base } : {}),
-    ...(Array.isArray(config.source) &&
-    config.source.every((color) => typeof color === 'string')
-      ? { source: config.source }
-      : {}),
-    ...(typeof config.label === 'string' ? { label: config.label } : {}),
   };
 }
 
@@ -98,6 +93,6 @@ for (const [materialName, material] of Object.entries(
 }
 
 writeFileSync(
-  path.join(packageRoot, 'dist', 'token-decode-metadata.json'),
+  path.join(packageRoot, 'token-decode-metadata.snapshot.json'),
   `${JSON.stringify({ schemaVersion: 1, items, materials })}\n`,
 );

@@ -1,12 +1,21 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { packedTarballName } from './package-archive-name.mjs';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const repoRoot = path.resolve(packageRoot, '../..');
+const assetsRoot = path.join(repoRoot, 'assets');
 const packageJson = JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf8'));
 const expectedTarballName = packedTarballName(packageJson);
 const isWindows = process.platform === 'win32';
@@ -34,11 +43,23 @@ const npmCliPath = resolveNodeTool('npm', 'bin', 'npm-cli.js');
 let packDir;
 let installPrefix;
 let emptyCwd;
+let assetsBackupRoot;
 
 try {
   packDir = mkdtempSync(path.join(os.tmpdir(), 'lpc-toolkit-pack-'));
   installPrefix = mkdtempSync(path.join(os.tmpdir(), 'lpc-toolkit-install-'));
   emptyCwd = mkdtempSync(path.join(os.tmpdir(), 'lpc-toolkit-empty-cwd-'));
+
+  if (existsSync(assetsRoot)) {
+    const backupRoot = mkdtempSync(path.join(repoRoot, '.lpc-toolkit-assets-backup-'));
+    try {
+      renameSync(assetsRoot, path.join(backupRoot, 'assets'));
+      assetsBackupRoot = backupRoot;
+    } catch (error) {
+      rmSync(backupRoot, { recursive: true, force: true });
+      throw error;
+    }
+  }
 
   rmSync(path.join(packageRoot, 'dist'), { recursive: true, force: true });
 
@@ -129,13 +150,21 @@ try {
 
   console.log('Packed CLI install smoke test passed.');
 } finally {
-  if (packDir !== undefined) {
-    rmSync(packDir, { recursive: true, force: true });
-  }
-  if (installPrefix !== undefined) {
-    rmSync(installPrefix, { recursive: true, force: true });
-  }
-  if (emptyCwd !== undefined) {
-    rmSync(emptyCwd, { recursive: true, force: true });
+  try {
+    if (assetsBackupRoot !== undefined) {
+      assert.ok(!existsSync(assetsRoot), 'cannot restore assets over an existing path');
+      renameSync(path.join(assetsBackupRoot, 'assets'), assetsRoot);
+      rmSync(assetsBackupRoot, { recursive: true, force: true });
+    }
+  } finally {
+    if (packDir !== undefined) {
+      rmSync(packDir, { recursive: true, force: true });
+    }
+    if (installPrefix !== undefined) {
+      rmSync(installPrefix, { recursive: true, force: true });
+    }
+    if (emptyCwd !== undefined) {
+      rmSync(emptyCwd, { recursive: true, force: true });
+    }
   }
 }

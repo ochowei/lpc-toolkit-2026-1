@@ -22,6 +22,12 @@ interface CliPackageJson {
   readonly scripts?: Record<string, string>;
 }
 
+interface TokenDecodeSnapshot {
+  readonly schemaVersion?: unknown;
+  readonly items?: Readonly<Record<string, { readonly name?: unknown }>>;
+  readonly materials?: unknown;
+}
+
 function readCliPackageJson(): CliPackageJson {
   const testDir = path.dirname(fileURLToPath(import.meta.url));
   const packageJsonPath = path.resolve(testDir, '../package.json');
@@ -80,6 +86,30 @@ describe('CLI package metadata', () => {
 
     expect(packageJson.files).toEqual(['dist', 'README.md']);
     expect(packageJson.scripts?.build).toContain('node scripts/copy-release-config.mjs');
+  });
+
+  it('builds token decode metadata from a tracked package snapshot', () => {
+    const testDir = path.dirname(fileURLToPath(import.meta.url));
+    const packageJson = readCliPackageJson();
+    const snapshotSource = readFileSync(
+      path.resolve(testDir, '../token-decode-metadata.snapshot.json'),
+      'utf8',
+    );
+    const snapshot = JSON.parse(snapshotSource) as TokenDecodeSnapshot;
+
+    expect(packageJson.scripts?.build).toContain(
+      'node scripts/copy-token-decode-metadata.mjs',
+    );
+    expect(packageJson.scripts?.build).not.toContain(
+      'node scripts/generate-token-decode-metadata.mjs',
+    );
+    expect(snapshot.schemaVersion).toBe(1);
+    expect(snapshot.materials).toEqual(expect.any(Object));
+    expect(
+      Object.values(snapshot.items ?? {}).some((item) => item.name === 'Braid'),
+    ).toBe(true);
+    expect(snapshotSource).not.toContain('"source"');
+    expect(snapshotSource).not.toMatch(/#[0-9A-F]{6}/iu);
   });
 
   it('includes a package-local copy of the GPL license', () => {
