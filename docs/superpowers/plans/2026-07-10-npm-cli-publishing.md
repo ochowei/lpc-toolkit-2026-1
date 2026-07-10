@@ -811,6 +811,9 @@ After committing, record the exact hash and Step 5 results under Task 4, mark it
 - Verification: focused asset-store, render, and validation tests PASS (11/11); package-directory CLI typecheck PASS via `rtk pnpm typecheck` from `packages/cli`.
 - RTK note: the shorthand `rtk pnpm --filter @lpc-toolkit/cli typecheck` reported no TypeScript errors but returned exit 1 because RTK does not support that filtered shorthand; running `rtk pnpm typecheck` from `packages/cli` exited 0.
 - Implementation note: added directory and index-backed ZIP asset stores with traversal and scheme rejection, synchronous existence checks, cached per-category ZIP parsing, buffer-backed Node canvas loading, and preserved default directory rendering.
+- Formal review fix: `0681ec13af40801554cd060cea7afa1edf8b5745` (`fix(cli): confine directory asset paths`).
+- Formal review verification: focused asset-store, render, and validation tests PASS (13/13, with one Windows-only regression skipped on the non-Windows host); full CLI tests PASS (96/96, with the same platform skip); CLI typecheck PASS via both `rtk pnpm --filter @lpc-toolkit/cli run typecheck` and `rtk pnpm typecheck` from `packages/cli`.
+- Formal review note: Windows drive-letter paths are distinguished from URI schemes, directory candidates are confined by canonical real-path comparison so escaping symlinks are rejected, and only regular files qualify as image assets.
 
 ---
 
