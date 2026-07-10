@@ -21,11 +21,11 @@ import {
   type AnimationName,
   type CanvasLike,
 } from '@lpc-toolkit/core';
-import { createRuntimeContext } from './context.js';
 import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
 import { createNodeCanvasAdapter, writeCanvasPng } from './node-canvas-adapter.js';
 import { CLI_VERSION } from './package-info.js';
 import type { CliIssue } from './response.js';
+import type { RuntimeAssets } from './runtime-assets.js';
 import { parseSelectionJson, type SelectionJson } from './selection.js';
 import { validateSelections } from './validation.js';
 import { writeZipBundle } from './zip.js';
@@ -48,6 +48,7 @@ export interface RenderArtifact {
 }
 
 export interface RenderSelectionOptions {
+  readonly runtime: RuntimeAssets;
   readonly cwd: string;
   readonly outDir: string;
   readonly selectionName: string;
@@ -73,10 +74,6 @@ interface AnimationMetadata {
 
 function safeName(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'sprite';
-}
-
-function spritePathExists(spritesheetsBaseUrl: string, spritePath: string): boolean {
-  return existsSync(path.join(spritesheetsBaseUrl, spritePath));
 }
 
 function animationFrameAnimations(
@@ -166,7 +163,8 @@ function publishStagedFiles(
 export async function renderSelection(
   options: RenderSelectionOptions,
 ): Promise<RenderSelectionResult> {
-  const context = createRuntimeContext({ cwd: options.cwd });
+  const { runtime } = options;
+  const context = runtime.context;
   const catalog = loadCatalogFromRoots(
     context.sheetDefinitionsRoot,
     context.customSheetDefinitionsRoot,
@@ -176,7 +174,7 @@ export async function renderSelection(
   const validation = validateSelections(parsed.selections, {
     catalog: catalog.catalog,
     palettes: palettes.palettes,
-    pathExists: (spritePath) => spritePathExists(context.spritesheetsBaseUrl, spritePath),
+    pathExists: (spritePath) => runtime.store.has(spritePath),
   });
   if (!validation.ok && !options.allowPartial) {
     throw new Error(validation.errors.map((error) => error.message).join('\n'));
@@ -196,11 +194,11 @@ export async function renderSelection(
     },
   );
 
-  const adapter = createNodeCanvasAdapter();
+  const adapter = createNodeCanvasAdapter({ assetStore: runtime.store });
   const sheet = await composeSelections(parsed.selections, {
     catalog: catalog.catalog,
     adapter,
-    spritesheetsBaseUrl: context.spritesheetsBaseUrl,
+    spritesheetsBaseUrl: runtime.store.baseUrl,
     resolvePalette,
   });
 
@@ -314,9 +312,12 @@ export async function renderSelection(
       resolvedPaths: sheet.credits.resolvedPaths,
     },
     source: {
-      assetRoot: context.assetsRoot,
-      customAssetRoot: context.customAssetsRoot,
-      spritesheetsBaseUrl: context.spritesheetsBaseUrl,
+      runtimeSource: runtime.source,
+      description: runtime.store.description,
+      releaseTag: runtime.releaseTag ?? null,
+      baseDefinitionsRoot: context.assetsRoot,
+      customOverlayRoot: context.customAssetsRoot,
+      spritesheetsBaseUrl: runtime.store.baseUrl,
     },
     warnings,
     skippedLayers: options.allowPartial ? validation.errors : [],

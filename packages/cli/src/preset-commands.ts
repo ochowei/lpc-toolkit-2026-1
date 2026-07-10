@@ -7,9 +7,9 @@ import {
 } from '@lpc-toolkit/presets';
 import type { BodyType, Catalog, PaletteMetadata } from '@lpc-toolkit/core';
 import { flagString, type ParsedArgs } from './args.js';
-import { createRuntimeContext } from './context.js';
 import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
 import { commandError, commandOk, type CliResponse } from './response.js';
+import type { RuntimeAssets } from './runtime-assets.js';
 import { selectionJsonFromCore, type SelectionJson } from './selection.js';
 
 export interface PresetSummary {
@@ -94,6 +94,7 @@ function errorMessage(error: unknown): string {
 export function runPresetCommand(
   parsed: ParsedArgs,
   cwd: string,
+  runtime?: RuntimeAssets,
 ): CliResponse<unknown> {
   if (parsed.command[1] === 'list') {
     return commandOk('preset list', listPresets());
@@ -109,7 +110,13 @@ export function runPresetCommand(
       });
     }
 
-    const context = createRuntimeContext({ cwd });
+    if (!runtime) {
+      return commandError('preset materialize', {
+        code: 'assets_unavailable',
+        message: 'Runtime assets are required to materialize a preset.',
+      });
+    }
+    const context = runtime.context;
     const catalog = loadCatalogFromRoots(
       context.sheetDefinitionsRoot,
       context.customSheetDefinitionsRoot,

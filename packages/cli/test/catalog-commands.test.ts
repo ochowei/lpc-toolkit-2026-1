@@ -10,6 +10,24 @@ import {
   runCatalogCommand,
 } from '../src/catalog-commands.js';
 import { parseArgs } from '../src/args.js';
+import { createDirectoryAssetStore } from '../src/asset-store.js';
+import { createRuntimeContext } from '../src/context.js';
+import type { RuntimeAssets } from '../src/runtime-assets.js';
+
+function createRuntime(cwd: string): RuntimeAssets {
+  const assetsRoot = path.join(cwd, 'assets');
+  mkdirSync(assetsRoot, { recursive: true });
+  const store = createDirectoryAssetStore(assetsRoot);
+  return {
+    context: createRuntimeContext({
+      cwd,
+      assetsRoot,
+      spritesheetsBaseUrl: store.baseUrl,
+    }),
+    store,
+    source: 'working-directory',
+  };
+}
 
 const body: ItemDefinition = {
   name: 'Body Color',
@@ -90,7 +108,11 @@ describe('catalog commands', () => {
   });
 
   it('returns catalog item command responses', () => {
-    const response = runCatalogCommand(parseArgs(['catalog', 'item', 'missing']), '/tmp');
+    const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-catalog-'));
+    const response = runCatalogCommand(
+      parseArgs(['catalog', 'item', 'missing']),
+      createRuntime(cwd),
+    );
 
     expect(response.ok).toBe(false);
     expect(response.command).toBe('catalog item');
@@ -130,7 +152,7 @@ describe('catalog commands', () => {
 
     const response = runCatalogCommand(
       parseArgs(['catalog', 'items', '--license', 'GPL', '--animation', 'walk']),
-      cwd,
+      createRuntime(cwd),
     );
 
     expect(response.ok).toBe(true);

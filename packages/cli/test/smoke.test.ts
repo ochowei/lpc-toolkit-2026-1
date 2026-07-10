@@ -1,8 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { runCli } from '../src/main.js';
+
+function createLocalRuntimeCwd(): string {
+  const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-cli-'));
+  const assetsRoot = path.join(cwd, 'assets');
+  mkdirSync(path.join(assetsRoot, 'sheet_definitions'), { recursive: true });
+  mkdirSync(path.join(assetsRoot, 'palette_definitions'), { recursive: true });
+  mkdirSync(path.join(assetsRoot, 'spritesheets'), { recursive: true });
+  writeFileSync(path.join(assetsRoot, 'CREDITS.csv'), 'file,authors,licenses\n');
+  return cwd;
+}
 
 describe('runCli', () => {
   it('prints help for no command', async () => {
@@ -24,13 +34,14 @@ describe('runCli', () => {
   });
 
   it('reports missing selection files as json responses', async () => {
+    const cwd = createLocalRuntimeCwd();
     const writes: string[] = [];
     const errors: string[] = [];
 
     const code = await runCli(['selection', 'validate', '--selection', 'missing.json', '--json'], {
       stdout: (text) => writes.push(text),
       stderr: (text) => errors.push(text),
-      cwd: '/tmp',
+      cwd,
     });
 
     const response = JSON.parse(writes.join('')) as {
@@ -45,7 +56,7 @@ describe('runCli', () => {
   });
 
   it('reports malformed selection json as json responses', async () => {
-    const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-cli-'));
+    const cwd = createLocalRuntimeCwd();
     writeFileSync(path.join(cwd, 'selection.json'), '{');
     const writes: string[] = [];
     const errors: string[] = [];
@@ -68,7 +79,7 @@ describe('runCli', () => {
   });
 
   it('reports unsupported selection schemas as json responses', async () => {
-    const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-cli-'));
+    const cwd = createLocalRuntimeCwd();
     writeFileSync(
       path.join(cwd, 'selection.json'),
       JSON.stringify({ schema: 'other', bodyType: 'male', items: {} }),

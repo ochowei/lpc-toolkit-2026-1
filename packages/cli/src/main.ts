@@ -1,17 +1,28 @@
 import path from 'node:path';
-import { flagBoolean, flagString, flagStrings, parseArgs } from './args.js';
+import {
+  flagBoolean,
+  flagString,
+  flagStrings,
+  parseArgs,
+  type ParsedArgs,
+} from './args.js';
+import { assetCacheErrorIssue } from './asset-cache.js';
 import { runCatalogCommand } from './catalog-commands.js';
-import { createRuntimeContext } from './context.js';
 import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
 import { materializePreset, runPresetCommand } from './preset-commands.js';
 import { readSelectionJsonFile, renderSelection } from './render.js';
 import {
   commandError,
   commandOk,
+  formatProgress,
   formatHumanResponse,
   formatJsonResponse,
   type CliResponse,
 } from './response.js';
+import {
+  prepareRuntimeAssets,
+  type RuntimeAssets,
+} from './runtime-assets.js';
 import { runSelectionCommand } from './selection-commands.js';
 import { runTokenCommand } from './token-commands.js';
 
@@ -20,6 +31,12 @@ export interface CliIo {
   readonly stderr: (text: string) => void;
   readonly cwd: string;
 }
+
+export interface CliDependencies {
+  readonly prepareRuntimeAssets: typeof prepareRuntimeAssets;
+}
+
+const DEFAULT_DEPENDENCIES: CliDependencies = { prepareRuntimeAssets };
 
 const HELP = `lpc-toolkit CLI
 
@@ -52,16 +69,46 @@ function writeResponse(
   return response.ok ? 0 : 1;
 }
 
-export async function runCli(argv: readonly string[], io: CliIo): Promise<number> {
+export function commandNeedsAssets(parsed: ParsedArgs): boolean {
+  if (parsed.command[0] === 'catalog') return true;
+  if (parsed.command[0] === 'selection') return true;
+  if (parsed.command[0] === 'render') return true;
+  if (parsed.command[0] === 'preset') return parsed.command[1] !== 'list';
+  return false;
+}
+
+export async function runCli(
+  argv: readonly string[],
+  io: CliIo,
+  dependencies: CliDependencies = DEFAULT_DEPENDENCIES,
+): Promise<number> {
   if (argv.length === 0 || argv[0] === '--help' || argv[0] === '-h') {
     io.stdout(HELP);
     return 0;
   }
 
   const parsed = parseArgs(argv);
+  let runtime: RuntimeAssets | undefined;
+  if (commandNeedsAssets(parsed)) {
+    try {
+      runtime = await dependencies.prepareRuntimeAssets({
+        cwd: io.cwd,
+        onProgress: (progress) =>
+          io.stderr(formatProgress(progress.phase, progress.message)),
+      });
+    } catch (error) {
+      return writeResponse(
+        commandError(parsed.command.join(' '), assetCacheErrorIssue(error)),
+        parsed,
+        io,
+        '',
+      );
+    }
+  }
+
   if (parsed.command[0] === 'catalog') {
     return writeResponse(
-      runCatalogCommand(parsed, io.cwd),
+      runCatalogCommand(parsed, runtime!),
       parsed,
       io,
       'Catalog command completed.\n',
@@ -70,7 +117,7 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<number
 
   if (parsed.command[0] === 'selection') {
     return writeResponse(
-      runSelectionCommand(parsed, io.cwd),
+      runSelectionCommand(parsed, runtime!),
       parsed,
       io,
       'Selection is valid.\n',
@@ -104,6 +151,7 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<number
     try {
       const selectionJson = readSelectionJsonFile(io.cwd, selectionPath);
       const result = await renderSelection({
+        runtime: runtime!,
         cwd: io.cwd,
         outDir: path.resolve(io.cwd, outDir),
         selectionName: selectionJson.name ?? 'sprite',
@@ -152,7 +200,7 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<number
     }
 
     try {
-      const context = createRuntimeContext({ cwd: io.cwd });
+      const context = runtime!.context;
       const catalog = loadCatalogFromRoots(
         context.sheetDefinitionsRoot,
         context.customSheetDefinitionsRoot,
@@ -163,6 +211,7 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<number
         palettes: palettes.palettes,
       });
       const result = await renderSelection({
+        runtime: runtime!,
         cwd: io.cwd,
         outDir: path.resolve(io.cwd, outDir),
         selectionName: selectionJson.name ?? presetId,
@@ -196,7 +245,7 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<number
 
   if (parsed.command[0] === 'preset') {
     return writeResponse(
-      runPresetCommand(parsed, io.cwd),
+      runPresetCommand(parsed, io.cwd, runtime),
       parsed,
       io,
       'Preset command completed.\n',

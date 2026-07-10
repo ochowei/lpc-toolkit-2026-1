@@ -11,6 +11,9 @@ import path from 'node:path';
 import { createCanvas } from '@napi-rs/canvas';
 import { describe, expect, it } from 'vitest';
 import { renderSelection } from '../src/render.js';
+import { createDirectoryAssetStore } from '../src/asset-store.js';
+import { createRuntimeContext } from '../src/context.js';
+import type { RuntimeAssets } from '../src/runtime-assets.js';
 
 const sheetDefinition = {
   name: 'Body Color',
@@ -60,6 +63,20 @@ async function createFixtureRepo(): Promise<string> {
   return cwd;
 }
 
+function createRuntime(cwd: string): RuntimeAssets {
+  const assetsRoot = path.join(cwd, 'assets');
+  const store = createDirectoryAssetStore(assetsRoot);
+  return {
+    context: createRuntimeContext({
+      cwd,
+      assetsRoot,
+      spritesheetsBaseUrl: store.baseUrl,
+    }),
+    store,
+    source: 'working-directory',
+  };
+}
+
 const bodyOnlySelection = {
   schema: 'lpc-toolkit.selection.v1',
   name: 'body-only',
@@ -73,7 +90,9 @@ describe('renderSelection', () => {
   it('keeps default directory rendering for a body-only selection', async () => {
     const cwd = await createFixtureRepo();
     const outDir = mkdtempSync(path.join(os.tmpdir(), 'lpc-render-'));
+    const runtime = createRuntime(cwd);
     const result = await renderSelection({
+      runtime,
       cwd,
       outDir,
       selectionName: 'body-only',
@@ -89,10 +108,21 @@ describe('renderSelection', () => {
     expect(existsSync(path.join(outDir, 'body-only.metadata.json'))).toBe(true);
     expect(existsSync(path.join(outDir, 'body-only.credits.txt'))).toBe(true);
     expect(existsSync(path.join(outDir, 'body-only.credits.csv'))).toBe(true);
-    expect(
-      JSON.parse(readFileSync(path.join(outDir, 'body-only.metadata.json'), 'utf8')).selection
-        .name,
-    ).toBe('body-only');
+    const metadata = JSON.parse(
+      readFileSync(path.join(outDir, 'body-only.metadata.json'), 'utf8'),
+    ) as {
+      readonly selection: { readonly name: string };
+      readonly source: Readonly<Record<string, unknown>>;
+    };
+    expect(metadata.selection.name).toBe('body-only');
+    expect(metadata.source).toEqual({
+      runtimeSource: 'working-directory',
+      description: runtime.store.description,
+      releaseTag: null,
+      baseDefinitionsRoot: runtime.context.assetsRoot,
+      customOverlayRoot: runtime.context.customAssetsRoot,
+      spritesheetsBaseUrl: runtime.store.baseUrl,
+    });
   }, 30000);
 
   it('does not leave artifacts when a requested animation is invalid', async () => {
@@ -101,6 +131,7 @@ describe('renderSelection', () => {
 
     await expect(
       renderSelection({
+        runtime: createRuntime(cwd),
         cwd,
         outDir,
         selectionName: 'body-only',
@@ -121,6 +152,7 @@ describe('renderSelection', () => {
 
     await expect(
       renderSelection({
+        runtime: createRuntime(cwd),
         cwd,
         outDir,
         selectionName: 'body-only',
@@ -142,6 +174,7 @@ describe('renderSelection', () => {
 
     await expect(
       renderSelection({
+        runtime: createRuntime(cwd),
         cwd,
         outDir,
         selectionName: 'body-only',
@@ -161,6 +194,7 @@ describe('renderSelection', () => {
     const cwd = await createFixtureRepo();
     const outDir = mkdtempSync(path.join(os.tmpdir(), 'lpc-render-'));
     const result = await renderSelection({
+      runtime: createRuntime(cwd),
       cwd,
       outDir,
       selectionName: 'body-only',
