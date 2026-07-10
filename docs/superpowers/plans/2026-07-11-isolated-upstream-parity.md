@@ -46,7 +46,7 @@
 - The function returns a normalized absolute path only when `value` is non-empty, already absolute, and outside `path.join(repoRoot, 'upstream')`.
 - `verify-upstream-parity.ts` consumes `process.env.LPC_UPSTREAM_PARITY_DIR`, resolves it through the helper, reads `git -C <isolatedDir> rev-parse HEAD`, then passes that SHA to existing `verifyUpstreamParity`.
 
-- [ ] **Step 1: Write the failing path-contract tests**
+- [x] **Step 1: Write the failing path-contract tests**
 
 Create `packages/web/test/parity-source.test.ts` with the exact behavioral cases:
 
@@ -86,13 +86,13 @@ describe('isolated upstream parity source', () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/parity-source.test.ts`
 
 Expected: FAIL because `scripts/parity-source.ts` does not exist.
 
-- [ ] **Step 3: Implement the minimal path contract**
+- [x] **Step 3: Implement the minimal path contract**
 
 Create `packages/web/scripts/parity-source.ts`:
 
@@ -139,7 +139,7 @@ const upstreamHead = execFileSync(
 
 Its failure message must name `LPC_UPSTREAM_PARITY_DIR`, `parityDir`, and the expected `config.sourceSha`; it must not suggest checking out or installing into `upstream/`.
 
-- [ ] **Step 4: Run focused and existing parity validation tests**
+- [x] **Step 4: Run focused and existing parity validation tests**
 
 Run:
 
@@ -150,7 +150,7 @@ rtk pnpm --filter @lpc-toolkit/web run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit the isolated-source contract**
+- [x] **Step 5: Commit the isolated-source contract**
 
 ```bash
 rtk git add packages/web/scripts/parity-source.ts packages/web/scripts/verify-upstream-parity.ts packages/web/test/parity-source.test.ts
@@ -158,6 +158,13 @@ rtk git commit -m "fix(web): require isolated upstream parity source"
 ```
 
 After committing, mark this task complete and add its implementation note, commit hash, and focused verification result below the checkbox list.
+
+Implementation note: Added the isolated parity-directory path contract, required the
+parity preflight to resolve `LPC_UPSTREAM_PARITY_DIR`, and read the upstream HEAD only
+from that validated checkout.
+
+- Commit: `91c26e0065ad58e6e04f25d5881de0c61ddd5a07`
+- Verification: focused Vitest (`24 passed`), web typecheck PASS, architecture boundary check PASS.
 
 ## Task 2: Separate ordinary and parity Playwright configurations
 
