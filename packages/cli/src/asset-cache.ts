@@ -12,6 +12,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
+import { inflateRawSync } from 'node:zlib';
 import JSZip from 'jszip';
 import {
   releaseCachePath,
@@ -121,10 +122,13 @@ function hashBuffer(buffer: Buffer): string {
 }
 
 function ensureInsideDirectory(root: string, pathName: string): string {
+  const components = pathName.split('/');
   if (
     pathName.length === 0 ||
     pathName.includes('\0') ||
     pathName.includes('\\') ||
+    components.includes('.') ||
+    components.includes('..') ||
     path.posix.isAbsolute(pathName) ||
     path.win32.isAbsolute(pathName)
   ) {
@@ -185,7 +189,7 @@ function parseAssetManifest(
     );
   }
 
-  const seen = new Set<string>();
+  const seenDestinations = new Set<string>();
   const files = record.files.map((entry, index): AssetManifestEntry => {
     const file = requireObject(entry, `Asset manifest file ${index}`);
     if (typeof file.path !== 'string' || file.path.length === 0) {
@@ -194,15 +198,16 @@ function parseAssetManifest(
         `Asset manifest file ${index} has an invalid path.`,
       );
     }
-    ensureInsideDirectory('asset-root', file.path);
-    if (seen.has(file.path)) {
+    const normalizedDestination = path.resolve('asset-root', file.path);
+    if (seenDestinations.has(normalizedDestination)) {
       throw new AssetCacheError(
         'asset_integrity_failed',
-        `Asset manifest contains duplicate path: ${file.path}.`,
+        `Asset manifest contains duplicate destination: ${file.path}.`,
         file.path,
       );
     }
-    seen.add(file.path);
+    seenDestinations.add(normalizedDestination);
+    ensureInsideDirectory('asset-root', file.path);
     if (
       typeof file.sizeBytes !== 'number' ||
       !Number.isSafeInteger(file.sizeBytes) ||
@@ -473,7 +478,16 @@ async function expandMetadataZips(layout: AssetCacheLayout): Promise<void> {
   );
 }
 
-function zipCentralEntryNames(buffer: Buffer, zipPath: string): readonly string[] {
+interface ZipCentralEntry {
+  readonly name: string;
+  readonly flags: number;
+  readonly compressionMethod: number;
+  readonly compressedSize: number;
+  readonly uncompressedSize: number;
+  readonly localHeaderOffset: number;
+}
+
+function zipCentralEntries(buffer: Buffer, zipPath: string): readonly ZipCentralEntry[] {
   const minimumEocdSize = 22;
   const searchStart = Math.max(0, buffer.byteLength - 65_557);
   let eocdOffset = -1;
@@ -500,7 +514,7 @@ function zipCentralEntryNames(buffer: Buffer, zipPath: string): readonly string[
     );
   }
 
-  const names: string[] = [];
+  const entries: ZipCentralEntry[] = [];
   let offset = centralOffset;
   for (let index = 0; index < entryCount; index++) {
     if (offset + 46 > buffer.byteLength || buffer.readUInt32LE(offset) !== 0x02014b50) {
@@ -511,9 +525,13 @@ function zipCentralEntryNames(buffer: Buffer, zipPath: string): readonly string[
       );
     }
     const flags = buffer.readUInt16LE(offset + 8);
+    const compressionMethod = buffer.readUInt16LE(offset + 10);
+    const compressedSize = buffer.readUInt32LE(offset + 20);
+    const uncompressedSize = buffer.readUInt32LE(offset + 24);
     const nameLength = buffer.readUInt16LE(offset + 28);
     const extraLength = buffer.readUInt16LE(offset + 30);
     const commentLength = buffer.readUInt16LE(offset + 32);
+    const localHeaderOffset = buffer.readUInt32LE(offset + 42);
     const nameStart = offset + 46;
     const nextOffset = nameStart + nameLength + extraLength + commentLength;
     if (nextOffset > buffer.byteLength) {
@@ -524,17 +542,105 @@ function zipCentralEntryNames(buffer: Buffer, zipPath: string): readonly string[
       );
     }
     const encoding = (flags & 0x0800) === 0 ? 'latin1' : 'utf8';
-    names.push(buffer.toString(encoding, nameStart, nameStart + nameLength));
+    entries.push({
+      name: buffer.toString(encoding, nameStart, nameStart + nameLength),
+      flags,
+      compressionMethod,
+      compressedSize,
+      uncompressedSize,
+      localHeaderOffset,
+    });
     offset = nextOffset;
   }
-  return names;
+  return entries;
 }
 
-function expectedSpriteIndex(layout: AssetCacheLayout): readonly string[] {
+function readZipEntry(
+  buffer: Buffer,
+  entry: ZipCentralEntry,
+  zipPath: string,
+): Buffer {
+  if ((entry.flags & 0x0001) !== 0) {
+    throw new AssetCacheError(
+      'asset_integrity_failed',
+      `Encrypted ZIP entries are not supported: ${zipPath}.`,
+      zipPath,
+    );
+  }
+  const offset = entry.localHeaderOffset;
+  if (offset + 30 > buffer.byteLength || buffer.readUInt32LE(offset) !== 0x04034b50) {
+    throw new AssetCacheError(
+      'asset_integrity_failed',
+      `Invalid ZIP local entry header: ${zipPath}.`,
+      zipPath,
+    );
+  }
+  const nameLength = buffer.readUInt16LE(offset + 26);
+  const extraLength = buffer.readUInt16LE(offset + 28);
+  const dataStart = offset + 30 + nameLength + extraLength;
+  const dataEnd = dataStart + entry.compressedSize;
+  if (dataEnd > buffer.byteLength) {
+    throw new AssetCacheError(
+      'asset_integrity_failed',
+      `Invalid ZIP compressed entry length: ${zipPath}.`,
+      zipPath,
+    );
+  }
+  const compressed = buffer.subarray(dataStart, dataEnd);
+  let contents: Buffer;
+  if (entry.compressionMethod === 0) {
+    contents = Buffer.from(compressed);
+  } else if (entry.compressionMethod === 8) {
+    contents = inflateRawSync(compressed);
+  } else {
+    throw new AssetCacheError(
+      'asset_integrity_failed',
+      `Unsupported ZIP compression method ${String(entry.compressionMethod)}: ${zipPath}.`,
+      zipPath,
+    );
+  }
+  if (contents.byteLength !== entry.uncompressedSize) {
+    throw new AssetCacheError(
+      'asset_integrity_failed',
+      `ZIP entry size mismatch: ${zipPath}.`,
+      zipPath,
+    );
+  }
+  return contents;
+}
+
+function manifestZipNames(manifest: AssetManifest): readonly string[] {
+  return retainedEntries(manifest)
+    .filter((entry) => /^zips\/[^/]+\.zip$/u.test(entry.path))
+    .map((entry) => entry.path.slice('zips/'.length))
+    .sort();
+}
+
+function cacheZipNames(layout: AssetCacheLayout): readonly string[] {
+  const names: string[] = [];
+  for (const entry of readdirSync(layout.zipsRoot, { withFileTypes: true })) {
+    if (!entry.name.endsWith('.zip')) {
+      continue;
+    }
+    if (!entry.isFile()) {
+      throw new AssetCacheError(
+        'asset_integrity_failed',
+        `Asset cache ZIP entry is not a regular file: ${entry.name}.`,
+        `zips/${entry.name}`,
+      );
+    }
+    names.push(entry.name);
+  }
+  return names.sort();
+}
+
+function expectedSpriteIndex(
+  layout: AssetCacheLayout,
+  manifest: AssetManifest,
+): readonly string[] {
   const logicalPaths: string[] = [];
-  for (const zipName of readdirSync(layout.zipsRoot).sort()) {
+  for (const zipName of manifestZipNames(manifest)) {
     if (
-      !zipName.endsWith('.zip') ||
       zipName === 'sheet_definitions.zip' ||
       zipName === 'palette_definitions.zip'
     ) {
@@ -542,7 +648,8 @@ function expectedSpriteIndex(layout: AssetCacheLayout): readonly string[] {
     }
     const category = zipName.slice(0, -'.zip'.length);
     const zipPath = path.join(layout.zipsRoot, zipName);
-    for (const entryName of zipCentralEntryNames(readFileSync(zipPath), zipPath)) {
+    for (const entry of zipCentralEntries(readFileSync(zipPath), zipPath)) {
+      const entryName = entry.name;
       ensureInsideDirectory(layout.releaseRoot, entryName);
       if (!entryName.endsWith('/')) {
         logicalPaths.push(`spritesheets/${category}/${entryName}`);
@@ -553,10 +660,10 @@ function expectedSpriteIndex(layout: AssetCacheLayout): readonly string[] {
   return logicalPaths;
 }
 
-function writeSpriteIndex(layout: AssetCacheLayout): void {
+function writeSpriteIndex(layout: AssetCacheLayout, manifest: AssetManifest): void {
   writeFileSync(
     layout.spriteIndexPath,
-    JSON.stringify(expectedSpriteIndex(layout), null, 2),
+    JSON.stringify(expectedSpriteIndex(layout, manifest), null, 2),
   );
 }
 
@@ -596,8 +703,50 @@ function metadataEntries(layout: AssetCacheLayout): readonly MetadataIndexEntry[
     .sort((left, right) => left.path.localeCompare(right.path));
 }
 
+function expectedMetadataEntries(
+  layout: AssetCacheLayout,
+): readonly MetadataIndexEntry[] {
+  const entries: MetadataIndexEntry[] = [];
+  const seenDestinations = new Set<string>();
+  for (const archive of [
+    {
+      zipName: 'sheet_definitions.zip',
+      destinationName: 'sheet_definitions',
+    },
+    {
+      zipName: 'palette_definitions.zip',
+      destinationName: 'palette_definitions',
+    },
+  ]) {
+    const zipPath = path.join(layout.zipsRoot, archive.zipName);
+    const zipBuffer = readFileSync(zipPath);
+    const destinationRoot = path.join(layout.releaseRoot, archive.destinationName);
+    for (const entry of zipCentralEntries(zipBuffer, zipPath)) {
+      if (entry.name.endsWith('/')) {
+        continue;
+      }
+      const destination = ensureInsideDirectory(destinationRoot, entry.name);
+      if (seenDestinations.has(destination)) {
+        throw new AssetCacheError(
+          'asset_integrity_failed',
+          `Metadata ZIP contains duplicate destination: ${entry.name}.`,
+          entry.name,
+        );
+      }
+      seenDestinations.add(destination);
+      const contents = readZipEntry(zipBuffer, entry, zipPath);
+      entries.push({
+        path: path.relative(layout.releaseRoot, destination).split(path.sep).join('/'),
+        sizeBytes: contents.byteLength,
+        sha256: hashBuffer(contents),
+      });
+    }
+  }
+  return entries.sort((left, right) => left.path.localeCompare(right.path));
+}
+
 function writeMetadataIndex(layout: AssetCacheLayout): void {
-  const index: MetadataIndex = { files: metadataEntries(layout) };
+  const index: MetadataIndex = { files: expectedMetadataEntries(layout) };
   writeFileSync(layout.metadataIndexPath, JSON.stringify(index, null, 2));
 }
 
@@ -656,11 +805,15 @@ export function validateAssetCache(
       return false;
     }
     const manifest = parseAssetManifest(readFileSync(layout.manifestPath), config);
-    for (const entry of retainedEntries(manifest)) {
+    const retained = retainedEntries(manifest);
+    for (const entry of retained) {
       const filePath = ensureInsideDirectory(layout.releaseRoot, entry.path);
       if (!validFile(filePath, entry.sizeBytes, entry.sha256)) {
         return false;
       }
+    }
+    if (JSON.stringify(cacheZipNames(layout)) !== JSON.stringify(manifestZipNames(manifest))) {
+      return false;
     }
     if (
       !manifest.files.some((entry) => entry.path === 'CREDITS.csv') ||
@@ -675,15 +828,19 @@ export function validateAssetCache(
     if (!Array.isArray(spriteIndex) || !spriteIndex.every((entry) => typeof entry === 'string')) {
       return false;
     }
-    if (JSON.stringify(spriteIndex) !== JSON.stringify(expectedSpriteIndex(layout))) {
+    if (JSON.stringify(spriteIndex) !== JSON.stringify(expectedSpriteIndex(layout, manifest))) {
       return false;
     }
     const metadataIndex = parseMetadataIndex(readFileSync(layout.metadataIndexPath));
+    const expectedEntries = expectedMetadataEntries(layout);
     const actualEntries = metadataEntries(layout);
-    if (JSON.stringify(metadataIndex.files) !== JSON.stringify(actualEntries)) {
+    if (
+      JSON.stringify(metadataIndex.files) !== JSON.stringify(expectedEntries) ||
+      JSON.stringify(actualEntries) !== JSON.stringify(expectedEntries)
+    ) {
       return false;
     }
-    return metadataIndex.files.every((entry) =>
+    return expectedEntries.every((entry) =>
       validFile(
         ensureInsideDirectory(layout.releaseRoot, entry.path),
         entry.sizeBytes,
@@ -813,7 +970,7 @@ export async function ensureAssetCache(
       force: true,
     });
     await expandMetadataZips(stagingLayout);
-    writeSpriteIndex(stagingLayout);
+    writeSpriteIndex(stagingLayout, manifest);
     writeMetadataIndex(stagingLayout);
     writeFileSync(stagingLayout.manifestPath, manifestBuffer);
     if (!validateAssetCache(stagingLayout, options.config)) {

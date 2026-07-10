@@ -205,6 +205,76 @@ describe('verified compressed asset cache', () => {
     expect(validateAssetCache(prepared.layout, fixture.config)).toBe(false);
   });
 
+  it('rejects an unmanifested category ZIP even when the sprite index matches it', async () => {
+    const fixture = await createAssetReleaseFixture();
+    const prepared = await ensureAssetCache({
+      config: fixture.config,
+      cacheRoot: cacheRoot(),
+      download: fixture.download,
+      readTarEntry: fixture.readTarEntry,
+    });
+    writeFileSync(
+      path.join(prepared.layout.zipsRoot, 'extra.zip'),
+      readFileSync(path.join(prepared.layout.zipsRoot, 'body.zip')),
+    );
+    const spriteIndex = JSON.parse(
+      readFileSync(prepared.layout.spriteIndexPath, 'utf8'),
+    ) as string[];
+    spriteIndex.push('spritesheets/extra/bodies/male/walk.png');
+    spriteIndex.sort();
+    writeFileSync(prepared.layout.spriteIndexPath, JSON.stringify(spriteIndex));
+
+    expect(validateAssetCache(prepared.layout, fixture.config)).toBe(false);
+  });
+
+  it('rejects an unmanifested non-file ZIP inventory entry', async () => {
+    const fixture = await createAssetReleaseFixture();
+    const prepared = await ensureAssetCache({
+      config: fixture.config,
+      cacheRoot: cacheRoot(),
+      download: fixture.download,
+      readTarEntry: fixture.readTarEntry,
+    });
+    mkdirSync(path.join(prepared.layout.zipsRoot, 'extra.zip'));
+
+    expect(validateAssetCache(prepared.layout, fixture.config)).toBe(false);
+  });
+
+  it('rejects coherently modified definitions and metadata index', async () => {
+    const fixture = await createAssetReleaseFixture();
+    const prepared = await ensureAssetCache({
+      config: fixture.config,
+      cacheRoot: cacheRoot(),
+      download: fixture.download,
+      readTarEntry: fixture.readTarEntry,
+    });
+    const definitionPath = path.join(
+      prepared.layout.sheetDefinitionsRoot,
+      'body/body.json',
+    );
+    const changedDefinition = Buffer.from('{"type":"tampered"}\n');
+    writeFileSync(definitionPath, changedDefinition);
+    const metadataIndex = JSON.parse(
+      readFileSync(prepared.layout.metadataIndexPath, 'utf8'),
+    ) as {
+      files: Array<{ path: string; sizeBytes: number; sha256: string }>;
+    };
+    const indexedDefinition = metadataIndex.files.find(
+      (entry) => entry.path === 'sheet_definitions/body/body.json',
+    );
+    if (indexedDefinition === undefined) {
+      throw new Error('Fixture sheet definition is not indexed.');
+    }
+    indexedDefinition.sizeBytes = changedDefinition.byteLength;
+    indexedDefinition.sha256 = sha256(changedDefinition);
+    writeFileSync(
+      prepared.layout.metadataIndexPath,
+      JSON.stringify(metadataIndex),
+    );
+
+    expect(validateAssetCache(prepared.layout, fixture.config)).toBe(false);
+  });
+
   it('rejects a manifest whose source SHA differs from the release pin', async () => {
     const fixture = await createAssetReleaseFixture();
     const changed = manifestWith(fixture, (manifest) => {
@@ -273,6 +343,56 @@ describe('verified compressed asset cache', () => {
         readTarEntry: fixture.readTarEntry,
       }),
     ).rejects.toMatchObject({ code: 'asset_archive_unsafe' });
+  });
+
+  it.each(['zips/./body.zip', 'zips/category/../body.zip'])(
+    'rejects archive dot components that resolve inside staging: %s',
+    async (unsafePath) => {
+      const fixture = await createAssetReleaseFixture();
+      const changed = manifestWith(fixture, (manifest) => {
+        const body = manifest.files.find((entry) => entry.path === 'zips/body.zip');
+        if (body === undefined) {
+          throw new Error('Fixture body entry is missing.');
+        }
+        body.path = unsafePath;
+      });
+
+      await expect(
+        ensureAssetCache({
+          config: changed.config,
+          cacheRoot: cacheRoot(),
+          download: downloadWithManifest(fixture, changed.buffer),
+          readTarEntry: async (entryName) =>
+            entryName === unsafePath
+              ? fixture.readTarEntry('zips/body.zip')
+              : fixture.readTarEntry(entryName),
+        }),
+      ).rejects.toMatchObject({ code: 'asset_archive_unsafe', path: unsafePath });
+    },
+  );
+
+  it('rejects manifest paths with the same normalized destination', async () => {
+    const fixture = await createAssetReleaseFixture();
+    const duplicatePath = 'zips//body.zip';
+    const changed = manifestWith(fixture, (manifest) => {
+      const body = manifest.files.find((entry) => entry.path === 'zips/body.zip');
+      if (body === undefined) {
+        throw new Error('Fixture body entry is missing.');
+      }
+      manifest.files.push({ ...body, path: duplicatePath });
+    });
+
+    await expect(
+      ensureAssetCache({
+        config: changed.config,
+        cacheRoot: cacheRoot(),
+        download: downloadWithManifest(fixture, changed.buffer),
+        readTarEntry: async (entryName) =>
+          entryName === duplicatePath
+            ? fixture.readTarEntry('zips/body.zip')
+            : fixture.readTarEntry(entryName),
+      }),
+    ).rejects.toMatchObject({ code: 'asset_integrity_failed' });
   });
 
   it.skipIf(process.platform === 'win32')(
