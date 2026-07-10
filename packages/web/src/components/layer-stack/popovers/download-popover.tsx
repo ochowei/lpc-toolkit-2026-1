@@ -21,6 +21,21 @@ import { createBrowserCanvasAdapter } from '../../../adapter/browser-canvas-adap
 import type { LabelTranslator, Translator } from '../../../i18n';
 import type { ComposedResult } from '../../../hooks/use-composed-character';
 import type { CustomOverlay } from '../../../lib/custom-overlay';
+import {
+  assertExportableCredits,
+  exportSpritesheetBundle,
+} from '../../../lib/spritesheet-export';
+
+const EMPTY_CREDIT_ERROR_MESSAGE = 'Cannot export pixels without resolved credits.';
+
+/** Map export failures to user-facing copy without exposing implementation errors. */
+export function downloadErrorTranslationKey(
+  error: unknown,
+): 'download.noCredits' | 'download.failed' {
+  return error instanceof Error && error.message === EMPTY_CREDIT_ERROR_MESSAGE
+    ? 'download.noCredits'
+    : 'download.failed';
+}
 
 interface ZipRunning {
   kind: ZipExportKind;
@@ -81,34 +96,48 @@ export function DownloadPopover({
     result.status === 'error' ? t('download.failed') : t('download.loading');
   const zipDisabled = disabled || zipRunning !== null;
 
-  const handlePng = () => {
+  const handleBundle = async () => {
     if (!sheet) return;
-    const canvas = sheet.canvas as unknown as HTMLCanvasElement;
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        onStatus({ kind: 'error', text: t('download.failed') });
-        return;
-      }
-      downloadBlob(blob, 'character-spritesheet.png');
+    const frozenSheet = sheet;
+    const frozenAnim = anim;
+    try {
+      assertExportableCredits(frozenSheet.credits);
+      const blob = await exportSpritesheetBundle(frozenSheet, frozenAnim);
+      downloadBlob(blob, 'character-spritesheet-with-credits.zip');
       onStatus({ kind: 'info', text: t('download.done') });
       setOpen(false);
-    }, 'image/png');
+    } catch (error) {
+      console.error('Spritesheet bundle export failed:', error);
+      onStatus({ kind: 'error', text: t(downloadErrorTranslationKey(error)) });
+    }
   };
 
   const handleTxt = () => {
     if (!sheet) return;
-    const txt = creditsToTxt(sheet.credits, anim);
-    downloadBlob(new Blob([txt], { type: 'text/plain' }), 'credits.txt');
-    onStatus({ kind: 'info', text: t('download.done') });
-    setOpen(false);
+    try {
+      assertExportableCredits(sheet.credits);
+      const txt = creditsToTxt(sheet.credits, anim);
+      downloadBlob(new Blob([txt], { type: 'text/plain' }), 'credits.txt');
+      onStatus({ kind: 'info', text: t('download.done') });
+      setOpen(false);
+    } catch (error) {
+      console.error('TXT credits export failed:', error);
+      onStatus({ kind: 'error', text: t(downloadErrorTranslationKey(error)) });
+    }
   };
 
   const handleCsv = () => {
     if (!sheet) return;
-    const csv = creditsToCsv(sheet.credits, anim);
-    downloadBlob(new Blob([csv], { type: 'text/csv' }), 'credits.csv');
-    onStatus({ kind: 'info', text: t('download.done') });
-    setOpen(false);
+    try {
+      assertExportableCredits(sheet.credits);
+      const csv = creditsToCsv(sheet.credits, anim);
+      downloadBlob(new Blob([csv], { type: 'text/csv' }), 'credits.csv');
+      onStatus({ kind: 'info', text: t('download.done') });
+      setOpen(false);
+    } catch (error) {
+      console.error('CSV credits export failed:', error);
+      onStatus({ kind: 'error', text: t(downloadErrorTranslationKey(error)) });
+    }
   };
 
   const runZip = async (
@@ -118,9 +147,10 @@ export function DownloadPopover({
     if (!sheet) return;
     const frozenSheet = sheet;
     const frozenSelections = selections;
-    const adapter = createBrowserCanvasAdapter();
-    setZipRunning({ kind, progress: 0 });
     try {
+      assertExportableCredits(frozenSheet.credits);
+      const adapter = createBrowserCanvasAdapter();
+      setZipRunning({ kind, progress: 0 });
       const blob = await fn({
         sheet: frozenSheet,
         selections: frozenSelections,
@@ -141,9 +171,9 @@ export function DownloadPopover({
       downloadBlob(blob, filename);
       onStatus({ kind: 'info', text: t('download.done') });
       setOpen(false);
-    } catch (err) {
-      console.error('ZIP export failed:', err);
-      onStatus({ kind: 'error', text: t('download.failed') });
+    } catch (error) {
+      console.error('ZIP export failed:', error);
+      onStatus({ kind: 'error', text: t(downloadErrorTranslationKey(error)) });
     } finally {
       setZipRunning(null);
     }
@@ -176,7 +206,7 @@ export function DownloadPopover({
             {t('download.title')}
           </div>
           <div className="flex flex-col gap-1">
-            <Button size="sm" variant="primary" disabled={disabled} onClick={handlePng}>
+            <Button size="sm" variant="primary" disabled={disabled} onClick={handleBundle}>
               {t('download.png')}
             </Button>
             <Button size="sm" disabled={disabled} onClick={handleTxt}>
