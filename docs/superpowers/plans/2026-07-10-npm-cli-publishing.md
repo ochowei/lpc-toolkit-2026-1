@@ -837,7 +837,7 @@ After committing, record the exact hash and Step 5 results under Task 4, mark it
 - Produces: `RuntimeAssets`, `PrepareRuntimeAssetsOptions`, `prepareRuntimeAssets`, and `commandNeedsAssets`.
 - Updates: command functions consume one prepared runtime instead of independently assuming `<cwd>/assets`.
 
-- [ ] **Step 1: Write runtime selection tests**
+- [x] **Step 1: Write runtime selection tests**
 
 Create `packages/cli/test/runtime-assets.test.ts` with these cases:
 
@@ -864,7 +864,7 @@ and assert `runtime.source === 'managed-cache'`, `runtime.releaseTag` equals the
 fixture pin, `runtime.store.kind === 'zip'`, and one call contains the resolved
 cache root.
 
-- [ ] **Step 2: Write command laziness and stream tests**
+- [x] **Step 2: Write command laziness and stream tests**
 
 Create `packages/cli/test/main-assets.test.ts` with:
 
@@ -1003,7 +1003,7 @@ describe('asset preparation dispatch', () => {
 });
 ```
 
-- [ ] **Step 3: Run both new tests and confirm the intended failures**
+- [x] **Step 3: Run both new tests and confirm the intended failures**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/cli test -- runtime-assets.test.ts main-assets.test.ts
@@ -1011,7 +1011,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- runtime-assets.test.ts main-assets.te
 
 Expected: FAIL because runtime orchestration and injectable CLI dependencies do not exist.
 
-- [ ] **Step 4: Implement runtime-assets selection**
+- [x] **Step 4: Implement runtime-assets selection**
 
 Create `packages/cli/src/runtime-assets.ts`:
 
@@ -1048,7 +1048,7 @@ Update `RuntimeContextOptions` so `assetsRoot`, `customAssetsRoot`, and
 `spritesheetsBaseUrl` are explicit selected-runtime inputs while preserving
 the existing default behavior for direct unit callers.
 
-- [ ] **Step 5: Make command asset requirements explicit in `main.ts`**
+- [x] **Step 5: Make command asset requirements explicit in `main.ts`**
 
 Add:
 
@@ -1075,7 +1075,7 @@ line per phase. Catch preparation errors before command dispatch and pass
 `assetCacheErrorIssue(error)` to `commandError` and the existing
 `writeResponse` function.
 
-- [ ] **Step 6: Pass one runtime through commands and rendering**
+- [x] **Step 6: Pass one runtime through commands and rendering**
 
 Change the relevant signatures to:
 
@@ -1103,7 +1103,7 @@ runtime. Update render metadata `source` to report the runtime source,
 description, release tag, base definition root, and custom overlay root without
 claiming that cached ZIP sprites are an expanded directory.
 
-- [ ] **Step 7: Run focused command and render tests**
+- [x] **Step 7: Run focused command and render tests**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/cli test -- runtime-assets.test.ts main-assets.test.ts catalog-commands.test.ts selection.test.ts preset-commands.test.ts render.test.ts main-json.test.ts main-human.test.ts
@@ -1113,7 +1113,7 @@ rtk pnpm check:boundaries
 
 Expected: all tests PASS, typecheck exits 0, and boundary check passes.
 
-- [ ] **Step 8: Commit Task 5**
+- [x] **Step 8: Commit Task 5**
 
 ```bash
 rtk git add packages/cli/src packages/cli/test
@@ -1123,6 +1123,13 @@ rtk git commit -m "feat(cli): prepare assets on demand"
 Before committing, confirm `rtk git diff --name-only` lists only Task 5 files.
 After committing, record the exact hash and Step 7 results under Task 5, mark
 its checkboxes complete, and commit that record separately.
+
+**Implementation record:**
+
+- Implementation: `0146fb99b2325333f27fc4b60579c54a666d1a0b` (`feat(cli): prepare assets on demand`)
+- Verification: focused runtime, command, render, and output tests 46/46 PASS; full CLI tests 113 PASS / 1 Windows-only platform skip on the non-Windows host; package-directory CLI typecheck PASS via `rtk pnpm typecheck` from `packages/cli`; architecture boundary check PASS.
+- Implementation note: selected complete current-directory assets before the managed cache, preserved the current-directory custom overlay, prepared one runtime only for asset-dependent commands, routed cache progress/errors without contaminating JSON stdout, and passed one store/context through validation, preset materialization, composition, rendering, attribution, and metadata.
+- Context note: the existing `RuntimeContextOptions` already exposed explicit `assetsRoot`, `customAssetsRoot`, and `spritesheetsBaseUrl` inputs with direct-caller defaults, so `context.ts` required no Task 5 change.
 
 ---
 
