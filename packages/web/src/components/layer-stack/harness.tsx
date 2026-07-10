@@ -656,6 +656,11 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
           open={popover === 'attribution'}
           setOpen={(v) => setPopover(v ? 'attribution' : null)}
           catalog={props.catalog}
+          credits={
+            composeResult.status === 'ready' && composeResult.sheet
+              ? composeResult.sheet.credits
+              : null
+          }
           state={props.state}
           licenseFilter={licenseFilter}
           animationFilter={animationFilter}

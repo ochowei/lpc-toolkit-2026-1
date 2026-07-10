@@ -60,6 +60,7 @@ export const TRANSLATIONS = {
     'controls.zoomOut': 'Zoom out',
     'status.loading': 'loading',
     'attribution.title': 'Attribution',
+    'attribution.noResolvedCredits': 'No resolved credits.',
     'attribution.required': 'required',
     'attribution.effectiveLicense': 'Effective license:',
     'attribution.licenseExceeded':
@@ -232,6 +233,7 @@ export const TRANSLATIONS = {
     'controls.zoomOut': '縮小',
     'status.loading': '載入中',
     'attribution.title': '署名',
+    'attribution.noResolvedCredits': '沒有已解析的署名資料。',
     'attribution.required': '必要',
     'attribution.effectiveLicense': '有效授權：',
     'attribution.licenseExceeded': '目前有效授權高於篩選授權：',
