@@ -70,7 +70,7 @@ const bodyOnlySelection = {
 } as const;
 
 describe('renderSelection', () => {
-  it('writes sheet, metadata, and credits for a body-only selection', async () => {
+  it('keeps default directory rendering for a body-only selection', async () => {
     const cwd = await createFixtureRepo();
     const outDir = mkdtempSync(path.join(os.tmpdir(), 'lpc-render-'));
     const result = await renderSelection({
