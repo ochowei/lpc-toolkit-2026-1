@@ -153,5 +153,9 @@ describe('CLI package metadata', () => {
     expect(readme).toContain('LPC_TOOLKIT_CACHE_DIR');
     expect(readme).toContain('CREDITS.csv');
     expect(readme).toContain('GPL-3.0-or-later');
+    expect(readme).toContain('lpc-toolkit catalog item hair_braid');
+    expect(readme).toContain('hair=Braid');
+    expect(readme).not.toContain('lpc-toolkit catalog item braids');
+    expect(readme).not.toContain('hair=Braids');
   });
 });

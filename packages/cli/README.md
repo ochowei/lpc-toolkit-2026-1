@@ -30,14 +30,14 @@ being consumed by a script or agent.
 # Explore the catalog.
 lpc-toolkit catalog types
 lpc-toolkit catalog items --type hair
-lpc-toolkit catalog item braids
+lpc-toolkit catalog item hair_braid
 
 # Validate a selection document.
 lpc-toolkit selection validate --selection selection.json
 
 # Encode and decode selection tokens.
 lpc-toolkit token encode --selection selection.json
-lpc-toolkit token decode --token 'sex=male&hair=Braids' --out decoded.json
+lpc-toolkit token decode --token 'sex=male&hair=Braid' --out decoded.json
 
 # List, materialize, and render built-in presets.
 lpc-toolkit preset list
