@@ -246,7 +246,6 @@ entries while catalog-derived filter incompatibilities remain a separate signal.
 **Files:**
 - Modify: `packages/web/src/components/layer-stack/popovers/download-popover.tsx`
 - Modify: `packages/web/src/i18n.ts`
-- Create: `packages/web/playwright.download.config.ts`
 - Create: `packages/web/e2e/download-attribution.spec.ts`
 
 **Interfaces:**
@@ -286,7 +285,7 @@ Expected: all commands PASS; the responsive test continues to verify popover con
 - [x] **Step 5: Commit the UI contract**
 
 ```bash
-rtk git add packages/web/src/components/layer-stack/popovers/download-popover.tsx packages/web/src/i18n.ts packages/web/playwright.download.config.ts packages/web/e2e/download-attribution.spec.ts
+rtk git add packages/web/src/components/layer-stack/popovers/download-popover.tsx packages/web/src/i18n.ts packages/web/e2e/download-attribution.spec.ts
 rtk git commit -m "fix(web): bundle credits with spritesheet download"
 ```
 
@@ -297,6 +296,9 @@ retryable localized error for empty manifests.
 - Commit: `4c5bbc535` (`fix(web): bundle credits with spritesheet download`)
 - Verification: focused unit tests PASS (29); browser tests PASS (13); web
   typecheck PASS; boundary check PASS; task spec/quality review PASS.
+- History correction: `packages/web/playwright.download.config.ts` was added by
+  follow-up commit `21088a432` (`test(web): make attribution browser checks
+  reproducible`), not by Task 4 commit `4c5bbc535`.
 
 ## Task 5: Document the thumbnail exception and verify the completed batch
 
@@ -367,11 +369,14 @@ Plan 3.
 Follow-up review implementation note: promoted the toolkit-only Playwright
 controller into tracked configuration, tightened the bundle assertion to exact
 three-entry equality, and corrected every required typecheck/browser command to
-its reproducible spelling. The duplicated empty-credit error classification is
-recorded as a Minor and deliberately remains unchanged; introducing a new error
-hierarchy is outside this focused review fix. These corrections are committed
+its reproducible spelling. At that review stage, the duplicated empty-credit
+classification remained a recorded Minor; the final review fix wave below
+later resolves it with a narrow shared predicate. These corrections are committed
 separately from `e7c831530e5f9db918469789664a96415bfcfe83` as the follow-up
 review-fix commit `test(web): make attribution browser checks reproducible`.
+
+- Review-fix commit: `21088a432` (`test(web): make attribution browser checks
+  reproducible`).
 
 - Review-fix verification: `rtk pnpm --filter @lpc-toolkit/web run typecheck`
   PASS.
@@ -384,10 +389,49 @@ review-fix commit `test(web): make attribution browser checks reproducible`.
 - Review-fix verification: `rtk pnpm check:boundaries` PASS.
 - Review-fix verification: `rtk git diff --check` PASS.
 
+## Final Review Fix Wave
+
+- [x] Prevent retained sheets from enabling downloads during idle, loading, or
+  error states.
+  - Implementation note: `DownloadPopover` now derives its handler sheet only
+    from a ready `ComposedResult`, and the replacement-composition browser test
+    verifies the trigger locks and unlocks with composition state.
+  - Commit: `192a464e4b83d42474cb6f6ce28b27132ec0323d`
+  - Verification: focused unit and browser regressions PASS.
+- [x] Exercise actual empty-credit DownloadPopover behavior in the browser.
+  - Implementation note: the narrowly gated
+    `?e2eProbe=1&emptyDownloadCredits=1` path empties only the download-facing
+    manifest; all seven actions remain retryable, show localized guard copy,
+    and emit no download.
+  - Commit: `192a464e4b83d42474cb6f6ce28b27132ec0323d`
+  - Verification: `download-attribution.spec.ts` PASS.
+- [x] Complete the low-cost review fixes.
+  - Implementation note: shared the missing-credit predicate, directly covered
+    one-shot/null PNG encoding, and corrected the tracked Playwright config
+    history above.
+  - Commit: `192a464e4b83d42474cb6f6ce28b27132ec0323d`
+  - Verification: focused helper tests PASS.
+
+Final-review verification:
+
+- `rtk pnpm --filter @lpc-toolkit/web exec vitest run
+  test/spritesheet-export.test.ts test/zip-export.test.ts
+  test/attribution-manifest.test.ts test/download-popover.test.ts` PASS (4
+  files, 33 tests).
+- `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS.
+- `rtk pnpm --filter @lpc-toolkit/web exec playwright test -c
+  playwright.download.config.ts e2e/download-attribution.spec.ts
+  e2e/composition-loading-lock.spec.ts` PASS (7 tests).
+- `rtk pnpm check:boundaries` PASS.
+- `rtk git diff --check` PASS.
+
 ## Plan Self-Review
 
 - Finding 2 is covered by Tasks 1, 2, and 4: no bare PNG remains, all pixel archives require credits, and browser E2E verifies the bundle.
 - Finding 11 is covered by Task 3: actual attribution and effective license come only from the composition manifest while filters remain separate.
 - Finding 15 is covered by Task 5: the thumbnail exception and reachable attribution surface are explicit policy.
+- Final review confirmed retained sheets cannot be downloaded while replacement
+  composition is loading and all real download actions enforce empty credits in
+  browser coverage.
 - The plan deliberately leaves isolated upstream parity, export/overlay hook extraction, boundary expansion, and full README alignment to Plans 3–6.
 - No dependencies, upstream modifications, or core runtime imports are introduced.
