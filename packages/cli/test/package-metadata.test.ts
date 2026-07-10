@@ -1,6 +1,7 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 interface CliPackageJson {
@@ -38,7 +39,9 @@ describe('CLI package metadata', () => {
 
     expect(packageJson).toMatchObject({
       name: '@lpc-toolkit/cli',
-      version: '0.1.0',
+      version: expect.stringMatching(
+        /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/u,
+      ),
       description: expect.stringContaining('LPC'),
       engines: { node: '>=22' },
       license: 'GPL-3.0-or-later',
@@ -108,6 +111,12 @@ describe('CLI package metadata', () => {
     expect(packageJson.scripts?.build).toContain('node scripts/vendor-workspace-deps.mjs');
   });
 
+  it('builds package output during the npm prepack lifecycle', () => {
+    const packageJson = readCliPackageJson();
+
+    expect(packageJson.scripts?.prepack).toBe('pnpm run build');
+  });
+
   it('defines the cross-platform packed install smoke command', () => {
     const packageJson = readCliPackageJson();
 
@@ -132,6 +141,30 @@ describe('CLI package metadata', () => {
     expect(smokeScript).toContain('process.execPath');
     expect(smokeScript).not.toContain('ComSpec');
     expect(smokeScript).not.toContain("'/c'");
+  });
+
+  it('derives a later release tarball name without current-version coupling', () => {
+    const testDir = path.dirname(fileURLToPath(import.meta.url));
+    const helperUrl = pathToFileURL(
+      path.resolve(testDir, '../scripts/package-archive-name.mjs'),
+    ).href;
+    const output = execFileSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '--eval',
+        `import { packedTarballName } from ${JSON.stringify(helperUrl)}; process.stdout.write(packedTarballName({ name: '@lpc-toolkit/cli', version: '0.2.0' }));`,
+      ],
+      { encoding: 'utf8' },
+    );
+    const smokeScript = readFileSync(
+      path.resolve(testDir, '../scripts/smoke-packed-cli.mjs'),
+      'utf8',
+    );
+
+    expect(output).toBe('lpc-toolkit-cli-0.2.0.tgz');
+    expect(smokeScript).toContain('packedTarballName');
+    expect(smokeScript).not.toContain('lpc-toolkit-cli-0.1.0.tgz');
   });
 
   it('creates packed install temporary directories inside the cleanup guard', () => {

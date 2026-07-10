@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { packedTarballName } from './package-archive-name.mjs';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const packageJson = JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf8'));
+const expectedTarballName = packedTarballName(packageJson);
 const isWindows = process.platform === 'win32';
 
 function resolveNodeTool(...segments) {
@@ -30,26 +33,29 @@ const pnpmCliPath = resolveNodeTool('corepack', 'dist', 'pnpm.js');
 const npmCliPath = resolveNodeTool('npm', 'bin', 'npm-cli.js');
 let packDir;
 let installPrefix;
+let emptyCwd;
 
 try {
   packDir = mkdtempSync(path.join(os.tmpdir(), 'lpc-toolkit-pack-'));
   installPrefix = mkdtempSync(path.join(os.tmpdir(), 'lpc-toolkit-install-'));
+  emptyCwd = mkdtempSync(path.join(os.tmpdir(), 'lpc-toolkit-empty-cwd-'));
+
+  rmSync(path.join(packageRoot, 'dist'), { recursive: true, force: true });
 
   runNodeTool(pnpmCliPath, ['pack', '--pack-destination', packDir], {
     cwd: packageRoot,
     stdio: 'inherit',
   });
 
-  const tarballNames = readdirSync(packDir).filter(
-    (entry) => entry === 'lpc-toolkit-cli-0.1.0.tgz',
-  );
-  assert.equal(tarballNames.length, 1, 'expected exactly one lpc-toolkit-cli-0.1.0.tgz');
+  const tarballNames = readdirSync(packDir).filter((entry) => entry === expectedTarballName);
+  assert.equal(tarballNames.length, 1, `expected exactly one ${expectedTarballName}`);
   const tarballPath = path.join(packDir, tarballNames[0]);
 
   const listing = execFileSync('tar', ['-tzf', tarballPath], { encoding: 'utf8' });
   const entries = listing.split(/\r?\n/u).filter(Boolean);
   const requiredEntries = [
     'package/dist/asset-release.json',
+    'package/dist/token-decode-metadata.json',
     'package/dist/vendor/@lpc-toolkit/core/dist/index.js',
     'package/dist/vendor/@lpc-toolkit/core/package.json',
     'package/dist/vendor/@lpc-toolkit/presets/dist/index.js',
@@ -104,6 +110,23 @@ try {
   });
   assert.match(helpOutput, /lpc-toolkit catalog types/u);
 
+  const decodeResult = spawnSync(
+    process.execPath,
+    [
+      path.resolve(installedPackageRoot, installedBinTarget),
+      'token',
+      'decode',
+      '--token',
+      'sex=male&hair=Braid',
+      '--json',
+    ],
+    { cwd: emptyCwd, encoding: 'utf8' },
+  );
+  assert.equal(decodeResult.status, 0, decodeResult.stderr);
+  assert.equal(decodeResult.stderr, '', 'token decode must not download runtime assets');
+  const decodeOutput = JSON.parse(decodeResult.stdout);
+  assert.equal(decodeOutput.data?.selection?.items?.hair?.name, 'Braid');
+
   console.log('Packed CLI install smoke test passed.');
 } finally {
   if (packDir !== undefined) {
@@ -111,5 +134,8 @@ try {
   }
   if (installPrefix !== undefined) {
     rmSync(installPrefix, { recursive: true, force: true });
+  }
+  if (emptyCwd !== undefined) {
+    rmSync(emptyCwd, { recursive: true, force: true });
   }
 }
