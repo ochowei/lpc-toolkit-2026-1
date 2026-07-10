@@ -2,7 +2,9 @@ name: Publish CLI
 
 on:
   push:
-    tags: ['v*']
+    tags:
+      - 'v*'
+      - '!v*-*'
 
 permissions:
   contents: read
@@ -18,9 +20,9 @@ jobs:
         with:
           node-version: 22.14.0
           registry-url: https://registry.npmjs.org
+      - run: pnpm --filter @lpc-toolkit/cli verify:release-tag
       - run: npm install --global npm@11.5.1
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @lpc-toolkit/cli verify:release-tag
       - run: pnpm check:boundaries
       - run: pnpm --filter @lpc-toolkit/cli typecheck
       - run: pnpm --filter @lpc-toolkit/cli test

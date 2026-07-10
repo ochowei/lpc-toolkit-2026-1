@@ -216,12 +216,22 @@ The CLI build vendors the local core and presets runtime output into `dist/`, so
 the tarball does not require `@lpc-toolkit/core` or `@lpc-toolkit/presets` to be
 published.
 
-### Maintainers: npm bootstrap and later releases
+### Maintainers: RC validation, npm bootstrap, and later releases
 
-The first publication is a deliberate manual gate. After all implementation
-verification passes and the release is explicitly authorized:
+Before any stable release, update `packages/cli/package.json` to the intended
+stable version and push a matching `v<version>-rc.<number>` tag. The **CLI
+Release Candidate** workflow verifies the full CLI package flow on
+`macos-latest` and `windows-latest`; it does not publish npm. Both jobs must pass
+before the matching stable tag is created.
 
-1. Merge the implementation, then create and push tag `v0.1.0`.
+Maintainers may also launch **CLI Release Candidate** manually for any selected
+ref. A manual run performs the same macOS and Windows checks, but it is advisory
+and does not replace a successful tagged RC run.
+
+The first publication is a deliberate manual gate. After the tagged
+`v0.1.0-rc.<number>` validation passes and the release is explicitly authorized:
+
+1. Create and push stable tag `v0.1.0`.
 2. Confirm the **Publish CLI** workflow passes all verification and skips only
    its publish step for `v0.1.0`.
 3. From `packages/cli`, use the npm owner account and 2FA to run
@@ -232,13 +242,13 @@ verification passes and the release is explicitly authorized:
    `ochowei/lpc-toolkit-2026-1`, workflow `publish.yml`, with `npm publish` as
    the allowed action.
 
-For later releases, update `packages/cli/package.json` to the intended version
-and push the matching `v<version>` tag. The tag workflow verifies the version,
-boundaries, types, tests, packed install, and real assets before publishing via
-npm OIDC. After one later OIDC release succeeds, restrict traditional token
-publishing. Creating tags, publishing, registry verification, and Trusted
-Publisher configuration are external release operations and must not be run as
-ordinary implementation verification.
+For later releases, push the matching RC tag and wait for both platform jobs,
+then manually push stable tag `v<version>`. The stable tag workflow verifies the
+version, boundaries, types, tests, packed install, and real assets before
+publishing via npm OIDC. After one later OIDC release succeeds, restrict
+traditional token publishing. Creating tags, publishing, registry verification,
+and Trusted Publisher configuration are external release operations and must
+not be run as ordinary implementation verification.
 
 ## Web UI design reference
 
