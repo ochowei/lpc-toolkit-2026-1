@@ -1466,7 +1466,7 @@ mark its checkboxes complete, and commit that record separately.
 - Documents the exact public contract produced by Tasks 1–7.
 - Does not change runtime behavior.
 
-- [ ] **Step 1: Write a failing documentation assertion**
+- [x] **Step 1: Write a failing documentation assertion**
 
 Extend `packages/cli/test/package-metadata.test.ts` with a helper that reads
 `packages/cli/README.md`, then assert:
@@ -1479,7 +1479,7 @@ expect(readme).toContain('CREDITS.csv');
 expect(readme).toContain('GPL-3.0-or-later');
 ```
 
-- [ ] **Step 2: Run the documentation assertion and confirm the intended failure**
+- [x] **Step 2: Run the documentation assertion and confirm the intended failure**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/cli test -- package-metadata.test.ts
@@ -1487,7 +1487,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- package-metadata.test.ts
 
 Expected: FAIL until the README contains every required section.
 
-- [ ] **Step 3: Complete user and maintainer documentation**
+- [x] **Step 3: Complete user and maintainer documentation**
 
 Update `packages/cli/README.md` with:
 
@@ -1514,7 +1514,7 @@ subsection. Add the first-release sequence (`v0.1.0`, 2FA
 Publisher configuration) and later tag release behavior. Do not claim
 `@lpc-toolkit/core` or `@lpc-toolkit/presets` are published.
 
-- [ ] **Step 4: Run full final verification**
+- [x] **Step 4: Run full final verification**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/cli test
@@ -1530,7 +1530,7 @@ rtk git diff --check
 Expected: every command exits 0. The full `pnpm test` may download the already
 pinned web assets if its local cache is absent; do not bypass that verification.
 
-- [ ] **Step 5: Commit Task 8**
+- [x] **Step 5: Commit Task 8**
 
 ```bash
 rtk git add README.md packages/cli/README.md packages/cli/test/package-metadata.test.ts
@@ -1539,6 +1539,15 @@ rtk git commit -m "docs(cli): document npm installation and releases"
 
 After committing, record the exact hash and Step 4 results under Task 8, mark
 its checkboxes complete, and commit that record separately.
+
+**Implementation record:**
+
+- Implementation: `8259ab51ab70f2be00304336d218f7dd68eb3987` (`docs(cli): document npm installation and releases`).
+- Documentation assertion: intended RED on the missing `Node.js 22` contract, then 12/12 PASS after the README updates.
+- CLI verification: 127 tests PASS with 1 Windows-only skip; explicit CLI typecheck PASS; CLI build PASS; packed tarball install smoke PASS after installing 16 packages from `lpc-toolkit-cli-0.1.0.tgz`.
+- Workspace verification: architecture boundaries PASS; explicit workspace typecheck PASS; full workspace test PASS with asset preparation cache-hit — core 162 PASS, presets 2 PASS, CLI 127 PASS with 1 skip, and web 499 PASS with 1 skip (790 PASS and 2 skips total); `git diff --check` PASS.
+- Verification environment: RTK's typecheck shortcuts printed `TypeScript: No errors found` but returned the documented wrapper false exit, so both typechecks were rerun with explicit `run` forms and exited 0. The packed smoke and full workspace test were rerun unchanged with approval after sandbox-only npm-cache and `tsx` IPC denials, then exited 0.
+- Bootstrap note: the `v0.1.0` tag, manual 2FA publication, clean public-registry installation, npm Trusted Publisher configuration, and later OIDC release remain external manual steps and were intentionally not executed.
 
 ---
 
