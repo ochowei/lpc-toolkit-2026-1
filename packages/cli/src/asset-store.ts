@@ -5,6 +5,19 @@ import type { AssetCacheLayout } from './asset-cache.js';
 
 export type AssetImageSource = string | Buffer;
 
+export type AssetStoreErrorCode = 'asset_image_missing';
+
+export class AssetStoreError extends Error {
+  constructor(
+    readonly code: AssetStoreErrorCode,
+    message: string,
+    readonly path: string,
+  ) {
+    super(message);
+    this.name = 'AssetStoreError';
+  }
+}
+
 export interface AssetStore {
   readonly kind: 'directory' | 'zip';
   readonly baseUrl: string;
@@ -148,15 +161,33 @@ export function createZipAssetStore(layout: AssetCacheLayout): AssetStore {
     async load(sourcePath) {
       const logicalPath = zipLogicalPath(sourcePath);
       if (!spriteIndex.has(logicalPath)) {
-        throw new Error(`ZIP asset is not present in the sprite index: ${logicalPath}`);
+        throw new AssetStoreError(
+          'asset_image_missing',
+          `ZIP asset is not present in the sprite index: ${logicalPath}`,
+          logicalPath,
+        );
       }
-      const { category, entryPath } = splitZipLogicalPath(logicalPath);
-      const zip = await loadCategory(category);
-      const file = zip.file(entryPath);
-      if (file === null || file.dir) {
-        throw new Error(`ZIP asset entry is missing: ${logicalPath}`);
+      try {
+        const { category, entryPath } = splitZipLogicalPath(logicalPath);
+        const zip = await loadCategory(category);
+        const file = zip.file(entryPath);
+        if (file === null || file.dir) {
+          throw new AssetStoreError(
+            'asset_image_missing',
+            `ZIP asset entry is missing: ${logicalPath}`,
+            logicalPath,
+          );
+        }
+        return await file.async('nodebuffer');
+      } catch (error) {
+        if (error instanceof AssetStoreError) throw error;
+        const message = error instanceof Error ? error.message : String(error);
+        throw new AssetStoreError(
+          'asset_image_missing',
+          `Failed to read ZIP asset ${logicalPath}: ${message}`,
+          logicalPath,
+        );
       }
-      return file.async('nodebuffer');
     },
   };
 }

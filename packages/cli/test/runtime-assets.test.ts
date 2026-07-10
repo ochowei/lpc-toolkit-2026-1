@@ -164,12 +164,14 @@ describe('prepareRuntimeAssets', () => {
     );
   });
 
-  it('propagates typed cache failures without creating a runtime', async () => {
+  it('contextualizes typed cache failures without creating a runtime', async () => {
     const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-runtime-failure-'));
+    const cacheRoot = path.join(cwd, 'cache');
+    const releaseRoot = path.join(cacheRoot, releaseConfig.tag);
     const failure = new AssetCacheError(
       'asset_integrity_failed',
       'Checksum mismatch.',
-      '/cache/assets-v1',
+      'https://example.test/assets.tar.gz',
     );
     const ensureCache = vi.fn(async (_options: EnsureAssetCacheOptions) => {
       throw failure;
@@ -179,10 +181,14 @@ describe('prepareRuntimeAssets', () => {
       prepareRuntimeAssets({
         cwd,
         configPath: createConfig(cwd),
-        env: { LPC_TOOLKIT_CACHE_DIR: path.join(cwd, 'cache') },
+        env: { LPC_TOOLKIT_CACHE_DIR: cacheRoot },
         ensureCache,
       }),
-    ).rejects.toBe(failure);
+    ).rejects.toMatchObject({
+      code: 'asset_integrity_failed',
+      path: releaseRoot,
+      message: expect.stringContaining(`pinned asset release ${releaseConfig.tag}`),
+    });
     expect(ensureCache).toHaveBeenCalledTimes(1);
   });
 });

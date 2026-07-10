@@ -2,6 +2,7 @@ import { statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import {
+  contextualizeAssetCacheError,
   ensureAssetCache,
   type AssetCacheProgress,
 } from './asset-cache.js';
@@ -90,21 +91,25 @@ export async function prepareRuntimeAssets(
       homeDir: options.homeDir ?? homedir(),
     }),
   );
-  const prepared = await (options.ensureCache ?? ensureAssetCache)({
-    config,
-    cacheRoot,
-    ...(options.onProgress ? { onProgress: options.onProgress } : {}),
-  });
-  const store = createZipAssetStore(prepared.layout);
-  return {
-    context: createRuntimeContext({
-      cwd,
-      assetsRoot: prepared.layout.releaseRoot,
-      customAssetsRoot,
-      spritesheetsBaseUrl: store.baseUrl,
-    }),
-    store,
-    source: 'managed-cache',
-    releaseTag: config.tag,
-  };
+  try {
+    const prepared = await (options.ensureCache ?? ensureAssetCache)({
+      config,
+      cacheRoot,
+      ...(options.onProgress ? { onProgress: options.onProgress } : {}),
+    });
+    const store = createZipAssetStore(prepared.layout);
+    return {
+      context: createRuntimeContext({
+        cwd,
+        assetsRoot: prepared.layout.releaseRoot,
+        customAssetsRoot,
+        spritesheetsBaseUrl: store.baseUrl,
+      }),
+      store,
+      source: 'managed-cache',
+      releaseTag: config.tag,
+    };
+  } catch (error) {
+    throw contextualizeAssetCacheError(error, config.tag, cacheRoot);
+  }
 }

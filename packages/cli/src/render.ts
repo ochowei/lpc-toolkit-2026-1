@@ -23,6 +23,7 @@ import {
 } from '@lpc-toolkit/core';
 import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
 import { createNodeCanvasAdapter, writeCanvasPng } from './node-canvas-adapter.js';
+import { AssetStoreError } from './asset-store.js';
 import { CLI_VERSION } from './package-info.js';
 import type { CliIssue } from './response.js';
 import type { RuntimeAssets } from './runtime-assets.js';
@@ -200,6 +201,9 @@ export async function renderSelection(
     adapter,
     spritesheetsBaseUrl: runtime.store.baseUrl,
     resolvePalette,
+    onImageLoadError: (error) => {
+      if (error instanceof AssetStoreError) throw error;
+    },
   });
 
   const baseName = safeName(options.selectionName);

@@ -11,6 +11,41 @@ import type {
   PrepareRuntimeAssetsOptions,
   RuntimeAssets,
 } from '../src/runtime-assets.js';
+import { prepareRuntimeAssets } from '../src/runtime-assets.js';
+
+const releaseConfig = {
+  tag: 'assets-v1',
+  sourceRepository: 'owner/repo',
+  sourceSha: 'a'.repeat(40),
+  manifestUrl: 'https://example.test/manifest.json',
+  manifestSha256: 'b'.repeat(64),
+  tarballUrl: 'https://example.test/assets.tar.gz',
+  tarballSha256: 'c'.repeat(64),
+};
+
+function failingManagedPreparation(
+  cwd: string,
+  failure: AssetCacheError,
+): {
+  readonly prepare: typeof prepareRuntimeAssets;
+  readonly releaseRoot: string;
+} {
+  const cacheRoot = path.join(cwd, 'managed-cache');
+  const configPath = path.join(cwd, 'asset-release.json');
+  writeFileSync(configPath, JSON.stringify(releaseConfig));
+  return {
+    releaseRoot: path.join(cacheRoot, releaseConfig.tag),
+    prepare: (options) =>
+      prepareRuntimeAssets({
+        ...options,
+        configPath,
+        env: { LPC_TOOLKIT_CACHE_DIR: cacheRoot },
+        ensureCache: async () => {
+          throw failure;
+        },
+      }),
+  };
+}
 
 function makeRuntimeAssets(): RuntimeAssets {
   const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-main-assets-'));
@@ -91,6 +126,35 @@ describe('asset preparation dispatch', () => {
   });
 
   it.each([
+    [['catalog', 'bogus'], 'unknown_command'],
+    [['catalog', 'item'], 'missing_argument'],
+    [['selection', 'bogus'], 'unknown_command'],
+    [['selection', 'validate'], 'missing_argument'],
+    [['render'], 'missing_argument'],
+    [
+      ['render', 'bogus', '--selection', 'selection.json', '--out', 'out'],
+      'unknown_command',
+    ],
+    [['preset', 'bogus'], 'unknown_command'],
+    [['preset', 'materialize'], 'missing_argument'],
+    [['preset', 'render', 'farmer'], 'missing_argument'],
+  ])(
+    'returns %s as a usage error without preparing assets',
+    async (argv, expectedCode) => {
+      const prepare = vi.fn(async (_options: PrepareRuntimeAssetsOptions) => runtime);
+      const capture = captureIo(runtime.context.repoRoot);
+
+      expect(await runCli([...argv, '--json'], capture.io, {
+        prepareRuntimeAssets: prepare,
+      })).toBe(1);
+      expect(prepare).not.toHaveBeenCalled();
+      expect(JSON.parse(capture.stdout.join('')).errors[0]).toMatchObject({
+        code: expectedCode,
+      });
+    },
+  );
+
+  it.each([
     [['catalog', '--help']],
     [['render', '--help']],
     [['preset', 'render', '--help']],
@@ -122,28 +186,50 @@ describe('asset preparation dispatch', () => {
   });
 
   it('formats typed cache failures as JSON', async () => {
-    const prepare = vi.fn(async (_options: PrepareRuntimeAssetsOptions): Promise<RuntimeAssets> => {
-      throw new AssetCacheError('asset_integrity_failed', 'Checksum mismatch.', '/cache/assets-v1');
-    });
-    const capture = captureIo(runtime.context.repoRoot);
+    const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-main-cache-json-'));
+    const { prepare, releaseRoot } = failingManagedPreparation(
+      cwd,
+      new AssetCacheError(
+        'asset_integrity_failed',
+        'Checksum mismatch.',
+        'https://example.test/assets.tar.gz',
+      ),
+    );
+    const capture = captureIo(cwd);
     expect(await runCli(['catalog', 'types', '--json'], capture.io, {
       prepareRuntimeAssets: prepare,
     })).toBe(1);
-    expect(JSON.parse(capture.stdout.join('')).errors[0]).toMatchObject({
+    const issue = JSON.parse(capture.stdout.join('')).errors[0] as {
+      readonly code: string;
+      readonly message: string;
+      readonly path: string;
+    };
+    expect(issue).toMatchObject({
       code: 'asset_integrity_failed',
-      path: '/cache/assets-v1',
+      path: releaseRoot,
     });
+    expect(issue.message).toContain(`pinned asset release ${releaseConfig.tag}`);
+    expect(issue.message).toContain(releaseRoot);
+    expect(issue.message).toContain(`remove only ${releaseRoot}`);
+    expect(issue.message).toContain('do not bypass integrity verification');
   });
 
   it('formats the same cache failure for humans', async () => {
-    const prepare = vi.fn(async (_options: PrepareRuntimeAssetsOptions): Promise<RuntimeAssets> => {
-      throw new AssetCacheError('asset_download_failed', 'Network unavailable.');
-    });
-    const capture = captureIo(runtime.context.repoRoot);
+    const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-main-cache-human-'));
+    const { prepare, releaseRoot } = failingManagedPreparation(
+      cwd,
+      new AssetCacheError('asset_download_failed', 'Network unavailable.'),
+    );
+    const capture = captureIo(cwd);
     expect(await runCli(['catalog', 'types'], capture.io, {
       prepareRuntimeAssets: prepare,
     })).toBe(1);
     expect(capture.stdout).toEqual([]);
-    expect(capture.stderr.join('')).toContain('asset_download_failed');
+    const output = capture.stderr.join('');
+    expect(output).toContain('asset_download_failed');
+    expect(output).toContain(`pinned asset release ${releaseConfig.tag}`);
+    expect(output).toContain(releaseRoot);
+    expect(output).toContain(`remove only ${releaseRoot}`);
+    expect(output).toContain('do not bypass integrity verification');
   });
 });

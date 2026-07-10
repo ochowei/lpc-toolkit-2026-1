@@ -1019,3 +1019,22 @@ export function assetCacheErrorIssue(error: unknown): AssetCacheIssue {
   }
   return { code: 'asset_cache_failed', message: errorMessage(error) };
 }
+
+export function contextualizeAssetCacheError(
+  error: unknown,
+  releaseTag: string,
+  cacheRoot: string,
+): AssetCacheError {
+  const issue = assetCacheErrorIssue(error);
+  const finalCachePath = releaseCachePath(cacheRoot, releaseTag);
+  const detail = issue.path === undefined
+    ? issue.message
+    : `${issue.message} (${issue.path})`;
+  return new AssetCacheError(
+    issue.code,
+    `Failed to prepare pinned asset release ${releaseTag} at ${finalCachePath}: ${detail} ` +
+      `Retry the command. If it still fails, remove only ${finalCachePath} and retry; ` +
+      'do not bypass integrity verification.',
+    finalCachePath,
+  );
+}

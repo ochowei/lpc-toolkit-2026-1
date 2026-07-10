@@ -167,4 +167,18 @@ describe('ZIP asset store', () => {
       store.load('lpc-zip:/spritesheets/body/bodies/male/missing.png'),
     ).rejects.toThrow();
   });
+
+  it.each([
+    'spritesheets/body/bodies/male/missing.png',
+    'spritesheets/hair/hair/male/walk.png',
+  ])('identifies an unreadable indexed image as %s', async (logicalPath) => {
+    const layout = await createZipFixture();
+    const store = createZipAssetStore(layout);
+
+    await expect(store.load(`lpc-zip:/${logicalPath}`)).rejects.toMatchObject({
+      name: 'AssetStoreError',
+      code: 'asset_image_missing',
+      path: logicalPath,
+    });
+  });
 });
