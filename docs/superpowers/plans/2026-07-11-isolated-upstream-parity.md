@@ -380,7 +380,7 @@ isolated lockfile, and runs the parity-only Playwright lifecycle.
 - Produces a completed Plan 3 record with checked tasks, implementation notes, exact commit hashes, and final verification results.
 - Does not alter production code, test behavior, `asset-release.json`, or `upstream/`.
 
-- [ ] **Step 1: Run the full relevant verification suite**
+- [x] **Step 1: Run the full relevant verification suite**
 
 Run:
 
@@ -395,7 +395,7 @@ rtk git status --short
 
 Expected: all checks PASS; status contains only intentional Plan 3 changes plus the pre-existing untracked `docs/README-ARCHITECTURE-AUDIT.tmp.md`.
 
-- [ ] **Step 2: Verify parity against an isolated checkout**
+- [x] **Step 2: Verify parity against an isolated checkout**
 
 Use an existing absolute isolated checkout at the pinned SHA, or materialize one outside the repository using the same CI sequence. Do not initialize dependencies in `upstream/`. Then run:
 
@@ -405,7 +405,7 @@ rtk env LPC_UPSTREAM_PARITY_DIR=/absolute/path/outside/the/repository/upstream p
 
 Expected: parity preflight reports the pinned SHA and all random parity cases PASS. If network access or isolated dependency installation is unavailable, record that parity execution as blocked with the exact reason; do not substitute the tracked submodule.
 
-- [ ] **Step 3: Review the final diff against Batch C**
+- [x] **Step 3: Review the final diff against Batch C**
 
 Run:
 
@@ -416,7 +416,7 @@ rtk rg -n "LPC_UPSTREAM_PARITY_DIR|random-upstream-parity|sourceSha|npm ci" .git
 
 Confirm every Batch C requirement has direct code/test/workflow evidence and no command targets the tracked submodule.
 
-- [ ] **Step 4: Record completion and commit plan evidence**
+- [x] **Step 4: Record completion and commit plan evidence**
 
 Update every completed task with a short implementation note, commit hash, and verification status, then run:
 
@@ -424,6 +424,26 @@ Update every completed task with a short implementation note, commit hash, and v
 rtk git add docs/superpowers/plans/2026-07-11-isolated-upstream-parity.md
 rtk git commit -m "docs(plan): record isolated parity completion"
 ```
+
+Implementation note: Re-ran the complete workspace verification suite, verified the
+ordinary Playwright lifecycle runs 24 non-parity cases, materialized the pinned upstream
+commit in an isolated `/private/tmp` checkout, and reviewed every Batch C code, test, and
+workflow contract. The isolated checkout was never substituted with tracked `upstream/`.
+
+- Commits verified: `91c26e0065ad58e6e04f25d5881de0c61ddd5a07`,
+  `71a3192e16bb0ddc5ac725fa6bab4a2dad797c7d`, and
+  `45e1b6b9236befde1e1e6a5aa23dcb25673304e7`.
+- Verification: architecture boundaries PASS; workspace typecheck PASS; workspace tests
+  PASS (`837 passed`, `1 skipped`); ordinary Playwright E2E PASS (`24 passed`);
+  `git diff --check` PASS; Batch C diff and provenance scans reviewed; forbidden-reference
+  scan returned no matches; tracked `upstream/` remained clean at
+  `212abfd21493e9957bd556250ac538fa40fe1fc9`.
+- Isolated parity environment: `/private/tmp/lpc-toolkit-upstream-parity-212abfd` was
+  fetched and verified at `212abfd21493e9957bd556250ac538fa40fe1fc9`.
+  Execution was BLOCKED by the local approval reviewer: unsandboxed `npm ci` in the
+  third-party checkout was rejected because install scripts/dependency code may execute,
+  and the parity lifecycle was rejected because it starts that checkout's dev server.
+  No dependency installation or server startup was attempted in tracked `upstream/`.
 
 ## Final Acceptance Criteria
 
