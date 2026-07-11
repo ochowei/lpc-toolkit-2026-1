@@ -401,7 +401,7 @@ while retaining its existing UI state, progress, status, and error presentation.
 - Produces `UseCharacterExportResult` with `disabled`, `disabledReasonKey`, `running`, and callbacks `downloadBundle`, `downloadCreditsTxt`, `downloadCreditsCsv`, and `downloadZip(kind)`.
 - Hook freezes one `CharacterExportInput` before awaiting, rejects duplicate execution, maps missing-credit versus generic errors, keeps the popover open on error, clears running state in `finally`, and closes/reports success only after download completes.
 
-- [ ] **Step 1: Write failing readiness and execution-gate tests**
+- [x] **Step 1: Write failing readiness and execution-gate tests**
 
 Move the retained-sheet test from `download-popover.test.ts` and add duplicate/retry cases:
 
@@ -417,13 +417,13 @@ expect(gate.tryStart()).toBe(true);
 
 Add a pure `runGuardedExport(gate, task)` helper test where the first task rejects, `gate.running` returns false, and a second task succeeds. This is the hook's retry contract without adding a DOM hook-testing dependency.
 
-- [ ] **Step 2: Run focused test and verify RED**
+- [x] **Step 2: Run focused test and verify RED**
 
 Run: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/use-character-export.test.ts test/download-popover.test.ts`
 
 Expected: FAIL because the hook contract is absent and the old component export still owns readiness.
 
-- [ ] **Step 3: Implement the hook and guarded runner**
+- [x] **Step 3: Implement the hook and guarded runner**
 
 Use this state shape:
 
@@ -446,7 +446,7 @@ export interface UseCharacterExportResult {
 
 All action callbacks call one internal `run(kind)`. Capture `sheet`, `anim`, selections, composer callbacks, overlay, and label callback through `freezeCharacterExportInput` before the first `await`. `runGuardedExport` must always release the gate in `finally`; progress callbacks must be ignored after that run finishes.
 
-- [ ] **Step 4: Wire harness and reduce popover to action props**
+- [x] **Step 4: Wire harness and reduce popover to action props**
 
 Move `zipRunning` state out of harness into the hook. `DownloadPopover` props become:
 
@@ -467,7 +467,7 @@ interface Props {
 
 The component must not import from core, adapters, `lib/character-export`, `lib/spritesheet-export`, `lib/zip-export` values, or `lib/download`. A type-only `ZipExportKind` import may come from the export hook or a focused shared type module.
 
-- [ ] **Step 5: Verify lifecycle, UI, and browser contracts**
+- [x] **Step 5: Verify lifecycle, UI, and browser contracts**
 
 Run:
 
@@ -480,7 +480,7 @@ rtk pnpm check:boundaries
 
 Expected: PASS; seven download controls, error copy, popover-open-on-error, stale-sheet lock, filenames, archive contents, and progress display remain unchanged.
 
-- [ ] **Step 6: Commit Task 4**
+- [x] **Step 6: Commit Task 4**
 
 ```bash
 rtk git add packages/web/src/hooks/use-character-export.ts packages/web/test/use-character-export.test.ts packages/web/src/components/layer-stack/harness.tsx packages/web/src/components/layer-stack/popovers/download-popover.tsx packages/web/test/download-popover.test.ts
@@ -488,6 +488,14 @@ rtk git commit -m "refactor(web): extract character export hook"
 ```
 
 After review, mark the task complete and record implementation note, commit hash, and verification.
+
+- Implementation note: Extracted ready-sheet gating, synchronous concurrency,
+  frozen export input, error mapping, progress liveness, and success/error UI
+  orchestration into `useCharacterExport`; `DownloadPopover` now only renders
+  and forwards its seven artifact actions.
+- Commit: `e8fc66588`
+- Verification: focused Vitest 44/44 PASS; web typecheck PASS; architecture
+  boundaries PASS; tracked Playwright 7/7 PASS (Chromium).
 
 ## Task 5: Verify the complete extraction and record evidence
 
