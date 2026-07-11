@@ -172,6 +172,8 @@ describe('CLI package metadata', () => {
     expect(smokeScript).toContain('process.execPath');
     expect(smokeScript).not.toContain('ComSpec');
     expect(smokeScript).not.toContain("'/c'");
+    expect(smokeScript).not.toContain('execFileSync(installedBinPath');
+    expect(smokeScript).toContain("args: ['--help']");
   });
 
   it('runs the installed CLI through Node on Windows and the shim elsewhere', () => {
