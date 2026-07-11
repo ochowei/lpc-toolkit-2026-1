@@ -15,6 +15,10 @@ const ciWorkflow = readFileSync(
   path.join(here, '../../../.github/workflows/ci.yml'),
   'utf8',
 );
+const publishWorkflow = readFileSync(
+  path.join(here, '../../../.github/workflows/publish.yml'),
+  'utf8',
+);
 const changesJob = ciWorkflow.slice(
   ciWorkflow.indexOf('  changes:'),
   ciWorkflow.indexOf('  unit:'),
@@ -56,6 +60,24 @@ describe('package scripts', () => {
     expect(rootPackageJson.scripts?.['check:boundaries']).toBe(
       'node scripts/check-boundaries.mjs',
     );
+  });
+
+  it('runs architecture boundaries in CI after install and before validation', () => {
+    const unitJobStart = ciWorkflow.indexOf('  unit:');
+    const cliJobStart = ciWorkflow.indexOf('  cli-package:');
+
+    expect(unitJobStart).toBeGreaterThanOrEqual(0);
+    expect(cliJobStart).toBeGreaterThan(unitJobStart);
+
+    const unitJob = ciWorkflow.slice(unitJobStart, cliJobStart);
+    expect(unitJob).toContain('- run: pnpm check:boundaries');
+    expect(unitJob.indexOf('pnpm install --frozen-lockfile')).toBeLessThan(
+      unitJob.indexOf('pnpm check:boundaries'),
+    );
+    expect(unitJob.indexOf('pnpm check:boundaries')).toBeLessThan(
+      unitJob.indexOf('pnpm typecheck'),
+    );
+    expect(publishWorkflow).toContain('- run: pnpm check:boundaries');
   });
 
   it('prepares release assets before production builds', () => {
