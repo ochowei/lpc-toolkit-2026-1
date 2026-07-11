@@ -310,7 +310,10 @@ Record commit and verification under Task 3.
 - Consumes: completed documentation, closure matrix, ordinary web environment, and an isolated parity checkout supplied through `LPC_UPSTREAM_PARITY_DIR`.
 - Produces: final Plan 6 evidence and a fully verified findings matrix.
 
-- [ ] **Step 1: Run static, type, unit, build, and README gates**
+- [x] **Step 1: Run static, type, unit, build, and README gates**
+  - Implementation: Ran every static, type, full-test, build, and focused documentation gate.
+  - Commit: `f0dee9558`
+  - Verification: boundaries PASS; root typecheck PASS; full tests 109 files / 965 passed / 1 skipped; build PASS; README example 2/2 PASS; docs contract 9/9 PASS.
 
 Run separately:
 
@@ -325,7 +328,10 @@ rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts
 
 Expected: all exit `0`. If the root `rtk pnpm typecheck` wrapper reports a non-zero status after printing success, run `rtk pnpm -r typecheck`, record both results accurately, and do not mislabel the wrapper result.
 
-- [ ] **Step 2: Run ordinary web E2E**
+- [x] **Step 2: Run ordinary web E2E**
+  - Implementation: Ran the toolkit-only Playwright configuration.
+  - Commit: `f0dee9558`
+  - Verification: ordinary web E2E 24/24 PASS without `upstream/`.
 
 Run:
 
@@ -335,7 +341,10 @@ rtk pnpm --filter @lpc-toolkit/web test:e2e
 
 Expected: toolkit-only Playwright suite PASS without using `upstream/`.
 
-- [ ] **Step 3: Run isolated upstream parity E2E**
+- [x] **Step 3: Run isolated upstream parity E2E**
+  - Implementation: Used the user-approved sibling checkout at SHA `212abfd21493e9957bd556250ac538fa40fe1fc9`; provisioned its locked dependencies after the initial missing-dependency block, without modifying tracked files or the submodule.
+  - Commit: `f0dee9558`
+  - Verification: isolated parity source validation PASS; Playwright parity 7/7 PASS; sibling git status clean.
 
 Use a separate read-only checkout outside `upstream/`:
 
@@ -346,7 +355,10 @@ LPC_UPSTREAM_PARITY_DIR=/absolute/path/to/isolated/lpc-character-generator \
 
 Expected: parity suite PASS without modifying or installing inside the submodule. If network/external checkout access blocks execution, record the exact blocker and leave affected closure rows open; do not convert the block into PASS.
 
-- [ ] **Step 4: Verify links, versions, public exports, and scope**
+- [x] **Step 4: Verify links, versions, public exports, and scope**
+  - Implementation: Verified docs contracts, core example, API categories versus `API.md`/core index, CLI 0.1.0, diff integrity, and repository scope.
+  - Commit: `f0dee9558`
+  - Verification: docs 9/9 PASS; core example 2/2 PASS; `git diff --check` PASS; only the preserved audit scratch file remains untracked.
 
 Run separately:
 
@@ -359,7 +371,10 @@ rtk git status --short
 
 Inspect `README.md` API categories against root `API.md` and `packages/core/src/index.ts`; inspect documented CLI version against `packages/cli/package.json`. Expected: no uncommitted task files, and only the preserved audit temp file remains untracked.
 
-- [ ] **Step 5: Record final evidence and commit**
+- [x] **Step 5: Record final evidence and commit**
+  - Implementation: Added the final report and permanent closure acceptance section with exact counts, warnings, provisioning, parity SHA, and scope.
+  - Commit: `f0dee9558`
+  - Verification: evidence commit created; final documentation contract 9/9 PASS.
 
 Write `.superpowers/sdd/plan6-final-report.md` with exact commands, exit statuses, test/build/E2E counts, isolated parity source SHA/path, scope audit, and any intentional skips. Update closure rows with final command results and the plan with per-step commits/verifications.
 
