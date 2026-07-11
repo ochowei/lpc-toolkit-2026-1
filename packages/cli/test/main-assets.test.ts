@@ -12,6 +12,7 @@ import type {
   RuntimeAssets,
 } from '../src/runtime-assets.js';
 import { prepareRuntimeAssets } from '../src/runtime-assets.js';
+import type { RunningWebServer } from '../src/web-server.js';
 
 const releaseConfig = {
   tag: 'assets-v1',
@@ -103,8 +104,45 @@ describe('asset preparation dispatch', () => {
     [['selection', 'validate', '--selection', 'selection.json']],
     [['preset', 'materialize', 'villager']],
     [['render', '--selection', 'selection.json', '--out', 'out']],
+    [['web']],
   ])('classifies %j as asset-dependent', (argv) => {
     expect(commandNeedsAssets(parseArgs(argv))).toBe(true);
+  });
+
+  it('does not classify web help as asset-dependent', () => {
+    expect(commandNeedsAssets(parseArgs(['web', '--help']))).toBe(false);
+  });
+
+  it('prepares managed assets, prints the URL, and waits for web server closure', async () => {
+    const prepare = vi.fn(async (_options: PrepareRuntimeAssetsOptions) => runtime);
+    const running: RunningWebServer = {
+      url: 'http://127.0.0.1:45678',
+      close: async () => undefined,
+      closed: Promise.resolve(),
+    };
+    const start = vi.fn(async () => running);
+    const capture = captureIo(runtime.context.repoRoot);
+
+    expect(await runCli(['web', '--port', '0', '--no-open'], capture.io, {
+      prepareRuntimeAssets: prepare,
+      startWebServer: start,
+    })).toBe(0);
+
+    expect(prepare).toHaveBeenCalledWith(expect.objectContaining({ managedCacheOnly: true }));
+    expect(start).toHaveBeenCalledOnce();
+    expect(capture.stdout.join('')).toContain('http://127.0.0.1:');
+  });
+
+  it.each([
+    [['web', '--port', '65536']],
+    [['web', 'extra']],
+    [['web', '--json']],
+  ])('rejects invalid web invocation %j without preparing assets', async (argv) => {
+    const prepare = vi.fn(async (_options: PrepareRuntimeAssetsOptions) => runtime);
+    const capture = captureIo(runtime.context.repoRoot);
+
+    expect(await runCli(argv, capture.io, { prepareRuntimeAssets: prepare })).toBe(1);
+    expect(prepare).not.toHaveBeenCalled();
   });
 
   it('prepares assets exactly once before catalog dispatch', async () => {
