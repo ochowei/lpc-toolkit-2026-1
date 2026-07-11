@@ -75,6 +75,7 @@ try {
   const listing = execFileSync('tar', ['-tzf', tarballPath], { encoding: 'utf8' });
   const entries = listing.split(/\r?\n/u).filter(Boolean);
   const requiredEntries = [
+    'package/dist/web/index.html',
     'package/dist/asset-release.json',
     'package/dist/token-decode-metadata.json',
     'package/dist/vendor/@lpc-toolkit/core/dist/index.js',
@@ -93,6 +94,14 @@ try {
   assert.ok(
     entries.every((entry) => !entry.startsWith('package/src/')),
     'packed tarball must not include package/src/',
+  );
+  assert.ok(
+    entries.every((entry) => !entry.startsWith('package/dist/web/zips/')),
+    'packed tarball must not duplicate cached ZIP assets',
+  );
+  assert.ok(
+    entries.every((entry) => !entry.startsWith('package/dist/web/spritesheets/')),
+    'packed tarball must not include expanded spritesheets',
   );
   assert.ok(
     entries.every((entry) => !entry.startsWith('package/test/')),

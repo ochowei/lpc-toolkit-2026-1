@@ -78,8 +78,9 @@ function localSpritesheetsPlugin(): Plugin {
 
 // `server.fs.allow` must reach the repo root so `import.meta.glob` can read
 // the local `assets/` directory (two levels up from packages/web).
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react(), tailwindcss(), localSpritesheetsPlugin()],
+  publicDir: mode === 'embedded' ? false : 'public',
   resolve: {
     alias: {
       // Read core's source directly so dev/build never sees a stale `dist/`.
@@ -92,4 +93,4 @@ export default defineConfig({
     },
   },
   server: { fs: { allow: ['../..'] } },
-});
+}));
