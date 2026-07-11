@@ -1,14 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  composeSelections,
-  makeResolvePalette,
   serializeHash,
   type AnimationName,
   type Catalog,
   type HashWarning,
   type LicenseGroup,
   type PaletteMetadata,
-  type Selections,
   type TypeName,
 } from '@lpc-toolkit/core';
 import { e2eProbeFromUrl } from '../../lib/e2e-probe-from-url';
@@ -53,15 +50,11 @@ import {
   useMediaQuery,
 } from '../../hooks/use-media-query';
 import { Button } from '../ui/button';
-import { createBrowserCanvasAdapter } from '../../adapter/browser-canvas-adapter';
+import { useSingleItemComposer } from '../../hooks/use-single-item-composer';
+import { useCustomOverlay } from '../../hooks/use-custom-overlay';
+import { useCharacterExport } from '../../hooks/use-character-export';
 import { toSelections } from '../../slice/selection';
 import { buildUpstreamUrl } from '../../lib/upstream-url';
-import type { ZipExportKind } from '../../lib/zip-export';
-import {
-  loadCustomOverlayImage,
-  parseCustomOverlayZPos,
-  type CustomOverlay,
-} from '../../lib/custom-overlay';
 import {
   MobileBottomNav,
   type MobileView,
@@ -150,8 +143,6 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   const [fullSheetMask, setFullSheetMask] = useState(false);
   const [fullSheetZoom, setFullSheetZoom] = useState<FullSheetZoom>('fit');
   const [splitterRatio, setSplitterRatio] = useState(0.5);
-  const [customOverlay, setCustomOverlay] = useState<CustomOverlay | null>(null);
-  const [customOverlayZPos, setCustomOverlayZPos] = useState(0);
   const isDesktop = useMediaQuery('(min-width: 768px)');
   const [mobileView, setMobileView] = useState<MobileView>('preview');
   const [
@@ -195,11 +186,6 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     dragSidebarWidth ?? preferredSidebarWidth,
     renderedSidebarMax,
   );
-
-  const [zipRunning, setZipRunning] = useState<null | {
-    kind: ZipExportKind;
-    progress: number;
-  }>(null);
 
   useEffect(() => {
     if (!isDesktop) {
@@ -289,34 +275,24 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     [props.catalog, props.state.selections, licenseFilter, animationFilter],
   );
 
-  const composeSingleItem = useCallback(
-    async (singleSelections: Selections, onlyLayerNumber?: number) => {
-      const adapter = createBrowserCanvasAdapter();
-      return composeSelections(singleSelections, {
-        catalog: props.catalog,
-        adapter,
-        spritesheetsBaseUrl: '',
-        ...(onlyLayerNumber !== undefined ? { onlyLayerNumber } : {}),
-        resolvePalette: makeResolvePalette(
-          props.catalog,
-          props.palettes,
-          singleSelections,
-        ),
-      });
-    },
-    [props.catalog, props.palettes],
-  );
+  const { composeSingleItem, composeSingleItemLayer } =
+    useSingleItemComposer(props.catalog, props.palettes);
 
+  const compositionLockedRef = useRef(false);
+  const customOverlayState = useCustomOverlay({
+    lockedRef: compositionLockedRef,
+    t,
+    onStatus: setStatus,
+  });
   const composeResult = useComposedCharacter(
     props.catalog,
     props.palettes,
     props.state,
     reloadCounter,
-    customOverlay,
+    customOverlayState.overlay,
   );
   const isComposing = isCompositionLocked(composeResult.status);
-  const isComposingRef = useRef(isComposing);
-  isComposingRef.current = isComposing;
+  compositionLockedRef.current = isComposing;
 
   const removeLicenseIncompatibleSelections = useCallback(() => {
     if (isComposing) return;
@@ -341,60 +317,6 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
       text: t('animationFilter.removed').replace('{n}', String(animationIncompatibleTypeNames.length)),
     });
   }, [animationIncompatibleTypeNames, isComposing, props.dispatch, t]);
-
-  const clearCustomOverlay = useCallback(() => {
-    if (isComposing) return;
-    setCustomOverlay((prev) => {
-      if (prev) URL.revokeObjectURL(prev.objectUrl);
-      return null;
-    });
-    setCustomOverlayZPos(0);
-    setStatus({ kind: 'info', text: t('advancedTools.cleared') });
-  }, [isComposing, t]);
-
-  const handleCustomOverlayZPosChange = useCallback((raw: string) => {
-    if (isComposing) return;
-    const zPos = parseCustomOverlayZPos(raw);
-    setCustomOverlayZPos(zPos);
-    setCustomOverlay((prev) => (prev ? { ...prev, zPos } : prev));
-  }, [isComposing]);
-
-  const handleCustomOverlayUpload = useCallback(
-    async (file: File) => {
-      if (isComposing) return;
-      try {
-        const loaded = await loadCustomOverlayImage({
-          file,
-          zPos: customOverlayZPos,
-        });
-        if (isComposingRef.current) {
-          if (!('ok' in loaded)) URL.revokeObjectURL(loaded.objectUrl);
-          return;
-        }
-        if ('ok' in loaded) {
-          setStatus({
-            kind: 'error',
-            text: t('advancedTools.invalidSize')
-              .replace('{width}', String(loaded.width))
-              .replace('{height}', String(loaded.height)),
-          });
-          return;
-        }
-        setCustomOverlay((prev) => {
-          if (prev) URL.revokeObjectURL(prev.objectUrl);
-          return loaded;
-        });
-        setStatus({
-          kind: 'info',
-          text: t('advancedTools.loaded').replace('{name}', loaded.fileName),
-        });
-      } catch (error) {
-        console.error('Custom overlay upload failed:', error);
-        setStatus({ kind: 'error', text: t('download.failed') });
-      }
-    },
-    [customOverlayZPos, isComposing, t],
-  );
 
   const fullSheet: FullSheetUiState = {
     open: fullSheetOpen,
@@ -423,6 +345,42 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     composeResult.status === 'loading' ? composeResult.progress : null;
   const e2eProbeEnabled =
     typeof window !== 'undefined' && e2eProbeFromUrl(window.location.search);
+  const emptyDownloadCreditsProbeEnabled =
+    e2eProbeEnabled &&
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('emptyDownloadCredits') ===
+      '1';
+  const downloadResult = useMemo<ComposedResult>(() => {
+    if (
+      !emptyDownloadCreditsProbeEnabled ||
+      composeResult.status !== 'ready' ||
+      !composeResult.sheet
+    ) {
+      return composeResult;
+    }
+
+    // E2E-only: exercise the real download controls without mutating composition.
+    return {
+      ...composeResult,
+      sheet: {
+        ...composeResult.sheet,
+        credits: { entries: [], resolvedPaths: [], licenses: [] },
+      },
+    };
+  }, [composeResult, emptyDownloadCreditsProbeEnabled]);
+  const characterExport = useCharacterExport({
+    result: downloadResult,
+    anim: props.state.anim,
+    selections: toSelections(props.state),
+    catalog: props.catalog,
+    composeSingleItem,
+    composeSingleItemLayer,
+    customOverlay: customOverlayState.overlay,
+    tl: props.tl,
+    t: props.t,
+    setOpen: (open) => setPopover(open ? 'download' : null),
+    onStatus: setStatus,
+  });
   const canonicalHash = useMemo(
     () => serializeHash(toSelections(props.state)),
     [props.state.bodyType, props.state.selections],
@@ -481,15 +439,6 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     return () => clearTimeout(id);
   }, [status]);
 
-  useEffect(() => {
-    return () => {
-      setCustomOverlay((prev) => {
-        if (prev) URL.revokeObjectURL(prev.objectUrl);
-        return null;
-      });
-    };
-  }, []);
-
   // Global ⌘K / Ctrl+K focuses the sidebar search input (selects existing text if any).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -529,7 +478,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   const handleReset = ({ outfit, view, filters }: { outfit: boolean; view: boolean; filters: boolean }) => {
     const allowedOutfit = outfit && !isComposing;
     if (allowedOutfit) {
-      clearCustomOverlay();
+      customOverlayState.clear();
     }
     if (allowedOutfit || view) {
       guardedDispatch({
@@ -574,11 +523,11 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
       toggleAnimation={toggleAnimation}
       animationIncompatibleCount={animationIncompatibleCount}
       removeAnimationIncompatibleSelections={removeAnimationIncompatibleSelections}
-      customOverlay={customOverlay}
-      customOverlayZPos={customOverlayZPos}
-      onCustomOverlayUpload={handleCustomOverlayUpload}
-      onCustomOverlayZPosChange={handleCustomOverlayZPosChange}
-      onClearCustomOverlay={clearCustomOverlay}
+      customOverlay={customOverlayState.overlay}
+      customOverlayZPos={customOverlayState.zPos}
+      onCustomOverlayUpload={customOverlayState.upload}
+      onCustomOverlayZPosChange={customOverlayState.changeZPos}
+      onClearCustomOverlay={customOverlayState.clear}
       t={props.t}
       tl={props.tl}
       onPresetApplied={handlePresetApplied}
@@ -656,6 +605,11 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
           open={popover === 'attribution'}
           setOpen={(v) => setPopover(v ? 'attribution' : null)}
           catalog={props.catalog}
+          credits={
+            composeResult.status === 'ready' && composeResult.sheet
+              ? composeResult.sheet.credits
+              : null
+          }
           state={props.state}
           licenseFilter={licenseFilter}
           animationFilter={animationFilter}
@@ -666,18 +620,14 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
         <DownloadPopover
           open={popover === 'download'}
           setOpen={(v) => setPopover(v ? 'download' : null)}
-          result={composeResult}
-          anim={props.state.anim}
-          selections={toSelections(props.state)}
-          catalog={props.catalog}
-          composeSingleItem={composeSingleItem}
-          composeSingleItemLayer={composeSingleItem}
-          customOverlay={customOverlay}
-          zipRunning={zipRunning}
-          setZipRunning={setZipRunning}
+          disabled={characterExport.disabled}
+          disabledReason={props.t(characterExport.disabledReasonKey)}
+          running={characterExport.running}
+          onBundle={() => void characterExport.downloadBundle()}
+          onCreditsTxt={() => void characterExport.downloadCreditsTxt()}
+          onCreditsCsv={() => void characterExport.downloadCreditsCsv()}
+          onZip={(kind) => void characterExport.downloadZip(kind)}
           t={props.t}
-          tl={props.tl}
-          onStatus={(s) => setStatus(s)}
         />
         <Button
           size="sm"

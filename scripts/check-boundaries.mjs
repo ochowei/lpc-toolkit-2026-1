@@ -2,8 +2,15 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { builtinModules } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 
 const sourceExtensions = new Set(['.js', '.jsx', '.ts', '.tsx']);
+const scriptKinds = new Map([
+  ['.js', ts.ScriptKind.JS],
+  ['.jsx', ts.ScriptKind.JSX],
+  ['.ts', ts.ScriptKind.TS],
+  ['.tsx', ts.ScriptKind.TSX],
+]);
 const coreRuntimeGlobals = [
   'window',
   'document',
@@ -17,6 +24,12 @@ const concreteCanvasImports = new Set([
   'node-canvas',
 ]);
 const reactImports = new Set(['react', 'react-dom', 'react/jsx-runtime']);
+const nodeFilesystemImports = new Set([
+  'fs',
+  'fs/promises',
+  'node:fs',
+  'node:fs/promises',
+]);
 const nodeBuiltins = new Set([
   ...builtinModules,
   ...builtinModules.map((name) => name.replace(/^node:/, '')),
@@ -49,28 +62,348 @@ function sourceFiles(dir) {
   return out;
 }
 
-function stripCommentsAndStrings(source) {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/\/\/[^\n\r]*/g, '')
-    .replace(/(['"`])(?:\\[\s\S]|(?!\1)[\s\S])*?\1/g, '');
+function parseSource(filePath, source) {
+  const parsed = ts.createSourceFile(
+    filePath,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    scriptKinds.get(path.extname(filePath)),
+  );
+  if (parsed.parseDiagnostics.length > 0) {
+    const message = ts.flattenDiagnosticMessageText(
+      parsed.parseDiagnostics[0].messageText,
+      '\n',
+    );
+    throw new Error(`${filePath}: unable to parse source: ${message}`);
+  }
+  return parsed;
 }
 
-function importSpecifiers(source) {
+function walk(node, visitor) {
+  visitor(node);
+  ts.forEachChild(node, (child) => walk(child, visitor));
+}
+
+function stringSpecifier(node) {
+  return node && ts.isStringLiteralLike(node) ? node.text : null;
+}
+
+function importSpecifiers(sourceFile) {
   const specifiers = [];
-  const patterns = [
-    /\bimport\s+(?:[\s\S]*?\s+from\s*)?['"]([^'"]+)['"]/g,
-    /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
-    /\bexport\s+(?:[\s\S]*?\s+from\s*)['"]([^'"]+)['"]/g,
-  ];
-
-  for (const pattern of patterns) {
-    for (const match of source.matchAll(pattern)) {
-      specifiers.push(match[1]);
+  walk(sourceFile, (node) => {
+    if (ts.isImportDeclaration(node)) {
+      const specifier = stringSpecifier(node.moduleSpecifier);
+      if (specifier !== null) specifiers.push(specifier);
+    } else if (ts.isExportDeclaration(node) && node.moduleSpecifier) {
+      const specifier = stringSpecifier(node.moduleSpecifier);
+      if (specifier !== null) specifiers.push(specifier);
+    } else if (
+      ts.isCallExpression(node) &&
+      node.expression.kind === ts.SyntaxKind.ImportKeyword
+    ) {
+      const specifier = stringSpecifier(node.arguments[0]);
+      if (specifier !== null) specifiers.push(specifier);
+    } else if (ts.isImportEqualsDeclaration(node) &&
+        ts.isExternalModuleReference(node.moduleReference)) {
+      const specifier = stringSpecifier(node.moduleReference.expression);
+      if (specifier !== null) specifiers.push(specifier);
     }
-  }
-
+  });
   return specifiers;
+}
+
+function isTypePosition(node) {
+  for (let current = node.parent; current; current = current.parent) {
+    if (ts.isTypeNode(current)) return true;
+    if (ts.isStatement(current) || ts.isExpression(current)) return false;
+  }
+  return false;
+}
+
+function isIdentifierReference(node) {
+  const parent = node.parent;
+  if (isTypePosition(node)) return false;
+  if (ts.isShorthandPropertyAssignment(parent)) return true;
+  if (ts.isPropertyAccessExpression(parent) && parent.name === node) return false;
+  if (ts.isPropertyAssignment(parent) && parent.name === node) return false;
+  if (ts.isBindingElement(parent) && parent.propertyName === node) return false;
+  if (ts.isImportClause(parent) || ts.isImportSpecifier(parent) ||
+      ts.isNamespaceImport(parent) || ts.isExportSpecifier(parent)) return false;
+  if ((ts.isLabeledStatement(parent) || ts.isBreakOrContinueStatement(parent)) &&
+      parent.label === node) return false;
+  if ('name' in parent && parent.name === node) return false;
+  return true;
+}
+
+function runtimeWords(sourceFile) {
+  const words = new Set();
+  walk(sourceFile, (node) => {
+    if (ts.isIdentifier(node) && isIdentifierReference(node)) {
+      let bound = false;
+      for (let current = node.parent; current; current = current.parent) {
+        if ((ts.isForInStatement(current) || ts.isForOfStatement(current)) &&
+            isInsideNode(node, current.expression)) continue;
+        if (scopeShadowsReference(current, null, node.text)) {
+          bound = true;
+          break;
+        }
+      }
+      if (!bound) words.add(node.text);
+    }
+  });
+  return words;
+}
+
+function unwrapExpression(node) {
+  let current = node;
+  while (ts.isParenthesizedExpression(current) || ts.isAwaitExpression(current)) {
+    current = current.expression;
+  }
+  return current;
+}
+
+function isCoreDynamicImport(node) {
+  const expression = unwrapExpression(node);
+  return ts.isCallExpression(expression) &&
+    expression.expression.kind === ts.SyntaxKind.ImportKeyword &&
+    stringSpecifier(expression.arguments[0]) === '@lpc-toolkit/core';
+}
+
+function bindingContainsCompose(name) {
+  return ts.isObjectBindingPattern(name) && name.elements.some((element) => {
+    const importedName = element.propertyName ?? element.name;
+    return ts.isIdentifier(importedName) && importedName.text === 'composeSelections';
+  });
+}
+
+function bindingDeclaresName(name, identifier) {
+  if (ts.isIdentifier(name)) return name.text === identifier;
+  return name.elements.some((element) =>
+    !ts.isOmittedExpression(element) && bindingDeclaresName(element.name, identifier));
+}
+
+function declarationListDeclaresName(list, identifier) {
+  return list.declarations.some((declaration) =>
+    bindingDeclaresName(declaration.name, identifier));
+}
+
+function hasDeclareModifier(node) {
+  return ts.canHaveModifiers(node) &&
+    ts.getModifiers(node)?.some((modifier) => modifier.kind === ts.SyntaxKind.DeclareKeyword);
+}
+
+function isAmbientNode(node) {
+  for (let current = node; current && !ts.isSourceFile(current); current = current.parent) {
+    if (hasDeclareModifier(current)) return true;
+  }
+  return node.getSourceFile().isDeclarationFile;
+}
+
+function functionScopeDeclaresVar(scope, identifier) {
+  let found = false;
+  function visit(node) {
+    if (node !== scope && ts.isFunctionLike(node)) return;
+    if (node !== scope && ts.isClassStaticBlockDeclaration(node)) return;
+    if (ts.isVariableDeclarationList(node) &&
+        !(node.flags & ts.NodeFlags.BlockScoped) &&
+        !isAmbientNode(node) &&
+        declarationListDeclaresName(node, identifier)) {
+      found = true;
+      return;
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(scope);
+  return found;
+}
+
+function statementsDeclareName(statements, identifier) {
+  return statements.some((statement) => {
+    if (ts.isVariableStatement(statement)) {
+      return !isAmbientNode(statement) &&
+        Boolean(statement.declarationList.flags & ts.NodeFlags.BlockScoped) &&
+        declarationListDeclaresName(statement.declarationList, identifier);
+    }
+    if (ts.isImportEqualsDeclaration(statement)) return statement.name.text === identifier;
+    if (ts.isImportDeclaration(statement) && statement.importClause) {
+      const clause = statement.importClause;
+      if (clause.isTypeOnly) return false;
+      if (clause.name?.text === identifier) return true;
+      const bindings = clause.namedBindings;
+      if (bindings && ts.isNamespaceImport(bindings)) return bindings.name.text === identifier;
+      if (bindings && ts.isNamedImports(bindings)) {
+        return bindings.elements.some((element) =>
+          !element.isTypeOnly && element.name.text === identifier);
+      }
+    }
+    if (ts.isEnumDeclaration(statement)) {
+      return !isAmbientNode(statement) && statement.name.text === identifier;
+    }
+    if (ts.isModuleDeclaration(statement) && ts.isIdentifier(statement.name)) {
+      return !isAmbientNode(statement) && statement.name.text === identifier;
+    }
+    return !isAmbientNode(statement) &&
+      (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) &&
+      statement.name?.text === identifier;
+  });
+}
+
+function scopeShadowsReference(node, callback, identifier) {
+  if (ts.isFunctionLike(node) && node !== callback) {
+    return node.name?.text === identifier || node.parameters.some((parameter) =>
+      bindingDeclaresName(parameter.name, identifier)) ||
+      functionScopeDeclaresVar(node, identifier);
+  }
+  if (ts.isClassLike(node)) return node.name?.text === identifier;
+  if (ts.isClassStaticBlockDeclaration(node)) {
+    return functionScopeDeclaresVar(node, identifier);
+  }
+  if (ts.isCatchClause(node)) {
+    return node.variableDeclaration
+      ? bindingDeclaresName(node.variableDeclaration.name, identifier)
+      : false;
+  }
+  if (ts.isForInStatement(node) || ts.isForOfStatement(node)) {
+    return ts.isVariableDeclarationList(node.initializer) &&
+      declarationListDeclaresName(node.initializer, identifier);
+  }
+  if (ts.isForStatement(node)) {
+    return node.initializer && ts.isVariableDeclarationList(node.initializer) &&
+      declarationListDeclaresName(node.initializer, identifier);
+  }
+  if (ts.isBlock(node)) return statementsDeclareName(node.statements, identifier);
+  if (ts.isSourceFile(node)) {
+    return statementsDeclareName(node.statements, identifier) ||
+      functionScopeDeclaresVar(node, identifier);
+  }
+  if (ts.isCaseBlock(node)) {
+    return node.clauses.some((clause) =>
+      statementsDeclareName(clause.statements, identifier));
+  }
+  return false;
+}
+
+function isInsideNode(node, parent) {
+  return node.pos >= parent.pos && node.end <= parent.end;
+}
+
+function referenceResolvesToParameter(reference, callback, identifier) {
+  for (let current = reference.parent; current && current !== callback; current = current.parent) {
+    if ((ts.isForInStatement(current) || ts.isForOfStatement(current)) &&
+        isInsideNode(reference, current.expression)) continue;
+    if (scopeShadowsReference(current, callback, identifier)) return false;
+  }
+  return true;
+}
+
+function referenceResolvesToNamespaceImport(reference, identifier) {
+  for (let current = reference.parent; current && !ts.isSourceFile(current); current = current.parent) {
+    if (scopeShadowsReference(current, null, identifier)) return false;
+  }
+  return true;
+}
+
+function modulePropertyReference(node) {
+  if (ts.isPropertyAccessExpression(node) && node.name.text === 'composeSelections') {
+    return unwrapExpression(node.expression);
+  }
+  if (ts.isElementAccessExpression(node) &&
+      stringSpecifier(node.argumentExpression) === 'composeSelections') {
+    return unwrapExpression(node.expression);
+  }
+  return null;
+}
+
+function callbackUsesCompose(callback) {
+  if (!ts.isArrowFunction(callback) && !ts.isFunctionExpression(callback)) return false;
+  const parameter = callback.parameters[0]?.name;
+  if (!parameter) return false;
+  if (bindingContainsCompose(parameter)) return true;
+  if (!ts.isIdentifier(parameter)) return false;
+  let usesCompose = false;
+  function visit(node) {
+    const receiver = modulePropertyReference(node);
+    if (receiver && ts.isIdentifier(receiver) && receiver.text === parameter.text &&
+        referenceResolvesToParameter(receiver, callback, parameter.text)) {
+      usesCompose = true;
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(callback.body);
+  return usesCompose;
+}
+
+function importsCoreCompose(sourceFile) {
+  let found = false;
+  const namespaceBindings = new Map();
+  walk(sourceFile, (node) => {
+    if (ts.isImportDeclaration(node) &&
+        stringSpecifier(node.moduleSpecifier) === '@lpc-toolkit/core' &&
+        !node.importClause?.isTypeOnly &&
+        node.importClause?.namedBindings &&
+        ts.isNamespaceImport(node.importClause.namedBindings)) {
+      namespaceBindings.set(node.importClause.namedBindings.name.text, node.importClause.namedBindings.name);
+    }
+  });
+  walk(sourceFile, (node) => {
+    if (found) return;
+    if (ts.isImportDeclaration(node) &&
+        stringSpecifier(node.moduleSpecifier) === '@lpc-toolkit/core' &&
+        !node.importClause?.isTypeOnly &&
+        node.importClause?.namedBindings &&
+        ts.isNamedImports(node.importClause.namedBindings)) {
+      found = node.importClause.namedBindings.elements.some((element) =>
+        !element.isTypeOnly &&
+        (element.propertyName ?? element.name).text === 'composeSelections');
+      return;
+    }
+    if (ts.isImportDeclaration(node) &&
+        stringSpecifier(node.moduleSpecifier) === '@lpc-toolkit/core' &&
+        !node.importClause?.isTypeOnly &&
+        node.importClause?.namedBindings &&
+        ts.isNamespaceImport(node.importClause.namedBindings)) {
+      return;
+    }
+    if (ts.isExportDeclaration(node) &&
+        stringSpecifier(node.moduleSpecifier) === '@lpc-toolkit/core' &&
+        !node.isTypeOnly &&
+        node.exportClause && ts.isNamedExports(node.exportClause)) {
+      found = node.exportClause.elements.some((element) =>
+        !element.isTypeOnly &&
+        (element.propertyName ?? element.name).text === 'composeSelections');
+      return;
+    }
+    if (ts.isExportDeclaration(node) &&
+        stringSpecifier(node.moduleSpecifier) === '@lpc-toolkit/core' &&
+        !node.isTypeOnly && !node.exportClause) {
+      found = true;
+      return;
+    }
+    const receiver = modulePropertyReference(node);
+    if (receiver && ts.isIdentifier(receiver) && namespaceBindings.has(receiver.text) &&
+        referenceResolvesToNamespaceImport(receiver, receiver.text)) {
+      found = true;
+      return;
+    }
+    if (ts.isVariableDeclaration(node) && node.initializer &&
+        bindingContainsCompose(node.name) && isCoreDynamicImport(node.initializer)) {
+      found = true;
+      return;
+    }
+    if (receiver && isCoreDynamicImport(receiver)) {
+      found = true;
+      return;
+    }
+    if (ts.isCallExpression(node) &&
+        ts.isPropertyAccessExpression(node.expression) &&
+        node.expression.name.text === 'then' &&
+        isCoreDynamicImport(node.expression.expression) &&
+        callbackUsesCompose(node.arguments[0])) {
+      found = true;
+    }
+  });
+  return found;
 }
 
 function resolveImport(filePath, specifier) {
@@ -83,33 +416,48 @@ function isInside(candidate, parent) {
   return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }
 
+function isPackageImport(specifier, packageName) {
+  return specifier === packageName || specifier.startsWith(`${packageName}/`);
+}
+
+function isConcreteCanvasImport(specifier) {
+  return [...concreteCanvasImports].some((packageName) =>
+    isPackageImport(specifier, packageName));
+}
+
 function addIssue(issues, root, filePath, message) {
   issues.push(`${relativePath(root, filePath)}: ${message}`);
 }
 
-function checkCoreFile({ issues, root, coreSrc, webSrc, filePath }) {
+function checkCoreFile({ issues, root, coreSrc, presetsSrc, webSrc, cliSrc, filePath }) {
   const source = readFileSync(filePath, 'utf8');
+  const sourceFile = parseSource(filePath, source);
 
-  for (const specifier of importSpecifiers(source)) {
+  for (const specifier of importSpecifiers(sourceFile)) {
     const resolved = resolveImport(filePath, specifier);
     const bareSpecifier = specifier.replace(/^node:/, '');
     if (
-      specifier.startsWith('@lpc-toolkit/web') ||
+      isPackageImport(specifier, '@lpc-toolkit/presets') ||
+      isPackageImport(specifier, '@lpc-toolkit/web') ||
+      isPackageImport(specifier, '@lpc-toolkit/cli') ||
       reactImports.has(specifier) ||
       specifier.startsWith('react/') ||
       specifier.startsWith('node:') ||
       nodeBuiltins.has(bareSpecifier) ||
-      concreteCanvasImports.has(specifier) ||
-      (resolved && isInside(resolved, webSrc))
+      isConcreteCanvasImport(specifier) ||
+      (resolved && (
+        isInside(resolved, presetsSrc) ||
+        isInside(resolved, webSrc) ||
+        isInside(resolved, cliSrc)
+      ))
     ) {
       addIssue(issues, root, filePath, `forbidden core import "${specifier}"`);
     }
   }
 
-  const runtimeSource = stripCommentsAndStrings(source);
+  const words = runtimeWords(sourceFile);
   for (const name of coreRuntimeGlobals) {
-    const pattern = new RegExp(`\\b${name}\\b`);
-    if (pattern.test(runtimeSource)) {
+    if (words.has(name)) {
       addIssue(
         issues,
         root,
@@ -122,8 +470,9 @@ function checkCoreFile({ issues, root, coreSrc, webSrc, filePath }) {
 
 function checkWebFile({ issues, root, coreSrc, filePath }) {
   const source = readFileSync(filePath, 'utf8');
+  const sourceFile = parseSource(filePath, source);
 
-  for (const specifier of importSpecifiers(source)) {
+  for (const specifier of importSpecifiers(sourceFile)) {
     const resolved = resolveImport(filePath, specifier);
     if (
       specifier.startsWith('@lpc-toolkit/core/') ||
@@ -140,17 +489,99 @@ function checkWebFile({ issues, root, coreSrc, filePath }) {
   }
 }
 
+function extensionless(filePath) {
+  const extension = path.extname(filePath);
+  return sourceExtensions.has(extension) ? filePath.slice(0, -extension.length) : filePath;
+}
+
+function checkWebComponentFile({ issues, root, webSrc, filePath }) {
+  const source = readFileSync(filePath, 'utf8');
+  const sourceFile = parseSource(filePath, source);
+  const forbiddenModules = new Set([
+    path.join(webSrc, 'adapter/browser-canvas-adapter'),
+    path.join(webSrc, 'lib/character-export'),
+    path.join(webSrc, 'lib/spritesheet-export'),
+    path.join(webSrc, 'lib/zip-export'),
+  ]);
+
+  if (importsCoreCompose(sourceFile)) {
+    addIssue(
+      issues,
+      root,
+      filePath,
+      'forbidden web component import "composeSelections"',
+    );
+  }
+
+  for (const specifier of importSpecifiers(sourceFile)) {
+    const resolved = resolveImport(filePath, specifier);
+    if (resolved && forbiddenModules.has(extensionless(resolved))) {
+      addIssue(
+        issues,
+        root,
+        filePath,
+        `forbidden web component import "${specifier}"`,
+      );
+    }
+  }
+}
+
+function checkPresetsFile({ issues, root, webSrc, cliSrc, filePath }) {
+  const source = readFileSync(filePath, 'utf8');
+  const sourceFile = parseSource(filePath, source);
+
+  for (const specifier of importSpecifiers(sourceFile)) {
+    const resolved = resolveImport(filePath, specifier);
+    if (
+      isPackageImport(specifier, '@lpc-toolkit/web') ||
+      isPackageImport(specifier, '@lpc-toolkit/cli') ||
+      reactImports.has(specifier) ||
+      specifier.startsWith('react/') ||
+      nodeFilesystemImports.has(specifier) ||
+      isConcreteCanvasImport(specifier) ||
+      (resolved && (
+        isInside(resolved, webSrc) ||
+        isInside(resolved, cliSrc)
+      ))
+    ) {
+      addIssue(issues, root, filePath, `forbidden presets import "${specifier}"`);
+    }
+  }
+
+  const words = runtimeWords(sourceFile);
+  for (const name of coreRuntimeGlobals) {
+    if (words.has(name)) {
+      addIssue(
+        issues,
+        root,
+        filePath,
+        `forbidden presets runtime global "${name}"`,
+      );
+    }
+  }
+}
+
 function checkBoundaries(root) {
   const coreSrc = path.join(root, 'packages/core/src');
+  const presetsSrc = path.join(root, 'packages/presets/src');
   const webSrc = path.join(root, 'packages/web/src');
+  const webComponents = path.join(webSrc, 'components');
+  const cliSrc = path.join(root, 'packages/cli/src');
   const issues = [];
 
   for (const filePath of sourceFiles(coreSrc)) {
-    checkCoreFile({ issues, root, coreSrc, webSrc, filePath });
+    checkCoreFile({ issues, root, coreSrc, presetsSrc, webSrc, cliSrc, filePath });
+  }
+
+  for (const filePath of sourceFiles(presetsSrc)) {
+    checkPresetsFile({ issues, root, webSrc, cliSrc, filePath });
   }
 
   for (const filePath of sourceFiles(webSrc)) {
     checkWebFile({ issues, root, coreSrc, filePath });
+    if (isInside(filePath, webComponents)) {
+      checkWebComponentFile({ issues, root, webSrc, filePath });
+    }
   }
 
   return issues;

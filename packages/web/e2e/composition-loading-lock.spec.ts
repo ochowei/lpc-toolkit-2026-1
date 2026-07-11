@@ -67,6 +67,8 @@ test.describe('composition loading lock', () => {
 
     const overlay = page.getByTestId('composition-loading-overlay');
     await expect(overlay).toBeHidden({ timeout: 30_000 });
+    const downloadButton = page.getByRole('button', { name: /Download/ });
+    await expect(downloadButton).toBeEnabled();
     await page.getByRole('button', { name: 'Pause' }).click();
 
     const previewCanvas = page.locator('main canvas').first();
@@ -79,12 +81,14 @@ test.describe('composition loading lock', () => {
     await gate.waitUntilBlocked();
     await expect(overlay).toBeVisible();
     await expect(page.getByRole('button', { name: 'Presets' })).toBeDisabled();
+    await expect(downloadButton).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Play' })).toBeEnabled();
     expect(await previewCanvas.evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL())).toBe(before);
 
     await gate.release();
     await expect(overlay).toBeHidden({ timeout: 30_000 });
     await expect(page.getByRole('button', { name: 'Presets' })).toBeEnabled();
+    await expect(downloadButton).toBeEnabled();
     expect(errors).toEqual([]);
   });
 

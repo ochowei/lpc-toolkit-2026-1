@@ -19,6 +19,7 @@ import {
   customOverlayItemFileName,
   type CustomOverlay,
 } from './custom-overlay';
+import { assertExportableCredits } from './spritesheet-export';
 type JSZipInstance = InstanceType<typeof JSZipModule>;
 
 /** ZIP layouts exposed by the download popover. */
@@ -159,6 +160,8 @@ function getExportableStandardAnimations(sheet: ComposedSheet): string[] {
 
 /** Export one PNG per animation, plus mandatory credits files. */
 export async function exportByAnimationZip(ctx: ExportContext): Promise<Blob> {
+  assertExportableCredits(ctx.sheet.credits);
+
   const { default: JSZip } = await import('jszip');
   const zip = new JSZip();
   const { sheet } = ctx;
@@ -262,6 +265,8 @@ function itemLayerMetas(
 
 /** Export each selected item split by animation folder. */
 export async function exportByAnimItemZip(ctx: ExportContext): Promise<Blob> {
+  assertExportableCredits(ctx.sheet.credits);
+
   const { default: JSZip } = await import('jszip');
   const zip = new JSZip();
 
@@ -363,6 +368,8 @@ export async function exportByAnimItemZip(ctx: ExportContext): Promise<Blob> {
 
 /** Export one full spritesheet per selected item layer, plus any custom overlay. */
 export async function exportByItemZip(ctx: ExportContext): Promise<Blob> {
+  assertExportableCredits(ctx.sheet.credits);
+
   const { default: JSZip } = await import('jszip');
   const zip = new JSZip();
 
@@ -436,6 +443,8 @@ const yieldToUi = (): Promise<void> => new Promise((r) => setTimeout(r, 0));
 
 /** Export every non-empty frame as an individual PNG grouped by animation/direction. */
 export async function exportByFrameZip(ctx: ExportContext): Promise<Blob> {
+  assertExportableCredits(ctx.sheet.credits);
+
   const { default: JSZip } = await import('jszip');
   const zip = new JSZip();
 

@@ -75,6 +75,20 @@ const EMPTY_CREDITS: CreditsManifest = {
   licenses: [],
 };
 
+const CREDITS: CreditsManifest = {
+  entries: [
+    {
+      file: 'body/bodies/male',
+      notes: '',
+      authors: ['Test Artist'],
+      licenses: ['GPL 3.0'],
+      urls: [],
+    },
+  ],
+  resolvedPaths: ['body/bodies/male/walk.png'],
+  licenses: ['GPL 3.0'],
+};
+
 function makeAdapter() {
   return {
     createCanvas: (w: number, h: number) =>
@@ -96,7 +110,7 @@ function makeWalkSheet(): ComposedSheet {
     width: 832,
     height: 3456,
     selections: { bodyType: 'male', items: {} },
-    credits: EMPTY_CREDITS,
+    credits: CREDITS,
     layers: [],
     animations: ['walk'],
   };
@@ -116,6 +130,40 @@ function makeCustomOverlay(): CustomOverlay {
     zPos: 70,
   };
 }
+
+describe('ZIP export credit guard', () => {
+  it('rejects every pixel ZIP workflow when resolved credits are empty', async () => {
+    const sheet: ComposedSheet = {
+      ...makeWalkSheet(),
+      credits: EMPTY_CREDITS,
+    };
+    const emptyCreditContext: ExportContext = {
+      sheet,
+      selections: sheet.selections,
+      catalog: {
+        byItemId: new Map(),
+        byTypeName: new Map(),
+        typeNames: [],
+        aliases: new Map(),
+      },
+      anim: 'walk',
+      composeSingleItem: async () => sheet,
+      adapter: makeAdapter(),
+      onProgress: () => {},
+    };
+
+    for (const exportZip of [
+      exportByAnimationZip,
+      exportByItemZip,
+      exportByAnimItemZip,
+      exportByFrameZip,
+    ]) {
+      await expect(exportZip(emptyCreditContext)).rejects.toThrow(
+        'Cannot export pixels without resolved credits.',
+      );
+    }
+  });
+});
 
 describe('exportByAnimationZip (F4)', () => {
   it('produces a ZIP containing standard/<anim>.png and credits/credits.txt+csv', async () => {
@@ -157,7 +205,7 @@ describe('exportByAnimationZip (F4)', () => {
       width: 832,
       height: 3456 + 64,
       selections: { bodyType: 'male', items: {} },
-      credits: EMPTY_CREDITS,
+      credits: CREDITS,
       layers: [],
       animations: [],
       customAnimations: new Map([
@@ -451,7 +499,7 @@ describe('exportByAnimItemZip (F6)', () => {
       width: 832,
       height: 3456 + 64,
       selections: { bodyType: 'male', items: {} },
-      credits: EMPTY_CREDITS,
+      credits: CREDITS,
       layers: [],
       animations: [],
       customAnimations: new Map([
@@ -497,7 +545,7 @@ describe('exportByAnimItemZip (F6)', () => {
       width: 832,
       height: 3456 + 64,
       selections: { bodyType: 'male', items: {} },
-      credits: EMPTY_CREDITS,
+      credits: CREDITS,
       layers: [],
       animations: ['walk'],
       customAnimations: new Map([
@@ -578,7 +626,7 @@ describe('exportByFrameZip (F7)', () => {
       width: 832,
       height: 3456 + frameSize,
       selections: { bodyType: 'male', items: {} },
-      credits: EMPTY_CREDITS,
+      credits: CREDITS,
       layers: [],
       animations: [],
       customAnimations: new Map([
