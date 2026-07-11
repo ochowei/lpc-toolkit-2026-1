@@ -384,7 +384,10 @@ rtk git add docs/README-ARCHITECTURE-AUDIT-CLOSURE.md docs/superpowers/plans/202
 rtk git commit -m "docs(plan): record audit remediation closure"
 ```
 
-- [ ] **Step 6: Request final read-only review**
+- [x] **Step 6: Request final read-only review**
+  - Implementation: Reviewed the exact Plan 6 diff, fixed invalid closure commands and stale README contradictions through a RED/GREEN contract cycle, then completed a clean re-review.
+  - Commit: `b4b6925aa`
+  - Verification: final re-review PASS — Critical 0, Important 0, Minor 0; documentation accuracy, finding evidence, verification completeness, and upstream/scope all PASS; Ready to close YES.
 
 Give the reviewer the original remediation design, this plan, closure matrix, final report, and exact merge-base-to-HEAD diff package. Require separate verdicts for documentation accuracy, finding-by-finding evidence, verification completeness, unchanged `upstream/`, and readiness to close the audit.
 
