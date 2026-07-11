@@ -188,12 +188,26 @@ function declarationListDeclaresName(list, identifier) {
     bindingDeclaresName(declaration.name, identifier));
 }
 
+function hasDeclareModifier(node) {
+  return ts.canHaveModifiers(node) &&
+    ts.getModifiers(node)?.some((modifier) => modifier.kind === ts.SyntaxKind.DeclareKeyword);
+}
+
+function isAmbientNode(node) {
+  for (let current = node; current && !ts.isSourceFile(current); current = current.parent) {
+    if (hasDeclareModifier(current)) return true;
+  }
+  return node.getSourceFile().isDeclarationFile;
+}
+
 function functionScopeDeclaresVar(scope, identifier) {
   let found = false;
   function visit(node) {
     if (node !== scope && ts.isFunctionLike(node)) return;
+    if (node !== scope && ts.isClassStaticBlockDeclaration(node)) return;
     if (ts.isVariableDeclarationList(node) &&
         !(node.flags & ts.NodeFlags.BlockScoped) &&
+        !isAmbientNode(node) &&
         declarationListDeclaresName(node, identifier)) {
       found = true;
       return;
@@ -207,20 +221,24 @@ function functionScopeDeclaresVar(scope, identifier) {
 function statementsDeclareName(statements, identifier) {
   return statements.some((statement) => {
     if (ts.isVariableStatement(statement)) {
-      return Boolean(statement.declarationList.flags & ts.NodeFlags.BlockScoped) &&
+      return !isAmbientNode(statement) &&
+        Boolean(statement.declarationList.flags & ts.NodeFlags.BlockScoped) &&
         declarationListDeclaresName(statement.declarationList, identifier);
     }
     if (ts.isImportEqualsDeclaration(statement)) return statement.name.text === identifier;
     if (ts.isImportDeclaration(statement) && statement.importClause) {
       const clause = statement.importClause;
+      if (clause.isTypeOnly) return false;
       if (clause.name?.text === identifier) return true;
       const bindings = clause.namedBindings;
       if (bindings && ts.isNamespaceImport(bindings)) return bindings.name.text === identifier;
       if (bindings && ts.isNamedImports(bindings)) {
-        return bindings.elements.some((element) => element.name.text === identifier);
+        return bindings.elements.some((element) =>
+          !element.isTypeOnly && element.name.text === identifier);
       }
     }
-    return (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) &&
+    return !isAmbientNode(statement) &&
+      (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) &&
       statement.name?.text === identifier;
   });
 }
@@ -232,6 +250,9 @@ function scopeShadowsReference(node, callback, identifier) {
       functionScopeDeclaresVar(node, identifier);
   }
   if (ts.isClassLike(node)) return node.name?.text === identifier;
+  if (ts.isClassStaticBlockDeclaration(node)) {
+    return functionScopeDeclaresVar(node, identifier);
+  }
   if (ts.isCatchClause(node)) {
     return node.variableDeclaration
       ? bindingDeclaresName(node.variableDeclaration.name, identifier)

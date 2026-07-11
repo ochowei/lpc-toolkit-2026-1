@@ -469,6 +469,35 @@ export function f() { { var document = local; } return document.title; }
     expect(runBoundaryCheck(root)).toEqual({ ok: true, stdout: 'Architecture boundary check passed.\n' });
   });
 
+  it.each([
+    ['ambient variable', 'declare const document: { title: string };\nexport const title = document.title;\n', 'document'],
+    ['ambient function', 'declare function fetch(url: string): unknown;\nexport const request = fetch;\n', 'fetch'],
+    ['type-only import', "import type { value as window } from './types';\nexport const title = window.title;\n", 'window'],
+  ])('does not treat an %s as a runtime binding', (_name, source, globalName) => {
+    const root = makeRepoFixture();
+    writeFixtureFile(root, 'packages/core/src/ambient-global.ts', source);
+    expectBoundaryFailure(root, 'forbidden core runtime global', globalName, 'packages/core/src/ambient-global.ts');
+  });
+
+  it('does not leak class static-block var bindings into source scope', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(root, 'packages/core/src/static-block-global.ts', `class Example {
+  static { var document = { title: 'local' }; document.title; }
+}
+export const title = document.title;
+`);
+    expectBoundaryFailure(root, 'forbidden core runtime global', 'document', 'packages/core/src/static-block-global.ts');
+  });
+
+  it('allows class static-block var bindings inside their own scope', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(root, 'packages/core/src/legal-static-block.ts', `export class Example {
+  static { var document = { title: 'local' }; document.title; }
+}
+`);
+    expect(runBoundaryCheck(root)).toEqual({ ok: true, stdout: 'Architecture boundary check passed.\n' });
+  });
+
   it('rejects TypeScript import-equals external modules in core', () => {
     const root = makeRepoFixture();
     writeFixtureFile(root, 'packages/core/src/import-equals.ts', "import fs = require('node:fs');\nexport { fs };\n");
