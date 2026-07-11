@@ -223,7 +223,10 @@ Record commit and verification under Task 2.
 - Consumes: completed Plans 1–5 and their recorded commits/verification, plus Tasks 1–2 of this plan.
 - Produces: the permanent audit closure record outside the temporary audit file.
 
-- [ ] **Step 1: Add a failing closure-table contract**
+- [x] **Step 1: Add a failing closure-table contract**
+  - Implementation: Added exact row, disposition, commit, command, result, placeholder, and temporary-source assertions.
+  - Commit: `a8e9f69eb`
+  - Verification: RED confirmed, 1 failed / 9 total because the permanent closure file was absent.
 
 Parse Markdown table rows and require findings `1` through `15` exactly once. Every row must contain:
 
@@ -239,7 +242,10 @@ type ClosureRow = {
 
 Reject placeholders (`TBD`, `TODO`, `pending`), empty commit cells, broad verification-only text, and any tracked reference to `docs/README-ARCHITECTURE-AUDIT.tmp.md` as the closure source.
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
+  - Implementation: Ran the focused suite before creating the closure record.
+  - Commit: `a8e9f69eb`
+  - Verification: Expected RED at the file-existence assertion.
 
 Run:
 
@@ -249,7 +255,10 @@ rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts
 
 Expected: FAIL because the permanent closure document does not yet exist.
 
-- [ ] **Step 3: Build the closure matrix from plan evidence**
+- [x] **Step 3: Build the closure matrix from plan evidence**
+  - Implementation: Added findings 1–15 with narrow commit and command evidence; only finding 15 uses the approved-exception disposition.
+  - Commit: `a8e9f69eb`
+  - Verification: Closure contract 9/9 PASS.
 
 Create `docs/README-ARCHITECTURE-AUDIT-CLOSURE.md` with one row per finding:
 
@@ -261,7 +270,10 @@ Create `docs/README-ARCHITECTURE-AUDIT-CLOSURE.md` with one row per finding:
 
 Use `documented approved exception` only for finding 15. Findings 1–14 use `fixed`. Cite the narrowest command proving each acceptance criterion, not only `rtk pnpm test`.
 
-- [ ] **Step 4: Cross-check every row against git and source**
+- [x] **Step 4: Cross-check every row against git and source**
+  - Implementation: Resolved every recorded hash with `git show` and scanned the three tracked documents for placeholders and machine paths.
+  - Commit: `a8e9f69eb`
+  - Verification: All hashes resolved; focused docs suite 9/9 PASS; forbidden-text scan returned no matches.
 
 Run:
 
@@ -273,7 +285,10 @@ rtk rg -n 'TBD|TODO|pending|file://|/Users/|[A-Z]:\\' README.md docs/ARCHITECTUR
 
 Expected: commits resolve; contract PASS; `rg` returns no forbidden placeholders or machine paths.
 
-- [ ] **Step 5: Commit Task 3**
+- [x] **Step 5: Commit Task 3**
+  - Implementation: Committed the permanent closure matrix and its executable documentation contract.
+  - Commit: `a8e9f69eb`
+  - Verification: Commit created; plan evidence recorded in the following documentation commit.
 
 ```bash
 rtk git add docs/README-ARCHITECTURE-AUDIT-CLOSURE.md packages/web/test/readme-architecture-docs.test.ts docs/superpowers/plans/2026-07-11-readme-architecture-audit-closure.md
