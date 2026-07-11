@@ -14,6 +14,16 @@ type OverlayStatus = {
 
 type LoadCustomOverlay = typeof loadCustomOverlayImage;
 
+interface CustomOverlayControllerDependencies {
+  readonly lockedRef: Readonly<{ current: boolean }>;
+  readonly lifetime: CustomOverlayLifetime;
+  readonly t: Translator;
+  readonly onOverlay: (overlay: CustomOverlay | null) => void;
+  readonly onZPos: (zPos: number) => void;
+  readonly onStatus: (status: OverlayStatus) => void;
+  readonly load: LoadCustomOverlay;
+}
+
 /** Owns object URLs created for custom overlays and revokes each at most once. */
 export class CustomOverlayLifetime {
   private overlay: CustomOverlay | null = null;
@@ -66,6 +76,94 @@ export function isCurrentOverlayRequest(
   return requestId === latestRequestId && !locked;
 }
 
+/** Node-testable owner of custom-overlay actions and async request ordering. */
+export class CustomOverlayController {
+  private requestId = 0;
+  private zPos = 0;
+
+  constructor(private dependencies: CustomOverlayControllerDependencies) {}
+
+  updateDependencies(
+    dependencies: Omit<CustomOverlayControllerDependencies, 'lifetime'>,
+  ): void {
+    this.dependencies = {
+      ...dependencies,
+      lifetime: this.dependencies.lifetime,
+    };
+  }
+
+  async upload(file: File): Promise<void> {
+    if (this.dependencies.lockedRef.current) return;
+    const requestId = ++this.requestId;
+
+    try {
+      const loaded = await this.dependencies.load({ file, zPos: this.zPos });
+      if ('ok' in loaded) {
+        if (this.isCurrent(requestId)) {
+          this.dependencies.onStatus(
+            invalidSizeStatus(loaded, this.dependencies.t),
+          );
+        }
+        return;
+      }
+      if (!this.isCurrent(requestId)) {
+        this.dependencies.lifetime.discard(loaded);
+        return;
+      }
+      this.dependencies.onOverlay(
+        this.dependencies.lifetime.replace(loaded),
+      );
+      this.dependencies.onStatus({
+        kind: 'info',
+        text: this.dependencies
+          .t('advancedTools.loaded')
+          .replace('{name}', loaded.fileName),
+      });
+    } catch (error) {
+      if (!this.isCurrent(requestId)) return;
+      console.error('Custom overlay upload failed:', error);
+      this.dependencies.onStatus({
+        kind: 'error',
+        text: this.dependencies.t('download.failed'),
+      });
+    }
+  }
+
+  changeZPos(raw: string): void {
+    if (this.dependencies.lockedRef.current) return;
+    this.zPos = parseCustomOverlayZPos(raw);
+    this.dependencies.onZPos(this.zPos);
+    this.dependencies.onOverlay(
+      this.dependencies.lifetime.updateZPos(this.zPos),
+    );
+  }
+
+  clear(): void {
+    if (this.dependencies.lockedRef.current) return;
+    ++this.requestId;
+    this.dependencies.onOverlay(this.dependencies.lifetime.clear());
+    this.zPos = 0;
+    this.dependencies.onZPos(this.zPos);
+    this.dependencies.onStatus({
+      kind: 'info',
+      text: this.dependencies.t('advancedTools.cleared'),
+    });
+  }
+
+  dispose(): void {
+    ++this.requestId;
+    this.dependencies.lifetime.dispose();
+  }
+
+  private isCurrent(requestId: number): boolean {
+    return isCurrentOverlayRequest(
+      requestId,
+      this.requestId,
+      this.dependencies.lockedRef.current,
+    );
+  }
+}
+
 function invalidSizeStatus(
   dimensions: InvalidCustomOverlayDimensions,
   t: Translator,
@@ -94,85 +192,40 @@ export function useCustomOverlay(args: {
   }
   const [overlay, setOverlay] = useState<CustomOverlay | null>(null);
   const [zPos, setZPos] = useState(0);
-  const zPosRef = useRef(zPos);
-  zPosRef.current = zPos;
-  const requestIdRef = useRef(0);
+  const controllerRef = useRef<CustomOverlayController>();
+  if (!controllerRef.current) {
+    controllerRef.current = new CustomOverlayController({
+      lockedRef,
+      lifetime: lifetimeRef.current,
+      t,
+      onOverlay: setOverlay,
+      onZPos: setZPos,
+      onStatus,
+      load,
+    });
+  }
+  controllerRef.current.updateDependencies({
+    lockedRef,
+    t,
+    onOverlay: setOverlay,
+    onZPos: setZPos,
+    onStatus,
+    load,
+  });
 
-  const upload = useCallback(
-    async (file: File) => {
-      if (lockedRef.current) return;
-      const requestId = ++requestIdRef.current;
-
-      try {
-        const loaded = await load({ file, zPos: zPosRef.current });
-        if ('ok' in loaded) {
-          if (
-            isCurrentOverlayRequest(
-              requestId,
-              requestIdRef.current,
-              lockedRef.current,
-            )
-          ) {
-            onStatus(invalidSizeStatus(loaded, t));
-          }
-          return;
-        }
-        if (
-          !isCurrentOverlayRequest(
-            requestId,
-            requestIdRef.current,
-            lockedRef.current,
-          )
-        ) {
-          lifetimeRef.current!.discard(loaded);
-          return;
-        }
-        setOverlay(lifetimeRef.current!.replace(loaded));
-        onStatus({
-          kind: 'info',
-          text: t('advancedTools.loaded').replace('{name}', loaded.fileName),
-        });
-      } catch (error) {
-        if (
-          !isCurrentOverlayRequest(
-            requestId,
-            requestIdRef.current,
-            lockedRef.current,
-          )
-        ) {
-          return;
-        }
-        console.error('Custom overlay upload failed:', error);
-        onStatus({ kind: 'error', text: t('download.failed') });
-      }
-    },
-    [load, lockedRef, onStatus, t],
-  );
-
-  const changeZPos = useCallback(
-    (raw: string) => {
-      if (lockedRef.current) return;
-      const nextZPos = parseCustomOverlayZPos(raw);
-      zPosRef.current = nextZPos;
-      setZPos(nextZPos);
-      setOverlay(lifetimeRef.current!.updateZPos(nextZPos));
-    },
-    [lockedRef],
-  );
-
+  const upload = useCallback((file: File) => {
+    return controllerRef.current!.upload(file);
+  }, []);
+  const changeZPos = useCallback((raw: string) => {
+    controllerRef.current!.changeZPos(raw);
+  }, []);
   const clear = useCallback(() => {
-    if (lockedRef.current) return;
-    ++requestIdRef.current;
-    setOverlay(lifetimeRef.current!.clear());
-    zPosRef.current = 0;
-    setZPos(0);
-    onStatus({ kind: 'info', text: t('advancedTools.cleared') });
-  }, [lockedRef, onStatus, t]);
+    controllerRef.current!.clear();
+  }, []);
 
   useEffect(() => {
     return () => {
-      ++requestIdRef.current;
-      lifetimeRef.current!.dispose();
+      controllerRef.current!.dispose();
     };
   }, []);
 
