@@ -168,16 +168,46 @@ function bindingDeclaresName(name, identifier) {
     !ts.isOmittedExpression(element) && bindingDeclaresName(element.name, identifier));
 }
 
-function scopeDeclaresName(node, identifier) {
-  if (ts.isFunctionLike(node)) {
-    return node.parameters.some((parameter) =>
+function declarationListDeclaresName(list, identifier) {
+  return list.declarations.some((declaration) =>
+    bindingDeclaresName(declaration.name, identifier));
+}
+
+function statementsDeclareName(statements, identifier) {
+  return statements.some((statement) => {
+    if (ts.isVariableStatement(statement)) {
+      return declarationListDeclaresName(statement.declarationList, identifier);
+    }
+    return (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) &&
+      statement.name?.text === identifier;
+  });
+}
+
+function scopeShadowsReference(node, callback, identifier) {
+  if (ts.isFunctionLike(node) && node !== callback) {
+    return node.name?.text === identifier || node.parameters.some((parameter) =>
       bindingDeclaresName(parameter.name, identifier));
   }
-  if (!ts.isBlock(node)) return false;
-  return node.statements.some((statement) =>
-    ts.isVariableStatement(statement) && statement.declarationList.declarations.some(
-      (declaration) => bindingDeclaresName(declaration.name, identifier),
-    ));
+  if (ts.isClassLike(node)) return node.name?.text === identifier;
+  if (ts.isCatchClause(node)) {
+    return node.variableDeclaration
+      ? bindingDeclaresName(node.variableDeclaration.name, identifier)
+      : false;
+  }
+  if (ts.isForInStatement(node) || ts.isForOfStatement(node)) {
+    return ts.isVariableDeclarationList(node.initializer) &&
+      declarationListDeclaresName(node.initializer, identifier);
+  }
+  if (ts.isForStatement(node)) {
+    return node.initializer && ts.isVariableDeclarationList(node.initializer) &&
+      declarationListDeclaresName(node.initializer, identifier);
+  }
+  if (ts.isBlock(node)) return statementsDeclareName(node.statements, identifier);
+  if (ts.isCaseBlock(node)) {
+    return node.clauses.some((clause) =>
+      statementsDeclareName(clause.statements, identifier));
+  }
+  return false;
 }
 
 function callbackUsesCompose(callback) {
@@ -188,7 +218,7 @@ function callbackUsesCompose(callback) {
   if (!ts.isIdentifier(parameter)) return false;
   let usesCompose = false;
   function visit(node) {
-    if (node !== callback.body && scopeDeclaresName(node, parameter.text)) return;
+    if (node !== callback.body && scopeShadowsReference(node, callback, parameter.text)) return;
     if (ts.isPropertyAccessExpression(node) &&
         ts.isIdentifier(node.expression) &&
         node.expression.text === parameter.text &&

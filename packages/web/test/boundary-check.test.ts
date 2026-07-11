@@ -438,6 +438,22 @@ export const commented = import(\`prefix-\${/* example */ '@lpc-toolkit/cli'}\`)
     });
   });
 
+  it('rejects computed destructuring keys that reference runtime globals', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(
+      root,
+      'packages/core/src/computed-destructuring-key.ts',
+      'const source = {};\nexport const { [document]: value } = source;\n',
+    );
+
+    expectBoundaryFailure(
+      root,
+      'forbidden core runtime global',
+      'document',
+      'packages/core/src/computed-destructuring-key.ts',
+    );
+  });
+
   it.each([
     ['template expression', 'export const title = `${document.title}`;'],
     ['code after a URL string', "const url = 'https://example.test'; document.title = url;"],
@@ -554,6 +570,47 @@ export const example = \`import { composeSelections } from '@lpc-toolkit/core'\`
   function nested(core) {
     return core.composeSelections;
   }
+  return 1;
+});
+`,
+    );
+
+    expect(runBoundaryCheck(root)).toEqual({
+      ok: true,
+      stdout: 'Architecture boundary check passed.\n',
+    });
+  });
+
+  it('allows catch parameters to shadow dynamic import callback parameters', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(
+      root,
+      'packages/web/src/components/legal-catch-shadow.tsx',
+      `import('@lpc-toolkit/core').then((core) => {
+  try {
+    return 1;
+  } catch (core) {
+    return core.composeSelections;
+  }
+});
+`,
+    );
+
+    expect(runBoundaryCheck(root)).toEqual({
+      ok: true,
+      stdout: 'Architecture boundary check passed.\n',
+    });
+  });
+
+  it('allows loop bindings to shadow dynamic import callback parameters', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(
+      root,
+      'packages/web/src/components/legal-loop-shadows.tsx',
+      `import('@lpc-toolkit/core').then((core) => {
+  for (const core of values) core.composeSelections;
+  for (const core in values) core.composeSelections;
+  for (let core = 0; core < 1; core += 1) core.composeSelections;
   return 1;
 });
 `,
