@@ -452,6 +452,23 @@ export function legal(document: string) { const fetch = document; return \`${'${
     expectBoundaryFailure(root, 'forbidden core runtime global', 'window', 'packages/core/src/mixed-globals.ts');
   });
 
+  it.each([
+    ['for-of right-hand side', 'for (const document of document.items) {}'],
+    ['for-in right-hand side', 'for (const window in window) {}'],
+  ])('rejects runtime globals in a %s', (_name, source) => {
+    const root = makeRepoFixture();
+    writeFixtureFile(root, 'packages/core/src/loop-global.ts', source);
+    expectBoundaryFailure(root, 'forbidden core runtime global', _name.startsWith('for-of') ? 'document' : 'window', 'packages/core/src/loop-global.ts');
+  });
+
+  it('allows function-scoped var bindings declared inside nested blocks', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(root, 'packages/core/src/legal-var-global.ts', `const local = {};
+export function f() { { var document = local; } return document.title; }
+`);
+    expect(runBoundaryCheck(root)).toEqual({ ok: true, stdout: 'Architecture boundary check passed.\n' });
+  });
+
   it('rejects TypeScript import-equals external modules in core', () => {
     const root = makeRepoFixture();
     writeFixtureFile(root, 'packages/core/src/import-equals.ts', "import fs = require('node:fs');\nexport { fs };\n");
@@ -727,6 +744,15 @@ export type Types = ComposeA | ComposeB;
       'composeSelections',
       'packages/web/src/components/awaited-core-composition-leak.tsx',
     );
+  });
+
+  it.each([
+    ['constant element', "const compose = (await import('@lpc-toolkit/core'))['composeSelections'];"],
+    ['optional element', "const compose = (await import('@lpc-toolkit/core'))?.['composeSelections'];"],
+  ])('rejects direct dynamic core %s composition access', (_name, source) => {
+    const root = makeRepoFixture();
+    writeFixtureFile(root, 'packages/web/src/components/direct-element-leak.tsx', source);
+    expectBoundaryFailure(root, 'forbidden web component import', 'composeSelections', 'packages/web/src/components/direct-element-leak.tsx');
   });
 
   it.each([

@@ -142,6 +142,8 @@ function runtimeWords(sourceFile) {
     if (ts.isIdentifier(node) && isIdentifierReference(node)) {
       let bound = false;
       for (let current = node.parent; current; current = current.parent) {
+        if ((ts.isForInStatement(current) || ts.isForOfStatement(current)) &&
+            isInsideNode(node, current.expression)) continue;
         if (scopeShadowsReference(current, null, node.text)) {
           bound = true;
           break;
@@ -186,10 +188,27 @@ function declarationListDeclaresName(list, identifier) {
     bindingDeclaresName(declaration.name, identifier));
 }
 
+function functionScopeDeclaresVar(scope, identifier) {
+  let found = false;
+  function visit(node) {
+    if (node !== scope && ts.isFunctionLike(node)) return;
+    if (ts.isVariableDeclarationList(node) &&
+        !(node.flags & ts.NodeFlags.BlockScoped) &&
+        declarationListDeclaresName(node, identifier)) {
+      found = true;
+      return;
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(scope);
+  return found;
+}
+
 function statementsDeclareName(statements, identifier) {
   return statements.some((statement) => {
     if (ts.isVariableStatement(statement)) {
-      return declarationListDeclaresName(statement.declarationList, identifier);
+      return Boolean(statement.declarationList.flags & ts.NodeFlags.BlockScoped) &&
+        declarationListDeclaresName(statement.declarationList, identifier);
     }
     if (ts.isImportEqualsDeclaration(statement)) return statement.name.text === identifier;
     if (ts.isImportDeclaration(statement) && statement.importClause) {
@@ -209,7 +228,8 @@ function statementsDeclareName(statements, identifier) {
 function scopeShadowsReference(node, callback, identifier) {
   if (ts.isFunctionLike(node) && node !== callback) {
     return node.name?.text === identifier || node.parameters.some((parameter) =>
-      bindingDeclaresName(parameter.name, identifier));
+      bindingDeclaresName(parameter.name, identifier)) ||
+      functionScopeDeclaresVar(node, identifier);
   }
   if (ts.isClassLike(node)) return node.name?.text === identifier;
   if (ts.isCatchClause(node)) {
@@ -226,7 +246,10 @@ function scopeShadowsReference(node, callback, identifier) {
       declarationListDeclaresName(node.initializer, identifier);
   }
   if (ts.isBlock(node)) return statementsDeclareName(node.statements, identifier);
-  if (ts.isSourceFile(node)) return statementsDeclareName(node.statements, identifier);
+  if (ts.isSourceFile(node)) {
+    return statementsDeclareName(node.statements, identifier) ||
+      functionScopeDeclaresVar(node, identifier);
+  }
   if (ts.isCaseBlock(node)) {
     return node.clauses.some((clause) =>
       statementsDeclareName(clause.statements, identifier));
@@ -256,13 +279,11 @@ function referenceResolvesToNamespaceImport(reference, identifier) {
 
 function modulePropertyReference(node) {
   if (ts.isPropertyAccessExpression(node) && node.name.text === 'composeSelections') {
-    const receiver = unwrapExpression(node.expression);
-    return ts.isIdentifier(receiver) ? receiver : null;
+    return unwrapExpression(node.expression);
   }
   if (ts.isElementAccessExpression(node) &&
       stringSpecifier(node.argumentExpression) === 'composeSelections') {
-    const receiver = unwrapExpression(node.expression);
-    return ts.isIdentifier(receiver) ? receiver : null;
+    return unwrapExpression(node.expression);
   }
   return null;
 }
@@ -276,7 +297,7 @@ function callbackUsesCompose(callback) {
   let usesCompose = false;
   function visit(node) {
     const receiver = modulePropertyReference(node);
-    if (receiver?.text === parameter.text &&
+    if (receiver && ts.isIdentifier(receiver) && receiver.text === parameter.text &&
         referenceResolvesToParameter(receiver, callback, parameter.text)) {
       usesCompose = true;
     }
@@ -325,7 +346,7 @@ function importsCoreCompose(sourceFile) {
       return;
     }
     const receiver = modulePropertyReference(node);
-    if (receiver && namespaceBindings.has(receiver.text) &&
+    if (receiver && ts.isIdentifier(receiver) && namespaceBindings.has(receiver.text) &&
         referenceResolvesToNamespaceImport(receiver, receiver.text)) {
       found = true;
       return;
@@ -335,9 +356,7 @@ function importsCoreCompose(sourceFile) {
       found = true;
       return;
     }
-    if (ts.isPropertyAccessExpression(node) &&
-        node.name.text === 'composeSelections' &&
-        isCoreDynamicImport(node.expression)) {
+    if (receiver && isCoreDynamicImport(receiver)) {
       found = true;
       return;
     }
