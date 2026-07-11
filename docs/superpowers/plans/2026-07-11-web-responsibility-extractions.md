@@ -493,9 +493,11 @@ After review, mark the task complete and record implementation note, commit hash
   frozen export input, error mapping, progress liveness, and success/error UI
   orchestration into `useCharacterExport`; `DownloadPopover` now only renders
   and forwards its seven artifact actions.
-- Commit: `e8fc66588`
+- Commit: `e8fc665881ef5d58243b86df0fa10aac6c38c951`
 - Verification: focused Vitest 44/44 PASS; web typecheck PASS; architecture
   boundaries PASS; tracked Playwright 7/7 PASS (Chromium).
+- Reviewer outcome: approved with two non-blocking test-hardening minors:
+  focused hook lifecycle coverage and a semantic seven-control assertion.
 
 ## Task 5: Verify the complete extraction and record evidence
 
@@ -590,13 +592,26 @@ serialization, composition inputs/pixels, attribution guards, ZIP routing and
 filenames, status/progress copy, overlay semantics, seven controls, and editor
 layout remain preserved by inspection and the fresh unit/E2E evidence.
 
+- Exact implementation range: `4f6b1bac^..e8fc665881ef5d58243b86df0fa10aac6c38c951`
+  contains 13 files changed, 1,314 insertions, and 321 deletions.
+- Exact range through the initial Task 5 evidence commit:
+  `4f6b1bac^..07deebc68b1283e679ca2bcf10c54abab2026343` contains
+  13 files changed, 1,382 insertions, and 331 deletions. This broader range
+  includes the Task 5 plan-evidence update and is not the implementation-only
+  Batch D total.
+
 - Implementation commits and reviewer outcomes: Task 1
   `4f6b1bac101a59f4889e7ac96dae3ce0fab11361` (review clean); Task 2
   `23e049bb3e72c3b3abd9c99f28cc75f8c27e1e21` plus review fix
   `78e58f4c75e71b4a53bcbf011285d93b7c26a59a` (re-review clean); Task 3
   `6912bb51546ddb374a3c43568c41da7cd60ef053` (review clean); Task 4
-  `e8fc665881ef5d58243b86df0fa10aac6c38c951` (review outcome recorded with
-  its focused verification).
+  `e8fc665881ef5d58243b86df0fa10aac6c38c951` (approved with two
+  non-blocking test-hardening minors: focused hook lifecycle coverage and a
+  semantic seven-control assertion).
+- Task 5 evidence commit: `07deebc68b1283e679ca2bcf10c54abab2026343`.
+  Initial Task 5 review required corrections to the range totals, exact Task 4
+  hash, and reviewer-outcome wording; the follow-up commit
+  `docs(plan): correct web extraction evidence` records that final review fix.
 - Verification: `packages/core/`, dependency manifests/lockfile, `assets/`, and
   tracked `upstream/` have no Batch D diff; submodule remains clean at
   `212abfd21493e9957bd556250ac538fa40fe1fc9`.
