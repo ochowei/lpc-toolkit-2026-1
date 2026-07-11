@@ -236,6 +236,18 @@ global references, GREEN was 76 passed.
 - Review-fix verification: focused tests PASS (2 files, 76 tests); boundary checker
   PASS; recursive workspace typecheck PASS (4 projects); `git diff --check` PASS
 
+Second review-fix note: Added fixtures for catch-parameter shadowing, `for...of`,
+`for...in`, and classic `for` initializer shadowing, plus an illegal computed
+binding key that must remain an executable runtime-global reference. RED was 2
+failed and 77 passed, with the computed-key rejection already green. Replaced the
+partial callback scope special cases with ancestor-owned binding resolution for
+parameters, variable declarations, catch bindings, loop initializers, and nested
+function/class scopes. GREEN was 79 passed.
+
+- Second review-fix commit: a4d181ff40960b7c44db5c94d44cf101b7b0cf98
+- Second review-fix verification: focused tests PASS (2 files, 79 tests); boundary
+  checker PASS; recursive workspace typecheck PASS (4 projects); `git diff --check` PASS
+
 ---
 
 ### Task 3: Full Verification and Plan 5 Closure Evidence

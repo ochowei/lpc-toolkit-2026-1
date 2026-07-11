@@ -30,3 +30,20 @@
   callback; type-only imports/re-exports are legal; noncomputed binding property
   keys are not executable globals while computed expressions remain traversed.
 - Concerns: none known.
+
+## Second Review Fixes
+
+- Fix commit: `a4d181ff40960b7c44db5c94d44cf101b7b0cf98`
+- RED command: `rtk pnpm --filter @lpc-toolkit/web test -- boundary-check.test.ts package-scripts.test.ts`
+- RED result: 2 files ran; 2 failed and 77 passed (79 total). The computed binding-key
+  rejection already passed, confirming executable computed expressions remained enforced.
+- GREEN command: `rtk pnpm --filter @lpc-toolkit/web test -- boundary-check.test.ts package-scripts.test.ts`
+- GREEN result: PASS (2 files, 79 tests).
+- Boundary checker: PASS.
+- Recursive workspace typecheck: PASS (4 projects).
+- Diff check: PASS.
+- Fix summary: fulfillment callback references are resolved against ancestor-owned
+  bindings, covering parameters, general variable declarations, catch bindings,
+  loop initializers, and nested function/class scopes. Direct core property and
+  destructuring ownership remain rejected.
+- Concerns: none known.
