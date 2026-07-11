@@ -55,13 +55,6 @@ function sourceFiles(dir) {
   return out;
 }
 
-function stripCommentsAndStrings(source) {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/\/\/[^\n\r]*/g, '')
-    .replace(/(['"`])(?:\\[\s\S]|(?!\1)[\s\S])*?\1/g, '');
-}
-
 function sourceTokens(source) {
   const tokens = [];
 
@@ -120,6 +113,30 @@ function sourceTokens(source) {
         continue;
       }
 
+      if (char === '/' && canStartRegex(tokens.at(-1))) {
+        index += 1;
+        let inCharacterClass = false;
+        while (index < source.length) {
+          if (source[index] === '\\') {
+            index += 2;
+          } else if (source[index] === '[') {
+            inCharacterClass = true;
+            index += 1;
+          } else if (source[index] === ']') {
+            inCharacterClass = false;
+            index += 1;
+          } else if (source[index] === '/' && !inCharacterClass) {
+            index += 1;
+            while (/[A-Za-z]/.test(source[index] ?? '')) index += 1;
+            break;
+          } else {
+            index += 1;
+          }
+        }
+        tokens.push({ kind: 'regex', value: '' });
+        continue;
+      }
+
       if (char === '`') {
         index = tokenizeTemplate(index + 1);
         continue;
@@ -159,6 +176,22 @@ function sourceTokens(source) {
 
   tokenizeCode(0, null);
   return tokens;
+}
+
+function canStartRegex(previousToken) {
+  if (!previousToken) return true;
+  if (previousToken.kind === 'word' || previousToken.kind === 'string' || previousToken.kind === 'template') {
+    return false;
+  }
+  return ![')', ']', '}'].includes(previousToken.value);
+}
+
+function runtimeWords(source) {
+  return new Set(
+    sourceTokens(source)
+      .filter((token) => token.kind === 'word')
+      .map((token) => token.value),
+  );
 }
 
 function importSpecifiers(source) {
@@ -261,6 +294,11 @@ function isPackageImport(specifier, packageName) {
   return specifier === packageName || specifier.startsWith(`${packageName}/`);
 }
 
+function isConcreteCanvasImport(specifier) {
+  return [...concreteCanvasImports].some((packageName) =>
+    isPackageImport(specifier, packageName));
+}
+
 function addIssue(issues, root, filePath, message) {
   issues.push(`${relativePath(root, filePath)}: ${message}`);
 }
@@ -279,7 +317,7 @@ function checkCoreFile({ issues, root, coreSrc, presetsSrc, webSrc, cliSrc, file
       specifier.startsWith('react/') ||
       specifier.startsWith('node:') ||
       nodeBuiltins.has(bareSpecifier) ||
-      concreteCanvasImports.has(specifier) ||
+      isConcreteCanvasImport(specifier) ||
       (resolved && (
         isInside(resolved, presetsSrc) ||
         isInside(resolved, webSrc) ||
@@ -290,10 +328,9 @@ function checkCoreFile({ issues, root, coreSrc, presetsSrc, webSrc, cliSrc, file
     }
   }
 
-  const runtimeSource = stripCommentsAndStrings(source);
+  const words = runtimeWords(source);
   for (const name of coreRuntimeGlobals) {
-    const pattern = new RegExp(`\\b${name}\\b`);
-    if (pattern.test(runtimeSource)) {
+    if (words.has(name)) {
       addIssue(
         issues,
         root,
@@ -331,6 +368,7 @@ function extensionless(filePath) {
 
 function checkWebComponentFile({ issues, root, webSrc, filePath }) {
   const source = readFileSync(filePath, 'utf8');
+  const tokens = sourceTokens(source);
   const forbiddenModules = new Set([
     path.join(webSrc, 'adapter/browser-canvas-adapter'),
     path.join(webSrc, 'lib/character-export'),
@@ -349,6 +387,45 @@ function checkWebComponentFile({ issues, root, webSrc, filePath }) {
         filePath,
         'forbidden web component import "composeSelections"',
       );
+    }
+  }
+
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index];
+    if (token.kind === 'word' && token.value === 'export') {
+      let exportsComposition = false;
+      let exportsFromCore = false;
+      for (let cursor = index + 1; cursor < tokens.length && tokens[cursor].value !== ';'; cursor += 1) {
+        if (tokens[cursor].kind === 'word' && tokens[cursor].value === 'composeSelections') {
+          exportsComposition = true;
+        }
+        if (
+          tokens[cursor].kind === 'word' &&
+          tokens[cursor].value === 'from' &&
+          tokens[cursor + 1]?.kind === 'string' &&
+          tokens[cursor + 1].value === '@lpc-toolkit/core'
+        ) {
+          exportsFromCore = true;
+        }
+      }
+      if (exportsComposition && exportsFromCore) {
+        addIssue(issues, root, filePath, 'forbidden web component import "composeSelections"');
+      }
+    }
+
+    if (
+      token.kind === 'word' &&
+      token.value === 'import' &&
+      tokens[index + 1]?.value === '(' &&
+      tokens[index + 2]?.kind === 'string' &&
+      tokens[index + 2].value === '@lpc-toolkit/core'
+    ) {
+      for (let cursor = index + 3; cursor < tokens.length && tokens[cursor].value !== ';'; cursor += 1) {
+        if (tokens[cursor].kind === 'word' && tokens[cursor].value === 'composeSelections') {
+          addIssue(issues, root, filePath, 'forbidden web component import "composeSelections"');
+          break;
+        }
+      }
     }
   }
 
@@ -376,7 +453,7 @@ function checkPresetsFile({ issues, root, webSrc, cliSrc, filePath }) {
       reactImports.has(specifier) ||
       specifier.startsWith('react/') ||
       nodeFilesystemImports.has(specifier) ||
-      concreteCanvasImports.has(specifier) ||
+      isConcreteCanvasImport(specifier) ||
       (resolved && (
         isInside(resolved, webSrc) ||
         isInside(resolved, cliSrc)
@@ -386,10 +463,9 @@ function checkPresetsFile({ issues, root, webSrc, cliSrc, filePath }) {
     }
   }
 
-  const runtimeSource = stripCommentsAndStrings(source);
+  const words = runtimeWords(source);
   for (const name of coreRuntimeGlobals) {
-    const pattern = new RegExp(`\\b${name}\\b`);
-    if (pattern.test(runtimeSource)) {
+    if (words.has(name)) {
       addIssue(
         issues,
         root,

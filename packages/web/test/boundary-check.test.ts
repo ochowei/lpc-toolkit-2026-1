@@ -92,6 +92,20 @@ describe('architecture boundary check', () => {
     });
   });
 
+  it('allows import-like text in regular expression literals', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(
+      root,
+      'packages/core/src/legal-regex.ts',
+      "export const importExample = /import('react')/;\n",
+    );
+
+    expect(runBoundaryCheck(root)).toEqual({
+      ok: true,
+      stdout: 'Architecture boundary check passed.\n',
+    });
+  });
+
   it('allows unrelated package names containing forbidden package text', () => {
     const root = makeRepoFixture();
     writeFixtureFile(
@@ -268,6 +282,7 @@ export const commented = import(\`prefix-\${/* example */ '@lpc-toolkit/cli'}\`)
     ['bare Node filesystem', "import { readFileSync } from 'fs';", 'fs'],
     ['bare Node filesystem promises', "import { readFile } from 'fs/promises';", 'fs/promises'],
     ['concrete canvas', "import { createCanvas } from '@napi-rs/canvas';", '@napi-rs/canvas'],
+    ['concrete canvas subpath', "import '@napi-rs/canvas/load-image';", '@napi-rs/canvas/load-image'],
     ['dynamic web import', "export const load = import('@lpc-toolkit/web');", '@lpc-toolkit/web'],
     [
       'dynamic web import in a template expression',
@@ -309,6 +324,22 @@ export const commented = import(\`prefix-\${/* example */ '@lpc-toolkit/cli'}\`)
     }
   });
 
+  it('rejects browser runtime globals in presets template expressions', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(
+      root,
+      'packages/presets/src/browser-template-leak.ts',
+      'export const title = `${document.title}`;\n',
+    );
+
+    expectBoundaryFailure(
+      root,
+      'forbidden presets runtime global',
+      'document',
+      'packages/presets/src/browser-template-leak.ts',
+    );
+  });
+
   it.each([
     ['presets package', "import '@lpc-toolkit/presets';", '@lpc-toolkit/presets'],
     ['presets source', "import '../../presets/src/index';", '../../presets/src/index'],
@@ -318,6 +349,7 @@ export const commented = import(\`prefix-\${/* example */ '@lpc-toolkit/cli'}\`)
     ['CLI source', "import '../../cli/src/index';", '../../cli/src/index'],
     ['React', "import React from 'react';", 'react'],
     ['concrete canvas', "import { createCanvas } from '@napi-rs/canvas';", '@napi-rs/canvas'],
+    ['concrete canvas subpath', "import '@napi-rs/canvas/load-image';", '@napi-rs/canvas/load-image'],
   ])('rejects core imports from %s', (_name, source, expected) => {
     const root = makeRepoFixture();
     writeFixtureFile(root, 'packages/core/src/leak.ts', source);
@@ -340,6 +372,21 @@ export const commented = import(\`prefix-\${/* example */ '@lpc-toolkit/cli'}\`)
       expect(result.output).toContain('forbidden core runtime global');
       expect(result.output).toContain('document');
     }
+  });
+
+  it.each([
+    ['template expression', 'export const title = `${document.title}`;'],
+    ['code after a URL string', "const url = 'https://example.test'; document.title = url;"],
+  ])('rejects browser runtime globals in core %s', (_name, source) => {
+    const root = makeRepoFixture();
+    writeFixtureFile(root, 'packages/core/src/runtime-leak.ts', source);
+
+    expectBoundaryFailure(
+      root,
+      'forbidden core runtime global',
+      'document',
+      'packages/core/src/runtime-leak.ts',
+    );
   });
 
   it('rejects concrete runtime imports in core source', () => {
@@ -425,6 +472,21 @@ export const example = \`import { composeSelections } from '@lpc-toolkit/core'\`
     [
       'multiline core composition',
       "import {\n  type CanvasAdapter,\n  composeSelections as compose,\n} from '@lpc-toolkit/core';\nexport { compose };",
+      'composeSelections',
+    ],
+    [
+      're-exported core composition',
+      "export { composeSelections } from '@lpc-toolkit/core';",
+      'composeSelections',
+    ],
+    [
+      'dynamic core composition access',
+      "export const compose = import('@lpc-toolkit/core').then((core) => core.composeSelections);",
+      'composeSelections',
+    ],
+    [
+      'dynamic core composition destructuring',
+      "export const compose = import('@lpc-toolkit/core').then(({ composeSelections }) => composeSelections);",
       'composeSelections',
     ],
     [
