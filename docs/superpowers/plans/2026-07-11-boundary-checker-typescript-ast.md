@@ -30,7 +30,7 @@
 - Consumes: the existing boundary fixture helper that writes a temporary source tree and invokes `scripts/check-boundaries.mjs`.
 - Produces: regression fixtures defining the required legal and illegal behavior for the AST migration.
 
-- [ ] **Step 1: Add legal regex and unrelated-name fixtures**
+- [x] **Step 1: Add legal regex and unrelated-name fixtures**
 
 Add individual legal fixtures equivalent to:
 
@@ -51,7 +51,7 @@ import('@lpc-toolkit/core').then(() => {
 
 Each fixture must assert checker exit status `0` and must live in the narrowest core, presets, or component fixture directory relevant to the rule.
 
-- [ ] **Step 2: Add illegal division and dynamic-core ownership fixtures**
+- [x] **Step 2: Add illegal division and dynamic-core ownership fixtures**
 
 Add individual illegal fixtures equivalent to:
 
@@ -66,7 +66,7 @@ const compose = (await import('@lpc-toolkit/core')).composeSelections;
 
 Assert non-zero exit status and the existing rule-specific diagnostic text. Keep existing direct-property, destructuring, re-export, template-expression, canvas-subpath, and runtime-global fixtures unchanged.
 
-- [ ] **Step 3: Run the focused suite and verify RED**
+- [x] **Step 3: Run the focused suite and verify RED**
 
 Run:
 
@@ -76,7 +76,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- boundary-check.test.ts package-script
 
 Expected: the newly added regex/control-context and parenthesized awaited-import cases fail for the reviewed lexer defects; all pre-existing fixtures remain green. Record the exact failed/passed counts in the implementation note.
 
-- [ ] **Step 4: Commit the RED fixtures**
+- [x] **Step 4: Commit the RED fixtures**
 
 ```bash
 rtk git add packages/web/test/boundary-check.test.ts docs/superpowers/plans/2026-07-11-boundary-checker-typescript-ast.md
@@ -84,6 +84,19 @@ rtk git commit -m "test(boundaries): cover AST syntax edge cases"
 ```
 
 Record the commit hash and RED verification status under Task 1.
+
+Implementation note: Added exact return-regex and control-flow regex fixtures in core,
+an unrelated local `composeSelections` callback fixture in web components, and a
+parenthesized awaited dynamic-core property-access rejection fixture. The existing
+division fixture already exercises the required illegal syntax and remains unchanged.
+Focused RED verification completed with 2 test files, 72 tests total: 69 passed and
+3 failed. The control-flow regex fixture was falsely reported as three forbidden core
+imports, the unrelated callback-local name was falsely reported as a forbidden web
+component import, and the parenthesized awaited dynamic-core ownership leak was missed.
+The exact return-regex fixture and all pre-existing fixtures passed.
+
+- Commit: pending (recorded immediately after the fixture commit)
+- Verification: RED as expected — 69 passed, 3 failed
 
 ---
 

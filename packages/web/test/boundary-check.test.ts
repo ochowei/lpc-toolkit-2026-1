@@ -111,7 +111,27 @@ describe('architecture boundary check', () => {
     writeFixtureFile(
       root,
       'packages/core/src/legal-return-regex.ts',
-      "export function example() { return /import('react')/; }\n",
+      `export function returned(value: string) {
+  return /import('react')/.test(value);
+}
+`,
+    );
+
+    expect(runBoundaryCheck(root)).toEqual({
+      ok: true,
+      stdout: 'Architecture boundary check passed.\n',
+    });
+  });
+
+  it('allows import-like regular expressions in control-flow statement bodies', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(
+      root,
+      'packages/core/src/legal-control-regex.ts',
+      `if (enabled) /import('@lpc-toolkit/web')/.test(value);
+else /import('react')/.test(value);
+do /import('react')/.test(value); while (false);
+`,
     );
 
     expect(runBoundaryCheck(root)).toEqual({
@@ -498,13 +518,33 @@ export const example = \`import { composeSelections } from '@lpc-toolkit/core'\`
     writeFixtureFile(
       root,
       'packages/web/src/components/legal-dynamic-import.tsx',
-      "const core = import('@lpc-toolkit/core')\nconst composeSelections = 1\nexport { composeSelections, core }\n",
+      `import('@lpc-toolkit/core').then(() => {
+  const composeSelections = 1;
+  return composeSelections;
+});
+`,
     );
 
     expect(runBoundaryCheck(root)).toEqual({
       ok: true,
       stdout: 'Architecture boundary check passed.\n',
     });
+  });
+
+  it('rejects parenthesized awaited dynamic core composition access in components', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(
+      root,
+      'packages/web/src/components/awaited-core-composition-leak.tsx',
+      "const compose = (await import('@lpc-toolkit/core')).composeSelections;\n",
+    );
+
+    expectBoundaryFailure(
+      root,
+      'forbidden web component import',
+      'composeSelections',
+      'packages/web/src/components/awaited-core-composition-leak.tsx',
+    );
   });
 
   it.each([
