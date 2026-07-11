@@ -10,6 +10,7 @@ import {
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { installedCliInvocation } from './installed-cli-command.mjs';
 import { packedTarballName } from './package-archive-name.mjs';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -144,20 +145,28 @@ try {
   );
   const installedBinTarget = installedPackageJson.bin?.['lpc-toolkit'];
   assert.equal(typeof installedBinTarget, 'string', 'installed package is missing its bin target');
+  const installedBinTargetPath = path.resolve(installedPackageRoot, installedBinTarget);
   const helpOutput = execFileSync(installedBinPath, ['--help'], {
     encoding: 'utf8',
   });
   assert.match(helpOutput, /lpc-toolkit catalog types/u);
 
-  const decodeResult = spawnSync(
-    installedBinPath,
-    [
+  const decodeInvocation = installedCliInvocation({
+    platform: process.platform,
+    nodePath: process.execPath,
+    shimPath: installedBinPath,
+    targetPath: installedBinTargetPath,
+    args: [
       'token',
       'decode',
       '--token',
       'sex=male&hair=Braid',
       '--json',
     ],
+  });
+  const decodeResult = spawnSync(
+    decodeInvocation.command,
+    decodeInvocation.args,
     { cwd: emptyCwd, encoding: 'utf8' },
   );
   assert.equal(decodeResult.status, 0, decodeResult.stderr);
@@ -166,9 +175,16 @@ try {
   assert.equal(decodeOutput.data?.selection?.items?.hair?.name, 'Braid');
 
   cacheRoot = mkdtempSync(path.join(os.tmpdir(), 'lpc-toolkit-cache-'));
+  const webInvocation = installedCliInvocation({
+    platform: process.platform,
+    nodePath: process.execPath,
+    shimPath: installedBinPath,
+    targetPath: installedBinTargetPath,
+    args: ['web', '--host', '127.0.0.1', '--port', '0', '--no-open'],
+  });
   const web = spawn(
-    installedBinPath,
-    ['web', '--host', '127.0.0.1', '--port', '0', '--no-open'],
+    webInvocation.command,
+    webInvocation.args,
     {
       cwd: emptyCwd,
       env: { ...process.env, LPC_TOOLKIT_CACHE_DIR: cacheRoot },
