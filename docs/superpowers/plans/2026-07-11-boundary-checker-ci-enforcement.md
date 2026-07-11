@@ -112,6 +112,7 @@ comments/strings, and unrelated-package-name fixtures protecting false positives
 - Commit: `04b11c0ede38ebb4518109ebbb9c288421a0e1f4`
 - Verification: RED focused Vitest (`5 failed, 9 passed`); GREEN focused Vitest
   (`14 passed`); repository boundaries PASS; `git diff --check` PASS.
+- Review outcome: Clean; no Task 1 review fix was required.
 
 ## Task 2: Enforce presets purity
 
@@ -232,6 +233,10 @@ retaining recursive nested-import detection.
 - Follow-up verification: RED focused Vitest (`1 failed, 37 passed`); GREEN
   focused Vitest (`38 passed`); repository boundaries PASS;
   `git diff --check` PASS.
+- Review outcome: Import parsing bypasses were fixed in
+  `17108b4605a54a7feb052803505bafb907828d66`,
+  `f745b36627b1f6ae4583572e280f0e3a20e3b505`, and
+  `b49c35e551008eb08c53f7c45b9ae0947fd730dd`; final re-review clean.
 
 ## Task 3: Enforce component ownership and public core imports
 
@@ -354,6 +359,8 @@ retaining static named-import analysis for `composeSelections` aliases.
 - Review verification: RED focused Vitest (`2 failed, 48 passed`); GREEN focused
   Vitest (`50 passed`); repository boundaries PASS; diff checks PASS; re-review
   clean.
+- Review outcome: Dynamic-import and export-from bypasses were fixed in
+  `69e5ca07c78e4c7d18f54b2ba0a6b7df06dfe8ff`; final re-review clean.
 
 ## Task 4: Run boundaries in the main CI unit job
 
@@ -442,6 +449,8 @@ After review, check the task and record implementation note, full commit hash, a
 - Review verification: Focused workflow and boundary tests (`58 passed`);
   repository boundary checker PASS; diff check PASS. No additional RED was
   available because the committed workflow already had the required sequence.
+- Review outcome: The exact consecutive workflow contract was strengthened in
+  `7ff1976ea7ea372ef2b8911766e0029d7158cc48`; final re-review clean.
 
 ## Task 5: Verify Plan 5 and record evidence
 
@@ -452,7 +461,7 @@ After review, check the task and record implementation note, full commit hash, a
 - Produces a completed Plan 5 record with every task checked, exact commits, reviewer outcomes, fixture counts, and fresh verification.
 - Makes no runtime, dependency, asset, or submodule change.
 
-- [ ] **Step 1: Run focused boundary and workflow verification**
+- [x] **Step 1: Run focused boundary and workflow verification**
 
 Run:
 
@@ -464,7 +473,12 @@ rtk rg -n "pnpm check:boundaries" .github/workflows/ci.yml .github/workflows/pub
 
 Expected: tests and checker PASS; command appears at workspace root, main CI, and publish verification.
 
-- [ ] **Step 2: Run full workspace verification**
+Implementation note: Focused Vitest passed `58/58` tests (`50` boundary
+fixtures and `8` workflow/package contracts). The repository checker passed.
+The root command is `package.json`'s `check:boundaries` script, and both the
+main CI unit job and publish verification invoke `pnpm check:boundaries`.
+
+- [x] **Step 2: Run full workspace verification**
 
 Run:
 
@@ -477,11 +491,29 @@ rtk git status --short
 
 Expected: PASS; status shows only intentional Plan 5 changes and preserved `docs/README-ARCHITECTURE-AUDIT.tmp.md`.
 
-- [ ] **Step 3: Audit objective scope and unchanged areas**
+Implementation note: Recursive workspace typecheck passed for core, presets,
+web, and CLI. The full suite passed `108` test files with `911` tests passed
+and `1` skipped. `git diff --check` passed. The untracked
+`docs/README-ARCHITECTURE-AUDIT.tmp.md` audit file remained preserved.
+
+- [x] **Step 3: Audit objective scope and unchanged areas**
 
 Inspect the final diff. Confirm every Batch E rule has legal/illegal fixture evidence, checker messages identify file/rule/specifier or global, and no subjective/file-size/naming rule was added. Confirm no diff under `packages/core/`, `packages/presets/`, runtime web source, dependency files, assets, or `upstream/`.
 
-- [ ] **Step 4: Record completion and commit plan evidence**
+Implementation note: Audited `50` boundary fixtures: `10` legal cases and `40`
+illegal cases. They cover every core, presets, all-web public-core-entry, and
+component-ownership policy category, including static, dynamic, export-from,
+template, lexical-text, package-prefix, and relative-resolution behavior.
+Illegal expectations identify the fixture file, rule text, and offending
+specifier or runtime global. No generic-word, subjective responsibility,
+file-size, hook-name, or naming rule was added. Against the pre-Plan-5 baseline
+`ca8db2668da164e47a1fd7650b354fbc658cddeb`, changes are limited to
+`.github/workflows/ci.yml`, `scripts/check-boundaries.mjs`, the two boundary
+contract test files, and this plan. There are no diffs under `packages/core/`,
+`packages/presets/`, runtime `packages/web/src/`, dependency manifests or
+lockfiles, `assets/`, or tracked `upstream/` content.
+
+- [x] **Step 4: Record completion and commit plan evidence**
 
 Update all task notes, exact commit hashes, review outcomes, fixture/test counts, and verification results, then run:
 
