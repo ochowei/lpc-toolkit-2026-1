@@ -248,6 +248,12 @@ function/class scopes. GREEN was 79 passed.
 - Second review-fix verification: focused tests PASS (2 files, 79 tests); boundary
   checker PASS; recursive workspace typecheck PASS (4 projects); `git diff --check` PASS
 
+Final branch-review note: implementation `caddd1fa5569f1698bc67119f3977d3e1351dd05`
+completed namespace/export-star ownership, wrapped/element access, loop-RHS binding
+identity, binding-aware runtime globals, and import-equals collection. RED: 9 failed,
+80 passed. GREEN: 89 passed. Full tests: 942 passed, 1 skipped; checker, recursive
+typecheck, and diff check PASS.
+
 ---
 
 ### Task 3: Full Verification and Plan 5 Closure Evidence

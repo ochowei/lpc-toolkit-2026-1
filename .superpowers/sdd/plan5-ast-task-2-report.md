@@ -31,6 +31,16 @@
   keys are not executable globals while computed expressions remain traversed.
 - Concerns: none known.
 
+## Final Branch Review Fixes
+
+- Implementation: `caddd1fa5569f1698bc67119f3977d3e1351dd05`
+- RED focused: 9 failed, 80 passed (89 total).
+- GREEN focused: PASS (2 files, 89 tests).
+- Full tests: PASS (108 files, 942 passed, 1 skipped).
+- Boundary checker, recursive typecheck, diff check: PASS.
+- Added namespace/export-star ownership, wrapped and constant element access,
+  loop-RHS identity, binding-aware runtime globals, and import-equals modules.
+
 ## Second Review Fixes
 
 - Fix commit: `a4d181ff40960b7c44db5c94d44cf101b7b0cf98`

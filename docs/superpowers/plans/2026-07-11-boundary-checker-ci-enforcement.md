@@ -566,6 +566,11 @@ final AST review remains pending and is not recorded as PASS.
 
 - AST closure evidence commit: `b8b636c9f7ee41bf054a37be893c248e4eb6a289`
 
+Final branch-review correction `caddd1fa5569f1698bc67119f3977d3e1351dd05`
+expanded AST binding and module ownership coverage. Focused tests pass 89/89;
+full workspace tests pass 942 with 1 intentional skip; checker, recursive
+typecheck, and diff check pass. Independent final review remains pending.
+
 ## Final Acceptance Criteria
 
 - Core imports from presets, web, CLI, React, Node runtime, and concrete canvas fail; core browser globals fail.
