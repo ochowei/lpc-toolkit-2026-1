@@ -52,7 +52,7 @@
 - Produces `useSingleItemComposer(catalog, palettes)` that memoizes one browser adapter and one composer object.
 - Both callbacks pass `spritesheetsBaseUrl: ''` and a resolver created from the exact passed selections; only the layer callback supplies `onlyLayerNumber`.
 
-- [ ] **Step 1: Write the failing factory tests**
+- [x] **Step 1: Write the failing factory tests**
 
 Create tests with a typed compose spy and assert the full-item call omits `onlyLayerNumber`, the layer call supplies it, both calls preserve the exact selections and adapter, and `resolvePalette` resolves against those selections:
 
@@ -77,13 +77,13 @@ expect(calls[0]?.options.adapter).toBe(adapter);
 expect(calls[0]?.options.spritesheetsBaseUrl).toBe('');
 ```
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/use-single-item-composer.test.ts`
 
 Expected: FAIL because the new hook module does not exist.
 
-- [ ] **Step 3: Implement the factory and hook**
+- [x] **Step 3: Implement the factory and hook**
 
 Use this public shape:
 
@@ -121,7 +121,7 @@ export function createSingleItemComposer(args: {
 
 The hook creates the adapter with `useMemo(() => createBrowserCanvasAdapter(), [])` and memoizes the factory result from `catalog`, `palettes`, and `adapter`.
 
-- [ ] **Step 4: Replace the harness callback and verify**
+- [x] **Step 4: Replace the harness callback and verify**
 
 Delete the harness imports of `composeSelections`, `makeResolvePalette`, and `createBrowserCanvasAdapter`. Replace its callback with:
 
@@ -140,7 +140,7 @@ rtk pnpm check:boundaries
 
 Expected: PASS; existing ZIP tests remain unchanged.
 
-- [ ] **Step 5: Commit Task 1**
+- [x] **Step 5: Commit Task 1**
 
 ```bash
 rtk git add packages/web/src/hooks/use-single-item-composer.ts packages/web/test/use-single-item-composer.test.ts packages/web/src/components/layer-stack/harness.tsx
@@ -148,6 +148,14 @@ rtk git commit -m "refactor(web): extract single-item composer hook"
 ```
 
 After review, mark the task complete and record implementation note, commit hash, and verification.
+
+Implementation note: Added a deterministic single-item composer factory and memoized
+hook, then replaced the harness-local core/adapter callback with distinct full-item and
+layer-specific callbacks.
+
+- Commit: `4f6b1bac101a59f4889e7ac96dae3ce0fab11361`
+- Verification: focused factory plus ZIP Vitest (`24 passed`), web typecheck PASS,
+  boundaries PASS, task review clean.
 
 ## Task 2: Extract custom-overlay ownership and stale-result handling
 
