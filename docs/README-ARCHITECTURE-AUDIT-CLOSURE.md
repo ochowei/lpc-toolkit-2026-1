@@ -26,3 +26,12 @@ Finding 15 is the approved exception: catalog picker thumbnails are internal
 editor previews and do not receive individual credit sidecars. The active
 composition keeps attribution visible, and every downloadable pixel artifact
 uses its precise `ComposedSheet.credits` manifest and bundled credit files.
+
+## Final acceptance gate
+
+Plan 6 completed the repository-wide gate with boundaries, typecheck, full
+tests, build, ordinary web E2E, README/documentation contracts, and isolated
+upstream parity all passing. The isolated parity run used the separate checkout
+at commit `212abfd21493e9957bd556250ac538fa40fe1fc9`; the read-only submodule was
+not used or modified. Exact counts, warnings, source provisioning, and scope are
+recorded in `.superpowers/sdd/plan6-final-report.md`.
