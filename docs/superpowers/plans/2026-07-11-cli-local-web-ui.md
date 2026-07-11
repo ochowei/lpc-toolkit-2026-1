@@ -439,7 +439,7 @@ Verification: `rtk pnpm --filter @lpc-toolkit/cli test` PASS (185 passed, 1 skip
 - Consumes: the installed CLI binary and cache layout from Tasks 1–4.
 - Produces: release-level proof that the packaged UI runs outside the repository without downloading when a valid cache is supplied.
 
-- [ ] **Step 1: Extend the smoke fixture and launch assertion**
+- [x] **Step 1: Extend the smoke fixture and launch assertion**
 
 Create a minimal valid managed-cache fixture under a temporary `LPC_TOOLKIT_CACHE_DIR` using the bundled `asset-release.json` tag and the existing cache manifest/index shapes. Put `body.zip` in its `zips/` directory. Spawn:
 
@@ -457,13 +457,13 @@ const web = spawn(
 
 Read stdout until the URL line appears with a bounded timeout, fetch `/` and `/zips/body.zip`, assert status 200 and expected bodies, then send `SIGTERM` and assert clean termination. The fixture must satisfy the real cache verifier; do not bypass checksum checks in the installed process.
 
-- [ ] **Step 2: Run the packed smoke test**
+- [x] **Step 2: Run the packed smoke test**
 
 Run: `rtk pnpm --filter @lpc-toolkit/cli test:package`
 
 Expected: PASS and print `Packed CLI install smoke test passed.`
 
-- [ ] **Step 3: Document installation and local Web use**
+- [x] **Step 3: Document installation and local Web use**
 
 Add to `packages/cli/README.md`:
 
@@ -485,7 +485,7 @@ other devices on the local network; only do this on a trusted network.
 
 Document `--port 0`, cache sharing, `Ctrl+C`, and that this command is a production server without Vite hot reload.
 
-- [ ] **Step 4: Run final verification**
+- [x] **Step 4: Run final verification**
 
 Run:
 
@@ -500,9 +500,13 @@ rtk pnpm --filter @lpc-toolkit/cli test:package
 
 Expected: every command PASS. Confirm the packed tarball contains `dist/web/index.html` and contains neither `dist/web/zips/` nor `dist/web/spritesheets/`.
 
-- [ ] **Step 5: Commit Task 5**
+- [x] **Step 5: Commit Task 5**
 
 ```sh
 rtk git add packages/cli/scripts/smoke-packed-cli.mjs packages/cli/README.md docs/superpowers/plans/2026-07-11-cli-local-web-ui.md
 rtk git commit -m "docs(cli): document local web UI"
 ```
+
+Implementation: added verifier-compatible installed-package smoke coverage and Local Web UI operations documentation.
+Commit: 774f5c85883c53785bb3ed099fe6f765d79273cc; prerequisite strict-options fix: 3a3dfbf08d0d7dd13734d910526823c3402c3746.
+Verification: CLI package smoke PASS; CLI tests PASS (185 passed, 1 skipped); CLI typecheck PASS; boundary check PASS. Web tests retain one unrelated baseline failure (645/646 passed).
