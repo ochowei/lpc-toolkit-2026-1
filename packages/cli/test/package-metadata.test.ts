@@ -174,6 +174,35 @@ describe('CLI package metadata', () => {
     expect(smokeScript).not.toContain("'/c'");
   });
 
+  it('runs the installed CLI through Node on Windows and the shim elsewhere', () => {
+    const testDir = path.dirname(fileURLToPath(import.meta.url));
+    const helperUrl = pathToFileURL(
+      path.resolve(testDir, '../scripts/installed-cli-command.mjs'),
+    ).href;
+    const output = execFileSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '--eval',
+        `import { installedCliInvocation } from ${JSON.stringify(helperUrl)};
+const common = { nodePath: '/node', shimPath: '/shim.cmd', targetPath: '/package/dist/index.js', args: ['token', 'decode'] };
+process.stdout.write(JSON.stringify([
+  installedCliInvocation({ ...common, platform: 'win32' }),
+  installedCliInvocation({ ...common, platform: 'darwin' }),
+]));`,
+      ],
+      { encoding: 'utf8' },
+    );
+
+    expect(JSON.parse(output) as unknown).toEqual([
+      {
+        command: '/node',
+        args: ['/package/dist/index.js', 'token', 'decode'],
+      },
+      { command: '/shim.cmd', args: ['token', 'decode'] },
+    ]);
+  });
+
   it('derives a later release tarball name without current-version coupling', () => {
     const testDir = path.dirname(fileURLToPath(import.meta.url));
     const helperUrl = pathToFileURL(
