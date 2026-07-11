@@ -9,6 +9,7 @@ const readRepoFile = (filePath: string) =>
   readFileSync(path.join(repoRoot, filePath), 'utf8');
 
 const readme = readRepoFile('README.md');
+const architecture = readRepoFile('docs/ARCHITECTURE.md');
 const cliPackage = JSON.parse(readRepoFile('packages/cli/package.json')) as {
   version: string;
 };
@@ -67,5 +68,39 @@ describe('README architecture contract', () => {
     expect(readme).toContain(
       '[Layer Stack reference](reference/v2/LPC-Toolkit-LayerStack.html)',
     );
+  });
+});
+
+describe('architecture ownership contract', () => {
+  it('documents CLI asset lifecycle and AssetStore ownership', () => {
+    for (const phrase of [
+      'pinned manifest',
+      'checksum verification',
+      'platform cache',
+      'working-directory `assets/`',
+      '`assets_custom/`',
+      '`createDirectoryAssetStore`',
+      '`createZipAssetStore`',
+    ]) {
+      expect(architecture).toContain(phrase);
+    }
+  });
+
+  it('documents web catalog and attribution ownership', () => {
+    for (const phrase of [
+      '`packages/web/src/catalog/`',
+      '`ComposedSheet.credits`',
+      'PNG/TXT/CSV',
+      'thumbnail attribution exception',
+    ]) {
+      expect(architecture).toContain(phrase);
+    }
+  });
+
+  it('documents boundary CI and isolated parity ownership', () => {
+    expect(architecture).toContain('`rtk pnpm check:boundaries`');
+    expect(architecture).toContain('CI unit job');
+    expect(architecture).toContain('read-only provenance');
+    expect(architecture).toContain('separate isolated checkout');
   });
 });

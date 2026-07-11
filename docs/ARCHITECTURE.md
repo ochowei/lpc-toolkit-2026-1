@@ -273,6 +273,52 @@ manifest.
 Because the project is GPL-3.0-or-later and inherits upstream LPC licensing
 requirements, attribution behavior is part of correctness.
 
+The thumbnail attribution exception is intentionally narrow: catalog picker
+thumbnails are editor-internal previews, while every active composition and
+download remains covered by the attribution surface and export contract.
+Browser downloads are built from one frozen `ComposedSheet.credits` manifest
+and package the PNG/TXT/CSV artifacts together.
+
+## CLI Asset Lifecycle and AssetStore Ownership
+
+The CLI ships a pinned manifest and tarball configuration in its built output.
+The configuration identifies the release tag and source SHA, HTTPS manifest and
+tarball URLs, and their SHA-256 digests. First use downloads into a staging
+area, performs checksum verification before publication, and materializes a
+platform cache under the operating system's cache convention (or
+`LPC_TOOLKIT_CACHE_DIR`). Cache publication is atomic so interrupted downloads
+do not replace a valid release.
+
+`prepareRuntimeAssets` selects assets in this order:
+
+1. A complete working-directory `assets/` tree takes precedence.
+2. Otherwise, the verified platform cache for the pinned release is created or
+   reused.
+3. The working-directory `assets_custom/` tree overlays custom definitions and
+   sprites without replacing the base asset source.
+
+Verified cache reuse requires no network access. Offline first use, a missing
+release, checksum failure, corrupt archive, or incomplete cache produces a
+typed cache error with release and cache-path context; it never silently falls
+back to the read-only submodule.
+
+The `AssetStore` port isolates logical sprite lookup from storage. A complete
+local tree uses `createDirectoryAssetStore`; the managed compressed cache uses
+`createZipAssetStore`, its sprite index, and lazy category ZIP reads. Both stay
+inside `packages/cli/` and supply core through its injected image-loading port.
+
+Production asset resolution uses the local tree or pinned managed cache.
+`upstream/` is read-only provenance and reference material. Upstream parity is
+the sole executable comparison and uses a separate isolated checkout; package
+installation inside the submodule is forbidden.
+
+## Web Catalog Ownership
+
+`packages/web/src/catalog/` owns browser catalog and palette loading,
+normalization, and the merge of generated base definitions with
+`assets_custom/` definitions. Components and hooks consume that normalized
+catalog rather than reading asset files or Vite glob records themselves.
+
 ## Browser and Asset Boundary
 
 Browser/runtime concerns belong in `packages/web`, not in `packages/core`.
@@ -306,6 +352,12 @@ rtk pnpm typecheck
 rtk pnpm test
 rtk pnpm build
 ```
+
+`rtk pnpm check:boundaries` is the executable dependency-policy gate. The CI unit job
+runs it after dependency installation and before typecheck and tests;
+the publish workflow also runs it before packaging or publication. It enforces
+core isolation, presets purity, public-core import ownership, and component
+workflow boundaries without changing runtime behavior.
 
 Target package commands when the change is scoped:
 
