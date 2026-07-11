@@ -136,7 +136,10 @@ Record commit and verification under Task 1.
 - Consumes: CLI release configuration/cache/AssetStore code, web catalog/assets/export code, `assets/CREDITS.csv`, and `scripts/check-boundaries.mjs`.
 - Produces: tested architecture ownership and data-flow documentation.
 
-- [ ] **Step 1: Extend the contract test with architecture assertions**
+- [x] **Step 1: Extend the contract test with architecture assertions**
+  - Implementation: Added three architecture contract cases covering CLI assets, web attribution/catalog ownership, boundaries, and parity isolation.
+  - Commit: `2007830ac`
+  - Verification: RED confirmed, 3 failed / 8 total.
 
 Assert `docs/ARCHITECTURE.md` names all required owners and flows:
 
@@ -146,8 +149,8 @@ for (const phrase of [
   'checksum',
   'platform cache',
   'assets_custom/',
-  'DirectoryAssetStore',
-  'ZipAssetStore',
+  'createDirectoryAssetStore',
+  'createZipAssetStore',
   'packages/web/src/catalog/',
   'ComposedSheet.credits',
   'pnpm check:boundaries',
@@ -158,7 +161,10 @@ for (const phrase of [
 
 Add assertions for working-directory `assets/` precedence; custom overlays; cache creation/reuse/failure behavior; thumbnail exception versus export sidecars; CI boundary role; production pinned/local-cache assets versus read-only provenance submodule and separate parity checkout.
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
+  - Implementation: Ran the focused documentation suite before architecture edits.
+  - Commit: `2007830ac`
+  - Verification: Expected RED, 3 failed / 8 total.
 
 Run:
 
@@ -168,15 +174,24 @@ rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts
 
 Expected: FAIL only for missing/incomplete architecture facts.
 
-- [ ] **Step 3: Document CLI asset lifecycle and stores**
+- [x] **Step 3: Document CLI asset lifecycle and stores**
+  - Implementation: Documented pinned release inputs, checksum/staging/cache behavior, precedence, offline failures, and the actual directory/ZIP store factories.
+  - Commit: `2007830ac`
+  - Verification: Architecture contract PASS.
 
 Add an architecture section describing pinned manifest/tarball configuration, checksum verification before extraction, platform cache creation and atomic reuse, offline behavior and failures, working-directory `assets/` precedence, `assets_custom/` overlays, and directory/ZIP `AssetStore` ownership.
 
-- [ ] **Step 4: Document web catalog, attribution, boundary, and submodule ownership**
+- [x] **Step 4: Document web catalog, attribution, boundary, and submodule ownership**
+  - Implementation: Added catalog normalization ownership, thumbnail/export attribution split, CI boundary role, and isolated parity ownership.
+  - Commit: `2007830ac`
+  - Verification: Architecture contract PASS.
 
 State that `packages/web/src/catalog/` owns browser catalog loading/normalization; picker thumbnails are editor-internal previews without individual sidecars; active composition/export uses `ComposedSheet.credits` and PNG/TXT/CSV bundles; `rtk pnpm check:boundaries` runs in CI; production assets use pinned local/cache materialization while `upstream/` remains read-only provenance/reference and parity uses a separate checkout.
 
-- [ ] **Step 5: Verify and commit Task 2**
+- [x] **Step 5: Verify and commit Task 2**
+  - Implementation: Ran focused docs tests, the real boundary checker, and diff validation before committing.
+  - Commit: `2007830ac`
+  - Verification: Docs 8/8 PASS; boundary checker PASS; `git diff --check` PASS.
 
 Run separately:
 
