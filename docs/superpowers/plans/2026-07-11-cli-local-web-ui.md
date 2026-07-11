@@ -229,7 +229,7 @@ Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- runtime-assets.test.ts
 - Produces: `RunningWebServer` with `url: string`, `close(): Promise<void>`, and `closed: Promise<void>`.
 - Produces: injectable filesystem/browser/listener dependencies so tests never open a real browser.
 
-- [ ] **Step 1: Write failing option and routing tests**
+- [x] **Step 1: Write failing option and routing tests**
 
 Create tests for defaults, valid port `0`, ports `-1`, `65536`, and non-integers; then create temporary Web/cache roots and test:
 
@@ -254,13 +254,13 @@ await running.close();
 
 Also assert hashed static assets receive their MIME type, an extensionless SPA route returns `index.html`, an unknown file returns 404, and each of `/../secret`, `/%2e%2e/secret`, `/zips/../secret`, encoded slash/backslash, NUL, and symlink escape attempts cannot read outside the allowlisted roots.
 
-- [ ] **Step 2: Run the focused test and confirm missing-module failure**
+- [x] **Step 2: Run the focused test and confirm missing-module failure**
 
 Run: `rtk pnpm --filter @lpc-toolkit/cli test -- web-server.test.ts`
 
 Expected: FAIL because `../src/web-server.js` does not exist.
 
-- [ ] **Step 3: Implement validation and safe file resolution**
+- [x] **Step 3: Implement validation and safe file resolution**
 
 Define strict types and helpers in `web-server.ts`:
 
@@ -288,7 +288,7 @@ export function validateWebOptions(input: {
 
 Decode exactly once, reject malformed encoding, NUL, backslash, encoded path separators, `.`/`..` components, and verify `realpath` remains inside its canonical allowlisted root before opening a regular file. Allow only `/zips/<single-file-name>.zip` from `assetsRoot/zips`; do not expose the complete cache root.
 
-- [ ] **Step 4: Implement MIME, SPA fallback, lifecycle, and browser opening**
+- [x] **Step 4: Implement MIME, SPA fallback, lifecycle, and browser opening**
 
 Use `node:http` and stream files. Map `.html`, `.js`, `.css`, `.json`, `.svg`, `.png`, `.woff`, `.woff2`, and `.zip`; default unknown binary extensions to `application/octet-stream`. Set `X-Content-Type-Options: nosniff`.
 
@@ -307,11 +307,11 @@ export function browserCommand(platform: NodeJS.Platform, url: string): {
 
 `startWebServer` resolves only after listening, reports the actual address for port `0`, calls the opener after the listener is healthy, treats opener rejection as a warning callback rather than a fatal server error, and makes `close()` idempotent.
 
-- [ ] **Step 5: Complete lifecycle and opener tests**
+- [x] **Step 5: Complete lifecycle and opener tests**
 
 Test `--no-open`, opener invocation with the final URL, opener rejection warning, port collision (`EADDRINUSE`), close idempotency, and `browserCommand` for darwin/win32/linux. No test may launch a real desktop application.
 
-- [ ] **Step 6: Run focused tests and typecheck**
+- [x] **Step 6: Run focused tests and typecheck**
 
 Run:
 
@@ -322,12 +322,16 @@ rtk pnpm --filter @lpc-toolkit/cli typecheck
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit Task 3**
+- [x] **Step 7: Commit Task 3**
 
 ```sh
 rtk git add packages/cli/src/web-server.ts packages/cli/test/web-server.test.ts
 rtk git commit -m "feat(cli): add local web server"
 ```
+
+Implementation: added the allowlisted cache-backed HTTP server, MIME/SPAfallback handling, safe canonical resolution, browser opening, and lifecycle controls.
+Commit: df23f42bf827dd1580db16478c765409cf573c37; security/lifecycle follow-up: 7c1ee47ed58c73f31a09ba578e119f759e51428a.
+Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- web-server.test.ts` PASS (22 tests); `rtk pnpm --filter @lpc-toolkit/cli typecheck` PASS; `rtk pnpm check:boundaries` PASS.
 
 ### Task 4: Wire the `web` command and process lifecycle
 
