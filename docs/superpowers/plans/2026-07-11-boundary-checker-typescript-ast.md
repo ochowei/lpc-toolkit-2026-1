@@ -268,6 +268,11 @@ RED 4 failed/96 passed, GREEN 100 passed. Full tests pass 953 with 1 skip.
 Ambient/type-only declarations are excluded from runtime bindings and static-block
 `var` scope is isolated. Checker, typecheck, diff, and scope audit pass.
 
+Namespace-preorder implementation `0b49bfde22813f278c5856c5841b55bf1bfe486d`:
+RED 3 failed/100 passed, GREEN 103 passed. Full tests pass 956 with 1 skip.
+Namespace imports are precollected and emitted enum/value-namespace bindings are
+recognized. Checker, typecheck, diff, and scope audit pass.
+
 ---
 
 ### Task 3: Full Verification and Plan 5 Closure Evidence

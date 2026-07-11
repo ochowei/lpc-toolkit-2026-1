@@ -64,6 +64,16 @@
 - Ambient declarations and type-only imports do not create runtime bindings;
   class static blocks own but do not leak their function-scoped `var` bindings.
 
+## Namespace Preorder and Emitted Declarations
+
+- Implementation: `0b49bfde22813f278c5856c5841b55bf1bfe486d`.
+- RED focused: 3 failed, 100 passed (103 total).
+- GREEN focused: PASS (2 files, 103 tests).
+- Full tests: PASS (108 files, 956 passed, 1 skipped).
+- Checker, recursive typecheck, diff check, and scope audit: PASS.
+- Core namespace imports are precollected independent of AST order; emitted enums
+  and non-ambient value namespaces count as runtime bindings.
+
 ## Second Review Fixes
 
 - Fix commit: `a4d181ff40960b7c44db5c94d44cf101b7b0cf98`

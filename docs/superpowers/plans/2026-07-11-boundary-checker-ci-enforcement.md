@@ -578,6 +578,9 @@ loop-RHS globals, function-scoped `var`, and dynamic-core element ownership.
 Final binding fix `9dd79723e34d9108a1692b858869a3c61b8ff2bc` passes 100
 focused and 953 full-suite tests with 1 skip, covering ambient declarations,
 type-only imports, and class static-block `var` isolation.
+Namespace-preorder fix `0b49bfde22813f278c5856c5841b55bf1bfe486d`
+passes 103 focused and 956 full-suite tests with 1 skip, including emitted enum
+and non-ambient value-namespace runtime bindings.
 
 ## Final Acceptance Criteria
 
