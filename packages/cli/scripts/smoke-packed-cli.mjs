@@ -146,7 +146,18 @@ try {
   const installedBinTarget = installedPackageJson.bin?.['lpc-toolkit'];
   assert.equal(typeof installedBinTarget, 'string', 'installed package is missing its bin target');
   const installedBinTargetPath = path.resolve(installedPackageRoot, installedBinTarget);
-  const helpOutput = execFileSync(installedBinPath, ['--help'], {
+  assert.ok(
+    existsSync(installedBinTargetPath),
+    `installed bin target is missing at ${installedBinTargetPath}`,
+  );
+  const helpInvocation = installedCliInvocation({
+    platform: process.platform,
+    nodePath: process.execPath,
+    shimPath: installedBinPath,
+    targetPath: installedBinTargetPath,
+    args: ['--help'],
+  });
+  const helpOutput = execFileSync(helpInvocation.command, helpInvocation.args, {
     encoding: 'utf8',
   });
   assert.match(helpOutput, /lpc-toolkit catalog types/u);
