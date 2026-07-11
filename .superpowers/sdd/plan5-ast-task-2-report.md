@@ -40,6 +40,9 @@
 - Boundary checker, recursive typecheck, diff check: PASS.
 - Added namespace/export-star ownership, wrapped and constant element access,
   loop-RHS identity, binding-aware runtime globals, and import-equals modules.
+- Namespace identity follow-up: `1d3dfe8824853eacafe371355142b0d97cd5f7a4`.
+  RED: 1 failed, 89 passed; GREEN: 90 passed. Final full tests: 943 passed,
+  1 skipped. Local bindings that shadow a core namespace import are legal.
 
 ## Second Review Fixes
 

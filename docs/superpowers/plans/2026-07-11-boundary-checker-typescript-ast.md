@@ -254,6 +254,10 @@ identity, binding-aware runtime globals, and import-equals collection. RED: 9 fa
 80 passed. GREEN: 89 passed. Full tests: 942 passed, 1 skipped; checker, recursive
 typecheck, and diff check PASS.
 
+Namespace binding-identity follow-up `1d3dfe8824853eacafe371355142b0d97cd5f7a4`:
+RED 1 failed/89 passed, GREEN 90 passed. Final full tests pass 943 with 1 skip;
+namespace property ownership now resolves through lexical shadowing.
+
 ---
 
 ### Task 3: Full Verification and Plan 5 Closure Evidence

@@ -570,6 +570,8 @@ Final branch-review correction `caddd1fa5569f1698bc67119f3977d3e1351dd05`
 expanded AST binding and module ownership coverage. Focused tests pass 89/89;
 full workspace tests pass 942 with 1 intentional skip; checker, recursive
 typecheck, and diff check pass. Independent final review remains pending.
+Namespace identity follow-up `1d3dfe8824853eacafe371355142b0d97cd5f7a4`
+passes 90 focused tests and 943 full-suite tests with 1 intentional skip.
 
 ## Final Acceptance Criteria
 
