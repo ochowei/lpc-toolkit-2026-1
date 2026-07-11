@@ -377,4 +377,84 @@ export const commented = import(\`prefix-\${/* example */ '@lpc-toolkit/cli'}\`)
       expect(result.output).toContain('../../core/src/compose');
     }
   });
+
+  it('allows components to import hooks, UI components, and public core types', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(
+      root,
+      'packages/web/src/components/legal.tsx',
+      `import type {
+  CanvasAdapter as Adapter,
+} from '@lpc-toolkit/core';
+import { useCatalog } from '../hooks/use-catalog';
+import { Button } from './ui/button';
+export type ComponentAdapter = Adapter;
+export { Button, useCatalog };
+`,
+    );
+
+    expect(runBoundaryCheck(root)).toEqual({
+      ok: true,
+      stdout: 'Architecture boundary check passed.\n',
+    });
+  });
+
+  it('ignores component ownership words in comments, strings, and template text', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(
+      root,
+      'packages/web/src/components/legal-words.tsx',
+      `// import { composeSelections } from '@lpc-toolkit/core';
+export const note = "composeSelections from '../lib/zip-export'";
+export const example = \`import { composeSelections } from '@lpc-toolkit/core'\`;
+`,
+    );
+
+    expect(runBoundaryCheck(root)).toEqual({
+      ok: true,
+      stdout: 'Architecture boundary check passed.\n',
+    });
+  });
+
+  it.each([
+    [
+      'core composition',
+      "import { composeSelections as compose } from '@lpc-toolkit/core';\nexport { compose };",
+      'composeSelections',
+    ],
+    [
+      'multiline core composition',
+      "import {\n  type CanvasAdapter,\n  composeSelections as compose,\n} from '@lpc-toolkit/core';\nexport { compose };",
+      'composeSelections',
+    ],
+    [
+      'browser adapter',
+      "import { createBrowserCanvasAdapter } from '../adapter/browser-canvas-adapter';",
+      'browser-canvas-adapter',
+    ],
+    [
+      'character export workflow',
+      "import { exportCharacterArtifact } from '../lib/character-export';",
+      'character-export',
+    ],
+    [
+      'spritesheet export workflow',
+      "import { exportSpritesheetBundle } from '../lib/spritesheet-export';",
+      'spritesheet-export',
+    ],
+    [
+      'ZIP export workflow',
+      "import { exportByFrameZip } from '../lib/zip-export';",
+      'zip-export',
+    ],
+  ])('rejects component-owned %s', (_name, source, expected) => {
+    const root = makeRepoFixture();
+    writeFixtureFile(root, 'packages/web/src/components/leak.tsx', source);
+    expectBoundaryFailure(
+      root,
+      'forbidden web component import',
+      expected,
+      'packages/web/src/components/leak.tsx',
+    );
+  });
 });

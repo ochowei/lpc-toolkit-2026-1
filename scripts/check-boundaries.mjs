@@ -62,7 +62,7 @@ function stripCommentsAndStrings(source) {
     .replace(/(['"`])(?:\\[\s\S]|(?!\1)[\s\S])*?\1/g, '');
 }
 
-function importSpecifiers(source) {
+function sourceTokens(source) {
   const tokens = [];
 
   function tokenizeTemplate(start) {
@@ -98,7 +98,10 @@ function importSpecifiers(source) {
       const char = source[index];
       const next = source[index + 1];
 
-      if (terminator && char === terminator) return index + 1;
+      if (terminator && char === terminator) {
+        tokens.push({ kind: 'punctuation', value: char });
+        return index + 1;
+      }
 
       if (/\s/.test(char)) {
         index += 1;
@@ -143,6 +146,7 @@ function importSpecifiers(source) {
       }
 
       if (char === '{') {
+        tokens.push({ kind: 'punctuation', value: char });
         index = tokenizeCode(index + 1, '}');
         continue;
       }
@@ -154,6 +158,11 @@ function importSpecifiers(source) {
   }
 
   tokenizeCode(0, null);
+  return tokens;
+}
+
+function importSpecifiers(source) {
+  const tokens = sourceTokens(source);
 
   const specifiers = [];
   for (let index = 0; index < tokens.length; index += 1) {
@@ -196,6 +205,46 @@ function importSpecifiers(source) {
   }
 
   return specifiers;
+}
+
+function staticImports(source) {
+  const tokens = sourceTokens(source);
+  const imports = [];
+
+  for (let index = 0; index < tokens.length; index += 1) {
+    if (tokens[index].kind !== 'word' || tokens[index].value !== 'import') continue;
+    if (tokens[index + 1]?.value === '.' || tokens[index + 1]?.value === '(') continue;
+
+    let openBrace = -1;
+    let closeBrace = -1;
+    let specifier = null;
+    for (let cursor = index + 1; cursor < tokens.length; cursor += 1) {
+      const token = tokens[cursor];
+      if (token.value === ';') break;
+      if (token.value === '{' && openBrace === -1) openBrace = cursor;
+      if (token.value === '}' && openBrace !== -1) closeBrace = cursor;
+      if (token.kind === 'string') {
+        specifier = token.value;
+        break;
+      }
+    }
+
+    if (!specifier) continue;
+    const names = [];
+    if (openBrace !== -1 && closeBrace > openBrace) {
+      for (let cursor = openBrace + 1; cursor < closeBrace; cursor += 1) {
+        const token = tokens[cursor];
+        if (token.kind !== 'word' || token.value === 'type') continue;
+        names.push(token.value);
+        while (tokens[cursor + 1]?.kind === 'word' && tokens[cursor + 1].value === 'as') {
+          cursor += 2;
+        }
+      }
+    }
+    imports.push({ specifier, names });
+  }
+
+  return imports;
 }
 
 function resolveImport(filePath, specifier) {
@@ -275,6 +324,38 @@ function checkWebFile({ issues, root, coreSrc, filePath }) {
   }
 }
 
+function extensionless(filePath) {
+  const extension = path.extname(filePath);
+  return sourceExtensions.has(extension) ? filePath.slice(0, -extension.length) : filePath;
+}
+
+function checkWebComponentFile({ issues, root, webSrc, filePath }) {
+  const source = readFileSync(filePath, 'utf8');
+  const forbiddenModules = new Set([
+    path.join(webSrc, 'adapter/browser-canvas-adapter'),
+    path.join(webSrc, 'lib/character-export'),
+    path.join(webSrc, 'lib/spritesheet-export'),
+    path.join(webSrc, 'lib/zip-export'),
+  ]);
+
+  for (const imported of staticImports(source)) {
+    const resolved = resolveImport(filePath, imported.specifier);
+    const importsComposition =
+      imported.specifier === '@lpc-toolkit/core' &&
+      imported.names.includes('composeSelections');
+    if (importsComposition || (resolved && forbiddenModules.has(extensionless(resolved)))) {
+      addIssue(
+        issues,
+        root,
+        filePath,
+        `forbidden web component import "${
+          importsComposition ? 'composeSelections' : imported.specifier
+        }"`,
+      );
+    }
+  }
+}
+
 function checkPresetsFile({ issues, root, webSrc, cliSrc, filePath }) {
   const source = readFileSync(filePath, 'utf8');
 
@@ -314,6 +395,7 @@ function checkBoundaries(root) {
   const coreSrc = path.join(root, 'packages/core/src');
   const presetsSrc = path.join(root, 'packages/presets/src');
   const webSrc = path.join(root, 'packages/web/src');
+  const webComponents = path.join(webSrc, 'components');
   const cliSrc = path.join(root, 'packages/cli/src');
   const issues = [];
 
@@ -327,6 +409,9 @@ function checkBoundaries(root) {
 
   for (const filePath of sourceFiles(webSrc)) {
     checkWebFile({ issues, root, coreSrc, filePath });
+    if (isInside(filePath, webComponents)) {
+      checkWebComponentFile({ issues, root, webSrc, filePath });
+    }
   }
 
   return issues;
