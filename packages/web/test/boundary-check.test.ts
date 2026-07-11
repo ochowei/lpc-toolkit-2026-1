@@ -665,6 +665,21 @@ export const example = \`import { composeSelections } from '@lpc-toolkit/core'\`
     expectBoundaryFailure(root, 'forbidden web component import', 'composeSelections', 'packages/web/src/components/ownership-leak.tsx');
   });
 
+  it('allows a local binding to shadow a core namespace import', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(
+      root,
+      'packages/web/src/components/legal-namespace-shadow.tsx',
+      `import * as core from '@lpc-toolkit/core';
+export function legal(core) { return core.composeSelections; }
+`,
+    );
+    expect(runBoundaryCheck(root)).toEqual({
+      ok: true,
+      stdout: 'Architecture boundary check passed.\n',
+    });
+  });
+
   it('allows composition property access in a dynamic import rejection callback', () => {
     const root = makeRepoFixture();
     writeFixtureFile(

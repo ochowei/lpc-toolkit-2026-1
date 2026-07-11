@@ -247,6 +247,13 @@ function referenceResolvesToParameter(reference, callback, identifier) {
   return true;
 }
 
+function referenceResolvesToNamespaceImport(reference, identifier) {
+  for (let current = reference.parent; current && !ts.isSourceFile(current); current = current.parent) {
+    if (scopeShadowsReference(current, null, identifier)) return false;
+  }
+  return true;
+}
+
 function modulePropertyReference(node) {
   if (ts.isPropertyAccessExpression(node) && node.name.text === 'composeSelections') {
     const receiver = unwrapExpression(node.expression);
@@ -318,7 +325,8 @@ function importsCoreCompose(sourceFile) {
       return;
     }
     const receiver = modulePropertyReference(node);
-    if (receiver && namespaceBindings.has(receiver.text)) {
+    if (receiver && namespaceBindings.has(receiver.text) &&
+        referenceResolvesToNamespaceImport(receiver, receiver.text)) {
       found = true;
       return;
     }
