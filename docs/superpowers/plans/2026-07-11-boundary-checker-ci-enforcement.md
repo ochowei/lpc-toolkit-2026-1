@@ -43,7 +43,7 @@
 - Package matching is boundary-aware: `@lpc-toolkit/presets` and `@lpc-toolkit/presets/...` match, while unrelated names containing that text do not.
 - Existing exported `checkBoundaries(root): string[]` and CLI output remain unchanged.
 
-- [ ] **Step 1: Add legal core and table-driven illegal fixtures**
+- [x] **Step 1: Add legal core and table-driven illegal fixtures**
 
 Extend `makeRepoFixture` to create `packages/presets/src/index.ts` and `packages/cli/src/index.ts`. Add a legal core file importing a local core type. Add table tests for public and relative package leaks:
 
@@ -66,13 +66,13 @@ it.each([
 
 Retain existing illegal browser-global and Node-import tests as the illegal fixtures for those categories. Add a passing fixture containing the words `document`, `react`, and `node:fs` only in comments/strings to prove they do not trigger generic-word checks.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 Run: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/boundary-check.test.ts`
 
 Expected: new presets/CLI package and relative-source cases FAIL because current core rules do not cover them.
 
-- [ ] **Step 3: Add package-prefix and directory rules**
+- [x] **Step 3: Add package-prefix and directory rules**
 
 Add a boundary-aware helper:
 
@@ -84,7 +84,7 @@ function isPackageImport(specifier, packageName) {
 
 Pass `presetsSrc` and `cliSrc` to `checkCoreFile`. Reject when a specifier matches any forbidden workspace package or its resolved relative target is inside those source directories. Keep existing React, Node built-in, canvas, web, and runtime-global checks intact.
 
-- [ ] **Step 4: Run focused tests and checker**
+- [x] **Step 4: Run focused tests and checker**
 
 Run:
 
@@ -96,7 +96,7 @@ rtk git diff --check
 
 Expected: PASS; real core source has no new violations.
 
-- [ ] **Step 5: Commit Task 1**
+- [x] **Step 5: Commit Task 1**
 
 ```bash
 rtk git add scripts/check-boundaries.mjs packages/web/test/boundary-check.test.ts
@@ -104,6 +104,14 @@ rtk git commit -m "test(boundaries): enforce complete core isolation"
 ```
 
 After review, check the task and record implementation note, full commit hash, and verification.
+
+Implementation note: Added boundary-aware workspace package matching for presets,
+web, and CLI plus resolved relative-source checks, with legal local-core,
+comments/strings, and unrelated-package-name fixtures protecting false positives.
+
+- Commit: `04b11c0ede38ebb4518109ebbb9c288421a0e1f4`
+- Verification: RED focused Vitest (`5 failed, 9 passed`); GREEN focused Vitest
+  (`14 passed`); repository boundaries PASS; `git diff --check` PASS.
 
 ## Task 2: Enforce presets purity
 
