@@ -225,6 +225,17 @@ invalid TypeScript and correctly triggered the new fail-closed diagnostic.
 - Verification: focused tests PASS (2 files, 72 tests); boundary checker PASS;
   recursive workspace typecheck PASS (4 projects); `git diff --check` PASS
 
+Review-fix note: Added RED fixtures for nested callback-parameter shadowing,
+rejection callbacks, type-only composition imports/re-exports, and noncomputed
+destructuring keys. RED was 4 failed and 72 passed; after making callback ownership
+scope-aware, limiting `.then()` analysis to its fulfillment callback, honoring
+TypeScript `isTypeOnly` flags, and excluding binding property keys from executable
+global references, GREEN was 76 passed.
+
+- Review-fix commit: 3b65c6a95a9f81071248cc5c9df72377a299eb89
+- Review-fix verification: focused tests PASS (2 files, 76 tests); boundary checker
+  PASS; recursive workspace typecheck PASS (4 projects); `git diff --check` PASS
+
 ---
 
 ### Task 3: Full Verification and Plan 5 Closure Evidence
