@@ -135,6 +135,38 @@ describe('architecture boundary check', () => {
     });
   });
 
+  it('ignores complete import syntax in comments, strings, and template text', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(
+      root,
+      'packages/core/src/import-examples.ts',
+      `// import React from 'react';
+export const example = "import '@lpc-toolkit/cli'";
+`,
+    );
+    writeFixtureFile(
+      root,
+      'packages/presets/src/import-examples.ts',
+      `// import '@lpc-toolkit/web';
+/* import React from 'react'; */
+export const example = "import '@lpc-toolkit/cli'";
+export const template = \`export { download } from '@lpc-toolkit/web';\`;
+`,
+    );
+    writeFixtureFile(
+      root,
+      'packages/web/src/import-examples.ts',
+      `/* import value from '../../core/src/index'; */
+export const template = \`import('@lpc-toolkit/core/internal')\`;
+`,
+    );
+
+    expect(runBoundaryCheck(root)).toEqual({
+      ok: true,
+      stdout: 'Architecture boundary check passed.\n',
+    });
+  });
+
   it.each([
     ['web package', "import '@lpc-toolkit/web';", '@lpc-toolkit/web'],
     ['web source', "import '../../web/src/lib/download';", '../../web/src/lib/download'],
@@ -146,6 +178,18 @@ describe('architecture boundary check', () => {
     ['bare Node filesystem', "import { readFileSync } from 'fs';", 'fs'],
     ['bare Node filesystem promises', "import { readFile } from 'fs/promises';", 'fs/promises'],
     ['concrete canvas', "import { createCanvas } from '@napi-rs/canvas';", '@napi-rs/canvas'],
+    ['dynamic web import', "export const load = import('@lpc-toolkit/web');", '@lpc-toolkit/web'],
+    [
+      'dynamic web import in a template expression',
+      "export const load = `${import('@lpc-toolkit/web')}`;",
+      '@lpc-toolkit/web',
+    ],
+    ['web export-from', "export { download } from '@lpc-toolkit/web';", '@lpc-toolkit/web'],
+    [
+      'multiline named web import',
+      "import {\n  download,\n} from '@lpc-toolkit/web';",
+      '@lpc-toolkit/web',
+    ],
   ])('rejects presets dependency on %s', (_name, source, expected) => {
     const root = makeRepoFixture();
     writeFixtureFile(root, 'packages/presets/src/leak.ts', source);

@@ -63,16 +63,122 @@ function stripCommentsAndStrings(source) {
 }
 
 function importSpecifiers(source) {
-  const specifiers = [];
-  const patterns = [
-    /\bimport\s+(?:[\s\S]*?\s+from\s*)?['"]([^'"]+)['"]/g,
-    /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
-    /\bexport\s+(?:[\s\S]*?\s+from\s*)['"]([^'"]+)['"]/g,
-  ];
+  const tokens = [];
 
-  for (const pattern of patterns) {
-    for (const match of source.matchAll(pattern)) {
-      specifiers.push(match[1]);
+  function tokenizeTemplate(start) {
+    let index = start;
+    while (index < source.length) {
+      if (source[index] === '\\') {
+        index += 2;
+      } else if (source[index] === '`') {
+        return index + 1;
+      } else if (source[index] === '$' && source[index + 1] === '{') {
+        index = tokenizeCode(index + 2, '}');
+      } else {
+        index += 1;
+      }
+    }
+    return index;
+  }
+
+  function tokenizeCode(start, terminator) {
+    let index = start;
+    while (index < source.length) {
+      const char = source[index];
+      const next = source[index + 1];
+
+      if (terminator && char === terminator) return index + 1;
+
+      if (/\s/.test(char)) {
+        index += 1;
+        continue;
+      }
+
+      if (char === '/' && next === '/') {
+        index = source.indexOf('\n', index + 2);
+        if (index === -1) return source.length;
+        continue;
+      }
+
+      if (char === '/' && next === '*') {
+        const end = source.indexOf('*/', index + 2);
+        index = end === -1 ? source.length : end + 2;
+        continue;
+      }
+
+      if (char === '`') {
+        index = tokenizeTemplate(index + 1);
+        continue;
+      }
+
+      if (char === "'" || char === '"') {
+        const quote = char;
+        const stringStart = index + 1;
+        index += 1;
+        while (index < source.length && source[index] !== quote) {
+          index += source[index] === '\\' ? 2 : 1;
+        }
+        tokens.push({ kind: 'string', value: source.slice(stringStart, index) });
+        index += 1;
+        continue;
+      }
+
+      if (/[A-Za-z_$]/.test(char)) {
+        const wordStart = index;
+        index += 1;
+        while (index < source.length && /[\w$]/.test(source[index])) index += 1;
+        tokens.push({ kind: 'word', value: source.slice(wordStart, index) });
+        continue;
+      }
+
+      if (char === '{') {
+        index = tokenizeCode(index + 1, '}');
+        continue;
+      }
+
+      tokens.push({ kind: 'punctuation', value: char });
+      index += 1;
+    }
+    return index;
+  }
+
+  tokenizeCode(0, null);
+
+  const specifiers = [];
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index];
+
+    if (token.kind === 'word' && token.value === 'import') {
+      const nextToken = tokens[index + 1];
+      if (nextToken?.value === '.') continue;
+      if (nextToken?.value === '(' && tokens[index + 2]?.kind === 'string') {
+        specifiers.push(tokens[index + 2].value);
+        continue;
+      }
+
+      for (let cursor = index + 1; cursor < tokens.length; cursor += 1) {
+        const candidate = tokens[cursor];
+        if (candidate.value === ';') break;
+        if (candidate.kind === 'string') {
+          specifiers.push(candidate.value);
+          break;
+        }
+      }
+    }
+
+    if (token.kind === 'word' && token.value === 'export') {
+      for (let cursor = index + 1; cursor < tokens.length; cursor += 1) {
+        const candidate = tokens[cursor];
+        if (candidate.value === ';') break;
+        if (
+          candidate.kind === 'word' &&
+          candidate.value === 'from' &&
+          tokens[cursor + 1]?.kind === 'string'
+        ) {
+          specifiers.push(tokens[cursor + 1].value);
+          break;
+        }
+      }
     }
   }
 
@@ -156,7 +262,7 @@ function checkWebFile({ issues, root, coreSrc, filePath }) {
   }
 }
 
-function checkPresetsFile({ issues, root, presetsSrc, webSrc, cliSrc, filePath }) {
+function checkPresetsFile({ issues, root, webSrc, cliSrc, filePath }) {
   const source = readFileSync(filePath, 'utf8');
 
   for (const specifier of importSpecifiers(source)) {
@@ -203,7 +309,7 @@ function checkBoundaries(root) {
   }
 
   for (const filePath of sourceFiles(presetsSrc)) {
-    checkPresetsFile({ issues, root, presetsSrc, webSrc, cliSrc, filePath });
+    checkPresetsFile({ issues, root, webSrc, cliSrc, filePath });
   }
 
   for (const filePath of sourceFiles(webSrc)) {
