@@ -215,7 +215,7 @@ commands for:
 
 Node.js 22 or newer is required. Install the public CLI package from npm:
 
-The current public package contract is `@lpc-toolkit/cli` version `0.1.1`.
+The current public package contract is `@lpc-toolkit/cli` version `0.1.2`.
 
 ```bash
 npm install -g @lpc-toolkit/cli
@@ -246,7 +246,7 @@ pnpm --filter @lpc-toolkit/cli build
 node packages/cli/dist/index.js --help
 pnpm --filter @lpc-toolkit/cli test:package
 pnpm --filter @lpc-toolkit/cli pack --pack-destination /tmp
-pnpm add -g /tmp/lpc-toolkit-cli-0.1.1.tgz
+pnpm add -g /tmp/lpc-toolkit-cli-0.1.2.tgz
 lpc-toolkit --help
 ```
 
