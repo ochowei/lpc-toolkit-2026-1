@@ -554,6 +554,16 @@ left-hand side instead of scanning until the next semicolon.
   focused boundary/workflow Vitest (`70 passed`); repository boundary checker
   PASS; recursive workspace typecheck PASS; `git diff --check` PASS.
 
+AST correction closure note: The TypeScript-AST replacement and its review
+fixes are complete through `a4d181ff40960b7c44db5c94d44cf101b7b0cf98`.
+Fresh focused verification passed `79/79` tests (`71` boundary and `8`
+workflow/package tests). Full workspace verification passed `108` files with
+`932` tests passed and `1` intentional skip; the boundary checker, recursive
+four-project typecheck, and `git diff --check` all passed. The scope audit from
+`894277f67` found only checker, boundary-test, and plan/evidence changes, with
+no manifest, lockfile, runtime source, asset, or `upstream/` changes. Independent
+final AST review remains pending and is not recorded as PASS.
+
 ## Final Acceptance Criteria
 
 - Core imports from presets, web, CLI, React, Node runtime, and concrete canvas fail; core browser globals fail.

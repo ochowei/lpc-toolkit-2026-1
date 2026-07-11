@@ -261,7 +261,7 @@ function/class scopes. GREEN was 79 passed.
 - Consumes: the completed AST checker and all workspace test suites.
 - Produces: objective completion evidence for the AST correction and Plan 5 final review.
 
-- [ ] **Step 1: Run the full project verification**
+- [x] **Step 1: Run the full project verification**
 
 Run separately:
 
@@ -274,7 +274,13 @@ rtk git diff --check
 
 Expected: every command exits `0`; the full test output has no failed test files or tests. Preserve known intentional skips as reported rather than converting them to passes.
 
-- [ ] **Step 2: Audit scope**
+Implementation note: Fresh full verification passed `108` test files with
+`932` tests passed and `1` intentional CLI asset-store test skipped. The first
+sandboxed test attempt was denied when `tsx` tried to create its IPC socket;
+the required out-of-sandbox rerun exited `0`. The boundary checker passed,
+recursive typecheck passed for all four projects, and `git diff --check` passed.
+
+- [x] **Step 2: Audit scope**
 
 Run:
 
@@ -285,7 +291,13 @@ rtk git status --short
 
 Expected: implementation changes are limited to the checker, boundary tests, plan/evidence files; no manifest, lockfile, runtime source, asset, or `upstream/` changes. Preserve `docs/README-ARCHITECTURE-AUDIT.tmp.md` as an untracked user file.
 
-- [ ] **Step 3: Record closure evidence**
+Implementation note: The `894277f67..HEAD` audit listed only
+`.superpowers/sdd/plan5-ast-task-2-report.md`, this AST plan,
+`packages/web/test/boundary-check.test.ts`, and
+`scripts/check-boundaries.mjs`. No manifest, lockfile, runtime source, asset,
+or `upstream/` path changed. The untracked user audit file remained untouched.
+
+- [x] **Step 3: Record closure evidence**
 
 In `.superpowers/sdd/plan5-ast-final-report.md`, record:
 
@@ -302,6 +314,11 @@ In `.superpowers/sdd/plan5-ast-final-report.md`, record:
 ```
 
 Update both plan documents with implementation notes, commit hashes, and verification status. Do not claim final review PASS until the independent reviewer returns no Critical or Important issues.
+
+Implementation note: Fresh focused verification passed `2` files and all
+`79` tests (`71` boundary fixtures and `8` workflow/package contracts). Closure
+evidence is recorded in `.superpowers/sdd/plan5-ast-final-report.md`. Final
+review remains pending.
 
 - [ ] **Step 4: Commit verification evidence**
 
