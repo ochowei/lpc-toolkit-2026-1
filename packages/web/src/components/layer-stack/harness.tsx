@@ -52,9 +52,9 @@ import {
 import { Button } from '../ui/button';
 import { useSingleItemComposer } from '../../hooks/use-single-item-composer';
 import { useCustomOverlay } from '../../hooks/use-custom-overlay';
+import { useCharacterExport } from '../../hooks/use-character-export';
 import { toSelections } from '../../slice/selection';
 import { buildUpstreamUrl } from '../../lib/upstream-url';
-import type { ZipExportKind } from '../../lib/zip-export';
 import {
   MobileBottomNav,
   type MobileView,
@@ -186,11 +186,6 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     dragSidebarWidth ?? preferredSidebarWidth,
     renderedSidebarMax,
   );
-
-  const [zipRunning, setZipRunning] = useState<null | {
-    kind: ZipExportKind;
-    progress: number;
-  }>(null);
 
   useEffect(() => {
     if (!isDesktop) {
@@ -373,6 +368,19 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
       },
     };
   }, [composeResult, emptyDownloadCreditsProbeEnabled]);
+  const characterExport = useCharacterExport({
+    result: downloadResult,
+    anim: props.state.anim,
+    selections: toSelections(props.state),
+    catalog: props.catalog,
+    composeSingleItem,
+    composeSingleItemLayer,
+    customOverlay: customOverlayState.overlay,
+    tl: props.tl,
+    t: props.t,
+    setOpen: (open) => setPopover(open ? 'download' : null),
+    onStatus: setStatus,
+  });
   const canonicalHash = useMemo(
     () => serializeHash(toSelections(props.state)),
     [props.state.bodyType, props.state.selections],
@@ -612,18 +620,14 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
         <DownloadPopover
           open={popover === 'download'}
           setOpen={(v) => setPopover(v ? 'download' : null)}
-          result={downloadResult}
-          anim={props.state.anim}
-          selections={toSelections(props.state)}
-          catalog={props.catalog}
-          composeSingleItem={composeSingleItem}
-          composeSingleItemLayer={composeSingleItemLayer}
-          customOverlay={customOverlayState.overlay}
-          zipRunning={zipRunning}
-          setZipRunning={setZipRunning}
+          disabled={characterExport.disabled}
+          disabledReason={props.t(characterExport.disabledReasonKey)}
+          running={characterExport.running}
+          onBundle={() => void characterExport.downloadBundle()}
+          onCreditsTxt={() => void characterExport.downloadCreditsTxt()}
+          onCreditsCsv={() => void characterExport.downloadCreditsCsv()}
+          onZip={(kind) => void characterExport.downloadZip(kind)}
           t={props.t}
-          tl={props.tl}
-          onStatus={(s) => setStatus(s)}
         />
         <Button
           size="sm"

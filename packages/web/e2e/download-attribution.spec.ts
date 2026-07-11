@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import JSZip from 'jszip';
 import { assertExportableCredits } from '../src/lib/spritesheet-export';
-import { downloadErrorTranslationKey } from '../src/components/layer-stack/popovers/download-popover';
+import { downloadErrorTranslationKey } from '../src/hooks/use-character-export';
 
 test('maps the shared empty-credit guard to localized download copy', () => {
   let guardError: unknown;

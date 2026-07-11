@@ -1,40 +1,10 @@
-import type {
-  Catalog,
-  ComposedSheet,
-  Selections,
-} from '@lpc-toolkit/core';
 import { Button } from '../../ui/button';
 import { usePopover } from './use-popover';
-import type { ZipExportKind } from '../../../lib/zip-export';
-import type { LabelTranslator, Translator } from '../../../i18n';
-import type { ComposedResult } from '../../../hooks/use-composed-character';
-import type { CustomOverlay } from '../../../lib/custom-overlay';
-import {
-  isMissingCreditsError,
-} from '../../../lib/spritesheet-export';
-import {
-  exportCharacterArtifact,
-  type CharacterExportInput,
-} from '../../../lib/character-export';
-
-/** Map export failures to user-facing copy without exposing implementation errors. */
-export function downloadErrorTranslationKey(
-  error: unknown,
-): 'download.noCredits' | 'download.failed' {
-  return isMissingCreditsError(error)
-    ? 'download.noCredits'
-    : 'download.failed';
-}
-
-/** Expose exports only after composition has settled for the current inputs. */
-export function readyDownloadSheet(result: ComposedResult): ComposedSheet | null {
-  return result.status === 'ready' ? result.sheet : null;
-}
-
-interface ZipRunning {
-  kind: ZipExportKind;
-  progress: number;
-}
+import type { Translator } from '../../../i18n';
+import type {
+  ExportRunningState,
+  ZipExportKind,
+} from '../../../hooks/use-character-export';
 
 const DOWNLOAD_POPOVER_WIDTH = 288;
 const VIEWPORT_GUTTER = 12;
@@ -48,117 +18,32 @@ function clampDownloadPopoverLeft(left: number): number {
 
 interface Props {
   open: boolean;
-  setOpen: (v: boolean) => void;
-  result: ComposedResult;
-  anim: string;
-  selections: Selections;
-  catalog: Catalog;
-  composeSingleItem: (s: Selections) => Promise<ComposedSheet>;
-  composeSingleItemLayer: (
-    s: Selections,
-    layerNumber: number,
-  ) => Promise<ComposedSheet>;
-  customOverlay: CustomOverlay | null;
-  zipRunning: ZipRunning | null;
-  setZipRunning: (r: ZipRunning | null) => void;
+  setOpen: (value: boolean) => void;
+  disabled: boolean;
+  disabledReason: string;
+  running: ExportRunningState | null;
+  onBundle: () => void;
+  onCreditsTxt: () => void;
+  onCreditsCsv: () => void;
+  onZip: (kind: ZipExportKind) => void;
   t: Translator;
-  tl: LabelTranslator;
-  onStatus: (status: { kind: 'info' | 'error'; text: string }) => void;
 }
 
 /** Download menu for composed PNGs, attribution files, and ZIP export layouts. */
 export function DownloadPopover({
   open,
   setOpen,
-  result,
-  anim,
-  selections,
-  catalog,
-  composeSingleItem,
-  composeSingleItemLayer,
-  customOverlay,
-  zipRunning,
-  setZipRunning,
+  disabled,
+  disabledReason,
+  running,
+  onBundle,
+  onCreditsTxt,
+  onCreditsCsv,
+  onZip,
   t,
-  tl,
-  onStatus,
 }: Props) {
   const { anchorRef, panelRef, pos } = usePopover(open, () => setOpen(false));
-  const sheet = readyDownloadSheet(result);
-  const disabled = sheet === null;
-  const disabledReason =
-    result.status === 'error' ? t('download.failed') : t('download.loading');
-  const zipDisabled = disabled || zipRunning !== null;
-
-  const exportInput = (readySheet: ComposedSheet): CharacterExportInput => ({
-    sheet: readySheet,
-    selections,
-    catalog,
-    anim,
-    composeSingleItem,
-    composeSingleItemLayer,
-    customOverlay,
-    itemLabel: (item) => tl.catalogItemName(item),
-  });
-
-  const handleBundle = async () => {
-    if (!sheet) return;
-    const frozenSheet = sheet;
-    const frozenAnim = anim;
-    try {
-      await exportCharacterArtifact('bundle', {
-        ...exportInput(frozenSheet),
-        anim: frozenAnim,
-      });
-      onStatus({ kind: 'info', text: t('download.done') });
-      setOpen(false);
-    } catch (error) {
-      console.error('Spritesheet bundle export failed:', error);
-      onStatus({ kind: 'error', text: t(downloadErrorTranslationKey(error)) });
-    }
-  };
-
-  const handleTxt = async () => {
-    if (!sheet) return;
-    try {
-      await exportCharacterArtifact('creditsTxt', exportInput(sheet));
-      onStatus({ kind: 'info', text: t('download.done') });
-      setOpen(false);
-    } catch (error) {
-      console.error('TXT credits export failed:', error);
-      onStatus({ kind: 'error', text: t(downloadErrorTranslationKey(error)) });
-    }
-  };
-
-  const handleCsv = async () => {
-    if (!sheet) return;
-    try {
-      await exportCharacterArtifact('creditsCsv', exportInput(sheet));
-      onStatus({ kind: 'info', text: t('download.done') });
-      setOpen(false);
-    } catch (error) {
-      console.error('CSV credits export failed:', error);
-      onStatus({ kind: 'error', text: t(downloadErrorTranslationKey(error)) });
-    }
-  };
-
-  const runZip = async (kind: ZipExportKind) => {
-    if (!sheet) return;
-    const frozenSheet = sheet;
-    try {
-      setZipRunning({ kind, progress: 0 });
-      await exportCharacterArtifact(kind, exportInput(frozenSheet), {
-        onProgress: (p) => setZipRunning({ kind, progress: p }),
-      });
-      onStatus({ kind: 'info', text: t('download.done') });
-      setOpen(false);
-    } catch (error) {
-      console.error('ZIP export failed:', error);
-      onStatus({ kind: 'error', text: t(downloadErrorTranslationKey(error)) });
-    } finally {
-      setZipRunning(null);
-    }
-  };
+  const actionDisabled = disabled || running !== null;
 
   return (
     <>
@@ -188,13 +73,13 @@ export function DownloadPopover({
             {t('download.title')}
           </div>
           <div className="flex flex-col gap-1">
-            <Button size="sm" variant="primary" disabled={disabled} onClick={handleBundle}>
+            <Button size="sm" variant="primary" disabled={actionDisabled} onClick={onBundle}>
               {t('download.png')}
             </Button>
-            <Button size="sm" disabled={disabled} onClick={handleTxt}>
+            <Button size="sm" disabled={actionDisabled} onClick={onCreditsTxt}>
               {t('download.creditsTxt')}
             </Button>
-            <Button size="sm" disabled={disabled} onClick={handleCsv}>
+            <Button size="sm" disabled={actionDisabled} onClick={onCreditsCsv}>
               {t('download.creditsCsv')}
             </Button>
           </div>
@@ -208,47 +93,47 @@ export function DownloadPopover({
           <div className="flex flex-col gap-1">
             <Button
               size="sm"
-              disabled={zipDisabled}
-              onClick={() => runZip('byAnimation')}
+              disabled={actionDisabled}
+              onClick={() => onZip('byAnimation')}
             >
               {t('download.zipByAnim')}
             </Button>
             <Button
               size="sm"
-              disabled={zipDisabled}
-              onClick={() => runZip('byItem')}
+              disabled={actionDisabled}
+              onClick={() => onZip('byItem')}
             >
               {t('download.zipByItem')}
             </Button>
             <Button
               size="sm"
-              disabled={zipDisabled}
-              onClick={() => runZip('byAnimItem')}
+              disabled={actionDisabled}
+              onClick={() => onZip('byAnimItem')}
             >
               {t('download.zipByAnimItem')}
             </Button>
             <Button
               size="sm"
-              disabled={zipDisabled}
-              onClick={() => runZip('byFrame')}
+              disabled={actionDisabled}
+              onClick={() => onZip('byFrame')}
             >
               {t('download.zipByFrame')}
             </Button>
           </div>
-          {zipRunning && (
+          {running && (
             <div className="mt-2">
               <div className="h-1 w-full overflow-hidden rounded bg-border">
                 <div
                   className="h-full bg-accent transition-[width] duration-150"
-                  style={{ width: `${Math.round(zipRunning.progress * 100)}%` }}
+                  style={{ width: `${Math.round(running.progress * 100)}%` }}
                 />
               </div>
               <div className="mt-1 text-[10px] text-text-mute">
-                {t('download.zipBusy')} {Math.round(zipRunning.progress * 100)}%
+                {t('download.zipBusy')} {Math.round(running.progress * 100)}%
               </div>
             </div>
           )}
-          {disabled && !zipRunning && (
+          {disabled && !running && (
             <div className="mt-2 text-[10px] text-text-mute">{disabledReason}</div>
           )}
         </div>
