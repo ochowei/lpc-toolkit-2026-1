@@ -205,6 +205,30 @@ process.stdout.write(JSON.stringify([
     ]);
   });
 
+  it('accepts Unix and Windows packed web-server termination results', () => {
+    const testDir = path.dirname(fileURLToPath(import.meta.url));
+    const helperUrl = pathToFileURL(
+      path.resolve(testDir, '../scripts/installed-cli-command.mjs'),
+    ).href;
+    const output = execFileSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '--eval',
+        `import { isExpectedWebTermination } from ${JSON.stringify(helperUrl)};
+process.stdout.write(JSON.stringify([
+  isExpectedWebTermination({ code: 143, signal: null }),
+  isExpectedWebTermination({ code: null, signal: 'SIGTERM' }),
+  isExpectedWebTermination({ code: 0, signal: null }),
+  isExpectedWebTermination({ code: null, signal: 'SIGKILL' }),
+]));`,
+      ],
+      { encoding: 'utf8' },
+    );
+
+    expect(JSON.parse(output) as unknown).toEqual([true, true, false, false]);
+  });
+
   it('derives a later release tarball name without current-version coupling', () => {
     const testDir = path.dirname(fileURLToPath(import.meta.url));
     const helperUrl = pathToFileURL(
