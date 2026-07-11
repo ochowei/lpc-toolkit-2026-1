@@ -1,14 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  composeSelections,
-  makeResolvePalette,
   serializeHash,
   type AnimationName,
   type Catalog,
   type HashWarning,
   type LicenseGroup,
   type PaletteMetadata,
-  type Selections,
   type TypeName,
 } from '@lpc-toolkit/core';
 import { e2eProbeFromUrl } from '../../lib/e2e-probe-from-url';
@@ -53,7 +50,7 @@ import {
   useMediaQuery,
 } from '../../hooks/use-media-query';
 import { Button } from '../ui/button';
-import { createBrowserCanvasAdapter } from '../../adapter/browser-canvas-adapter';
+import { useSingleItemComposer } from '../../hooks/use-single-item-composer';
 import { toSelections } from '../../slice/selection';
 import { buildUpstreamUrl } from '../../lib/upstream-url';
 import type { ZipExportKind } from '../../lib/zip-export';
@@ -289,23 +286,8 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     [props.catalog, props.state.selections, licenseFilter, animationFilter],
   );
 
-  const composeSingleItem = useCallback(
-    async (singleSelections: Selections, onlyLayerNumber?: number) => {
-      const adapter = createBrowserCanvasAdapter();
-      return composeSelections(singleSelections, {
-        catalog: props.catalog,
-        adapter,
-        spritesheetsBaseUrl: '',
-        ...(onlyLayerNumber !== undefined ? { onlyLayerNumber } : {}),
-        resolvePalette: makeResolvePalette(
-          props.catalog,
-          props.palettes,
-          singleSelections,
-        ),
-      });
-    },
-    [props.catalog, props.palettes],
-  );
+  const { composeSingleItem, composeSingleItemLayer } =
+    useSingleItemComposer(props.catalog, props.palettes);
 
   const composeResult = useComposedCharacter(
     props.catalog,
@@ -699,7 +681,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
           selections={toSelections(props.state)}
           catalog={props.catalog}
           composeSingleItem={composeSingleItem}
-          composeSingleItemLayer={composeSingleItem}
+          composeSingleItemLayer={composeSingleItemLayer}
           customOverlay={customOverlay}
           zipRunning={zipRunning}
           setZipRunning={setZipRunning}
