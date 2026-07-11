@@ -339,18 +339,27 @@ function checkWebComponentFile({ issues, root, webSrc, filePath }) {
   ]);
 
   for (const imported of staticImports(source)) {
-    const resolved = resolveImport(filePath, imported.specifier);
     const importsComposition =
       imported.specifier === '@lpc-toolkit/core' &&
       imported.names.includes('composeSelections');
-    if (importsComposition || (resolved && forbiddenModules.has(extensionless(resolved)))) {
+    if (importsComposition) {
       addIssue(
         issues,
         root,
         filePath,
-        `forbidden web component import "${
-          importsComposition ? 'composeSelections' : imported.specifier
-        }"`,
+        'forbidden web component import "composeSelections"',
+      );
+    }
+  }
+
+  for (const specifier of importSpecifiers(source)) {
+    const resolved = resolveImport(filePath, specifier);
+    if (resolved && forbiddenModules.has(extensionless(resolved))) {
+      addIssue(
+        issues,
+        root,
+        filePath,
+        `forbidden web component import "${specifier}"`,
       );
     }
   }

@@ -447,6 +447,26 @@ export const example = \`import { composeSelections } from '@lpc-toolkit/core'\`
       "import { exportByFrameZip } from '../lib/zip-export';",
       'zip-export',
     ],
+    [
+      'dynamic browser adapter workflow',
+      "export const loadAdapter = () => import('../adapter/browser-canvas-adapter');",
+      'browser-canvas-adapter',
+    ],
+    [
+      'exported character workflow',
+      "export { exportCharacterArtifact } from '../lib/character-export';",
+      'character-export',
+    ],
+    [
+      'namespace spritesheet workflow',
+      "import * as spritesheet from '../lib/spritesheet-export';\nexport { spritesheet };",
+      'spritesheet-export',
+    ],
+    [
+      'default ZIP workflow',
+      "import zipExport from '../lib/zip-export';\nexport { zipExport };",
+      'zip-export',
+    ],
   ])('rejects component-owned %s', (_name, source, expected) => {
     const root = makeRepoFixture();
     writeFixtureFile(root, 'packages/web/src/components/leak.tsx', source);
