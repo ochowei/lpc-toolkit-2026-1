@@ -51,14 +51,10 @@ import {
 } from '../../hooks/use-media-query';
 import { Button } from '../ui/button';
 import { useSingleItemComposer } from '../../hooks/use-single-item-composer';
+import { useCustomOverlay } from '../../hooks/use-custom-overlay';
 import { toSelections } from '../../slice/selection';
 import { buildUpstreamUrl } from '../../lib/upstream-url';
 import type { ZipExportKind } from '../../lib/zip-export';
-import {
-  loadCustomOverlayImage,
-  parseCustomOverlayZPos,
-  type CustomOverlay,
-} from '../../lib/custom-overlay';
 import {
   MobileBottomNav,
   type MobileView,
@@ -147,8 +143,6 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   const [fullSheetMask, setFullSheetMask] = useState(false);
   const [fullSheetZoom, setFullSheetZoom] = useState<FullSheetZoom>('fit');
   const [splitterRatio, setSplitterRatio] = useState(0.5);
-  const [customOverlay, setCustomOverlay] = useState<CustomOverlay | null>(null);
-  const [customOverlayZPos, setCustomOverlayZPos] = useState(0);
   const isDesktop = useMediaQuery('(min-width: 768px)');
   const [mobileView, setMobileView] = useState<MobileView>('preview');
   const [
@@ -289,16 +283,21 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   const { composeSingleItem, composeSingleItemLayer } =
     useSingleItemComposer(props.catalog, props.palettes);
 
+  const compositionLockedRef = useRef(false);
+  const customOverlayState = useCustomOverlay({
+    lockedRef: compositionLockedRef,
+    t,
+    onStatus: setStatus,
+  });
   const composeResult = useComposedCharacter(
     props.catalog,
     props.palettes,
     props.state,
     reloadCounter,
-    customOverlay,
+    customOverlayState.overlay,
   );
   const isComposing = isCompositionLocked(composeResult.status);
-  const isComposingRef = useRef(isComposing);
-  isComposingRef.current = isComposing;
+  compositionLockedRef.current = isComposing;
 
   const removeLicenseIncompatibleSelections = useCallback(() => {
     if (isComposing) return;
@@ -323,60 +322,6 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
       text: t('animationFilter.removed').replace('{n}', String(animationIncompatibleTypeNames.length)),
     });
   }, [animationIncompatibleTypeNames, isComposing, props.dispatch, t]);
-
-  const clearCustomOverlay = useCallback(() => {
-    if (isComposing) return;
-    setCustomOverlay((prev) => {
-      if (prev) URL.revokeObjectURL(prev.objectUrl);
-      return null;
-    });
-    setCustomOverlayZPos(0);
-    setStatus({ kind: 'info', text: t('advancedTools.cleared') });
-  }, [isComposing, t]);
-
-  const handleCustomOverlayZPosChange = useCallback((raw: string) => {
-    if (isComposing) return;
-    const zPos = parseCustomOverlayZPos(raw);
-    setCustomOverlayZPos(zPos);
-    setCustomOverlay((prev) => (prev ? { ...prev, zPos } : prev));
-  }, [isComposing]);
-
-  const handleCustomOverlayUpload = useCallback(
-    async (file: File) => {
-      if (isComposing) return;
-      try {
-        const loaded = await loadCustomOverlayImage({
-          file,
-          zPos: customOverlayZPos,
-        });
-        if (isComposingRef.current) {
-          if (!('ok' in loaded)) URL.revokeObjectURL(loaded.objectUrl);
-          return;
-        }
-        if ('ok' in loaded) {
-          setStatus({
-            kind: 'error',
-            text: t('advancedTools.invalidSize')
-              .replace('{width}', String(loaded.width))
-              .replace('{height}', String(loaded.height)),
-          });
-          return;
-        }
-        setCustomOverlay((prev) => {
-          if (prev) URL.revokeObjectURL(prev.objectUrl);
-          return loaded;
-        });
-        setStatus({
-          kind: 'info',
-          text: t('advancedTools.loaded').replace('{name}', loaded.fileName),
-        });
-      } catch (error) {
-        console.error('Custom overlay upload failed:', error);
-        setStatus({ kind: 'error', text: t('download.failed') });
-      }
-    },
-    [customOverlayZPos, isComposing, t],
-  );
 
   const fullSheet: FullSheetUiState = {
     open: fullSheetOpen,
@@ -486,15 +431,6 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     return () => clearTimeout(id);
   }, [status]);
 
-  useEffect(() => {
-    return () => {
-      setCustomOverlay((prev) => {
-        if (prev) URL.revokeObjectURL(prev.objectUrl);
-        return null;
-      });
-    };
-  }, []);
-
   // Global ⌘K / Ctrl+K focuses the sidebar search input (selects existing text if any).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -534,7 +470,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   const handleReset = ({ outfit, view, filters }: { outfit: boolean; view: boolean; filters: boolean }) => {
     const allowedOutfit = outfit && !isComposing;
     if (allowedOutfit) {
-      clearCustomOverlay();
+      customOverlayState.clear();
     }
     if (allowedOutfit || view) {
       guardedDispatch({
@@ -579,11 +515,11 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
       toggleAnimation={toggleAnimation}
       animationIncompatibleCount={animationIncompatibleCount}
       removeAnimationIncompatibleSelections={removeAnimationIncompatibleSelections}
-      customOverlay={customOverlay}
-      customOverlayZPos={customOverlayZPos}
-      onCustomOverlayUpload={handleCustomOverlayUpload}
-      onCustomOverlayZPosChange={handleCustomOverlayZPosChange}
-      onClearCustomOverlay={clearCustomOverlay}
+      customOverlay={customOverlayState.overlay}
+      customOverlayZPos={customOverlayState.zPos}
+      onCustomOverlayUpload={customOverlayState.upload}
+      onCustomOverlayZPosChange={customOverlayState.changeZPos}
+      onClearCustomOverlay={customOverlayState.clear}
       t={props.t}
       tl={props.tl}
       onPresetApplied={handlePresetApplied}
@@ -682,7 +618,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
           catalog={props.catalog}
           composeSingleItem={composeSingleItem}
           composeSingleItemLayer={composeSingleItemLayer}
-          customOverlay={customOverlay}
+          customOverlay={customOverlayState.overlay}
           zipRunning={zipRunning}
           setZipRunning={setZipRunning}
           t={props.t}
