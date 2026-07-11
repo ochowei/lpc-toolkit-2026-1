@@ -133,6 +133,24 @@ describe('asset preparation dispatch', () => {
     expect(capture.stdout.join('')).toContain('http://127.0.0.1:');
   });
 
+  it('warns when an explicitly requested non-loopback host exposes the web UI to the LAN', async () => {
+    const prepare = vi.fn(async (_options: PrepareRuntimeAssetsOptions) => runtime);
+    const running: RunningWebServer = {
+      url: 'http://0.0.0.0:45678',
+      close: async () => undefined,
+      closed: Promise.resolve(),
+    };
+    const capture = captureIo(runtime.context.repoRoot);
+
+    expect(await runCli(['web', '--host', '0.0.0.0', '--no-open'], capture.io, {
+      prepareRuntimeAssets: prepare,
+      startWebServer: async () => running,
+    })).toBe(0);
+
+    expect(capture.stderr.join('')).toContain('reachable from other machines on your network');
+    expect(capture.stderr.join('')).toContain('trusted network');
+  });
+
   it.each([
     [['web', '--port', '65536']],
     [['web', 'extra']],

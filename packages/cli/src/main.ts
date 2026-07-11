@@ -111,6 +111,10 @@ function webOptionInput(
   };
 }
 
+function isLoopbackHost(host: string): boolean {
+  return host === 'localhost' || host === '::1' || /^127(?:\.\d{1,3}){3}$/.test(host);
+}
+
 function preflightAssetCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
   const command = parsed.command[0];
   const subcommand = parsed.command[1];
@@ -298,6 +302,10 @@ export async function runCli(
         assetsRoot: runtime!.context.assetsRoot,
       });
       io.stdout(`${running.url}\n`);
+      const requestedHost = flagString(parsed.flags, 'host');
+      if (requestedHost !== undefined && !isLoopbackHost(requestedHost)) {
+        io.stderr('Warning: The web UI is reachable from other machines on your network; use only on a trusted network.\n');
+      }
       await running.closed;
       return 0;
     } catch (error) {

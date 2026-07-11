@@ -50,7 +50,7 @@ export async function runExecutable(
       startWebServer: async (options) => {
         const server = await dependencies.startWebServer(options);
         activeServer = server;
-        await closeActiveServer();
+        if (shutdownExitCode !== undefined) await closeActiveServer();
         return server;
       },
     });
