@@ -17,6 +17,7 @@ import {
   AssetCacheError,
   assetCacheErrorIssue,
   ensureAssetCache,
+  isRetryableCacheRenameError,
   validateAssetCache,
 } from '../src/asset-cache.js';
 import type { AssetReleaseConfig } from '../src/asset-release.js';
@@ -145,6 +146,12 @@ async function runRaceWorker(
 }
 
 describe('verified compressed asset cache', () => {
+  it('retries transient Windows cache rename errors', () => {
+    expect(isRetryableCacheRenameError({ code: 'EPERM' })).toBe(true);
+    expect(isRetryableCacheRenameError({ code: 'EACCES' })).toBe(true);
+    expect(isRetryableCacheRenameError({ code: 'EIO' })).toBe(false);
+  });
+
   it('prepares compressed ZIPs, metadata, credits, manifest, and sprite index', async () => {
     const fixture = await createAssetReleaseFixture();
     const root = cacheRoot();
