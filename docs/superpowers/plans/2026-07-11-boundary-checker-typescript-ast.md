@@ -320,7 +320,7 @@ Implementation note: Fresh focused verification passed `2` files and all
 evidence is recorded in `.superpowers/sdd/plan5-ast-final-report.md`. Final
 review remains pending.
 
-- [ ] **Step 4: Commit verification evidence**
+- [x] **Step 4: Commit verification evidence**
 
 ```bash
 rtk git add .superpowers/sdd/plan5-ast-final-report.md docs/superpowers/plans/2026-07-11-boundary-checker-typescript-ast.md docs/superpowers/plans/2026-07-11-boundary-checker-ci-enforcement.md
@@ -328,6 +328,15 @@ rtk git commit -m "docs(plan): record AST boundary verification"
 ```
 
 Record the evidence commit hash and exact verification results under Task 3.
+
+Implementation note: Committed the final report and both plan updates without
+staging the preserved untracked audit file.
+
+- Evidence commit: `b8b636c9f7ee41bf054a37be893c248e4eb6a289`
+- Verification: focused tests PASS (`2` files, `79` tests); full tests PASS
+  (`108` files, `932` passed, `1` skipped); boundary checker PASS; recursive
+  workspace typecheck PASS (`4` projects); `git diff --check` PASS; scope audit
+  PASS; independent final review pending.
 
 - [ ] **Step 5: Request final read-only review**
 

@@ -564,6 +564,8 @@ four-project typecheck, and `git diff --check` all passed. The scope audit from
 no manifest, lockfile, runtime source, asset, or `upstream/` changes. Independent
 final AST review remains pending and is not recorded as PASS.
 
+- AST closure evidence commit: `b8b636c9f7ee41bf054a37be893c248e4eb6a289`
+
 ## Final Acceptance Criteria
 
 - Core imports from presets, web, CLI, React, Node runtime, and concrete canvas fail; core browser globals fail.
