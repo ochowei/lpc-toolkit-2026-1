@@ -2,9 +2,8 @@
 
 ## Status
 
-PASS for verification, evidence recording, scope audit, and evidence commit.
-Independent final read-only review remains pending by design; it is not marked
-PASS and Task 3 Step 5 remains unchecked.
+PASS for verification, evidence recording, scope audit, evidence commit, and
+independent final read-only review. Task 3 Step 5 is complete.
 
 ## Evidence commit
 
@@ -37,15 +36,14 @@ documents. There are no changes to manifests, lockfiles, runtime source,
 assets, or `upstream/`. `docs/README-ARCHITECTURE-AUDIT.tmp.md` remains an
 untracked user file and was not staged or modified.
 
-## Concerns and remaining gate
+## Final review closure
 
 - No verification or scope concerns found.
-- Independent final review must inspect AST parse diagnostics,
-  runtime-identifier reference filtering, import/export/dynamic-import
-  coverage, parenthesized awaited imports, `.then()` parameter ownership,
-  package subpaths, and absence of generic identifier false positives.
-- Final review status remains pending until that reviewer reports no Critical
-  or Important issues.
+- Reviewed head: `d6a3d2cb301292b2e4137ea32382b6ac6b6e2e9b`.
+- Verdict: Critical none; Important none; one nonblocking Minor; Ready to merge
+  Yes.
+- Minor: `namespaceBindings` stores unused `Map` values; a `Set` would express
+  membership-only intent more clearly.
 
 ## Documentation review fix
 
@@ -56,5 +54,5 @@ untracked user file and was not staged or modified.
   commit. No tests were rerun because this correction changes plan text only;
   the recorded fresh test evidence remains focused `79/79` and full workspace
   `932` passed with `1` intentional skip.
-- Scope: documentation only; Step 5 remains unchecked and independent final
-  review remains pending.
+- Scope: documentation only; the final review was subsequently completed and
+  is recorded above.
