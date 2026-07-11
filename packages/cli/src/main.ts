@@ -42,6 +42,10 @@ export interface CliDependencies {
 
 const DEFAULT_DEPENDENCIES: CliDependencies = { prepareRuntimeAssets, startWebServer };
 
+export function resolveWebRoot(moduleUrl: string): string {
+  return fileURLToPath(new URL('./web', moduleUrl));
+}
+
 const HELP = `lpc-toolkit CLI
 
 Commands:
@@ -298,7 +302,7 @@ export async function runCli(
     try {
       const running = await resolvedDependencies.startWebServer({
         ...options,
-        webRoot: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../web'),
+        webRoot: resolveWebRoot(import.meta.url),
         assetsRoot: runtime!.context.assetsRoot,
       });
       io.stdout(`${running.url}\n`);

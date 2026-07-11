@@ -1,12 +1,13 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { parseArgs } from '../src/args.js';
 import { AssetCacheError } from '../src/asset-cache.js';
 import { createDirectoryAssetStore } from '../src/asset-store.js';
 import { createRuntimeContext } from '../src/context.js';
-import { commandNeedsAssets, runCli } from '../src/main.js';
+import { commandNeedsAssets, resolveWebRoot, runCli } from '../src/main.js';
 import type {
   PrepareRuntimeAssetsOptions,
   RuntimeAssets,
@@ -23,6 +24,14 @@ const releaseConfig = {
   tarballUrl: 'https://example.test/assets.tar.gz',
   tarballSha256: 'c'.repeat(64),
 };
+
+it('resolves the packaged Web bundle beside the emitted CLI module', () => {
+  const distRoot = path.join(tmpdir(), 'installed-cli', 'dist');
+
+  expect(resolveWebRoot(pathToFileURL(path.join(distRoot, 'main.js')).href)).toBe(
+    path.join(distRoot, 'web'),
+  );
+});
 
 function failingManagedPreparation(
   cwd: string,

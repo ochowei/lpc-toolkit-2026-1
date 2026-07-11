@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { pathToFileURL } from 'node:url';
+import { realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { runCli } from './main.js';
 import { startWebServer, type RunningWebServer } from './web-server.js';
 
@@ -15,6 +16,14 @@ export interface ExecutableDependencies {
 }
 
 const DEFAULT_DEPENDENCIES: ExecutableDependencies = { runCli, startWebServer };
+
+export function isDirectExecution(moduleUrl: string, entryPath: string): boolean {
+  try {
+    return realpathSync.native(fileURLToPath(moduleUrl)) === realpathSync.native(entryPath);
+  } catch {
+    return false;
+  }
+}
 
 export async function runExecutable(
   argv: readonly string[],
@@ -61,6 +70,6 @@ export async function runExecutable(
   }
 }
 
-if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] !== undefined && isDirectExecution(import.meta.url, process.argv[1])) {
   process.exitCode = await runExecutable(process.argv.slice(2));
 }

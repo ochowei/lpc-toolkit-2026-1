@@ -1,8 +1,34 @@
-import { describe, expect, it, vi } from 'vitest';
-import { runExecutable } from '../src/index.js';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { isDirectExecution, runExecutable } from '../src/index.js';
 import type { RunningWebServer } from '../src/web-server.js';
 
 type SignalHandler = () => void;
+const temporaryRoots: string[] = [];
+
+afterEach(() => {
+  for (const root of temporaryRoots.splice(0)) {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+describe('executable entry detection', () => {
+  it('recognizes an npm bin symlink to the executable module', () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'lpc-cli-entry-'));
+    temporaryRoots.push(root);
+    const entry = path.join(root, 'dist', 'index.js');
+    const bin = path.join(root, 'node_modules', '.bin', 'lpc-toolkit');
+    mkdirSync(path.dirname(entry), { recursive: true });
+    mkdirSync(path.dirname(bin), { recursive: true });
+    writeFileSync(entry, '');
+    symlinkSync(entry, bin);
+
+    expect(isDirectExecution(pathToFileURL(entry).href, bin)).toBe(true);
+  });
+});
 
 function createLifecycle(): {
   readonly listeners: Map<NodeJS.Signals, SignalHandler>;
