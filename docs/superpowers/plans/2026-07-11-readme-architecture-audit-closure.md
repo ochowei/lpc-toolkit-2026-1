@@ -33,7 +33,10 @@
 - Consumes: `packages/cli/package.json`, root `API.md`, web routes/components, package scripts, and current release workflows.
 - Produces: tested public documentation for CLI release guidance, web layout/routes, core API categories, sheet dimensions, assets, builds, and links.
 
-- [ ] **Step 1: Add failing README contract tests**
+- [x] **Step 1: Add failing README contract tests**
+  - Implementation: Added five public README contract cases.
+  - Commit: `0a8140e97`
+  - Verification: RED confirmed, 5 failed / 5 total.
 
 Create a Vitest suite that reads repository files and asserts exact current facts:
 
@@ -53,7 +56,10 @@ expect(readme).not.toMatch(/file:\/\/|\/Users\/|[A-Z]:\\/);
 
 Also assert named sections or phrases for sidebar/splitter/preview/top-bar popovers/responsive layout; categorized core API; standard and custom-animation sheet dimensions; first preparation/pinned download/cache reuse/offline behavior; core/presets/web/CLI build behavior; read-only submodule and isolated parity checkout.
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
+  - Implementation: Ran the focused web documentation suite outside the sandbox because `tsx` requires IPC.
+  - Commit: `0a8140e97`
+  - Verification: Expected RED, 5 failed / 5 total.
 
 Run:
 
@@ -63,11 +69,17 @@ rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts
 
 Expected: FAIL on stale/missing README facts, including the machine-specific `file://` design link. Record exact failures.
 
-- [ ] **Step 3: Update CLI and release documentation**
+- [x] **Step 3: Update CLI and release documentation**
+  - Implementation: Anchored the CLI contract at 0.1.0 and retained current RC, stable-tag, npm OIDC, and external publishing gates.
+  - Commit: `0a8140e97`
+  - Verification: README contract PASS.
 
 Replace historical/bootstrap language with current guidance anchored to version `0.1.0`: RC tags use `v<version>-rc.<number>`, stable tags use `v<version>`, tagged RC jobs are required gates, the manual workflow is advisory, npm OIDC/trusted-publisher configuration is external, and no instruction installs inside `upstream/`.
 
-- [ ] **Step 4: Update web, API, sheet, asset, and build documentation**
+- [x] **Step 4: Update web, API, sheet, asset, and build documentation**
+  - Implementation: Documented routes, responsive editor regions, categorized core APIs, sheet sizing, asset preparation/cache behavior, package builds, and repository-relative design links.
+  - Commit: `0a8140e97`
+  - Verification: README contract PASS; no machine-specific link remains.
 
 Document:
 
@@ -84,7 +96,10 @@ Document:
 
 Replace the absolute `file://` design reference with a repository-relative link under `reference/v2/`.
 
-- [ ] **Step 5: Run README contracts and existing README example test**
+- [x] **Step 5: Run README contracts and existing README example test**
+  - Implementation: Ran both focused suites and whitespace validation.
+  - Commit: `0a8140e97`
+  - Verification: README docs 5/5 PASS; README core example 2/2 PASS; `git diff --check` PASS.
 
 Run separately:
 
@@ -96,7 +111,10 @@ rtk git diff --check
 
 Expected: all PASS; no machine-specific link remains in tracked Markdown.
 
-- [ ] **Step 6: Commit Task 1**
+- [x] **Step 6: Commit Task 1**
+  - Implementation: Committed the tested README and contract suite.
+  - Commit: `0a8140e97`
+  - Verification: Commit created; plan evidence recorded in the following documentation commit.
 
 ```bash
 rtk git add README.md packages/web/test/readme-architecture-docs.test.ts docs/superpowers/plans/2026-07-11-readme-architecture-audit-closure.md
