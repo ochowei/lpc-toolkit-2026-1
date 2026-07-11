@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -102,5 +102,39 @@ describe('architecture ownership contract', () => {
     expect(architecture).toContain('CI unit job');
     expect(architecture).toContain('read-only provenance');
     expect(architecture).toContain('separate isolated checkout');
+  });
+});
+
+describe('audit closure contract', () => {
+  it('records complete evidence for findings 1 through 15', () => {
+    const closurePath = path.join(
+      repoRoot,
+      'docs/README-ARCHITECTURE-AUDIT-CLOSURE.md',
+    );
+    expect(existsSync(closurePath)).toBe(true);
+
+    const closure = readFileSync(closurePath, 'utf8');
+    const rows = closure
+      .split('\n')
+      .filter((line) => /^\|\s*\d+\s*\|/.test(line))
+      .map((line) => line.split('|').slice(1, -1).map((cell) => cell.trim()));
+
+    expect(rows.map(([finding]) => Number(finding))).toEqual(
+      Array.from({ length: 15 }, (_, index) => index + 1),
+    );
+    expect(new Set(rows.map(([finding]) => finding)).size).toBe(15);
+
+    for (const [finding, disposition, commits, verification, result] of rows) {
+      expect(Number(finding)).toBeGreaterThanOrEqual(1);
+      expect(['fixed', 'documented approved exception']).toContain(disposition);
+      expect(commits).toMatch(/`[0-9a-f]{9,40}`/);
+      expect(verification).toMatch(/`rtk [^`]+`/);
+      expect(result).toBe('PASS');
+    }
+
+    expect(rows[14]?.[1]).toBe('documented approved exception');
+    expect(rows.slice(0, 14).every((row) => row[1] === 'fixed')).toBe(true);
+    expect(closure).not.toMatch(/\b(?:TBD|TODO|pending)\b/i);
+    expect(closure).not.toContain('docs/README-ARCHITECTURE-AUDIT.tmp.md');
   });
 });
