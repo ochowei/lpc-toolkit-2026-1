@@ -506,7 +506,7 @@ After review, mark the task complete and record implementation note, commit hash
 - Produces the completed Plan 4 record with checked tasks, implementation notes, exact commit hashes, reviewer outcomes, and fresh verification.
 - Does not change runtime behavior or touch `upstream/`.
 
-- [ ] **Step 1: Inspect responsibility boundaries**
+- [x] **Step 1: Inspect responsibility boundaries**
 
 Run:
 
@@ -517,7 +517,16 @@ rtk wc -l packages/web/src/components/layer-stack/harness.tsx packages/web/src/c
 
 Expected: the forbidden low-level symbols produce no component matches; `harness.tsx` remains the orchestrator and `DownloadPopover` contains only rendering/event forwarding.
 
-- [ ] **Step 2: Run full workspace and browser verification**
+Implementation note: The responsibility scan returned no matches in either
+component. Final line counts are `harness.tsx` 677, `download-popover.tsx` 143,
+`use-single-item-composer.ts` 53, `use-custom-overlay.ts` 233,
+`use-character-export.ts` 152, and `character-export.ts` 134.
+
+- Verification: responsibility scan PASS; manual component review confirms the
+  harness remains the editor orchestrator and the popover only renders state and
+  forwards its seven actions.
+
+- [x] **Step 2: Run full workspace and browser verification**
 
 Run:
 
@@ -532,7 +541,18 @@ rtk git status --short
 
 Expected: PASS; status shows only intentional Plan 4 work plus the preserved untracked `docs/README-ARCHITECTURE-AUDIT.tmp.md`.
 
-- [ ] **Step 3: Run isolated parity when execution approval allows it**
+Implementation note: Ran the complete fresh verification set from the normal
+checkout. The initial sandboxed workspace-test attempt could not create the
+`tsx` IPC socket (`listen EPERM`); the identical approved local-process run
+completed successfully.
+
+- Verification: boundaries PASS; workspace typecheck PASS; workspace tests
+  PASS (`core` 164, `presets` 2, `cli` 153 passed/1 skipped, `web` 545);
+  general Playwright PASS (24/24 Chromium); `git diff --check` PASS; final
+  pre-evidence status contained only preserved
+  `docs/README-ARCHITECTURE-AUDIT.tmp.md`.
+
+- [x] **Step 3: Run isolated parity when execution approval allows it**
 
 Use the absolute isolated checkout at the pinned SHA, never tracked `upstream/`:
 
@@ -542,7 +562,18 @@ rtk env LPC_UPSTREAM_PARITY_DIR=/private/tmp/lpc-toolkit-upstream-parity-212abfd
 
 Expected: all parity cases PASS. If approval review again blocks third-party dependency/server execution, record the exact external blocker and rely on the dedicated CI parity job; do not substitute the submodule or report PASS.
 
-- [ ] **Step 4: Review behavior preservation and commit evidence**
+Implementation note: The isolated command verified the checkout HEAD exactly
+matches `212abfd21493e9957bd556250ac538fa40fe1fc9`, then Playwright could not
+start the isolated upstream server because that preserved checkout has no
+installed third-party dependencies: Vite reported unresolved
+`@tsconfig/strictest/tsconfig.json` and `ERR_MODULE_NOT_FOUND` for `vite`.
+No dependency installation was performed and tracked `upstream/` was not used.
+
+- Verification: BLOCKED by missing third-party dependencies in
+  `/private/tmp/lpc-toolkit-upstream-parity-212abfd`; not reported as PASS.
+  Dedicated CI parity remains the authoritative executable parity check.
+
+- [x] **Step 4: Review behavior preservation and commit evidence**
 
 Compare the final diff to Batch D and confirm reducer actions, hash/token identity, pixels, attribution, ZIP layouts, filenames, status/progress, custom overlay lifecycle, and visible controls are unchanged. Update every completed task with implementation note, commit hash, and verification, then run:
 
@@ -550,6 +581,25 @@ Compare the final diff to Batch D and confirm reducer actions, hash/token identi
 rtk git add docs/superpowers/plans/2026-07-11-web-responsibility-extractions.md
 rtk git commit -m "docs(plan): record web extraction completion"
 ```
+
+Implementation note: Reviewed the complete Batch D diff from
+`4f6b1bac101a59f4889e7ac96dae3ce0fab11361^` through Task 4. Changes are limited
+to the planned web hooks/helper, narrow component wiring, lifecycle/export tests,
+one test import relocation, and plan records. Reducer dispatches, hash/token
+serialization, composition inputs/pixels, attribution guards, ZIP routing and
+filenames, status/progress copy, overlay semantics, seven controls, and editor
+layout remain preserved by inspection and the fresh unit/E2E evidence.
+
+- Implementation commits and reviewer outcomes: Task 1
+  `4f6b1bac101a59f4889e7ac96dae3ce0fab11361` (review clean); Task 2
+  `23e049bb3e72c3b3abd9c99f28cc75f8c27e1e21` plus review fix
+  `78e58f4c75e71b4a53bcbf011285d93b7c26a59a` (re-review clean); Task 3
+  `6912bb51546ddb374a3c43568c41da7cd60ef053` (review clean); Task 4
+  `e8fc665881ef5d58243b86df0fa10aac6c38c951` (review outcome recorded with
+  its focused verification).
+- Verification: `packages/core/`, dependency manifests/lockfile, `assets/`, and
+  tracked `upstream/` have no Batch D diff; submodule remains clean at
+  `212abfd21493e9957bd556250ac538fa40fe1fc9`.
 
 ## Final Acceptance Criteria
 
