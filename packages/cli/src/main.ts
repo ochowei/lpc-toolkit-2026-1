@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   flagBoolean,
   flagString,
@@ -26,6 +27,7 @@ import {
 } from './runtime-assets.js';
 import { runSelectionCommand } from './selection-commands.js';
 import { runTokenCommand } from './token-commands.js';
+import { startWebServer, validateWebOptions } from './web-server.js';
 
 export interface CliIo {
   readonly stdout: (text: string) => void;
@@ -35,9 +37,14 @@ export interface CliIo {
 
 export interface CliDependencies {
   readonly prepareRuntimeAssets: typeof prepareRuntimeAssets;
+  readonly startWebServer: typeof startWebServer;
 }
 
-const DEFAULT_DEPENDENCIES: CliDependencies = { prepareRuntimeAssets };
+const DEFAULT_DEPENDENCIES: CliDependencies = { prepareRuntimeAssets, startWebServer };
+
+export function resolveWebRoot(moduleUrl: string): string {
+  return fileURLToPath(new URL('./web', moduleUrl));
+}
 
 const HELP = `lpc-toolkit CLI
 
@@ -52,6 +59,7 @@ Commands:
   lpc-toolkit preset list
   lpc-toolkit preset materialize <preset-id> --out <file>
   lpc-toolkit preset render <preset-id> --out <dir>
+  lpc-toolkit web [--host <host>] [--port <port>] [--no-open]
 `;
 
 function renderErrorIssue(
@@ -91,7 +99,24 @@ export function commandNeedsAssets(parsed: ParsedArgs): boolean {
   if (parsed.command[0] === 'selection') return true;
   if (parsed.command[0] === 'render') return true;
   if (parsed.command[0] === 'preset') return parsed.command[1] !== 'list';
+  if (parsed.command[0] === 'web') return true;
   return false;
+}
+
+function webOptionInput(
+  parsed: ParsedArgs,
+): Parameters<typeof validateWebOptions>[0] {
+  const host = flagString(parsed.flags, 'host');
+  const port = flagString(parsed.flags, 'port');
+  return {
+    ...(host === undefined ? {} : { host }),
+    ...(port === undefined ? {} : { port }),
+    noOpen: flagBoolean(parsed.flags, 'no-open'),
+  };
+}
+
+function isLoopbackHost(host: string): boolean {
+  return host === 'localhost' || host === '::1' || /^127(?:\.\d{1,3}){3}$/.test(host);
 }
 
 function preflightAssetCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
@@ -167,14 +192,58 @@ function preflightAssetCommand(parsed: ParsedArgs): CliResponse<null> | undefine
     }
   }
 
+  if (command === 'web') {
+    if (subcommand !== undefined) {
+      return commandError(parsed.command.join(' '), {
+        code: 'unknown_command',
+        message: `Unknown web command: ${parsed.command.join(' ')}`,
+      });
+    }
+    if (parsed.positionals.length > 0) {
+      return commandError('web', {
+        code: 'unexpected_argument',
+        message: 'web does not accept positional arguments.',
+      });
+    }
+    if (flagBoolean(parsed.flags, 'json')) {
+      return commandError('web', {
+        code: 'invalid_option',
+        message: '--json is not supported by the web command.',
+      });
+    }
+    for (const [name, value] of parsed.flags) {
+      if (name !== 'host' && name !== 'port' && name !== 'no-open') {
+        return commandError('web', {
+          code: 'unknown_option',
+          message: `Unknown web option: --${name}`,
+        });
+      }
+      if ((name === 'host' || name === 'port') && typeof value !== 'string') {
+        return commandError('web', {
+          code: 'invalid_option',
+          message: `--${name} requires a value.`,
+        });
+      }
+    }
+    try {
+      validateWebOptions(webOptionInput(parsed));
+    } catch (error) {
+      return commandError('web', {
+        code: 'invalid_option',
+        message: error instanceof Error ? error.message : 'Invalid web options.',
+      });
+    }
+  }
+
   return undefined;
 }
 
 export async function runCli(
   argv: readonly string[],
   io: CliIo,
-  dependencies: CliDependencies = DEFAULT_DEPENDENCIES,
+  dependencies: Partial<CliDependencies> = {},
 ): Promise<number> {
+  const resolvedDependencies: CliDependencies = { ...DEFAULT_DEPENDENCIES, ...dependencies };
   if (argv.length === 0 || argv[0] === '--help' || argv[0] === '-h') {
     io.stdout(HELP);
     return 0;
@@ -194,8 +263,9 @@ export async function runCli(
   let runtime: RuntimeAssets | undefined;
   if (commandNeedsAssets(parsed)) {
     try {
-      runtime = await dependencies.prepareRuntimeAssets({
+      runtime = await resolvedDependencies.prepareRuntimeAssets({
         cwd: io.cwd,
+        ...(parsed.command[0] === 'web' ? { managedCacheOnly: true } : {}),
         onProgress: (progress) =>
           io.stderr(formatProgress(progress.phase, progress.message)),
       });
@@ -225,6 +295,31 @@ export async function runCli(
       io,
       'Selection is valid.\n',
     );
+  }
+
+  if (parsed.command[0] === 'web') {
+    const options = validateWebOptions(webOptionInput(parsed));
+    try {
+      const running = await resolvedDependencies.startWebServer({
+        ...options,
+        webRoot: resolveWebRoot(import.meta.url),
+        assetsRoot: runtime!.context.assetsRoot,
+      });
+      io.stdout(`${running.url}\n`);
+      const requestedHost = flagString(parsed.flags, 'host');
+      if (requestedHost !== undefined && !isLoopbackHost(requestedHost)) {
+        io.stderr('Warning: The web UI is reachable from other machines on your network; use only on a trusted network.\n');
+      }
+      await running.closed;
+      return 0;
+    } catch (error) {
+      return writeResponse(
+        commandError('web', renderErrorIssue(error, 'Web server failed.')),
+        parsed,
+        io,
+        '',
+      );
+    }
   }
 
   if (parsed.command[0] === 'token') {

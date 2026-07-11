@@ -51,6 +51,24 @@ lpc-toolkit render --selection selection.json --out ./rendered \
 
 Run `lpc-toolkit --help` for the command summary.
 
+## Local Web UI
+
+Start the packaged production UI with the same verified asset cache used by
+render commands:
+
+```sh
+lpc-toolkit web
+lpc-toolkit web --port 4173 --no-open
+```
+
+Use `--port 0` to let the operating system select an available port. The first
+run downloads the pinned assets when needed; later runs share the verified cache
+with render commands and work offline. Press `Ctrl+C` to stop the server.
+
+The server binds to `127.0.0.1` by default. Using `--host 0.0.0.0` exposes it to
+other devices on the local network; only do this on a trusted network. This is a
+production server, so it does not provide Vite hot reload.
+
 ## Asset download and cache
 
 The npm package does not contain the art archive. The first asset-dependent

@@ -1,17 +1,19 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { parseArgs } from '../src/args.js';
 import { AssetCacheError } from '../src/asset-cache.js';
 import { createDirectoryAssetStore } from '../src/asset-store.js';
 import { createRuntimeContext } from '../src/context.js';
-import { commandNeedsAssets, runCli } from '../src/main.js';
+import { commandNeedsAssets, resolveWebRoot, runCli } from '../src/main.js';
 import type {
   PrepareRuntimeAssetsOptions,
   RuntimeAssets,
 } from '../src/runtime-assets.js';
 import { prepareRuntimeAssets } from '../src/runtime-assets.js';
+import type { RunningWebServer } from '../src/web-server.js';
 
 const releaseConfig = {
   tag: 'assets-v1',
@@ -22,6 +24,14 @@ const releaseConfig = {
   tarballUrl: 'https://example.test/assets.tar.gz',
   tarballSha256: 'c'.repeat(64),
 };
+
+it('resolves the packaged Web bundle beside the emitted CLI module', () => {
+  const distRoot = path.join(tmpdir(), 'installed-cli', 'dist');
+
+  expect(resolveWebRoot(pathToFileURL(path.join(distRoot, 'main.js')).href)).toBe(
+    path.join(distRoot, 'web'),
+  );
+});
 
 function failingManagedPreparation(
   cwd: string,
@@ -103,8 +113,63 @@ describe('asset preparation dispatch', () => {
     [['selection', 'validate', '--selection', 'selection.json']],
     [['preset', 'materialize', 'villager']],
     [['render', '--selection', 'selection.json', '--out', 'out']],
+    [['web']],
   ])('classifies %j as asset-dependent', (argv) => {
     expect(commandNeedsAssets(parseArgs(argv))).toBe(true);
+  });
+
+  it('does not classify web help as asset-dependent', () => {
+    expect(commandNeedsAssets(parseArgs(['web', '--help']))).toBe(false);
+  });
+
+  it('prepares managed assets, prints the URL, and waits for web server closure', async () => {
+    const prepare = vi.fn(async (_options: PrepareRuntimeAssetsOptions) => runtime);
+    const running: RunningWebServer = {
+      url: 'http://127.0.0.1:45678',
+      close: async () => undefined,
+      closed: Promise.resolve(),
+    };
+    const start = vi.fn(async () => running);
+    const capture = captureIo(runtime.context.repoRoot);
+
+    expect(await runCli(['web', '--port', '0', '--no-open'], capture.io, {
+      prepareRuntimeAssets: prepare,
+      startWebServer: start,
+    })).toBe(0);
+
+    expect(prepare).toHaveBeenCalledWith(expect.objectContaining({ managedCacheOnly: true }));
+    expect(start).toHaveBeenCalledOnce();
+    expect(capture.stdout.join('')).toContain('http://127.0.0.1:');
+  });
+
+  it('warns when an explicitly requested non-loopback host exposes the web UI to the LAN', async () => {
+    const prepare = vi.fn(async (_options: PrepareRuntimeAssetsOptions) => runtime);
+    const running: RunningWebServer = {
+      url: 'http://0.0.0.0:45678',
+      close: async () => undefined,
+      closed: Promise.resolve(),
+    };
+    const capture = captureIo(runtime.context.repoRoot);
+
+    expect(await runCli(['web', '--host', '0.0.0.0', '--no-open'], capture.io, {
+      prepareRuntimeAssets: prepare,
+      startWebServer: async () => running,
+    })).toBe(0);
+
+    expect(capture.stderr.join('')).toContain('reachable from other machines on your network');
+    expect(capture.stderr.join('')).toContain('trusted network');
+  });
+
+  it.each([
+    [['web', '--port', '65536']],
+    [['web', 'extra']],
+    [['web', '--json']],
+  ])('rejects invalid web invocation %j without preparing assets', async (argv) => {
+    const prepare = vi.fn(async (_options: PrepareRuntimeAssetsOptions) => runtime);
+    const capture = captureIo(runtime.context.repoRoot);
+
+    expect(await runCli(argv, capture.io, { prepareRuntimeAssets: prepare })).toBe(1);
+    expect(prepare).not.toHaveBeenCalled();
   });
 
   it('prepares assets exactly once before catalog dispatch', async () => {

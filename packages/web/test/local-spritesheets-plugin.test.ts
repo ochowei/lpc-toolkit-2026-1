@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { PassThrough } from 'node:stream';
-import type { Plugin, ViteDevServer } from 'vite';
+import type { ConfigEnv, Plugin, UserConfig, ViteDevServer } from 'vite';
 import JSZip from 'jszip';
 import { describe, expect, it, vi } from 'vitest';
 import viteConfig from '../vite.config';
@@ -27,7 +27,16 @@ class BufferedResponse extends PassThrough {
 }
 
 function getLocalSpritesheetsMiddleware(): Middleware {
-  const plugins = (viteConfig.plugins ?? []).flat(4).filter(Boolean) as Plugin[];
+  const configEnv: ConfigEnv = {
+    command: 'serve',
+    mode: 'development',
+    isSsrBuild: false,
+    isPreview: false,
+  };
+  const config: UserConfig = typeof viteConfig === 'function'
+    ? viteConfig(configEnv)
+    : viteConfig;
+  const plugins = (config.plugins ?? []).flat(4).filter(Boolean) as Plugin[];
   const plugin = plugins.find(
     (candidate) => candidate.name === 'local-spritesheets-plugin',
   );
@@ -79,6 +88,17 @@ async function invokeMiddleware(
 }
 
 describe('local-spritesheets-plugin', () => {
+  it('disables public asset copying only for the embedded build', () => {
+    const embeddedConfig = viteConfig({
+      command: 'build',
+      mode: 'embedded',
+      isSsrBuild: false,
+      isPreview: false,
+    });
+
+    expect(embeddedConfig.publicDir).toBe(false);
+  });
+
   it('serves complete PNG responses from the release ZIP under parallel load', async () => {
     const middleware = getLocalSpritesheetsMiddleware();
     const expected = Buffer.from([

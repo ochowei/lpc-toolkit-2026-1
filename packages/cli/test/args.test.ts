@@ -28,4 +28,13 @@ describe('parseArgs', () => {
     expect(parseArgs(['render', '--animation', 'walk', '--animation', 'idle']).flags)
       .toEqual(new Map([['animation', ['walk', 'idle']]]));
   });
+
+  it('parses no-open as a boolean flag', () => {
+    expect(parseArgs(['web', '--no-open', '--port', '0']).flags).toEqual(
+      new Map<string, FlagValue>([
+        ['no-open', true],
+        ['port', '0'],
+      ]),
+    );
+  });
 });

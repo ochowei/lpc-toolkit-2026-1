@@ -6,7 +6,7 @@ export interface ParsedArgs {
   readonly positionals: readonly string[];
 }
 
-const BOOLEAN_FLAGS = new Set(['allow-partial', 'json']);
+const BOOLEAN_FLAGS = new Set(['allow-partial', 'json', 'no-open']);
 
 function addFlag(
   flags: Map<string, FlagValue>,

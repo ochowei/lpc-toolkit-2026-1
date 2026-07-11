@@ -1,11 +1,10 @@
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import {
   existsSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
-  renameSync,
   rmSync,
 } from 'node:fs';
 import os from 'node:os';
@@ -15,7 +14,6 @@ import { packedTarballName } from './package-archive-name.mjs';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = path.resolve(packageRoot, '../..');
-const assetsRoot = path.join(repoRoot, 'assets');
 const packageJson = JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf8'));
 const expectedTarballName = packedTarballName(packageJson);
 const isWindows = process.platform === 'win32';
@@ -38,28 +36,38 @@ function runNodeTool(toolPath, args, options = {}) {
   return execFileSync(process.execPath, [toolPath, ...args], options);
 }
 
+function waitForWebUrl(web, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    let output = '';
+    let errorOutput = '';
+    const timeout = setTimeout(() => reject(new Error('timed out waiting for web server URL')), timeoutMs);
+    web.stderr.on('data', (chunk) => {
+      errorOutput += chunk;
+    });
+    web.stdout.on('data', (chunk) => {
+      output += chunk;
+      const match = output.match(/http:\/\/127\.0\.0\.1:\d+/u);
+      if (match) { clearTimeout(timeout); resolve(match[0]); }
+    });
+    web.once('exit', (code, signal) => {
+      clearTimeout(timeout);
+      reject(new Error(`web server exited before listening (${code}, ${signal}): ${errorOutput.trim()}`));
+    });
+    web.once('error', reject);
+  });
+}
+
 const pnpmCliPath = resolveNodeTool('corepack', 'dist', 'pnpm.js');
 const npmCliPath = resolveNodeTool('npm', 'bin', 'npm-cli.js');
 let packDir;
 let installPrefix;
 let emptyCwd;
-let assetsBackupRoot;
+let cacheRoot;
 
 try {
   packDir = mkdtempSync(path.join(os.tmpdir(), 'lpc-toolkit-pack-'));
   installPrefix = mkdtempSync(path.join(os.tmpdir(), 'lpc-toolkit-install-'));
   emptyCwd = mkdtempSync(path.join(os.tmpdir(), 'lpc-toolkit-empty-cwd-'));
-
-  if (existsSync(assetsRoot)) {
-    const backupRoot = mkdtempSync(path.join(repoRoot, '.lpc-toolkit-assets-backup-'));
-    try {
-      renameSync(assetsRoot, path.join(backupRoot, 'assets'));
-      assetsBackupRoot = backupRoot;
-    } catch (error) {
-      rmSync(backupRoot, { recursive: true, force: true });
-      throw error;
-    }
-  }
 
   rmSync(path.join(packageRoot, 'dist'), { recursive: true, force: true });
 
@@ -75,6 +83,7 @@ try {
   const listing = execFileSync('tar', ['-tzf', tarballPath], { encoding: 'utf8' });
   const entries = listing.split(/\r?\n/u).filter(Boolean);
   const requiredEntries = [
+    'package/dist/web/index.html',
     'package/dist/asset-release.json',
     'package/dist/token-decode-metadata.json',
     'package/dist/vendor/@lpc-toolkit/core/dist/index.js',
@@ -95,6 +104,14 @@ try {
     'packed tarball must not include package/src/',
   );
   assert.ok(
+    entries.every((entry) => !entry.startsWith('package/dist/web/zips/')),
+    'packed tarball must not duplicate cached ZIP assets',
+  );
+  assert.ok(
+    entries.every((entry) => !entry.startsWith('package/dist/web/spritesheets/')),
+    'packed tarball must not include expanded spritesheets',
+  );
+  assert.ok(
     entries.every((entry) => !entry.startsWith('package/test/')),
     'packed tarball must not include package/test/',
   );
@@ -105,6 +122,7 @@ try {
 
   runNodeTool(npmCliPath, ['install', '--prefix', installPrefix, tarballPath], {
     stdio: 'inherit',
+    env: { ...process.env, npm_config_cache: path.join(installPrefix, '.npm-cache') },
   });
 
   const installedBinPath = path.join(
@@ -126,15 +144,14 @@ try {
   );
   const installedBinTarget = installedPackageJson.bin?.['lpc-toolkit'];
   assert.equal(typeof installedBinTarget, 'string', 'installed package is missing its bin target');
-  const helpOutput = runNodeTool(path.resolve(installedPackageRoot, installedBinTarget), ['--help'], {
+  const helpOutput = execFileSync(installedBinPath, ['--help'], {
     encoding: 'utf8',
   });
   assert.match(helpOutput, /lpc-toolkit catalog types/u);
 
   const decodeResult = spawnSync(
-    process.execPath,
+    installedBinPath,
     [
-      path.resolve(installedPackageRoot, installedBinTarget),
       'token',
       'decode',
       '--token',
@@ -148,14 +165,30 @@ try {
   const decodeOutput = JSON.parse(decodeResult.stdout);
   assert.equal(decodeOutput.data?.selection?.items?.hair?.name, 'Braid');
 
+  cacheRoot = mkdtempSync(path.join(os.tmpdir(), 'lpc-toolkit-cache-'));
+  const web = spawn(
+    installedBinPath,
+    ['web', '--host', '127.0.0.1', '--port', '0', '--no-open'],
+    {
+      cwd: emptyCwd,
+      env: { ...process.env, LPC_TOOLKIT_CACHE_DIR: cacheRoot },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  );
+  const webUrl = await waitForWebUrl(web, 300_000);
+  const indexResponse = await fetch(`${webUrl}/`);
+  assert.equal(indexResponse.status, 200);
+  assert.match(await indexResponse.text(), /<div id="root"><\/div>/u);
+  const zipResponse = await fetch(`${webUrl}/zips/body.zip`);
+  assert.equal(zipResponse.status, 200);
+  assert.ok((await zipResponse.arrayBuffer()).byteLength > 0, 'cached body ZIP must not be empty');
+  web.kill('SIGTERM');
+  const webResult = await new Promise((resolve) => web.once('exit', (code, signal) => resolve({ code, signal })));
+  assert.deepEqual(webResult, { code: 143, signal: null });
+
   console.log('Packed CLI install smoke test passed.');
 } finally {
   try {
-    if (assetsBackupRoot !== undefined) {
-      assert.ok(!existsSync(assetsRoot), 'cannot restore assets over an existing path');
-      renameSync(path.join(assetsBackupRoot, 'assets'), assetsRoot);
-      rmSync(assetsBackupRoot, { recursive: true, force: true });
-    }
   } finally {
     if (packDir !== undefined) {
       rmSync(packDir, { recursive: true, force: true });
@@ -165,6 +198,9 @@ try {
     }
     if (emptyCwd !== undefined) {
       rmSync(emptyCwd, { recursive: true, force: true });
+    }
+    if (cacheRoot !== undefined) {
+      rmSync(cacheRoot, { recursive: true, force: true });
     }
   }
 }

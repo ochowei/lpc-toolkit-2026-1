@@ -11,6 +11,7 @@
     "zip-assets": "tsx scripts/zip-assets.ts",
     "prebuild": "pnpm prepare-assets && pnpm --filter @lpc-toolkit/core build && pnpm --filter @lpc-toolkit/presets build",
     "build": "vite build",
+    "build:embedded": "vite build --mode embedded --outDir dist-embedded",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "copy-sprites": "tsx scripts/copy-spritesheets.ts",
