@@ -348,7 +348,7 @@ Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- web-server.test.ts` PA
 - Produces: `lpc-toolkit web [--host <host>] [--port <port>] [--no-open]`.
 - Guarantees: help and invalid invocations do not prepare assets; the valid command prepares exactly once and waits for server closure.
 
-- [ ] **Step 1: Write failing parser and dispatch tests**
+- [x] **Step 1: Write failing parser and dispatch tests**
 
 Add `no-open` to the boolean parsing expectation:
 
@@ -378,7 +378,7 @@ expect(capture.stdout.join('')).toContain('http://127.0.0.1:');
 
 Add invalid port, extra subcommand, and `--json` cases and assert they return 1 without preparing assets.
 
-- [ ] **Step 2: Run focused tests and confirm failures**
+- [x] **Step 2: Run focused tests and confirm failures**
 
 Run:
 
@@ -388,7 +388,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- args.test.ts main-assets.test.ts main
 
 Expected: FAIL because `no-open`, `web` preflight, and `startWebServer` injection are absent.
 
-- [ ] **Step 3: Add parsing, help, preflight, and dispatch**
+- [x] **Step 3: Add parsing, help, preflight, and dispatch**
 
 Add `no-open` to `BOOLEAN_FLAGS`, add the help line, and extend `CliDependencies`:
 
@@ -401,13 +401,13 @@ export interface CliDependencies {
 
 Preflight `web` before asset preparation: reject a second command token, positionals, `--json`, unknown flags, invalid host, and invalid port through `validateWebOptions`. On valid dispatch, request managed cache and start the server with `webRoot` resolved from `import.meta.url`, `assetsRoot: runtime.context.assetsRoot`, and parsed options. Print the URL before awaiting `running.closed`.
 
-- [ ] **Step 4: Add signal ownership at the executable boundary**
+- [x] **Step 4: Add signal ownership at the executable boundary**
 
 Keep reusable `runCli` free of global listener leaks. In `index.ts`, install one-shot `SIGINT` and `SIGTERM` handlers around the active server through injected lifecycle callbacks, and always remove them after `runCli` settles. The handler awaits `close()` and sets the conventional exit code (`130` for SIGINT, `143` for SIGTERM).
 
 Use an injected `spawn`-backed opener in production; do not make unit tests depend on `process`, signals, or desktop applications.
 
-- [ ] **Step 5: Run the CLI suite and typecheck**
+- [x] **Step 5: Run the CLI suite and typecheck**
 
 Run:
 
@@ -418,12 +418,16 @@ rtk pnpm --filter @lpc-toolkit/cli typecheck
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit Task 4**
+- [x] **Step 6: Commit Task 4**
 
 ```sh
 rtk git add packages/cli/src/args.ts packages/cli/src/main.ts packages/cli/src/index.ts packages/cli/test/args.test.ts packages/cli/test/main-assets.test.ts packages/cli/test/main-human.test.ts
 rtk git commit -m "feat(cli): add web command"
 ```
+
+Implementation: added `web` parsing/preflight/managed-cache dispatch and executable-only signal lifecycle ownership.
+Commit: 6e09adb8c7e6d4878874a86678eb111365749dd8; lifecycle follow-up: 8a5f7309cc3c3a6b966b29283d28436363b23cc7.
+Verification: `rtk pnpm --filter @lpc-toolkit/cli test` PASS (185 passed, 1 skipped); `rtk pnpm --filter @lpc-toolkit/cli typecheck` PASS; `rtk pnpm check:boundaries` PASS.
 
 ### Task 5: Complete installed-package smoke coverage and documentation
 
