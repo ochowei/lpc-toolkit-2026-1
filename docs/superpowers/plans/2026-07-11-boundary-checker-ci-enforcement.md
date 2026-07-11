@@ -366,7 +366,7 @@ retaining static named-import analysis for `composeSelections` aliases.
 - `.github/workflows/publish.yml` retains its existing boundary command.
 - Static workflow test uses bounded `unit` job markers and verifies command ordering.
 
-- [ ] **Step 1: Add the failing CI contract test**
+- [x] **Step 1: Add the failing CI contract test**
 
 Create a bounded unit-job slice and assert marker validity plus ordering:
 
@@ -389,13 +389,13 @@ expect(unitJob.indexOf('pnpm check:boundaries')).toBeLessThan(
 
 Read `.github/workflows/publish.yml` and assert it still contains `- run: pnpm check:boundaries`.
 
-- [ ] **Step 2: Run the package-script test and verify RED**
+- [x] **Step 2: Run the package-script test and verify RED**
 
 Run: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/package-scripts.test.ts`
 
 Expected: FAIL because the main unit job does not run the boundary checker.
 
-- [ ] **Step 3: Add the boundary step to CI**
+- [x] **Step 3: Add the boundary step to CI**
 
 In `.github/workflows/ci.yml`, make the unit sequence exactly:
 
@@ -408,7 +408,7 @@ In `.github/workflows/ci.yml`, make the unit sequence exactly:
 
 Do not move or remove the publish workflow's existing boundary command.
 
-- [ ] **Step 4: Run workflow and checker tests**
+- [x] **Step 4: Run workflow and checker tests**
 
 Run:
 
@@ -420,7 +420,7 @@ rtk git diff --check
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit Task 4**
+- [x] **Step 5: Commit Task 4**
 
 ```bash
 rtk git add .github/workflows/ci.yml packages/web/test/package-scripts.test.ts
@@ -428,6 +428,20 @@ rtk git commit -m "ci: enforce architecture boundaries in unit job"
 ```
 
 After review, check the task and record implementation note, full commit hash, and verification.
+
+- Implementation: Added the root boundary checker to the main CI `unit` job
+  between frozen install and typecheck, with a bounded static workflow contract
+  that also preserves the publish workflow boundary command.
+- Commit: `de963e282670ba4a1e77331d1def75fe824f2079`
+- Verification: RED package-script test (`1 failed, 7 passed`); GREEN focused
+  workflow and boundary tests (`58 passed`); repository boundary checker PASS;
+  diff check PASS.
+- Review fix: Strengthened the bounded `unit` contract to require the exact
+  four consecutive install, boundary, typecheck, and test command lines.
+- Review fix commit: `7ff1976ea7ea372ef2b8911766e0029d7158cc48`
+- Review verification: Focused workflow and boundary tests (`58 passed`);
+  repository boundary checker PASS; diff check PASS. No additional RED was
+  available because the committed workflow already had the required sequence.
 
 ## Task 5: Verify Plan 5 and record evidence
 
