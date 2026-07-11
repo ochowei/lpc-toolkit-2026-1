@@ -152,7 +152,7 @@ Verification: `rtk pnpm --filter @lpc-toolkit/web build` PASS; `rtk pnpm --filte
 - Guarantees: when `managedCacheOnly` is true, `./assets` is ignored and the returned source is `managed-cache`; omission preserves current local-assets precedence.
 - Consumes: existing `ensureAssetCache`, release config, and cache-root resolution.
 
-- [ ] **Step 1: Write failing managed-cache-only tests**
+- [x] **Step 1: Write failing managed-cache-only tests**
 
 Add a test beside the current local-assets precedence coverage. Create a complete temporary `assets/` tree, pass a mocked `ensureCache`, and assert the managed result is used:
 
@@ -173,13 +173,13 @@ expect(result.context.assetsRoot).toBe(managedLayout.releaseRoot);
 
 Retain/add a control assertion that omitting the flag returns `working-directory` and never calls `ensureCache`.
 
-- [ ] **Step 2: Run the focused test and confirm the type/behavior failure**
+- [x] **Step 2: Run the focused test and confirm the type/behavior failure**
 
 Run: `rtk pnpm --filter @lpc-toolkit/cli test -- runtime-assets.test.ts`
 
 Expected: FAIL because `managedCacheOnly` is not part of `PrepareRuntimeAssetsOptions`.
 
-- [ ] **Step 3: Implement the opt-in branch**
+- [x] **Step 3: Implement the opt-in branch**
 
 Add the option and gate only the existing local-assets early return:
 
@@ -194,7 +194,7 @@ if (!options.managedCacheOnly && hasCompleteLocalAssets(localAssetsRoot)) {
 }
 ```
 
-- [ ] **Step 4: Run focused tests and typecheck**
+- [x] **Step 4: Run focused tests and typecheck**
 
 Run:
 
@@ -205,12 +205,16 @@ rtk pnpm --filter @lpc-toolkit/cli typecheck
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit Task 2**
+- [x] **Step 5: Commit Task 2**
 
 ```sh
 rtk git add packages/cli/src/runtime-assets.ts packages/cli/test/runtime-assets.test.ts
 rtk git commit -m "feat(cli): support managed-only asset preparation"
 ```
+
+Implementation: added the opt-in managed-cache-only branch while preserving default local-assets precedence.
+Commit: 3ae96c6c026c0fbbcd32ac424d02dfd26bd56986.
+Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- runtime-assets.test.ts` PASS (7 tests); `rtk pnpm --filter @lpc-toolkit/cli typecheck` PASS; `rtk pnpm check:boundaries` PASS.
 
 ### Task 3: Implement the safe local Web server
 
