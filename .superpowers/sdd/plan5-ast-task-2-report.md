@@ -54,6 +54,16 @@
 - Unified loop-RHS binding semantics, function/source-scoped `var`, block-scoped
   `let`/`const`, and direct dynamic-core constant/optional element ownership.
 
+## Final Binding-Resolver Fixes
+
+- Implementation: `9dd79723e34d9108a1692b858869a3c61b8ff2bc`.
+- RED focused: 4 failed, 96 passed (100 total).
+- GREEN focused: PASS (2 files, 100 tests).
+- Full tests: PASS (108 files, 953 passed, 1 skipped).
+- Checker, recursive typecheck, diff check, and scope audit: PASS.
+- Ambient declarations and type-only imports do not create runtime bindings;
+  class static blocks own but do not leak their function-scoped `var` bindings.
+
 ## Second Review Fixes
 
 - Fix commit: `a4d181ff40960b7c44db5c94d44cf101b7b0cf98`

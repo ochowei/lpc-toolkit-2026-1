@@ -575,6 +575,9 @@ passes 90 focused tests and 943 full-suite tests with 1 intentional skip.
 Second final-review implementation `bd4a578d8ddd250654aefd79a59898f48b263124`
 passes 95 focused and 948 full-suite tests with 1 intentional skip, including
 loop-RHS globals, function-scoped `var`, and dynamic-core element ownership.
+Final binding fix `9dd79723e34d9108a1692b858869a3c61b8ff2bc` passes 100
+focused and 953 full-suite tests with 1 skip, covering ambient declarations,
+type-only imports, and class static-block `var` isolation.
 
 ## Final Acceptance Criteria
 

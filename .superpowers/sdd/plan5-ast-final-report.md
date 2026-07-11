@@ -1,7 +1,7 @@
 # Plan 5 AST Final Report
 
 - Focused boundary/workflow tests: PASS (2 files, 79 tests; 71 boundary and 8 workflow/package tests)
-- Full tests: PASS (108 files, 948 passed, 1 skipped)
+- Full tests: PASS (108 files, 953 passed, 1 skipped)
 - Boundary checker: PASS
 - Recursive workspace typecheck: PASS (4 projects: core, presets, CLI, web)
 - Diff check: PASS
@@ -14,6 +14,8 @@ Namespace identity follow-up `1d3dfe8824853eacafe371355142b0d97cd5f7a4` brings
 focused verification to 90 tests and preserves all full-suite results.
 Second final-review implementation `bd4a578d8ddd250654aefd79a59898f48b263124`
 brings focused verification to 95 tests; checker, typecheck, diff, and scope remain PASS.
+Final binding fix `9dd79723e34d9108a1692b858869a3c61b8ff2bc` brings
+focused verification to 100 tests and preserves all required checks.
 
 The full and focused test commands required an out-of-sandbox rerun because
 the `tsx` pretest IPC socket was denied by the sandbox. Both required reruns

@@ -263,6 +263,11 @@ RED 5 failed/90 passed, GREEN 95 passed. Full tests pass 948 with 1 skip;
 loop RHS, function-scoped `var`, and direct dynamic-core element ownership now
 share the corrected lexical/property analysis. All static checks pass.
 
+Final binding-resolver implementation `9dd79723e34d9108a1692b858869a3c61b8ff2bc`:
+RED 4 failed/96 passed, GREEN 100 passed. Full tests pass 953 with 1 skip.
+Ambient/type-only declarations are excluded from runtime bindings and static-block
+`var` scope is isolated. Checker, typecheck, diff, and scope audit pass.
+
 ---
 
 ### Task 3: Full Verification and Plan 5 Closure Evidence
