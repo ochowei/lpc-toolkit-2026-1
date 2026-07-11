@@ -70,6 +70,14 @@ describe('package scripts', () => {
     expect(cliJobStart).toBeGreaterThan(unitJobStart);
 
     const unitJob = ciWorkflow.slice(unitJobStart, cliJobStart);
+    expect(unitJob).toContain(
+      [
+        '      - run: pnpm install --frozen-lockfile',
+        '      - run: pnpm check:boundaries',
+        '      - run: pnpm typecheck',
+        '      - run: pnpm test',
+      ].join('\n'),
+    );
     expect(unitJob).toContain('- run: pnpm check:boundaries');
     expect(unitJob.indexOf('pnpm install --frozen-lockfile')).toBeLessThan(
       unitJob.indexOf('pnpm check:boundaries'),
