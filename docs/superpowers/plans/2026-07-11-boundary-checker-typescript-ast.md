@@ -111,7 +111,7 @@ The exact return-regex fixture and all pre-existing fixtures passed.
 - Consumes: source file path and text already read by the checker.
 - Produces: `parseSource(filePath, source): ts.SourceFile`, `walk(node, visitor): void`, module-specifier records for import/export/dynamic-import nodes, executable identifier detection, and core `composeSelections` ownership detection.
 
-- [ ] **Step 1: Add TypeScript parsing and fail-closed diagnostics**
+- [x] **Step 1: Add TypeScript parsing and fail-closed diagnostics**
 
 Import TypeScript and choose script kind by extension:
 
@@ -146,7 +146,7 @@ function parseSource(filePath, source) {
 
 Use the checker entry point's existing error path so parse failures produce a non-zero exit and include the file path.
 
-- [ ] **Step 2: Collect real module references from AST nodes**
+- [x] **Step 2: Collect real module references from AST nodes**
 
 Walk the source file and collect only:
 
@@ -158,11 +158,11 @@ ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeywor
 
 Accept only string-literal-like module specifiers. Preserve the current output shape consumed by core, presets, all-web public-core, component, and canvas rules. Comments, strings, regex literals, and inert template text must not generate records; a dynamic import inside `${...}` must generate one.
 
-- [ ] **Step 3: Detect executable runtime globals**
+- [x] **Step 3: Detect executable runtime globals**
 
 Walk `Identifier` nodes and ignore non-reference positions: import/export specifiers, property names in `obj.document`, object-literal keys, declarations, labels, and type-only nodes. Treat shorthand properties and executable identifiers inside template substitutions as references. Replace `runtimeWords(source)` consumers with this AST-derived set.
 
-- [ ] **Step 4: Tie `composeSelections` to core module values**
+- [x] **Step 4: Tie `composeSelections` to core module values**
 
 Reject only these relationships:
 
@@ -177,11 +177,11 @@ import('@lpc-toolkit/core').then(({ composeSelections }) => composeSelections);
 
 Implement this structurally by unwrapping parenthesized/await expressions around a dynamic import, inspecting property-access parents, binding patterns initialized from that value, and `.then()` callback parameters tied to that promise. Do not search callback text for a generic word. An unrelated local `composeSelections` remains legal.
 
-- [ ] **Step 5: Remove obsolete lexer helpers**
+- [x] **Step 5: Remove obsolete lexer helpers**
 
 Delete `sourceTokens`, `canStartRegex`, punctuation-range scans, and any unused token-based helpers. Keep package matching and filesystem resolution helpers unchanged.
 
-- [ ] **Step 6: Run focused tests and verify GREEN**
+- [x] **Step 6: Run focused tests and verify GREEN**
 
 Run:
 
@@ -191,7 +191,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- boundary-check.test.ts package-script
 
 Expected: all focused fixtures pass, including every pre-existing fixture and Task 1 regression case.
 
-- [ ] **Step 7: Run checker and typecheck**
+- [x] **Step 7: Run checker and typecheck**
 
 Run separately:
 
@@ -203,7 +203,7 @@ rtk git diff --check
 
 Expected: each exits `0`. Record exact results.
 
-- [ ] **Step 8: Commit the AST implementation**
+- [x] **Step 8: Commit the AST implementation**
 
 ```bash
 rtk git add scripts/check-boundaries.mjs docs/superpowers/plans/2026-07-11-boundary-checker-typescript-ast.md
@@ -211,6 +211,19 @@ rtk git commit -m "fix(boundaries): analyze source with TypeScript AST"
 ```
 
 Record the commit hash and verification status under Task 2.
+
+Implementation note: Replaced the handwritten lexer with the repository's
+TypeScript 5.7 parser, fail-closed parse diagnostics, AST module-reference
+collection, executable-identifier filtering, and structural ownership tracking
+for `composeSelections` values from `@lpc-toolkit/core`. The obsolete token,
+regex-context, and punctuation-range helpers were removed while package and path
+matching remained unchanged. With user approval, corrected the legal control-flow
+regex fixture to escape the `/` in `@lpc-toolkit/web`; the original fixture was
+invalid TypeScript and correctly triggered the new fail-closed diagnostic.
+
+- Commit: 01b54f188bc615cedf40da70e8dc440753eb8d83
+- Verification: focused tests PASS (2 files, 72 tests); boundary checker PASS;
+  recursive workspace typecheck PASS (4 projects); `git diff --check` PASS
 
 ---
 
