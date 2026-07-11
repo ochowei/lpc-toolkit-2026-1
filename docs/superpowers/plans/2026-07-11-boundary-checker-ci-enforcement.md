@@ -120,11 +120,11 @@ comments/strings, and unrelated-package-name fixtures protecting false positives
 - Modify: `packages/web/test/boundary-check.test.ts`
 
 **Interfaces:**
-- Adds `checkPresetsFile({ issues, root, presetsSrc, webSrc, cliSrc, filePath })`.
+- Adds `checkPresetsFile({ issues, root, webSrc, cliSrc, filePath })`.
 - Presets may import `@lpc-toolkit/core` and local preset modules.
 - Presets reject web/CLI packages and relative source paths, React, browser globals, Node filesystem (`fs`, `fs/promises`, `node:fs`, `node:fs/promises`), and concrete canvas packages.
 
-- [ ] **Step 1: Add a legal preset fixture and illegal category fixtures**
+- [x] **Step 1: Add a legal preset fixture and illegal category fixtures**
 
 The legal fixture imports a type from the public core entry and a local preset module. Add table cases:
 
@@ -146,13 +146,13 @@ it.each([
 
 Add one illegal browser-global fixture using `window.localStorage`; add a passing comments/strings fixture.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 Run: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/boundary-check.test.ts`
 
 Expected: presets illegal fixtures FAIL because presets source is not currently scanned.
 
-- [ ] **Step 3: Implement `checkPresetsFile` and scan presets source**
+- [x] **Step 3: Implement `checkPresetsFile` and scan presets source**
 
 Add:
 
@@ -167,7 +167,7 @@ const nodeFilesystemImports = new Set([
 
 For each presets source file, inspect import specifiers with the exact package/path rules above and inspect stripped runtime source with the existing browser-global list. Do not forbid all Node built-ins; Batch E specifically requires Node filesystem for presets.
 
-- [ ] **Step 4: Run focused tests, checker, and typecheck**
+- [x] **Step 4: Run focused tests, checker, and typecheck**
 
 Run:
 
@@ -180,7 +180,7 @@ rtk git diff --check
 
 Expected: PASS; the existing public core import in presets remains legal.
 
-- [ ] **Step 5: Commit Task 2**
+- [x] **Step 5: Commit Task 2**
 
 ```bash
 rtk git add scripts/check-boundaries.mjs packages/web/test/boundary-check.test.ts
@@ -188,6 +188,50 @@ rtk git commit -m "test(boundaries): enforce presets purity"
 ```
 
 After review, check the task and record implementation note, full commit hash, and verification.
+
+Implementation note: Added a presets-only import and runtime-global scan that
+allows the public core entry, local preset modules, and non-filesystem Node
+builtins while rejecting web/CLI packages and sources, React, the exact Node
+filesystem family, concrete canvas packages, and browser globals. Fixtures
+cover legal imports, legal comments/strings, all four filesystem specifiers,
+and every forbidden category.
+
+- Commit: `f27a7d6baf03672d6a9a12adf7a91b3b594b13d4`
+- Verification: RED focused Vitest (`11 failed, 16 passed`); GREEN focused
+  Vitest (`27 passed`); repository boundaries PASS; presets typecheck PASS;
+  `git diff --check` PASS.
+
+Review fix note: Replaced raw-source import regular expressions with a shared
+dependency-free lexical tokenizer/parser so core, presets, and web checks ignore
+complete import syntax in comments, ordinary strings, and template text while
+retaining static, dynamic, export-from, multiline, and template-expression
+imports. Removed the unused `presetsSrc` parameter from `checkPresetsFile`.
+
+- Review fix commit: `17108b4605a54a7feb052803505bafb907828d66`
+- Review verification: RED focused Vitest (`1 failed, 30 passed`) for lexical
+  text; intermediate GREEN (`31 passed`); second RED (`1 failed, 31 passed`)
+  for dynamic import in a template expression; final GREEN (`32 passed`);
+  repository boundaries PASS; `git diff --check` PASS.
+
+Template-specifier review follow-up: Added no-substitution template literal
+specifier tokens for dynamic imports without treating templates containing
+`${...}` as one static specifier. Core, presets, and web bypass fixtures now
+cover this form while inert and computed template cases remain legal.
+
+- Follow-up commit: `f745b36627b1f6ae4583572e280f0e3a20e3b505`
+- Follow-up verification: RED focused Vitest (`3 failed, 33 passed`); GREEN
+  focused Vitest (`36 passed`); repository boundaries PASS;
+  `git diff --check` PASS.
+
+Computed-template review follow-up: Preserved a structural marker for computed
+templates and made dynamic-import parsing terminal, preventing the first quoted
+expression token from being misclassified as the outer static specifier while
+retaining recursive nested-import detection.
+
+- Follow-up commit: `b49c35e551008eb08c53f7c45b9ae0947fd730dd`
+- Follow-up verification: RED focused Vitest (`1 failed, 37 passed`); GREEN
+  focused Vitest (`38 passed`); repository boundaries PASS;
+  `git diff --check` PASS.
 
 ## Task 3: Enforce component ownership and public core imports
 
