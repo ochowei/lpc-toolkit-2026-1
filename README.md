@@ -18,7 +18,7 @@ CLI can share one engine.
 | ------------------- | ------------ | --------------------------------------------------- |
 | `packages/core/`    | **Working**  | Pure TypeScript composition logic (catalog, compose, recolor, hash, credits) |
 | `packages/presets/` | **Working**  | Shared themed outfit presets and preset-application logic |
-| `packages/web/`     | **Working**  | React 18 + Vite + Tailwind CSS v4 + shadcn-style UI with a full three-region grid desktop editor and mobile responsive layout |
+| `packages/web/`     | **Working**  | React 18 + Vite + Tailwind CSS v4 + shadcn-style UI with a two-column desktop editor, top-bar popovers, and responsive mobile layout |
 | `packages/cli/`     | **Working**  | Agent-first Node CLI for catalog exploration, selection validation, token conversion, presets, and rendering |
 
 The core composition pipeline, shared presets, web UI, and CLI are working and tested.
@@ -75,7 +75,7 @@ Install dependencies and verify the workspace:
 pnpm install
 pnpm typecheck   # tsc --noEmit across all packages
 pnpm test        # vitest run across all packages
-pnpm build       # tsc build across all packages
+pnpm build       # package builds: TypeScript, asset preparation, Vite, and CLI vendoring
 ```
 
 The root build runs the package builds for core, presets, web, and CLI. Core and

@@ -65,3 +65,22 @@
 The permanent closure matrix records findings 1–14 as `fixed` and finding 15
 as `documented approved exception`. Each row contains implementation or
 documentation commits, a specific verification command, and `PASS`.
+
+## Final review fix wave
+
+The first final review found three invalid test filenames in matrix rows 2, 11,
+and 15, plus two contradictory stale README phrases. The documentation contract
+was strengthened to reject stale build/layout copy and to verify that every
+referenced `*.test.ts` file exists in the filtered workspace.
+
+- RED after adding the stronger contract: 2 failed / 9 total (stale build copy
+  and missing `spritesheet-bundle.test.ts`).
+- Corrected documentation contract: 9/9 PASS.
+- Finding 2 corrected command: `spritesheet-export.test.ts` plus
+  `zip-export.test.ts`, 29/29 PASS.
+- Finding 11 corrected command: `attribution-manifest.test.ts` plus
+  `attribution-summary.test.ts`, 9/9 PASS.
+- Finding 15 corrected command: `attribution-manifest.test.ts` plus
+  `readme-architecture-docs.test.ts`, 12/12 PASS.
+- README now describes the actual two-column editor and the real mixed package
+  build instead of the stale three-region/TypeScript-only claims.

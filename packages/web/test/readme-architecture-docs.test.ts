@@ -61,6 +61,8 @@ describe('README architecture contract', () => {
     ]) {
       expect(readme).toContain(phrase);
     }
+    expect(readme).not.toContain('tsc build across all packages');
+    expect(readme).not.toContain('three-region grid desktop editor');
   });
 
   it('uses repository-relative documentation links', () => {
@@ -130,6 +132,17 @@ describe('audit closure contract', () => {
       expect(commits).toMatch(/`[0-9a-f]{9,40}`/);
       expect(verification).toMatch(/`rtk [^`]+`/);
       expect(result).toBe('PASS');
+
+      const packageName = verification.match(
+        /--filter @lpc-toolkit\/(core|web|cli)/,
+      )?.[1];
+      for (const testFile of verification.match(/[\w-]+\.test\.ts/g) ?? []) {
+        expect(packageName, `${testFile} must name its workspace package`).toBeDefined();
+        expect(
+          existsSync(path.join(repoRoot, `packages/${packageName}/test`, testFile)),
+          `${testFile} referenced by finding ${finding} must exist`,
+        ).toBe(true);
+      }
     }
 
     expect(rows[14]?.[1]).toBe('documented approved exception');
