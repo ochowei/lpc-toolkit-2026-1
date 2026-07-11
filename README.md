@@ -78,7 +78,23 @@ pnpm test        # vitest run across all packages
 pnpm build       # tsc build across all packages
 ```
 
-All core art assets (spritesheets, sheet definitions, palette definitions, and `CREDITS.csv`) have been migrated from the `upstream/` submodule into the local `assets/` folder. The submodule is now kept for reference only.
+The root build runs the package builds for core, presets, web, and CLI. Core and
+presets compile their reusable TypeScript output; web prepares assets and builds
+the Vite SPA; CLI builds and vendors the workspace runtime needed by its npm
+tarball.
+
+All core art assets (spritesheets, sheet definitions, palette definitions, and
+`CREDITS.csv`) have been migrated from the `upstream/` submodule into the local
+`assets/` folder. The submodule is read-only reference and provenance material.
+Production web and CLI flows use local or pinned/cache-backed assets; parity
+tests use an isolated parity checkout and never install packages inside
+`upstream/`.
+
+The CLI performs first-time asset preparation from its pinned release download,
+verifies the checksum, and stores a platform cache. Later commands use verified cache reuse.
+Offline cache use works after preparation; an empty or invalid
+offline cache fails with recovery guidance. A working-directory `assets/`
+override takes precedence, with `assets_custom/` applied as custom overlays.
 
 To start the web UI development server locally:
 
@@ -157,19 +173,24 @@ console.log(sheet.credits.licenses, walk.credits.licenses);
 
 ### Public API
 
-Exported from `@lpc-toolkit/core` (see `API.md` for full signatures):
+Exported from `@lpc-toolkit/core`; [`API.md`](API.md) is the signature source of
+truth:
 
-- **Catalog** — `createCatalog`
-- **Compose** — `composeSelections`, `getSpritePathsForSelections`
-- **Animation** — `extractAnimation`
-- **Recolor** — `recolorImage`, `recolorPixels`
-- **URL hash ↔ state** — `parseHash`, `serializeHash`
-- **Attribution** — `getCredits`, `computeEffectiveLicense`
-- **Result type** — `ok`, `err`, `isOk`, `isErr`, `unwrapOr` (a tiny
-  `neverthrow`-shaped discriminated union, no dependency)
-- **Constants** — `FRAME_SIZE` (64), `SHEET_WIDTH` (832), `SHEET_HEIGHT`
-  (3456), `ANIMATIONS`, `ANIMATION_OFFSETS`, `LICENSE_CONFIG`, … plus the
-  shared `types.ts` definitions (`Selections`, `ComposedSheet`, etc.)
+- **Catalog and palettes** — catalog creation, palette catalogs, lookups, and
+  palette resolution.
+- **Selections and tokens** — selection types, hash/token parsing, and
+  serialization.
+- **Composition and animation** — `composeSelections`, sprite-path resolution,
+  frame helpers, and `extractAnimation`.
+- **Recoloring** — image and pixel recoloring helpers.
+- **Credits and validation** — precise credit manifests, effective licenses,
+  credit formatting, and asset validation.
+- **Shared contracts** — result helpers, canvas/image adapter types, constants,
+  and animation metadata.
+
+The standard animation atlas is `832×3456` pixels. The custom-animation source sheets
+are not assumed to share those dimensions: each block is computed as
+`frameSize × columns` by `frameSize × rows` and appended to the composed sheet.
 
 ## `@lpc-toolkit/presets`
 
@@ -193,6 +214,8 @@ commands for:
 - rendering: `lpc-toolkit render --selection <file> --out <dir>`
 
 Node.js 22 or newer is required. Install the public CLI package from npm:
+
+The current public package contract is `@lpc-toolkit/cli` version `0.1.0`.
 
 ```bash
 npm install -g @lpc-toolkit/cli
@@ -265,13 +288,28 @@ traditional token publishing. Creating tags, publishing, registry verification,
 and Trusted Publisher configuration are external release operations and must
 not be run as ordinary implementation verification.
 
-## Web UI design reference
+## Web UI and design reference
 
-The web UI in `packages/web/` is fully built. Its design and component mockup live in [`reference/v2/`](reference/v2) as a self-contained HTML file ([`LPC-Toolkit-LayerStack.html`](file:///Users/william/gitRepo/lpc-toolkit-2026-1/reference/v2/LPC-Toolkit-LayerStack.html)). It serves as the **design source and reference material** — the production `packages/web/` is built with React 18 + Vite + Tailwind CSS v4 + shadcn-style UI consuming `@lpc-toolkit/core`.
+The web app has three routes: `/`, `/compose`, and the not-found route. The
+landing page at `/` introduces the toolkit; `/compose` opens the editor; other
+paths show the local not-found page.
+
+The desktop editor uses a layer sidebar and sidebar splitter beside the preview canvas.
+The top-bar popovers own settings and export actions. The responsive layout
+collapses these regions into mobile navigation without changing composition or
+attribution behavior.
+
+The design mockup is the repository-relative
+[Layer Stack reference](reference/v2/LPC-Toolkit-LayerStack.html). It is
+reference material; the production `packages/web/` implementation uses React
+18, Vite, Tailwind CSS v4, and the shared core package.
 
 ### Previewing it
 
-Open [LPC-Toolkit-LayerStack.html](file:///Users/william/gitRepo/lpc-toolkit-2026-1/reference/v2/LPC-Toolkit-LayerStack.html) in a browser (no install, no build step). It renders the mockup for the Layer Stack component, showcasing the styling, structure, and design system.
+Open the checked-in
+[Layer Stack reference](reference/v2/LPC-Toolkit-LayerStack.html) in a browser
+(no install or build step). It renders the component mockup, styling, structure,
+and design system.
 
 ### Layout
 
