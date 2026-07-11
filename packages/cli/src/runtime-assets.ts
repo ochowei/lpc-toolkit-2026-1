@@ -33,6 +33,7 @@ export interface PrepareRuntimeAssetsOptions {
   readonly configPath?: string;
   readonly ensureCache?: typeof ensureAssetCache;
   readonly onProgress?: (progress: AssetCacheProgress) => void;
+  readonly managedCacheOnly?: boolean;
 }
 
 function isDirectory(pathName: string): boolean {
@@ -67,7 +68,7 @@ export async function prepareRuntimeAssets(
   const localAssetsRoot = path.join(cwd, 'assets');
   const customAssetsRoot = path.join(cwd, 'assets_custom');
 
-  if (hasCompleteLocalAssets(localAssetsRoot)) {
+  if (!options.managedCacheOnly && hasCompleteLocalAssets(localAssetsRoot)) {
     const store = createDirectoryAssetStore(localAssetsRoot);
     return {
       context: createRuntimeContext({

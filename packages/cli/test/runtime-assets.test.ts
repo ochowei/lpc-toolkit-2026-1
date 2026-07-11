@@ -68,6 +68,29 @@ describe('prepareRuntimeAssets', () => {
     expect(ensureCache).not.toHaveBeenCalled();
   });
 
+  it('uses the managed cache when managedCacheOnly is enabled', async () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-runtime-managed-only-'));
+    createCompleteLocalAssets(cwd);
+    const cacheRoot = path.join(cwd, 'managed-cache');
+    const layout = createLayout(cacheRoot);
+    const ensureCache = vi.fn(async (_options: EnsureAssetCacheOptions) => ({
+      status: 'cache-hit' as const,
+      layout,
+    }));
+
+    const runtime = await prepareRuntimeAssets({
+      cwd,
+      configPath: createConfig(cwd),
+      env: { LPC_TOOLKIT_CACHE_DIR: cacheRoot },
+      ensureCache,
+      managedCacheOnly: true,
+    });
+
+    expect(runtime.source).toBe('managed-cache');
+    expect(ensureCache).toHaveBeenCalledOnce();
+    expect(runtime.context.assetsRoot).toBe(layout.releaseRoot);
+  });
+
   it('falls back to the pinned managed cache outside the repository', async () => {
     const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-runtime-managed-'));
     const cacheRoot = path.join(cwd, 'managed-cache');
