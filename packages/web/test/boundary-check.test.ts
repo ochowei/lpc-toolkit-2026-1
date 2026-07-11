@@ -498,6 +498,15 @@ export const title = document.title;
     expect(runBoundaryCheck(root)).toEqual({ ok: true, stdout: 'Architecture boundary check passed.\n' });
   });
 
+  it.each([
+    ['enum', 'enum document { Title }\nexport const title = document.Title;\n'],
+    ['namespace', 'namespace document { export const title = "local"; }\nexport const title = document.title;\n'],
+  ])('allows emitted TypeScript %s bindings named after runtime globals', (_name, source) => {
+    const root = makeRepoFixture();
+    writeFixtureFile(root, 'packages/core/src/legal-value-declaration.ts', source);
+    expect(runBoundaryCheck(root)).toEqual({ ok: true, stdout: 'Architecture boundary check passed.\n' });
+  });
+
   it('rejects TypeScript import-equals external modules in core', () => {
     const root = makeRepoFixture();
     writeFixtureFile(root, 'packages/core/src/import-equals.ts', "import fs = require('node:fs');\nexport { fs };\n");
@@ -724,6 +733,18 @@ export function legal(core) { return core.composeSelections; }
       ok: true,
       stdout: 'Architecture boundary check passed.\n',
     });
+  });
+
+  it('rejects core namespace ownership before the import declaration', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(
+      root,
+      'packages/web/src/components/preorder-namespace-leak.tsx',
+      `export const compose = core.composeSelections;
+import * as core from '@lpc-toolkit/core';
+`,
+    );
+    expectBoundaryFailure(root, 'forbidden web component import', 'composeSelections', 'packages/web/src/components/preorder-namespace-leak.tsx');
   });
 
   it('allows composition property access in a dynamic import rejection callback', () => {

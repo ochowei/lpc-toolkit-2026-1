@@ -237,6 +237,12 @@ function statementsDeclareName(statements, identifier) {
           !element.isTypeOnly && element.name.text === identifier);
       }
     }
+    if (ts.isEnumDeclaration(statement)) {
+      return !isAmbientNode(statement) && statement.name.text === identifier;
+    }
+    if (ts.isModuleDeclaration(statement) && ts.isIdentifier(statement.name)) {
+      return !isAmbientNode(statement) && statement.name.text === identifier;
+    }
     return !isAmbientNode(statement) &&
       (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) &&
       statement.name?.text === identifier;
@@ -330,7 +336,16 @@ function callbackUsesCompose(callback) {
 
 function importsCoreCompose(sourceFile) {
   let found = false;
-  const namespaceBindings = new Set();
+  const namespaceBindings = new Map();
+  walk(sourceFile, (node) => {
+    if (ts.isImportDeclaration(node) &&
+        stringSpecifier(node.moduleSpecifier) === '@lpc-toolkit/core' &&
+        !node.importClause?.isTypeOnly &&
+        node.importClause?.namedBindings &&
+        ts.isNamespaceImport(node.importClause.namedBindings)) {
+      namespaceBindings.set(node.importClause.namedBindings.name.text, node.importClause.namedBindings.name);
+    }
+  });
   walk(sourceFile, (node) => {
     if (found) return;
     if (ts.isImportDeclaration(node) &&
@@ -348,7 +363,6 @@ function importsCoreCompose(sourceFile) {
         !node.importClause?.isTypeOnly &&
         node.importClause?.namedBindings &&
         ts.isNamespaceImport(node.importClause.namedBindings)) {
-      namespaceBindings.add(node.importClause.namedBindings.name.text);
       return;
     }
     if (ts.isExportDeclaration(node) &&
