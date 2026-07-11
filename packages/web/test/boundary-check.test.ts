@@ -37,14 +37,28 @@ function makeRepoFixture(): string {
   writeFixtureFile(
     root,
     'packages/core/src/index.ts',
-    "export interface CanvasAdapter {}\n",
+    "import type { CoreType } from './types';\nexport interface CanvasAdapter extends CoreType {}\n",
   );
+  writeFixtureFile(root, 'packages/core/src/types.ts', 'export interface CoreType {}\n');
+  writeFixtureFile(root, 'packages/presets/src/index.ts', 'export const preset = {};\n');
+  writeFixtureFile(root, 'packages/cli/src/index.ts', 'export const cli = {};\n');
   writeFixtureFile(
     root,
     'packages/web/src/adapter/browser-canvas-adapter.ts',
     "import type { CanvasAdapter } from '@lpc-toolkit/core';\nexport const adapter = {} as CanvasAdapter;\n",
   );
   return root;
+}
+
+function expectBoundaryFailure(root: string, message: string, expected: string): void {
+  const result = runBoundaryCheck(root);
+
+  expect(result.ok).toBe(false);
+  if (!result.ok) {
+    expect(result.output).toContain('packages/core/src/leak.ts');
+    expect(result.output).toContain(message);
+    expect(result.output).toContain(expected);
+  }
 }
 
 describe('architecture boundary check', () => {
@@ -57,6 +71,49 @@ describe('architecture boundary check', () => {
       ok: true,
       stdout: 'Architecture boundary check passed.\n',
     });
+  });
+
+  it('allows forbidden-looking words in core comments and strings', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(
+      root,
+      'packages/core/src/legal-words.ts',
+      "// document and react are words here\nexport const note = 'node:fs document react';\n",
+    );
+
+    expect(runBoundaryCheck(root)).toEqual({
+      ok: true,
+      stdout: 'Architecture boundary check passed.\n',
+    });
+  });
+
+  it('allows unrelated package names containing forbidden package text', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(
+      root,
+      'packages/core/src/legal-packages.ts',
+      "import '@lpc-toolkit/web-tools';\nimport '@lpc-toolkit/presets-extra';\nimport '@lpc-toolkit/cli-utils';\n",
+    );
+
+    expect(runBoundaryCheck(root)).toEqual({
+      ok: true,
+      stdout: 'Architecture boundary check passed.\n',
+    });
+  });
+
+  it.each([
+    ['presets package', "import '@lpc-toolkit/presets';", '@lpc-toolkit/presets'],
+    ['presets source', "import '../../presets/src/index';", '../../presets/src/index'],
+    ['web package', "import '@lpc-toolkit/web';", '@lpc-toolkit/web'],
+    ['web source', "import '../../web/src/lib/download';", '../../web/src/lib/download'],
+    ['CLI package', "import '@lpc-toolkit/cli';", '@lpc-toolkit/cli'],
+    ['CLI source', "import '../../cli/src/index';", '../../cli/src/index'],
+    ['React', "import React from 'react';", 'react'],
+    ['concrete canvas', "import { createCanvas } from '@napi-rs/canvas';", '@napi-rs/canvas'],
+  ])('rejects core imports from %s', (_name, source, expected) => {
+    const root = makeRepoFixture();
+    writeFixtureFile(root, 'packages/core/src/leak.ts', source);
+    expectBoundaryFailure(root, 'forbidden core import', expected);
   });
 
   it('rejects browser runtime globals in core source', () => {

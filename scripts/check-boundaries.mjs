@@ -83,24 +83,34 @@ function isInside(candidate, parent) {
   return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }
 
+function isPackageImport(specifier, packageName) {
+  return specifier === packageName || specifier.startsWith(`${packageName}/`);
+}
+
 function addIssue(issues, root, filePath, message) {
   issues.push(`${relativePath(root, filePath)}: ${message}`);
 }
 
-function checkCoreFile({ issues, root, coreSrc, webSrc, filePath }) {
+function checkCoreFile({ issues, root, coreSrc, presetsSrc, webSrc, cliSrc, filePath }) {
   const source = readFileSync(filePath, 'utf8');
 
   for (const specifier of importSpecifiers(source)) {
     const resolved = resolveImport(filePath, specifier);
     const bareSpecifier = specifier.replace(/^node:/, '');
     if (
-      specifier.startsWith('@lpc-toolkit/web') ||
+      isPackageImport(specifier, '@lpc-toolkit/presets') ||
+      isPackageImport(specifier, '@lpc-toolkit/web') ||
+      isPackageImport(specifier, '@lpc-toolkit/cli') ||
       reactImports.has(specifier) ||
       specifier.startsWith('react/') ||
       specifier.startsWith('node:') ||
       nodeBuiltins.has(bareSpecifier) ||
       concreteCanvasImports.has(specifier) ||
-      (resolved && isInside(resolved, webSrc))
+      (resolved && (
+        isInside(resolved, presetsSrc) ||
+        isInside(resolved, webSrc) ||
+        isInside(resolved, cliSrc)
+      ))
     ) {
       addIssue(issues, root, filePath, `forbidden core import "${specifier}"`);
     }
@@ -142,11 +152,13 @@ function checkWebFile({ issues, root, coreSrc, filePath }) {
 
 function checkBoundaries(root) {
   const coreSrc = path.join(root, 'packages/core/src');
+  const presetsSrc = path.join(root, 'packages/presets/src');
   const webSrc = path.join(root, 'packages/web/src');
+  const cliSrc = path.join(root, 'packages/cli/src');
   const issues = [];
 
   for (const filePath of sourceFiles(coreSrc)) {
-    checkCoreFile({ issues, root, coreSrc, webSrc, filePath });
+    checkCoreFile({ issues, root, coreSrc, presetsSrc, webSrc, cliSrc, filePath });
   }
 
   for (const filePath of sourceFiles(webSrc)) {
