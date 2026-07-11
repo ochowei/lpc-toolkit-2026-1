@@ -44,6 +44,16 @@
   RED: 1 failed, 89 passed; GREEN: 90 passed. Final full tests: 943 passed,
   1 skipped. Local bindings that shadow a core namespace import are legal.
 
+## Second Final-Review Fixes
+
+- Implementation: `bd4a578d8ddd250654aefd79a59898f48b263124`.
+- RED focused: 5 failed, 90 passed (95 total).
+- GREEN focused: PASS (2 files, 95 tests).
+- Full tests: PASS (108 files, 948 passed, 1 skipped).
+- Checker, recursive typecheck, diff check, and scope audit: PASS.
+- Unified loop-RHS binding semantics, function/source-scoped `var`, block-scoped
+  `let`/`const`, and direct dynamic-core constant/optional element ownership.
+
 ## Second Review Fixes
 
 - Fix commit: `a4d181ff40960b7c44db5c94d44cf101b7b0cf98`

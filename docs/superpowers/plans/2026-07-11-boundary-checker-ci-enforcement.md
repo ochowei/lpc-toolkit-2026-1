@@ -572,6 +572,9 @@ full workspace tests pass 942 with 1 intentional skip; checker, recursive
 typecheck, and diff check pass. Independent final review remains pending.
 Namespace identity follow-up `1d3dfe8824853eacafe371355142b0d97cd5f7a4`
 passes 90 focused tests and 943 full-suite tests with 1 intentional skip.
+Second final-review implementation `bd4a578d8ddd250654aefd79a59898f48b263124`
+passes 95 focused and 948 full-suite tests with 1 intentional skip, including
+loop-RHS globals, function-scoped `var`, and dynamic-core element ownership.
 
 ## Final Acceptance Criteria
 

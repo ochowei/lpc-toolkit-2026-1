@@ -258,6 +258,11 @@ Namespace binding-identity follow-up `1d3dfe8824853eacafe371355142b0d97cd5f7a4`:
 RED 1 failed/89 passed, GREEN 90 passed. Final full tests pass 943 with 1 skip;
 namespace property ownership now resolves through lexical shadowing.
 
+Second final-review implementation `bd4a578d8ddd250654aefd79a59898f48b263124`:
+RED 5 failed/90 passed, GREEN 95 passed. Full tests pass 948 with 1 skip;
+loop RHS, function-scoped `var`, and direct dynamic-core element ownership now
+share the corrected lexical/property analysis. All static checks pass.
+
 ---
 
 ### Task 3: Full Verification and Plan 5 Closure Evidence
