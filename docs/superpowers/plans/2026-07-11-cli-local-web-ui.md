@@ -51,7 +51,7 @@
 - Produces: `packages/cli/dist/web/index.html` and hashed SPA assets during `pnpm --filter @lpc-toolkit/cli build`.
 - Consumes: the current Web build and CLI `dist` packaging conventions.
 
-- [ ] **Step 1: Add a failing packed-art exclusion assertion**
+- [x] **Step 1: Add a failing packed-art exclusion assertion**
 
 In `packages/cli/scripts/smoke-packed-cli.mjs`, add the required SPA entry and explicit art exclusions:
 
@@ -68,13 +68,13 @@ assert.ok(
 );
 ```
 
-- [ ] **Step 2: Run the package smoke test and confirm the missing SPA failure**
+- [x] **Step 2: Run the package smoke test and confirm the missing SPA failure**
 
 Run: `rtk pnpm --filter @lpc-toolkit/cli test:package`
 
 Expected: FAIL with `packed tarball is missing package/dist/web/index.html`.
 
-- [ ] **Step 3: Add the embedded Vite mode**
+- [x] **Step 3: Add the embedded Vite mode**
 
 Change `packages/web/vite.config.ts` to use Vite's config environment and disable public copying only for `embedded` mode:
 
@@ -98,7 +98,7 @@ Add the Web script:
 "build:embedded": "vite build --mode embedded --outDir dist-embedded"
 ```
 
-- [ ] **Step 4: Copy the embedded bundle with an invariant check**
+- [x] **Step 4: Copy the embedded bundle with an invariant check**
 
 Create `packages/cli/scripts/copy-web-dist.mjs` using `cpSync`, `readdirSync`, and `rmSync`. Resolve `../../web/dist-embedded` as the source and `../dist/web` as the destination, fail if `index.html` is absent, and fail if either forbidden directory exists:
 
@@ -118,7 +118,7 @@ Update the CLI build script so it runs the Web embedded build after core/presets
 "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && pnpm --filter @lpc-toolkit/core build && pnpm --filter @lpc-toolkit/presets build && pnpm --filter @lpc-toolkit/web build:embedded && tsc -p tsconfig.build.json && node scripts/copy-web-dist.mjs && node scripts/copy-token-decode-metadata.mjs && node scripts/vendor-workspace-deps.mjs && node scripts/copy-release-config.mjs"
 ```
 
-- [ ] **Step 5: Verify both Web build modes and the packed artifact**
+- [x] **Step 5: Verify both Web build modes and the packed artifact**
 
 Run:
 
@@ -130,12 +130,16 @@ rtk pnpm --filter @lpc-toolkit/cli test:package
 
 Expected: all PASS; `dist-embedded/index.html` exists; `dist-embedded/zips` and `dist-embedded/spritesheets` do not exist; the packed smoke test passes.
 
-- [ ] **Step 6: Commit Task 1**
+- [x] **Step 6: Commit Task 1**
 
 ```sh
 rtk git add packages/web/vite.config.ts packages/web/package.json packages/cli/package.json packages/cli/scripts/copy-web-dist.mjs packages/cli/scripts/smoke-packed-cli.mjs
 rtk git commit -m "build(cli): package embedded web UI"
 ```
+
+Implementation: added the embedded Vite build, guarded CLI bundle copy, and packed-artifact exclusions.
+Commit: 15d074da7d4b2d32850ae2db731a546c70332751; follow-up fix: f8cc4bc9483fbd5dc62640ce58e7bb49022d98f7.
+Verification: `rtk pnpm --filter @lpc-toolkit/web build` PASS; `rtk pnpm --filter @lpc-toolkit/web build:embedded` PASS; `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS; `rtk pnpm check:boundaries` PASS.
 
 ### Task 2: Add managed-cache-only asset preparation
 
