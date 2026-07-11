@@ -128,7 +128,7 @@ describe('architecture boundary check', () => {
     writeFixtureFile(
       root,
       'packages/core/src/legal-control-regex.ts',
-      `if (enabled) /import('@lpc-toolkit/web')/.test(value);
+      `if (enabled) /import('@lpc-toolkit\\/web')/.test(value);
 else /import('react')/.test(value);
 do /import('react')/.test(value); while (false);
 `,

@@ -2,8 +2,15 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { builtinModules } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 
 const sourceExtensions = new Set(['.js', '.jsx', '.ts', '.tsx']);
+const scriptKinds = new Map([
+  ['.js', ts.ScriptKind.JS],
+  ['.jsx', ts.ScriptKind.JSX],
+  ['.ts', ts.ScriptKind.TS],
+  ['.tsx', ts.ScriptKind.TSX],
+]);
 const coreRuntimeGlobals = [
   'window',
   'document',
@@ -55,268 +62,162 @@ function sourceFiles(dir) {
   return out;
 }
 
-function sourceTokens(source) {
-  const tokens = [];
-
-  function tokenizeTemplate(start) {
-    const markerIndex = tokens.length;
-    tokens.push({ kind: 'computed-template', value: '' });
-    const contentStart = start;
-    let hasSubstitution = false;
-    let index = start;
-    while (index < source.length) {
-      if (source[index] === '\\') {
-        index += 2;
-      } else if (source[index] === '`') {
-        if (!hasSubstitution) {
-          tokens[markerIndex] = {
-            kind: 'template',
-            value: source.slice(contentStart, index),
-          };
-        }
-        return index + 1;
-      } else if (source[index] === '$' && source[index + 1] === '{') {
-        hasSubstitution = true;
-        index = tokenizeCode(index + 2, '}');
-      } else {
-        index += 1;
-      }
-    }
-    return index;
-  }
-
-  function tokenizeCode(start, terminator) {
-    let index = start;
-    while (index < source.length) {
-      const char = source[index];
-      const next = source[index + 1];
-
-      if (terminator && char === terminator) {
-        tokens.push({ kind: 'punctuation', value: char });
-        return index + 1;
-      }
-
-      if (/\s/.test(char)) {
-        index += 1;
-        continue;
-      }
-
-      if (char === '/' && next === '/') {
-        index = source.indexOf('\n', index + 2);
-        if (index === -1) return source.length;
-        continue;
-      }
-
-      if (char === '/' && next === '*') {
-        const end = source.indexOf('*/', index + 2);
-        index = end === -1 ? source.length : end + 2;
-        continue;
-      }
-
-      if (char === '/' && canStartRegex(tokens.at(-1))) {
-        index += 1;
-        let inCharacterClass = false;
-        while (index < source.length) {
-          if (source[index] === '\\') {
-            index += 2;
-          } else if (source[index] === '[') {
-            inCharacterClass = true;
-            index += 1;
-          } else if (source[index] === ']') {
-            inCharacterClass = false;
-            index += 1;
-          } else if (source[index] === '/' && !inCharacterClass) {
-            index += 1;
-            while (/[A-Za-z]/.test(source[index] ?? '')) index += 1;
-            break;
-          } else {
-            index += 1;
-          }
-        }
-        tokens.push({ kind: 'regex', value: '' });
-        continue;
-      }
-
-      if (char === '`') {
-        index = tokenizeTemplate(index + 1);
-        continue;
-      }
-
-      if (char === "'" || char === '"') {
-        const quote = char;
-        const stringStart = index + 1;
-        index += 1;
-        while (index < source.length && source[index] !== quote) {
-          index += source[index] === '\\' ? 2 : 1;
-        }
-        tokens.push({ kind: 'string', value: source.slice(stringStart, index) });
-        index += 1;
-        continue;
-      }
-
-      if (/[A-Za-z_$]/.test(char)) {
-        const wordStart = index;
-        index += 1;
-        while (index < source.length && /[\w$]/.test(source[index])) index += 1;
-        tokens.push({ kind: 'word', value: source.slice(wordStart, index) });
-        continue;
-      }
-
-      if (/\d/.test(char)) {
-        const numberStart = index;
-        index += 1;
-        while (/[\w.]/.test(source[index] ?? '')) index += 1;
-        tokens.push({ kind: 'number', value: source.slice(numberStart, index) });
-        continue;
-      }
-
-      if (char === '{') {
-        tokens.push({ kind: 'punctuation', value: char });
-        index = tokenizeCode(index + 1, '}');
-        continue;
-      }
-
-      tokens.push({ kind: 'punctuation', value: char });
-      index += 1;
-    }
-    return index;
-  }
-
-  tokenizeCode(0, null);
-  return tokens;
-}
-
-function canStartRegex(previousToken) {
-  if (!previousToken) return true;
-  if (previousToken.kind === 'word') {
-    return new Set([
-      'await',
-      'case',
-      'delete',
-      'in',
-      'instanceof',
-      'new',
-      'return',
-      'throw',
-      'typeof',
-      'void',
-      'yield',
-    ]).has(previousToken.value);
-  }
-  if (['number', 'string', 'template', 'regex'].includes(previousToken.kind)) {
-    return false;
-  }
-  return ![')', ']', '}'].includes(previousToken.value);
-}
-
-function matchingPunctuation(tokens, start, open, close) {
-  let depth = 0;
-  for (let index = start; index < tokens.length; index += 1) {
-    if (tokens[index].value === open) depth += 1;
-    if (tokens[index].value === close) depth -= 1;
-    if (depth === 0) return index;
-  }
-  return -1;
-}
-
-function containsWord(tokens, start, end, word) {
-  return tokens
-    .slice(start, end)
-    .some((token) => token.kind === 'word' && token.value === word);
-}
-
-function runtimeWords(source) {
-  return new Set(
-    sourceTokens(source)
-      .filter((token) => token.kind === 'word')
-      .map((token) => token.value),
+function parseSource(filePath, source) {
+  const parsed = ts.createSourceFile(
+    filePath,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    scriptKinds.get(path.extname(filePath)),
   );
+  if (parsed.parseDiagnostics.length > 0) {
+    const message = ts.flattenDiagnosticMessageText(
+      parsed.parseDiagnostics[0].messageText,
+      '\n',
+    );
+    throw new Error(`${filePath}: unable to parse source: ${message}`);
+  }
+  return parsed;
 }
 
-function importSpecifiers(source) {
-  const tokens = sourceTokens(source);
+function walk(node, visitor) {
+  visitor(node);
+  ts.forEachChild(node, (child) => walk(child, visitor));
+}
 
+function stringSpecifier(node) {
+  return node && ts.isStringLiteralLike(node) ? node.text : null;
+}
+
+function importSpecifiers(sourceFile) {
   const specifiers = [];
-  for (let index = 0; index < tokens.length; index += 1) {
-    const token = tokens[index];
-
-    if (token.kind === 'word' && token.value === 'import') {
-      const nextToken = tokens[index + 1];
-      if (nextToken?.value === '.') continue;
-      if (nextToken?.value === '(') {
-        if (['string', 'template'].includes(tokens[index + 2]?.kind)) {
-          specifiers.push(tokens[index + 2].value);
-        }
-        continue;
-      }
-
-      for (let cursor = index + 1; cursor < tokens.length; cursor += 1) {
-        const candidate = tokens[cursor];
-        if (candidate.value === ';') break;
-        if (candidate.kind === 'string') {
-          specifiers.push(candidate.value);
-          break;
-        }
-      }
+  walk(sourceFile, (node) => {
+    if (ts.isImportDeclaration(node)) {
+      const specifier = stringSpecifier(node.moduleSpecifier);
+      if (specifier !== null) specifiers.push(specifier);
+    } else if (ts.isExportDeclaration(node) && node.moduleSpecifier) {
+      const specifier = stringSpecifier(node.moduleSpecifier);
+      if (specifier !== null) specifiers.push(specifier);
+    } else if (
+      ts.isCallExpression(node) &&
+      node.expression.kind === ts.SyntaxKind.ImportKeyword
+    ) {
+      const specifier = stringSpecifier(node.arguments[0]);
+      if (specifier !== null) specifiers.push(specifier);
     }
-
-    if (token.kind === 'word' && token.value === 'export') {
-      for (let cursor = index + 1; cursor < tokens.length; cursor += 1) {
-        const candidate = tokens[cursor];
-        if (candidate.value === ';') break;
-        if (
-          candidate.kind === 'word' &&
-          candidate.value === 'from' &&
-          tokens[cursor + 1]?.kind === 'string'
-        ) {
-          specifiers.push(tokens[cursor + 1].value);
-          break;
-        }
-      }
-    }
-  }
-
+  });
   return specifiers;
 }
 
-function staticImports(source) {
-  const tokens = sourceTokens(source);
-  const imports = [];
-
-  for (let index = 0; index < tokens.length; index += 1) {
-    if (tokens[index].kind !== 'word' || tokens[index].value !== 'import') continue;
-    if (tokens[index + 1]?.value === '.' || tokens[index + 1]?.value === '(') continue;
-
-    let openBrace = -1;
-    let closeBrace = -1;
-    let specifier = null;
-    for (let cursor = index + 1; cursor < tokens.length; cursor += 1) {
-      const token = tokens[cursor];
-      if (token.value === ';') break;
-      if (token.value === '{' && openBrace === -1) openBrace = cursor;
-      if (token.value === '}' && openBrace !== -1) closeBrace = cursor;
-      if (token.kind === 'string') {
-        specifier = token.value;
-        break;
-      }
-    }
-
-    if (!specifier) continue;
-    const names = [];
-    if (openBrace !== -1 && closeBrace > openBrace) {
-      for (let cursor = openBrace + 1; cursor < closeBrace; cursor += 1) {
-        const token = tokens[cursor];
-        if (token.kind !== 'word' || token.value === 'type') continue;
-        names.push(token.value);
-        while (tokens[cursor + 1]?.kind === 'word' && tokens[cursor + 1].value === 'as') {
-          cursor += 2;
-        }
-      }
-    }
-    imports.push({ specifier, names });
+function isTypePosition(node) {
+  for (let current = node.parent; current; current = current.parent) {
+    if (ts.isTypeNode(current)) return true;
+    if (ts.isStatement(current) || ts.isExpression(current)) return false;
   }
+  return false;
+}
 
-  return imports;
+function isIdentifierReference(node) {
+  const parent = node.parent;
+  if (isTypePosition(node)) return false;
+  if (ts.isShorthandPropertyAssignment(parent)) return true;
+  if (ts.isPropertyAccessExpression(parent) && parent.name === node) return false;
+  if (ts.isPropertyAssignment(parent) && parent.name === node) return false;
+  if (ts.isImportClause(parent) || ts.isImportSpecifier(parent) ||
+      ts.isNamespaceImport(parent) || ts.isExportSpecifier(parent)) return false;
+  if ((ts.isLabeledStatement(parent) || ts.isBreakOrContinueStatement(parent)) &&
+      parent.label === node) return false;
+  if ('name' in parent && parent.name === node) return false;
+  return true;
+}
+
+function runtimeWords(sourceFile) {
+  const words = new Set();
+  walk(sourceFile, (node) => {
+    if (ts.isIdentifier(node) && isIdentifierReference(node)) words.add(node.text);
+  });
+  return words;
+}
+
+function unwrapExpression(node) {
+  let current = node;
+  while (ts.isParenthesizedExpression(current) || ts.isAwaitExpression(current)) {
+    current = current.expression;
+  }
+  return current;
+}
+
+function isCoreDynamicImport(node) {
+  const expression = unwrapExpression(node);
+  return ts.isCallExpression(expression) &&
+    expression.expression.kind === ts.SyntaxKind.ImportKeyword &&
+    stringSpecifier(expression.arguments[0]) === '@lpc-toolkit/core';
+}
+
+function bindingContainsCompose(name) {
+  return ts.isObjectBindingPattern(name) && name.elements.some((element) => {
+    const importedName = element.propertyName ?? element.name;
+    return ts.isIdentifier(importedName) && importedName.text === 'composeSelections';
+  });
+}
+
+function callbackUsesCompose(callback) {
+  if (!ts.isArrowFunction(callback) && !ts.isFunctionExpression(callback)) return false;
+  const parameter = callback.parameters[0]?.name;
+  if (!parameter) return false;
+  if (bindingContainsCompose(parameter)) return true;
+  if (!ts.isIdentifier(parameter)) return false;
+  let usesCompose = false;
+  walk(callback.body, (node) => {
+    if (ts.isPropertyAccessExpression(node) &&
+        ts.isIdentifier(node.expression) &&
+        node.expression.text === parameter.text &&
+        node.name.text === 'composeSelections') {
+      usesCompose = true;
+    }
+  });
+  return usesCompose;
+}
+
+function importsCoreCompose(sourceFile) {
+  let found = false;
+  walk(sourceFile, (node) => {
+    if (found) return;
+    if (ts.isImportDeclaration(node) &&
+        stringSpecifier(node.moduleSpecifier) === '@lpc-toolkit/core' &&
+        node.importClause?.namedBindings &&
+        ts.isNamedImports(node.importClause.namedBindings)) {
+      found = node.importClause.namedBindings.elements.some((element) =>
+        (element.propertyName ?? element.name).text === 'composeSelections');
+      return;
+    }
+    if (ts.isExportDeclaration(node) &&
+        stringSpecifier(node.moduleSpecifier) === '@lpc-toolkit/core' &&
+        node.exportClause && ts.isNamedExports(node.exportClause)) {
+      found = node.exportClause.elements.some((element) =>
+        (element.propertyName ?? element.name).text === 'composeSelections');
+      return;
+    }
+    if (ts.isVariableDeclaration(node) && node.initializer &&
+        bindingContainsCompose(node.name) && isCoreDynamicImport(node.initializer)) {
+      found = true;
+      return;
+    }
+    if (ts.isPropertyAccessExpression(node) &&
+        node.name.text === 'composeSelections' &&
+        isCoreDynamicImport(node.expression)) {
+      found = true;
+      return;
+    }
+    if (ts.isCallExpression(node) &&
+        ts.isPropertyAccessExpression(node.expression) &&
+        node.expression.name.text === 'then' &&
+        isCoreDynamicImport(node.expression.expression) &&
+        node.arguments.some(callbackUsesCompose)) {
+      found = true;
+    }
+  });
+  return found;
 }
 
 function resolveImport(filePath, specifier) {
@@ -344,8 +245,9 @@ function addIssue(issues, root, filePath, message) {
 
 function checkCoreFile({ issues, root, coreSrc, presetsSrc, webSrc, cliSrc, filePath }) {
   const source = readFileSync(filePath, 'utf8');
+  const sourceFile = parseSource(filePath, source);
 
-  for (const specifier of importSpecifiers(source)) {
+  for (const specifier of importSpecifiers(sourceFile)) {
     const resolved = resolveImport(filePath, specifier);
     const bareSpecifier = specifier.replace(/^node:/, '');
     if (
@@ -367,7 +269,7 @@ function checkCoreFile({ issues, root, coreSrc, presetsSrc, webSrc, cliSrc, file
     }
   }
 
-  const words = runtimeWords(source);
+  const words = runtimeWords(sourceFile);
   for (const name of coreRuntimeGlobals) {
     if (words.has(name)) {
       addIssue(
@@ -382,8 +284,9 @@ function checkCoreFile({ issues, root, coreSrc, presetsSrc, webSrc, cliSrc, file
 
 function checkWebFile({ issues, root, coreSrc, filePath }) {
   const source = readFileSync(filePath, 'utf8');
+  const sourceFile = parseSource(filePath, source);
 
-  for (const specifier of importSpecifiers(source)) {
+  for (const specifier of importSpecifiers(sourceFile)) {
     const resolved = resolveImport(filePath, specifier);
     if (
       specifier.startsWith('@lpc-toolkit/core/') ||
@@ -407,7 +310,7 @@ function extensionless(filePath) {
 
 function checkWebComponentFile({ issues, root, webSrc, filePath }) {
   const source = readFileSync(filePath, 'utf8');
-  const tokens = sourceTokens(source);
+  const sourceFile = parseSource(filePath, source);
   const forbiddenModules = new Set([
     path.join(webSrc, 'adapter/browser-canvas-adapter'),
     path.join(webSrc, 'lib/character-export'),
@@ -415,108 +318,16 @@ function checkWebComponentFile({ issues, root, webSrc, filePath }) {
     path.join(webSrc, 'lib/zip-export'),
   ]);
 
-  for (const imported of staticImports(source)) {
-    const importsComposition =
-      imported.specifier === '@lpc-toolkit/core' &&
-      imported.names.includes('composeSelections');
-    if (importsComposition) {
-      addIssue(
-        issues,
-        root,
-        filePath,
-        'forbidden web component import "composeSelections"',
-      );
-    }
+  if (importsCoreCompose(sourceFile)) {
+    addIssue(
+      issues,
+      root,
+      filePath,
+      'forbidden web component import "composeSelections"',
+    );
   }
 
-  for (let index = 0; index < tokens.length; index += 1) {
-    const token = tokens[index];
-    if (token.kind === 'word' && token.value === 'export') {
-      let exportsComposition = false;
-      let exportsFromCore = false;
-      for (let cursor = index + 1; cursor < tokens.length && tokens[cursor].value !== ';'; cursor += 1) {
-        if (tokens[cursor].kind === 'word' && tokens[cursor].value === 'composeSelections') {
-          exportsComposition = true;
-        }
-        if (
-          tokens[cursor].kind === 'word' &&
-          tokens[cursor].value === 'from' &&
-          tokens[cursor + 1]?.kind === 'string' &&
-          tokens[cursor + 1].value === '@lpc-toolkit/core'
-        ) {
-          exportsFromCore = true;
-        }
-      }
-      if (exportsComposition && exportsFromCore) {
-        addIssue(issues, root, filePath, 'forbidden web component import "composeSelections"');
-      }
-    }
-
-    if (
-      token.kind === 'word' &&
-      token.value === 'import' &&
-      tokens[index + 1]?.value === '(' &&
-      tokens[index + 2]?.kind === 'string' &&
-      tokens[index + 2].value === '@lpc-toolkit/core'
-    ) {
-      const importClose = matchingPunctuation(tokens, index + 1, '(', ')');
-      let importsComposition = false;
-
-      if (
-        tokens[importClose + 1]?.value === '.' &&
-        tokens[importClose + 2]?.kind === 'word' &&
-        tokens[importClose + 2].value === 'composeSelections'
-      ) {
-        importsComposition = true;
-      }
-
-      if (
-        tokens[importClose + 1]?.value === '.' &&
-        tokens[importClose + 2]?.kind === 'word' &&
-        tokens[importClose + 2].value === 'then' &&
-        tokens[importClose + 3]?.value === '('
-      ) {
-        const thenClose = matchingPunctuation(tokens, importClose + 3, '(', ')');
-        importsComposition = containsWord(
-          tokens,
-          importClose + 4,
-          thenClose,
-          'composeSelections',
-        );
-      }
-
-      let declarationStart = index - 1;
-      while (
-        declarationStart >= 0 &&
-        tokens[declarationStart].value !== ';' &&
-        !['const', 'let', 'var'].includes(tokens[declarationStart].value)
-      ) {
-        declarationStart -= 1;
-      }
-      if (['const', 'let', 'var'].includes(tokens[declarationStart]?.value)) {
-        const assignment = tokens.findIndex(
-          (candidate, candidateIndex) =>
-            candidateIndex > declarationStart &&
-            candidateIndex < index &&
-            candidate.value === '=',
-        );
-        if (assignment !== -1) {
-          importsComposition ||= containsWord(
-            tokens,
-            declarationStart + 1,
-            assignment,
-            'composeSelections',
-          );
-        }
-      }
-
-      if (importsComposition) {
-        addIssue(issues, root, filePath, 'forbidden web component import "composeSelections"');
-      }
-    }
-  }
-
-  for (const specifier of importSpecifiers(source)) {
+  for (const specifier of importSpecifiers(sourceFile)) {
     const resolved = resolveImport(filePath, specifier);
     if (resolved && forbiddenModules.has(extensionless(resolved))) {
       addIssue(
@@ -531,8 +342,9 @@ function checkWebComponentFile({ issues, root, webSrc, filePath }) {
 
 function checkPresetsFile({ issues, root, webSrc, cliSrc, filePath }) {
   const source = readFileSync(filePath, 'utf8');
+  const sourceFile = parseSource(filePath, source);
 
-  for (const specifier of importSpecifiers(source)) {
+  for (const specifier of importSpecifiers(sourceFile)) {
     const resolved = resolveImport(filePath, specifier);
     if (
       isPackageImport(specifier, '@lpc-toolkit/web') ||
@@ -550,7 +362,7 @@ function checkPresetsFile({ issues, root, webSrc, cliSrc, filePath }) {
     }
   }
 
-  const words = runtimeWords(source);
+  const words = runtimeWords(sourceFile);
   for (const name of coreRuntimeGlobals) {
     if (words.has(name)) {
       addIssue(
