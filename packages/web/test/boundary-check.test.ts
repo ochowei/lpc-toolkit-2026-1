@@ -106,6 +106,36 @@ describe('architecture boundary check', () => {
     });
   });
 
+  it('allows import-like text in a regular expression returned from a function', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(
+      root,
+      'packages/core/src/legal-return-regex.ts',
+      "export function example() { return /import('react')/; }\n",
+    );
+
+    expect(runBoundaryCheck(root)).toEqual({
+      ok: true,
+      stdout: 'Architecture boundary check passed.\n',
+    });
+  });
+
+  it('does not let division hide a later forbidden import', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(
+      root,
+      'packages/core/src/division-import-leak.ts',
+      "const ratio = 10 / divisor; import('react');\n",
+    );
+
+    expectBoundaryFailure(
+      root,
+      'forbidden core import',
+      'react',
+      'packages/core/src/division-import-leak.ts',
+    );
+  });
+
   it('allows unrelated package names containing forbidden package text', () => {
     const root = makeRepoFixture();
     writeFixtureFile(
@@ -455,6 +485,20 @@ export { Button, useCatalog };
 export const note = "composeSelections from '../lib/zip-export'";
 export const example = \`import { composeSelections } from '@lpc-toolkit/core'\`;
 `,
+    );
+
+    expect(runBoundaryCheck(root)).toEqual({
+      ok: true,
+      stdout: 'Architecture boundary check passed.\n',
+    });
+  });
+
+  it('allows an unrelated semicolonless declaration after a dynamic core import', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(
+      root,
+      'packages/web/src/components/legal-dynamic-import.tsx',
+      "const core = import('@lpc-toolkit/core')\nconst composeSelections = 1\nexport { composeSelections, core }\n",
     );
 
     expect(runBoundaryCheck(root)).toEqual({

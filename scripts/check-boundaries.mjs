@@ -162,6 +162,14 @@ function sourceTokens(source) {
         continue;
       }
 
+      if (/\d/.test(char)) {
+        const numberStart = index;
+        index += 1;
+        while (/[\w.]/.test(source[index] ?? '')) index += 1;
+        tokens.push({ kind: 'number', value: source.slice(numberStart, index) });
+        continue;
+      }
+
       if (char === '{') {
         tokens.push({ kind: 'punctuation', value: char });
         index = tokenizeCode(index + 1, '}');
@@ -180,10 +188,41 @@ function sourceTokens(source) {
 
 function canStartRegex(previousToken) {
   if (!previousToken) return true;
-  if (previousToken.kind === 'word' || previousToken.kind === 'string' || previousToken.kind === 'template') {
+  if (previousToken.kind === 'word') {
+    return new Set([
+      'await',
+      'case',
+      'delete',
+      'in',
+      'instanceof',
+      'new',
+      'return',
+      'throw',
+      'typeof',
+      'void',
+      'yield',
+    ]).has(previousToken.value);
+  }
+  if (['number', 'string', 'template', 'regex'].includes(previousToken.kind)) {
     return false;
   }
   return ![')', ']', '}'].includes(previousToken.value);
+}
+
+function matchingPunctuation(tokens, start, open, close) {
+  let depth = 0;
+  for (let index = start; index < tokens.length; index += 1) {
+    if (tokens[index].value === open) depth += 1;
+    if (tokens[index].value === close) depth -= 1;
+    if (depth === 0) return index;
+  }
+  return -1;
+}
+
+function containsWord(tokens, start, end, word) {
+  return tokens
+    .slice(start, end)
+    .some((token) => token.kind === 'word' && token.value === word);
 }
 
 function runtimeWords(source) {
@@ -420,11 +459,59 @@ function checkWebComponentFile({ issues, root, webSrc, filePath }) {
       tokens[index + 2]?.kind === 'string' &&
       tokens[index + 2].value === '@lpc-toolkit/core'
     ) {
-      for (let cursor = index + 3; cursor < tokens.length && tokens[cursor].value !== ';'; cursor += 1) {
-        if (tokens[cursor].kind === 'word' && tokens[cursor].value === 'composeSelections') {
-          addIssue(issues, root, filePath, 'forbidden web component import "composeSelections"');
-          break;
+      const importClose = matchingPunctuation(tokens, index + 1, '(', ')');
+      let importsComposition = false;
+
+      if (
+        tokens[importClose + 1]?.value === '.' &&
+        tokens[importClose + 2]?.kind === 'word' &&
+        tokens[importClose + 2].value === 'composeSelections'
+      ) {
+        importsComposition = true;
+      }
+
+      if (
+        tokens[importClose + 1]?.value === '.' &&
+        tokens[importClose + 2]?.kind === 'word' &&
+        tokens[importClose + 2].value === 'then' &&
+        tokens[importClose + 3]?.value === '('
+      ) {
+        const thenClose = matchingPunctuation(tokens, importClose + 3, '(', ')');
+        importsComposition = containsWord(
+          tokens,
+          importClose + 4,
+          thenClose,
+          'composeSelections',
+        );
+      }
+
+      let declarationStart = index - 1;
+      while (
+        declarationStart >= 0 &&
+        tokens[declarationStart].value !== ';' &&
+        !['const', 'let', 'var'].includes(tokens[declarationStart].value)
+      ) {
+        declarationStart -= 1;
+      }
+      if (['const', 'let', 'var'].includes(tokens[declarationStart]?.value)) {
+        const assignment = tokens.findIndex(
+          (candidate, candidateIndex) =>
+            candidateIndex > declarationStart &&
+            candidateIndex < index &&
+            candidate.value === '=',
+        );
+        if (assignment !== -1) {
+          importsComposition ||= containsWord(
+            tokens,
+            declarationStart + 1,
+            assignment,
+            'composeSelections',
+          );
         }
+      }
+
+      if (importsComposition) {
+        addIssue(issues, root, filePath, 'forbidden web component import "composeSelections"');
       }
     }
   }
