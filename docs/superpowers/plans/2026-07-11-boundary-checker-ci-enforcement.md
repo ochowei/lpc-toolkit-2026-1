@@ -538,6 +538,22 @@ import access/destructuring.
   focused boundary/workflow Vitest (`67 passed`); repository boundary checker
   PASS; web TypeScript check reported no errors; `git diff --check` PASS.
 
+Second final-review fix note: Refined lexical slash context so expression-prefix
+keywords such as `return` permit regex literals while numbers and completed
+literals imply division, preventing division from consuming later code. Dynamic
+core-import ownership checks are now bounded to direct property access, the
+matching `.then(...)` callback, or a destructuring declaration on the import's
+left-hand side instead of scanning until the next semicolon.
+
+- Second final-review fix commit: `669e64f4b349b9e0369d8812e110917b3350acbc`
+- Second final-review RED verification: focused boundary Vitest failed exactly
+  the three new regressions (`3 failed, 59 passed`): returned regex text was a
+  false positive, division hid a later forbidden import, and a semicolonless
+  unrelated declaration after dynamic import was a false positive.
+- Second final-review GREEN verification: focused boundary Vitest (`62 passed`);
+  focused boundary/workflow Vitest (`70 passed`); repository boundary checker
+  PASS; recursive workspace typecheck PASS; `git diff --check` PASS.
+
 ## Final Acceptance Criteria
 
 - Core imports from presets, web, CLI, React, Node runtime, and concrete canvas fail; core browser globals fail.
