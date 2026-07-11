@@ -167,6 +167,62 @@ export const template = \`import('@lpc-toolkit/core/internal')\`;
     });
   });
 
+  it('does not treat template literals with substitutions as static import specifiers', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(
+      root,
+      'packages/presets/src/computed-import.ts',
+      "const packageName = 'web';\nexport const load = import(`@lpc-toolkit/${packageName}`);\n",
+    );
+
+    expect(runBoundaryCheck(root)).toEqual({
+      ok: true,
+      stdout: 'Architecture boundary check passed.\n',
+    });
+  });
+
+  it.each([
+    [
+      'core',
+      'packages/core/src/template-leak.ts',
+      "export const load = import(`@lpc-toolkit/web`);",
+      'forbidden core import',
+      '@lpc-toolkit/web',
+    ],
+    [
+      'presets',
+      'packages/presets/src/template-leak.ts',
+      'export const load = import(`node:fs`);',
+      'forbidden presets import',
+      'node:fs',
+    ],
+    [
+      'web',
+      'packages/web/src/template-leak.ts',
+      'export const load = import(`@lpc-toolkit/core/internal`);',
+      'web must import core through @lpc-toolkit/core',
+      '@lpc-toolkit/core/internal',
+    ],
+  ])('rejects no-substitution template dynamic imports in %s', (
+    _name,
+    filePath,
+    source,
+    message,
+    expected,
+  ) => {
+    const root = makeRepoFixture();
+    writeFixtureFile(root, filePath, source);
+
+    const result = runBoundaryCheck(root);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.output).toContain(filePath);
+      expect(result.output).toContain(message);
+      expect(result.output).toContain(expected);
+    }
+  });
+
   it.each([
     ['web package', "import '@lpc-toolkit/web';", '@lpc-toolkit/web'],
     ['web source', "import '../../web/src/lib/download';", '../../web/src/lib/download'],
