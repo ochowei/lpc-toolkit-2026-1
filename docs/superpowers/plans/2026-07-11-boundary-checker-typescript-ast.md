@@ -95,7 +95,7 @@ imports, the unrelated callback-local name was falsely reported as a forbidden w
 component import, and the parenthesized awaited dynamic-core ownership leak was missed.
 The exact return-regex fixture and all pre-existing fixtures passed.
 
-- Commit: pending (recorded immediately after the fixture commit)
+- Commit: b26c756a518a587d9f568ae24f49358139a13d12
 - Verification: RED as expected — 69 passed, 3 failed
 
 ---
