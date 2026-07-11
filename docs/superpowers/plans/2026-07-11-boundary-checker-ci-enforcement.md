@@ -522,6 +522,22 @@ rtk git add docs/superpowers/plans/2026-07-11-boundary-checker-ci-enforcement.md
 rtk git commit -m "docs(plan): record boundary enforcement completion"
 ```
 
+Final-review fix note: Replaced the runtime-global regex sanitizer with the
+shared lexical token stream so executable template substitutions and code after
+URL strings remain visible while comments, strings, and regex literals remain
+inert. Concrete canvas package matching now includes package subpaths. Component
+ownership now rejects public-core `composeSelections` re-exports and dynamic
+import access/destructuring.
+
+- Final-review fix commit: `68361ad1fe27b6839691836f68acbf0d7ae7e9aa`
+- Final-review RED verification: focused boundary Vitest failed the new
+  regressions (`9 failed, 50 passed`): one regex-literal false positive, two
+  duplicated canvas-subpath cases subsequently consolidated, three
+  runtime-global bypasses, and three component-ownership bypasses.
+- Final-review GREEN verification: focused boundary Vitest (`59 passed`);
+  focused boundary/workflow Vitest (`67 passed`); repository boundary checker
+  PASS; web TypeScript check reported no errors; `git diff --check` PASS.
+
 ## Final Acceptance Criteria
 
 - Core imports from presets, web, CLI, React, Node runtime, and concrete canvas fail; core browser globals fail.
