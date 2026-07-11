@@ -34,8 +34,9 @@ function parseClosureTableRow(line: string): ClosureTableRow {
 
 describe('README architecture contract', () => {
   it('documents the current CLI version and tagged release gates', () => {
-    expect(cliPackage.version).toBe('0.1.0');
-    expect(readme).toContain('`@lpc-toolkit/cli` version `0.1.0`');
+    expect(readme).toContain(
+      `\`@lpc-toolkit/cli\` version \`${cliPackage.version}\``,
+    );
     expect(readme).toContain('`v<version>-rc.<number>`');
     expect(readme).toContain('`v<version>`');
     expect(readme).toContain('npm OIDC');
