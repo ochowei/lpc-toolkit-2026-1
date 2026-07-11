@@ -170,7 +170,7 @@ layer-specific callbacks.
 - Produces `useCustomOverlay({ lockedRef, t, onStatus, load? })` returning `overlay`, `zPos`, `upload`, `changeZPos`, and `clear`; `lockedRef.current` breaks the composition/overlay hook-order cycle without conditional hooks.
 - A new upload, clear, or unmount invalidates older pending requests. A result resolving after invalidation or while composition is locked is discarded and its URL revoked.
 
-- [ ] **Step 1: Write failing lifetime and freshness tests**
+- [x] **Step 1: Write failing lifetime and freshness tests**
 
 Cover replacement, z-position updates without revocation, clear, idempotent dispose, stale request rejection, and locked request rejection:
 
@@ -193,13 +193,13 @@ expect(isCurrentOverlayRequest(2, 2, true)).toBe(false);
 expect(isCurrentOverlayRequest(2, 2, false)).toBe(true);
 ```
 
-- [ ] **Step 2: Run focused test and verify RED**
+- [x] **Step 2: Run focused test and verify RED**
 
 Run: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/use-custom-overlay.test.ts`
 
 Expected: FAIL because `use-custom-overlay.ts` does not exist.
 
-- [ ] **Step 3: Implement the lifetime owner and hook**
+- [x] **Step 3: Implement the lifetime owner and hook**
 
 Use `useRef` for one `CustomOverlayLifetime` and a monotonic request id. Read the caller-owned `lockedRef.current` at action start and again after async loading. The async upload flow must follow this order:
 
@@ -221,7 +221,7 @@ setOverlay(lifetimeRef.current.replace(loaded));
 
 `clear` and the unmount cleanup increment the request id before clearing/disposing. `changeZPos` updates both the numeric input state and the owned overlay. Preserve the existing localized loaded/cleared/invalid/error messages and `console.error` label.
 
-- [ ] **Step 4: Wire the hook into harness and verify lifecycle contracts**
+- [x] **Step 4: Wire the hook into harness and verify lifecycle contracts**
 
 Replace all overlay `useState`, `isComposingRef`, URL revocation effects, and upload callbacks with an unconditional lock ref plus the hook:
 
@@ -255,7 +255,7 @@ rtk pnpm check:boundaries
 
 Expected: PASS; no direct `URL.revokeObjectURL` remains in `harness.tsx`.
 
-- [ ] **Step 5: Commit Task 2**
+- [x] **Step 5: Commit Task 2**
 
 ```bash
 rtk git add packages/web/src/hooks/use-custom-overlay.ts packages/web/test/use-custom-overlay.test.ts packages/web/src/components/layer-stack/harness.tsx
@@ -263,6 +263,19 @@ rtk git commit -m "refactor(web): own custom overlay lifecycle in hook"
 ```
 
 After review, mark the task complete and record implementation note, commit hash, and verification.
+
+Implementation note: Added a dedicated custom-overlay hook and lifetime owner with
+monotonic stale-request invalidation, lock-aware async result handling, and at-most-once
+object URL revocation, then replaced the harness-local overlay lifecycle with narrow hook
+state and actions while preserving composition and export wiring.
+
+- Commits:
+  - `23e049bb3e72c3b3abd9c99f28cc75f8c27e1e21`
+  - `78e58f4c75e71b4a53bcbf011285d93b7c26a59a` (review fix: production
+    controller race coverage)
+- Verification: TDD RED confirmed missing hook module; focused custom-overlay,
+  composition, and ZIP Vitest (`54 passed`), web typecheck PASS, boundaries PASS,
+  no `URL.revokeObjectURL` remains in `harness.tsx`, re-review clean.
 
 ## Task 3: Move browser artifact assembly into one export helper
 
