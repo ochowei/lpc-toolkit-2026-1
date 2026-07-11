@@ -181,6 +181,40 @@ export const template = \`import('@lpc-toolkit/core/internal')\`;
     });
   });
 
+  it('does not treat quoted computed-template expressions as outer static specifiers', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(
+      root,
+      'packages/presets/src/quoted-computed-imports.ts',
+      `export const direct = import(\`prefix-\${'@lpc-toolkit/web'}\`);
+export const commented = import(\`prefix-\${/* example */ '@lpc-toolkit/cli'}\`);
+`,
+    );
+
+    expect(runBoundaryCheck(root)).toEqual({
+      ok: true,
+      stdout: 'Architecture boundary check passed.\n',
+    });
+  });
+
+  it('detects a forbidden nested import inside a computed-template expression', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(
+      root,
+      'packages/presets/src/nested-template-leak.ts',
+      "export const load = import(`prefix-${import('@lpc-toolkit/web')}`);\n",
+    );
+
+    const result = runBoundaryCheck(root);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.output).toContain('packages/presets/src/nested-template-leak.ts');
+      expect(result.output).toContain('forbidden presets import');
+      expect(result.output).toContain('@lpc-toolkit/web');
+    }
+  });
+
   it.each([
     [
       'core',

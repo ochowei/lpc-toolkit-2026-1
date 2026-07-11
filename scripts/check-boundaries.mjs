@@ -66,6 +66,8 @@ function importSpecifiers(source) {
   const tokens = [];
 
   function tokenizeTemplate(start) {
+    const markerIndex = tokens.length;
+    tokens.push({ kind: 'computed-template', value: '' });
     const contentStart = start;
     let hasSubstitution = false;
     let index = start;
@@ -74,7 +76,10 @@ function importSpecifiers(source) {
         index += 2;
       } else if (source[index] === '`') {
         if (!hasSubstitution) {
-          tokens.push({ kind: 'template', value: source.slice(contentStart, index) });
+          tokens[markerIndex] = {
+            kind: 'template',
+            value: source.slice(contentStart, index),
+          };
         }
         return index + 1;
       } else if (source[index] === '$' && source[index + 1] === '{') {
@@ -157,11 +162,10 @@ function importSpecifiers(source) {
     if (token.kind === 'word' && token.value === 'import') {
       const nextToken = tokens[index + 1];
       if (nextToken?.value === '.') continue;
-      if (
-        nextToken?.value === '(' &&
-        ['string', 'template'].includes(tokens[index + 2]?.kind)
-      ) {
-        specifiers.push(tokens[index + 2].value);
+      if (nextToken?.value === '(') {
+        if (['string', 'template'].includes(tokens[index + 2]?.kind)) {
+          specifiers.push(tokens[index + 2].value);
+        }
         continue;
       }
 
