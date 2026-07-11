@@ -10,7 +10,10 @@ import {
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { installedCliInvocation } from './installed-cli-command.mjs';
+import {
+  installedCliInvocation,
+  isExpectedWebTermination,
+} from './installed-cli-command.mjs';
 import { packedTarballName } from './package-archive-name.mjs';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -211,7 +214,10 @@ try {
   assert.ok((await zipResponse.arrayBuffer()).byteLength > 0, 'cached body ZIP must not be empty');
   web.kill('SIGTERM');
   const webResult = await new Promise((resolve) => web.once('exit', (code, signal) => resolve({ code, signal })));
-  assert.deepEqual(webResult, { code: 143, signal: null });
+  assert.ok(
+    isExpectedWebTermination(webResult),
+    `unexpected web server termination: ${JSON.stringify(webResult)}`,
+  );
 
   console.log('Packed CLI install smoke test passed.');
 } finally {
