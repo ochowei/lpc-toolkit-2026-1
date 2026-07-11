@@ -50,12 +50,17 @@ function makeRepoFixture(): string {
   return root;
 }
 
-function expectBoundaryFailure(root: string, message: string, expected: string): void {
+function expectBoundaryFailure(
+  root: string,
+  message: string,
+  expected: string,
+  expectedPath = 'packages/core/src/leak.ts',
+): void {
   const result = runBoundaryCheck(root);
 
   expect(result.ok).toBe(false);
   if (!result.ok) {
-    expect(result.output).toContain('packages/core/src/leak.ts');
+    expect(result.output).toContain(expectedPath);
     expect(result.output).toContain(message);
     expect(result.output).toContain(expected);
   }
@@ -99,6 +104,75 @@ describe('architecture boundary check', () => {
       ok: true,
       stdout: 'Architecture boundary check passed.\n',
     });
+  });
+
+  it('allows presets to import the public core entry, local modules, and non-filesystem Node builtins', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(root, 'packages/presets/src/local.ts', 'export interface LocalPreset {}\n');
+    writeFixtureFile(
+      root,
+      'packages/presets/src/legal-imports.ts',
+      "import type { CanvasAdapter } from '@lpc-toolkit/core';\nimport type { LocalPreset } from './local';\nimport { posix } from 'node:path';\nexport type Preset = CanvasAdapter & LocalPreset;\nexport const separator = posix.sep;\n",
+    );
+
+    expect(runBoundaryCheck(root)).toEqual({
+      ok: true,
+      stdout: 'Architecture boundary check passed.\n',
+    });
+  });
+
+  it('allows forbidden-looking words in presets comments and strings', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(
+      root,
+      'packages/presets/src/legal-words.ts',
+      "// window.localStorage, react, node:fs, and @lpc-toolkit/web are words here\nexport const note = 'window react node:fs @napi-rs/canvas';\n",
+    );
+
+    expect(runBoundaryCheck(root)).toEqual({
+      ok: true,
+      stdout: 'Architecture boundary check passed.\n',
+    });
+  });
+
+  it.each([
+    ['web package', "import '@lpc-toolkit/web';", '@lpc-toolkit/web'],
+    ['web source', "import '../../web/src/lib/download';", '../../web/src/lib/download'],
+    ['CLI package', "import '@lpc-toolkit/cli';", '@lpc-toolkit/cli'],
+    ['CLI source', "import '../../cli/src/index';", '../../cli/src/index'],
+    ['React', "import React from 'react';", 'react'],
+    ['Node filesystem', "import { readFileSync } from 'node:fs';", 'node:fs'],
+    ['Node filesystem promises', "import { readFile } from 'node:fs/promises';", 'node:fs/promises'],
+    ['bare Node filesystem', "import { readFileSync } from 'fs';", 'fs'],
+    ['bare Node filesystem promises', "import { readFile } from 'fs/promises';", 'fs/promises'],
+    ['concrete canvas', "import { createCanvas } from '@napi-rs/canvas';", '@napi-rs/canvas'],
+  ])('rejects presets dependency on %s', (_name, source, expected) => {
+    const root = makeRepoFixture();
+    writeFixtureFile(root, 'packages/presets/src/leak.ts', source);
+    expectBoundaryFailure(
+      root,
+      'forbidden presets import',
+      expected,
+      'packages/presets/src/leak.ts',
+    );
+  });
+
+  it('rejects browser runtime globals in presets source', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(
+      root,
+      'packages/presets/src/browser-leak.ts',
+      'export const saved = window.localStorage;\n',
+    );
+
+    const result = runBoundaryCheck(root);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.output).toContain('packages/presets/src/browser-leak.ts');
+      expect(result.output).toContain('forbidden presets runtime global');
+      expect(result.output).toContain('window');
+    }
   });
 
   it.each([

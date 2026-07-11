@@ -17,6 +17,12 @@ const concreteCanvasImports = new Set([
   'node-canvas',
 ]);
 const reactImports = new Set(['react', 'react-dom', 'react/jsx-runtime']);
+const nodeFilesystemImports = new Set([
+  'fs',
+  'fs/promises',
+  'node:fs',
+  'node:fs/promises',
+]);
 const nodeBuiltins = new Set([
   ...builtinModules,
   ...builtinModules.map((name) => name.replace(/^node:/, '')),
@@ -150,6 +156,41 @@ function checkWebFile({ issues, root, coreSrc, filePath }) {
   }
 }
 
+function checkPresetsFile({ issues, root, presetsSrc, webSrc, cliSrc, filePath }) {
+  const source = readFileSync(filePath, 'utf8');
+
+  for (const specifier of importSpecifiers(source)) {
+    const resolved = resolveImport(filePath, specifier);
+    if (
+      isPackageImport(specifier, '@lpc-toolkit/web') ||
+      isPackageImport(specifier, '@lpc-toolkit/cli') ||
+      reactImports.has(specifier) ||
+      specifier.startsWith('react/') ||
+      nodeFilesystemImports.has(specifier) ||
+      concreteCanvasImports.has(specifier) ||
+      (resolved && (
+        isInside(resolved, webSrc) ||
+        isInside(resolved, cliSrc)
+      ))
+    ) {
+      addIssue(issues, root, filePath, `forbidden presets import "${specifier}"`);
+    }
+  }
+
+  const runtimeSource = stripCommentsAndStrings(source);
+  for (const name of coreRuntimeGlobals) {
+    const pattern = new RegExp(`\\b${name}\\b`);
+    if (pattern.test(runtimeSource)) {
+      addIssue(
+        issues,
+        root,
+        filePath,
+        `forbidden presets runtime global "${name}"`,
+      );
+    }
+  }
+}
+
 function checkBoundaries(root) {
   const coreSrc = path.join(root, 'packages/core/src');
   const presetsSrc = path.join(root, 'packages/presets/src');
@@ -159,6 +200,10 @@ function checkBoundaries(root) {
 
   for (const filePath of sourceFiles(coreSrc)) {
     checkCoreFile({ issues, root, coreSrc, presetsSrc, webSrc, cliSrc, filePath });
+  }
+
+  for (const filePath of sourceFiles(presetsSrc)) {
+    checkPresetsFile({ issues, root, presetsSrc, webSrc, cliSrc, filePath });
   }
 
   for (const filePath of sourceFiles(webSrc)) {
