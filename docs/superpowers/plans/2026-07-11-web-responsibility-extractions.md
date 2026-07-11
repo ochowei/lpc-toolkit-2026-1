@@ -291,7 +291,7 @@ state and actions while preserving composition and export wiring.
 - Produces `exportCharacterArtifact(kind, input, options): Promise<void>`; options allow typed injection of adapter creation, download, timestamp, ZIP exporters, and progress only for tests.
 - The helper keeps exact existing filenames, ZIP exporter routing, credit guards, and errors; it performs `downloadBlob` only after complete artifact assembly.
 
-- [ ] **Step 1: Write failing action-routing and frozen-input tests**
+- [x] **Step 1: Write failing action-routing and frozen-input tests**
 
 Use typed dependency spies. Assert bundle/TXT/CSV exact names, all four ZIP kinds route to the corresponding exporter, ZIP name uses the frozen `input.selections.bodyType`, and an async exporter continues using the original input after a separate later input object is created. Assert thrown encoder/exporter errors cause no download and propagate:
 
@@ -309,13 +309,13 @@ expect(download).toHaveBeenCalledWith(
 );
 ```
 
-- [ ] **Step 2: Run focused test and verify RED**
+- [x] **Step 2: Run focused test and verify RED**
 
 Run: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/character-export.test.ts`
 
 Expected: FAIL because `character-export.ts` does not exist.
 
-- [ ] **Step 3: Implement the browser workflow helper**
+- [x] **Step 3: Implement the browser workflow helper**
 
 Implement `freezeCharacterExportInput` as:
 
@@ -354,7 +354,7 @@ const ZIP_EXPORTERS: Readonly<
 
 Bundle uses `exportSpritesheetBundle`; TXT/CSV use core credit formatters; ZIP creates the browser adapter and exact `ExportContext`. Call `assertExportableCredits` before artifact work. Do not catch errors in this helper.
 
-- [ ] **Step 4: Run export helper and existing artifact tests**
+- [x] **Step 4: Run export helper and existing artifact tests**
 
 Run:
 
@@ -366,7 +366,7 @@ rtk pnpm check:boundaries
 
 Expected: PASS. `DownloadPopover` may temporarily call the new helper while still owning state; UI behavior remains unchanged.
 
-- [ ] **Step 5: Commit Task 3**
+- [x] **Step 5: Commit Task 3**
 
 ```bash
 rtk git add packages/web/src/lib/character-export.ts packages/web/test/character-export.test.ts packages/web/src/components/layer-stack/popovers/download-popover.tsx
@@ -374,6 +374,17 @@ rtk git commit -m "refactor(web): centralize browser export workflows"
 ```
 
 After review, mark the task complete and record implementation note, commit hash, and verification.
+
+Implementation note: Added a single browser export workflow helper that freezes
+mutable selection and overlay metadata at invocation, retains the ready sheet and
+other immutable references, routes all seven artifact actions, and downloads only
+after complete assembly. `DownloadPopover` now delegates artifact construction
+while retaining its existing UI state, progress, status, and error presentation.
+
+- Commit: `6912bb51546ddb374a3c43568c41da7cd60ef053`
+- Verification: focused RED failed because `character-export.ts` did not exist;
+  GREEN artifact suite PASS (40 tests); download popover test PASS (1 test);
+  web typecheck PASS; architecture boundary check PASS; `git diff --check` PASS.
 
 ## Task 4: Extract character-export state and concurrency into a hook
 
