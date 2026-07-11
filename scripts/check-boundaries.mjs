@@ -123,6 +123,7 @@ function isIdentifierReference(node) {
   if (ts.isShorthandPropertyAssignment(parent)) return true;
   if (ts.isPropertyAccessExpression(parent) && parent.name === node) return false;
   if (ts.isPropertyAssignment(parent) && parent.name === node) return false;
+  if (ts.isBindingElement(parent) && parent.propertyName === node) return false;
   if (ts.isImportClause(parent) || ts.isImportSpecifier(parent) ||
       ts.isNamespaceImport(parent) || ts.isExportSpecifier(parent)) return false;
   if ((ts.isLabeledStatement(parent) || ts.isBreakOrContinueStatement(parent)) &&
@@ -161,6 +162,24 @@ function bindingContainsCompose(name) {
   });
 }
 
+function bindingDeclaresName(name, identifier) {
+  if (ts.isIdentifier(name)) return name.text === identifier;
+  return name.elements.some((element) =>
+    !ts.isOmittedExpression(element) && bindingDeclaresName(element.name, identifier));
+}
+
+function scopeDeclaresName(node, identifier) {
+  if (ts.isFunctionLike(node)) {
+    return node.parameters.some((parameter) =>
+      bindingDeclaresName(parameter.name, identifier));
+  }
+  if (!ts.isBlock(node)) return false;
+  return node.statements.some((statement) =>
+    ts.isVariableStatement(statement) && statement.declarationList.declarations.some(
+      (declaration) => bindingDeclaresName(declaration.name, identifier),
+    ));
+}
+
 function callbackUsesCompose(callback) {
   if (!ts.isArrowFunction(callback) && !ts.isFunctionExpression(callback)) return false;
   const parameter = callback.parameters[0]?.name;
@@ -168,14 +187,17 @@ function callbackUsesCompose(callback) {
   if (bindingContainsCompose(parameter)) return true;
   if (!ts.isIdentifier(parameter)) return false;
   let usesCompose = false;
-  walk(callback.body, (node) => {
+  function visit(node) {
+    if (node !== callback.body && scopeDeclaresName(node, parameter.text)) return;
     if (ts.isPropertyAccessExpression(node) &&
         ts.isIdentifier(node.expression) &&
         node.expression.text === parameter.text &&
         node.name.text === 'composeSelections') {
       usesCompose = true;
     }
-  });
+    ts.forEachChild(node, visit);
+  }
+  visit(callback.body);
   return usesCompose;
 }
 
@@ -185,16 +207,20 @@ function importsCoreCompose(sourceFile) {
     if (found) return;
     if (ts.isImportDeclaration(node) &&
         stringSpecifier(node.moduleSpecifier) === '@lpc-toolkit/core' &&
+        !node.importClause?.isTypeOnly &&
         node.importClause?.namedBindings &&
         ts.isNamedImports(node.importClause.namedBindings)) {
       found = node.importClause.namedBindings.elements.some((element) =>
+        !element.isTypeOnly &&
         (element.propertyName ?? element.name).text === 'composeSelections');
       return;
     }
     if (ts.isExportDeclaration(node) &&
         stringSpecifier(node.moduleSpecifier) === '@lpc-toolkit/core' &&
+        !node.isTypeOnly &&
         node.exportClause && ts.isNamedExports(node.exportClause)) {
       found = node.exportClause.elements.some((element) =>
+        !element.isTypeOnly &&
         (element.propertyName ?? element.name).text === 'composeSelections');
       return;
     }
@@ -213,7 +239,7 @@ function importsCoreCompose(sourceFile) {
         ts.isPropertyAccessExpression(node.expression) &&
         node.expression.name.text === 'then' &&
         isCoreDynamicImport(node.expression.expression) &&
-        node.arguments.some(callbackUsesCompose)) {
+        callbackUsesCompose(node.arguments[0])) {
       found = true;
     }
   });

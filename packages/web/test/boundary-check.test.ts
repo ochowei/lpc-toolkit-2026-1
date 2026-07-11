@@ -424,6 +424,20 @@ export const commented = import(\`prefix-\${/* example */ '@lpc-toolkit/cli'}\`)
     }
   });
 
+  it('allows noncomputed destructuring property keys named after runtime globals', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(
+      root,
+      'packages/core/src/legal-destructuring-key.ts',
+      'const metadata = { document: 1 };\nexport const { document: localDocument } = metadata;\n',
+    );
+
+    expect(runBoundaryCheck(root)).toEqual({
+      ok: true,
+      stdout: 'Architecture boundary check passed.\n',
+    });
+  });
+
   it.each([
     ['template expression', 'export const title = `${document.title}`;'],
     ['code after a URL string', "const url = 'https://example.test'; document.title = url;"],
@@ -522,6 +536,59 @@ export const example = \`import { composeSelections } from '@lpc-toolkit/core'\`
   const composeSelections = 1;
   return composeSelections;
 });
+`,
+    );
+
+    expect(runBoundaryCheck(root)).toEqual({
+      ok: true,
+      stdout: 'Architecture boundary check passed.\n',
+    });
+  });
+
+  it('allows shadowed callback parameters to use unrelated composition properties', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(
+      root,
+      'packages/web/src/components/legal-shadowed-callback.tsx',
+      `import('@lpc-toolkit/core').then((core) => {
+  function nested(core) {
+    return core.composeSelections;
+  }
+  return 1;
+});
+`,
+    );
+
+    expect(runBoundaryCheck(root)).toEqual({
+      ok: true,
+      stdout: 'Architecture boundary check passed.\n',
+    });
+  });
+
+  it('allows composition property access in a dynamic import rejection callback', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(
+      root,
+      'packages/web/src/components/legal-rejection-callback.tsx',
+      "import('@lpc-toolkit/core').then(() => 1, (core) => core.composeSelections);\n",
+    );
+
+    expect(runBoundaryCheck(root)).toEqual({
+      ok: true,
+      stdout: 'Architecture boundary check passed.\n',
+    });
+  });
+
+  it('allows type-only imports and re-exports of core composition declarations', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(
+      root,
+      'packages/web/src/components/legal-type-composition.tsx',
+      `import type { composeSelections as ComposeA } from '@lpc-toolkit/core';
+import { type composeSelections as ComposeB } from '@lpc-toolkit/core';
+export type { composeSelections as ComposeC } from '@lpc-toolkit/core';
+export { type composeSelections as ComposeD } from '@lpc-toolkit/core';
+export type Types = ComposeA | ComposeB;
 `,
     );
 
