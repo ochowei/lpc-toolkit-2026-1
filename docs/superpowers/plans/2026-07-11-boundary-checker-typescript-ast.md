@@ -280,6 +280,11 @@ sandboxed test attempt was denied when `tsx` tried to create its IPC socket;
 the required out-of-sandbox rerun exited `0`. The boundary checker passed,
 recursive typecheck passed for all four projects, and `git diff --check` passed.
 
+- Commit: `b8b636c9f7ee41bf054a37be893c248e4eb6a289`
+- Verification: full tests PASS (`108` files, `932` passed, `1` skipped);
+  boundary checker PASS; recursive workspace typecheck PASS (`4` projects);
+  `git diff --check` PASS.
+
 - [x] **Step 2: Audit scope**
 
 Run:
@@ -296,6 +301,10 @@ Implementation note: The `894277f67..HEAD` audit listed only
 `packages/web/test/boundary-check.test.ts`, and
 `scripts/check-boundaries.mjs`. No manifest, lockfile, runtime source, asset,
 or `upstream/` path changed. The untracked user audit file remained untouched.
+
+- Commit: `b8b636c9f7ee41bf054a37be893c248e4eb6a289`
+- Verification: scope audit PASS for `894277f67..HEAD`; no manifest, lockfile,
+  runtime source, asset, or `upstream/` changes; preserved untracked user file.
 
 - [x] **Step 3: Record closure evidence**
 
@@ -319,6 +328,10 @@ Implementation note: Fresh focused verification passed `2` files and all
 `79` tests (`71` boundary fixtures and `8` workflow/package contracts). Closure
 evidence is recorded in `.superpowers/sdd/plan5-ast-final-report.md`. Final
 review remains pending.
+
+- Commit: `b8b636c9f7ee41bf054a37be893c248e4eb6a289`
+- Verification: focused boundary/workflow tests PASS (`2` files, `79` tests);
+  final report and both plan updates recorded; independent final review pending.
 
 - [x] **Step 4: Commit verification evidence**
 
