@@ -99,6 +99,18 @@ export function commandNeedsAssets(parsed: ParsedArgs): boolean {
   return false;
 }
 
+function webOptionInput(
+  parsed: ParsedArgs,
+): Parameters<typeof validateWebOptions>[0] {
+  const host = flagString(parsed.flags, 'host');
+  const port = flagString(parsed.flags, 'port');
+  return {
+    ...(host === undefined ? {} : { host }),
+    ...(port === undefined ? {} : { port }),
+    noOpen: flagBoolean(parsed.flags, 'no-open'),
+  };
+}
+
 function preflightAssetCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
   const command = parsed.command[0];
   const subcommand = parsed.command[1];
@@ -206,11 +218,7 @@ function preflightAssetCommand(parsed: ParsedArgs): CliResponse<null> | undefine
       }
     }
     try {
-      validateWebOptions({
-        host: flagString(parsed.flags, 'host'),
-        port: flagString(parsed.flags, 'port'),
-        noOpen: flagBoolean(parsed.flags, 'no-open'),
-      });
+      validateWebOptions(webOptionInput(parsed));
     } catch (error) {
       return commandError('web', {
         code: 'invalid_option',
@@ -282,11 +290,7 @@ export async function runCli(
   }
 
   if (parsed.command[0] === 'web') {
-    const options = validateWebOptions({
-      host: flagString(parsed.flags, 'host'),
-      port: flagString(parsed.flags, 'port'),
-      noOpen: flagBoolean(parsed.flags, 'no-open'),
-    });
+    const options = validateWebOptions(webOptionInput(parsed));
     try {
       const running = await resolvedDependencies.startWebServer({
         ...options,
