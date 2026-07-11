@@ -106,10 +106,10 @@ jobs:
     needs: [unit, changes]
     if: needs.changes.outputs.web == 'true' || github.event_name == 'push'
     runs-on: ubuntu-latest
-    env:
-      LPC_UPSTREAM_PARITY_DIR: ${{ runner.temp }}/lpc-toolkit-upstream-parity
     steps:
       - uses: actions/checkout@v4
+      - name: Configure isolated upstream parity path
+        run: echo "LPC_UPSTREAM_PARITY_DIR=$RUNNER_TEMP/lpc-toolkit-upstream-parity" >> "$GITHUB_ENV"
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:

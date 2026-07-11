@@ -125,8 +125,12 @@ describe('package scripts', () => {
     expect(e2eJob).not.toContain('test:e2e:parity');
 
     expect(parityJob).toContain(
-      'LPC_UPSTREAM_PARITY_DIR: ${{ runner.temp }}/lpc-toolkit-upstream-parity',
+      [
+        '- name: Configure isolated upstream parity path',
+        '        run: echo "LPC_UPSTREAM_PARITY_DIR=$RUNNER_TEMP/lpc-toolkit-upstream-parity" >> "$GITHUB_ENV"',
+      ].join('\n'),
     );
+    expect(parityJob).not.toContain('${{ runner.temp }}');
     expect(parityJob).toContain(
       "require('./asset-release.json').sourceRepository",
     );
