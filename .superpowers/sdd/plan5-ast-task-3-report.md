@@ -46,3 +46,15 @@ untracked user file and was not staged or modified.
   package subpaths, and absence of generic identifier false positives.
 - Final review status remains pending until that reviewer reports no Critical
   or Important issues.
+
+## Documentation review fix
+
+- Commit: `669f21ca10ab9fdb7790b544042637ffe5a40dfc` — added the applicable
+  evidence commit hash and explicit verification status under each completed
+  Task 3 Step 1–3, as required by `AGENTS.md`.
+- Verification: `rtk git diff --check` PASS before the documentation-fix
+  commit. No tests were rerun because this correction changes plan text only;
+  the recorded fresh test evidence remains focused `79/79` and full workspace
+  `932` passed with `1` intentional skip.
+- Scope: documentation only; Step 5 remains unchecked and independent final
+  review remains pending.
