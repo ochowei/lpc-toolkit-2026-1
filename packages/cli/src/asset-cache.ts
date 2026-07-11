@@ -333,6 +333,10 @@ function errorCode(error: unknown): unknown {
     : undefined;
 }
 
+export function isRetryableCacheRenameError(error: unknown): boolean {
+  return ['EACCES', 'EPERM'].includes(String(errorCode(error)));
+}
+
 function createSafeTarReader(
   tarball: Buffer,
   stagingRoot: string,
@@ -868,11 +872,11 @@ export function validateAssetCache(
   }
 }
 
-function publishStagedCache(
+async function publishStagedCache(
   stagingLayout: AssetCacheLayout,
   finalLayout: AssetCacheLayout,
   config: AssetReleaseConfig,
-): { readonly status: AssetCacheStatus; readonly layout: AssetCacheLayout } {
+): Promise<{ readonly status: AssetCacheStatus; readonly layout: AssetCacheLayout }> {
   let validCandidate: string | undefined;
   for (let attempt = 0; attempt < 100; attempt++) {
     if (validCandidate !== undefined) {
@@ -905,7 +909,10 @@ function publishStagedCache(
       try {
         renameSync(finalLayout.releaseRoot, quarantineRoot);
       } catch (error) {
-        if (errorCode(error) === 'ENOENT') {
+        if (errorCode(error) === 'ENOENT' || isRetryableCacheRenameError(error)) {
+          if (isRetryableCacheRenameError(error)) {
+            await new Promise((resolve) => setTimeout(resolve, 5));
+          }
           continue;
         }
         throw new AssetCacheError(
@@ -995,7 +1002,7 @@ export async function ensureAssetCache(
         'Prepared asset cache failed validation.',
       );
     }
-    const result = publishStagedCache(stagingLayout, finalLayout, options.config);
+    const result = await publishStagedCache(stagingLayout, finalLayout, options.config);
     progress(options, 'ready', 'Asset cache is ready.');
     return result;
   } catch (error) {
