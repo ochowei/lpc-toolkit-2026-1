@@ -1,4 +1,5 @@
-import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { EventEmitter } from 'node:events';
 import { get } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
@@ -96,6 +97,18 @@ describe('startWebServer', () => {
     expect((await fetch(new URL('/zips/escape.zip', server.url))).status).toBe(404);
   });
 
+  it('rejects an assetsRoot zips-directory symlink that escapes the assets root', async () => {
+    const roots = createRoots();
+    const externalZips = path.join(roots.outside, 'zips');
+    mkdirSync(externalZips);
+    writeFileSync(path.join(externalZips, 'body.zip'), 'external-zip-data');
+    rmSync(path.join(roots.assetsRoot, 'zips'), { recursive: true });
+    symlinkSync(externalZips, path.join(roots.assetsRoot, 'zips'), 'dir');
+    await expect(startWebServer(
+      { ...roots, host: '127.0.0.1', port: 0, open: false },
+    )).rejects.toThrow('zips');
+  });
+
   it('opens only after listening and warns without failing when opening fails', async () => {
     const roots = createRoots();
     const openBrowser = vi.fn(async () => { throw new Error('desktop unavailable'); });
@@ -115,6 +128,29 @@ describe('startWebServer', () => {
     await server.close();
     await server.close();
     await expect(server.closed).resolves.toBeUndefined();
+  });
+
+  it('warns and remains healthy when the default browser spawn emits an error', async () => {
+    const roots = createRoots();
+    const child = new EventEmitter();
+    const unref = vi.fn();
+    const onWarning = vi.fn();
+    const spawnBrowser = vi.fn(() => {
+      queueMicrotask(() => child.emit('error', new Error('spawn failed')));
+      return {
+        once: child.once.bind(child),
+        unref,
+      };
+    });
+    const server = await startWebServer(
+      { ...roots, host: '127.0.0.1', port: 0, open: true },
+      { onWarning, spawnBrowser },
+    );
+    runningServers.push(server);
+    expect(spawnBrowser).toHaveBeenCalled();
+    expect(unref).toHaveBeenCalled();
+    expect(onWarning).toHaveBeenCalledWith(expect.stringContaining('spawn failed'));
+    expect((await fetch(new URL('/', server.url))).status).toBe(200);
   });
 
   it('rejects when the requested port is already in use', async () => {

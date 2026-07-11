@@ -27,7 +27,19 @@ export interface WebServerDependencies {
   readonly realpath?: (pathName: string) => string;
   readonly stat?: (pathName: string) => { isFile(): boolean };
   readonly streamFile?: typeof createReadStream;
+  readonly spawnBrowser?: BrowserSpawner;
 }
+
+export interface BrowserChild {
+  once(event: 'error' | 'spawn', listener: (error?: Error) => void): unknown;
+  unref(): void;
+}
+
+export type BrowserSpawner = (
+  command: string,
+  args: readonly string[],
+  options: { readonly detached: boolean; readonly stdio: 'ignore' },
+) => BrowserChild;
 
 const MIME_TYPES: Readonly<Record<string, string>> = {
   '.html': 'text/html; charset=utf-8',
@@ -101,19 +113,35 @@ function resolveRegularFile(
   }
 }
 
-function defaultOpenBrowser(url: string): Promise<void> {
+function defaultOpenBrowser(url: string, spawnBrowser?: BrowserSpawner): Promise<void> {
   const { command, args } = browserCommand(process.platform, url);
-  const child = spawn(command, args, { detached: true, stdio: 'ignore' });
-  child.unref();
-  return Promise.resolve();
+  const start = spawnBrowser ?? ((spawnCommand, spawnArgs, spawnOptions) =>
+    spawn(spawnCommand, spawnArgs, spawnOptions));
+  return new Promise((resolve, reject) => {
+    let child: BrowserChild;
+    try {
+      child = start(command, args, { detached: true, stdio: 'ignore' });
+    } catch (error) {
+      reject(error);
+      return;
+    }
+    child.once('error', (error) => reject(error ?? new Error('Browser process failed to start.')));
+    child.once('spawn', () => resolve());
+    child.unref();
+  });
 }
 
 export async function startWebServer(
   options: StartWebServerOptions,
   dependencies: WebServerDependencies = {},
 ): Promise<RunningWebServer> {
-  const canonicalWebRoot = (dependencies.realpath ?? realpathSync.native)(path.resolve(options.webRoot));
-  const canonicalZipsRoot = (dependencies.realpath ?? realpathSync.native)(path.resolve(options.assetsRoot, 'zips'));
+  const realpath = dependencies.realpath ?? realpathSync.native;
+  const canonicalWebRoot = realpath(path.resolve(options.webRoot));
+  const canonicalAssetsRoot = realpath(path.resolve(options.assetsRoot));
+  const canonicalZipsRoot = realpath(path.join(canonicalAssetsRoot, 'zips'));
+  if (!isInsideRoot(canonicalAssetsRoot, canonicalZipsRoot)) {
+    throw new Error('assetsRoot/zips must resolve inside assetsRoot.');
+  }
   const makeServer = dependencies.createServer ?? createServer;
   const streamFile = dependencies.streamFile ?? createReadStream;
   const server = makeServer((request, response) => {
@@ -168,7 +196,7 @@ export async function startWebServer(
   };
   if (options.open) {
     try {
-      await (dependencies.openBrowser ?? defaultOpenBrowser)(url);
+      await (dependencies.openBrowser ?? ((browserUrl) => defaultOpenBrowser(browserUrl, dependencies.spawnBrowser)))(url);
     } catch (error) {
       dependencies.onWarning?.(`Could not open browser: ${error instanceof Error ? error.message : String(error)}`);
     }
