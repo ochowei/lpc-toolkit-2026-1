@@ -1,4 +1,3 @@
-import { creditsToTxt, creditsToCsv } from '@lpc-toolkit/core';
 import type {
   Catalog,
   ComposedSheet,
@@ -6,26 +5,17 @@ import type {
 } from '@lpc-toolkit/core';
 import { Button } from '../../ui/button';
 import { usePopover } from './use-popover';
-import { downloadBlob } from '../../../lib/download';
-import {
-  exportByAnimationZip,
-  exportByItemZip,
-  exportByAnimItemZip,
-  exportByFrameZip,
-  zipExportTimestamp,
-  zipName,
-  type ExportContext,
-  type ZipExportKind,
-} from '../../../lib/zip-export';
-import { createBrowserCanvasAdapter } from '../../../adapter/browser-canvas-adapter';
+import type { ZipExportKind } from '../../../lib/zip-export';
 import type { LabelTranslator, Translator } from '../../../i18n';
 import type { ComposedResult } from '../../../hooks/use-composed-character';
 import type { CustomOverlay } from '../../../lib/custom-overlay';
 import {
-  assertExportableCredits,
-  exportSpritesheetBundle,
   isMissingCreditsError,
 } from '../../../lib/spritesheet-export';
+import {
+  exportCharacterArtifact,
+  type CharacterExportInput,
+} from '../../../lib/character-export';
 
 /** Map export failures to user-facing copy without exposing implementation errors. */
 export function downloadErrorTranslationKey(
@@ -100,14 +90,26 @@ export function DownloadPopover({
     result.status === 'error' ? t('download.failed') : t('download.loading');
   const zipDisabled = disabled || zipRunning !== null;
 
+  const exportInput = (readySheet: ComposedSheet): CharacterExportInput => ({
+    sheet: readySheet,
+    selections,
+    catalog,
+    anim,
+    composeSingleItem,
+    composeSingleItemLayer,
+    customOverlay,
+    itemLabel: (item) => tl.catalogItemName(item),
+  });
+
   const handleBundle = async () => {
     if (!sheet) return;
     const frozenSheet = sheet;
     const frozenAnim = anim;
     try {
-      assertExportableCredits(frozenSheet.credits);
-      const blob = await exportSpritesheetBundle(frozenSheet, frozenAnim);
-      downloadBlob(blob, 'character-spritesheet-with-credits.zip');
+      await exportCharacterArtifact('bundle', {
+        ...exportInput(frozenSheet),
+        anim: frozenAnim,
+      });
       onStatus({ kind: 'info', text: t('download.done') });
       setOpen(false);
     } catch (error) {
@@ -116,12 +118,10 @@ export function DownloadPopover({
     }
   };
 
-  const handleTxt = () => {
+  const handleTxt = async () => {
     if (!sheet) return;
     try {
-      assertExportableCredits(sheet.credits);
-      const txt = creditsToTxt(sheet.credits, anim);
-      downloadBlob(new Blob([txt], { type: 'text/plain' }), 'credits.txt');
+      await exportCharacterArtifact('creditsTxt', exportInput(sheet));
       onStatus({ kind: 'info', text: t('download.done') });
       setOpen(false);
     } catch (error) {
@@ -130,12 +130,10 @@ export function DownloadPopover({
     }
   };
 
-  const handleCsv = () => {
+  const handleCsv = async () => {
     if (!sheet) return;
     try {
-      assertExportableCredits(sheet.credits);
-      const csv = creditsToCsv(sheet.credits, anim);
-      downloadBlob(new Blob([csv], { type: 'text/csv' }), 'credits.csv');
+      await exportCharacterArtifact('creditsCsv', exportInput(sheet));
       onStatus({ kind: 'info', text: t('download.done') });
       setOpen(false);
     } catch (error) {
@@ -144,35 +142,14 @@ export function DownloadPopover({
     }
   };
 
-  const runZip = async (
-    kind: ZipExportKind,
-    fn: (ctx: ExportContext) => Promise<Blob>,
-  ) => {
+  const runZip = async (kind: ZipExportKind) => {
     if (!sheet) return;
     const frozenSheet = sheet;
-    const frozenSelections = selections;
     try {
-      assertExportableCredits(frozenSheet.credits);
-      const adapter = createBrowserCanvasAdapter();
       setZipRunning({ kind, progress: 0 });
-      const blob = await fn({
-        sheet: frozenSheet,
-        selections: frozenSelections,
-        catalog,
-        anim,
-        composeSingleItem,
-        composeSingleItemLayer,
-        adapter,
-        customOverlay,
-        itemLabel: (item) => tl.catalogItemName(item),
+      await exportCharacterArtifact(kind, exportInput(frozenSheet), {
         onProgress: (p) => setZipRunning({ kind, progress: p }),
       });
-      const filename = zipName(
-        frozenSelections.bodyType,
-        kind,
-        zipExportTimestamp(),
-      );
-      downloadBlob(blob, filename);
       onStatus({ kind: 'info', text: t('download.done') });
       setOpen(false);
     } catch (error) {
@@ -232,28 +209,28 @@ export function DownloadPopover({
             <Button
               size="sm"
               disabled={zipDisabled}
-              onClick={() => runZip('byAnimation', exportByAnimationZip)}
+              onClick={() => runZip('byAnimation')}
             >
               {t('download.zipByAnim')}
             </Button>
             <Button
               size="sm"
               disabled={zipDisabled}
-              onClick={() => runZip('byItem', exportByItemZip)}
+              onClick={() => runZip('byItem')}
             >
               {t('download.zipByItem')}
             </Button>
             <Button
               size="sm"
               disabled={zipDisabled}
-              onClick={() => runZip('byAnimItem', exportByAnimItemZip)}
+              onClick={() => runZip('byAnimItem')}
             >
               {t('download.zipByAnimItem')}
             </Button>
             <Button
               size="sm"
               disabled={zipDisabled}
-              onClick={() => runZip('byFrame', exportByFrameZip)}
+              onClick={() => runZip('byFrame')}
             >
               {t('download.zipByFrame')}
             </Button>
