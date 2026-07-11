@@ -438,6 +438,26 @@ export const commented = import(\`prefix-\${/* example */ '@lpc-toolkit/cli'}\`)
     });
   });
 
+  it('allows locally bound runtime-global names', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(root, 'packages/core/src/local-globals.ts', `import { value as window } from './types';
+export function legal(document: string) { const fetch = document; return \`${'${fetch}'}-${'${window}'}\`; }
+`);
+    expect(runBoundaryCheck(root)).toEqual({ ok: true, stdout: 'Architecture boundary check passed.\n' });
+  });
+
+  it('rejects unbound globals beside local bindings', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(root, 'packages/core/src/mixed-globals.ts', 'export function legal(document: string) { return `${document}-${window}`; }\n');
+    expectBoundaryFailure(root, 'forbidden core runtime global', 'window', 'packages/core/src/mixed-globals.ts');
+  });
+
+  it('rejects TypeScript import-equals external modules in core', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(root, 'packages/core/src/import-equals.ts', "import fs = require('node:fs');\nexport { fs };\n");
+    expectBoundaryFailure(root, 'forbidden core import', 'node:fs', 'packages/core/src/import-equals.ts');
+  });
+
   it('rejects computed destructuring keys that reference runtime globals', () => {
     const root = makeRepoFixture();
     writeFixtureFile(
@@ -620,6 +640,29 @@ export const example = \`import { composeSelections } from '@lpc-toolkit/core'\`
       ok: true,
       stdout: 'Architecture boundary check passed.\n',
     });
+  });
+
+  it('rejects callback ownership in loop right-hand expressions', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(root, 'packages/web/src/components/loop-rhs-leak.tsx', `import('@lpc-toolkit/core').then((core) => {
+  for (const core of core.composeSelections) return core;
+  for (const core in core.composeSelections) return core;
+});
+`);
+    expectBoundaryFailure(root, 'forbidden web component import', 'composeSelections', 'packages/web/src/components/loop-rhs-leak.tsx');
+  });
+
+  it.each([
+    ['namespace import', "import * as core from '@lpc-toolkit/core';\nexport const value = core.composeSelections;"],
+    ['export star', "export * from '@lpc-toolkit/core';"],
+    ['parenthesized callback', "import('@lpc-toolkit/core').then((core) => (core).composeSelections);"],
+    ['awaited callback', "import('@lpc-toolkit/core').then(async (core) => (await core).composeSelections);"],
+    ['element callback', "import('@lpc-toolkit/core').then((core) => core['composeSelections']);"],
+    ['optional element callback', "import('@lpc-toolkit/core').then((core) => core?.['composeSelections']);"],
+  ])('rejects %s composition ownership', (_name, source) => {
+    const root = makeRepoFixture();
+    writeFixtureFile(root, 'packages/web/src/components/ownership-leak.tsx', source);
+    expectBoundaryFailure(root, 'forbidden web component import', 'composeSelections', 'packages/web/src/components/ownership-leak.tsx');
   });
 
   it('allows composition property access in a dynamic import rejection callback', () => {

@@ -104,6 +104,10 @@ function importSpecifiers(sourceFile) {
     ) {
       const specifier = stringSpecifier(node.arguments[0]);
       if (specifier !== null) specifiers.push(specifier);
+    } else if (ts.isImportEqualsDeclaration(node) &&
+        ts.isExternalModuleReference(node.moduleReference)) {
+      const specifier = stringSpecifier(node.moduleReference.expression);
+      if (specifier !== null) specifiers.push(specifier);
     }
   });
   return specifiers;
@@ -135,7 +139,16 @@ function isIdentifierReference(node) {
 function runtimeWords(sourceFile) {
   const words = new Set();
   walk(sourceFile, (node) => {
-    if (ts.isIdentifier(node) && isIdentifierReference(node)) words.add(node.text);
+    if (ts.isIdentifier(node) && isIdentifierReference(node)) {
+      let bound = false;
+      for (let current = node.parent; current; current = current.parent) {
+        if (scopeShadowsReference(current, null, node.text)) {
+          bound = true;
+          break;
+        }
+      }
+      if (!bound) words.add(node.text);
+    }
   });
   return words;
 }
@@ -178,6 +191,16 @@ function statementsDeclareName(statements, identifier) {
     if (ts.isVariableStatement(statement)) {
       return declarationListDeclaresName(statement.declarationList, identifier);
     }
+    if (ts.isImportEqualsDeclaration(statement)) return statement.name.text === identifier;
+    if (ts.isImportDeclaration(statement) && statement.importClause) {
+      const clause = statement.importClause;
+      if (clause.name?.text === identifier) return true;
+      const bindings = clause.namedBindings;
+      if (bindings && ts.isNamespaceImport(bindings)) return bindings.name.text === identifier;
+      if (bindings && ts.isNamedImports(bindings)) {
+        return bindings.elements.some((element) => element.name.text === identifier);
+      }
+    }
     return (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) &&
       statement.name?.text === identifier;
   });
@@ -203,11 +226,38 @@ function scopeShadowsReference(node, callback, identifier) {
       declarationListDeclaresName(node.initializer, identifier);
   }
   if (ts.isBlock(node)) return statementsDeclareName(node.statements, identifier);
+  if (ts.isSourceFile(node)) return statementsDeclareName(node.statements, identifier);
   if (ts.isCaseBlock(node)) {
     return node.clauses.some((clause) =>
       statementsDeclareName(clause.statements, identifier));
   }
   return false;
+}
+
+function isInsideNode(node, parent) {
+  return node.pos >= parent.pos && node.end <= parent.end;
+}
+
+function referenceResolvesToParameter(reference, callback, identifier) {
+  for (let current = reference.parent; current && current !== callback; current = current.parent) {
+    if ((ts.isForInStatement(current) || ts.isForOfStatement(current)) &&
+        isInsideNode(reference, current.expression)) continue;
+    if (scopeShadowsReference(current, callback, identifier)) return false;
+  }
+  return true;
+}
+
+function modulePropertyReference(node) {
+  if (ts.isPropertyAccessExpression(node) && node.name.text === 'composeSelections') {
+    const receiver = unwrapExpression(node.expression);
+    return ts.isIdentifier(receiver) ? receiver : null;
+  }
+  if (ts.isElementAccessExpression(node) &&
+      stringSpecifier(node.argumentExpression) === 'composeSelections') {
+    const receiver = unwrapExpression(node.expression);
+    return ts.isIdentifier(receiver) ? receiver : null;
+  }
+  return null;
 }
 
 function callbackUsesCompose(callback) {
@@ -218,11 +268,9 @@ function callbackUsesCompose(callback) {
   if (!ts.isIdentifier(parameter)) return false;
   let usesCompose = false;
   function visit(node) {
-    if (node !== callback.body && scopeShadowsReference(node, callback, parameter.text)) return;
-    if (ts.isPropertyAccessExpression(node) &&
-        ts.isIdentifier(node.expression) &&
-        node.expression.text === parameter.text &&
-        node.name.text === 'composeSelections') {
+    const receiver = modulePropertyReference(node);
+    if (receiver?.text === parameter.text &&
+        referenceResolvesToParameter(receiver, callback, parameter.text)) {
       usesCompose = true;
     }
     ts.forEachChild(node, visit);
@@ -233,6 +281,7 @@ function callbackUsesCompose(callback) {
 
 function importsCoreCompose(sourceFile) {
   let found = false;
+  const namespaceBindings = new Set();
   walk(sourceFile, (node) => {
     if (found) return;
     if (ts.isImportDeclaration(node) &&
@@ -245,6 +294,14 @@ function importsCoreCompose(sourceFile) {
         (element.propertyName ?? element.name).text === 'composeSelections');
       return;
     }
+    if (ts.isImportDeclaration(node) &&
+        stringSpecifier(node.moduleSpecifier) === '@lpc-toolkit/core' &&
+        !node.importClause?.isTypeOnly &&
+        node.importClause?.namedBindings &&
+        ts.isNamespaceImport(node.importClause.namedBindings)) {
+      namespaceBindings.add(node.importClause.namedBindings.name.text);
+      return;
+    }
     if (ts.isExportDeclaration(node) &&
         stringSpecifier(node.moduleSpecifier) === '@lpc-toolkit/core' &&
         !node.isTypeOnly &&
@@ -252,6 +309,17 @@ function importsCoreCompose(sourceFile) {
       found = node.exportClause.elements.some((element) =>
         !element.isTypeOnly &&
         (element.propertyName ?? element.name).text === 'composeSelections');
+      return;
+    }
+    if (ts.isExportDeclaration(node) &&
+        stringSpecifier(node.moduleSpecifier) === '@lpc-toolkit/core' &&
+        !node.isTypeOnly && !node.exportClause) {
+      found = true;
+      return;
+    }
+    const receiver = modulePropertyReference(node);
+    if (receiver && namespaceBindings.has(receiver.text)) {
+      found = true;
       return;
     }
     if (ts.isVariableDeclaration(node) && node.initializer &&
