@@ -14,6 +14,24 @@ const cliPackage = JSON.parse(readRepoFile('packages/cli/package.json')) as {
   version: string;
 };
 
+type ClosureTableRow = readonly [string, string, string, string, string];
+
+function parseClosureTableRow(line: string): ClosureTableRow {
+  const cells = line.split('|').slice(1, -1).map((cell) => cell.trim());
+  const [finding, disposition, commits, verification, result, extra] = cells;
+  if (
+    finding === undefined ||
+    disposition === undefined ||
+    commits === undefined ||
+    verification === undefined ||
+    result === undefined ||
+    extra !== undefined
+  ) {
+    throw new Error(`Closure row must contain exactly five cells: ${line}`);
+  }
+  return [finding, disposition, commits, verification, result];
+}
+
 describe('README architecture contract', () => {
   it('documents the current CLI version and tagged release gates', () => {
     expect(cliPackage.version).toBe('0.1.0');
@@ -119,7 +137,7 @@ describe('audit closure contract', () => {
     const rows = closure
       .split('\n')
       .filter((line) => /^\|\s*\d+\s*\|/.test(line))
-      .map((line) => line.split('|').slice(1, -1).map((cell) => cell.trim()));
+      .map(parseClosureTableRow);
 
     expect(rows.map(([finding]) => Number(finding))).toEqual(
       Array.from({ length: 15 }, (_, index) => index + 1),
