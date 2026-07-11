@@ -244,7 +244,7 @@ retaining recursive nested-import detection.
 - `checkWebComponentFile` rejects named `composeSelections` imports from the public core entry and any direct import resolving to `adapter/browser-canvas-adapter`, `lib/character-export`, `lib/spritesheet-export`, or `lib/zip-export`.
 - Existing `checkWebFile` continues enforcing public core entry usage for every web source file.
 
-- [ ] **Step 1: Add legal component fixtures and each illegal ownership fixture**
+- [x] **Step 1: Add legal component fixtures and each illegal ownership fixture**
 
 Create legal component imports from a hook, UI component, and public core type. Add:
 
@@ -284,13 +284,13 @@ it.each([
 
 Keep/add explicit legal and illegal fixtures for the all-web public-core-entry rule. Add a component comment/string containing `composeSelections` to prove named-import parsing is used.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 Run: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/boundary-check.test.ts`
 
 Expected: all new component illegal fixtures FAIL because components currently receive only the generic web core-entry check.
 
-- [ ] **Step 3: Implement named-import and resolved-workflow checks**
+- [x] **Step 3: Implement named-import and resolved-workflow checks**
 
 Add a helper returning named bindings and source specifier from static imports. It must normalize aliases to the imported name:
 
@@ -311,7 +311,7 @@ function namedImports(source) {
 
 Run this only against component files. Resolve relative specifiers and compare normalized extensionless paths to the four prohibited implementation modules. Do not forbid hook imports or public core type imports.
 
-- [ ] **Step 4: Run focused tests and real-repository scans**
+- [x] **Step 4: Run focused tests and real-repository scans**
 
 Run:
 
@@ -324,7 +324,7 @@ rtk git diff --check
 
 Expected: tests/checker PASS. The `rg` command may find explanatory test-independent text only if present; every actual component import must satisfy the new checker.
 
-- [ ] **Step 5: Commit Task 3**
+- [x] **Step 5: Commit Task 3**
 
 ```bash
 rtk git add scripts/check-boundaries.mjs packages/web/test/boundary-check.test.ts
@@ -332,6 +332,28 @@ rtk git commit -m "test(boundaries): enforce web component ownership"
 ```
 
 After review, check the task and record implementation note, full commit hash, and verification.
+
+Implementation note: Reused the shared lexical tokenizer to extract static
+named imports without matching comments, strings, or template text. Component
+files now reject aliased or multiline `composeSelections` imports from the
+public core entry and relative imports resolving to the browser canvas adapter
+or character, spritesheet, and ZIP export workflows. Hook/UI imports and public
+core type imports remain legal, while the all-web public-core-entry check is
+unchanged.
+
+- Commit: `88e39a35e58ce543d52dfd75cbfdb0f31fed26c9`
+- Verification: RED focused Vitest (`6 failed, 40 passed`); GREEN focused
+  Vitest (`46 passed`); repository boundaries PASS; component import scan found
+  only approved `use-character-export` hook imports; `git diff --check` PASS.
+
+Review fix note: Routed prohibited component module paths through the shared
+`importSpecifiers` stream, closing dynamic-import and export-from bypasses while
+retaining static named-import analysis for `composeSelections` aliases.
+
+- Review fix commit: `69e5ca07c78e4c7d18f54b2ba0a6b7df06dfe8ff`
+- Review verification: RED focused Vitest (`2 failed, 48 passed`); GREEN focused
+  Vitest (`50 passed`); repository boundaries PASS; diff checks PASS; re-review
+  clean.
 
 ## Task 4: Run boundaries in the main CI unit job
 
