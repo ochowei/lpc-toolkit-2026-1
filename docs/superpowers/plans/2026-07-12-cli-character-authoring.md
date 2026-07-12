@@ -1086,7 +1086,7 @@ Then update Task 6 checkboxes and record, stage only this plan, and commit it wi
 - No new runtime interfaces.
 - Verifies the public installed command contract outside the monorepo.
 
-- [ ] **Step 1: Add a failing package-script assertion**
+- [x] **Step 1: Add a failing package-script assertion**
 
 ```ts
 it('smokes the installed character authoring workflow', () => {
@@ -1099,7 +1099,7 @@ it('smokes the installed character authoring workflow', () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- package-metadata.test.ts
@@ -1107,7 +1107,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- package-metadata.test.ts
 
 Expected: FAIL because the packed workflow is absent.
 
-- [ ] **Step 3: Document and add the installed workflow smoke**
+- [x] **Step 3: Document and add the installed workflow smoke**
 
 Add a README quick start that requires no JSON editing:
 
@@ -1121,7 +1121,7 @@ lpc-toolkit character render hero --out ./dist/hero --animation walk --bundle zi
 
 In `smoke-packed-cli.mjs`, invoke the installed binary with the prepared cache, create from `farmer`, search, set a fixture-confirmed valid item, preview, and render. Assert PNG, metadata, TXT, and CSV files for preview and render. Keep cleanup inside the existing `finally` guard and do not download a second asset release.
 
-- [ ] **Step 4: Run full verification**
+- [x] **Step 4: Run full verification**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test
@@ -1133,7 +1133,7 @@ rtk pnpm --filter @lpc-toolkit/cli test:package
 
 Expected: all commands exit 0; CLI tests report zero failures; packed smoke prints `Packed CLI install smoke test passed.`
 
-- [ ] **Step 5: Commit implementation and final execution record**
+- [x] **Step 5: Commit implementation and final execution record**
 
 ```sh
 rtk git add packages/cli/README.md packages/cli/scripts/smoke-packed-cli.mjs packages/cli/test/package-metadata.test.ts
@@ -1142,9 +1142,27 @@ rtk git commit -m "docs(cli): document character authoring workflow"
 
 Then mark Task 7 complete, record the implementation commit and exact verification results below, stage only this plan, and commit the plan record with `rtk git commit -m "docs(plan): record final character workflow verification"`.
 
-- Implementation: Not executed
-- Commit: Not executed
-- Verification: Not executed
+- Implementation: Added a no-JSON installed-package quick start and extended
+  the packed tarball smoke to create a farmer character, search the production
+  catalog, set the exact `hair_braid` item with its valid `lpcr.brown` recolor,
+  preview it, and render it. The preview and render paths each assert their PNG,
+  metadata, TXT credit, and CSV credit artifacts. All installed commands reuse
+  the cache prepared by the existing web smoke and remain inside its cleanup
+  guard. The executable quick start uses the catalog-confirmed item/recolor
+  values rather than the draft's invalid shorthand `braid`/`brown` pair.
+- Commit: `337d67d8578907d6d2b091c532ab79d1d2785c4e`
+- Verification: RED confirmed the new package-metadata assertion failed 1 of 18
+  tests because the installed workflow was absent; focused GREEN passed 18 of
+  18. Final CLI suite PASS (279 passed, 1 platform-specific skip); CLI package
+  typecheck PASS; core suite PASS (167 tests); architecture boundary check and
+  `git diff --check` PASS. Packed installed-package smoke PASS and printed
+  `Packed CLI install smoke test passed.` The first packed run correctly exposed
+  `brown` as invalid for hair's default ULPC palette; the catalog-qualified
+  `lpcr.brown` rerun passed. The first sandboxed CLI suite failed only because
+  localhost binding was denied; the permission-enabled rerun passed all 30 test
+  files. The RTK typecheck shorthand reported no TypeScript errors but returned
+  nonzero, so `rtk pnpm --filter @lpc-toolkit/cli run typecheck` was used for the
+  successful package-script verification.
 
 ## Final Review Checklist
 
