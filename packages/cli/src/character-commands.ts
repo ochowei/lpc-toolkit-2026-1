@@ -15,9 +15,16 @@ import {
   writeCharacter,
   type CharacterLocator,
 } from './character-store.js';
+import { SelectionOutputError } from './compose-selection.js';
 import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
 import type { CliIo } from './main.js';
 import { materializePreset } from './preset-commands.js';
+import {
+  PreviewError,
+  previewIssue,
+  renderCharacterPreview,
+  type CharacterPreviewResult,
+} from './preview.js';
 import { renderSelection } from './render.js';
 import {
   commandError,
@@ -33,20 +40,14 @@ import {
 } from './selection.js';
 import { validateSelections, type ValidationResult } from './validation.js';
 
-export type RenderCharacterPreview = (options: unknown) => Promise<unknown>;
-
 export interface CharacterCommandDependencies {
   readonly renderSelection: typeof renderSelection;
-  readonly renderCharacterPreview: RenderCharacterPreview;
-}
-
-async function unavailableCharacterPreview(): Promise<never> {
-  throw new Error('Character preview is not available yet.');
+  readonly renderCharacterPreview: typeof renderCharacterPreview;
 }
 
 const DEFAULT_DEPENDENCIES: CharacterCommandDependencies = {
   renderSelection,
-  renderCharacterPreview: unavailableCharacterPreview,
+  renderCharacterPreview,
 };
 
 class CharacterUsageError extends Error {
@@ -73,6 +74,14 @@ function requiredFlag(parsed: ParsedArgs, name: string): string {
   const value = flagString(parsed.flags, name);
   if (!value) throw usageError('missing_argument', `--${name} is required.`, `--${name}`);
   return value;
+}
+
+function previewFrameIndex(value: string | undefined): number {
+  if (value === undefined) return 0;
+  if (!/^-?(?:0|[1-9]\d*)$/u.test(value)) {
+    throw previewIssue('preview_frame_out_of_range', value);
+  }
+  return Number(value);
 }
 
 function characterLocator(parsed: ParsedArgs): CharacterLocator {
@@ -157,6 +166,22 @@ function issueFromError(error: unknown): CliIssue {
       ),
     };
   }
+  if (error instanceof PreviewError) {
+    return {
+      code: error.code,
+      message: error.message,
+      ...(error.path === undefined ? {} : { path: error.path }),
+      ...(error.details === undefined ? {} : { details: error.details }),
+    };
+  }
+  if (error instanceof SelectionOutputError) {
+    return {
+      code: error.code,
+      message: error.message,
+      ...(error.issues[0]?.path === undefined ? {} : { path: error.issues[0].path }),
+      ...(error.issues[0]?.details === undefined ? {} : { details: error.issues[0].details }),
+    };
+  }
   return {
     code: 'character_command_failed',
     message: error instanceof Error ? error.message : String(error),
@@ -181,7 +206,7 @@ export async function runCharacterCommand(
   parsed: ParsedArgs,
   io: CliIo,
   runtime?: RuntimeAssets,
-  _dependencies: CharacterCommandDependencies = DEFAULT_DEPENDENCIES,
+  dependencies: CharacterCommandDependencies = DEFAULT_DEPENDENCIES,
 ): Promise<CliResponse<unknown>> {
   const subcommand = parsed.command[1];
   try {
@@ -315,7 +340,26 @@ export async function runCharacterCommand(
       }, [...loaded.warnings, ...validation.warnings]);
     }
 
-    if (subcommand === 'preview' || subcommand === 'render') {
+    if (subcommand === 'preview') {
+      const locator = characterLocator(parsed);
+      const stored = readCharacter(io.cwd, locator);
+      const frameValue = flagString(parsed.flags, 'frame');
+      const result: CharacterPreviewResult = await dependencies.renderCharacterPreview({
+        runtime: requireRuntime(runtime),
+        cwd: io.cwd,
+        selectionPath: stored.path,
+        ...(locator.name === undefined ? {} : { characterName: locator.name }),
+        ...(flagString(parsed.flags, 'out') === undefined
+          ? {}
+          : { outDir: flagString(parsed.flags, 'out') }),
+        animation: flagString(parsed.flags, 'animation') ?? 'walk',
+        direction: flagString(parsed.flags, 'direction') ?? 'down',
+        frameIndex: previewFrameIndex(frameValue),
+      });
+      return commandOk('character preview', result, result.warnings);
+    }
+
+    if (subcommand === 'render') {
       return commandError(`character ${subcommand}`, {
         code: 'character_command_unavailable',
         message: `character ${subcommand} is not implemented yet.`,

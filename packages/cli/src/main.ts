@@ -9,6 +9,7 @@ import {
 } from './args.js';
 import { assetCacheErrorIssue } from './asset-cache.js';
 import { AssetStoreError } from './asset-store.js';
+import { SelectionOutputError } from './compose-selection.js';
 import { runCatalogCommand } from './catalog-commands.js';
 import {
   characterCommandNeedsAssets,
@@ -59,6 +60,13 @@ function renderErrorIssue(
 ): { readonly code: string; readonly message: string; readonly path?: string } {
   if (error instanceof AssetStoreError) {
     return { code: error.code, message: error.message, path: error.path };
+  }
+  if (error instanceof SelectionOutputError) {
+    return {
+      code: error.code,
+      message: error.message,
+      ...(error.issues[0]?.path === undefined ? {} : { path: error.issues[0].path }),
+    };
   }
   return {
     code: 'render_failed',

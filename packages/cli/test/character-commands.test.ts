@@ -1,12 +1,13 @@
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { parseArgs } from '../src/args.js';
 import { createDirectoryAssetStore } from '../src/asset-store.js';
 import { runCharacterCommand } from '../src/character-commands.js';
 import { createRuntimeContext } from '../src/context.js';
 import { runCli, type CliIo } from '../src/main.js';
+import { previewIssue } from '../src/preview.js';
 import type { CliResponse } from '../src/response.js';
 import type { RuntimeAssets } from '../src/runtime-assets.js';
 
@@ -71,6 +72,101 @@ async function run(
 }
 
 describe('character commands', () => {
+  it('delegates character preview defaults and returns its attributed artifacts', async () => {
+    const fixture = createFixture();
+    expect((await run(fixture, ['character', 'create', 'hero'])).response.ok).toBe(true);
+    const renderCharacterPreview = vi.fn().mockResolvedValue({
+      artifacts: [{ type: 'preview', path: '/tmp/hero.preview.png' }],
+      warnings: [],
+      metadataPath: '/tmp/hero.metadata.json',
+      outDir: '/tmp',
+    });
+
+    const response = await runCharacterCommand(
+      parseArgs(['character', 'preview', 'hero']),
+      fixture.io,
+      fixture.runtime,
+      { renderSelection: vi.fn(), renderCharacterPreview },
+    );
+
+    expect(renderCharacterPreview).toHaveBeenCalledWith(expect.objectContaining({
+      runtime: fixture.runtime,
+      cwd: fixture.cwd,
+      characterName: 'hero',
+      animation: 'walk',
+      direction: 'down',
+      frameIndex: 0,
+    }));
+    expect(response).toMatchObject({ ok: true, command: 'character preview' });
+  });
+
+  it('maps actionable preview errors into the command response', async () => {
+    const fixture = createFixture();
+    expect((await run(fixture, ['character', 'create', 'hero'])).response.ok).toBe(true);
+    const previewError = previewIssue('preview_animation_unavailable', 'idle', {
+      available: ['walk'],
+    });
+
+    const response = await runCharacterCommand(
+      parseArgs(['character', 'preview', 'hero', '--animation', 'idle']),
+      fixture.io,
+      fixture.runtime,
+      {
+        renderSelection: vi.fn(),
+        renderCharacterPreview: vi.fn().mockRejectedValue(previewError),
+      },
+    );
+
+    expect(response.errors[0]).toEqual({
+      code: 'preview_animation_unavailable',
+      message: 'The requested preview animation is unavailable.',
+      path: 'idle',
+      details: { available: ['walk'] },
+    });
+  });
+
+  it('maps strict preview selection validation to the stable output error code', async () => {
+    const fixture = createFixture();
+    const selectionPath = path.join(fixture.cwd, 'saved', 'invalid.selection.json');
+    mkdirSync(path.dirname(selectionPath), { recursive: true });
+    writeFileSync(selectionPath, `${JSON.stringify({
+      schema: 'lpc-toolkit.selection.v1',
+      name: 'invalid',
+      bodyType: 'male',
+      items: { hair: { name: 'Missing Hair' } },
+    })}\n`);
+
+    const response = await runCharacterCommand(
+      parseArgs(['character', 'preview', '--selection', selectionPath]),
+      fixture.io,
+      fixture.runtime,
+    );
+
+    expect(response.errors[0]).toMatchObject({
+      code: 'selection_output_invalid',
+      path: 'hair/Missing Hair',
+    });
+  });
+
+  it.each(['abc', '0x1', '1e0'])('rejects non-decimal preview frame %s without delegating', async (frame) => {
+    const fixture = createFixture();
+    expect((await run(fixture, ['character', 'create', 'hero'])).response.ok).toBe(true);
+    const renderCharacterPreview = vi.fn();
+
+    const response = await runCharacterCommand(
+      parseArgs(['character', 'preview', 'hero', '--frame', frame]),
+      fixture.io,
+      fixture.runtime,
+      { renderSelection: vi.fn(), renderCharacterPreview },
+    );
+
+    expect(response.errors[0]).toMatchObject({
+      code: 'preview_frame_out_of_range',
+      path: frame,
+    });
+    expect(renderCharacterPreview).not.toHaveBeenCalled();
+  });
+
   it('creates, sets, searches, shows, validates, removes, and lists a named character', async () => {
     const fixture = createFixture();
 
