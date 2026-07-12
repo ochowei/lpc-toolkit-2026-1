@@ -597,6 +597,7 @@ export async function composeSelections(
   // Render the standard sheet layers.
   const drawnFolders = new Set<string>();
   const successfulLayers = new Map<number, LayerSpec>();
+  const successfulCreditLayers: LayerSpec[] = [];
   for (const item of standardDrawItems) {
     if (item.kind === 'extra') {
       ctx.drawImage(item.value.image, 0, 0);
@@ -613,6 +614,12 @@ export async function composeSelections(
     // Draw the entire spritesheet row at its vertical animation offset.
     ctx.drawImage(sprite, 0, d.yPos);
     drawnFolders.add(d.folder);
+    successfulCreditLayers.push({
+      itemId: d.itemId,
+      typeName: d.typeName,
+      path: d.path,
+      zPos: d.zPos,
+    });
     if (!successfulLayers.has(d.layerIndex)) {
       successfulLayers.set(d.layerIndex, {
         itemId: d.itemId,
@@ -665,6 +672,13 @@ export async function composeSelections(
           zPos: c.zPos,
           draw: () => {
             ctx.drawImage(sprite, 0, region.offsetY);
+            successfulCreditLayers.push({
+              itemId: c.itemId,
+              typeName: c.typeName,
+              path: c.path,
+              zPos: c.zPos,
+              customAnimation: c.customAnim,
+            });
             if (!successfulLayers.has(c.layerIndex)) {
               successfulLayers.set(c.layerIndex, {
                 itemId: c.itemId,
@@ -727,12 +741,22 @@ export async function composeSelections(
   }
 
   const layers = [...successfulLayers.values()].sort((a, b) => a.zPos - b.zPos);
+  const representativePaths = new Set(
+    getSpritePathsForSelections(selections, catalog).map((layer) => layer.path),
+  );
+  const creditLayers = [...successfulCreditLayers].sort(
+    (a, b) =>
+      Number(representativePaths.has(b.path)) -
+      Number(representativePaths.has(a.path)),
+  );
   return {
     canvas,
     width: totalWidth,
     height: totalHeight,
     selections,
-    credits: getCredits(selections, catalog, { layers }),
+    credits: getCredits(selections, catalog, {
+      layers: creditLayers,
+    }),
     layers,
     animations: composedAnimations,
     ...(missingPaths.size > 0 ? { missingPaths: [...missingPaths] } : {}),
