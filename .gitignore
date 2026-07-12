@@ -18,6 +18,7 @@ dist/
 assets/
 
 # Web slice: generated public asset outputs
+packages/web/dist-embedded/
 packages/web/public/spritesheets/
 packages/web/public/zips/
 
