@@ -1,0 +1,896 @@
+# CLI Character Authoring Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Add a complete, non-interactive CLI workflow for creating, editing, previewing, validating, and rendering a named LPC character without hand-writing selection JSON.
+
+**Architecture:** Add focused CLI-only modules for command metadata, character persistence, pure selection editing, command orchestration, and attributed previews. Reuse the existing core catalog/composition APIs, shared presets, selection schema, runtime assets, response envelope, and render pipeline; keep Node/filesystem/canvas behavior out of core.
+
+**Tech Stack:** TypeScript strict mode, Node.js 22+, pnpm workspaces, Vitest, `@lpc-toolkit/core`, `@lpc-toolkit/presets`, existing `@napi-rs/canvas` (MIT) and `jszip` (MIT).
+
+## Global Constraints
+
+- Never modify `upstream/`.
+- Keep `packages/core/` environment-agnostic; no Node, filesystem, DOM, React, Vite, or concrete canvas imports.
+- Preserve mandatory `ComposedSheet.credits`-derived TXT/CSV attribution and effective-license metadata for every preview and render.
+- Use TypeScript strict mode; do not add `any`.
+- Use pnpm and prefix every terminal command with `rtk`.
+- Add no dependency.
+- Preserve valid existing CLI invocations and the `lpc-toolkit.selection.v1` schema.
+- Reject unknown options before asset preparation.
+- After each task, update its checkboxes and execution record in this plan, recording the implementation commit and verification result in a separate documentation commit.
+
+---
+
+## Planned File Structure
+
+- Create `packages/cli/src/command-spec.ts`: hierarchical help text and option-shape validation for all public commands.
+- Create `packages/cli/src/character-store.ts`: safe character-name/path resolution and transactional selection JSON persistence.
+- Create `packages/cli/src/character-editor.ts`: pure create/search/set/remove transitions and suggestions.
+- Create `packages/cli/src/character-commands.ts`: character command orchestration and response construction.
+- Create `packages/cli/src/compose-selection.ts`: reusable CLI composition setup shared by full render and preview.
+- Create `packages/cli/src/preview.ts`: attributed single-frame preview extraction and publication.
+- Create matching focused tests under `packages/cli/test/`.
+- Modify `packages/cli/src/main.ts`: early help/option validation, asset classification, and character dispatch only.
+- Modify `packages/cli/src/render.ts`: consume the shared CLI composition helper without changing artifacts.
+- Modify `packages/cli/src/response.ts`: optional structured issue details plus character human formatting.
+- Modify `packages/cli/README.md` and `packages/cli/scripts/smoke-packed-cli.mjs`: document and verify the installed workflow.
+
+### Task 1: Hierarchical Help and Strict Option Validation
+
+**Files:**
+- Create: `packages/cli/src/command-spec.ts`
+- Create: `packages/cli/test/command-spec.test.ts`
+- Modify: `packages/cli/src/args.ts`
+- Modify: `packages/cli/src/main.ts`
+- Modify: `packages/cli/src/response.ts`
+- Test: `packages/cli/test/main-assets.test.ts`
+- Test: `packages/cli/test/response.test.ts`
+
+**Interfaces:**
+- Produces: `helpForCommand(command: readonly string[]): string`.
+- Produces: `validateCommandOptions(parsed: ParsedArgs): CliIssue | undefined`.
+- Private helpers: `findCommandSpec`, `suggestOption`, and `renderCommandSpec`; each is defined and tested in `command-spec.ts` and is not exported.
+- Extends: `CliIssue.details?: { suggestions?: readonly string[]; available?: readonly string[] }`.
+- Consumes later: every character command uses the same option validator and issue details.
+
+- [ ] **Step 1: Write failing command-spec and dispatch tests**
+
+Add tests that prove nested help is specific and unknown/malformed options fail before asset preparation:
+
+```ts
+it('renders command-specific character set help', () => {
+  const help = helpForCommand(['character', 'set']);
+  expect(help).toContain('lpc-toolkit character set <name>');
+  expect(help).toContain('--item <item-id-or-type/name>');
+});
+
+it('rejects an unknown option', () => {
+  const issue = validateCommandOptions(
+    parseArgs(['catalog', 'items', '--tpye', 'hair']),
+  );
+  expect(issue).toMatchObject({ code: 'unknown_option', path: '--tpye' });
+  expect(issue?.details?.suggestions).toContain('--type');
+});
+
+it('rejects invalid options without preparing assets', async () => {
+  const prepare = vi.fn(async () => runtime);
+  const capture = captureIo(runtime.context.repoRoot);
+  expect(await runCli(['catalog', 'items', '--tpye', 'hair'], capture.io, {
+    prepareRuntimeAssets: prepare,
+  })).toBe(1);
+  expect(prepare).not.toHaveBeenCalled();
+});
+```
+
+- [ ] **Step 2: Run the focused tests and verify RED**
+
+Run:
+
+```sh
+rtk pnpm --filter @lpc-toolkit/cli test -- command-spec.test.ts main-assets.test.ts response.test.ts
+```
+
+Expected: FAIL because `command-spec.ts` and `CliIssue.details` do not exist and nested help still returns the global summary.
+
+- [ ] **Step 3: Implement the command metadata and validator**
+
+Use an explicit table, not ad-hoc checks spread through `main.ts`:
+
+```ts
+type OptionKind = 'boolean' | 'value' | 'repeatable';
+
+interface CommandOptionSpec {
+  readonly name: string;
+  readonly kind: OptionKind;
+  readonly valueLabel?: string;
+  readonly description: string;
+}
+
+interface CommandSpec {
+  readonly command: readonly string[];
+  readonly usage: string;
+  readonly description: string;
+  readonly options: readonly CommandOptionSpec[];
+  readonly examples: readonly string[];
+}
+
+export function validateCommandOptions(parsed: ParsedArgs): CliIssue | undefined {
+  const spec = findCommandSpec(parsed.command);
+  if (!spec) return undefined;
+  for (const [name, value] of parsed.flags) {
+    const option = spec.options.find((candidate) => candidate.name === name);
+    if (!option) {
+      return {
+        code: 'unknown_option',
+        message: `Unknown option: --${name}`,
+        path: `--${name}`,
+        details: { suggestions: suggestOption(name, spec.options) },
+      };
+    }
+    if (option.kind !== 'boolean' && value === true) {
+      return { code: 'invalid_option', message: `--${name} requires a value.`, path: `--${name}` };
+    }
+    if (option.kind !== 'repeatable' && Array.isArray(value)) {
+      return { code: 'invalid_option', message: `--${name} may be supplied only once.`, path: `--${name}` };
+    }
+  }
+  return undefined;
+}
+```
+
+Include specs for all existing commands and every designed `character` command. Every spec allows `help`; commands that support structured output allow `json`. Add `help` to `BOOLEAN_FLAGS` in `args.ts`.
+
+In `runCli`, resolve nested help and validate options before `commandNeedsAssets`:
+
+```ts
+const parsed = parseArgs(argv);
+if (parsed.flags.has('help')) {
+  io.stdout(helpForCommand(parsed.command));
+  return 0;
+}
+const optionIssue = validateCommandOptions(parsed);
+if (optionIssue) {
+  return writeResponse(commandError(parsed.command.join(' '), optionIssue), parsed, io, '');
+}
+```
+
+Extend `CliIssue` exactly as approved:
+
+```ts
+readonly details?: {
+  readonly suggestions?: readonly string[];
+  readonly available?: readonly string[];
+};
+```
+
+- [ ] **Step 4: Run focused tests and typecheck**
+
+Run:
+
+```sh
+rtk pnpm --filter @lpc-toolkit/cli test -- command-spec.test.ts main-assets.test.ts response.test.ts args.test.ts
+rtk pnpm --filter @lpc-toolkit/cli typecheck
+```
+
+Expected: all selected tests PASS and typecheck exits 0.
+
+- [ ] **Step 5: Commit the implementation**
+
+```sh
+rtk git add packages/cli/src/args.ts packages/cli/src/command-spec.ts packages/cli/src/main.ts packages/cli/src/response.ts packages/cli/test/args.test.ts packages/cli/test/command-spec.test.ts packages/cli/test/main-assets.test.ts packages/cli/test/response.test.ts
+rtk git commit -m "feat(cli): add hierarchical command help"
+```
+
+- [ ] **Step 6: Record task completion**
+
+After the implementation commit, mark Task 1 steps complete and replace this current-state record with actual evidence, then stage only this plan and commit it with `rtk git commit -m "docs(plan): record CLI help task"`.
+
+- Implementation: Not executed
+- Commit: Not executed
+- Verification: Not executed
+
+### Task 2: Character Store and Safe Persistence
+
+**Files:**
+- Create: `packages/cli/src/character-store.ts`
+- Create: `packages/cli/test/character-store.test.ts`
+
+**Interfaces:**
+- Produces: `resolveCharacterPath(cwd: string, input: CharacterLocator): string`.
+- Produces: `readCharacter(cwd: string, input: CharacterLocator): StoredCharacter`.
+- Produces: `writeCharacter(targetPath: string, selection: SelectionJson, mode: 'create' | 'replace'): void`.
+- Produces: `listCharacters(cwd: string): readonly CharacterListEntry[]`.
+- Produces: `CharacterStoreError extends Error` with readonly `code` and optional `path`; `toCharacterWriteError` is its private unknown-error mapper.
+- Consumes: existing `parseSelectionJson` and `SelectionJson`.
+
+- [ ] **Step 1: Write failing persistence tests**
+
+Cover safe names, explicit paths, listing, create conflicts, replacement, and unchanged bytes after validation failure:
+
+```ts
+it.each(['../hero', '/hero', '.', '..', 'hero/alt'])('rejects unsafe name %s', (name) => {
+  expect(() => resolveCharacterPath(cwd, { name })).toThrowError(
+    expect.objectContaining({ code: 'character_name_invalid' }),
+  );
+});
+
+it('creates and replaces a character through a sibling temporary file', () => {
+  const target = resolveCharacterPath(cwd, { name: 'hero' });
+  writeCharacter(target, selection('hero'), 'create');
+  expect(readCharacter(cwd, { name: 'hero' }).selection.name).toBe('hero');
+  writeCharacter(target, selection('hero', 'female'), 'replace');
+  expect(readCharacter(cwd, { name: 'hero' }).selection.bodyType).toBe('female');
+  expect(readdirSync(path.dirname(target))).not.toEqual(
+    expect.arrayContaining([expect.stringMatching(/\.tmp$/u)]),
+  );
+});
+```
+
+- [ ] **Step 2: Run the focused test and verify RED**
+
+```sh
+rtk pnpm --filter @lpc-toolkit/cli test -- character-store.test.ts
+```
+
+Expected: FAIL because the store module does not exist.
+
+- [ ] **Step 3: Implement the store**
+
+Use a strict portable name rule and keep explicit paths relative to `cwd`:
+
+```ts
+const CHARACTER_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/u;
+
+export type CharacterLocator =
+  | { readonly name: string; readonly selectionPath?: never }
+  | { readonly name?: never; readonly selectionPath: string };
+
+export function resolveCharacterPath(cwd: string, input: CharacterLocator): string {
+  if (input.selectionPath !== undefined) return path.resolve(cwd, input.selectionPath);
+  if (!CHARACTER_NAME.test(input.name) || input.name === '.' || input.name === '..') {
+    throw new CharacterStoreError('character_name_invalid', `Invalid character name: ${input.name}`);
+  }
+  return path.join(cwd, 'characters', `${input.name}.selection.json`);
+}
+```
+
+Publish formatted JSON through a sibling temporary path and clean it in `finally`:
+
+```ts
+export function writeCharacter(
+  targetPath: string,
+  selection: SelectionJson,
+  mode: 'create' | 'replace',
+): void {
+  parseSelectionJson(selection);
+  if (mode === 'create' && existsSync(targetPath)) {
+    throw new CharacterStoreError('character_already_exists', 'Character already exists.', targetPath);
+  }
+  mkdirSync(path.dirname(targetPath), { recursive: true });
+  const temporaryPath = `${targetPath}.${process.pid}.${randomUUID()}.tmp`;
+  try {
+    writeFileSync(temporaryPath, `${JSON.stringify(selection, null, 2)}\n`, { flag: 'wx' });
+    renameSync(temporaryPath, targetPath);
+  } catch (error) {
+    throw toCharacterWriteError(error, targetPath);
+  } finally {
+    rmSync(temporaryPath, { force: true });
+  }
+}
+```
+
+`listCharacters` reads only `characters/*.selection.json`, parses each file, and returns stable name-sorted entries. Invalid files are returned with an issue instead of aborting the entire list.
+
+- [ ] **Step 4: Run store tests and typecheck**
+
+```sh
+rtk pnpm --filter @lpc-toolkit/cli test -- character-store.test.ts selection.test.ts
+rtk pnpm --filter @lpc-toolkit/cli typecheck
+```
+
+Expected: PASS; no `.tmp` files remain.
+
+- [ ] **Step 5: Commit and record**
+
+```sh
+rtk git add packages/cli/src/character-store.ts packages/cli/test/character-store.test.ts
+rtk git commit -m "feat(cli): add character selection store"
+```
+
+Then update Task 2 checkboxes and the record below, stage only this plan, and commit it with `rtk git commit -m "docs(plan): record character store task"`.
+
+- Implementation: Not executed
+- Commit: Not executed
+- Verification: Not executed
+
+### Task 3: Pure Character Editing and Search
+
+**Files:**
+- Create: `packages/cli/src/character-editor.ts`
+- Create: `packages/cli/test/character-editor.test.ts`
+
+**Interfaces:**
+- Produces: `createEmptyCharacter(name: string, bodyType: BodyType): SelectionJson`.
+- Produces: `searchCharacterItems(selections: Selections, input: CharacterSearchInput, context: CharacterCatalogContext): CharacterSearchResult`.
+- Produces: `setCharacterItem(selections: Selections, input: CharacterSetInput, context: CharacterCatalogContext): CharacterEditResult`.
+- Produces: `removeCharacterItem(selections: Selections, typeName: TypeName): CharacterEditResult`.
+- `CharacterCatalogContext` contains `catalog`, `palettes`, and `pathExists` only, keeping operations deterministic and filesystem-free.
+- Consumes: public core `BODY_TYPES` to reject unsupported body types before writing.
+- Produces: `CharacterEditError extends Error` with readonly `code`, optional `path`, and optional `details`; private `unknownItemError` and `editErrorFromValidation` return this type.
+
+- [ ] **Step 1: Write failing editor tests**
+
+```ts
+it('searches name and item id, filters body type, and sorts by item id', () => {
+  const result = searchCharacterItems(maleSelections, { typeName: 'hair', query: 'braid' }, context);
+  expect(result.items.map((item) => item.itemId)).toEqual(['braid', 'braids']);
+  expect(result.items[0]).toMatchObject({ licenses: ['GPL'], replacesCurrent: false });
+});
+
+it('sets one type without changing another type', () => {
+  const result = setCharacterItem(maleSelections, {
+    typeName: 'hair', itemRef: 'braids', variant: 'brown',
+  }, context);
+  expect(result.selections.items.body).toEqual(maleSelections.items.body);
+  expect(result.selections.items.hair).toEqual({
+    typeName: 'hair', name: 'Braids', variant: 'brown',
+  });
+});
+
+it('returns available variants instead of guessing', () => {
+  expect(() => setCharacterItem(maleSelections, {
+    typeName: 'hair', itemRef: 'variant-only',
+  }, context)).toThrowError(expect.objectContaining({
+    code: 'missing_variant',
+    details: { available: ['black', 'brown'] },
+  }));
+});
+
+it('rejects a body type outside the public core list', () => {
+  expect(() => createEmptyCharacter('hero', 'centaur')).toThrowError(
+    expect.objectContaining({
+      code: 'body_type_invalid',
+      details: { available: [...BODY_TYPES] },
+    }),
+  );
+});
+```
+
+- [ ] **Step 2: Run the focused test and verify RED**
+
+```sh
+rtk pnpm --filter @lpc-toolkit/cli test -- character-editor.test.ts
+```
+
+Expected: FAIL because the editor module does not exist.
+
+- [ ] **Step 3: Implement deterministic editor operations**
+
+Resolve item ID first, then exact `type/name`, and reject a type mismatch:
+
+```ts
+function resolveItem(catalog: Catalog, typeName: TypeName, itemRef: string): ItemDefinition {
+  const byId = catalog.byItemId.get(itemRef);
+  const exact = byId ?? catalog.byTypeName.get(typeName)?.find(
+    (item) => `${typeName}/${item.name}` === itemRef,
+  );
+  if (!exact) throw unknownItemError(itemRef, catalog, typeName);
+  if (exact.type_name !== typeName) {
+    throw new CharacterEditError('item_type_mismatch', `${itemRef} belongs to ${exact.type_name}.`);
+  }
+  return exact;
+}
+```
+
+Build a fresh candidate without mutating the input, call existing `validateSelections`, and convert option-related failures into structured errors:
+
+```ts
+const candidate: Selections = {
+  bodyType: selections.bodyType,
+  items: {
+    ...selections.items,
+    [input.typeName]: {
+      typeName: input.typeName,
+      name: item.name,
+      ...(input.variant ? { variant: input.variant } : {}),
+      ...(input.recolor ? { recolor: input.recolor } : {}),
+    },
+  },
+};
+const validation = validateSelections(candidate, context);
+if (!validation.ok) throw editErrorFromValidation(validation, item, context.palettes, input);
+return { selections: candidate, replaced: selections.items[input.typeName] !== undefined };
+```
+
+For search, expose item ID, display name fallback, variants, `getRecolorVariants`, animations, unique license family keys, and `replacesCurrent`. Only shared catalog/body compatibility is enforced; do not invent cross-slot fashion rules.
+
+- [ ] **Step 4: Run editor tests and related validation tests**
+
+```sh
+rtk pnpm --filter @lpc-toolkit/cli test -- character-editor.test.ts validation.test.ts catalog-commands.test.ts
+rtk pnpm --filter @lpc-toolkit/cli typecheck
+```
+
+Expected: PASS.
+
+- [ ] **Step 5: Commit and record**
+
+```sh
+rtk git add packages/cli/src/character-editor.ts packages/cli/test/character-editor.test.ts
+rtk git commit -m "feat(cli): add pure character editing"
+```
+
+Then update Task 3 checkboxes and record, stage only this plan, and commit it with `rtk git commit -m "docs(plan): record character editor task"`.
+
+- Implementation: Not executed
+- Commit: Not executed
+- Verification: Not executed
+
+### Task 4: Character CRUD, Search, Show, and Validate Commands
+
+**Files:**
+- Create: `packages/cli/src/character-commands.ts`
+- Create: `packages/cli/test/character-commands.test.ts`
+- Modify: `packages/cli/src/main.ts`
+- Modify: `packages/cli/src/response.ts`
+- Test: `packages/cli/test/main-human.test.ts`
+- Test: `packages/cli/test/main-assets.test.ts`
+
+**Interfaces:**
+- Produces: `runCharacterCommand(parsed: ParsedArgs, io: CliIo, runtime?: RuntimeAssets): Promise<CliResponse<unknown>>`.
+- Produces: `characterCommandNeedsAssets(parsed: ParsedArgs): boolean`.
+- Produces: `CharacterCommandDependencies` with injectable `renderSelection` and `renderCharacterPreview` functions, defaulting to the production implementations.
+- Consumes: store/editor/preset/validation interfaces from Tasks 2 and 3.
+- Leaves `preview` and `render` dispatch injected as functions so Tasks 5 and 6 can add them without growing `main.ts`.
+
+- [ ] **Step 1: Write failing command lifecycle tests**
+
+```ts
+it('creates, sets, shows, validates, removes, and lists a named character', async () => {
+  expect((await run(['character', 'create', 'hero'])).response.ok).toBe(true);
+  expect((await run(['character', 'set', 'hero', '--type', 'body', '--item', 'body'])).response.ok).toBe(true);
+  expect((await run(['character', 'show', 'hero'])).response.data).toMatchObject({
+    selection: { name: 'hero', items: { body: { name: 'Body Color' } } },
+    valid: true,
+  });
+  expect((await run(['character', 'remove', 'hero', '--type', 'body'])).response.ok).toBe(true);
+  expect((await run(['character', 'list'])).response.data).toMatchObject({ count: 1 });
+});
+
+it('does not write an invalid set candidate', async () => {
+  await run(['character', 'create', 'hero', '--preset', 'farmer']);
+  const before = readFileSync(heroPath, 'utf8');
+  const result = await run(['character', 'set', 'hero', '--type', 'hair', '--item', 'missing']);
+  expect(result.response.ok).toBe(false);
+  expect(readFileSync(heroPath, 'utf8')).toBe(before);
+});
+```
+
+- [ ] **Step 2: Run focused tests and verify RED**
+
+```sh
+rtk pnpm --filter @lpc-toolkit/cli test -- character-commands.test.ts main-assets.test.ts main-human.test.ts
+```
+
+Expected: FAIL because character dispatch and formatting do not exist.
+
+- [ ] **Step 3: Implement command orchestration**
+
+Resolve exactly one locator:
+
+```ts
+function characterLocator(parsed: ParsedArgs): CharacterLocator {
+  const name = parsed.positionals[0];
+  const selectionPath = flagString(parsed.flags, 'selection');
+  if (name && selectionPath) throw usageError('character_locator_conflict', 'Use a name or --selection, not both.');
+  if (selectionPath) return { selectionPath };
+  if (name) return { name };
+  throw usageError('missing_argument', 'Character name or --selection is required.');
+}
+```
+
+For mutations, compute and validate the complete candidate before `writeCharacter(..., 'replace')`. `create --preset` calls existing `materializePreset` with loaded catalog/palettes and the requested body type. `show` includes path, selection, and validation. `search` returns a stable total and item list. Map `CharacterStoreError` and `CharacterEditError` directly to `CliIssue`.
+
+`character create` always requires the positional metadata name. Its optional
+`--selection <path>` changes only the output path; without that flag it writes
+`characters/<name>.selection.json`. Existing-character commands instead treat
+the positional name and `--selection` as mutually exclusive locators.
+
+Keep `main.ts` dispatch small:
+
+```ts
+if (parsed.command[0] === 'character') {
+  const response = await runCharacterCommand(parsed, io, runtime);
+  return writeResponse(response, parsed, io, 'Character command completed.\n');
+}
+```
+
+Update `commandNeedsAssets`: `character list` and empty `character create` do not prepare assets; preset create, search, set, show validation, validate, preview, and render do.
+
+- [ ] **Step 4: Run command tests, typecheck, and boundary check**
+
+```sh
+rtk pnpm --filter @lpc-toolkit/cli test -- character-commands.test.ts main-assets.test.ts main-human.test.ts preset-commands.test.ts
+rtk pnpm --filter @lpc-toolkit/cli typecheck
+rtk pnpm check:boundaries
+```
+
+Expected: PASS.
+
+- [ ] **Step 5: Commit and record**
+
+```sh
+rtk git add packages/cli/src/character-commands.ts packages/cli/src/main.ts packages/cli/src/response.ts packages/cli/test/character-commands.test.ts packages/cli/test/main-assets.test.ts packages/cli/test/main-human.test.ts
+rtk git commit -m "feat(cli): add character authoring commands"
+```
+
+Then update Task 4 checkboxes and record, stage only this plan, and commit it with `rtk git commit -m "docs(plan): record character command task"`.
+
+- Implementation: Not executed
+- Commit: Not executed
+- Verification: Not executed
+
+### Task 5: Shared Composition Setup and Attributed Preview
+
+**Files:**
+- Create: `packages/cli/src/compose-selection.ts`
+- Create: `packages/cli/src/preview.ts`
+- Create: `packages/cli/test/preview.test.ts`
+- Modify: `packages/cli/src/render.ts`
+- Modify: `packages/cli/src/character-commands.ts`
+- Test: `packages/cli/test/render.test.ts`
+
+**Interfaces:**
+- Produces: `composeSelectionForOutput(options: ComposeSelectionOptions): Promise<ComposedSelectionOutput>` containing `sheet`, `adapter`, `warnings`, parsed selection, catalog, and palettes.
+- Produces: `renderCharacterPreview(options: CharacterPreviewOptions): Promise<CharacterPreviewResult>`.
+- Produces: `PreviewError` with `code`, `path?`, and `details?`; `previewIssue(code, path, details?)` constructs it for command mapping.
+- Preview input uses zero-based `frameIndex`; core `FrameSlice.frameNumber` remains one-based internally.
+
+- [ ] **Step 1: Write failing preview and render-regression tests**
+
+```ts
+it('writes one down-facing walk frame and exact attribution', async () => {
+  const result = await renderCharacterPreview({
+    runtime, cwd, selectionPath, outDir,
+    animation: 'walk', direction: 'down', frameIndex: 0,
+  });
+  expect(result.artifacts.map((artifact) => artifact.type)).toEqual([
+    'preview', 'credits_txt', 'credits_csv', 'metadata',
+  ]);
+  expect(readFileSync(path.join(outDir, 'hero.credits.txt'), 'utf8')).toContain('Fixture Artist');
+  expect(JSON.parse(readFileSync(path.join(outDir, 'hero.metadata.json'), 'utf8'))).toMatchObject({
+    animation: 'walk', direction: 'down', frameIndex: 0, effectiveLicense: 'GPL 3.0',
+  });
+});
+
+it.each([
+  ['idle', 'preview_animation_unavailable'],
+  ['walk:sideways', 'preview_direction_unavailable'],
+  ['walk:down:99', 'preview_frame_out_of_range'],
+])('returns actionable preview error for %s', async (request, code) => {
+  await expect(runPreviewRequest(request)).rejects.toMatchObject({ code });
+});
+
+it('does not publish a preview for an empty character', async () => {
+  await expect(renderCharacterPreview(emptyCharacterOptions)).rejects.toMatchObject({
+    code: 'preview_incomplete_character',
+  });
+  expect(existsSync(emptyCharacterOptions.outDir)).toBe(false);
+});
+```
+
+Keep the existing `render.test.ts` artifact and metadata assertions unchanged to prove the extraction refactor is behavior-preserving.
+
+- [ ] **Step 2: Run preview and render tests and verify RED**
+
+```sh
+rtk pnpm --filter @lpc-toolkit/cli test -- preview.test.ts render.test.ts
+```
+
+Expected: preview tests FAIL because modules do not exist; existing render tests PASS before refactoring.
+
+- [ ] **Step 3: Extract shared composition setup**
+
+Move only catalog/palette loading, validation, palette resolution, adapter construction, and `composeSelections` into `compose-selection.ts`:
+
+```ts
+export interface ComposedSelectionOutput {
+  readonly sheet: ComposedSheet;
+  readonly adapter: CanvasAdapter;
+  readonly warnings: readonly CliIssue[];
+  readonly parsed: ParsedSelectionJson;
+  readonly catalog: Catalog;
+  readonly palettes: PaletteMetadata;
+}
+
+export async function composeSelectionForOutput(
+  options: ComposeSelectionOptions,
+): Promise<ComposedSelectionOutput> {
+  const catalog = loadCatalogFromRoots(
+    options.runtime.context.sheetDefinitionsRoot,
+    options.runtime.context.customSheetDefinitionsRoot,
+  );
+  const palettes = loadPalettesFromRoot(options.runtime.context.paletteDefinitionsRoot);
+  const parsed = parseSelectionJson(options.selectionJson);
+  const validation = validateSelections(parsed.selections, {
+    catalog: catalog.catalog,
+    palettes: palettes.palettes,
+    pathExists: (spritePath) => options.runtime.store.has(spritePath),
+  });
+  if (!validation.ok && !options.allowPartial) throw new SelectionOutputError(validation.errors);
+  const recolorWarnings: CliIssue[] = [];
+  const resolvePalette = makeResolvePalette(
+    catalog.catalog,
+    palettes.palettes,
+    parsed.selections,
+    { onWarn: (message) => recolorWarnings.push({ code: 'recolor_warning', message }) },
+  );
+  const adapter = createNodeCanvasAdapter({ assetStore: options.runtime.store });
+  const sheet = await composeSelections(parsed.selections, {
+    catalog: catalog.catalog,
+    adapter,
+    spritesheetsBaseUrl: options.runtime.store.baseUrl,
+    resolvePalette,
+    onImageLoadError: (error) => {
+      if (error instanceof AssetStoreError) throw error;
+    },
+  });
+  const warnings = [
+    ...catalog.warnings,
+    ...palettes.warnings,
+    ...validation.warnings,
+    ...(options.allowPartial ? validation.errors : []),
+    ...recolorWarnings,
+    ...(sheet.missingPaths ?? []).map((missingPath) => ({
+      code: 'missing_sprite_path',
+      message: 'Composed sheet skipped a missing sprite path.',
+      path: missingPath,
+    })),
+  ];
+  return {
+    sheet,
+    adapter,
+    parsed,
+    warnings,
+    catalog: catalog.catalog,
+    palettes: palettes.palettes,
+  };
+}
+```
+
+Define `SelectionOutputError` in this module with
+`readonly issues: readonly CliIssue[]`; its message joins issue messages and
+its stable command-mapping code is `selection_output_invalid`.
+
+Modify `renderSelection` to consume this result while preserving its current artifact staging, metadata, ZIP, and attribution code.
+
+- [ ] **Step 4: Implement preview extraction and transactional publication**
+
+Validate against the composed sheet and core direction IDs:
+
+```ts
+const animation = extractAnimation(sheet, options.animation, { adapter });
+if (!DIRECTIONS.slice(0, animation.directions).includes(options.direction)) {
+  throw previewIssue('preview_direction_unavailable', options.direction, {
+    available: DIRECTIONS.slice(0, animation.directions),
+  });
+}
+if (options.frameIndex < 0 || options.frameIndex >= animation.frameCount) {
+  throw previewIssue('preview_frame_out_of_range', String(options.frameIndex), {
+    available: Array.from({ length: animation.frameCount }, (_, index) => String(index)),
+  });
+}
+const frames = extractAnimationFrames(sheet, options.animation, { adapter, skipEmpty: false });
+const frame = frames.get(options.direction)?.[options.frameIndex];
+if (!frame) throw previewIssue('preview_frame_out_of_range', String(options.frameIndex));
+```
+
+Write `<safe-name>.preview.png`, `<safe-name>.credits.txt`,
+`<safe-name>.credits.csv`, and `<safe-name>.metadata.json` into a staging
+directory, then publish only after all files exist. Use defaults `walk`,
+`down`, and `0`. Metadata records the zero-based CLI index, source path,
+dimensions, effective license, CLI version, and precise credit paths.
+
+Resolve output paths exactly: `--out` wins; a named character defaults to
+`characters/previews/<name>/`; an explicit selection defaults to
+`<selection-directory>/previews/<safe-selection-name>/`, using selection
+metadata and then the selection file stem as fallback. If the composed sheet
+has no credited or resolved layers, throw `preview_incomplete_character`
+before creating the staging directory.
+
+- [ ] **Step 5: Run preview/render tests and verification**
+
+```sh
+rtk pnpm --filter @lpc-toolkit/cli test -- preview.test.ts render.test.ts character-commands.test.ts
+rtk pnpm --filter @lpc-toolkit/cli typecheck
+rtk pnpm --filter @lpc-toolkit/core test
+rtk pnpm check:boundaries
+```
+
+Expected: PASS; preview has exactly one pixel artifact and both credit sidecars; existing render assertions remain green.
+
+- [ ] **Step 6: Commit and record**
+
+```sh
+rtk git add packages/cli/src/compose-selection.ts packages/cli/src/preview.ts packages/cli/src/render.ts packages/cli/src/character-commands.ts packages/cli/test/preview.test.ts packages/cli/test/render.test.ts packages/cli/test/character-commands.test.ts
+rtk git commit -m "feat(cli): add attributed character previews"
+```
+
+Then update Task 5 checkboxes and record, stage only this plan, and commit it with `rtk git commit -m "docs(plan): record character preview task"`.
+
+- Implementation: Not executed
+- Commit: Not executed
+- Verification: Not executed
+
+### Task 6: Character Render Delegation and Complete Human Output
+
+**Files:**
+- Modify: `packages/cli/src/character-commands.ts`
+- Modify: `packages/cli/src/response.ts`
+- Modify: `packages/cli/test/character-commands.test.ts`
+- Modify: `packages/cli/test/main-human.test.ts`
+- Modify: `packages/cli/test/main-render-errors.test.ts`
+
+**Interfaces:**
+- `character render` maps a stored character to the existing `renderSelection` options.
+- `character preview` and every read/mutation command receive explicit human formatting; JSON continues to use `CliResponse` unchanged.
+
+- [ ] **Step 1: Write failing render-delegation and human-output tests**
+
+```ts
+it('delegates all character render options', async () => {
+  await runCharacterCommand(
+    parseArgs(['character', 'render', 'hero', '--out', 'dist/hero',
+      '--animation', 'walk', '--frames', 'all', '--bundle', 'zip']),
+    io,
+    runtime,
+    { renderSelection: renderSpy, renderCharacterPreview: previewSpy },
+  );
+  expect(renderSpy).toHaveBeenCalledWith(expect.objectContaining({
+    selectionName: 'hero', animations: ['walk'], frames: 'all', bundleZip: true,
+  }));
+});
+
+it('prints actionable search and set output', async () => {
+  expect(await runHuman(['character', 'search', 'hero', '--type', 'hair', '--query', 'braid']))
+    .toContain('hair/Braids [braids]');
+  expect(await runHuman(['character', 'set', 'hero', '--type', 'hair', '--item', 'braids']))
+    .toContain('Updated hero: hair = Braids');
+});
+```
+
+- [ ] **Step 2: Run focused tests and verify RED**
+
+```sh
+rtk pnpm --filter @lpc-toolkit/cli test -- character-commands.test.ts main-human.test.ts main-render-errors.test.ts
+```
+
+Expected: FAIL until render delegation and formatters are complete.
+
+- [ ] **Step 3: Implement exact render option mapping and formatters**
+
+```ts
+const result = await dependencies.renderSelection({
+  runtime: runtime!,
+  cwd: io.cwd,
+  outDir: path.resolve(io.cwd, requiredFlag(parsed, 'out')),
+  selectionName: stored.selection.name ?? stored.safeName,
+  selectionJson: stored.selection,
+  animations: flagStrings(parsed.flags, 'animation'),
+  frames: flagString(parsed.flags, 'frames') === 'all'
+    ? 'all'
+    : flagStrings(parsed.flags, 'frames'),
+  bundleZip: flagString(parsed.flags, 'bundle') === 'zip',
+  allowPartial: flagBoolean(parsed.flags, 'allow-partial'),
+});
+return commandOk('character render', result, result.warnings);
+```
+
+Add focused formatters for list/show/search/create/set/remove/validate/preview/render. Human suggestions print `Did you mean:` and `Available:` from `CliIssue.details`; do not parse those values out of messages.
+
+- [ ] **Step 4: Run focused tests, full CLI tests, and typecheck**
+
+```sh
+rtk pnpm --filter @lpc-toolkit/cli test -- character-commands.test.ts main-human.test.ts main-render-errors.test.ts response.test.ts
+rtk pnpm --filter @lpc-toolkit/cli test
+rtk pnpm --filter @lpc-toolkit/cli typecheck
+```
+
+Expected: all CLI tests PASS.
+
+- [ ] **Step 5: Commit and record**
+
+```sh
+rtk git add packages/cli/src/character-commands.ts packages/cli/src/response.ts packages/cli/test/character-commands.test.ts packages/cli/test/main-human.test.ts packages/cli/test/main-render-errors.test.ts packages/cli/test/response.test.ts
+rtk git commit -m "feat(cli): complete character render workflow"
+```
+
+Then update Task 6 checkboxes and record, stage only this plan, and commit it with `rtk git commit -m "docs(plan): record character render task"`.
+
+- Implementation: Not executed
+- Commit: Not executed
+- Verification: Not executed
+
+### Task 7: Installed Workflow Documentation and Release Verification
+
+**Files:**
+- Modify: `packages/cli/README.md`
+- Modify: `packages/cli/scripts/smoke-packed-cli.mjs`
+- Modify: `packages/cli/test/package-metadata.test.ts`
+- Modify: `docs/superpowers/plans/2026-07-12-cli-character-authoring.md`
+
+**Interfaces:**
+- No new runtime interfaces.
+- Verifies the public installed command contract outside the monorepo.
+
+- [ ] **Step 1: Add a failing package-script assertion**
+
+```ts
+it('smokes the installed character authoring workflow', () => {
+  const smoke = readFileSync('scripts/smoke-packed-cli.mjs', 'utf8');
+  expect(smoke).toContain("'character', 'create', 'packed-hero'");
+  expect(smoke).toContain("'character', 'preview', 'packed-hero'");
+  expect(smoke).toContain("'character', 'render', 'packed-hero'");
+  expect(smoke).toContain('packed-hero.credits.txt');
+  expect(smoke).toContain('packed-hero.credits.csv');
+});
+```
+
+- [ ] **Step 2: Run the focused test and verify RED**
+
+```sh
+rtk pnpm --filter @lpc-toolkit/cli test -- package-metadata.test.ts
+```
+
+Expected: FAIL because the packed workflow is absent.
+
+- [ ] **Step 3: Document and add the installed workflow smoke**
+
+Add a README quick start that requires no JSON editing:
+
+```sh
+lpc-toolkit character create hero --preset farmer
+lpc-toolkit character search hero --type hair --query braid
+lpc-toolkit character set hero --type hair --item braid --recolor brown
+lpc-toolkit character preview hero
+lpc-toolkit character render hero --out ./dist/hero --animation walk --bundle zip
+```
+
+In `smoke-packed-cli.mjs`, invoke the installed binary with the prepared cache, create from `farmer`, search, set a fixture-confirmed valid item, preview, and render. Assert PNG, metadata, TXT, and CSV files for preview and render. Keep cleanup inside the existing `finally` guard and do not download a second asset release.
+
+- [ ] **Step 4: Run full verification**
+
+```sh
+rtk pnpm --filter @lpc-toolkit/cli test
+rtk pnpm --filter @lpc-toolkit/cli typecheck
+rtk pnpm --filter @lpc-toolkit/core test
+rtk pnpm check:boundaries
+rtk pnpm --filter @lpc-toolkit/cli test:package
+```
+
+Expected: all commands exit 0; CLI tests report zero failures; packed smoke prints `Packed CLI install smoke test passed.`
+
+- [ ] **Step 5: Commit implementation and final execution record**
+
+```sh
+rtk git add packages/cli/README.md packages/cli/scripts/smoke-packed-cli.mjs packages/cli/test/package-metadata.test.ts
+rtk git commit -m "docs(cli): document character authoring workflow"
+```
+
+Then mark Task 7 complete, record the implementation commit and exact verification results below, stage only this plan, and commit the plan record with `rtk git commit -m "docs(plan): record final character workflow verification"`.
+
+- Implementation: Not executed
+- Commit: Not executed
+- Verification: Not executed
+
+## Final Review Checklist
+
+- [ ] Every requirement in `docs/superpowers/specs/2026-07-12-cli-character-authoring-design.md` maps to a task above.
+- [ ] Existing command forms and JSON envelope remain compatible.
+- [ ] Unknown options fail before asset preparation.
+- [ ] No mutation writes before candidate validation succeeds.
+- [ ] Preview and full render use exact composed credit manifests.
+- [ ] `packages/core/` remains environment-agnostic.
+- [ ] No dependency or `any` was added.
+- [ ] Full CLI/core/boundary/package verification evidence is recorded.
