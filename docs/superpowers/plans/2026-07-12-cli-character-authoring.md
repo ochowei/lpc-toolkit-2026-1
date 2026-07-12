@@ -637,7 +637,7 @@ rtk git commit -m "docs(plan): record shared character defaults"
 - Consumes: store/editor/preset/validation interfaces from Tasks 2 and 3.
 - Leaves `preview` and `render` dispatch injected as functions so Tasks 5 and 6 can add them without growing `main.ts`.
 
-- [ ] **Step 1: Write failing command lifecycle tests**
+- [x] **Step 1: Write failing command lifecycle tests**
 
 ```ts
 it('creates, sets, shows, validates, removes, and lists a named character', async () => {
@@ -660,7 +660,7 @@ it('does not write an invalid set candidate', async () => {
 });
 ```
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- character-commands.test.ts main-assets.test.ts main-human.test.ts
@@ -668,7 +668,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- character-commands.test.ts main-asset
 
 Expected: FAIL because character dispatch and formatting do not exist.
 
-- [ ] **Step 3: Implement command orchestration**
+- [x] **Step 3: Implement command orchestration**
 
 Resolve exactly one locator:
 
@@ -701,7 +701,7 @@ if (parsed.command[0] === 'character') {
 
 Update `commandNeedsAssets`: `character list` and empty `character create` do not prepare assets; preset create, search, set, show validation, validate, preview, and render do.
 
-- [ ] **Step 4: Run command tests, typecheck, and boundary check**
+- [x] **Step 4: Run command tests, typecheck, and boundary check**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- character-commands.test.ts main-assets.test.ts main-human.test.ts preset-commands.test.ts
@@ -711,7 +711,7 @@ rtk pnpm check:boundaries
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit and record**
+- [x] **Step 5: Commit and record**
 
 ```sh
 rtk git add packages/cli/src/character-commands.ts packages/cli/src/main.ts packages/cli/src/response.ts packages/cli/test/character-commands.test.ts packages/cli/test/main-assets.test.ts packages/cli/test/main-human.test.ts
@@ -720,9 +720,19 @@ rtk git commit -m "feat(cli): add character authoring commands"
 
 Then update Task 4 checkboxes and record, stage only this plan, and commit it with `rtk git commit -m "docs(plan): record character command task"`.
 
-- Implementation: Not executed
-- Commit: Not executed
-- Verification: Not executed
+- Implementation: Added character create/list/show/search/set/remove/validate
+  orchestration, exact locator semantics, atomic validated mutations, typed issue
+  mapping, asset-need classification, compact main dispatch, and initial list/show
+  human formatting. Self-review added portable metadata-name and preset body-type
+  regression coverage.
+- RED: Focused run failed because `character-commands.ts`, character dispatch,
+  asset classification, and human formatting did not exist (3 test files failed;
+  8 assertions failed and the command suite could not load). The two self-review
+  regressions also failed before their fixes.
+- Commit: `bfffd1a6f0ebf0a66c74f3a7e7405064c12f1c87`
+- Verification: Focused Task 4/preset suite PASS (69 tests); full CLI suite PASS
+  (247 passed, 1 skipped; approved localhost permission required for Web server
+  tests); CLI typecheck PASS; boundary check PASS; `git diff --check` PASS.
 
 ### Task 5: Shared Composition Setup and Attributed Preview
 
