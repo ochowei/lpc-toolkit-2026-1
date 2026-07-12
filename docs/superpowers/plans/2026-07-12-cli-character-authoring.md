@@ -320,7 +320,7 @@ Then update Task 2 checkboxes and the record below, stage only this plan, and co
 - Consumes: public core `BODY_TYPES` to reject unsupported body types before writing.
 - Produces: `CharacterEditError extends Error` with readonly `code`, optional `path`, and optional `details`; private `unknownItemError` and `editErrorFromValidation` return this type.
 
-- [ ] **Step 1: Write failing editor tests**
+- [x] **Step 1: Write failing editor tests**
 
 ```ts
 it('searches name and item id, filters body type, and sorts by item id', () => {
@@ -358,7 +358,7 @@ it('rejects a body type outside the public core list', () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- character-editor.test.ts
@@ -366,7 +366,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- character-editor.test.ts
 
 Expected: FAIL because the editor module does not exist.
 
-- [ ] **Step 3: Implement deterministic editor operations**
+- [x] **Step 3: Implement deterministic editor operations**
 
 Resolve item ID first, then exact `type/name`, and reject a type mismatch:
 
@@ -406,7 +406,7 @@ return { selections: candidate, replaced: selections.items[input.typeName] !== u
 
 For search, expose item ID, display name fallback, variants, `getRecolorVariants`, animations, unique license family keys, and `replacesCurrent`. Only shared catalog/body compatibility is enforced; do not invent cross-slot fashion rules.
 
-- [ ] **Step 4: Run editor tests and related validation tests**
+- [x] **Step 4: Run editor tests and related validation tests**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- character-editor.test.ts validation.test.ts catalog-commands.test.ts
@@ -415,7 +415,7 @@ rtk pnpm --filter @lpc-toolkit/cli typecheck
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit and record**
+- [x] **Step 5: Commit and record**
 
 ```sh
 rtk git add packages/cli/src/character-editor.ts packages/cli/test/character-editor.test.ts
@@ -424,9 +424,15 @@ rtk git commit -m "feat(cli): add pure character editing"
 
 Then update Task 3 checkboxes and record, stage only this plan, and commit it with `rtk git commit -m "docs(plan): record character editor task"`.
 
-- Implementation: Not executed
-- Commit: Not executed
-- Verification: Not executed
+- Implementation: Added filesystem-free character creation, catalog search,
+  immutable set/remove transitions, structured editor errors, and option
+  availability reporting. TDD recorded the initial missing-module RED and an
+  additional RED preventing validation failures from another selected type
+  being attributed to the edited item.
+- Commit: `83a408f4bc6ce09c41995987f13c13e94fc99993`
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- character-editor.test.ts validation.test.ts catalog-commands.test.ts`
+  PASS (15 tests); package-local `rtk pnpm typecheck` PASS; `rtk pnpm
+  check:boundaries` PASS; `rtk git diff --check` PASS.
 
 ### Task 4: Character CRUD, Search, Show, and Validate Commands
 
