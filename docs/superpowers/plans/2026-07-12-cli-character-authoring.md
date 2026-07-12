@@ -454,7 +454,7 @@ The initial Task 3 implementation and record above remain historical evidence,
 but Task 3 is not approved. The approved spec revision supersedes its
 `missing_variant`/`missing_recolor` path-recovery behavior.
 
-- [ ] **Step 6: Write failing shared-default and strict-path tests**
+- [x] **Step 6: Write failing shared-default and strict-path tests**
 
 Add core tests for the exact shared priority:
 
@@ -505,7 +505,7 @@ it('preserves missing_sprite_path after applying defaults', () => {
 });
 ```
 
-- [ ] **Step 7: Run the amendment tests and verify RED**
+- [x] **Step 7: Run the amendment tests and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/core test -- selection-defaults.test.ts
@@ -518,7 +518,7 @@ Expected: core fails because `getDefaultColorSelection` does not exist; CLI
 fails because omitted options do not use the shared default and current error
 translation can mislabel missing paths.
 
-- [ ] **Step 8: Implement one shared helper and strict CLI mapping**
+- [x] **Step 8: Implement one shared helper and strict CLI mapping**
 
 Create the core helper and export it from `packages/core/src/index.ts`:
 
@@ -570,7 +570,7 @@ existing edited-slot validation issue unchanged so a missing image remains
 `missing_sprite_path`; explicit invalid fields remain `unknown_variant` or
 `unknown_recolor` through `validateSelections`.
 
-- [ ] **Step 9: Run cross-package GREEN verification**
+- [x] **Step 9: Run cross-package GREEN verification**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/core test -- selection-defaults.test.ts
@@ -587,14 +587,14 @@ rtk pnpm check:boundaries
 Expected: all focused tests and four package typechecks PASS; boundary check
 exits 0.
 
-- [ ] **Step 10: Commit the amendment**
+- [x] **Step 10: Commit the amendment**
 
 ```sh
 rtk git add packages/core/src/selection-defaults.ts packages/core/src/index.ts packages/core/test/selection-defaults.test.ts packages/web/src/slice/color-options.ts packages/web/test/color-options.test.ts packages/presets/src/index.ts packages/presets/test/presets.test.ts packages/cli/src/character-editor.ts packages/cli/test/character-editor.test.ts
 rtk git commit -m "fix(cli): align character defaults with web"
 ```
 
-- [ ] **Step 11: Record amendment completion**
+- [x] **Step 11: Record amendment completion**
 
 Append the amendment commit and exact cross-package verification evidence to
 the Task 3 execution record, stage only this plan, and commit with:
@@ -603,6 +603,22 @@ the Task 3 execution record, stage only this plan, and commit with:
 rtk git add docs/superpowers/plans/2026-07-12-cli-character-authoring.md
 rtk git commit -m "docs(plan): record shared character defaults"
 ```
+
+- Amendment implementation: Added public core `getDefaultColorSelection` with
+  recolor-first priority, delegated Web and presets defaults to it, applied it
+  in CLI only when neither color field is explicit, and removed all
+  `missing_sprite_path` option inference. Added exact `type/name` CLI coverage.
+- Amendment RED: Core failed 3 tests because the helper was absent; CLI failed
+  2 tests because defaults were omitted and missing paths were mislabeled.
+  Web (8 tests) and presets (3 tests) passed their parity assertions against
+  the pre-existing duplicate behavior.
+- Amendment commit: `3e1e36a24bff7e741886d0c90d6fba5797e8bacf`
+- Amendment verification: Core selection-defaults PASS (3 tests), Web
+  color-options PASS (8 tests), presets PASS (3 tests), CLI editor/validation/
+  catalog PASS (17 tests); core, Web, presets, and CLI typechecks PASS;
+  boundary check and `git diff --check` PASS. Web tests required approved
+  sandbox escalation for the `tsx` IPC socket; asset preparation was a cache
+  hit.
 
 ### Task 4: Character CRUD, Search, Show, and Validate Commands
 
