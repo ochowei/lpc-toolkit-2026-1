@@ -162,6 +162,22 @@ function formatPresetList(data: JsonRecord): string | undefined {
   return `Presets (${presets.length})\n${lines.join('\n')}\n`;
 }
 
+function formatCharacterList(data: JsonRecord): string | undefined {
+  const characters = recordArrayValue(data, 'characters');
+  if (!characters) return undefined;
+  const lines = characters.flatMap((character) => {
+    const name = stringValue(character, 'name');
+    return name ? [`- ${name}`] : [];
+  });
+  return `Characters (${characters.length})\n${lines.join('\n')}\n`;
+}
+
+function formatCharacterShow(data: JsonRecord): string | undefined {
+  const selection = data['selection'];
+  if (!isRecord(selection)) return undefined;
+  return `${JSON.stringify(selection, null, 2)}\n`;
+}
+
 function formatRender(data: JsonRecord): string | undefined {
   const artifacts = recordArrayValue(data, 'artifacts');
   const metadataPath = stringValue(data, 'metadataPath');
@@ -193,6 +209,10 @@ function formatHumanData(response: CliResponse<unknown>): string | undefined {
       return formatPresetList(data);
     case 'preset materialize':
       return formatSelectionOrOut(data, 'Preset selection written to');
+    case 'character list':
+      return formatCharacterList(data);
+    case 'character show':
+      return formatCharacterShow(data);
     case 'render':
     case 'preset render':
       return formatRender(data);

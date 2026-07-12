@@ -102,6 +102,8 @@ describe('asset preparation dispatch', () => {
     [['token', 'encode', '--selection', 'selection.json']],
     [['token', 'decode', '--token', 'v1.example']],
     [['preset', 'list']],
+    [['character', 'list']],
+    [['character', 'create', 'hero']],
     [['catalog', '--help']],
     [['render', '--help']],
     [['preset', 'render', '--help']],
@@ -115,6 +117,13 @@ describe('asset preparation dispatch', () => {
     [['preset', 'materialize', 'villager']],
     [['render', '--selection', 'selection.json', '--out', 'out']],
     [['web']],
+    [['character', 'create', 'hero', '--preset', 'farmer']],
+    [['character', 'search', 'hero', '--type', 'hair']],
+    [['character', 'set', 'hero', '--type', 'hair', '--item', 'braids']],
+    [['character', 'show', 'hero']],
+    [['character', 'validate', 'hero']],
+    [['character', 'preview', 'hero']],
+    [['character', 'render', 'hero', '--out', 'out']],
   ])('classifies %j as asset-dependent', (argv) => {
     expect(commandNeedsAssets(parseArgs(argv))).toBe(true);
   });

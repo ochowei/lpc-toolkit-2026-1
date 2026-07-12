@@ -123,4 +123,12 @@ describe('human-readable CLI output', () => {
     expect(materializeOutput).toContain('"schema": "lpc-toolkit.selection.v1"');
     expect(materializeOutput).toContain('"name": "farmer"');
   });
+
+  it('prints character list and show data without --json', async () => {
+    const cwd = makeCatalogCwd();
+    await runHuman(['character', 'create', 'hero'], cwd);
+
+    expect(await runHuman(['character', 'list'], cwd)).toContain('- hero');
+    expect(await runHuman(['character', 'show', 'hero'], cwd)).toContain('"name": "hero"');
+  });
 });

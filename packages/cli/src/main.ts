@@ -10,6 +10,10 @@ import {
 import { assetCacheErrorIssue } from './asset-cache.js';
 import { AssetStoreError } from './asset-store.js';
 import { runCatalogCommand } from './catalog-commands.js';
+import {
+  characterCommandNeedsAssets,
+  runCharacterCommand,
+} from './character-commands.js';
 import { helpForCommand, validateCommandOptions } from './command-spec.js';
 import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
 import { materializePreset, runPresetCommand } from './preset-commands.js';
@@ -85,6 +89,7 @@ export function commandNeedsAssets(parsed: ParsedArgs): boolean {
   if (parsed.command[0] === 'selection') return true;
   if (parsed.command[0] === 'render') return true;
   if (parsed.command[0] === 'preset') return parsed.command[1] !== 'list';
+  if (parsed.command[0] === 'character') return characterCommandNeedsAssets(parsed);
   if (parsed.command[0] === 'web') return true;
   return false;
 }
@@ -329,6 +334,11 @@ export async function runCli(
       io,
       'Token command completed.\n',
     );
+  }
+
+  if (parsed.command[0] === 'character') {
+    const response = await runCharacterCommand(parsed, io, runtime);
+    return writeResponse(response, parsed, io, 'Character command completed.\n');
   }
 
   if (parsed.command[0] === 'render') {
