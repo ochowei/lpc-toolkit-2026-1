@@ -144,7 +144,7 @@ output and asset-independence coverage for both flags.
 - Produces: root help containing separate `lpc-toolkit --version` and
   `lpc-toolkit -V` invocation lines.
 
-- [ ] **Step 1: Write the failing help test**
+- [x] **Step 1: Write the failing help test**
 
 In the existing `prints help for no command` test in
 `packages/cli/test/smoke.test.ts`, add:
@@ -153,7 +153,7 @@ In the existing `prints help for no command` test in
 expect(writes.join('')).toContain('lpc-toolkit -V');
 ```
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run:
 
@@ -164,7 +164,7 @@ rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/smoke.test.ts
 Expected: FAIL because root help contains `lpc-toolkit --version` but does not
 contain `lpc-toolkit -V`.
 
-- [ ] **Step 3: Add the short invocation to help**
+- [x] **Step 3: Add the short invocation to help**
 
 In `packages/cli/src/main.ts`, add this line immediately after the existing
 `lpc-toolkit --version` line in `HELP`:
@@ -173,7 +173,7 @@ In `packages/cli/src/main.ts`, add this line immediately after the existing
   lpc-toolkit -V
 ```
 
-- [ ] **Step 4: Run the focused test and verify GREEN**
+- [x] **Step 4: Run the focused test and verify GREEN**
 
 Run:
 
@@ -183,7 +183,7 @@ rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/smoke.test.ts
 
 Expected: the test file PASS with no warnings or errors.
 
-- [ ] **Step 5: Run package and boundary verification**
+- [x] **Step 5: Run package and boundary verification**
 
 Run:
 
@@ -197,7 +197,7 @@ Expected: typecheck PASS, all CLI tests PASS, and boundary checks PASS. If the
 full CLI test requires localhost binding, rerun the same test command with
 approved elevated sandbox access.
 
-- [ ] **Step 6: Record completion and commit**
+- [x] **Step 6: Record completion and commit**
 
 Commit the two implementation files first, then update this task with its
 checkboxes, implementation note, commit hash, and verification result. Leave
@@ -208,3 +208,13 @@ rtk git add packages/cli/src/main.ts packages/cli/test/smoke.test.ts
 rtk git commit -m "docs(cli): show version alias in help"
 rtk git rev-parse --short HEAD
 ```
+
+Implementation note: Added `lpc-toolkit -V` on its own line in root help and
+extended the existing help smoke test to require the short invocation.
+
+- Commit: `9205684ec219f46ef93caa01d1d4f836f61f80aa`
+- Verification: TDD RED observed for the missing help text; focused smoke tests
+  PASS (4/4); CLI tests PASS (194 passed, 1 skipped); TypeScript typecheck PASS;
+  architecture boundary check PASS; direct CLI help output contains both
+  version invocations; independent code review reports no Critical, Important,
+  or Minor issues.
