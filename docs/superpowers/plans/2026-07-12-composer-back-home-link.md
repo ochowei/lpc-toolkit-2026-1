@@ -12,6 +12,8 @@
 
 - Show `← Back to home` in English and `← 返回首頁` in Traditional Chinese.
 - Keep the complete label visible on desktop and mobile.
+- Make the home action the first interactive element at the far left of the
+  top bar, followed by a vertical divider and then the LPC Toolkit brand.
 - Navigate to `/` through the existing SPA routing callback, without a full page reload.
 - Add no dependencies and do not modify `upstream/`.
 - Preserve composition, attribution, catalog, export, and selection behavior.
@@ -268,3 +270,149 @@ rtk git commit -m "docs(web): record composer home link verification"
 ```
 
 Expected: a documentation-only commit that records the exact implementation commit hash.
+
+### Task 2: Move the Home Action Before the Brand
+
+**Files:**
+
+- Modify: `packages/web/test/top-bar.test.tsx`
+- Modify: `packages/web/src/components/layer-stack/top-bar.tsx`
+
+**Interfaces:**
+
+- Consumes: the existing `TopBar` prop `onNavigateHome: () => void` and
+  translation key `topBar.backHome` from Task 1.
+- Produces: unchanged public component interfaces; only the rendered order and
+  divider presentation change.
+
+- [ ] **Step 1: Add the failing rendered-order assertion**
+
+In `packages/web/test/top-bar.test.tsx`, replace the current label assertion:
+
+```tsx
+expect(html).toContain('← Back to home');
+```
+
+with:
+
+```tsx
+const homeActionIndex = html.indexOf('← Back to home');
+const brandIndex = html.indexOf('LPC');
+
+expect(homeActionIndex).toBeGreaterThanOrEqual(0);
+expect(brandIndex).toBeGreaterThan(homeActionIndex);
+```
+
+Keep the existing `findAction` and callback assertions unchanged so this test
+continues to cover visible copy and emitted navigation intent.
+
+- [ ] **Step 2: Run the focused test and verify RED**
+
+Run:
+
+```bash
+rtk pnpm --filter @lpc-toolkit/web exec vitest run test/top-bar.test.tsx
+```
+
+Expected: FAIL at `expect(brandIndex).toBeGreaterThan(homeActionIndex)` because
+the current TopBar renders the LPC brand before the home action.
+
+- [ ] **Step 3: Move the action and add the divider**
+
+In `packages/web/src/components/layer-stack/top-bar.tsx`, move the existing
+home `Button` so it is the first child inside `<header>`, immediately before
+the brand block. Render the divider between the button and brand:
+
+```tsx
+<Button
+  size="sm"
+  variant="ghost"
+  onClick={onNavigateHome}
+  aria-label={t('topBar.backHome')}
+>
+  {t('topBar.backHome')}
+</Button>
+<div aria-hidden="true" className="h-6 w-px shrink-0 bg-border" />
+<div className="mr-1 flex min-w-0 flex-col leading-none">
+  <span className="text-[13px] font-bold tracking-tight">
+    LPC<span className="font-medium text-text-mute">·Toolkit</span>
+  </span>
+  <span className="hidden font-mono text-[9px] text-text-dim sm:inline">
+    {t('app.subtitle')}
+    {' · '}
+    <a
+      href={upstreamHref}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="underline-offset-2 hover:text-text-mute hover:underline"
+      title={t('topBar.upstreamLink')}
+    >
+      upstream
+    </a>
+  </span>
+</div>
+```
+
+Remove the old copy of the button after the brand block. Do not change its
+copy, callback, responsive visibility, or shared `Button` styling.
+
+- [ ] **Step 4: Run the focused test and verify GREEN**
+
+Run:
+
+```bash
+rtk pnpm --filter @lpc-toolkit/web exec vitest run test/top-bar.test.tsx
+```
+
+Expected: PASS with one passing test.
+
+- [ ] **Step 5: Run scoped and architectural verification**
+
+Run:
+
+```bash
+rtk proxy pnpm --filter @lpc-toolkit/web typecheck
+rtk pnpm --filter @lpc-toolkit/web test
+rtk pnpm check:boundaries
+```
+
+Expected: web typecheck exits successfully; 73 web test files and 648 tests
+pass; the architecture boundary check passes.
+
+- [ ] **Step 6: Commit the verified placement revision and current plan state**
+
+Check Steps 1–6 and append this note beneath Task 2:
+
+```markdown
+- Implementation: Moved the localized home action to the far-left position before the brand and added an aria-hidden vertical divider.
+- Verification: focused TopBar test PASS; web typecheck PASS; web test PASS; boundary check PASS.
+```
+
+Then commit the implementation and plan state:
+
+```bash
+rtk git add packages/web/test/top-bar.test.tsx packages/web/src/components/layer-stack/top-bar.tsx docs/superpowers/plans/2026-07-12-composer-back-home-link.md
+rtk git commit -m "fix(web): move composer home link before brand"
+```
+
+Expected: one commit containing only the revised test, TopBar placement, and
+Task 2 plan state.
+
+- [ ] **Step 7: Record the Task 2 implementation commit hash**
+
+Run:
+
+```bash
+rtk git rev-parse --short HEAD
+```
+
+Copy the exact printed hash into a `Commit:` implementation note beneath Task
+2, check Step 7, then commit that evidence:
+
+```bash
+rtk git add docs/superpowers/plans/2026-07-12-composer-back-home-link.md
+rtk git commit -m "docs(web): record composer home link placement verification"
+```
+
+Expected: a documentation-only commit that records the exact Task 2
+implementation commit hash.
