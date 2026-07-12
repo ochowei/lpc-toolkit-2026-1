@@ -974,7 +974,7 @@ Then update Task 5 checkboxes and record, stage only this plan, and commit it wi
 - `character render` maps a stored character to the existing `renderSelection` options.
 - `character preview` and every read/mutation command receive explicit human formatting; JSON continues to use `CliResponse` unchanged.
 
-- [ ] **Step 1: Write failing render-delegation and human-output tests**
+- [x] **Step 1: Write failing render-delegation and human-output tests**
 
 ```ts
 it('delegates all character render options', async () => {
@@ -998,7 +998,7 @@ it('prints actionable search and set output', async () => {
 });
 ```
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- character-commands.test.ts main-human.test.ts main-render-errors.test.ts
@@ -1006,7 +1006,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- character-commands.test.ts main-human
 
 Expected: FAIL until render delegation and formatters are complete.
 
-- [ ] **Step 3: Implement exact render option mapping and formatters**
+- [x] **Step 3: Implement exact render option mapping and formatters**
 
 ```ts
 const result = await dependencies.renderSelection({
@@ -1027,7 +1027,7 @@ return commandOk('character render', result, result.warnings);
 
 Add focused formatters for list/show/search/create/set/remove/validate/preview/render. Human suggestions print `Did you mean:` and `Available:` from `CliIssue.details`; do not parse those values out of messages.
 
-- [ ] **Step 4: Run focused tests, full CLI tests, and typecheck**
+- [x] **Step 4: Run focused tests, full CLI tests, and typecheck**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- character-commands.test.ts main-human.test.ts main-render-errors.test.ts response.test.ts
@@ -1037,7 +1037,7 @@ rtk pnpm --filter @lpc-toolkit/cli typecheck
 
 Expected: all CLI tests PASS.
 
-- [ ] **Step 5: Commit and record**
+- [x] **Step 5: Commit and record**
 
 ```sh
 rtk git add packages/cli/src/character-commands.ts packages/cli/src/response.ts packages/cli/test/character-commands.test.ts packages/cli/test/main-human.test.ts packages/cli/test/main-render-errors.test.ts packages/cli/test/response.test.ts
@@ -1046,9 +1046,20 @@ rtk git commit -m "feat(cli): complete character render workflow"
 
 Then update Task 6 checkboxes and record, stage only this plan, and commit it with `rtk git commit -m "docs(plan): record character render task"`.
 
-- Implementation: Not executed
-- Commit: Not executed
-- Verification: Not executed
+- Implementation: Delegated stored named and explicit-path characters to the
+  existing render workflow with exact animation, frame, ZIP, and partial-mode
+  option mapping. Added explicit human output for every character command,
+  structured suggestions and available values, stable explicit-selection file
+  stem fallback, and typed asset-store error preservation without changing the
+  JSON response envelope.
+- Commit: `032267353712514b77f21eca76e48a78b4ec9419`
+- Verification: RED confirmed 7 expected focused failures before implementation
+  and 1 expected explicit-selection stem failure during self-review. Focused
+  character/response suite PASS (35 tests); full CLI suite PASS (275 passed, 1
+  platform-specific skip); CLI typecheck, architecture boundary check, and
+  `git diff --check` PASS. The first sandboxed full CLI run failed only because
+  localhost binding was denied; the permission-enabled rerun passed all 30 test
+  files.
 
 ### Task 7: Installed Workflow Documentation and Release Verification
 
