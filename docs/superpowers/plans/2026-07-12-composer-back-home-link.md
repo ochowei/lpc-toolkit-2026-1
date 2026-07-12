@@ -14,6 +14,9 @@
 - Keep the complete label visible on desktop and mobile.
 - Make the home action the first interactive element at the far left of the
   top bar, followed by a vertical divider and then the LPC Toolkit brand.
+- Style only the home action with accent text, an `accent/10` background, an
+  `accent/50` border, and an `accent/20` hover background; do not add or change
+  a shared `Button` variant.
 - Navigate to `/` through the existing SPA routing callback, without a full page reload.
 - Add no dependencies and do not modify `upstream/`.
 - Preserve composition, attribution, catalog, export, and selection behavior.
@@ -419,4 +422,136 @@ rtk git commit -m "docs(web): record composer home link placement verification"
 ```
 
 Expected: a documentation-only commit that records the exact Task 2
+implementation commit hash.
+
+### Task 3: Distinguish the Home Action with Accent Styling
+
+**Files:**
+
+- Modify: `packages/web/test/top-bar.test.tsx`
+- Modify: `packages/web/src/components/layer-stack/top-bar.tsx`
+
+**Interfaces:**
+
+- Consumes: the existing home `Button`, `topBar.backHome` label, and
+  theme-aware Tailwind `accent` color token.
+- Produces: unchanged public component interfaces and shared `Button`
+  variants; only this TopBar action receives a one-off `className`.
+
+- [ ] **Step 1: Add the failing accent-style assertions**
+
+In `packages/web/test/top-bar.test.tsx`, add `className` to `ActionProps`:
+
+```tsx
+interface ActionProps {
+  readonly 'aria-label'?: string;
+  readonly children?: ReactNode;
+  readonly className?: string;
+  readonly onClick?: () => void;
+}
+```
+
+After the existing `expect(action).toBeDefined()` assertion, add:
+
+```tsx
+expect(action?.props.className).toContain('border-accent/50');
+expect(action?.props.className).toContain('bg-accent/10');
+expect(action?.props.className).toContain('text-accent');
+expect(action?.props.className).toContain('hover:bg-accent/20');
+```
+
+Keep the existing visible-copy, rendered-order, and callback assertions
+unchanged.
+
+- [ ] **Step 2: Run the focused test and verify RED**
+
+Run:
+
+```bash
+rtk pnpm --filter @lpc-toolkit/web exec vitest run test/top-bar.test.tsx
+```
+
+Expected: FAIL because the current home action has no one-off `className`, so
+the received value is `undefined` rather than containing
+`border-accent/50`.
+
+- [ ] **Step 3: Add the approved one-off accent treatment**
+
+In `packages/web/src/components/layer-stack/top-bar.tsx`, update only the
+existing home action:
+
+```tsx
+<Button
+  size="sm"
+  variant="ghost"
+  className="border border-accent/50 bg-accent/10 text-accent hover:bg-accent/20"
+  onClick={onNavigateHome}
+  aria-label={t('topBar.backHome')}
+>
+  {t('topBar.backHome')}
+</Button>
+```
+
+Do not modify `packages/web/src/components/ui/button.tsx`; its shared variants
+and focus outline remain unchanged.
+
+- [ ] **Step 4: Run the focused test and verify GREEN**
+
+Run:
+
+```bash
+rtk pnpm --filter @lpc-toolkit/web exec vitest run test/top-bar.test.tsx
+```
+
+Expected: PASS with one passing test.
+
+- [ ] **Step 5: Run scoped and architectural verification**
+
+Run:
+
+```bash
+rtk proxy pnpm --filter @lpc-toolkit/web typecheck
+rtk pnpm --filter @lpc-toolkit/web test
+rtk pnpm check:boundaries
+```
+
+Expected: web typecheck exits successfully; 73 web test files and 648 tests
+pass; the architecture boundary check passes.
+
+- [ ] **Step 6: Commit the verified color revision and current plan state**
+
+Check Steps 1–6 and append this note beneath Task 3:
+
+```markdown
+- Implementation: Added the approved accent tint, border, text, and hover treatment to only the TopBar home action.
+- Verification: focused TopBar test PASS; web typecheck PASS; web test PASS; boundary check PASS.
+```
+
+Then commit the implementation and plan state:
+
+```bash
+rtk git add packages/web/test/top-bar.test.tsx packages/web/src/components/layer-stack/top-bar.tsx docs/superpowers/plans/2026-07-12-composer-back-home-link.md
+rtk git commit -m "style(web): distinguish composer home link"
+```
+
+Expected: one commit containing only the revised test, TopBar styling, and
+Task 3 plan state.
+
+- [ ] **Step 7: Record the Task 3 implementation commit hash**
+
+Run:
+
+```bash
+rtk git rev-parse --short HEAD
+```
+
+Copy the exact printed hash into a `Commit:` implementation note beneath Task
+3, check Step 7, then commit that evidence:
+
+```bash
+rtk git add docs/superpowers/plans/2026-07-12-composer-back-home-link.md
+rtk git commit -m "docs(web): record composer home link color verification"
+```
+
+Expected: a documentation-only commit that records the exact Task 3
 implementation commit hash.
