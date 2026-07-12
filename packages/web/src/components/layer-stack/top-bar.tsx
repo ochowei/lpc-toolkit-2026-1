@@ -1,10 +1,12 @@
 import type { PropsWithChildren, ReactNode } from 'react';
 import type { Translator } from '../../i18n';
+import { Button } from '../ui/button';
 
 interface Props {
   t: Translator;
   loadingProgress: number | null;
   upstreamHref: string;
+  onNavigateHome: () => void;
   rightSlot?: ReactNode;
 }
 
@@ -13,11 +15,22 @@ export function TopBar({
   t,
   loadingProgress,
   upstreamHref,
+  onNavigateHome,
   rightSlot,
   children,
 }: PropsWithChildren<Props>) {
   return (
     <header className="flex flex-wrap items-center gap-2 border-b border-border bg-surface px-2 py-2 text-xs sm:px-3 md:flex-nowrap">
+      <Button
+        size="sm"
+        variant="ghost"
+        className="border border-accent/50 bg-accent/10 text-accent hover:bg-accent/20"
+        onClick={onNavigateHome}
+        aria-label={t('topBar.backHome')}
+      >
+        {t('topBar.backHome')}
+      </Button>
+      <div aria-hidden="true" className="h-6 w-px shrink-0 bg-border" />
       <div className="mr-1 flex min-w-0 flex-col leading-none">
         <span className="text-[13px] font-bold tracking-tight">
           LPC<span className="font-medium text-text-mute">·Toolkit</span>
