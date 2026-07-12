@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 export interface CliIssue {
   readonly code: string;
   readonly message: string;
@@ -189,13 +191,16 @@ function formatCharacterShow(data: JsonRecord): string | undefined {
   return `${JSON.stringify(selection, null, 2)}\n`;
 }
 
-function selectionName(data: JsonRecord): string | undefined {
+function characterDisplayName(data: JsonRecord): string | undefined {
   const selection = data['selection'];
-  return isRecord(selection) ? stringValue(selection, 'name') : undefined;
+  const metadataName = isRecord(selection) ? stringValue(selection, 'name') : undefined;
+  if (metadataName) return metadataName;
+  const characterPath = stringValue(data, 'path');
+  return characterPath ? path.parse(characterPath).name : undefined;
 }
 
 function formatCharacterCreate(data: JsonRecord): string | undefined {
-  const name = selectionName(data);
+  const name = characterDisplayName(data);
   const characterPath = stringValue(data, 'path');
   return name && characterPath ? `Created ${name}: ${characterPath}\n` : undefined;
 }
@@ -212,7 +217,7 @@ function formatCharacterSearch(data: JsonRecord): string | undefined {
 }
 
 function formatCharacterSet(data: JsonRecord): string | undefined {
-  const name = selectionName(data);
+  const name = characterDisplayName(data);
   const typeName = stringValue(data, 'typeName');
   const item = data['item'];
   const itemName = isRecord(item) ? stringValue(item, 'name') : undefined;
@@ -222,13 +227,13 @@ function formatCharacterSet(data: JsonRecord): string | undefined {
 }
 
 function formatCharacterRemove(data: JsonRecord): string | undefined {
-  const name = selectionName(data);
+  const name = characterDisplayName(data);
   const typeName = stringValue(data, 'typeName');
   return name && typeName ? `Updated ${name}: removed ${typeName}\n` : undefined;
 }
 
 function formatCharacterValidate(data: JsonRecord): string | undefined {
-  const name = selectionName(data);
+  const name = characterDisplayName(data);
   return name ? `Character ${name} is valid.\n` : undefined;
 }
 

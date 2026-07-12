@@ -354,14 +354,13 @@ export async function runCharacterCommand(
       const locator = characterLocator(parsed);
       const stored = readCharacter(io.cwd, locator);
       const frameValue = flagString(parsed.flags, 'frame');
+      const outDir = flagString(parsed.flags, 'out');
       const result: CharacterPreviewResult = await dependencies.renderCharacterPreview({
         runtime: requireRuntime(runtime),
         cwd: io.cwd,
         selectionPath: stored.path,
         ...(locator.name === undefined ? {} : { characterName: locator.name }),
-        ...(flagString(parsed.flags, 'out') === undefined
-          ? {}
-          : { outDir: flagString(parsed.flags, 'out') }),
+        ...(outDir === undefined ? {} : { outDir }),
         animation: flagString(parsed.flags, 'animation') ?? 'walk',
         direction: flagString(parsed.flags, 'direction') ?? 'down',
         frameIndex: previewFrameIndex(frameValue),

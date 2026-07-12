@@ -165,6 +165,41 @@ describe('human-readable CLI output', () => {
       .toContain('Updated hero: removed hair');
   });
 
+  it.each([
+    {
+      command: ['set', '--type', 'hair', '--item', 'braids'],
+      items: {},
+      expected: 'Updated custom.selection: hair = Braids',
+    },
+    {
+      command: ['validate'],
+      items: {},
+      expected: 'Character custom.selection is valid.',
+    },
+    {
+      command: ['remove', '--type', 'hair'],
+      items: { hair: { name: 'Braids', variant: 'brown' } },
+      expected: 'Updated custom.selection: removed hair',
+    },
+  ])('prints explicit character $command.0 output for an unnamed selection', async ({
+    command,
+    items,
+    expected,
+  }) => {
+    const cwd = makeCatalogCwd();
+    const selectionPath = path.join(cwd, 'saved', 'custom.selection.json');
+    mkdirSync(path.dirname(selectionPath), { recursive: true });
+    writeFileSync(selectionPath, JSON.stringify({
+      schema: 'lpc-toolkit.selection.v1',
+      bodyType: 'male',
+      items,
+    }));
+
+    expect(await runHuman([
+      'character', ...command, '--selection', selectionPath,
+    ], cwd)).toContain(expected);
+  });
+
   it('prints structured character suggestions and available values', async () => {
     const cwd = makeCatalogCwd();
     await runHuman(['character', 'create', 'hero'], cwd);
