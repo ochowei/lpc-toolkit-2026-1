@@ -11,9 +11,14 @@ import type {
   CreditsManifest,
   ItemDefinition,
   ItemId,
+  LayerSpec,
   License,
   Selections,
 } from './types.js';
+
+export interface GetCreditsOptions {
+  readonly layers?: readonly LayerSpec[];
+}
 
 const SPRITESHEETS_PREFIX = 'spritesheets/';
 
@@ -89,8 +94,9 @@ function findItem(
 export function getCredits(
   selections: Selections,
   catalog: Catalog,
+  options: GetCreditsOptions = {},
 ): CreditsManifest {
-  const layers = getSpritePathsForSelections(selections, catalog);
+  const layers = options.layers ?? getSpritePathsForSelections(selections, catalog);
   const usedPathsByItemId = new Map<ItemId, string[]>();
   for (const layer of layers) {
     const used = stripSpritesheetsPrefix(layer.path);

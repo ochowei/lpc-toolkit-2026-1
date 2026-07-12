@@ -72,6 +72,48 @@ async function run(
 }
 
 describe('character commands', () => {
+  it('overrides a preset body type only when --body-type is explicit', async () => {
+    const implicitFixture = createFixture();
+    const explicitFixture = createFixture();
+    const materializePreset = vi.fn().mockReturnValue({
+      schema: 'lpc-toolkit.selection.v1',
+      name: 'future-preset',
+      bodyType: 'female',
+      items: {},
+    });
+    const dependencies = {
+      renderSelection: vi.fn(),
+      renderCharacterPreview: vi.fn(),
+      materializePreset,
+    };
+
+    const implicit = await runCharacterCommand(
+      parseArgs(['character', 'create', 'implicit', '--preset', 'future-preset']),
+      implicitFixture.io,
+      implicitFixture.runtime,
+      dependencies,
+    );
+    const explicit = await runCharacterCommand(
+      parseArgs([
+        'character', 'create', 'explicit', '--preset', 'future-preset',
+        '--body-type', 'female',
+      ]),
+      explicitFixture.io,
+      explicitFixture.runtime,
+      dependencies,
+    );
+
+    expect(implicit).toMatchObject({ ok: true, data: { selection: { bodyType: 'female' } } });
+    expect(explicit).toMatchObject({ ok: true, data: { selection: { bodyType: 'female' } } });
+    expect(materializePreset).toHaveBeenNthCalledWith(1, 'future-preset', expect.not.objectContaining({
+      overridePresetBodyType: true,
+    }));
+    expect(materializePreset).toHaveBeenNthCalledWith(2, 'future-preset', expect.objectContaining({
+      bodyType: 'female',
+      overridePresetBodyType: true,
+    }));
+  });
+
   it('delegates all character render options', async () => {
     const fixture = createFixture();
     expect((await run(fixture, ['character', 'create', 'hero'])).response.ok).toBe(true);

@@ -12,6 +12,7 @@ import type {
   FilePath,
   ItemDefinition,
   License,
+  LayerSpec,
   Selections,
 } from '../src/types.js';
 
@@ -244,6 +245,58 @@ describe('getCredits dedupe logic', () => {
     );
     expect(manifest.entries.map((e) => e.file)).toEqual(['sparse/used']);
     expect(manifest.licenses).toEqual(['CC0']);
+  });
+
+  it('limits credits to supplied successfully composed layers', () => {
+    const loaded: ItemDefinition = {
+      name: 'Loaded',
+      type_name: 'loaded',
+      animations: ['walk'],
+      credits: [{
+        file: 'loaded',
+        authors: ['Loaded Artist'],
+        licenses: ['CC-BY 4.0'],
+        urls: [],
+      }],
+      layer_1: { zPos: 1, male: 'loaded/' },
+    };
+    const missing: ItemDefinition = {
+      name: 'Missing',
+      type_name: 'missing',
+      animations: ['walk'],
+      credits: [{
+        file: 'missing',
+        authors: ['Missing Artist'],
+        licenses: ['GPL 3.0'],
+        urls: [],
+      }],
+      layer_1: { zPos: 2, male: 'missing/' },
+    };
+    const catalog = makeCatalog([loaded, missing]);
+    const selections: Selections = {
+      bodyType: 'male',
+      items: {
+        loaded: { typeName: 'loaded', name: 'Loaded' },
+        missing: { typeName: 'missing', name: 'Missing' },
+      },
+    };
+    const loadedItemId = [...catalog.byItemId.entries()]
+      .find(([, item]) => item.name === 'Loaded')?.[0];
+    if (!loadedItemId) throw new Error('Expected loaded fixture item.');
+    const layers: readonly LayerSpec[] = [{
+      itemId: loadedItemId,
+      typeName: 'loaded',
+      path: 'spritesheets/loaded/walk.png',
+      zPos: 1,
+    }];
+
+    const manifest = getCredits(selections, catalog, { layers });
+
+    expect(manifest.entries.map((entry) => entry.authors)).toEqual([
+      ['Loaded Artist'],
+    ]);
+    expect(manifest.resolvedPaths).toEqual(['loaded/walk.png']);
+    expect(manifest.licenses).toEqual(['CC-BY 4.0']);
   });
 });
 

@@ -184,4 +184,39 @@ describe('render asset-store error responses', () => {
     }
     expect(existsSync(path.join(runtime.context.repoRoot, 'empty-out'))).toBe(false);
   });
+
+  it.each([
+    ['human', false],
+    ['JSON', true],
+  ])('rejects an all-missing partial character render in %s mode without publishing', async (
+    _label,
+    json,
+  ) => {
+    const runtime = await createMissingImageRuntime();
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const argv = [
+      'character', 'render', 'missing-image', '--out', 'all-missing-out', '--allow-partial',
+    ];
+    if (json) argv.push('--json');
+
+    const code = await runCli(argv, {
+      cwd: runtime.context.repoRoot,
+      stdout: (text) => stdout.push(text),
+      stderr: (text) => stderr.push(text),
+    }, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+
+    expect(code).toBe(1);
+    const output = json ? stdout.join('') : stderr.join('');
+    expect(output).toContain('incomplete_character');
+    if (json) {
+      expect(JSON.parse(output).errors[0]).toMatchObject({ code: 'incomplete_character' });
+      expect(stderr).toEqual([]);
+    } else {
+      expect(stdout).toEqual([]);
+    }
+    expect(existsSync(path.join(runtime.context.repoRoot, 'all-missing-out'))).toBe(false);
+  });
 });

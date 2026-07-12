@@ -50,11 +50,13 @@ import { validateSelections, type ValidationResult } from './validation.js';
 export interface CharacterCommandDependencies {
   readonly renderSelection: typeof renderSelection;
   readonly renderCharacterPreview: typeof renderCharacterPreview;
+  readonly materializePreset?: typeof materializePreset;
 }
 
 const DEFAULT_DEPENDENCIES: CharacterCommandDependencies = {
   renderSelection,
   renderCharacterPreview,
+  materializePreset,
 };
 
 class CharacterUsageError extends Error {
@@ -235,7 +237,8 @@ export async function runCharacterCommand(
         ? namedPath
         : resolveCharacterPath(io.cwd, { selectionPath });
       const presetId = flagString(parsed.flags, 'preset');
-      const bodyType = flagString(parsed.flags, 'body-type') ?? 'male';
+      const requestedBodyType = flagString(parsed.flags, 'body-type');
+      const bodyType = requestedBodyType ?? 'male';
       const emptySelection = createEmptyCharacter(name, bodyType);
       let selection: SelectionJson;
       let warnings: readonly CliIssue[] = [];
@@ -243,11 +246,13 @@ export async function runCharacterCommand(
         const loaded = loadCharacterContext(requireRuntime(runtime));
         warnings = loaded.warnings;
         try {
-          const preset = materializePreset(presetId, {
+          const preset = (dependencies.materializePreset ?? materializePreset)(presetId, {
             catalog: loaded.editor.catalog,
             palettes: loaded.editor.palettes,
             bodyType: emptySelection.bodyType,
-            overridePresetBodyType: true,
+            ...(requestedBodyType === undefined
+              ? {}
+              : { overridePresetBodyType: true }),
             rejectSkipped: true,
           });
           selection = { ...preset, name };

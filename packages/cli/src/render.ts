@@ -197,7 +197,9 @@ export async function renderSelection(
   const creditsAnimation = options.animations[0] ?? sheet.animations[0] ?? 'walk';
   const creditsTxt = creditsToTxt(sheet.credits, creditsAnimation);
   const creditsCsv = creditsToCsv(sheet.credits, creditsAnimation);
-  const effectiveLicense = computeEffectiveLicense(sheet.credits);
+  const effectiveLicense = sheet.credits.licenses.length > 0
+    ? computeEffectiveLicense(sheet.credits)
+    : null;
 
   const artifacts: RenderArtifact[] = [
     { type: 'sheet', path: sheetPath, width: sheet.width, height: sheet.height },

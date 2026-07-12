@@ -53,7 +53,7 @@ const hairDefinition = {
     {
       file: 'hair/fixture/male',
       authors: ['Remaining Artist'],
-      licenses: ['GPL 3.0'],
+      licenses: ['CC-BY 4.0'],
       urls: ['https://example.com/lpc-remaining-fixture'],
     },
   ],
@@ -211,13 +211,25 @@ async function expectPartialMissingImageOutput(
   ]));
   expect(readFileSync(path.join(outDir, 'partial-character.credits.txt'), 'utf8'))
     .toContain('Remaining Artist');
+  expect(readFileSync(path.join(outDir, 'partial-character.credits.txt'), 'utf8'))
+    .not.toContain('Fixture Artist');
+  expect(readFileSync(path.join(outDir, 'partial-character.credits.csv'), 'utf8'))
+    .not.toContain('GPL 3.0');
   const metadata = JSON.parse(
     readFileSync(path.join(outDir, 'partial-character.metadata.json'), 'utf8'),
   ) as {
-    readonly credits: { readonly resolvedPaths: readonly string[] };
+    readonly credits: {
+      readonly resolvedPaths: readonly string[];
+      readonly licenses: readonly string[];
+      readonly entries: number;
+    };
+    readonly effectiveLicense: string;
     readonly skippedLayers: readonly { readonly code: string; readonly path?: string }[];
   };
   expect(metadata.credits.resolvedPaths).toContain('hair/fixture/male/walk.png');
+  expect(metadata.credits.resolvedPaths).not.toContain('body/bodies/male/walk.png');
+  expect(metadata.credits).toMatchObject({ entries: 1, licenses: ['CC-BY 4.0'] });
+  expect(metadata.effectiveLicense).toBe('CC-BY 4.0');
   expect(metadata.skippedLayers).toEqual(expect.arrayContaining([
     expect.objectContaining({
       code: 'missing_sprite_path',
@@ -451,5 +463,33 @@ describe('renderSelection', () => {
       runtime,
       mkdtempSync(path.join(os.tmpdir(), 'lpc-render-partial-zip-')),
     );
+  }, 30000);
+
+  it('keeps direct partial render compatibility when every selected image is missing', async () => {
+    const cwd = await createFixtureRepo();
+    rmSync(path.join(cwd, 'assets/spritesheets/body/bodies/male/walk.png'));
+    const outDir = mkdtempSync(path.join(os.tmpdir(), 'lpc-render-all-missing-direct-'));
+
+    await renderSelection({
+      runtime: createRuntime(cwd),
+      cwd,
+      outDir,
+      selectionName: 'body-only',
+      selectionJson: bodyOnlySelection,
+      animations: [],
+      frames: [],
+      bundleZip: false,
+      allowPartial: true,
+    });
+
+    expect(existsSync(path.join(outDir, 'body-only.sheet.png'))).toBe(true);
+    const metadata = JSON.parse(
+      readFileSync(path.join(outDir, 'body-only.metadata.json'), 'utf8'),
+    ) as {
+      readonly effectiveLicense: string | null;
+      readonly credits: { readonly entries: number; readonly resolvedPaths: readonly string[] };
+    };
+    expect(metadata.effectiveLicense).toBeNull();
+    expect(metadata.credits).toMatchObject({ entries: 0, resolvedPaths: [] });
   }, 30000);
 });
