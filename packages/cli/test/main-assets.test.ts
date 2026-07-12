@@ -291,7 +291,9 @@ describe('asset preparation dispatch', () => {
       prepareRuntimeAssets: prepare,
     })).toBe(0);
     expect(prepare).not.toHaveBeenCalled();
-    expect(capture.stdout.join('')).toContain('lpc-toolkit character set <name>');
+    expect(capture.stdout.join('')).toContain(
+      'lpc-toolkit character set (<name> | --selection <file>) --type <type> --item <item-id-or-type/name> [options]',
+    );
   });
 
   it('keeps JSON stdout parseable while progress goes to stderr', async () => {
