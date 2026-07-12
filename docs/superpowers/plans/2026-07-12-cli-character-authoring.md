@@ -1060,6 +1060,19 @@ Then update Task 6 checkboxes and record, stage only this plan, and commit it wi
   `git diff --check` PASS. The first sandboxed full CLI run failed only because
   localhost binding was denied; the permission-enabled rerun passed all 30 test
   files.
+- Review fix: Derived unnamed explicit-selection display identity from the
+  response path using the same parsed file-stem convention as render, so set,
+  validate, and remove retain command-specific human output without changing
+  response data or JSON. Cached the preview output flag once to satisfy the
+  package's `exactOptionalPropertyTypes` typecheck.
+- Review-fix RED: `main-human.test.ts` failed 3 independent assertions because
+  successful unnamed explicit-selection set, validate, and remove commands all
+  emitted only `Character command completed.`. Package-directory typecheck also
+  exposed the existing repeated preview `--out` lookup as `string | undefined`.
+- Review-fix commit: `c7007b8fa89a69a48d8fe42af4c2e03630261522`
+- Review-fix verification: Focused character/human/response/render-error suite
+  PASS (38 tests); full CLI suite PASS (278 passed, 1 platform-specific skip);
+  package-directory CLI typecheck and `git diff --check` PASS.
 
 ### Task 7: Installed Workflow Documentation and Release Verification
 
