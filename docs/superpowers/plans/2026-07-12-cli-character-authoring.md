@@ -948,6 +948,18 @@ Then update Task 5 checkboxes and record, stage only this plan, and commit it wi
   suite PASS (167 tests); architecture boundary check and `git diff --check`
   PASS. The first sandboxed full CLI run failed only because localhost binding
   was denied; the permission-enabled rerun passed all 30 test files.
+- Review fix: Normalized preview metadata names before accepting them, rejected
+  empty and dot-segment results, and safely fell back to the normalized
+  selection file stem so explicit-selection artifacts cannot escape their
+  required preview directory. Added containment regressions for `..` and
+  punctuation-only metadata.
+- Review-fix RED: `preview.test.ts` failed 2 assertions: `..` normalized the
+  output to the selection directory, while punctuation-only metadata did not
+  use the required safe file-stem fallback.
+- Review-fix commit: `cdb6e8c8baa432b4dd5dad8b4d1ca5956a05ce53`
+- Review-fix verification: Focused preview/render/character suite PASS (32
+  tests); CLI package typecheck PASS; architecture boundary check and
+  `git diff --check` PASS.
 
 ### Task 6: Character Render Delegation and Complete Human Output
 
