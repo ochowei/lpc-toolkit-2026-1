@@ -54,7 +54,7 @@
 - Extends: `CliIssue.details?: { suggestions?: readonly string[]; available?: readonly string[] }`.
 - Consumes later: every character command uses the same option validator and issue details.
 
-- [ ] **Step 1: Write failing command-spec and dispatch tests**
+- [x] **Step 1: Write failing command-spec and dispatch tests**
 
 Add tests that prove nested help is specific and unknown/malformed options fail before asset preparation:
 
@@ -83,7 +83,7 @@ it('rejects invalid options without preparing assets', async () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused tests and verify RED**
+- [x] **Step 2: Run the focused tests and verify RED**
 
 Run:
 
@@ -93,7 +93,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- command-spec.test.ts main-assets.test
 
 Expected: FAIL because `command-spec.ts` and `CliIssue.details` do not exist and nested help still returns the global summary.
 
-- [ ] **Step 3: Implement the command metadata and validator**
+- [x] **Step 3: Implement the command metadata and validator**
 
 Use an explicit table, not ad-hoc checks spread through `main.ts`:
 
@@ -164,7 +164,7 @@ readonly details?: {
 };
 ```
 
-- [ ] **Step 4: Run focused tests and typecheck**
+- [x] **Step 4: Run focused tests and typecheck**
 
 Run:
 
@@ -175,20 +175,20 @@ rtk pnpm --filter @lpc-toolkit/cli typecheck
 
 Expected: all selected tests PASS and typecheck exits 0.
 
-- [ ] **Step 5: Commit the implementation**
+- [x] **Step 5: Commit the implementation**
 
 ```sh
 rtk git add packages/cli/src/args.ts packages/cli/src/command-spec.ts packages/cli/src/main.ts packages/cli/src/response.ts packages/cli/test/args.test.ts packages/cli/test/command-spec.test.ts packages/cli/test/main-assets.test.ts packages/cli/test/response.test.ts
 rtk git commit -m "feat(cli): add hierarchical command help"
 ```
 
-- [ ] **Step 6: Record task completion**
+- [x] **Step 6: Record task completion**
 
 After the implementation commit, mark Task 1 steps complete and replace this current-state record with actual evidence, then stage only this plan and commit it with `rtk git commit -m "docs(plan): record CLI help task"`.
 
-- Implementation: Not executed
-- Commit: Not executed
-- Verification: Not executed
+- Implementation: Added explicit hierarchical command metadata for every existing and designed character command, command-specific help, strict option-shape validation with typo suggestions, boolean `--help` parsing, early validation before asset preparation, and structured issue details.
+- Commit: `24173d8b0` (`feat(cli): add hierarchical command help`)
+- Verification: TDD RED captured with the required focused command (missing `command-spec.ts`, unknown option accepted, and global nested help); GREEN with 53/53 focused tests passing; CLI typecheck PASS; full CLI suite PASS (205 passed, 1 skipped).
 
 ### Task 2: Character Store and Safe Persistence
 
