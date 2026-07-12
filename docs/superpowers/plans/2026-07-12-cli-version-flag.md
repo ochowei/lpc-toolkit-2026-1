@@ -31,7 +31,7 @@
 - Consumes: `CLI_VERSION: string` from `packages/cli/src/package-info.ts` and the existing `runCli(argv, io, dependencies): Promise<number>` interface.
 - Produces: `runCli(['--version'], ...)` and `runCli(['-V'], ...)` output `${CLI_VERSION}\n` with status `0`, no stderr, and no asset preparation.
 
-- [ ] **Step 1: Write failing version behavior tests**
+- [x] **Step 1: Write failing version behavior tests**
 
 In `packages/cli/test/main-assets.test.ts`, import `CLI_VERSION` and add this test inside `describe('asset preparation dispatch', ...)` after the existing help test:
 
@@ -55,7 +55,7 @@ In the existing `prints help for no command` test in `packages/cli/test/smoke.te
 expect(writes.join('')).toContain('lpc-toolkit --version');
 ```
 
-- [ ] **Step 2: Run the focused tests and verify RED**
+- [x] **Step 2: Run the focused tests and verify RED**
 
 Run:
 
@@ -65,7 +65,7 @@ rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/main-assets.test.ts test
 
 Expected: FAIL because `--version` currently reaches unknown-command handling, `-V` is parsed as a command, and help does not list `lpc-toolkit --version`.
 
-- [ ] **Step 3: Implement the minimal version handling**
+- [x] **Step 3: Implement the minimal version handling**
 
 In `packages/cli/src/main.ts`, add the package version import:
 
@@ -88,7 +88,7 @@ if (argv[0] === '--version' || argv[0] === '-V') {
 }
 ```
 
-- [ ] **Step 4: Run focused tests and verify GREEN**
+- [x] **Step 4: Run focused tests and verify GREEN**
 
 Run:
 
@@ -98,7 +98,7 @@ rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/main-assets.test.ts test
 
 Expected: both test files PASS with no warnings or errors.
 
-- [ ] **Step 5: Run package and boundary verification**
+- [x] **Step 5: Run package and boundary verification**
 
 Run:
 
@@ -110,7 +110,7 @@ rtk pnpm check:boundaries
 
 Expected: typecheck PASS, all CLI tests PASS, and boundary checks PASS. If the full CLI test requires localhost binding, rerun the same test command with approved elevated sandbox access.
 
-- [ ] **Step 6: Record completion and commit**
+- [x] **Step 6: Record completion and commit**
 
 Update this task checkbox and append an implementation note, verification result, and the commit hash after committing. Stage only the three implementation files and this plan file, leaving unrelated working-tree files untouched:
 
@@ -119,3 +119,13 @@ rtk git add packages/cli/src/main.ts packages/cli/test/main-assets.test.ts packa
 rtk git commit -m "feat(cli): add version flags"
 rtk git rev-parse --short HEAD
 ```
+
+Implementation note: Added root-level `--version` and `-V` early returns using
+the existing `CLI_VERSION`, documented `--version` in help, and added exact
+output and asset-independence coverage for both flags.
+
+- Commit: `2a43c494cdd4ab682709be0c626cc1c2fa51460f`
+- Verification: focused tests PASS (41/41); CLI tests PASS (194 passed,
+  1 skipped); TypeScript typecheck PASS; architecture boundary check PASS;
+  direct CLI entry checks print `0.1.2` for both flags; independent code review
+  reports no Critical, Important, or Minor issues.
