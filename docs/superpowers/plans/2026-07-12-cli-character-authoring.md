@@ -1215,3 +1215,25 @@ passed. Full command and behavior evidence is appended to
 `.superpowers/sdd/final-fix-report.md`. All final checklist items above remain
 satisfied, including exact composed credit manifests and no pre-validation
 writes.
+
+## PR CI Attribution Follow-up
+
+- [x] Preserve every successfully composed animation path for exact credit
+  matching while keeping the default animation first for folder-level resolved
+  attribution.
+  - Implementation: Core now supplies `getCredits` with every catalog image
+    actually drawn into the sheet. It stably prioritizes each selection's
+    existing representative/default path, so folder-level catalog credits keep
+    the Web UI's `walk.png` resolved path without dropping file-level credits
+    for other successfully composed animations. Missing image paths remain
+    excluded.
+  - Commit: `938ae6a5f98fd303920b476021559605fbe22887`
+  - Verification: TDD RED first reproduced the missing second successful path
+    (`spellcast.png` present, `walk.png` absent), then a second RED reproduced
+    the folder-credit regression (`spellcast.png` resolved instead of
+    `walk.png`). Focused core GREEN passed 34 tests. Full core passed 170;
+    full CLI passed 294 with 1 platform-specific skip; full Web passed 649;
+    core/CLI/Web typechecks and architecture boundaries passed; the originally
+    failing attribution E2E passed 3/3; the complete Web E2E suite passed
+    24/24; and `git diff --check` passed. Initial sandboxed CLI/Web unit runs
+    failed only on localhost/tsx IPC `EPERM`; permission-enabled reruns passed.
