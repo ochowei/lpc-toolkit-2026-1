@@ -24,6 +24,7 @@ export function TopBar({
       <Button
         size="sm"
         variant="ghost"
+        className="border border-accent/50 bg-accent/10 text-accent hover:bg-accent/20"
         onClick={onNavigateHome}
         aria-label={t('topBar.backHome')}
       >

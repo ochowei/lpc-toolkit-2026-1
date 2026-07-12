@@ -438,7 +438,11 @@ implementation commit hash.
 - Produces: unchanged public component interfaces and shared `Button`
   variants; only this TopBar action receives a one-off `className`.
 
-- [ ] **Step 1: Add the failing accent-style assertions**
+- [x] **Step 1: Add the failing accent-style assertions**
+
+  - Implementation: Added focused assertions for the approved one-off accent classes.
+  - Commit: pending implementation commit.
+  - Verification: focused test failed at the first accent assertion because `className` was `undefined`.
 
 In `packages/web/test/top-bar.test.tsx`, add `className` to `ActionProps`:
 
@@ -463,7 +467,11 @@ expect(action?.props.className).toContain('hover:bg-accent/20');
 Keep the existing visible-copy, rendered-order, and callback assertions
 unchanged.
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
+
+  - Implementation: Ran the focused TopBar test before changing production code.
+  - Commit: pending implementation commit.
+  - Verification: RED confirmed; 1 test failed because `className` was `undefined`.
 
 Run:
 
@@ -475,7 +483,11 @@ Expected: FAIL because the current home action has no one-off `className`, so
 the received value is `undefined` rather than containing
 `border-accent/50`.
 
-- [ ] **Step 3: Add the approved one-off accent treatment**
+- [x] **Step 3: Add the approved one-off accent treatment**
+
+  - Implementation: Added the exact approved accent classes to only the TopBar home action.
+  - Commit: pending implementation commit.
+  - Verification: focused TopBar test PASS; 1 test passed.
 
 In `packages/web/src/components/layer-stack/top-bar.tsx`, update only the
 existing home action:
@@ -495,7 +507,11 @@ existing home action:
 Do not modify `packages/web/src/components/ui/button.tsx`; its shared variants
 and focus outline remain unchanged.
 
-- [ ] **Step 4: Run the focused test and verify GREEN**
+- [x] **Step 4: Run the focused test and verify GREEN**
+
+  - Implementation: Re-ran the focused TopBar test after the minimal styling change.
+  - Commit: pending implementation commit.
+  - Verification: GREEN confirmed; 1 test passed.
 
 Run:
 
@@ -505,7 +521,11 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/top-bar.test.tsx
 
 Expected: PASS with one passing test.
 
-- [ ] **Step 5: Run scoped and architectural verification**
+- [x] **Step 5: Run scoped and architectural verification**
+
+  - Implementation: Ran the required web typecheck, complete web suite, and architecture boundary checker.
+  - Commit: pending implementation commit.
+  - Verification: web typecheck PASS; 73 files / 648 tests PASS; boundary check PASS.
 
 Run:
 
@@ -518,7 +538,14 @@ rtk pnpm check:boundaries
 Expected: web typecheck exits successfully; 73 web test files and 648 tests
 pass; the architecture boundary check passes.
 
-- [ ] **Step 6: Commit the verified color revision and current plan state**
+- [x] **Step 6: Commit the verified color revision and current plan state**
+
+  - Implementation: Prepared the scoped test, TopBar styling, and current plan evidence for commit.
+  - Commit: pending implementation commit.
+  - Verification: focused TopBar test PASS; web typecheck PASS; web test PASS; boundary check PASS.
+
+- Implementation: Added the approved accent tint, border, text, and hover treatment to only the TopBar home action.
+- Verification: focused TopBar test PASS; web typecheck PASS; web test PASS; boundary check PASS.
 
 Check Steps 1–6 and append this note beneath Task 3:
 

@@ -12,6 +12,7 @@ import { createTranslator } from '../src/i18n';
 interface ActionProps {
   readonly 'aria-label'?: string;
   readonly children?: ReactNode;
+  readonly className?: string;
   readonly onClick?: () => void;
 }
 
@@ -49,6 +50,10 @@ describe('TopBar', () => {
 
     const action = findAction(tree, '← Back to home');
     expect(action).toBeDefined();
+    expect(action?.props.className).toContain('border-accent/50');
+    expect(action?.props.className).toContain('bg-accent/10');
+    expect(action?.props.className).toContain('text-accent');
+    expect(action?.props.className).toContain('hover:bg-accent/20');
     action?.props.onClick?.();
     expect(onNavigateHome).toHaveBeenCalledOnce();
   });
