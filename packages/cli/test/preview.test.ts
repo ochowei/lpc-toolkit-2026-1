@@ -165,4 +165,31 @@ describe('renderCharacterPreview', () => {
       path.join(path.dirname(options.selectionPath), 'previews', 'custom.selection'),
     );
   }, 30000);
+
+  it.each(['..', ' !!! '])(
+    'contains every explicit-selection artifact under the safe file-stem fallback for metadata %j',
+    async (name) => {
+      const options = await createFixture();
+      const selection = JSON.parse(
+        readFileSync(options.selectionPath, 'utf8'),
+      ) as Record<string, unknown>;
+      selection.name = name;
+      writeJson(options.selectionPath, selection);
+
+      const result = await renderCharacterPreview(options);
+      const expectedOutDir = path.join(
+        path.dirname(options.selectionPath),
+        'previews',
+        'custom.selection',
+      );
+
+      expect(result.outDir).toBe(expectedOutDir);
+      expect(result.artifacts).toHaveLength(4);
+      for (const artifact of result.artifacts) {
+        expect(path.dirname(artifact.path)).toBe(expectedOutDir);
+        expect(path.relative(expectedOutDir, artifact.path)).not.toMatch(/^\.\.(?:[/\\]|$)/u);
+      }
+    },
+    30000,
+  );
 });

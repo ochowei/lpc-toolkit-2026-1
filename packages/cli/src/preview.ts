@@ -86,8 +86,10 @@ export interface CharacterPreviewResult {
   readonly outDir: string;
 }
 
-function safeName(name: string): string {
-  return name.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'sprite';
+function normalizedSafeName(name: string): string | undefined {
+  const normalized = name.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
+  if (normalized.length === 0 || normalized === '.' || normalized === '..') return undefined;
+  return normalized;
 }
 
 function readSelection(selectionPath: string): SelectionJson {
@@ -105,14 +107,17 @@ function outputIdentity(options: CharacterPreviewOptions, selection: SelectionJs
   const metadataName = typeof selection.name === 'string' && selection.name.length > 0
     ? selection.name
     : undefined;
-  const baseName = safeName(options.characterName ?? metadataName ?? fallbackName);
+  const baseName = normalizedSafeName(options.characterName ?? '')
+    ?? normalizedSafeName(metadataName ?? '')
+    ?? normalizedSafeName(fallbackName)
+    ?? 'sprite';
   if (options.outDir !== undefined) {
     return { baseName, outDir: path.resolve(options.cwd, options.outDir) };
   }
   if (options.characterName !== undefined) {
     return {
       baseName,
-      outDir: path.join(options.cwd, 'characters', 'previews', safeName(options.characterName)),
+      outDir: path.join(options.cwd, 'characters', 'previews', baseName),
     };
   }
   return {
