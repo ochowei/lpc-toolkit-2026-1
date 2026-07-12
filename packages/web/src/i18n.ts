@@ -6,6 +6,7 @@ import type { ItemDefinition } from '@lpc-toolkit/core';
 export const TRANSLATIONS = {
   en: {
     'app.subtitle': 'foundation slice',
+    'topBar.backHome': '← Back to home',
     'topBar.upstreamLink':
       'Open this character in the upstream Universal LPC Sprite Sheet Character Generator',
     'source.project':
@@ -180,6 +181,7 @@ export const TRANSLATIONS = {
   },
   'zh-TW': {
     'app.subtitle': '基礎切片',
+    'topBar.backHome': '← 返回首頁',
     'topBar.upstreamLink':
       '在原始 Universal LPC Sprite Sheet Character Generator 開啟此角色',
     'source.project':

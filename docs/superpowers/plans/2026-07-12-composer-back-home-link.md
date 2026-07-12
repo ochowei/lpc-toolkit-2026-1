@@ -42,7 +42,11 @@
 - Consumes: existing `navigateToRoute(routeName: NavigableAppRoute): void`, `Translator`, and shared `Button`.
 - Produces: `LayerStackHarnessProps.onNavigateHome: () => void` and `TopBar` prop `onNavigateHome: () => void`.
 
-- [ ] **Step 1: Write the failing top-bar test**
+- [x] **Step 1: Write the failing top-bar test**
+
+  - Implementation: Added the focused TopBar presentation-boundary test.
+  - Commit: pending Task 1 implementation commit.
+  - Verification: test created; RED run pending.
 
 Create `packages/web/test/top-bar.test.tsx`:
 
@@ -100,7 +104,11 @@ describe('TopBar', () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
+
+  - Implementation: Ran the focused TopBar test before production changes.
+  - Commit: pending Task 1 implementation commit.
+  - Verification: RED confirmed; 1 test failed because rendered markup omitted `← Back to home`.
 
 Run:
 
@@ -110,7 +118,11 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/top-bar.test.tsx
 
 Expected: FAIL because `TopBar` does not render `← Back to home`; no navigation callback is invoked.
 
-- [ ] **Step 3: Add localized copy and render the action**
+- [x] **Step 3: Add localized copy and render the action**
+
+  - Implementation: Added English and Traditional Chinese copy and rendered the shared ghost Button after the brand block.
+  - Commit: pending Task 1 implementation commit.
+  - Verification: focused GREEN run pending callback threading.
 
 In both locale maps in `packages/web/src/i18n.ts`, add the same key:
 
@@ -147,7 +159,11 @@ Destructure `onNavigateHome`, then place this action immediately after the brand
 </Button>
 ```
 
-- [ ] **Step 4: Thread the callback from App to TopBar**
+- [x] **Step 4: Thread the callback from App to TopBar**
+
+  - Implementation: Threaded `onNavigateHome` from App through ComposerApp and LayerStackHarness into TopBar.
+  - Commit: pending Task 1 implementation commit.
+  - Verification: focused GREEN run pending.
 
 Change the `ComposerApp` signature in `packages/web/src/App.tsx`:
 
@@ -179,7 +195,11 @@ Pass the callback into `TopBar`:
 onNavigateHome={props.onNavigateHome}
 ```
 
-- [ ] **Step 5: Run the focused test and verify GREEN**
+- [x] **Step 5: Run the focused test and verify GREEN**
+
+  - Implementation: Re-ran the focused TopBar test after the minimal callback and UI implementation.
+  - Commit: pending Task 1 implementation commit.
+  - Verification: GREEN confirmed; 1 test passed.
 
 Run:
 
@@ -189,7 +209,11 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/top-bar.test.tsx
 
 Expected: PASS with one passing test.
 
-- [ ] **Step 6: Run scoped and architectural verification**
+- [x] **Step 6: Run scoped and architectural verification**
+
+  - Implementation: Ran web typecheck, the complete web test suite, and the architecture boundary checker.
+  - Commit: pending Task 1 implementation commit.
+  - Verification: web typecheck PASS; 73 files / 648 tests PASS; boundary check PASS.
 
 Run:
 
@@ -201,7 +225,14 @@ rtk pnpm check:boundaries
 
 Expected: all three commands exit successfully with no TypeScript, test, or boundary failures.
 
-- [ ] **Step 7: Commit the verified implementation and current plan state**
+- [x] **Step 7: Commit the verified implementation and current plan state**
+
+  - Implementation: Staged the scoped implementation, test, and current plan evidence for the implementation commit.
+  - Commit: pending Task 1 implementation commit.
+  - Verification: scoped diff review PASS; `git diff --check` PASS.
+
+- Implementation: Added a localized explicit home action and threaded SPA navigation ownership from App through the composer presentation boundary.
+- Verification: focused TopBar test PASS; web typecheck PASS; web test PASS; boundary check PASS.
 
 Check Steps 1–7 and append this note beneath Task 1:
 

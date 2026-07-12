@@ -1,10 +1,12 @@
 import type { PropsWithChildren, ReactNode } from 'react';
 import type { Translator } from '../../i18n';
+import { Button } from '../ui/button';
 
 interface Props {
   t: Translator;
   loadingProgress: number | null;
   upstreamHref: string;
+  onNavigateHome: () => void;
   rightSlot?: ReactNode;
 }
 
@@ -13,6 +15,7 @@ export function TopBar({
   t,
   loadingProgress,
   upstreamHref,
+  onNavigateHome,
   rightSlot,
   children,
 }: PropsWithChildren<Props>) {
@@ -36,6 +39,14 @@ export function TopBar({
           </a>
         </span>
       </div>
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={onNavigateHome}
+        aria-label={t('topBar.backHome')}
+      >
+        {t('topBar.backHome')}
+      </Button>
       {children /* slots for BodyType pill, popovers, attribution */}
       <div className="min-w-2 flex-1" />
       {loadingProgress != null && loadingProgress < 1 && (

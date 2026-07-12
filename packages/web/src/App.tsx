@@ -44,7 +44,7 @@ function useAppPathname(): [string, (path: AppPath) => void] {
   return [pathname, navigate];
 }
 
-function ComposerApp() {
+function ComposerApp({ onNavigateHome }: { onNavigateHome: () => void }) {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE);
 
@@ -87,6 +87,7 @@ function ComposerApp() {
       locale={locale}
       t={t}
       tl={tl}
+      onNavigateHome={onNavigateHome}
       onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
       onToggleLocale={() =>
         setLocale((current) => (current === 'en' ? 'zh-TW' : 'en'))
@@ -107,7 +108,7 @@ export default function App() {
   };
 
   if (route === 'compose') {
-    return <ComposerApp />;
+    return <ComposerApp onNavigateHome={() => navigateToRoute('landing')} />;
   }
 
   if (route === 'not-found') {
