@@ -261,7 +261,7 @@ a competing rule set.
 attribution. Its documented defaults are:
 
 - animation: `walk`;
-- direction: `s`;
+- direction: `down`;
 - frame index: `0`.
 
 If a default or requested value is unavailable, preview fails with the
