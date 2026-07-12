@@ -7,7 +7,7 @@ import {
 } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   listCharacters,
   readCharacter,
@@ -15,6 +15,29 @@ import {
   writeCharacter,
 } from '../src/character-store.js';
 import { SELECTION_SCHEMA, type SelectionJson } from '../src/selection.js';
+
+const publicationRace = vi.hoisted(() => ({
+  afterTemporaryWrite: undefined as (() => void) | undefined,
+}));
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    writeFileSync(
+      file: Parameters<typeof actual.writeFileSync>[0],
+      data: Parameters<typeof actual.writeFileSync>[1],
+      options?: Parameters<typeof actual.writeFileSync>[2],
+    ) {
+      actual.writeFileSync(file, data, options);
+      const afterTemporaryWrite = publicationRace.afterTemporaryWrite;
+      if (afterTemporaryWrite !== undefined && String(file).endsWith('.tmp')) {
+        publicationRace.afterTemporaryWrite = undefined;
+        afterTemporaryWrite();
+      }
+    },
+  };
+});
 
 const temporaryDirectories: string[] = [];
 
@@ -36,6 +59,7 @@ function selection(name: string, bodyType: 'male' | 'female' = 'male'): Selectio
 }
 
 afterEach(() => {
+  publicationRace.afterTemporaryWrite = undefined;
   for (const directory of temporaryDirectories.splice(0)) {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -93,6 +117,24 @@ describe('character persistence', () => {
       }),
     );
     expect(readCharacter(cwd, { name: 'hero' }).selection.name).toBe('hero');
+  });
+
+  it('does not overwrite a character created during create publication', () => {
+    const cwd = createCwd();
+    const target = resolveCharacterPath(cwd, { name: 'hero' });
+    const competingBytes = `${JSON.stringify(selection('competitor'), null, 2)}\n`;
+    publicationRace.afterTemporaryWrite = () => writeFileSync(target, competingBytes);
+
+    expect(() => writeCharacter(target, selection('ours'), 'create')).toThrowError(
+      expect.objectContaining({
+        code: 'character_already_exists',
+        path: target,
+      }),
+    );
+    expect(readFileSync(target, 'utf8')).toBe(competingBytes);
+    expect(readdirSync(path.dirname(target))).not.toEqual(
+      expect.arrayContaining([expect.stringMatching(/\.tmp$/u)]),
+    );
   });
 
   it('leaves existing bytes unchanged when replacement validation fails', () => {

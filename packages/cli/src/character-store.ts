@@ -1,5 +1,5 @@
 import {
-  existsSync,
+  linkSync,
   mkdirSync,
   readFileSync,
   readdirSync,
@@ -78,6 +78,21 @@ function toCharacterWriteError(error: unknown, targetPath: string): CharacterSto
   );
 }
 
+function publishCreatedCharacter(temporaryPath: string, targetPath: string): void {
+  try {
+    linkSync(temporaryPath, targetPath);
+  } catch (error) {
+    if (isNodeError(error) && error.code === 'EEXIST') {
+      throw new CharacterStoreError(
+        'character_already_exists',
+        'Character already exists.',
+        targetPath,
+      );
+    }
+    throw error;
+  }
+}
+
 export function resolveCharacterPath(cwd: string, input: CharacterLocator): string {
   if (input.selectionPath !== undefined) return path.resolve(cwd, input.selectionPath);
   if (!CHARACTER_NAME.test(input.name) || input.name === '.' || input.name === '..') {
@@ -128,20 +143,17 @@ export function writeCharacter(
   mode: 'create' | 'replace',
 ): void {
   parseSelectionJson(selection);
-  if (mode === 'create' && existsSync(targetPath)) {
-    throw new CharacterStoreError(
-      'character_already_exists',
-      'Character already exists.',
-      targetPath,
-    );
-  }
   mkdirSync(path.dirname(targetPath), { recursive: true });
   const temporaryPath = `${targetPath}.${process.pid}.${randomUUID()}.tmp`;
   try {
     writeFileSync(temporaryPath, `${JSON.stringify(selection, null, 2)}\n`, {
       flag: 'wx',
     });
-    renameSync(temporaryPath, targetPath);
+    if (mode === 'create') {
+      publishCreatedCharacter(temporaryPath, targetPath);
+    } else {
+      renameSync(temporaryPath, targetPath);
+    }
   } catch (error) {
     throw toCharacterWriteError(error, targetPath);
   } finally {
