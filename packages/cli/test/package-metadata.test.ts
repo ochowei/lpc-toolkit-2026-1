@@ -176,6 +176,20 @@ describe('CLI package metadata', () => {
     expect(smokeScript).toContain("args: ['--help']");
   });
 
+  it('smokes the installed character authoring workflow', () => {
+    const testDir = path.dirname(fileURLToPath(import.meta.url));
+    const smoke = readFileSync(
+      path.resolve(testDir, '../scripts/smoke-packed-cli.mjs'),
+      'utf8',
+    );
+
+    expect(smoke).toContain("'character', 'create', 'packed-hero'");
+    expect(smoke).toContain("'character', 'preview', 'packed-hero'");
+    expect(smoke).toContain("'character', 'render', 'packed-hero'");
+    expect(smoke).toContain('packed-hero.credits.txt');
+    expect(smoke).toContain('packed-hero.credits.csv');
+  });
+
   it('runs the installed CLI through Node on Windows and the shim elsewhere', () => {
     const testDir = path.dirname(fileURLToPath(import.meta.url));
     const helperUrl = pathToFileURL(

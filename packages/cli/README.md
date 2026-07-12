@@ -21,6 +21,22 @@ npx @lpc-toolkit/cli --help
 The package installs only the `lpc-toolkit` binary. Node.js 22 or newer is
 required.
 
+## Character authoring quick start
+
+Create and edit a named character without writing a selection JSON file:
+
+```sh
+lpc-toolkit character create hero --preset farmer
+lpc-toolkit character search hero --type hair --query braid
+lpc-toolkit character set hero --type hair --item hair_braid --recolor lpcr.brown
+lpc-toolkit character preview hero
+lpc-toolkit character render hero --out ./dist/hero --animation walk --bundle zip
+```
+
+The character selection is saved under `./characters/`. Preview and render
+commands write the sprite together with metadata and both TXT and CSV credit
+files; keep those attribution artifacts with the generated image.
+
 ## Commands
 
 Commands print human-readable output by default. Add `--json` when a command is

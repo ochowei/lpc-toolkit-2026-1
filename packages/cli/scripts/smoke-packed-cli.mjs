@@ -219,6 +219,59 @@ try {
     `unexpected web server termination: ${JSON.stringify(webResult)}`,
   );
 
+  function runInstalled(args) {
+    const invocation = installedCliInvocation({
+      platform: process.platform,
+      nodePath: process.execPath,
+      shimPath: installedBinPath,
+      targetPath: installedBinTargetPath,
+      args,
+    });
+    const result = spawnSync(invocation.command, invocation.args, {
+      cwd: emptyCwd,
+      encoding: 'utf8',
+      env: { ...process.env, LPC_TOOLKIT_CACHE_DIR: cacheRoot },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    return result.stdout;
+  }
+
+  runInstalled(['character', 'create', 'packed-hero', '--preset', 'farmer']);
+  const searchOutput = runInstalled([
+    'character', 'search', 'packed-hero', '--type', 'hair', '--query', 'braid',
+  ]);
+  assert.match(searchOutput, /hair\/Braid \[hair_braid\]/u);
+  const setOutput = runInstalled([
+    'character', 'set', 'packed-hero', '--type', 'hair', '--item', 'hair_braid',
+    '--recolor', 'lpcr.brown',
+  ]);
+  assert.match(setOutput, /Updated packed-hero: hair = Braid/u);
+
+  runInstalled(['character', 'preview', 'packed-hero']);
+  const previewDir = path.join(emptyCwd, 'characters', 'previews', 'packed-hero');
+  for (const fileName of [
+    'packed-hero.preview.png',
+    'packed-hero.metadata.json',
+    'packed-hero.credits.txt',
+    'packed-hero.credits.csv',
+  ]) {
+    assert.ok(existsSync(path.join(previewDir, fileName)), `preview is missing ${fileName}`);
+  }
+
+  const renderDir = path.join(emptyCwd, 'rendered-packed-hero');
+  runInstalled([
+    'character', 'render', 'packed-hero', '--out', renderDir,
+    '--animation', 'walk', '--bundle', 'zip',
+  ]);
+  for (const fileName of [
+    'packed-hero.sheet.png',
+    'packed-hero.metadata.json',
+    'packed-hero.credits.txt',
+    'packed-hero.credits.csv',
+  ]) {
+    assert.ok(existsSync(path.join(renderDir, fileName)), `render is missing ${fileName}`);
+  }
+
   console.log('Packed CLI install smoke test passed.');
 } finally {
   try {
