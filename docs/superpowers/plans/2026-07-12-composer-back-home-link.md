@@ -285,7 +285,7 @@ Expected: a documentation-only commit that records the exact implementation comm
 - Produces: unchanged public component interfaces; only the rendered order and
   divider presentation change.
 
-- [ ] **Step 1: Add the failing rendered-order assertion**
+- [x] **Step 1: Add the failing rendered-order assertion**
 
 In `packages/web/test/top-bar.test.tsx`, replace the current label assertion:
 
@@ -306,7 +306,7 @@ expect(brandIndex).toBeGreaterThan(homeActionIndex);
 Keep the existing `findAction` and callback assertions unchanged so this test
 continues to cover visible copy and emitted navigation intent.
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run:
 
@@ -317,7 +317,7 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/top-bar.test.tsx
 Expected: FAIL at `expect(brandIndex).toBeGreaterThan(homeActionIndex)` because
 the current TopBar renders the LPC brand before the home action.
 
-- [ ] **Step 3: Move the action and add the divider**
+- [x] **Step 3: Move the action and add the divider**
 
 In `packages/web/src/components/layer-stack/top-bar.tsx`, move the existing
 home `Button` so it is the first child inside `<header>`, immediately before
@@ -356,7 +356,7 @@ the brand block. Render the divider between the button and brand:
 Remove the old copy of the button after the brand block. Do not change its
 copy, callback, responsive visibility, or shared `Button` styling.
 
-- [ ] **Step 4: Run the focused test and verify GREEN**
+- [x] **Step 4: Run the focused test and verify GREEN**
 
 Run:
 
@@ -366,7 +366,7 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/top-bar.test.tsx
 
 Expected: PASS with one passing test.
 
-- [ ] **Step 5: Run scoped and architectural verification**
+- [x] **Step 5: Run scoped and architectural verification**
 
 Run:
 
@@ -379,7 +379,7 @@ rtk pnpm check:boundaries
 Expected: web typecheck exits successfully; 73 web test files and 648 tests
 pass; the architecture boundary check passes.
 
-- [ ] **Step 6: Commit the verified placement revision and current plan state**
+- [x] **Step 6: Commit the verified placement revision and current plan state**
 
 Check Steps 1–6 and append this note beneath Task 2:
 
@@ -397,6 +397,9 @@ rtk git commit -m "fix(web): move composer home link before brand"
 
 Expected: one commit containing only the revised test, TopBar placement, and
 Task 2 plan state.
+
+- Implementation: Moved the localized home action to the far-left position before the brand and added an aria-hidden vertical divider.
+- Verification: focused TopBar test PASS; web typecheck PASS; web test PASS; boundary check PASS.
 
 - [ ] **Step 7: Record the Task 2 implementation commit hash**
 

@@ -41,7 +41,11 @@ describe('TopBar', () => {
     });
     const html = renderToStaticMarkup(tree);
 
-    expect(html).toContain('← Back to home');
+    const homeActionIndex = html.indexOf('← Back to home');
+    const brandIndex = html.indexOf('LPC');
+
+    expect(homeActionIndex).toBeGreaterThanOrEqual(0);
+    expect(brandIndex).toBeGreaterThan(homeActionIndex);
 
     const action = findAction(tree, '← Back to home');
     expect(action).toBeDefined();
