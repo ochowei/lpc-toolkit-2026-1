@@ -38,6 +38,13 @@ const SELECTION_OPTION: CommandOptionSpec = {
   description: 'Use an explicit selection JSON file.',
 };
 
+const CREATE_SELECTION_OPTION: CommandOptionSpec = {
+  name: 'selection',
+  kind: 'value',
+  valueLabel: 'file',
+  description: 'Write the new selection to this explicit path.',
+};
+
 const RENDER_OPTIONS: readonly CommandOptionSpec[] = [
   { name: 'out', kind: 'value', valueLabel: 'directory', description: 'Write artifacts to this directory.' },
   { name: 'animation', kind: 'repeatable', valueLabel: 'name', description: 'Render an animation; may be repeated.' },
@@ -206,7 +213,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
     options: [
       HELP_OPTION,
       JSON_OPTION,
-      SELECTION_OPTION,
+      CREATE_SELECTION_OPTION,
       { name: 'preset', kind: 'value', valueLabel: 'id', description: 'Start from a shared preset.' },
       { name: 'body-type', kind: 'value', valueLabel: 'type', description: 'Set the initial body type. Default: male.' },
     ],

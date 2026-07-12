@@ -39,7 +39,11 @@ describe('helpForCommand', () => {
   });
 
   it('documents character creation and preview defaults', () => {
-    expect(helpForCommand(['character', 'create'])).toContain('Default: male');
+    const createHelp = helpForCommand(['character', 'create']);
+    expect(createHelp).toContain('Default: male');
+    expect(createHelp).toContain(
+      '--selection <file>  Write the new selection to this explicit path.',
+    );
 
     const previewHelp = helpForCommand(['character', 'preview']);
     expect(previewHelp).toContain('Default: walk');
