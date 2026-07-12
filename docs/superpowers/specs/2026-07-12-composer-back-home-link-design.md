@@ -17,6 +17,16 @@ Give users an obvious way to return from the web composer to the landing page.
 - Activating the action returns to the landing page at `/` without a full page
   reload.
 
+## Visual Styling
+
+- Distinguish the page-level home action from adjacent ghost-style composer
+  tools with the existing theme-aware `accent` color.
+- Use accent-colored text, a 10% accent-tinted background, and a 50%
+  accent-colored border. Increase the accent tint to 20% on hover.
+- Preserve the existing small button size and accent focus outline.
+- Apply these classes only to this TopBar action. Do not add or change a shared
+  `Button` variant.
+
 ## Architecture
 
 `App` already owns route state and SPA navigation. It will pass a landing-page
@@ -37,6 +47,8 @@ The same localized text will serve as the action's accessible name.
 - Keep the focused component coverage for the action label and click callback,
   and add a structural assertion that the action appears before the brand in
   rendered markup.
+- Assert the TopBar action carries the approved accent text, tint, border, and
+  hover classes.
 - Run the focused web test, web typecheck, and repository boundary check.
 
 ## Scope
