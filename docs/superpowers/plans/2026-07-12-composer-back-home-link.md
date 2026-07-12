@@ -45,7 +45,7 @@
 - [x] **Step 1: Write the failing top-bar test**
 
   - Implementation: Added the focused TopBar presentation-boundary test.
-  - Commit: pending Task 1 implementation commit.
+  - Commit: 031a5f3b1
   - Verification: test created; RED run pending.
 
 Create `packages/web/test/top-bar.test.tsx`:
@@ -107,7 +107,7 @@ describe('TopBar', () => {
 - [x] **Step 2: Run the focused test and verify RED**
 
   - Implementation: Ran the focused TopBar test before production changes.
-  - Commit: pending Task 1 implementation commit.
+  - Commit: 031a5f3b1
   - Verification: RED confirmed; 1 test failed because rendered markup omitted `← Back to home`.
 
 Run:
@@ -121,7 +121,7 @@ Expected: FAIL because `TopBar` does not render `← Back to home`; no navigatio
 - [x] **Step 3: Add localized copy and render the action**
 
   - Implementation: Added English and Traditional Chinese copy and rendered the shared ghost Button after the brand block.
-  - Commit: pending Task 1 implementation commit.
+  - Commit: 031a5f3b1
   - Verification: focused GREEN run pending callback threading.
 
 In both locale maps in `packages/web/src/i18n.ts`, add the same key:
@@ -162,7 +162,7 @@ Destructure `onNavigateHome`, then place this action immediately after the brand
 - [x] **Step 4: Thread the callback from App to TopBar**
 
   - Implementation: Threaded `onNavigateHome` from App through ComposerApp and LayerStackHarness into TopBar.
-  - Commit: pending Task 1 implementation commit.
+  - Commit: 031a5f3b1
   - Verification: focused GREEN run pending.
 
 Change the `ComposerApp` signature in `packages/web/src/App.tsx`:
@@ -198,7 +198,7 @@ onNavigateHome={props.onNavigateHome}
 - [x] **Step 5: Run the focused test and verify GREEN**
 
   - Implementation: Re-ran the focused TopBar test after the minimal callback and UI implementation.
-  - Commit: pending Task 1 implementation commit.
+  - Commit: 031a5f3b1
   - Verification: GREEN confirmed; 1 test passed.
 
 Run:
@@ -212,7 +212,7 @@ Expected: PASS with one passing test.
 - [x] **Step 6: Run scoped and architectural verification**
 
   - Implementation: Ran web typecheck, the complete web test suite, and the architecture boundary checker.
-  - Commit: pending Task 1 implementation commit.
+  - Commit: 031a5f3b1
   - Verification: web typecheck PASS; 73 files / 648 tests PASS; boundary check PASS.
 
 Run:
@@ -228,7 +228,7 @@ Expected: all three commands exit successfully with no TypeScript, test, or boun
 - [x] **Step 7: Commit the verified implementation and current plan state**
 
   - Implementation: Staged the scoped implementation, test, and current plan evidence for the implementation commit.
-  - Commit: pending Task 1 implementation commit.
+  - Commit: 031a5f3b1
   - Verification: scoped diff review PASS; `git diff --check` PASS.
 
 - Implementation: Added a localized explicit home action and threaded SPA navigation ownership from App through the composer presentation boundary.
@@ -248,7 +248,11 @@ rtk git commit -m "feat(web): add composer home link"
 
 Expected: one commit containing only the scoped implementation, test, and updated plan state.
 
-- [ ] **Step 8: Record the implementation commit hash**
+- [x] **Step 8: Record the implementation commit hash**
+
+  - Implementation: Recorded the exact implementation commit hash in the Task 1 plan evidence.
+  - Commit: 031a5f3b1
+  - Verification: `rtk git rev-parse --short HEAD` printed `031a5f3b1` before this documentation-only commit.
 
 Run:
 
