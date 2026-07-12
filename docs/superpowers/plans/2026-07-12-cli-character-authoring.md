@@ -4,7 +4,7 @@
 
 **Goal:** Add a complete, non-interactive CLI workflow for creating, editing, previewing, validating, and rendering a named LPC character without hand-writing selection JSON.
 
-**Architecture:** Add focused CLI-only modules for command metadata, character persistence, pure selection editing, command orchestration, and attributed previews. Reuse the existing core catalog/composition APIs, shared presets, selection schema, runtime assets, response envelope, and render pipeline; keep Node/filesystem/canvas behavior out of core.
+**Architecture:** Add focused CLI-only modules for command metadata, character persistence, pure selection editing, command orchestration, and attributed previews. Add one pure core default-selection helper shared by Web, presets, and CLI so item-pick defaults cannot drift. Reuse the existing selection schema, runtime assets, response envelope, and render pipeline; keep Node/filesystem/canvas behavior out of core.
 
 **Tech Stack:** TypeScript strict mode, Node.js 22+, pnpm workspaces, Vitest, `@lpc-toolkit/core`, `@lpc-toolkit/presets`, existing `@napi-rs/canvas` (MIT) and `jszip` (MIT).
 
@@ -25,6 +25,9 @@
 ## Planned File Structure
 
 - Create `packages/cli/src/command-spec.ts`: hierarchical help text and option-shape validation for all public commands.
+- Create `packages/core/src/selection-defaults.ts`: environment-agnostic recolor-first, variant-fallback item defaults.
+- Create `packages/core/test/selection-defaults.test.ts`: shared-default behavior.
+- Modify `packages/core/src/index.ts`, `packages/web/src/slice/color-options.ts`, and `packages/presets/src/index.ts`: expose and consume one shared default rule.
 - Create `packages/cli/src/character-store.ts`: safe character-name/path resolution and transactional selection JSON persistence.
 - Create `packages/cli/src/character-editor.ts`: pure create/search/set/remove transitions and suggestions.
 - Create `packages/cli/src/character-commands.ts`: character command orchestration and response construction.
@@ -310,6 +313,13 @@ Then update Task 2 checkboxes and the record below, stage only this plan, and co
 **Files:**
 - Create: `packages/cli/src/character-editor.ts`
 - Create: `packages/cli/test/character-editor.test.ts`
+- Create: `packages/core/src/selection-defaults.ts`
+- Create: `packages/core/test/selection-defaults.test.ts`
+- Modify: `packages/core/src/index.ts`
+- Modify: `packages/web/src/slice/color-options.ts`
+- Modify: `packages/web/test/color-options.test.ts`
+- Modify: `packages/presets/src/index.ts`
+- Modify: `packages/presets/test/presets.test.ts`
 
 **Interfaces:**
 - Produces: `createEmptyCharacter(name: string, bodyType: BodyType): SelectionJson`.
@@ -319,6 +329,8 @@ Then update Task 2 checkboxes and the record below, stage only this plan, and co
 - `CharacterCatalogContext` contains `catalog`, `palettes`, and `pathExists` only, keeping operations deterministic and filesystem-free.
 - Consumes: public core `BODY_TYPES` to reject unsupported body types before writing.
 - Produces: `CharacterEditError extends Error` with readonly `code`, optional `path`, and optional `details`; private `unknownItemError` and `editErrorFromValidation` return this type.
+- Produces: core `getDefaultColorSelection(item, palettes): { readonly variant?: string; readonly recolor?: string }`.
+- Web `pickDefaults` delegates to the core helper; presets and CLI consume it directly.
 
 - [x] **Step 1: Write failing editor tests**
 
@@ -339,6 +351,8 @@ it('sets one type without changing another type', () => {
   });
 });
 
+// Historical initial requirement, superseded by the approved Web-alignment
+// amendment below. The amendment replaces this behavior with shared defaults.
 it('returns available variants instead of guessing', () => {
   expect(() => setCharacterItem(maleSelections, {
     typeName: 'hair', itemRef: 'variant-only',
@@ -433,6 +447,162 @@ Then update Task 3 checkboxes and record, stage only this plan, and commit it wi
 - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- character-editor.test.ts validation.test.ts catalog-commands.test.ts`
   PASS (15 tests); package-local `rtk pnpm typecheck` PASS; `rtk pnpm
   check:boundaries` PASS; `rtk git diff --check` PASS.
+
+#### Required Review Amendment: Align Defaults with Web
+
+The initial Task 3 implementation and record above remain historical evidence,
+but Task 3 is not approved. The approved spec revision supersedes its
+`missing_variant`/`missing_recolor` path-recovery behavior.
+
+- [ ] **Step 6: Write failing shared-default and strict-path tests**
+
+Add core tests for the exact shared priority:
+
+```ts
+it('uses the first recolor swatch before declared variants', () => {
+  expect(getDefaultColorSelection(recolorAndVariantItem, palettes)).toEqual({
+    recolor: 'black',
+  });
+});
+
+it('falls back to the first variant when recolors are unavailable', () => {
+  expect(getDefaultColorSelection(variantItem, palettes)).toEqual({
+    variant: 'brown',
+  });
+});
+
+it('returns no fields for an item with no color choices', () => {
+  expect(getDefaultColorSelection(plainItem, palettes)).toEqual({});
+});
+```
+
+Add Web and preset parity assertions:
+
+```ts
+expect(pickDefaults(recolorItem, palettes)).toEqual({ recolor: 'black' });
+expect(pickDefaults(variantItem, palettes)).toEqual({ variant: 'brown' });
+expect(computePresetSelection(preset, {}, 'male', catalog, palettes).selections)
+  .toEqual(existingExpectedSelections);
+```
+
+Replace the superseded CLI option-recovery expectations with:
+
+```ts
+it('applies shared defaults only when neither option is explicit', () => {
+  expect(setCharacterItem(base, { typeName: 'hair', itemRef: 'recolor-hair' }, context)
+    .selections.items.hair).toMatchObject({ recolor: 'black' });
+  expect(setCharacterItem(base, {
+    typeName: 'hair', itemRef: 'recolor-hair', recolor: 'orange',
+  }, context).selections.items.hair).toMatchObject({ recolor: 'orange' });
+});
+
+it('preserves missing_sprite_path after applying defaults', () => {
+  expect(() => setCharacterItem(base, {
+    typeName: 'hair', itemRef: 'missing-variant-item',
+  }, missingPathContext)).toThrowError(expect.objectContaining({
+    code: 'missing_sprite_path',
+  }));
+});
+```
+
+- [ ] **Step 7: Run the amendment tests and verify RED**
+
+```sh
+rtk pnpm --filter @lpc-toolkit/core test -- selection-defaults.test.ts
+rtk pnpm --filter @lpc-toolkit/web test -- color-options.test.ts
+rtk pnpm --filter @lpc-toolkit/presets test -- presets.test.ts
+rtk pnpm --filter @lpc-toolkit/cli test -- character-editor.test.ts
+```
+
+Expected: core fails because `getDefaultColorSelection` does not exist; CLI
+fails because omitted options do not use the shared default and current error
+translation can mislabel missing paths.
+
+- [ ] **Step 8: Implement one shared helper and strict CLI mapping**
+
+Create the core helper and export it from `packages/core/src/index.ts`:
+
+```ts
+export function getDefaultColorSelection(
+  item: ItemDefinition | undefined,
+  palettes: PaletteMetadata,
+): { readonly variant?: string; readonly recolor?: string } {
+  if (!item) return {};
+  const firstRecolor = getRecolorSwatches(item, palettes)[0];
+  if (firstRecolor) return { recolor: firstRecolor.recolor };
+  const firstVariant = item.variants?.[0];
+  return firstVariant ? { variant: firstVariant } : {};
+}
+```
+
+Keep the Web API stable while delegating:
+
+```ts
+export function pickDefaults(
+  item: ItemDefinition | undefined,
+  palettes: PaletteMetadata,
+): { variant?: string; recolor?: string } {
+  return getDefaultColorSelection(item, palettes);
+}
+```
+
+Use `getDefaultColorSelection` in presets in place of its private duplicated
+default picker. In CLI editor construction, explicit input wins and defaults
+apply only when both fields are absent:
+
+```ts
+const colorFields = input.variant || input.recolor
+  ? {
+      ...(input.variant ? { variant: input.variant } : {}),
+      ...(input.recolor ? { recolor: input.recolor } : {}),
+    }
+  : getDefaultColorSelection(item, context.palettes);
+
+const editedSelection: Selection = {
+  typeName: input.typeName,
+  name: item.name,
+  ...colorFields,
+};
+```
+
+Delete missing-option inference from `editErrorFromValidation`. Return the
+existing edited-slot validation issue unchanged so a missing image remains
+`missing_sprite_path`; explicit invalid fields remain `unknown_variant` or
+`unknown_recolor` through `validateSelections`.
+
+- [ ] **Step 9: Run cross-package GREEN verification**
+
+```sh
+rtk pnpm --filter @lpc-toolkit/core test -- selection-defaults.test.ts
+rtk pnpm --filter @lpc-toolkit/web test -- color-options.test.ts
+rtk pnpm --filter @lpc-toolkit/presets test -- presets.test.ts
+rtk pnpm --filter @lpc-toolkit/cli test -- character-editor.test.ts validation.test.ts catalog-commands.test.ts
+rtk pnpm --dir packages/core run typecheck
+rtk pnpm --dir packages/web run typecheck
+rtk pnpm --dir packages/presets run typecheck
+rtk pnpm --dir packages/cli run typecheck
+rtk pnpm check:boundaries
+```
+
+Expected: all focused tests and four package typechecks PASS; boundary check
+exits 0.
+
+- [ ] **Step 10: Commit the amendment**
+
+```sh
+rtk git add packages/core/src/selection-defaults.ts packages/core/src/index.ts packages/core/test/selection-defaults.test.ts packages/web/src/slice/color-options.ts packages/web/test/color-options.test.ts packages/presets/src/index.ts packages/presets/test/presets.test.ts packages/cli/src/character-editor.ts packages/cli/test/character-editor.test.ts
+rtk git commit -m "fix(cli): align character defaults with web"
+```
+
+- [ ] **Step 11: Record amendment completion**
+
+Append the amendment commit and exact cross-package verification evidence to
+the Task 3 execution record, stage only this plan, and commit with:
+
+```sh
+rtk git add docs/superpowers/plans/2026-07-12-cli-character-authoring.md
+rtk git commit -m "docs(plan): record shared character defaults"
+```
 
 ### Task 4: Character CRUD, Search, Show, and Validate Commands
 
