@@ -2,6 +2,10 @@ export interface CliIssue {
   readonly code: string;
   readonly message: string;
   readonly path?: string;
+  readonly details?: {
+    readonly suggestions?: readonly string[];
+    readonly available?: readonly string[];
+  };
 }
 
 export interface CliResponse<T> {

@@ -10,6 +10,7 @@ import {
 import { assetCacheErrorIssue } from './asset-cache.js';
 import { AssetStoreError } from './asset-store.js';
 import { runCatalogCommand } from './catalog-commands.js';
+import { helpForCommand, validateCommandOptions } from './command-spec.js';
 import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
 import { materializePreset, runPresetCommand } from './preset-commands.js';
 import { CLI_VERSION } from './package-info.js';
@@ -46,24 +47,6 @@ const DEFAULT_DEPENDENCIES: CliDependencies = { prepareRuntimeAssets, startWebSe
 export function resolveWebRoot(moduleUrl: string): string {
   return fileURLToPath(new URL('./web', moduleUrl));
 }
-
-const HELP = `lpc-toolkit CLI
-
-Commands:
-  lpc-toolkit --version
-  lpc-toolkit -V
-  lpc-toolkit catalog types
-  lpc-toolkit catalog items --type <typeName>
-  lpc-toolkit catalog item <item-id-or-type/name>
-  lpc-toolkit selection validate --selection <file>
-  lpc-toolkit render --selection <file> --out <dir>
-  lpc-toolkit token decode --token <hash-or-token> --out <file>
-  lpc-toolkit token encode --selection <file>
-  lpc-toolkit preset list
-  lpc-toolkit preset materialize <preset-id> --out <file>
-  lpc-toolkit preset render <preset-id> --out <dir>
-  lpc-toolkit web [--host <host>] [--port <port>] [--no-open]
-`;
 
 function renderErrorIssue(
   error: unknown,
@@ -248,7 +231,7 @@ export async function runCli(
 ): Promise<number> {
   const resolvedDependencies: CliDependencies = { ...DEFAULT_DEPENDENCIES, ...dependencies };
   if (argv.length === 0 || argv[0] === '--help' || argv[0] === '-h') {
-    io.stdout(HELP);
+    io.stdout(helpForCommand([]));
     return 0;
   }
   if (argv[0] === '--version' || argv[0] === '-V') {
@@ -258,8 +241,18 @@ export async function runCli(
 
   const parsed = parseArgs(argv);
   if (parsed.flags.has('help')) {
-    io.stdout(HELP);
+    io.stdout(helpForCommand(parsed.command));
     return 0;
+  }
+
+  const optionIssue = validateCommandOptions(parsed);
+  if (optionIssue) {
+    return writeResponse(
+      commandError(parsed.command.join(' '), optionIssue),
+      parsed,
+      io,
+      '',
+    );
   }
 
   const preflightResponse = preflightAssetCommand(parsed);

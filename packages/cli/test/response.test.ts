@@ -42,4 +42,20 @@ describe('response envelope', () => {
       ],
     });
   });
+
+  it('preserves structured issue suggestions', () => {
+    const response = commandError('catalog items', {
+      code: 'unknown_option',
+      message: 'Unknown option: --tpye',
+      path: '--tpye',
+      details: { suggestions: ['--type'] },
+    });
+
+    expect(JSON.parse(formatJsonResponse(response)).errors[0]).toEqual({
+      code: 'unknown_option',
+      message: 'Unknown option: --tpye',
+      path: '--tpye',
+      details: { suggestions: ['--type'] },
+    });
+  });
 });

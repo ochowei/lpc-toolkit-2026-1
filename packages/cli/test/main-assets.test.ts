@@ -191,6 +191,17 @@ describe('asset preparation dispatch', () => {
     expect(prepare).not.toHaveBeenCalled();
   });
 
+  it('rejects invalid options without preparing assets', async () => {
+    const prepare = vi.fn(async (_options: PrepareRuntimeAssetsOptions) => runtime);
+    const capture = captureIo(runtime.context.repoRoot);
+
+    expect(await runCli(['catalog', 'items', '--tpye', 'hair'], capture.io, {
+      prepareRuntimeAssets: prepare,
+    })).toBe(1);
+    expect(prepare).not.toHaveBeenCalled();
+    expect(capture.stderr.join('')).toContain('Unknown option: --tpye');
+  });
+
   it.each(['--version', '-V'])('prints the package version for %s without preparing assets', async (flag) => {
     const prepare = vi.fn(async (_options: PrepareRuntimeAssetsOptions) => runtime);
     const capture = captureIo(runtime.context.repoRoot);
@@ -240,8 +251,19 @@ describe('asset preparation dispatch', () => {
 
     expect(await runCli(argv, capture.io, { prepareRuntimeAssets: prepare })).toBe(0);
     expect(prepare).not.toHaveBeenCalled();
-    expect(capture.stdout.join('')).toContain('Commands:');
+    expect(capture.stdout.join('')).toContain('Usage:');
     expect(capture.stderr).toEqual([]);
+  });
+
+  it('prints command-specific nested help', async () => {
+    const prepare = vi.fn(async (_options: PrepareRuntimeAssetsOptions) => runtime);
+    const capture = captureIo(runtime.context.repoRoot);
+
+    expect(await runCli(['character', 'set', '--help'], capture.io, {
+      prepareRuntimeAssets: prepare,
+    })).toBe(0);
+    expect(prepare).not.toHaveBeenCalled();
+    expect(capture.stdout.join('')).toContain('lpc-toolkit character set <name>');
   });
 
   it('keeps JSON stdout parseable while progress goes to stderr', async () => {
