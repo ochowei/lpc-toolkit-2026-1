@@ -51,6 +51,7 @@ const HELP = `lpc-toolkit CLI
 
 Commands:
   lpc-toolkit --version
+  lpc-toolkit -V
   lpc-toolkit catalog types
   lpc-toolkit catalog items --type <typeName>
   lpc-toolkit catalog item <item-id-or-type/name>
