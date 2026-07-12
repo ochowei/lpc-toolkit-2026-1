@@ -1,5 +1,6 @@
 import {
   BODY_TYPES,
+  getDefaultColorSelection,
   getRecolorVariants,
   LICENSE_GROUP_OF,
   type AnimationName,
@@ -130,58 +131,8 @@ function resolveItem(catalog: Catalog, typeName: TypeName, itemRef: string): Ite
 
 function editErrorFromValidation(
   validation: ValidationResult,
-  item: ItemDefinition,
-  palettes: PaletteMetadata,
-  input: CharacterSetInput,
 ): CharacterEditError {
   const first = validation.errors[0];
-  const variants = item.variants ?? [];
-  const recolors = getRecolorVariants(item, palettes);
-  const editedPath = `${input.typeName}/${item.name}`;
-  const concernsEditedItem = first?.path === editedPath;
-
-  if (concernsEditedItem && first?.code === 'unknown_variant') {
-    return new CharacterEditError(first.code, first.message, {
-      ...(first.path ? { path: first.path } : {}),
-      details: { available: variants },
-    });
-  }
-  if (concernsEditedItem && first?.code === 'unknown_recolor') {
-    return new CharacterEditError(first.code, first.message, {
-      ...(first.path ? { path: first.path } : {}),
-      details: { available: recolors },
-    });
-  }
-  if (
-    concernsEditedItem &&
-    first?.code === 'missing_sprite_path' &&
-    !input.variant &&
-    variants.length > 0
-  ) {
-    return new CharacterEditError(
-      'missing_variant',
-      `${item.itemId ?? item.name} requires a variant.`,
-      {
-        ...(first.path ? { path: first.path } : {}),
-        details: { available: variants },
-      },
-    );
-  }
-  if (
-    concernsEditedItem &&
-    first?.code === 'missing_sprite_path' &&
-    !input.recolor &&
-    recolors.length > 0
-  ) {
-    return new CharacterEditError(
-      'missing_recolor',
-      `${item.itemId ?? item.name} requires a recolor.`,
-      {
-        ...(first.path ? { path: first.path } : {}),
-        details: { available: recolors },
-      },
-    );
-  }
   return new CharacterEditError(
     first?.code ?? 'selection_invalid',
     first?.message ?? 'Selection is invalid.',
@@ -241,6 +192,12 @@ export function setCharacterItem(
   context: CharacterCatalogContext,
 ): CharacterEditResult {
   const item = resolveItem(context.catalog, input.typeName, input.itemRef);
+  const colorFields = input.variant || input.recolor
+    ? {
+        ...(input.variant ? { variant: input.variant } : {}),
+        ...(input.recolor ? { recolor: input.recolor } : {}),
+      }
+    : getDefaultColorSelection(item, context.palettes);
   const candidate: Selections = {
     bodyType: selections.bodyType,
     items: {
@@ -248,14 +205,13 @@ export function setCharacterItem(
       [input.typeName]: {
         typeName: input.typeName,
         name: item.name,
-        ...(input.variant ? { variant: input.variant } : {}),
-        ...(input.recolor ? { recolor: input.recolor } : {}),
+        ...colorFields,
       },
     },
   };
   const validation = validateSelections(candidate, context);
   if (!validation.ok) {
-    throw editErrorFromValidation(validation, item, context.palettes, input);
+    throw editErrorFromValidation(validation);
   }
   return {
     selections: candidate,

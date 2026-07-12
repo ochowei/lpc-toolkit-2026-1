@@ -1,6 +1,7 @@
 import {
   BODY_TYPES,
   createCatalog,
+  createPaletteCatalog,
   type ItemDefinition,
   type Selections,
 } from '@lpc-toolkit/core';
@@ -57,7 +58,16 @@ const variantOnly: ItemDefinition = {
   animations: ['walk'],
   credits: [],
   variants: ['black', 'brown'],
-  layer_1: { zPos: 50, male: 'hair/variant-only/${variant}/' },
+  layer_1: { zPos: 50, male: 'hair/variant-only/' },
+};
+
+const recolorHair: ItemDefinition = {
+  name: 'Recolor Hair',
+  type_name: 'hair',
+  animations: ['walk'],
+  credits: [],
+  recolors: { material: 'hair', palettes: ['ulpc'] },
+  layer_1: { zPos: 50, male: 'hair/recolor/' },
 };
 
 const femaleHair: ItemDefinition = {
@@ -81,14 +91,23 @@ const catalog = createCatalog({
   'hair/braid.json': braid,
   'hair/braids.json': braids,
   'hair/variant-only.json': variantOnly,
+  'hair/recolor-hair.json': recolorHair,
   'hair/female-hair.json': femaleHair,
   'hat/cap.json': hat,
 }).catalog;
 
+const palettes = createPaletteCatalog({
+  'hair/meta_hair.json': { type: 'material', default: 'ulpc', base: 'black' },
+  'hair/hair_ulpc.json': {
+    black: ['#111111', '#222222'],
+    orange: ['#cc5500', '#ee7700'],
+  },
+}).palettes;
+
 const context: CharacterCatalogContext = {
   catalog,
-  palettes: { materials: {}, versions: {} },
-  pathExists: (spritePath) => !spritePath.includes('${variant}'),
+  palettes,
+  pathExists: () => true,
 };
 
 const maleSelections: Selections = {
@@ -130,14 +149,28 @@ describe('character editor', () => {
     expect(maleSelections.items.hair).toBeUndefined();
   });
 
-  it('returns available variants instead of guessing', () => {
+  it('applies shared defaults only when neither option is explicit', () => {
+    expect(setCharacterItem(
+      maleSelections,
+      { typeName: 'hair', itemRef: 'recolor-hair' },
+      context,
+    ).selections.items.hair).toMatchObject({ recolor: 'black' });
+
+    expect(setCharacterItem(
+      maleSelections,
+      { typeName: 'hair', itemRef: 'recolor-hair', recolor: 'orange' },
+      context,
+    ).selections.items.hair).toMatchObject({ recolor: 'orange' });
+  });
+
+  it('preserves missing_sprite_path after applying defaults', () => {
     expect(() => setCharacterItem(
       maleSelections,
       { typeName: 'hair', itemRef: 'variant-only' },
-      context,
+      { ...context, pathExists: (spritePath) => !spritePath.includes('variant-only') },
     )).toThrowError(expect.objectContaining({
-      code: 'missing_variant',
-      details: { available: ['black', 'brown'] },
+      code: 'missing_sprite_path',
+      path: 'hair/Variant Only',
     }));
   });
 
@@ -176,6 +209,14 @@ describe('character editor', () => {
       { typeName: 'hair', itemRef: 'cap' },
       context,
     )).toThrowError(expect.objectContaining({ code: 'item_type_mismatch' }));
+  });
+
+  it('sets an item by exact type and name', () => {
+    expect(setCharacterItem(
+      maleSelections,
+      { typeName: 'hair', itemRef: 'hair/Braid' },
+      context,
+    ).selections.items.hair).toEqual({ typeName: 'hair', name: 'Braid' });
   });
 
   it('removes exactly one selected type and rejects an unselected type', () => {

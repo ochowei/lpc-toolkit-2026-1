@@ -1,5 +1,5 @@
 import {
-  getRecolorSwatches,
+  getDefaultColorSelection,
   type BodyType,
   type Catalog,
   type ItemDefinition,
@@ -177,17 +177,6 @@ function itemSupportsBodyType(
   return typeof item.layer_1?.[bodyType] === 'string';
 }
 
-function pickDefaults(
-  item: ItemDefinition | undefined,
-  palettes: PaletteMetadata,
-): { variant?: string; recolor?: string } {
-  if (!item) return {};
-  const firstRecolor = getRecolorSwatches(item, palettes)[0];
-  if (firstRecolor) return { recolor: firstRecolor.recolor };
-  const firstVariant = item.variants?.[0];
-  return firstVariant ? { variant: firstVariant } : {};
-}
-
 /**
  * Compute the selections after applying `preset`:
  * - every CLOTHING_TYPES entry is removed from `current` (clean slate);
@@ -223,7 +212,7 @@ export function computePresetSelection(
             ...(item.variant ? { variant: item.variant } : {}),
             ...(item.recolor ? { recolor: item.recolor } : {}),
           }
-        : pickDefaults(def, palettes);
+        : getDefaultColorSelection(def, palettes);
     selections[item.typeName] = {
       typeName: item.typeName,
       name: item.name,
