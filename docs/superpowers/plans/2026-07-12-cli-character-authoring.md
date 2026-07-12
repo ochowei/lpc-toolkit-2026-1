@@ -204,7 +204,7 @@ After the implementation commit, mark Task 1 steps complete and replace this cur
 - Produces: `CharacterStoreError extends Error` with readonly `code` and optional `path`; `toCharacterWriteError` is its private unknown-error mapper.
 - Consumes: existing `parseSelectionJson` and `SelectionJson`.
 
-- [ ] **Step 1: Write failing persistence tests**
+- [x] **Step 1: Write failing persistence tests**
 
 Cover safe names, explicit paths, listing, create conflicts, replacement, and unchanged bytes after validation failure:
 
@@ -227,7 +227,7 @@ it('creates and replaces a character through a sibling temporary file', () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- character-store.test.ts
@@ -235,7 +235,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- character-store.test.ts
 
 Expected: FAIL because the store module does not exist.
 
-- [ ] **Step 3: Implement the store**
+- [x] **Step 3: Implement the store**
 
 Use a strict portable name rule and keep explicit paths relative to `cwd`:
 
@@ -282,7 +282,7 @@ export function writeCharacter(
 
 `listCharacters` reads only `characters/*.selection.json`, parses each file, and returns stable name-sorted entries. Invalid files are returned with an issue instead of aborting the entire list.
 
-- [ ] **Step 4: Run store tests and typecheck**
+- [x] **Step 4: Run store tests and typecheck**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- character-store.test.ts selection.test.ts
@@ -291,7 +291,7 @@ rtk pnpm --filter @lpc-toolkit/cli typecheck
 
 Expected: PASS; no `.tmp` files remain.
 
-- [ ] **Step 5: Commit and record**
+- [x] **Step 5: Commit and record**
 
 ```sh
 rtk git add packages/cli/src/character-store.ts packages/cli/test/character-store.test.ts
@@ -300,9 +300,9 @@ rtk git commit -m "feat(cli): add character selection store"
 
 Then update Task 2 checkboxes and the record below, stage only this plan, and commit it with `rtk git commit -m "docs(plan): record character store task"`.
 
-- Implementation: Not executed
-- Commit: Not executed
-- Verification: Not executed
+- Implementation: Added portable name resolution, validated reads, sibling-temporary atomic writes, and resilient stable character listing.
+- Commit: a6cefa669b7c7ce04e108a62972a4e19c63ef171
+- Verification: RED confirmed missing module; 18 focused tests PASS; CLI typecheck PASS; no temporary files remain.
 
 ### Task 3: Pure Character Editing and Search
 
