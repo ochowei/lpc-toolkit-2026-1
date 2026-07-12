@@ -21,6 +21,43 @@ npx @lpc-toolkit/cli --help
 The package installs only the `lpc-toolkit` binary. Node.js 22 or newer is
 required.
 
+## Character authoring quick start
+
+Create and edit a named character without writing a selection JSON file:
+
+```sh
+lpc-toolkit character create hero --preset farmer
+lpc-toolkit character search hero --type hair --query braid
+lpc-toolkit character set hero --type hair --item hair_braid --recolor lpcr.brown
+lpc-toolkit character preview hero
+lpc-toolkit character render hero --out ./dist/hero --animation walk --bundle zip
+```
+
+The character selection is saved under `./characters/`. Preview and render
+commands write the sprite together with metadata and both TXT and CSV credit
+files; keep those attribution artifacts with the generated image.
+
+### Character commands and locators
+
+| Command | Purpose |
+| --- | --- |
+| `character create` | Create a named selection, optionally from a preset. |
+| `character list` | List selections stored under `./characters/`. |
+| `character show` | Show a stored or explicitly located selection. |
+| `character search` | Find compatible catalog items for one selection type. |
+| `character set` | Set or replace one selected item. |
+| `character remove` | Remove one selected item. |
+| `character validate` | Validate the complete selection against the catalog. |
+| `character preview` | Render one attributed animation frame. |
+| `character render` | Render the attributed sheet and optional exports. |
+
+Locator-based commands accept either a character name or
+`--selection <file>`, never both. A named preview defaults to
+`characters/previews/<name>/`; use `--out <directory>` to override it.
+Character rendering is strict by default. Use `--allow-partial` only when
+attributed partial animation output is acceptable; missing paths are reported
+in warnings and metadata rather than silently credited.
+
 ## Commands
 
 Commands print human-readable output by default. Add `--json` when a command is

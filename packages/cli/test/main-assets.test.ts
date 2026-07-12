@@ -102,6 +102,8 @@ describe('asset preparation dispatch', () => {
     [['token', 'encode', '--selection', 'selection.json']],
     [['token', 'decode', '--token', 'v1.example']],
     [['preset', 'list']],
+    [['character', 'list']],
+    [['character', 'create', 'hero']],
     [['catalog', '--help']],
     [['render', '--help']],
     [['preset', 'render', '--help']],
@@ -115,6 +117,14 @@ describe('asset preparation dispatch', () => {
     [['preset', 'materialize', 'villager']],
     [['render', '--selection', 'selection.json', '--out', 'out']],
     [['web']],
+    [['character', 'create', 'hero', '--preset', 'farmer']],
+    [['character', 'search', 'hero', '--type', 'hair']],
+    [['character', 'set', 'hero', '--type', 'hair', '--item', 'braids']],
+    [['character', 'remove', 'hero', '--type', 'hair']],
+    [['character', 'show', 'hero']],
+    [['character', 'validate', 'hero']],
+    [['character', 'preview', 'hero']],
+    [['character', 'render', 'hero', '--out', 'out']],
   ])('classifies %j as asset-dependent', (argv) => {
     expect(commandNeedsAssets(parseArgs(argv))).toBe(true);
   });
@@ -191,6 +201,35 @@ describe('asset preparation dispatch', () => {
     expect(prepare).not.toHaveBeenCalled();
   });
 
+  it('rejects invalid options without preparing assets', async () => {
+    const prepare = vi.fn(async (_options: PrepareRuntimeAssetsOptions) => runtime);
+    const capture = captureIo(runtime.context.repoRoot);
+
+    expect(await runCli(['catalog', 'items', '--tpye', 'hair'], capture.io, {
+      prepareRuntimeAssets: prepare,
+    })).toBe(1);
+    expect(prepare).not.toHaveBeenCalled();
+    expect(capture.stderr.join('')).toContain('Unknown option: --tpye');
+  });
+
+  it.each([
+    ['render', '--selection', 'selection.json', '--out', 'out', '--bundle', 'tar'],
+    ['character', 'render', 'hero', '--out', 'out', '--bundle', 'tar'],
+  ])('rejects an unsupported bundle value before preparing assets: %j', async (...argv) => {
+    const prepare = vi.fn(async (_options: PrepareRuntimeAssetsOptions) => runtime);
+    const capture = captureIo(runtime.context.repoRoot);
+
+    expect(await runCli([...argv, '--json'], capture.io, {
+      prepareRuntimeAssets: prepare,
+    })).toBe(1);
+    expect(prepare).not.toHaveBeenCalled();
+    expect(JSON.parse(capture.stdout.join('')).errors[0]).toMatchObject({
+      code: 'invalid_option',
+      path: '--bundle',
+      details: { available: ['zip'] },
+    });
+  });
+
   it.each(['--version', '-V'])('prints the package version for %s without preparing assets', async (flag) => {
     const prepare = vi.fn(async (_options: PrepareRuntimeAssetsOptions) => runtime);
     const capture = captureIo(runtime.context.repoRoot);
@@ -240,8 +279,21 @@ describe('asset preparation dispatch', () => {
 
     expect(await runCli(argv, capture.io, { prepareRuntimeAssets: prepare })).toBe(0);
     expect(prepare).not.toHaveBeenCalled();
-    expect(capture.stdout.join('')).toContain('Commands:');
+    expect(capture.stdout.join('')).toContain('Usage:');
     expect(capture.stderr).toEqual([]);
+  });
+
+  it('prints command-specific nested help', async () => {
+    const prepare = vi.fn(async (_options: PrepareRuntimeAssetsOptions) => runtime);
+    const capture = captureIo(runtime.context.repoRoot);
+
+    expect(await runCli(['character', 'set', '--help'], capture.io, {
+      prepareRuntimeAssets: prepare,
+    })).toBe(0);
+    expect(prepare).not.toHaveBeenCalled();
+    expect(capture.stdout.join('')).toContain(
+      'lpc-toolkit character set (<name> | --selection <file>) --type <type> --item <item-id-or-type/name> [options]',
+    );
   });
 
   it('keeps JSON stdout parseable while progress goes to stderr', async () => {

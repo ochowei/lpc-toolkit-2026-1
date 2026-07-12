@@ -11,24 +11,20 @@ import {
 import os from 'node:os';
 import path from 'node:path';
 import {
-  composeSelections,
   computeEffectiveLicense,
   creditsToCsv,
   creditsToTxt,
   extractAnimation,
   extractAnimationFrames,
-  makeResolvePalette,
   type AnimationName,
   type CanvasLike,
 } from '@lpc-toolkit/core';
-import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
-import { createNodeCanvasAdapter, writeCanvasPng } from './node-canvas-adapter.js';
-import { AssetStoreError } from './asset-store.js';
+import { composeSelectionForOutput } from './compose-selection.js';
+import { writeCanvasPng } from './node-canvas-adapter.js';
 import { CLI_VERSION } from './package-info.js';
 import type { CliIssue } from './response.js';
 import type { RuntimeAssets } from './runtime-assets.js';
 import { parseSelectionJson, type SelectionJson } from './selection.js';
-import { validateSelections } from './validation.js';
 import { writeZipBundle } from './zip.js';
 
 export interface RenderArtifact {
@@ -58,6 +54,7 @@ export interface RenderSelectionOptions {
   readonly frames: readonly AnimationName[] | 'all';
   readonly bundleZip: boolean;
   readonly allowPartial: boolean;
+  readonly requireProductive?: boolean;
 }
 
 export interface RenderSelectionResult {
@@ -71,6 +68,15 @@ interface AnimationMetadata {
   readonly height: number;
   readonly frameCount: number;
   readonly directions: number;
+}
+
+export class IncompleteCharacterError extends Error {
+  readonly code = 'incomplete_character';
+
+  constructor() {
+    super('Character selection does not produce an attributed composition.');
+    this.name = 'IncompleteCharacterError';
+  }
 }
 
 function safeName(name: string): string {
@@ -166,48 +172,22 @@ export async function renderSelection(
 ): Promise<RenderSelectionResult> {
   const { runtime } = options;
   const context = runtime.context;
-  const catalog = loadCatalogFromRoots(
-    context.sheetDefinitionsRoot,
-    context.customSheetDefinitionsRoot,
-  );
-  const palettes = loadPalettesFromRoot(context.paletteDefinitionsRoot);
-  const parsed = parseSelectionJson(options.selectionJson);
-  const validation = validateSelections(parsed.selections, {
-    catalog: catalog.catalog,
-    palettes: palettes.palettes,
-    pathExists: (spritePath) => runtime.store.has(spritePath),
+  const composed = await composeSelectionForOutput({
+    runtime,
+    selectionJson: options.selectionJson,
+    allowPartial: options.allowPartial,
   });
-  if (!validation.ok && !options.allowPartial) {
-    throw new Error(validation.errors.map((error) => error.message).join('\n'));
+  const { adapter, sheet, warnings } = composed;
+  if (
+    options.requireProductive &&
+    (sheet.layers.length === 0 ||
+      sheet.credits.entries.length === 0 ||
+      sheet.credits.resolvedPaths.length === 0)
+  ) {
+    throw new IncompleteCharacterError();
   }
 
-  const recolorWarnings: CliIssue[] = [];
-  const resolvePalette = makeResolvePalette(
-    catalog.catalog,
-    palettes.palettes,
-    parsed.selections,
-    {
-      onWarn: (message) =>
-        recolorWarnings.push({
-          code: 'recolor_warning',
-          message,
-        }),
-    },
-  );
-
-  const adapter = createNodeCanvasAdapter({ assetStore: runtime.store });
-  const sheet = await composeSelections(parsed.selections, {
-    catalog: catalog.catalog,
-    adapter,
-    spritesheetsBaseUrl: runtime.store.baseUrl,
-    resolvePalette,
-    onImageLoadError: (error) => {
-      if (error instanceof AssetStoreError) throw error;
-    },
-  });
-
   const baseName = safeName(options.selectionName);
-  const partialValidationWarnings = options.allowPartial ? validation.errors : [];
   const animationMetadata: Record<string, AnimationMetadata> = {};
   const sheetPath = path.join(options.outDir, `${baseName}.sheet.png`);
   const creditsTxtPath = path.join(options.outDir, `${baseName}.credits.txt`);
@@ -217,7 +197,9 @@ export async function renderSelection(
   const creditsAnimation = options.animations[0] ?? sheet.animations[0] ?? 'walk';
   const creditsTxt = creditsToTxt(sheet.credits, creditsAnimation);
   const creditsCsv = creditsToCsv(sheet.credits, creditsAnimation);
-  const effectiveLicense = computeEffectiveLicense(sheet.credits);
+  const effectiveLicense = sheet.credits.licenses.length > 0
+    ? computeEffectiveLicense(sheet.credits)
+    : null;
 
   const artifacts: RenderArtifact[] = [
     { type: 'sheet', path: sheetPath, width: sheet.width, height: sheet.height },
@@ -278,18 +260,6 @@ export async function renderSelection(
     }
   }
 
-  const warnings = [
-    ...catalog.warnings,
-    ...palettes.warnings,
-    ...validation.warnings,
-    ...partialValidationWarnings,
-    ...recolorWarnings,
-    ...(sheet.missingPaths ?? []).map((missingPath) => ({
-      code: 'missing_sprite_path',
-      message: 'Composed sheet skipped a missing sprite path.',
-      path: missingPath,
-    })),
-  ];
   artifacts.push({ type: 'metadata', path: metadataPath });
   if (options.bundleZip) {
     artifacts.push({ type: 'zip', path: zipPath });
@@ -324,7 +294,16 @@ export async function renderSelection(
       spritesheetsBaseUrl: runtime.store.baseUrl,
     },
     warnings,
-    skippedLayers: options.allowPartial ? validation.errors : [],
+    skippedLayers: options.allowPartial
+      ? [
+          ...composed.validationErrors,
+          ...(sheet.missingPaths ?? []).map((missingPath) => ({
+            code: 'missing_sprite_path',
+            message: 'Composed sheet skipped a missing sprite path.',
+            path: missingPath,
+          })),
+        ]
+      : [],
   };
 
   preflightPublishPaths(options.outDir, artifacts);

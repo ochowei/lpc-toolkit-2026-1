@@ -368,6 +368,9 @@ function representativeCustomPaths(
 }
 
 interface DrawItem {
+  readonly layerIndex: number;
+  readonly itemId: ItemId;
+  readonly typeName: TypeName;
   readonly path: string;
   readonly zPos: number;
   readonly yPos: number;
@@ -378,6 +381,9 @@ interface DrawItem {
 
 /** A custom-animation sprite layer (e.g. the wheelchair body PNG). */
 interface CustomLayerEntry {
+  readonly layerIndex: number;
+  readonly itemId: ItemId;
+  readonly typeName: TypeName;
   readonly customAnim: string;
   readonly path: string;
   readonly zPos: number;
@@ -445,7 +451,7 @@ export async function composeSelections(
   const addedCustomAnimations = new Set<string>();
 
   // Walk through each resolved layer to categorize standard vs custom animations
-  for (const layer of resolved) {
+  for (const [layerIndex, layer] of resolved.entries()) {
     const selection = selections.items[layer.typeName];
     if (!selection) continue;
 
@@ -457,6 +463,9 @@ export async function composeSelections(
       // They are loaded from a single PNG file corresponding to the custom animation name.
       if (!variantFile) continue;
       customLayers.push({
+        layerIndex,
+        itemId: layer.itemId,
+        typeName: layer.typeName,
         customAnim: layer.customAnimation,
         path: `spritesheets/${layer.basePath}${variantFile}.png`,
         zPos: layer.zPos,
@@ -477,6 +486,9 @@ export async function composeSelections(
       if (allowedFolders && !allowedFolders.has(folder)) continue;
 
       drawItems.push({
+        layerIndex,
+        itemId: layer.itemId,
+        typeName: layer.typeName,
         path: `spritesheets/${layer.basePath}${folder}${tail}.png`,
         zPos: layer.zPos,
         yPos,
@@ -584,6 +596,8 @@ export async function composeSelections(
 
   // Render the standard sheet layers.
   const drawnFolders = new Set<string>();
+  const successfulLayers = new Map<number, LayerSpec>();
+  const successfulCreditLayers: LayerSpec[] = [];
   for (const item of standardDrawItems) {
     if (item.kind === 'extra') {
       ctx.drawImage(item.value.image, 0, 0);
@@ -600,6 +614,20 @@ export async function composeSelections(
     // Draw the entire spritesheet row at its vertical animation offset.
     ctx.drawImage(sprite, 0, d.yPos);
     drawnFolders.add(d.folder);
+    successfulCreditLayers.push({
+      itemId: d.itemId,
+      typeName: d.typeName,
+      path: d.path,
+      zPos: d.zPos,
+    });
+    if (!successfulLayers.has(d.layerIndex)) {
+      successfulLayers.set(d.layerIndex, {
+        itemId: d.itemId,
+        typeName: d.typeName,
+        path: d.path,
+        zPos: d.zPos,
+      });
+    }
   }
 
   // --- Custom Animation Blocks Rendering ---
@@ -642,7 +670,25 @@ export async function composeSelections(
         const sprite = swap ? recolorImage(img, swap, { adapter }) : img;
         areaItems.push({
           zPos: c.zPos,
-          draw: () => ctx.drawImage(sprite, 0, region.offsetY),
+          draw: () => {
+            ctx.drawImage(sprite, 0, region.offsetY);
+            successfulCreditLayers.push({
+              itemId: c.itemId,
+              typeName: c.typeName,
+              path: c.path,
+              zPos: c.zPos,
+              customAnimation: c.customAnim,
+            });
+            if (!successfulLayers.has(c.layerIndex)) {
+              successfulLayers.set(c.layerIndex, {
+                itemId: c.itemId,
+                typeName: c.typeName,
+                path: c.path,
+                zPos: c.zPos,
+                customAnimation: c.customAnim,
+              });
+            }
+          },
         });
       }
 
@@ -694,13 +740,24 @@ export async function composeSelections(
     });
   }
 
+  const layers = [...successfulLayers.values()].sort((a, b) => a.zPos - b.zPos);
+  const representativePaths = new Set(
+    getSpritePathsForSelections(selections, catalog).map((layer) => layer.path),
+  );
+  const creditLayers = [...successfulCreditLayers].sort(
+    (a, b) =>
+      Number(representativePaths.has(b.path)) -
+      Number(representativePaths.has(a.path)),
+  );
   return {
     canvas,
     width: totalWidth,
     height: totalHeight,
     selections,
-    credits: getCredits(selections, catalog),
-    layers: getSpritePathsForSelections(selections, catalog),
+    credits: getCredits(selections, catalog, {
+      layers: creditLayers,
+    }),
+    layers,
     animations: composedAnimations,
     ...(missingPaths.size > 0 ? { missingPaths: [...missingPaths] } : {}),
     ...(customAnimationsMeta.size > 0

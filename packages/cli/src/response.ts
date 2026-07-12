@@ -1,7 +1,13 @@
+import path from 'node:path';
+
 export interface CliIssue {
   readonly code: string;
   readonly message: string;
   readonly path?: string;
+  readonly details?: {
+    readonly suggestions?: readonly string[];
+    readonly available?: readonly string[];
+  };
 }
 
 export interface CliResponse<T> {
@@ -33,9 +39,20 @@ export function formatJsonResponse(response: CliResponse<unknown>): string {
 }
 
 export function humanIssue(issue: CliIssue): string {
-  return issue.path
+  const summary = issue.path
     ? `${issue.code}: ${issue.message} (${issue.path})`
     : `${issue.code}: ${issue.message}`;
+  const suggestions = issue.details?.suggestions;
+  const available = issue.details?.available;
+  return [
+    summary,
+    ...(suggestions && suggestions.length > 0
+      ? [`Did you mean: ${suggestions.join(', ')}`]
+      : []),
+    ...(available && available.length > 0
+      ? [`Available: ${available.join(', ')}`]
+      : []),
+  ].join('\n');
 }
 
 export function formatProgress(phase: string, message: string): string {
@@ -158,7 +175,90 @@ function formatPresetList(data: JsonRecord): string | undefined {
   return `Presets (${presets.length})\n${lines.join('\n')}\n`;
 }
 
-function formatRender(data: JsonRecord): string | undefined {
+function formatCharacterList(data: JsonRecord): string | undefined {
+  const characters = recordArrayValue(data, 'characters');
+  if (!characters) return undefined;
+  const lines = characters.flatMap((character) => {
+    const name = stringValue(character, 'name');
+    return name ? [`- ${name}`] : [];
+  });
+  return `Characters (${characters.length})\n${lines.join('\n')}\n`;
+}
+
+function formatCharacterShow(data: JsonRecord): string | undefined {
+  const selection = data['selection'];
+  const characterPath = stringValue(data, 'path');
+  const valid = data['valid'];
+  if (!isRecord(selection) || !characterPath || typeof valid !== 'boolean') return undefined;
+  const lines = [
+    `Path: ${characterPath}`,
+    `Status: ${valid ? 'valid' : 'invalid'}`,
+    'Selection:',
+    JSON.stringify(selection, null, 2),
+  ];
+  const validation = data['validation'];
+  const errors = isRecord(validation) ? recordArrayValue(validation, 'errors') : undefined;
+  if (!valid && errors && errors.length > 0) {
+    lines.push(
+      `Validation issues (${errors.length}):`,
+      ...errors.map((error) => {
+        const code = stringValue(error, 'code') ?? 'validation_error';
+        const message = stringValue(error, 'message') ?? 'Invalid selection.';
+        const issuePath = stringValue(error, 'path');
+        return `- ${code}: ${message}${issuePath ? ` (${issuePath})` : ''}`;
+      }),
+    );
+  }
+  return `${lines.join('\n')}\n`;
+}
+
+function characterDisplayName(data: JsonRecord): string | undefined {
+  const selection = data['selection'];
+  const metadataName = isRecord(selection) ? stringValue(selection, 'name') : undefined;
+  if (metadataName) return metadataName;
+  const characterPath = stringValue(data, 'path');
+  return characterPath ? path.parse(characterPath).name : undefined;
+}
+
+function formatCharacterCreate(data: JsonRecord): string | undefined {
+  const name = characterDisplayName(data);
+  const characterPath = stringValue(data, 'path');
+  return name && characterPath ? `Created ${name}: ${characterPath}\n` : undefined;
+}
+
+function formatCharacterSearch(data: JsonRecord): string | undefined {
+  const items = recordArrayValue(data, 'items');
+  if (!items) return undefined;
+  const lines = items.flatMap((item) => {
+    const label = catalogItemLabel(item);
+    if (!label) return [];
+    return [`- ${label}`, ...formatCatalogItemDetails(item, '  ')];
+  });
+  return `Compatible items (${items.length})\n${lines.join('\n')}\n`;
+}
+
+function formatCharacterSet(data: JsonRecord): string | undefined {
+  const name = characterDisplayName(data);
+  const typeName = stringValue(data, 'typeName');
+  const item = data['item'];
+  const itemName = isRecord(item) ? stringValue(item, 'name') : undefined;
+  return name && typeName && itemName
+    ? `Updated ${name}: ${typeName} = ${itemName}\n`
+    : undefined;
+}
+
+function formatCharacterRemove(data: JsonRecord): string | undefined {
+  const name = characterDisplayName(data);
+  const typeName = stringValue(data, 'typeName');
+  return name && typeName ? `Updated ${name}: removed ${typeName}\n` : undefined;
+}
+
+function formatCharacterValidate(data: JsonRecord): string | undefined {
+  const name = characterDisplayName(data);
+  return name ? `Character ${name} is valid.\n` : undefined;
+}
+
+function formatRender(data: JsonRecord, label = 'Render'): string | undefined {
   const artifacts = recordArrayValue(data, 'artifacts');
   const metadataPath = stringValue(data, 'metadataPath');
   if (!artifacts || !metadataPath) return undefined;
@@ -167,7 +267,7 @@ function formatRender(data: JsonRecord): string | undefined {
     const artifactPath = stringValue(artifact, 'path');
     return type && artifactPath ? [`- ${type}: ${artifactPath}`] : [];
   });
-  return `Render complete. Artifacts (${artifacts.length})\n${lines.join('\n')}\nMetadata: ${metadataPath}\n`;
+  return `${label} complete. Artifacts (${artifacts.length})\n${lines.join('\n')}\nMetadata: ${metadataPath}\n`;
 }
 
 function formatHumanData(response: CliResponse<unknown>): string | undefined {
@@ -189,6 +289,24 @@ function formatHumanData(response: CliResponse<unknown>): string | undefined {
       return formatPresetList(data);
     case 'preset materialize':
       return formatSelectionOrOut(data, 'Preset selection written to');
+    case 'character list':
+      return formatCharacterList(data);
+    case 'character show':
+      return formatCharacterShow(data);
+    case 'character create':
+      return formatCharacterCreate(data);
+    case 'character search':
+      return formatCharacterSearch(data);
+    case 'character set':
+      return formatCharacterSet(data);
+    case 'character remove':
+      return formatCharacterRemove(data);
+    case 'character validate':
+      return formatCharacterValidate(data);
+    case 'character preview':
+      return formatRender(data, 'Preview');
+    case 'character render':
+      return formatRender(data);
     case 'render':
     case 'preset render':
       return formatRender(data);

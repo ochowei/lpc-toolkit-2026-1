@@ -19,7 +19,7 @@ CLI can share one engine.
 | `packages/core/`    | **Working**  | Pure TypeScript composition logic (catalog, compose, recolor, hash, credits) |
 | `packages/presets/` | **Working**  | Shared themed outfit presets and preset-application logic |
 | `packages/web/`     | **Working**  | React 18 + Vite + Tailwind CSS v4 + shadcn-style UI with a two-column desktop editor, top-bar popovers, and responsive mobile layout |
-| `packages/cli/`     | **Working**  | Agent-first Node CLI for catalog exploration, selection validation, token conversion, presets, and rendering |
+| `packages/cli/`     | **Working**  | Agent-first Node CLI for persistent named character authoring, catalog exploration, selection validation, token conversion, presets, and rendering |
 
 The core composition pipeline, shared presets, web UI, and CLI are working and tested.
 
@@ -221,6 +221,23 @@ The current public package contract is `@lpc-toolkit/cli` version `0.1.2`.
 npm install -g @lpc-toolkit/cli
 lpc-toolkit --help
 ```
+
+### Character authoring quick start
+
+Create and edit a named character without writing selection JSON by hand:
+
+```sh
+lpc-toolkit character create hero --preset farmer
+lpc-toolkit character search hero --type hair --query braid
+lpc-toolkit character set hero --type hair --item hair_braid --recolor lpcr.brown
+lpc-toolkit character preview hero
+lpc-toolkit character render hero --out ./dist/hero --animation walk --bundle zip
+```
+
+Named selections are stored under `./characters/`. Preview and render outputs
+include metadata plus TXT and CSV attribution. See
+[`packages/cli/README.md`](packages/cli/README.md) for every character command,
+locator rules, output defaults, cache behavior, and troubleshooting.
 
 See [`packages/cli/README.md`](packages/cli/README.md) for `npx` usage, command
 examples, cache locations and offline behavior, local asset precedence,

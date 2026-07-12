@@ -9,7 +9,13 @@ import {
 } from './args.js';
 import { assetCacheErrorIssue } from './asset-cache.js';
 import { AssetStoreError } from './asset-store.js';
+import { SelectionOutputError } from './compose-selection.js';
 import { runCatalogCommand } from './catalog-commands.js';
+import {
+  characterCommandNeedsAssets,
+  runCharacterCommand,
+} from './character-commands.js';
+import { helpForCommand, validateCommandOptions } from './command-spec.js';
 import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
 import { materializePreset, runPresetCommand } from './preset-commands.js';
 import { CLI_VERSION } from './package-info.js';
@@ -47,24 +53,6 @@ export function resolveWebRoot(moduleUrl: string): string {
   return fileURLToPath(new URL('./web', moduleUrl));
 }
 
-const HELP = `lpc-toolkit CLI
-
-Commands:
-  lpc-toolkit --version
-  lpc-toolkit -V
-  lpc-toolkit catalog types
-  lpc-toolkit catalog items --type <typeName>
-  lpc-toolkit catalog item <item-id-or-type/name>
-  lpc-toolkit selection validate --selection <file>
-  lpc-toolkit render --selection <file> --out <dir>
-  lpc-toolkit token decode --token <hash-or-token> --out <file>
-  lpc-toolkit token encode --selection <file>
-  lpc-toolkit preset list
-  lpc-toolkit preset materialize <preset-id> --out <file>
-  lpc-toolkit preset render <preset-id> --out <dir>
-  lpc-toolkit web [--host <host>] [--port <port>] [--no-open]
-`;
-
 function renderErrorIssue(
   error: unknown,
   fallbackMessage: string,
@@ -72,6 +60,13 @@ function renderErrorIssue(
 ): { readonly code: string; readonly message: string; readonly path?: string } {
   if (error instanceof AssetStoreError) {
     return { code: error.code, message: error.message, path: error.path };
+  }
+  if (error instanceof SelectionOutputError) {
+    return {
+      code: error.code,
+      message: error.message,
+      ...(error.issues[0]?.path === undefined ? {} : { path: error.issues[0].path }),
+    };
   }
   return {
     code: 'render_failed',
@@ -102,6 +97,7 @@ export function commandNeedsAssets(parsed: ParsedArgs): boolean {
   if (parsed.command[0] === 'selection') return true;
   if (parsed.command[0] === 'render') return true;
   if (parsed.command[0] === 'preset') return parsed.command[1] !== 'list';
+  if (parsed.command[0] === 'character') return characterCommandNeedsAssets(parsed);
   if (parsed.command[0] === 'web') return true;
   return false;
 }
@@ -248,7 +244,7 @@ export async function runCli(
 ): Promise<number> {
   const resolvedDependencies: CliDependencies = { ...DEFAULT_DEPENDENCIES, ...dependencies };
   if (argv.length === 0 || argv[0] === '--help' || argv[0] === '-h') {
-    io.stdout(HELP);
+    io.stdout(helpForCommand([]));
     return 0;
   }
   if (argv[0] === '--version' || argv[0] === '-V') {
@@ -258,8 +254,18 @@ export async function runCli(
 
   const parsed = parseArgs(argv);
   if (parsed.flags.has('help')) {
-    io.stdout(HELP);
+    io.stdout(helpForCommand(parsed.command));
     return 0;
+  }
+
+  const optionIssue = validateCommandOptions(parsed);
+  if (optionIssue) {
+    return writeResponse(
+      commandError(parsed.command.join(' '), optionIssue),
+      parsed,
+      io,
+      '',
+    );
   }
 
   const preflightResponse = preflightAssetCommand(parsed);
@@ -336,6 +342,11 @@ export async function runCli(
       io,
       'Token command completed.\n',
     );
+  }
+
+  if (parsed.command[0] === 'character') {
+    const response = await runCharacterCommand(parsed, io, runtime);
+    return writeResponse(response, parsed, io, 'Character command completed.\n');
   }
 
   if (parsed.command[0] === 'render') {

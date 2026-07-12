@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { createCatalog } from '../src/catalog.js';
 import { composeSelections, getSpritePathsForSelections } from '../src/compose.js';
+import { computeEffectiveLicense } from '../src/credits.js';
 import type { CanvasAdapter, CanvasLike, ImageLike } from '../src/adapters.js';
 import type { PaletteSwap } from '../src/recolor.js';
 import type {
@@ -744,8 +745,9 @@ describe('composeSelections', () => {
       expect(
         hasContent(regionPixels(sheet.canvas, 0, WALK_Y, 8, 8)),
       ).toBe(false);
-      // Credits are still resolved from the catalog, not the pixels.
-      expect(sheet.credits.entries.map((e) => e.file)).toEqual(['test/body']);
+      // Failed layers do not contribute pixels or attribution.
+      expect(sheet.layers).toEqual([]);
+      expect(sheet.credits.entries).toEqual([]);
     });
 
     it('composes a custom-only item into a block below the standard sheet (B1 closed)', async () => {
@@ -1046,14 +1048,24 @@ describe('composeSelections', () => {
         name: 'Human Female',
         type_name: 'body',
         animations: ['walk'],
-        credits: [],
+        credits: [{
+          file: 'body',
+          authors: ['Loaded Artist'],
+          licenses: ['CC-BY 4.0'],
+          urls: [],
+        }],
         layer_1: { zPos: 10, female: 'body/' },
       };
       const neckItem: ItemDefinition = {
         name: 'Bowtie',
         type_name: 'neck',
         animations: ['walk'],
-        credits: [],
+        credits: [{
+          file: 'neck',
+          authors: ['Missing Artist'],
+          licenses: ['GPL 3.0'],
+          urls: [],
+        }],
         layer_1: { zPos: 20, female: 'neck/' },
       };
       const wheelsItem: ItemDefinition = {
@@ -1102,6 +1114,95 @@ describe('composeSelections', () => {
       expect(sheet.missingPaths).toEqual([
         'spritesheets/neck/walk.png',
       ]);
+      expect(sheet.layers.map((layer) => layer.path)).toEqual([
+        'spritesheets/body/walk.png',
+      ]);
+      expect(sheet.credits.entries.map((entry) => entry.authors)).toEqual([
+        ['Loaded Artist'],
+      ]);
+      expect(sheet.credits.resolvedPaths).toEqual(['body/walk.png']);
+      expect(computeEffectiveLicense(sheet.credits)).toBe('CC-BY 4.0');
+    });
+
+    it('attributes every successfully composed animation path', async () => {
+      const bodyItem: ItemDefinition = {
+        name: 'Human Male',
+        type_name: 'body',
+        animations: ['spellcast', 'walk'],
+        credits: [
+          {
+            file: 'body/spellcast.png',
+            authors: ['Spellcast Artist'],
+            licenses: ['CC-BY 4.0'],
+            urls: [],
+          },
+          {
+            file: 'body/walk.png',
+            authors: ['Walk Artist'],
+            licenses: ['GPL 3.0'],
+            urls: [],
+          },
+        ],
+        layer_1: { zPos: 10, male: 'body/' },
+      };
+      const catalog = createCatalog({
+        'body/body.json': bodyItem,
+      }).catalog;
+      const selections: Selections = {
+        bodyType: 'male',
+        items: {
+          body: { typeName: 'body', name: 'Human Male' },
+        },
+      };
+
+      const sheet = await composeSelections(selections, {
+        catalog,
+        adapter: mockCanvasAdapter(() => createMockImage(64, 64)),
+        spritesheetsBaseUrl: '',
+      });
+
+      expect(sheet.credits.entries.map((entry) => entry.file)).toEqual([
+        'body/spellcast.png',
+        'body/walk.png',
+      ]);
+      expect(sheet.credits.resolvedPaths).toEqual([
+        'body/spellcast.png',
+        'body/walk.png',
+      ]);
+    });
+
+    it('uses the default animation path for a folder-level credit', async () => {
+      const bodyItem: ItemDefinition = {
+        name: 'Human Male',
+        type_name: 'body',
+        animations: ['spellcast', 'walk'],
+        credits: [
+          {
+            file: 'body',
+            authors: ['Body Artist'],
+            licenses: ['CC-BY 4.0'],
+            urls: [],
+          },
+        ],
+        layer_1: { zPos: 10, male: 'body/' },
+      };
+      const catalog = createCatalog({
+        'body/body.json': bodyItem,
+      }).catalog;
+      const selections: Selections = {
+        bodyType: 'male',
+        items: {
+          body: { typeName: 'body', name: 'Human Male' },
+        },
+      };
+
+      const sheet = await composeSelections(selections, {
+        catalog,
+        adapter: mockCanvasAdapter(() => createMockImage(64, 64)),
+        spritesheetsBaseUrl: '',
+      });
+
+      expect(sheet.credits.resolvedPaths).toEqual(['body/walk.png']);
     });
 
     it('records missing custom-animation layers while completing composition', async () => {

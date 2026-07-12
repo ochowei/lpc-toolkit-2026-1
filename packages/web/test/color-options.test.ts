@@ -37,6 +37,11 @@ const plainItem: ItemDefinition = {
   layer_1: { zPos: 1, male: 't/' },
 };
 
+const recolorAndVariantItem: ItemDefinition = {
+  ...recolorItem,
+  variants: ['black'],
+};
+
 describe('getColorOptions', () => {
   it('returns real color swatches for a recolors item', () => {
     expect(getColorOptions(recolorItem, palettes)).toEqual({
@@ -64,6 +69,10 @@ describe('getColorOptions', () => {
 });
 
 describe('pickDefaults', () => {
+  it('uses the shared recolor-first priority', () => {
+    expect(pickDefaults(recolorAndVariantItem, palettes)).toEqual({ recolor: 'c0' });
+  });
+
   it('defaults a recolors item to its first color', () => {
     expect(pickDefaults(recolorItem, palettes)).toEqual({ recolor: 'c0' });
   });

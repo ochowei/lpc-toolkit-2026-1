@@ -12,6 +12,8 @@ function makeCatalogCwd(): string {
   mkdirSync(path.join(root, 'hair'), { recursive: true });
   mkdirSync(path.join(assetsRoot, 'palette_definitions'), { recursive: true });
   mkdirSync(path.join(assetsRoot, 'spritesheets'), { recursive: true });
+  mkdirSync(path.join(assetsRoot, 'spritesheets', 'hair', 'braids'), { recursive: true });
+  writeFileSync(path.join(assetsRoot, 'spritesheets', 'hair', 'braids', 'walk.png'), 'fixture');
   writeFileSync(path.join(assetsRoot, 'CREDITS.csv'), 'file,authors,licenses\n');
   writeFileSync(
     path.join(root, 'body', 'body.json'),
@@ -57,6 +59,20 @@ async function runHuman(argv: readonly string[], cwd: string): Promise<string> {
   expect(code).toBe(0);
   expect(stderr).toEqual([]);
   return stdout.join('');
+}
+
+async function runHumanError(argv: readonly string[], cwd: string): Promise<string> {
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+  const code = await runCli(argv, {
+    cwd,
+    stdout: (text) => stdout.push(text),
+    stderr: (text) => stderr.push(text),
+  });
+
+  expect(code).toBe(1);
+  expect(stdout).toEqual([]);
+  return stderr.join('');
 }
 
 describe('human-readable CLI output', () => {
@@ -122,5 +138,101 @@ describe('human-readable CLI output', () => {
     );
     expect(materializeOutput).toContain('"schema": "lpc-toolkit.selection.v1"');
     expect(materializeOutput).toContain('"name": "farmer"');
+  });
+
+  it('prints character list and show data without --json', async () => {
+    const cwd = makeCatalogCwd();
+    await runHuman(['character', 'create', 'hero'], cwd);
+
+    expect(await runHuman(['character', 'list'], cwd)).toContain('- hero');
+    const output = await runHuman(['character', 'show', 'hero'], cwd);
+    expect(output).toContain('"name": "hero"');
+    expect(output).toContain(path.join(cwd, 'characters', 'hero.selection.json'));
+    expect(output).toContain('Status: valid');
+  });
+
+  it('prints invalid character status and validation issues without --json', async () => {
+    const cwd = makeCatalogCwd();
+    const selectionPath = path.join(cwd, 'saved', 'invalid.selection.json');
+    mkdirSync(path.dirname(selectionPath), { recursive: true });
+    writeFileSync(selectionPath, JSON.stringify({
+      schema: 'lpc-toolkit.selection.v1',
+      name: 'invalid',
+      bodyType: 'male',
+      items: { hair: { name: 'Missing Hair' } },
+    }));
+
+    const output = await runHuman([
+      'character', 'show', '--selection', selectionPath,
+    ], cwd);
+
+    expect(output).toContain(selectionPath);
+    expect(output).toContain('Status: invalid');
+    expect(output).toContain('unknown_item');
+    expect(output).toContain('hair/Missing Hair');
+  });
+
+  it('prints actionable character mutation and search output without --json', async () => {
+    const cwd = makeCatalogCwd();
+
+    expect(await runHuman(['character', 'create', 'hero'], cwd))
+      .toContain('Created hero:');
+    expect(await runHuman([
+      'character', 'search', 'hero', '--type', 'hair', '--query', 'braid',
+    ], cwd)).toContain('hair/Braids [braids]');
+    expect(await runHuman([
+      'character', 'set', 'hero', '--type', 'hair', '--item', 'braids',
+    ], cwd)).toContain('Updated hero: hair = Braids');
+    expect(await runHuman(['character', 'validate', 'hero'], cwd))
+      .toContain('Character hero is valid.');
+    expect(await runHuman(['character', 'remove', 'hero', '--type', 'hair'], cwd))
+      .toContain('Updated hero: removed hair');
+  });
+
+  it.each([
+    {
+      command: ['set', '--type', 'hair', '--item', 'braids'],
+      items: {},
+      expected: 'Updated custom.selection: hair = Braids',
+    },
+    {
+      command: ['validate'],
+      items: {},
+      expected: 'Character custom.selection is valid.',
+    },
+    {
+      command: ['remove', '--type', 'hair'],
+      items: { hair: { name: 'Braids', variant: 'brown' } },
+      expected: 'Updated custom.selection: removed hair',
+    },
+  ])('prints explicit character $command.0 output for an unnamed selection', async ({
+    command,
+    items,
+    expected,
+  }) => {
+    const cwd = makeCatalogCwd();
+    const selectionPath = path.join(cwd, 'saved', 'custom.selection.json');
+    mkdirSync(path.dirname(selectionPath), { recursive: true });
+    writeFileSync(selectionPath, JSON.stringify({
+      schema: 'lpc-toolkit.selection.v1',
+      bodyType: 'male',
+      items,
+    }));
+
+    expect(await runHuman([
+      'character', ...command, '--selection', selectionPath,
+    ], cwd)).toContain(expected);
+  });
+
+  it('prints structured character suggestions and available values', async () => {
+    const cwd = makeCatalogCwd();
+    await runHuman(['character', 'create', 'hero'], cwd);
+
+    expect(await runHumanError([
+      'character', 'set', 'hero', '--type', 'hair', '--item', 'braid',
+    ], cwd)).toContain('Did you mean: braids');
+    expect(await runHumanError([
+      'character', 'create', 'other', '--body-type', 'centaur',
+    ], cwd)).toContain('Available: male, female, teen, child, muscular, pregnant');
   });
 });

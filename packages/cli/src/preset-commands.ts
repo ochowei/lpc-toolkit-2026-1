@@ -34,6 +34,24 @@ export interface MaterializePresetOptions {
   readonly catalog?: Catalog;
   readonly palettes?: PaletteMetadata;
   readonly bodyType?: BodyType;
+  readonly overridePresetBodyType?: boolean;
+  readonly rejectSkipped?: boolean;
+}
+
+export class PresetBodyTypeError extends Error {
+  readonly code = 'preset_body_type_incompatible';
+
+  constructor(
+    readonly bodyType: BodyType,
+    readonly skipped: readonly { readonly typeName: string; readonly name: string }[],
+  ) {
+    super(
+      `Preset is incompatible with body type ${bodyType}: ${skipped
+        .map((item) => `${item.typeName}/${item.name}`)
+        .join(', ')}`,
+    );
+    this.name = 'PresetBodyTypeError';
+  }
 }
 
 function findPreset(id: string): Preset {
@@ -68,13 +86,19 @@ export function materializePreset(
 ): SelectionJson {
   const preset = findPreset(id);
   if (options.catalog && options.palettes) {
+    const appliedPreset = options.overridePresetBodyType && options.bodyType
+      ? { ...preset, bodyType: options.bodyType }
+      : preset;
     const selection = computePresetSelection(
-      preset,
+      appliedPreset,
       {},
       options.bodyType ?? 'male',
       options.catalog,
       options.palettes,
     );
+    if (options.rejectSkipped && selection.skipped.length > 0) {
+      throw new PresetBodyTypeError(selection.bodyType, selection.skipped);
+    }
     if (selection.skipped.length === preset.items.length) {
       return materializePresetRaw(preset);
     }

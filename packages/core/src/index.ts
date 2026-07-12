@@ -86,6 +86,7 @@ export {
   getRecolorVariants,
   makeResolvePalette,
 } from './recolor-resolve.js';
+export { getDefaultColorSelection } from './selection-defaults.js';
 
 // ==========================================
 // 7. Layer Composition Engine
@@ -183,4 +184,3 @@ export { recolorImage, recolorPixels } from './recolor.js';
 // ==========================================
 export { validateAssets } from './validation/asset-validator.js';
 export type { ValidateAssetsOptions, ValidationIssue } from './validation/asset-validator.js';
-

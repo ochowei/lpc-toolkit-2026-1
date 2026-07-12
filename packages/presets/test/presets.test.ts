@@ -19,6 +19,32 @@ function item(name: string, typeName: TypeName): ItemDefinition {
 }
 
 describe('built-in presets', () => {
+  it('uses recolor-first defaults for preset items without explicit color fields', () => {
+    const def: ItemDefinition = {
+      ...item('Defaulted Hair', 'hair'),
+      variants: ['brown'],
+      recolors: { material: 'hair', palettes: ['ulpc'] },
+    };
+    const catalog = createCatalog({ 'hair/defaulted.json': def }).catalog;
+    const palettes = createPaletteCatalog({
+      'hair/meta_hair.json': { type: 'material', default: 'ulpc', base: 'black' },
+      'hair/hair_ulpc.json': { black: ['#111111'], orange: ['#ee7700'] },
+    }).palettes;
+
+    const result = computePresetSelection({
+      id: 'defaults',
+      labelKey: 'preset.defaults',
+      emoji: '',
+      items: [{ typeName: 'hair', name: 'Defaulted Hair' }],
+    }, {}, 'male', catalog, palettes);
+
+    expect(result.selections.hair).toEqual({
+      typeName: 'hair',
+      name: 'Defaulted Hair',
+      recolor: 'black',
+    });
+  });
+
   it('includes stable unique preset ids', () => {
     const ids = PRESETS.map((preset) => preset.id);
 

@@ -37,4 +37,12 @@ describe('parseArgs', () => {
       ]),
     );
   });
+
+  it('parses help as a boolean flag before a positional', () => {
+    expect(parseArgs(['character', 'set', '--help', 'hero'])).toEqual({
+      command: ['character', 'set'],
+      flags: new Map<string, FlagValue>([['help', true]]),
+      positionals: ['hero'],
+    });
+  });
 });

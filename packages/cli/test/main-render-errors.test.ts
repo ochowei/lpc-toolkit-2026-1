@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import JSZip from 'jszip';
@@ -82,6 +82,16 @@ async function createMissingImageRuntime(): Promise<RuntimeAssets> {
       items: { body: { name: 'Body Color' } },
     }),
   );
+  mkdirSync(path.join(cwd, 'characters'), { recursive: true });
+  writeFileSync(
+    path.join(cwd, 'characters', 'missing-image.selection.json'),
+    JSON.stringify({
+      schema: 'lpc-toolkit.selection.v1',
+      name: 'missing-image',
+      bodyType: 'male',
+      items: { body: { name: 'Body Color' } },
+    }),
+  );
   const store = createZipAssetStore(layout);
   return {
     context: createRuntimeContext({
@@ -117,6 +127,9 @@ describe('render asset-store error responses', () => {
   it.each([
     ['direct render', ['render', '--selection', 'selection.json', '--out', 'out', '--json']],
     ['preset render', ['preset', 'render', 'farmer', '--out', 'preset-out', '--json']],
+    ['character render', [
+      'character', 'render', 'missing-image', '--out', 'character-out', '--json',
+    ]],
   ])('preserves a missing image issue through %s', async (_label, argv) => {
     const runtime = await createMissingImageRuntime();
     const response = await runJson(argv, runtime);
@@ -128,5 +141,82 @@ describe('render asset-store error responses', () => {
         path: logicalSpritePath,
       },
     ]);
+  });
+
+  it.each([
+    ['human', false],
+    ['JSON', true],
+  ])('rejects an empty character render in %s mode without publishing', async (_label, json) => {
+    const runtime = await createMissingImageRuntime();
+    const characterPath = path.join(
+      runtime.context.repoRoot,
+      'characters/empty.selection.json',
+    );
+    writeFileSync(characterPath, JSON.stringify({
+      schema: 'lpc-toolkit.selection.v1',
+      name: 'empty',
+      bodyType: 'male',
+      items: {},
+    }));
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const argv = ['character', 'render', 'empty', '--out', 'empty-out'];
+    if (json) argv.push('--json');
+
+    const code = await runCli(argv, {
+      cwd: runtime.context.repoRoot,
+      stdout: (text) => stdout.push(text),
+      stderr: (text) => stderr.push(text),
+    }, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+
+    expect(code).toBe(1);
+    const output = json ? stdout.join('') : stderr.join('');
+    expect(output).toContain('incomplete_character');
+    if (json) {
+      expect(JSON.parse(output).errors[0]).toMatchObject({
+        code: 'incomplete_character',
+      });
+      expect(stderr).toEqual([]);
+    } else {
+      expect(stdout).toEqual([]);
+    }
+    expect(existsSync(path.join(runtime.context.repoRoot, 'empty-out'))).toBe(false);
+  });
+
+  it.each([
+    ['human', false],
+    ['JSON', true],
+  ])('rejects an all-missing partial character render in %s mode without publishing', async (
+    _label,
+    json,
+  ) => {
+    const runtime = await createMissingImageRuntime();
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const argv = [
+      'character', 'render', 'missing-image', '--out', 'all-missing-out', '--allow-partial',
+    ];
+    if (json) argv.push('--json');
+
+    const code = await runCli(argv, {
+      cwd: runtime.context.repoRoot,
+      stdout: (text) => stdout.push(text),
+      stderr: (text) => stderr.push(text),
+    }, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+
+    expect(code).toBe(1);
+    const output = json ? stdout.join('') : stderr.join('');
+    expect(output).toContain('incomplete_character');
+    if (json) {
+      expect(JSON.parse(output).errors[0]).toMatchObject({ code: 'incomplete_character' });
+      expect(stderr).toEqual([]);
+    } else {
+      expect(stdout).toEqual([]);
+    }
+    expect(existsSync(path.join(runtime.context.repoRoot, 'all-missing-out'))).toBe(false);
   });
 });

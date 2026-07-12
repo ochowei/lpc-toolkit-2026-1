@@ -9,6 +9,7 @@ const readRepoFile = (filePath: string) =>
   readFileSync(path.join(repoRoot, filePath), 'utf8');
 
 const readme = readRepoFile('README.md');
+const cliReadme = readRepoFile('packages/cli/README.md');
 const architecture = readRepoFile('docs/ARCHITECTURE.md');
 const cliPackage = JSON.parse(readRepoFile('packages/cli/package.json')) as {
   version: string;
@@ -90,6 +91,38 @@ describe('README architecture contract', () => {
       '[Layer Stack reference](reference/v2/LPC-Toolkit-LayerStack.html)',
     );
   });
+
+  it('links the persistent character authoring workflow', () => {
+    expect(readme).toContain('Character authoring quick start');
+    expect(readme).toContain('lpc-toolkit character create hero --preset farmer');
+    expect(readme).toContain('[`packages/cli/README.md`](packages/cli/README.md)');
+  });
+});
+
+describe('CLI README character contract', () => {
+  it('documents all character commands and locator/output semantics', () => {
+    for (const command of [
+      'create',
+      'list',
+      'show',
+      'search',
+      'set',
+      'remove',
+      'validate',
+      'preview',
+      'render',
+    ]) {
+      expect(cliReadme).toContain(`\`character ${command}\``);
+    }
+    for (const phrase of [
+      '`--selection <file>`',
+      '`characters/previews/<name>/`',
+      'strict by default',
+      '`--allow-partial`',
+    ]) {
+      expect(cliReadme).toContain(phrase);
+    }
+  });
 });
 
 describe('architecture ownership contract', () => {
@@ -123,6 +156,17 @@ describe('architecture ownership contract', () => {
     expect(architecture).toContain('CI unit job');
     expect(architecture).toContain('read-only provenance');
     expect(architecture).toContain('separate isolated checkout');
+  });
+
+  it('documents CLI character persistence and output ownership', () => {
+    for (const phrase of [
+      '`character-store.ts`',
+      'atomic create and replace',
+      'catalog-backed character editing',
+      'transactional attributed preview and render publication',
+    ]) {
+      expect(architecture).toContain(phrase);
+    }
   });
 });
 

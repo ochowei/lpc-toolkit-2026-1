@@ -1,4 +1,5 @@
 import {
+  getDefaultColorSelection,
   getRecolorSwatches,
   type ItemDefinition,
   type PaletteMetadata,
@@ -88,15 +89,5 @@ export function pickDefaults(
   item: ItemDefinition | undefined,
   palettes: PaletteMetadata,
 ): { variant?: string; recolor?: string } {
-  if (!item) return {};
-  const colors = getColorOptions(item, palettes);
-  if (colors.mode === 'variants') {
-    const first = colors.options[0];
-    return first ? { variant: first.value } : {};
-  }
-  if (colors.mode === 'recolors') {
-    const first = colors.options[0];
-    return first ? { recolor: first.value } : {};
-  }
-  return {};
+  return getDefaultColorSelection(item, palettes);
 }
