@@ -120,6 +120,7 @@ describe('asset preparation dispatch', () => {
     [['character', 'create', 'hero', '--preset', 'farmer']],
     [['character', 'search', 'hero', '--type', 'hair']],
     [['character', 'set', 'hero', '--type', 'hair', '--item', 'braids']],
+    [['character', 'remove', 'hero', '--type', 'hair']],
     [['character', 'show', 'hero']],
     [['character', 'validate', 'hero']],
     [['character', 'preview', 'hero']],

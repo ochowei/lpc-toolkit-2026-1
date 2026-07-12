@@ -76,6 +76,12 @@ function requiredFlag(parsed: ParsedArgs, name: string): string {
 }
 
 function characterLocator(parsed: ParsedArgs): CharacterLocator {
+  if (parsed.positionals.length > 1) {
+    throw usageError(
+      'unexpected_argument',
+      'Character commands accept exactly one positional locator.',
+    );
+  }
   const name = parsed.positionals[0];
   const selectionPath = flagString(parsed.flags, 'selection');
   if (name && selectionPath) {
@@ -166,7 +172,8 @@ export function characterCommandNeedsAssets(parsed: ParsedArgs): boolean {
   const subcommand = parsed.command[1];
   if (subcommand === 'list') return false;
   if (subcommand === 'create') return flagString(parsed.flags, 'preset') !== undefined;
-  return subcommand === 'search' || subcommand === 'set' || subcommand === 'show' ||
+  return subcommand === 'search' || subcommand === 'set' || subcommand === 'remove' ||
+    subcommand === 'show' ||
     subcommand === 'validate' || subcommand === 'preview' || subcommand === 'render';
 }
 
@@ -285,17 +292,15 @@ export async function runCharacterCommand(
       const typeName = requiredFlag(parsed, 'type');
       const edited = removeCharacterItem(stored.parsed.selections, typeName);
       const candidate = selectionJsonFromCore(edited.selections, stored.selection.name);
-      const loaded = runtime ? loadCharacterContext(runtime) : undefined;
-      if (loaded) {
-        const validation = validateCandidate(candidate, loaded);
-        if (!validation.ok) return validationFailure('character remove', validation, loaded.warnings);
-      }
+      const loaded = loadCharacterContext(requireRuntime(runtime));
+      const validation = validateCandidate(candidate, loaded);
+      if (!validation.ok) return validationFailure('character remove', validation, loaded.warnings);
       writeCharacter(stored.path, candidate, 'replace');
       return commandOk('character remove', {
         path: stored.path,
         selection: candidate,
         typeName,
-      }, loaded?.warnings ?? []);
+      }, [...loaded.warnings, ...validation.warnings]);
     }
 
     if (subcommand === 'validate') {

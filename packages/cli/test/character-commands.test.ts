@@ -6,7 +6,7 @@ import { parseArgs } from '../src/args.js';
 import { createDirectoryAssetStore } from '../src/asset-store.js';
 import { runCharacterCommand } from '../src/character-commands.js';
 import { createRuntimeContext } from '../src/context.js';
-import type { CliIo } from '../src/main.js';
+import { runCli, type CliIo } from '../src/main.js';
 import type { CliResponse } from '../src/response.js';
 import type { RuntimeAssets } from '../src/runtime-assets.js';
 
@@ -131,6 +131,53 @@ describe('character commands', () => {
     ])).response.errors[0]).toMatchObject({ code: 'character_locator_conflict' });
     expect((await run(fixture, ['character', 'show'])).response.errors[0])
       .toMatchObject({ code: 'missing_argument' });
+  });
+
+  it('rejects surplus positionals for named and explicit-path locators', async () => {
+    const fixture = createFixture();
+
+    expect((await run(fixture, [
+      'character', 'show', 'hero', 'extra',
+    ])).response.errors[0]).toMatchObject({ code: 'unexpected_argument' });
+    expect((await run(fixture, [
+      'character', 'show', 'extra', 'another', '--selection', 'saved/hero.json',
+    ])).response.errors[0]).toMatchObject({ code: 'unexpected_argument' });
+  });
+
+  it('keeps bytes unchanged when production remove yields an invalid candidate', async () => {
+    const fixture = createFixture();
+    const heroPath = path.join(fixture.cwd, 'characters', 'hero.selection.json');
+    mkdirSync(path.dirname(heroPath), { recursive: true });
+    const original = `${JSON.stringify({
+      schema: 'lpc-toolkit.selection.v1',
+      name: 'hero',
+      bodyType: 'male',
+      items: {
+        body: { name: 'Body Color' },
+        hair: { name: 'Missing Hair' },
+      },
+    }, null, 2)}\n`;
+    writeFileSync(heroPath, original);
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+
+    const code = await runCli(
+      ['character', 'remove', 'hero', '--type', 'body', '--json'],
+      {
+        cwd: fixture.cwd,
+        stdout: (text) => stdout.push(text),
+        stderr: (text) => stderr.push(text),
+      },
+    );
+
+    expect(code).toBe(1);
+    expect(JSON.parse(stdout.join(''))).toMatchObject({
+      ok: false,
+      command: 'character remove',
+      errors: [{ code: 'unknown_item', path: 'hair/Missing Hair' }],
+    });
+    expect(stderr).toEqual([]);
+    expect(readFileSync(heroPath, 'utf8')).toBe(original);
   });
 
   it('maps typed store errors directly to CLI issues', async () => {
