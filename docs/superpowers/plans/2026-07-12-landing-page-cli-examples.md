@@ -36,7 +36,7 @@
 - Consumes: `LandingPageProps.onNavigate(route: NavigableAppRoute): void` and the existing `Button` component.
 - Produces: unchanged `LandingPage({ onNavigate }: LandingPageProps): JSX.Element`; no new exported API.
 
-- [ ] **Step 1: Replace the focused test with the public-package expectations**
+- [x] **Step 1: Replace the focused test with the public-package expectations**
 
 Use this complete test file:
 
@@ -74,7 +74,7 @@ describe('LandingPage', () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused test and confirm RED**
+- [x] **Step 2: Run the focused test and confirm RED**
 
 Run:
 
@@ -86,7 +86,7 @@ Expected: FAIL because the existing page does not contain
 `npm install -g @lpc-toolkit/cli` and the two concrete workflows. Record the
 failing assertion in the implementation note before continuing.
 
-- [ ] **Step 3: Implement the static workflows and attribution guidance**
+- [x] **Step 3: Implement the static workflows and attribution guidance**
 
 Replace `packages/web/src/components/landing-page.tsx` with:
 
@@ -239,7 +239,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
 }
 ```
 
-- [ ] **Step 4: Run the focused test and confirm GREEN**
+- [x] **Step 4: Run the focused test and confirm GREEN**
 
 Run:
 
@@ -250,7 +250,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx
 Expected: PASS for `packages/web/test/landing-page.test.tsx` with no warnings or
 errors.
 
-- [ ] **Step 5: Run architecture-sensitive verification**
+- [x] **Step 5: Run architecture-sensitive verification**
 
 Run:
 
@@ -263,7 +263,7 @@ rtk git diff --check
 Expected: all commands exit `0`; typecheck reports no TypeScript errors,
 boundary verification reports no violations, and diff check prints no errors.
 
-- [ ] **Step 6: Commit the implementation**
+- [x] **Step 6: Commit the implementation**
 
 Run:
 
@@ -274,7 +274,7 @@ rtk git commit -m "feat(web): add CLI usage examples to landing page"
 
 Expected: one commit containing only the component and its focused test.
 
-- [ ] **Step 7: Record task completion in this plan**
+- [x] **Step 7: Record task completion in this plan**
 
 Read the implementation commit hash with `rtk git rev-parse --short HEAD`, mark
 Steps 1–7 complete, and append an implementation note, that exact hash, and the
@@ -293,3 +293,12 @@ Commit only this plan update with:
 rtk git add docs/superpowers/plans/2026-07-12-landing-page-cli-examples.md
 rtk git commit -m "docs(web): record landing CLI examples verification"
 ```
+
+- Implementation note: Added public install guidance, preset and
+  custom-selection examples, and mandatory attribution output guidance. The
+  RED run failed on the expected missing global-install command before the
+  component changed.
+- Commit: `de55c2a48`
+- Verification: focused landing-page test PASS (1/1); package-local web
+  typecheck PASS; boundary check PASS; diff check PASS; task review approved
+  with no findings.
