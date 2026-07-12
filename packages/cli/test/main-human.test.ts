@@ -145,7 +145,31 @@ describe('human-readable CLI output', () => {
     await runHuman(['character', 'create', 'hero'], cwd);
 
     expect(await runHuman(['character', 'list'], cwd)).toContain('- hero');
-    expect(await runHuman(['character', 'show', 'hero'], cwd)).toContain('"name": "hero"');
+    const output = await runHuman(['character', 'show', 'hero'], cwd);
+    expect(output).toContain('"name": "hero"');
+    expect(output).toContain(path.join(cwd, 'characters', 'hero.selection.json'));
+    expect(output).toContain('Status: valid');
+  });
+
+  it('prints invalid character status and validation issues without --json', async () => {
+    const cwd = makeCatalogCwd();
+    const selectionPath = path.join(cwd, 'saved', 'invalid.selection.json');
+    mkdirSync(path.dirname(selectionPath), { recursive: true });
+    writeFileSync(selectionPath, JSON.stringify({
+      schema: 'lpc-toolkit.selection.v1',
+      name: 'invalid',
+      bodyType: 'male',
+      items: { hair: { name: 'Missing Hair' } },
+    }));
+
+    const output = await runHuman([
+      'character', 'show', '--selection', selectionPath,
+    ], cwd);
+
+    expect(output).toContain(selectionPath);
+    expect(output).toContain('Status: invalid');
+    expect(output).toContain('unknown_item');
+    expect(output).toContain('hair/Missing Hair');
   });
 
   it('prints actionable character mutation and search output without --json', async () => {

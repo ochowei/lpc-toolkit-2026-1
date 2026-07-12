@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -102,6 +102,7 @@ describe('character commands', () => {
       frames: 'all',
       bundleZip: true,
       allowPartial: true,
+      requireProductive: true,
     });
     expect(response).toMatchObject({ ok: true, command: 'character render' });
   });
@@ -280,9 +281,7 @@ describe('character commands', () => {
   it('does not write an invalid set candidate', async () => {
     const fixture = createFixture();
     const heroPath = path.join(fixture.cwd, 'characters', 'hero.selection.json');
-    expect((await run(fixture, [
-      'character', 'create', 'hero', '--preset', 'farmer',
-    ])).response.ok).toBe(true);
+    expect((await run(fixture, ['character', 'create', 'hero'])).response.ok).toBe(true);
     const before = readFileSync(heroPath, 'utf8');
 
     const result = await run(fixture, [
@@ -391,5 +390,50 @@ describe('character commands', () => {
     ])).response;
 
     expect(response.errors[0]).toMatchObject({ code: 'body_type_invalid' });
+  });
+
+  it('rejects a partially incompatible preset for an explicit body type without writing', async () => {
+    const fixture = createFixture();
+    const targetPath = path.join(fixture.cwd, 'characters', 'hero.selection.json');
+    const bodyDefinitionPath = path.join(
+      fixture.cwd,
+      'assets/sheet_definitions/body/body.json',
+    );
+    const bodyDefinition = JSON.parse(readFileSync(bodyDefinitionPath, 'utf8')) as {
+      readonly layer_1: Readonly<Record<string, unknown>>;
+    };
+    writeFileSync(bodyDefinitionPath, JSON.stringify({
+      ...bodyDefinition,
+      layer_1: {
+        ...bodyDefinition.layer_1,
+        female: 'body/bodies/female/',
+      },
+    }));
+
+    const response = (await run(fixture, [
+      'character', 'create', 'hero', '--preset', 'farmer', '--body-type', 'female',
+    ])).response;
+
+    expect(response.errors[0]).toMatchObject({
+      code: 'preset_body_type_incompatible',
+      path: 'female',
+    });
+    expect(existsSync(targetPath)).toBe(false);
+  });
+
+  it('rejects a fully incompatible preset for an explicit body type without writing', async () => {
+    const fixture = createFixture();
+    const targetPath = path.join(fixture.cwd, 'characters', 'hero.selection.json');
+    rmSync(path.join(fixture.cwd, 'assets/sheet_definitions/body/body.json'));
+
+    const response = (await run(fixture, [
+      'character', 'create', 'hero', '--preset', 'farmer', '--body-type', 'female',
+    ])).response;
+
+    expect(response.errors[0]).toMatchObject({
+      code: 'preset_body_type_incompatible',
+      path: 'female',
+    });
+    expect(existsSync(targetPath)).toBe(false);
   });
 });

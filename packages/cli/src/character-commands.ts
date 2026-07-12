@@ -25,14 +25,14 @@ import {
 import { SelectionOutputError } from './compose-selection.js';
 import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
 import type { CliIo } from './main.js';
-import { materializePreset } from './preset-commands.js';
+import { materializePreset, PresetBodyTypeError } from './preset-commands.js';
 import {
   PreviewError,
   previewIssue,
   renderCharacterPreview,
   type CharacterPreviewResult,
 } from './preview.js';
-import { renderSelection } from './render.js';
+import { IncompleteCharacterError, renderSelection } from './render.js';
 import {
   commandError,
   commandOk,
@@ -189,6 +189,9 @@ function issueFromError(error: unknown): CliIssue {
       ...(error.issues[0]?.details === undefined ? {} : { details: error.issues[0].details }),
     };
   }
+  if (error instanceof IncompleteCharacterError) {
+    return { code: error.code, message: error.message };
+  }
   if (error instanceof AssetStoreError) {
     return { code: error.code, message: error.message, path: error.path };
   }
@@ -244,9 +247,18 @@ export async function runCharacterCommand(
             catalog: loaded.editor.catalog,
             palettes: loaded.editor.palettes,
             bodyType: emptySelection.bodyType,
+            overridePresetBodyType: true,
+            rejectSkipped: true,
           });
           selection = { ...preset, name };
         } catch (error) {
+          if (error instanceof PresetBodyTypeError) {
+            return commandError('character create', {
+              code: error.code,
+              message: error.message,
+              path: error.bodyType,
+            }, warnings);
+          }
           return commandError('character create', {
             code: 'unknown_preset',
             message: error instanceof Error ? error.message : String(error),
@@ -383,6 +395,7 @@ export async function runCharacterCommand(
           : flagStrings(parsed.flags, 'frames'),
         bundleZip: flagString(parsed.flags, 'bundle') === 'zip',
         allowPartial: flagBoolean(parsed.flags, 'allow-partial'),
+        requireProductive: true,
       });
       return commandOk('character render', result, result.warnings);
     }

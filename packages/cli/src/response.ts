@@ -187,8 +187,29 @@ function formatCharacterList(data: JsonRecord): string | undefined {
 
 function formatCharacterShow(data: JsonRecord): string | undefined {
   const selection = data['selection'];
-  if (!isRecord(selection)) return undefined;
-  return `${JSON.stringify(selection, null, 2)}\n`;
+  const characterPath = stringValue(data, 'path');
+  const valid = data['valid'];
+  if (!isRecord(selection) || !characterPath || typeof valid !== 'boolean') return undefined;
+  const lines = [
+    `Path: ${characterPath}`,
+    `Status: ${valid ? 'valid' : 'invalid'}`,
+    'Selection:',
+    JSON.stringify(selection, null, 2),
+  ];
+  const validation = data['validation'];
+  const errors = isRecord(validation) ? recordArrayValue(validation, 'errors') : undefined;
+  if (!valid && errors && errors.length > 0) {
+    lines.push(
+      `Validation issues (${errors.length}):`,
+      ...errors.map((error) => {
+        const code = stringValue(error, 'code') ?? 'validation_error';
+        const message = stringValue(error, 'message') ?? 'Invalid selection.';
+        const issuePath = stringValue(error, 'path');
+        return `- ${code}: ${message}${issuePath ? ` (${issuePath})` : ''}`;
+      }),
+    );
+  }
+  return `${lines.join('\n')}\n`;
 }
 
 function characterDisplayName(data: JsonRecord): string | undefined {

@@ -212,6 +212,24 @@ describe('asset preparation dispatch', () => {
     expect(capture.stderr.join('')).toContain('Unknown option: --tpye');
   });
 
+  it.each([
+    ['render', '--selection', 'selection.json', '--out', 'out', '--bundle', 'tar'],
+    ['character', 'render', 'hero', '--out', 'out', '--bundle', 'tar'],
+  ])('rejects an unsupported bundle value before preparing assets: %j', async (...argv) => {
+    const prepare = vi.fn(async (_options: PrepareRuntimeAssetsOptions) => runtime);
+    const capture = captureIo(runtime.context.repoRoot);
+
+    expect(await runCli([...argv, '--json'], capture.io, {
+      prepareRuntimeAssets: prepare,
+    })).toBe(1);
+    expect(prepare).not.toHaveBeenCalled();
+    expect(JSON.parse(capture.stdout.join('')).errors[0]).toMatchObject({
+      code: 'invalid_option',
+      path: '--bundle',
+      details: { available: ['zip'] },
+    });
+  });
+
   it.each(['--version', '-V'])('prints the package version for %s without preparing assets', async (flag) => {
     const prepare = vi.fn(async (_options: PrepareRuntimeAssetsOptions) => runtime);
     const capture = captureIo(runtime.context.repoRoot);

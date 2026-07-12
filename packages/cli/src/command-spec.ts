@@ -7,6 +7,7 @@ interface CommandOptionSpec {
   readonly name: string;
   readonly kind: OptionKind;
   readonly valueLabel?: string;
+  readonly allowedValues?: readonly string[];
   readonly description: string;
 }
 
@@ -41,7 +42,13 @@ const RENDER_OPTIONS: readonly CommandOptionSpec[] = [
   { name: 'out', kind: 'value', valueLabel: 'directory', description: 'Write artifacts to this directory.' },
   { name: 'animation', kind: 'repeatable', valueLabel: 'name', description: 'Render an animation; may be repeated.' },
   { name: 'frames', kind: 'repeatable', valueLabel: 'name|all', description: 'Select frames; may be repeated.' },
-  { name: 'bundle', kind: 'value', valueLabel: 'zip', description: 'Bundle artifacts as a ZIP file.' },
+  {
+    name: 'bundle',
+    kind: 'value',
+    valueLabel: 'zip',
+    allowedValues: ['zip'],
+    description: 'Bundle artifacts as a ZIP file.',
+  },
   { name: 'allow-partial', kind: 'boolean', description: 'Allow partial animation output.' },
 ];
 
@@ -245,7 +252,9 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
       { name: 'variant', kind: 'value', valueLabel: 'id', description: 'Item variant to select.' },
       { name: 'recolor', kind: 'value', valueLabel: 'id', description: 'Item recolor to select.' },
     ],
-    examples: ['lpc-toolkit character set hero --type hair --item hair/braid --recolor brown'],
+    examples: [
+      'lpc-toolkit character set hero --type hair --item hair_braid --recolor lpcr.brown',
+    ],
   },
   {
     command: ['character', 'remove'],
@@ -385,6 +394,18 @@ export function validateCommandOptions(parsed: ParsedArgs): CliIssue | undefined
         code: 'invalid_option',
         message: `--${name} may be supplied only once.`,
         path: `--${name}`,
+      };
+    }
+    if (
+      option.allowedValues &&
+      typeof value === 'string' &&
+      !option.allowedValues.includes(value)
+    ) {
+      return {
+        code: 'invalid_option',
+        message: `Unsupported value for --${name}: ${value}`,
+        path: `--${name}`,
+        details: { available: option.allowedValues },
       };
     }
   }

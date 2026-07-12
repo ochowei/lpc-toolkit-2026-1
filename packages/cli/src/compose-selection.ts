@@ -77,7 +77,7 @@ export async function composeSelectionForOutput(
     spritesheetsBaseUrl: options.runtime.store.baseUrl,
     resolvePalette,
     onImageLoadError: (error) => {
-      if (error instanceof AssetStoreError) throw error;
+      if (!options.allowPartial && error instanceof AssetStoreError) throw error;
     },
   });
   const warnings: CliIssue[] = [

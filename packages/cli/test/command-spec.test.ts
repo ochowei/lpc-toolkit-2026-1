@@ -11,6 +11,8 @@ describe('helpForCommand', () => {
 
     expect(help).toContain('lpc-toolkit character set <name>');
     expect(help).toContain('--item <item-id-or-type/name>');
+    expect(help).toContain('--item hair_braid --recolor lpcr.brown');
+    expect(help).not.toContain('--item hair/braid --recolor brown');
   });
 
   it('renders command-group help for catalog', () => {
@@ -73,5 +75,16 @@ describe('validateCommandOptions', () => {
         ]),
       ),
     ).toBeUndefined();
+  });
+
+  it.each([
+    ['render', '--selection', 'hero.json', '--out', 'out', '--bundle', 'tar'],
+    ['character', 'render', 'hero', '--out', 'out', '--bundle', 'tar'],
+  ])('rejects unsupported closed-domain option values for %s', (...argv) => {
+    expect(validateCommandOptions(parseArgs(argv))).toMatchObject({
+      code: 'invalid_option',
+      path: '--bundle',
+      details: { available: ['zip'] },
+    });
   });
 });

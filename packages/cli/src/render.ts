@@ -54,6 +54,7 @@ export interface RenderSelectionOptions {
   readonly frames: readonly AnimationName[] | 'all';
   readonly bundleZip: boolean;
   readonly allowPartial: boolean;
+  readonly requireProductive?: boolean;
 }
 
 export interface RenderSelectionResult {
@@ -67,6 +68,15 @@ interface AnimationMetadata {
   readonly height: number;
   readonly frameCount: number;
   readonly directions: number;
+}
+
+export class IncompleteCharacterError extends Error {
+  readonly code = 'incomplete_character';
+
+  constructor() {
+    super('Character selection does not produce an attributed composition.');
+    this.name = 'IncompleteCharacterError';
+  }
 }
 
 function safeName(name: string): string {
@@ -168,6 +178,14 @@ export async function renderSelection(
     allowPartial: options.allowPartial,
   });
   const { adapter, sheet, warnings } = composed;
+  if (
+    options.requireProductive &&
+    (sheet.layers.length === 0 ||
+      sheet.credits.entries.length === 0 ||
+      sheet.credits.resolvedPaths.length === 0)
+  ) {
+    throw new IncompleteCharacterError();
+  }
 
   const baseName = safeName(options.selectionName);
   const animationMetadata: Record<string, AnimationMetadata> = {};
@@ -274,7 +292,16 @@ export async function renderSelection(
       spritesheetsBaseUrl: runtime.store.baseUrl,
     },
     warnings,
-    skippedLayers: options.allowPartial ? composed.validationErrors : [],
+    skippedLayers: options.allowPartial
+      ? [
+          ...composed.validationErrors,
+          ...(sheet.missingPaths ?? []).map((missingPath) => ({
+            code: 'missing_sprite_path',
+            message: 'Composed sheet skipped a missing sprite path.',
+            path: missingPath,
+          })),
+        ]
+      : [],
   };
 
   preflightPublishPaths(options.outDir, artifacts);

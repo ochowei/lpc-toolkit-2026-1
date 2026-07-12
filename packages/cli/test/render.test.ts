@@ -4,6 +4,7 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from 'node:fs';
 import os from 'node:os';
@@ -39,6 +40,25 @@ const sheetDefinition = {
   ],
 } as const;
 
+const hairDefinition = {
+  name: 'Fixture Hair',
+  type_name: 'hair',
+  priority: 20,
+  layer_1: {
+    zPos: 20,
+    male: 'hair/fixture/male/',
+  },
+  animations: ['walk'],
+  credits: [
+    {
+      file: 'hair/fixture/male',
+      authors: ['Remaining Artist'],
+      licenses: ['GPL 3.0'],
+      urls: ['https://example.com/lpc-remaining-fixture'],
+    },
+  ],
+} as const;
+
 function listFiles(root: string): readonly string[] {
   return readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
     const fullPath = path.join(root, entry.name);
@@ -55,6 +75,7 @@ function writeJson(filePath: string, value: unknown): void {
 async function createFixtureRepo(): Promise<string> {
   const cwd = mkdtempSync(path.join(os.tmpdir(), 'lpc-render-fixture-'));
   writeJson(path.join(cwd, 'assets/sheet_definitions/body/body.json'), sheetDefinition);
+  writeJson(path.join(cwd, 'assets/sheet_definitions/hair/hair.json'), hairDefinition);
   mkdirSync(path.join(cwd, 'assets/palette_definitions'), { recursive: true });
 
   const spritePath = path.join(cwd, 'assets/spritesheets/body/bodies/male/walk.png');
@@ -64,6 +85,10 @@ async function createFixtureRepo(): Promise<string> {
   context.fillStyle = '#ff00ff';
   context.fillRect(0, 8 * 64, 64, 64);
   writeFileSync(spritePath, await canvas.encode('png'));
+
+  const hairSpritePath = path.join(cwd, 'assets/spritesheets/hair/fixture/male/walk.png');
+  mkdirSync(path.dirname(hairSpritePath), { recursive: true });
+  writeFileSync(hairSpritePath, await canvas.encode('png'));
 
   return cwd;
 }
@@ -82,7 +107,7 @@ function createRuntime(cwd: string): RuntimeAssets {
   };
 }
 
-async function createManagedRuntime(): Promise<RuntimeAssets> {
+async function createManagedRuntime(missingBody = false): Promise<RuntimeAssets> {
   const cwd = mkdtempSync(path.join(os.tmpdir(), 'lpc-render-managed-'));
   const releaseRoot = path.join(cwd, 'cache', 'assets-v1');
   const layout: AssetCacheLayout = {
@@ -96,6 +121,7 @@ async function createManagedRuntime(): Promise<RuntimeAssets> {
     metadataIndexPath: path.join(releaseRoot, 'metadata-index.json'),
   };
   writeJson(path.join(layout.sheetDefinitionsRoot, 'body/body.json'), sheetDefinition);
+  writeJson(path.join(layout.sheetDefinitionsRoot, 'hair/hair.json'), hairDefinition);
   mkdirSync(layout.paletteDefinitionsRoot, { recursive: true });
   mkdirSync(layout.zipsRoot, { recursive: true });
   writeFileSync(
@@ -104,7 +130,10 @@ async function createManagedRuntime(): Promise<RuntimeAssets> {
   );
   writeFileSync(
     layout.spriteIndexPath,
-    `${JSON.stringify(['spritesheets/body/bodies/male/walk.png'])}\n`,
+    `${JSON.stringify([
+      'spritesheets/body/bodies/male/walk.png',
+      'spritesheets/hair/fixture/male/walk.png',
+    ])}\n`,
   );
 
   const spriteCanvas = createCanvas(832, 4 * 64);
@@ -112,10 +141,18 @@ async function createManagedRuntime(): Promise<RuntimeAssets> {
   spriteContext.fillStyle = '#00ff00';
   spriteContext.fillRect(0, 0, 64, 64);
   const zip = new JSZip();
-  zip.file('bodies/male/walk.png', await spriteCanvas.encode('png'));
+  if (!missingBody) {
+    zip.file('bodies/male/walk.png', await spriteCanvas.encode('png'));
+  }
   writeFileSync(
     path.join(layout.zipsRoot, 'body.zip'),
     await zip.generateAsync({ type: 'nodebuffer' }),
+  );
+  const hairZip = new JSZip();
+  hairZip.file('fixture/male/walk.png', await spriteCanvas.encode('png'));
+  writeFileSync(
+    path.join(layout.zipsRoot, 'hair.zip'),
+    await hairZip.generateAsync({ type: 'nodebuffer' }),
   );
 
   const store = createZipAssetStore(layout);
@@ -139,6 +176,55 @@ const bodyOnlySelection = {
     body: { name: 'Body Color' },
   },
 } as const;
+
+const bodyAndHairSelection = {
+  ...bodyOnlySelection,
+  name: 'partial-character',
+  items: {
+    ...bodyOnlySelection.items,
+    hair: { name: 'Fixture Hair' },
+  },
+} as const;
+
+async function expectPartialMissingImageOutput(
+  runtime: RuntimeAssets,
+  outDir: string,
+): Promise<void> {
+  const result = await renderSelection({
+    runtime,
+    cwd: runtime.context.repoRoot,
+    outDir,
+    selectionName: 'partial-character',
+    selectionJson: bodyAndHairSelection,
+    animations: [],
+    frames: [],
+    bundleZip: false,
+    allowPartial: true,
+  });
+
+  expect(existsSync(path.join(outDir, 'partial-character.sheet.png'))).toBe(true);
+  expect(result.warnings).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      code: 'missing_sprite_path',
+      path: 'spritesheets/body/bodies/male/walk.png',
+    }),
+  ]));
+  expect(readFileSync(path.join(outDir, 'partial-character.credits.txt'), 'utf8'))
+    .toContain('Remaining Artist');
+  const metadata = JSON.parse(
+    readFileSync(path.join(outDir, 'partial-character.metadata.json'), 'utf8'),
+  ) as {
+    readonly credits: { readonly resolvedPaths: readonly string[] };
+    readonly skippedLayers: readonly { readonly code: string; readonly path?: string }[];
+  };
+  expect(metadata.credits.resolvedPaths).toContain('hair/fixture/male/walk.png');
+  expect(metadata.skippedLayers).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      code: 'missing_sprite_path',
+      path: 'spritesheets/body/bodies/male/walk.png',
+    }),
+  ]));
+}
 
 describe('renderSelection', () => {
   it('keeps default directory rendering for a body-only selection', async () => {
@@ -345,6 +431,25 @@ describe('renderSelection', () => {
           path: 'missing_type',
         }),
       ]),
+    );
+  }, 30000);
+
+  it('keeps attributed directory output when a selected image is missing in partial mode', async () => {
+    const cwd = await createFixtureRepo();
+    rmSync(path.join(cwd, 'assets/spritesheets/body/bodies/male/walk.png'));
+
+    await expectPartialMissingImageOutput(
+      createRuntime(cwd),
+      mkdtempSync(path.join(os.tmpdir(), 'lpc-render-partial-directory-')),
+    );
+  }, 30000);
+
+  it('keeps attributed ZIP output when an indexed selected image is missing in partial mode', async () => {
+    const runtime = await createManagedRuntime(true);
+
+    await expectPartialMissingImageOutput(
+      runtime,
+      mkdtempSync(path.join(os.tmpdir(), 'lpc-render-partial-zip-')),
     );
   }, 30000);
 });
