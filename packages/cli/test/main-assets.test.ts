@@ -8,6 +8,7 @@ import { AssetCacheError } from '../src/asset-cache.js';
 import { createDirectoryAssetStore } from '../src/asset-store.js';
 import { createRuntimeContext } from '../src/context.js';
 import { commandNeedsAssets, resolveWebRoot, runCli } from '../src/main.js';
+import { CLI_VERSION } from '../src/package-info.js';
 import type {
   PrepareRuntimeAssetsOptions,
   RuntimeAssets,
@@ -188,6 +189,16 @@ describe('asset preparation dispatch', () => {
     const capture = captureIo(runtime.context.repoRoot);
     expect(await runCli(['--help'], capture.io, { prepareRuntimeAssets: prepare })).toBe(0);
     expect(prepare).not.toHaveBeenCalled();
+  });
+
+  it.each(['--version', '-V'])('prints the package version for %s without preparing assets', async (flag) => {
+    const prepare = vi.fn(async (_options: PrepareRuntimeAssetsOptions) => runtime);
+    const capture = captureIo(runtime.context.repoRoot);
+
+    expect(await runCli([flag], capture.io, { prepareRuntimeAssets: prepare })).toBe(0);
+    expect(prepare).not.toHaveBeenCalled();
+    expect(capture.stdout).toEqual([`${CLI_VERSION}\n`]);
+    expect(capture.stderr).toEqual([]);
   });
 
   it.each([
