@@ -399,9 +399,10 @@ Expected: one commit containing only the revised test, TopBar placement, and
 Task 2 plan state.
 
 - Implementation: Moved the localized home action to the far-left position before the brand and added an aria-hidden vertical divider.
+- Commit: 88742b16b
 - Verification: focused TopBar test PASS; web typecheck PASS; web test PASS; boundary check PASS.
 
-- [ ] **Step 7: Record the Task 2 implementation commit hash**
+- [x] **Step 7: Record the Task 2 implementation commit hash**
 
 Run:
 
