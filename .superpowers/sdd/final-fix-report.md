@@ -8,6 +8,10 @@ the new strict preset and productive-output rules apply only to character
 commands. No dependency, `any`, core environment dependency, attribution
 bypass, or `upstream/` change was introduced.
 
+Implementation commit:
+`98d81c02ac78667b2a36e5fd36f86400fe00db52`
+(`fix(cli): close character authoring review findings`).
+
 ## Root Causes and Fixes
 
 1. Character preset creation reused the shared preset rule that prefers a

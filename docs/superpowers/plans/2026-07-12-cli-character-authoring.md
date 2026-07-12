@@ -1166,11 +1166,31 @@ Then mark Task 7 complete, record the implementation commit and exact verificati
 
 ## Final Review Checklist
 
-- [ ] Every requirement in `docs/superpowers/specs/2026-07-12-cli-character-authoring-design.md` maps to a task above.
-- [ ] Existing command forms and JSON envelope remain compatible.
-- [ ] Unknown options fail before asset preparation.
-- [ ] No mutation writes before candidate validation succeeds.
-- [ ] Preview and full render use exact composed credit manifests.
-- [ ] `packages/core/` remains environment-agnostic.
-- [ ] No dependency or `any` was added.
-- [ ] Full CLI/core/boundary/package verification evidence is recorded.
+- [x] Every requirement in `docs/superpowers/specs/2026-07-12-cli-character-authoring-design.md` maps to a task above.
+- [x] Existing command forms and JSON envelope remain compatible.
+- [x] Unknown options fail before asset preparation.
+- [x] No mutation writes before candidate validation succeeds.
+- [x] Preview and full render use exact composed credit manifests.
+- [x] `packages/core/` remains environment-agnostic.
+- [x] No dependency or `any` was added.
+- [x] Full CLI/core/boundary/package verification evidence is recorded.
+
+Final-review fix implementation note: commit
+`98d81c02ac78667b2a36e5fd36f86400fe00db52` closes all three Important and
+three Minor findings. Character preset creation now honors explicit body type
+and rejects any skipped preset item before writing; partial directory and ZIP
+composition retain attributed output and record missing paths; character render
+rejects nonproductive output before staging; human show includes path/status and
+invalid issues; help uses `hair_braid` with `lpcr.brown`; and closed-domain
+`--bundle` validation rejects non-`zip` values before asset preparation. Direct
+preset materialize/render and direct render compatibility remain intact.
+
+Final-review fix verification: focused CLI PASS (113 tests); presets focused
+PASS (3); CLI and presets typechecks PASS; full CLI PASS (290 passed, 1
+platform-specific skip); core PASS (167); Web color options PASS (8);
+architecture boundaries and `git diff --check` PASS; packed installed-package
+smoke PASS with `Packed CLI install smoke test passed.` Sandbox-only localhost,
+tsx IPC, and npm DNS failures were rerun through the approved permission path
+and passed. Complete RED/GREEN and gate evidence is recorded in
+`.superpowers/sdd/final-fix-report.md`. The unrelated untracked
+`docs/README-ARCHITECTURE-AUDIT.tmp.md` remains untouched.
