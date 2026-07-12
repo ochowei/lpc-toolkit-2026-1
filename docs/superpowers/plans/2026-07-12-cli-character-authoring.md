@@ -764,7 +764,7 @@ Then update Task 4 checkboxes and record, stage only this plan, and commit it wi
 - Produces: `PreviewError` with `code`, `path?`, and `details?`; `previewIssue(code, path, details?)` constructs it for command mapping.
 - Preview input uses zero-based `frameIndex`; core `FrameSlice.frameNumber` remains one-based internally.
 
-- [ ] **Step 1: Write failing preview and render-regression tests**
+- [x] **Step 1: Write failing preview and render-regression tests**
 
 ```ts
 it('writes one down-facing walk frame and exact attribution', async () => {
@@ -799,7 +799,7 @@ it('does not publish a preview for an empty character', async () => {
 
 Keep the existing `render.test.ts` artifact and metadata assertions unchanged to prove the extraction refactor is behavior-preserving.
 
-- [ ] **Step 2: Run preview and render tests and verify RED**
+- [x] **Step 2: Run preview and render tests and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- preview.test.ts render.test.ts
@@ -807,7 +807,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- preview.test.ts render.test.ts
 
 Expected: preview tests FAIL because modules do not exist; existing render tests PASS before refactoring.
 
-- [ ] **Step 3: Extract shared composition setup**
+- [x] **Step 3: Extract shared composition setup**
 
 Move only catalog/palette loading, validation, palette resolution, adapter construction, and `composeSelections` into `compose-selection.ts`:
 
@@ -882,7 +882,7 @@ its stable command-mapping code is `selection_output_invalid`.
 
 Modify `renderSelection` to consume this result while preserving its current artifact staging, metadata, ZIP, and attribution code.
 
-- [ ] **Step 4: Implement preview extraction and transactional publication**
+- [x] **Step 4: Implement preview extraction and transactional publication**
 
 Validate against the composed sheet and core direction IDs:
 
@@ -916,7 +916,7 @@ metadata and then the selection file stem as fallback. If the composed sheet
 has no credited or resolved layers, throw `preview_incomplete_character`
 before creating the staging directory.
 
-- [ ] **Step 5: Run preview/render tests and verification**
+- [x] **Step 5: Run preview/render tests and verification**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- preview.test.ts render.test.ts character-commands.test.ts
@@ -927,7 +927,7 @@ rtk pnpm check:boundaries
 
 Expected: PASS; preview has exactly one pixel artifact and both credit sidecars; existing render assertions remain green.
 
-- [ ] **Step 6: Commit and record**
+- [x] **Step 6: Commit and record**
 
 ```sh
 rtk git add packages/cli/src/compose-selection.ts packages/cli/src/preview.ts packages/cli/src/render.ts packages/cli/src/character-commands.ts packages/cli/test/preview.test.ts packages/cli/test/render.test.ts packages/cli/test/character-commands.test.ts
@@ -936,9 +936,18 @@ rtk git commit -m "feat(cli): add attributed character previews"
 
 Then update Task 5 checkboxes and record, stage only this plan, and commit it with `rtk git commit -m "docs(plan): record character preview task"`.
 
-- Implementation: Not executed
-- Commit: Not executed
-- Verification: Not executed
+- Implementation: Extracted the shared strict/partial composition setup without
+  changing render artifact publication or metadata semantics. Added strict
+  single-frame character preview output with exact TXT/CSV attribution,
+  metadata, output defaults, typed actionable errors, and rollback-safe staging
+  on the destination filesystem. Review follow-up added metadata-name fallback
+  and strict decimal frame parsing.
+- Commit: `5c601efcea070d51e31ade51d58b2a4564230174`
+- Verification: Preview/render/character focused suite PASS (30 tests); full CLI
+  suite PASS (265 passed, 1 platform-specific skip); CLI typecheck PASS; core
+  suite PASS (167 tests); architecture boundary check and `git diff --check`
+  PASS. The first sandboxed full CLI run failed only because localhost binding
+  was denied; the permission-enabled rerun passed all 30 test files.
 
 ### Task 6: Character Render Delegation and Complete Human Output
 
