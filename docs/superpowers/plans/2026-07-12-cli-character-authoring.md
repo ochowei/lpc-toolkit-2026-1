@@ -1194,3 +1194,24 @@ tsx IPC, and npm DNS failures were rerun through the approved permission path
 and passed. Complete RED/GREEN and gate evidence is recorded in
 `.superpowers/sdd/final-fix-report.md`. The unrelated untracked
 `docs/README-ARCHITECTURE-AUDIT.tmp.md` remains untouched.
+
+Second final re-review implementation note: commit
+`31fc1820fc10bea70a01b4c700c68202da4e5ced` makes core composition layers and
+credit manifests reflect only successfully drawn catalog layers. Mixed partial
+directory and ZIP output now excludes the missing artist, path, and GPL license
+while retaining the exact remaining CC-BY 4.0 attribution. All-missing partial
+character render returns `incomplete_character` before staging in human and
+JSON modes; direct partial render retains blank-output compatibility with an
+empty manifest and null effective license. Omitted character preset body type
+now preserves the preset's own default, while explicit `--body-type` still
+overrides it.
+
+Second final re-review verification: RED was 2 failed/48 passed for focused
+core and 6 failed/31 passed for focused CLI. GREEN passed core 50 and CLI 37.
+All core/CLI/presets/Web typechecks passed; full core passed 168; full CLI
+passed 294 with 1 platform-specific skip; full Web passed 649; presets passed
+3; boundaries and `git diff --check` passed; packed installed-package smoke
+passed. Full command and behavior evidence is appended to
+`.superpowers/sdd/final-fix-report.md`. All final checklist items above remain
+satisfied, including exact composed credit manifests and no pre-validation
+writes.

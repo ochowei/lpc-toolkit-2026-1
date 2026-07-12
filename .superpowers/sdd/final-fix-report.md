@@ -99,3 +99,57 @@ The pre-existing untracked `docs/README-ARCHITECTURE-AUDIT.tmp.md` remains
 untouched. No blocking concern remains. Core composition still logs its
 existing optional-missing-spritesheet diagnostic to stderr during the two new
 partial render tests; both tests and all required output assertions pass.
+
+## Second Final Re-review Follow-up
+
+Implementation commit:
+`31fc1820fc10bea70a01b4c700c68202da4e5ced`
+(`fix(core): attribute only composed sprite layers`).
+
+### Root Causes and Changes
+
+- Core collected `missingPaths` during image loading but rebuilt
+  `ComposedSheet.layers` and `credits` from every requested selection. It now
+  records one representative `LayerSpec` per catalog layer only after an image
+  is successfully drawn. `getCredits` accepts that environment-agnostic layer
+  set, so missing pixels no longer contribute artists, paths, licenses, or the
+  effective license.
+- Character productiveness is therefore evaluated against successfully drawn,
+  attributed layers. An all-missing `character render --allow-partial` returns
+  `incomplete_character` in human and JSON modes before staging. Direct partial
+  render remains compatible and publishes its blank sheet with empty credit
+  sidecars and `effectiveLicense: null`.
+- Character create now retains raw `--body-type` presence separately. Omitted
+  body type preserves the preset default; only an explicit flag enables the
+  preset body-type override.
+
+### RED Evidence
+
+- `rtk pnpm --filter @lpc-toolkit/core test -- compose.test.ts credits.test.ts`
+  - Expected FAIL: 2 failed and 48 passed. Missing layers remained in
+    `ComposedSheet.layers`, and `getCredits` ignored the supplied successful
+    layer set and included `Missing Artist`.
+- `rtk pnpm --filter @lpc-toolkit/cli test -- render.test.ts
+  main-render-errors.test.ts character-commands.test.ts`
+  - Expected FAIL: 6 failed and 31 passed. Directory and ZIP mixed renders
+    retained the missing fixture artist/GPL license, all-missing character
+    partial renders exited successfully, direct partial metadata retained GPL,
+    and the injected non-male preset default was not used.
+
+### GREEN and Final Verification
+
+- Focused core composition/credits: PASS, 2 files and 50 tests.
+- Focused CLI render/character integration: PASS, 3 files and 37 tests.
+- Core, CLI, presets, and Web typechecks: PASS with no diagnostics.
+- Full core: PASS, 14 files and 168 tests.
+- Presets focused compatibility: PASS, 1 file and 3 tests.
+- Full CLI: PASS, 30 files, 294 passed and 1 platform-specific skip.
+- Full Web: PASS, 73 files and 649 tests.
+- `rtk pnpm check:boundaries`: PASS.
+- `rtk pnpm --filter @lpc-toolkit/cli test:package`: PASS; installed smoke
+  printed `Packed CLI install smoke test passed.`
+- `rtk git diff --check`: PASS.
+
+Expected existing missing-image diagnostics were printed during focused and
+full tests. No assertion failed, no dependency or `any` was added, core remains
+environment-agnostic, and the unrelated audit temp file remains untouched.
