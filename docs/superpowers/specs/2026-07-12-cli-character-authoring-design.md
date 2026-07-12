@@ -130,8 +130,33 @@ forms continue to work.
 
 ## Architecture
 
-The new feature remains inside `packages/cli/` and forms a thin application
-layer. It does not move filesystem, Node canvas, or command parsing into core.
+The authoring workflow remains a thin application layer inside
+`packages/cli/`. One environment-agnostic default-selection helper is added to
+core and consumed by Web, presets, and CLI so their item-pick behavior cannot
+drift. This does not move filesystem, Node canvas, or command parsing into
+core.
+
+### Shared item defaults
+
+Core exports:
+
+```ts
+getDefaultColorSelection(
+  item: ItemDefinition | undefined,
+  palettes: PaletteMetadata,
+): { readonly variant?: string; readonly recolor?: string }
+```
+
+The helper follows the Web editor's established priority:
+
+1. If palette-backed recolor swatches exist, return the first recolor.
+2. Otherwise, if declared variants exist, return the first variant.
+3. Otherwise, return an empty object.
+
+Web keeps its existing `pickDefaults` API as a thin delegation to the core
+helper. Shared preset materialization and CLI character editing use the same
+helper directly. This preserves current Web and preset output while giving the
+CLI identical defaults.
 
 ### Character store
 
@@ -231,11 +256,17 @@ shared domain data.
 `type/name`. The resolved item's type must match `--type`.
 
 The command builds a candidate selection, validates body compatibility,
-variant, recolor, and sprite path, then publishes it only if valid. Omitting an
-optional variant or recolor preserves the core's normal base behavior. If the
-base cannot resolve but explicit options can, the command returns
-`missing_variant` or `missing_recolor` with available values instead of
-guessing one.
+variant, recolor, and sprite path, then publishes it only if valid. When both
+`--variant` and `--recolor` are omitted, it applies
+`getDefaultColorSelection`. An explicitly supplied value overrides the shared
+default and remains subject to `unknown_variant` or `unknown_recolor`
+validation.
+
+Variant can alter the resolved PNG path. Recolor never does: it selects a
+palette swap after the PNG is loaded. The command therefore never translates
+`missing_sprite_path` into `missing_recolor`. If the default or explicit
+variant still cannot resolve a sprite, the command preserves the accurate
+`missing_sprite_path` error and does not write the selection.
 
 Set replaces only the current selection under the named type. It never clears
 another type as a side effect.
@@ -294,6 +325,12 @@ existing render workflow. Existing animation, frame, ZIP, partial-render,
 metadata, transactional publication, and attribution semantics remain
 unchanged.
 
+Missing assets remain strict by default for character mutation, preview, and
+render. `character render --allow-partial` is the only character workflow that
+adopts the Web-like tolerant behavior: missing layers are skipped and emitted
+as structured warnings and metadata. Preview never produces a knowingly
+partial representative image.
+
 ## Errors and Structured Responses
 
 Human errors explain the failed input and the next valid action. Examples:
@@ -302,8 +339,10 @@ Human errors explain the failed input and the next valid action. Examples:
 unknown_item: Unknown item: hair_briad
 Did you mean: hair_braid?
 
-missing_variant: hair_braid requires a variant
+unknown_recolor: Unknown recolor: ultraviolet
 Available: black, blonde, brown
+
+missing_sprite_path: No sprite path exists for hair/Braid
 ```
 
 JSON mode keeps the existing envelope:
@@ -340,8 +379,6 @@ Stable new error codes include:
 - `unknown_option`;
 - `unknown_item`;
 - `item_type_mismatch`;
-- `missing_variant`;
-- `missing_recolor`;
 - `selection_type_not_set`;
 - `preview_animation_unavailable`;
 - `preview_direction_unavailable`;
@@ -366,6 +403,14 @@ project's GPL-3.0-or-later license.
 - create, set, replace, and remove as pure transitions;
 - item-ID and exact type/name resolution;
 - body-type, variant, recolor, and item-type validation;
+- shared default selection uses recolor first, variant fallback, and empty
+  fallback;
+- Web and preset default-selection behavior remains unchanged after delegating
+  to the shared core helper;
+- CLI omitted options use the shared default while explicit options override
+  it;
+- missing sprite paths remain `missing_sprite_path` and are never mislabeled
+  as recolor failures;
 - deterministic search sorting and case-insensitive matching;
 - suggestion and available-option data;
 - command-specific option validation and help generation.
@@ -412,9 +457,11 @@ APIs.
 1. Add strict hierarchical help and option validation without changing valid
    existing invocations.
 2. Add the character store and pure editor transitions.
-3. Add create, list, show, search, set, remove, and validate commands.
-4. Add attributed single-frame preview.
-5. Add character render delegation and packed-package workflow coverage.
+3. Add the shared core default-selection helper and migrate Web and presets
+   without changing their output.
+4. Add create, list, show, search, set, remove, and validate commands.
+5. Add attributed single-frame preview.
+6. Add character render delegation and packed-package workflow coverage.
 
 Each delivery step must preserve the existing selection schema and render
 attribution contract.
