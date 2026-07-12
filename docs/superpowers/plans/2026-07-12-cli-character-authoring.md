@@ -733,6 +733,20 @@ Then update Task 4 checkboxes and record, stage only this plan, and commit it wi
 - Verification: Focused Task 4/preset suite PASS (69 tests); full CLI suite PASS
   (247 passed, 1 skipped; approved localhost permission required for Web server
   tests); CLI typecheck PASS; boundary check PASS; `git diff --check` PASS.
+- Review fix: Classified `character remove` as asset-dependent, required its
+  runtime context, validated the complete post-remove candidate before atomic
+  replacement, and rejected surplus positional locators through the shared
+  locator resolver. Added a production `runCli` regression proving structured
+  validation errors and byte-for-byte preservation, plus named/explicit-path
+  surplus-locator coverage.
+- Review-fix RED: `character-commands.test.ts` and `main-assets.test.ts` failed
+  three assertions: removal was asset-independent, surplus positionals reached
+  character lookup, and production removal returned success while rewriting an
+  invalid candidate.
+- Review-fix commit: `8f87225a515f3853c72bf7fc0b62554e01e57dd2`
+- Review-fix verification: Focused Task 4/preset suite PASS (72 tests); full CLI
+  suite PASS (250 passed, 1 skipped); package-directory CLI typecheck PASS;
+  boundary check and `git diff --check` PASS.
 
 ### Task 5: Shared Composition Setup and Attributed Preview
 
