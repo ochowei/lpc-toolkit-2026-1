@@ -300,9 +300,10 @@ rtk git commit -m "feat(cli): add character selection store"
 
 Then update Task 2 checkboxes and the record below, stage only this plan, and commit it with `rtk git commit -m "docs(plan): record character store task"`.
 
-- Implementation: Added portable name resolution, validated reads, sibling-temporary atomic writes, and resilient stable character listing.
+- Implementation: Added portable name resolution, validated reads, sibling-temporary atomic writes, resilient stable character listing, and atomic no-replace create publication.
 - Commit: a6cefa669b7c7ce04e108a62972a4e19c63ef171
-- Verification: RED confirmed missing module; 18 focused tests PASS; CLI typecheck PASS; no temporary files remain.
+- Review fix: 4c14a5da767c658b6bf50d2b0f4b444f3d0c081b
+- Verification: Initial RED confirmed missing module; review RED reproduced concurrent create overwrite; 15 character-store tests PASS; CLI typecheck PASS; no temporary files remain.
 
 ### Task 3: Pure Character Editing and Search
 
