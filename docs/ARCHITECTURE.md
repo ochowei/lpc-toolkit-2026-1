@@ -126,6 +126,10 @@ not modify `upstream/`.
 
 - agent-first command parsing and JSON/human responses
 - filesystem-backed catalog, palette, custom asset, and selection loading
+- filesystem-backed character documents with atomic create and replace in
+  `character-store.ts`
+- catalog-backed character editing, search, and validation decisions
+- transactional attributed preview and render publication
 - Node `CanvasAdapter` wiring through `@napi-rs/canvas`
 - render output staging and atomic publishing
 - metadata, credits, animation, frame, and ZIP artifact writing
@@ -224,6 +228,14 @@ CLI commands should continue to call core through injected adapter contracts and
 shared package APIs. Do not add CLI conveniences by importing Node APIs into
 `packages/core/src/**`, and do not bypass attribution files when rendering or
 bundling output.
+
+The character store owns named selection persistence under `./characters/` and
+explicit selection-file access. Character commands validate a complete
+candidate before atomic mutation, and preview/render stage every pixel,
+metadata, TXT credit, and CSV credit artifact before transactional publication.
+Shared selection parsing, composition, attribution, and preset rules remain in
+core or presets; CLI persistence must not introduce Node filesystem APIs into
+those packages.
 
 ## Presets Package Rules
 
