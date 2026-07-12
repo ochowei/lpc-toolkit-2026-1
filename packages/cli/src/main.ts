@@ -12,6 +12,7 @@ import { AssetStoreError } from './asset-store.js';
 import { runCatalogCommand } from './catalog-commands.js';
 import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
 import { materializePreset, runPresetCommand } from './preset-commands.js';
+import { CLI_VERSION } from './package-info.js';
 import { readSelectionJsonFile, renderSelection } from './render.js';
 import {
   commandError,
@@ -49,6 +50,7 @@ export function resolveWebRoot(moduleUrl: string): string {
 const HELP = `lpc-toolkit CLI
 
 Commands:
+  lpc-toolkit --version
   lpc-toolkit catalog types
   lpc-toolkit catalog items --type <typeName>
   lpc-toolkit catalog item <item-id-or-type/name>
@@ -246,6 +248,10 @@ export async function runCli(
   const resolvedDependencies: CliDependencies = { ...DEFAULT_DEPENDENCIES, ...dependencies };
   if (argv.length === 0 || argv[0] === '--help' || argv[0] === '-h') {
     io.stdout(HELP);
+    return 0;
+  }
+  if (argv[0] === '--version' || argv[0] === '-V') {
+    io.stdout(`${CLI_VERSION}\n`);
     return 0;
   }
 

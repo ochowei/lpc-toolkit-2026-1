@@ -29,6 +29,7 @@ describe('runCli', () => {
 
     expect(code).toBe(0);
     expect(writes.join('')).toContain('lpc-toolkit catalog types');
+    expect(writes.join('')).toContain('lpc-toolkit --version');
     expect(writes.join('')).not.toContain(staleShortCommand);
     expect(errors).toEqual([]);
   });
