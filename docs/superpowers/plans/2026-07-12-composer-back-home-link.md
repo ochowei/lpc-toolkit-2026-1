@@ -441,7 +441,7 @@ implementation commit hash.
 - [x] **Step 1: Add the failing accent-style assertions**
 
   - Implementation: Added focused assertions for the approved one-off accent classes.
-  - Commit: pending implementation commit.
+  - Commit: 729cc491b
   - Verification: focused test failed at the first accent assertion because `className` was `undefined`.
 
 In `packages/web/test/top-bar.test.tsx`, add `className` to `ActionProps`:
@@ -470,7 +470,7 @@ unchanged.
 - [x] **Step 2: Run the focused test and verify RED**
 
   - Implementation: Ran the focused TopBar test before changing production code.
-  - Commit: pending implementation commit.
+  - Commit: 729cc491b
   - Verification: RED confirmed; 1 test failed because `className` was `undefined`.
 
 Run:
@@ -486,7 +486,7 @@ the received value is `undefined` rather than containing
 - [x] **Step 3: Add the approved one-off accent treatment**
 
   - Implementation: Added the exact approved accent classes to only the TopBar home action.
-  - Commit: pending implementation commit.
+  - Commit: 729cc491b
   - Verification: focused TopBar test PASS; 1 test passed.
 
 In `packages/web/src/components/layer-stack/top-bar.tsx`, update only the
@@ -510,7 +510,7 @@ and focus outline remain unchanged.
 - [x] **Step 4: Run the focused test and verify GREEN**
 
   - Implementation: Re-ran the focused TopBar test after the minimal styling change.
-  - Commit: pending implementation commit.
+  - Commit: 729cc491b
   - Verification: GREEN confirmed; 1 test passed.
 
 Run:
@@ -524,7 +524,7 @@ Expected: PASS with one passing test.
 - [x] **Step 5: Run scoped and architectural verification**
 
   - Implementation: Ran the required web typecheck, complete web suite, and architecture boundary checker.
-  - Commit: pending implementation commit.
+  - Commit: 729cc491b
   - Verification: web typecheck PASS; 73 files / 648 tests PASS; boundary check PASS.
 
 Run:
@@ -541,7 +541,7 @@ pass; the architecture boundary check passes.
 - [x] **Step 6: Commit the verified color revision and current plan state**
 
   - Implementation: Prepared the scoped test, TopBar styling, and current plan evidence for commit.
-  - Commit: pending implementation commit.
+  - Commit: 729cc491b
   - Verification: focused TopBar test PASS; web typecheck PASS; web test PASS; boundary check PASS.
 
 - Implementation: Added the approved accent tint, border, text, and hover treatment to only the TopBar home action.
@@ -564,7 +564,11 @@ rtk git commit -m "style(web): distinguish composer home link"
 Expected: one commit containing only the revised test, TopBar styling, and
 Task 3 plan state.
 
-- [ ] **Step 7: Record the Task 3 implementation commit hash**
+- [x] **Step 7: Record the Task 3 implementation commit hash**
+
+  - Implementation: Recorded the exact Task 3 implementation commit hash.
+  - Commit: 729cc491b
+  - Verification: `rtk git rev-parse --short HEAD` printed `729cc491b` before this documentation-only commit.
 
 Run:
 
