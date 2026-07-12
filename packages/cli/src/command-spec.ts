@@ -221,14 +221,14 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
   },
   {
     command: ['character', 'show'],
-    usage: 'lpc-toolkit character show <name> [--selection <file>]',
+    usage: 'lpc-toolkit character show (<name> | --selection <file>)',
     description: 'Show a character selection.',
     options: [HELP_OPTION, JSON_OPTION, SELECTION_OPTION],
     examples: ['lpc-toolkit character show hero'],
   },
   {
     command: ['character', 'search'],
-    usage: 'lpc-toolkit character search <name> --type <type> [options]',
+    usage: 'lpc-toolkit character search (<name> | --selection <file>) --type <type> [options]',
     description: 'Search compatible items for a character type.',
     options: [
       HELP_OPTION,
@@ -241,7 +241,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
   },
   {
     command: ['character', 'set'],
-    usage: 'lpc-toolkit character set <name> --type <type> --item <item-id-or-type/name> [options]',
+    usage: 'lpc-toolkit character set (<name> | --selection <file>) --type <type> --item <item-id-or-type/name> [options]',
     description: 'Set or replace one selected character type.',
     options: [
       HELP_OPTION,
@@ -258,7 +258,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
   },
   {
     command: ['character', 'remove'],
-    usage: 'lpc-toolkit character remove <name> --type <type> [options]',
+    usage: 'lpc-toolkit character remove (<name> | --selection <file>) --type <type> [options]',
     description: 'Remove one selected character type.',
     options: [
       HELP_OPTION,
@@ -270,14 +270,14 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
   },
   {
     command: ['character', 'validate'],
-    usage: 'lpc-toolkit character validate <name> [--selection <file>]',
+    usage: 'lpc-toolkit character validate (<name> | --selection <file>)',
     description: 'Validate a character selection.',
     options: [HELP_OPTION, JSON_OPTION, SELECTION_OPTION],
     examples: ['lpc-toolkit character validate hero'],
   },
   {
     command: ['character', 'preview'],
-    usage: 'lpc-toolkit character preview <name> [options]',
+    usage: 'lpc-toolkit character preview (<name> | --selection <file>) [options]',
     description: 'Render one attributed preview frame.',
     options: [
       HELP_OPTION,
@@ -292,7 +292,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
   },
   {
     command: ['character', 'render'],
-    usage: 'lpc-toolkit character render <name> --out <directory> [options]',
+    usage: 'lpc-toolkit character render (<name> | --selection <file>) --out <directory> [options]',
     description: 'Render an attributed character selection.',
     options: [HELP_OPTION, JSON_OPTION, SELECTION_OPTION, ...RENDER_OPTIONS],
     examples: ['lpc-toolkit character render hero --out rendered --animation walk'],

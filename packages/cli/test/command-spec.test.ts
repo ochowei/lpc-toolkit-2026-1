@@ -6,10 +6,26 @@ import {
 } from '../src/command-spec.js';
 
 describe('helpForCommand', () => {
+  it.each([
+    ['show', ''],
+    ['search', ' --type <type> [options]'],
+    ['set', ' --type <type> --item <item-id-or-type/name> [options]'],
+    ['remove', ' --type <type> [options]'],
+    ['validate', ''],
+    ['preview', ' [options]'],
+    ['render', ' --out <directory> [options]'],
+  ])('documents the alternative locator for character %s', (command, suffix) => {
+    expect(helpForCommand(['character', command])).toContain(
+      `lpc-toolkit character ${command} (<name> | --selection <file>)${suffix}`,
+    );
+  });
+
   it('renders command-specific character set help', () => {
     const help = helpForCommand(['character', 'set']);
 
-    expect(help).toContain('lpc-toolkit character set <name>');
+    expect(help).toContain(
+      'lpc-toolkit character set (<name> | --selection <file>)',
+    );
     expect(help).toContain('--item <item-id-or-type/name>');
     expect(help).toContain('--item hair_braid --recolor lpcr.brown');
     expect(help).not.toContain('--item hair/braid --recolor brown');
