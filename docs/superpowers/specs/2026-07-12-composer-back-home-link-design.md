@@ -6,8 +6,11 @@ Give users an obvious way to return from the web composer to the landing page.
 
 ## User Experience
 
-- Add a dedicated ghost-style action to the left side of the composer top bar,
-  next to the LPC Toolkit brand.
+- Make the dedicated ghost-style action the first interactive element at the
+  far left of the composer top bar.
+- Place a vertical divider after the action, followed by the LPC Toolkit brand
+  and the existing composer tools. This makes the action read as page-level
+  navigation rather than another composer control.
 - Show `← Back to home` in English and `← 返回首頁` in Traditional Chinese.
 - Keep the complete label visible on desktop and mobile so the destination is
   explicit.
@@ -31,8 +34,9 @@ The same localized text will serve as the action's accessible name.
 
 ## Testing and Verification
 
-- Add a focused component test that first fails because the top bar does not
-  expose the back-to-home action, then verify its label and click callback.
+- Keep the focused component coverage for the action label and click callback,
+  and add a structural assertion that the action appears before the brand in
+  rendered markup.
 - Run the focused web test, web typecheck, and repository boundary check.
 
 ## Scope
