@@ -1,4 +1,11 @@
-import { flagString, type ParsedArgs } from './args.js';
+import path from 'node:path';
+import {
+  flagBoolean,
+  flagString,
+  flagStrings,
+  type ParsedArgs,
+} from './args.js';
+import { AssetStoreError } from './asset-store.js';
 import {
   CharacterEditError,
   createEmptyCharacter,
@@ -182,6 +189,9 @@ function issueFromError(error: unknown): CliIssue {
       ...(error.issues[0]?.details === undefined ? {} : { details: error.issues[0].details }),
     };
   }
+  if (error instanceof AssetStoreError) {
+    return { code: error.code, message: error.message, path: error.path };
+  }
   return {
     code: 'character_command_failed',
     message: error instanceof Error ? error.message : String(error),
@@ -360,10 +370,22 @@ export async function runCharacterCommand(
     }
 
     if (subcommand === 'render') {
-      return commandError(`character ${subcommand}`, {
-        code: 'character_command_unavailable',
-        message: `character ${subcommand} is not implemented yet.`,
+      const locator = characterLocator(parsed);
+      const stored = readCharacter(io.cwd, locator);
+      const result = await dependencies.renderSelection({
+        runtime: requireRuntime(runtime),
+        cwd: io.cwd,
+        outDir: path.resolve(io.cwd, requiredFlag(parsed, 'out')),
+        selectionName: stored.selection.name ?? locator.name ?? path.parse(stored.path).name,
+        selectionJson: stored.selection,
+        animations: flagStrings(parsed.flags, 'animation'),
+        frames: flagString(parsed.flags, 'frames') === 'all'
+          ? 'all'
+          : flagStrings(parsed.flags, 'frames'),
+        bundleZip: flagString(parsed.flags, 'bundle') === 'zip',
+        allowPartial: flagBoolean(parsed.flags, 'allow-partial'),
       });
+      return commandOk('character render', result, result.warnings);
     }
 
     return commandError(commandName(parsed), {

@@ -82,6 +82,16 @@ async function createMissingImageRuntime(): Promise<RuntimeAssets> {
       items: { body: { name: 'Body Color' } },
     }),
   );
+  mkdirSync(path.join(cwd, 'characters'), { recursive: true });
+  writeFileSync(
+    path.join(cwd, 'characters', 'missing-image.selection.json'),
+    JSON.stringify({
+      schema: 'lpc-toolkit.selection.v1',
+      name: 'missing-image',
+      bodyType: 'male',
+      items: { body: { name: 'Body Color' } },
+    }),
+  );
   const store = createZipAssetStore(layout);
   return {
     context: createRuntimeContext({
@@ -117,6 +127,9 @@ describe('render asset-store error responses', () => {
   it.each([
     ['direct render', ['render', '--selection', 'selection.json', '--out', 'out', '--json']],
     ['preset render', ['preset', 'render', 'farmer', '--out', 'preset-out', '--json']],
+    ['character render', [
+      'character', 'render', 'missing-image', '--out', 'character-out', '--json',
+    ]],
   ])('preserves a missing image issue through %s', async (_label, argv) => {
     const runtime = await createMissingImageRuntime();
     const response = await runJson(argv, runtime);

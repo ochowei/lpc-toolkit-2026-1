@@ -72,6 +72,95 @@ async function run(
 }
 
 describe('character commands', () => {
+  it('delegates all character render options', async () => {
+    const fixture = createFixture();
+    expect((await run(fixture, ['character', 'create', 'hero'])).response.ok).toBe(true);
+    const renderSelection = vi.fn().mockResolvedValue({
+      artifacts: [{ type: 'sheet', path: path.join(fixture.cwd, 'dist/hero/hero.sheet.png') }],
+      warnings: [],
+      metadataPath: path.join(fixture.cwd, 'dist/hero/hero.metadata.json'),
+    });
+
+    const response = await runCharacterCommand(
+      parseArgs([
+        'character', 'render', 'hero', '--out', 'dist/hero',
+        '--animation', 'walk', '--animation', 'slash', '--frames', 'all',
+        '--bundle', 'zip', '--allow-partial',
+      ]),
+      fixture.io,
+      fixture.runtime,
+      { renderSelection, renderCharacterPreview: vi.fn() },
+    );
+
+    expect(renderSelection).toHaveBeenCalledWith({
+      runtime: fixture.runtime,
+      cwd: fixture.cwd,
+      outDir: path.join(fixture.cwd, 'dist/hero'),
+      selectionName: 'hero',
+      selectionJson: expect.objectContaining({ name: 'hero' }),
+      animations: ['walk', 'slash'],
+      frames: 'all',
+      bundleZip: true,
+      allowPartial: true,
+    });
+    expect(response).toMatchObject({ ok: true, command: 'character render' });
+  });
+
+  it('maps named frame selections when delegating character render', async () => {
+    const fixture = createFixture();
+    expect((await run(fixture, ['character', 'create', 'hero'])).response.ok).toBe(true);
+    const renderSelection = vi.fn().mockResolvedValue({
+      artifacts: [],
+      warnings: [],
+      metadataPath: path.join(fixture.cwd, 'out/hero.metadata.json'),
+    });
+
+    await runCharacterCommand(
+      parseArgs([
+        'character', 'render', 'hero', '--out', 'out',
+        '--frames', 'walk', '--frames', 'slash',
+      ]),
+      fixture.io,
+      fixture.runtime,
+      { renderSelection, renderCharacterPreview: vi.fn() },
+    );
+
+    expect(renderSelection).toHaveBeenCalledWith(expect.objectContaining({
+      frames: ['walk', 'slash'],
+      bundleZip: false,
+      allowPartial: false,
+    }));
+  });
+
+  it('uses the explicit selection file stem when render metadata has no name', async () => {
+    const fixture = createFixture();
+    const selectionPath = path.join(fixture.cwd, 'saved', 'custom.selection.json');
+    mkdirSync(path.dirname(selectionPath), { recursive: true });
+    writeFileSync(selectionPath, JSON.stringify({
+      schema: 'lpc-toolkit.selection.v1',
+      bodyType: 'male',
+      items: {},
+    }));
+    const renderSelection = vi.fn().mockResolvedValue({
+      artifacts: [],
+      warnings: [],
+      metadataPath: path.join(fixture.cwd, 'out/custom.selection.metadata.json'),
+    });
+
+    await runCharacterCommand(
+      parseArgs([
+        'character', 'render', '--selection', selectionPath, '--out', 'out',
+      ]),
+      fixture.io,
+      fixture.runtime,
+      { renderSelection, renderCharacterPreview: vi.fn() },
+    );
+
+    expect(renderSelection).toHaveBeenCalledWith(expect.objectContaining({
+      selectionName: 'custom.selection',
+    }));
+  });
+
   it('delegates character preview defaults and returns its attributed artifacts', async () => {
     const fixture = createFixture();
     expect((await run(fixture, ['character', 'create', 'hero'])).response.ok).toBe(true);

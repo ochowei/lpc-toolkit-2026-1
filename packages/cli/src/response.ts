@@ -37,9 +37,20 @@ export function formatJsonResponse(response: CliResponse<unknown>): string {
 }
 
 export function humanIssue(issue: CliIssue): string {
-  return issue.path
+  const summary = issue.path
     ? `${issue.code}: ${issue.message} (${issue.path})`
     : `${issue.code}: ${issue.message}`;
+  const suggestions = issue.details?.suggestions;
+  const available = issue.details?.available;
+  return [
+    summary,
+    ...(suggestions && suggestions.length > 0
+      ? [`Did you mean: ${suggestions.join(', ')}`]
+      : []),
+    ...(available && available.length > 0
+      ? [`Available: ${available.join(', ')}`]
+      : []),
+  ].join('\n');
 }
 
 export function formatProgress(phase: string, message: string): string {
@@ -178,7 +189,50 @@ function formatCharacterShow(data: JsonRecord): string | undefined {
   return `${JSON.stringify(selection, null, 2)}\n`;
 }
 
-function formatRender(data: JsonRecord): string | undefined {
+function selectionName(data: JsonRecord): string | undefined {
+  const selection = data['selection'];
+  return isRecord(selection) ? stringValue(selection, 'name') : undefined;
+}
+
+function formatCharacterCreate(data: JsonRecord): string | undefined {
+  const name = selectionName(data);
+  const characterPath = stringValue(data, 'path');
+  return name && characterPath ? `Created ${name}: ${characterPath}\n` : undefined;
+}
+
+function formatCharacterSearch(data: JsonRecord): string | undefined {
+  const items = recordArrayValue(data, 'items');
+  if (!items) return undefined;
+  const lines = items.flatMap((item) => {
+    const label = catalogItemLabel(item);
+    if (!label) return [];
+    return [`- ${label}`, ...formatCatalogItemDetails(item, '  ')];
+  });
+  return `Compatible items (${items.length})\n${lines.join('\n')}\n`;
+}
+
+function formatCharacterSet(data: JsonRecord): string | undefined {
+  const name = selectionName(data);
+  const typeName = stringValue(data, 'typeName');
+  const item = data['item'];
+  const itemName = isRecord(item) ? stringValue(item, 'name') : undefined;
+  return name && typeName && itemName
+    ? `Updated ${name}: ${typeName} = ${itemName}\n`
+    : undefined;
+}
+
+function formatCharacterRemove(data: JsonRecord): string | undefined {
+  const name = selectionName(data);
+  const typeName = stringValue(data, 'typeName');
+  return name && typeName ? `Updated ${name}: removed ${typeName}\n` : undefined;
+}
+
+function formatCharacterValidate(data: JsonRecord): string | undefined {
+  const name = selectionName(data);
+  return name ? `Character ${name} is valid.\n` : undefined;
+}
+
+function formatRender(data: JsonRecord, label = 'Render'): string | undefined {
   const artifacts = recordArrayValue(data, 'artifacts');
   const metadataPath = stringValue(data, 'metadataPath');
   if (!artifacts || !metadataPath) return undefined;
@@ -187,7 +241,7 @@ function formatRender(data: JsonRecord): string | undefined {
     const artifactPath = stringValue(artifact, 'path');
     return type && artifactPath ? [`- ${type}: ${artifactPath}`] : [];
   });
-  return `Render complete. Artifacts (${artifacts.length})\n${lines.join('\n')}\nMetadata: ${metadataPath}\n`;
+  return `${label} complete. Artifacts (${artifacts.length})\n${lines.join('\n')}\nMetadata: ${metadataPath}\n`;
 }
 
 function formatHumanData(response: CliResponse<unknown>): string | undefined {
@@ -213,6 +267,20 @@ function formatHumanData(response: CliResponse<unknown>): string | undefined {
       return formatCharacterList(data);
     case 'character show':
       return formatCharacterShow(data);
+    case 'character create':
+      return formatCharacterCreate(data);
+    case 'character search':
+      return formatCharacterSearch(data);
+    case 'character set':
+      return formatCharacterSet(data);
+    case 'character remove':
+      return formatCharacterRemove(data);
+    case 'character validate':
+      return formatCharacterValidate(data);
+    case 'character preview':
+      return formatRender(data, 'Preview');
+    case 'character render':
+      return formatRender(data);
     case 'render':
     case 'preset render':
       return formatRender(data);

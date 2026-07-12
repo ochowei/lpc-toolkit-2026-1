@@ -12,6 +12,8 @@ function makeCatalogCwd(): string {
   mkdirSync(path.join(root, 'hair'), { recursive: true });
   mkdirSync(path.join(assetsRoot, 'palette_definitions'), { recursive: true });
   mkdirSync(path.join(assetsRoot, 'spritesheets'), { recursive: true });
+  mkdirSync(path.join(assetsRoot, 'spritesheets', 'hair', 'braids'), { recursive: true });
+  writeFileSync(path.join(assetsRoot, 'spritesheets', 'hair', 'braids', 'walk.png'), 'fixture');
   writeFileSync(path.join(assetsRoot, 'CREDITS.csv'), 'file,authors,licenses\n');
   writeFileSync(
     path.join(root, 'body', 'body.json'),
@@ -57,6 +59,20 @@ async function runHuman(argv: readonly string[], cwd: string): Promise<string> {
   expect(code).toBe(0);
   expect(stderr).toEqual([]);
   return stdout.join('');
+}
+
+async function runHumanError(argv: readonly string[], cwd: string): Promise<string> {
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+  const code = await runCli(argv, {
+    cwd,
+    stdout: (text) => stdout.push(text),
+    stderr: (text) => stderr.push(text),
+  });
+
+  expect(code).toBe(1);
+  expect(stdout).toEqual([]);
+  return stderr.join('');
 }
 
 describe('human-readable CLI output', () => {
@@ -130,5 +146,34 @@ describe('human-readable CLI output', () => {
 
     expect(await runHuman(['character', 'list'], cwd)).toContain('- hero');
     expect(await runHuman(['character', 'show', 'hero'], cwd)).toContain('"name": "hero"');
+  });
+
+  it('prints actionable character mutation and search output without --json', async () => {
+    const cwd = makeCatalogCwd();
+
+    expect(await runHuman(['character', 'create', 'hero'], cwd))
+      .toContain('Created hero:');
+    expect(await runHuman([
+      'character', 'search', 'hero', '--type', 'hair', '--query', 'braid',
+    ], cwd)).toContain('hair/Braids [braids]');
+    expect(await runHuman([
+      'character', 'set', 'hero', '--type', 'hair', '--item', 'braids',
+    ], cwd)).toContain('Updated hero: hair = Braids');
+    expect(await runHuman(['character', 'validate', 'hero'], cwd))
+      .toContain('Character hero is valid.');
+    expect(await runHuman(['character', 'remove', 'hero', '--type', 'hair'], cwd))
+      .toContain('Updated hero: removed hair');
+  });
+
+  it('prints structured character suggestions and available values', async () => {
+    const cwd = makeCatalogCwd();
+    await runHuman(['character', 'create', 'hero'], cwd);
+
+    expect(await runHumanError([
+      'character', 'set', 'hero', '--type', 'hair', '--item', 'braid',
+    ], cwd)).toContain('Did you mean: braids');
+    expect(await runHumanError([
+      'character', 'create', 'other', '--body-type', 'centaur',
+    ], cwd)).toContain('Available: male, female, teen, child, muscular, pregnant');
   });
 });
