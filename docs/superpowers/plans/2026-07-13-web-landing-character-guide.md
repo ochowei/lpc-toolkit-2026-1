@@ -254,7 +254,7 @@ below supersedes only its Composer action count and placement.
 - Produces: the unchanged `LandingPage({ onNavigate }: LandingPageProps)` API
   with header and final-section Composer entry points.
 
-- [ ] **Step 1: Specify two Composer actions and verify RED**
+- [x] **Step 1: Specify two Composer actions and verify RED**
 
   Update the focused test in `packages/web/test/landing-page.test.tsx` so the
   final assertions read:
@@ -284,6 +284,12 @@ below supersedes only its Composer action count and placement.
 
   Then check off this step with its test commit hash and
   `Focused landing-page test RED as expected`.
+
+  - Implementation note: Extended the landing-page test to require a Composer
+    action inside the header and exactly two total `Open Composer` actions.
+  - Commit: d7937405c05c86dc9118080d2c4e8cfd47f795b2
+  - Verification: Focused landing-page test RED as expected (assertion failure
+    for the missing header Composer action).
 
 - [ ] **Step 2: Add the header action and verify GREEN**
 
