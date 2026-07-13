@@ -31,6 +31,15 @@ export const FIXTURE_SPRITE_PATHS = [
   'spritesheets/body/wheelchair/adult/background/black.png',
   'spritesheets/body/wheelchair/adult/foreground/black.png',
 ] as const;
+const FIXTURE_CREDIT_SOURCE_PATH_ALIASES: Readonly<Record<string, string>> = {
+  'body/bodies/male/backslash.png': 'body/bodies/male/1h_backslash.png',
+  'body/bodies/male/combat_idle.png': 'body/bodies/male/combat.png',
+  'body/bodies/male/halfslash.png': 'body/bodies/male/1h_halfslash.png',
+  'body/wheelchair/adult/background/black.png':
+    'body/wheelchair/adult/background/wheelchair.png',
+  'body/wheelchair/adult/foreground/black.png':
+    'body/wheelchair/adult/foreground/wheelchair.png',
+};
 
 export interface UpstreamFixtureFile {
   readonly path: string;
@@ -112,6 +121,55 @@ function hashFile(filePath: string): string {
   return hashBuffer(readFileSync(filePath));
 }
 
+function fixtureCreditPath(relativePath: string): string {
+  return relativePath.replace(/^spritesheets\//, '');
+}
+
+function sourceCreditPath(relativePath: string): string {
+  const creditPath = fixtureCreditPath(relativePath);
+  return FIXTURE_CREDIT_SOURCE_PATH_ALIASES[creditPath] ?? creditPath;
+}
+
+function parseCreditsRows(credits: string): {
+  readonly header: string;
+  readonly rows: ReadonlyMap<string, string>;
+} {
+  const lines = credits.split(/\r?\n/);
+  const rows = new Map<string, string>();
+
+  for (const line of lines.slice(1)) {
+    if (line.length === 0) {
+      continue;
+    }
+
+    const match = line.match(/^"([^"]+)"(,.*)$/);
+    if (!match) {
+      throw new Error(`Malformed CREDITS.csv row: ${line}`);
+    }
+
+    const [, filename] = match;
+    if (rows.has(filename)) {
+      throw new Error(`Duplicate CREDITS.csv row: ${filename}`);
+    }
+
+    rows.set(filename, line);
+  }
+
+  return {
+    header: lines[0] ?? '',
+    rows,
+  };
+}
+
+function rewriteCreditFilename(line: string, filename: string): string {
+  const match = line.match(/^"[^"]+"(,.*)$/);
+  if (!match) {
+    throw new Error(`Malformed CREDITS.csv row: ${line}`);
+  }
+
+  return `"${filename}"${match[1]}`;
+}
+
 function parseFixtureFile(
   value: unknown,
   index: number,
@@ -144,24 +202,20 @@ function parseFixtureFile(
 function readMinimalCredits(sourceRoot: string): string {
   const creditsPath = resolveInside(sourceRoot, 'CREDITS.csv');
   const credits = readFileSync(creditsPath, 'utf8');
-  const lines = credits.split(/\r?\n/);
-  const header = lines[0] ?? '';
-  const bodyLines = lines.filter((line) =>
-    line.startsWith('"body/bodies/male/'),
-  );
-  const wheelchairLines = lines.filter((line) =>
-    line.startsWith('"body/wheelchair/adult/'),
-  );
+  const { header, rows } = parseCreditsRows(credits);
+  const fixtureLines = FIXTURE_SPRITE_PATHS.map((relativePath) => {
+    const sourcePath = sourceCreditPath(relativePath);
+    const line = rows.get(sourcePath);
+    if (!line) {
+      throw new Error(
+        `CREDITS.csv missing required fixture credit row: ${sourcePath}`,
+      );
+    }
 
-  if (bodyLines.length === 0) {
-    throw new Error('CREDITS.csv missing required body fixture rows');
-  }
+    return rewriteCreditFilename(line, fixtureCreditPath(relativePath));
+  });
 
-  if (wheelchairLines.length === 0) {
-    throw new Error('CREDITS.csv missing required wheelchair fixture rows');
-  }
-
-  return [header, ...bodyLines, ...wheelchairLines, ''].join('\n');
+  return [header, ...fixtureLines, ''].join('\n');
 }
 
 function listFilesRecursively(root: string, prefix = ''): string[] {
@@ -313,6 +367,23 @@ export function verifyUpstreamFixtureIntegrity(
   const credits = existsSync(creditsPath) ? readFileSync(creditsPath, 'utf8') : '';
   if (credits.length === 0) {
     throw new Error('CREDITS.csv must be non-empty');
+  }
+  const creditRows = parseCreditsRows(credits).rows;
+  const expectedCreditPaths = provenance.files.map((file) =>
+    fixtureCreditPath(file.path),
+  );
+  const expectedCreditSet = new Set(expectedCreditPaths);
+
+  for (const expectedCreditPath of expectedCreditPaths) {
+    if (!creditRows.has(expectedCreditPath)) {
+      throw new Error(`Missing credited fixture row: ${expectedCreditPath}`);
+    }
+  }
+
+  for (const actualCreditPath of creditRows.keys()) {
+    if (!expectedCreditSet.has(actualCreditPath)) {
+      throw new Error(`Unexpected credited fixture row: ${actualCreditPath}`);
+    }
   }
 
   const actualPaths = listFilesRecursively(

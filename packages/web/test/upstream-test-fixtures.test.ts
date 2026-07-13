@@ -12,11 +12,49 @@ import {
 const SOURCE_SHA = '212abfd21493e9957bd556250ac538fa40fe1fc9';
 const SOURCE_REPOSITORY =
   'ochowei/Universal-LPC-Spritesheet-Character-Generator';
+const BODY_CREDIT_ROW_SUFFIX =
+  `,"body","Author","GPL 3.0","https://example.com/body"`;
+const WHEELCHAIR_CREDIT_ROW_SUFFIX =
+  `,"wheelchair","Author","CC-BY 3.0","https://example.com/wheelchair"`;
+const FIXTURE_CREDIT_SOURCE_PATH_ALIASES: Readonly<Record<string, string>> = {
+  'body/bodies/male/backslash.png': 'body/bodies/male/1h_backslash.png',
+  'body/bodies/male/combat_idle.png': 'body/bodies/male/combat.png',
+  'body/bodies/male/halfslash.png': 'body/bodies/male/1h_halfslash.png',
+  'body/wheelchair/adult/background/black.png':
+    'body/wheelchair/adult/background/wheelchair.png',
+  'body/wheelchair/adult/foreground/black.png':
+    'body/wheelchair/adult/foreground/wheelchair.png',
+};
 
 function write(root: string, relativePath: string, data: string | Buffer): void {
   const fullPath = path.join(root, relativePath);
   mkdirSync(path.dirname(fullPath), { recursive: true });
   writeFileSync(fullPath, data);
+}
+
+function fixtureCreditPath(relativePath: string): string {
+  return relativePath.replace(/^spritesheets\//, '');
+}
+
+function sourceCreditPath(relativePath: string): string {
+  const creditPath = fixtureCreditPath(relativePath);
+  return FIXTURE_CREDIT_SOURCE_PATH_ALIASES[creditPath] ?? creditPath;
+}
+
+function creditRow(pathValue: string): string {
+  const suffix = pathValue.startsWith('body/wheelchair/adult/')
+    ? WHEELCHAIR_CREDIT_ROW_SUFFIX
+    : BODY_CREDIT_ROW_SUFFIX;
+  return `"${pathValue}"${suffix}`;
+}
+
+function creditFilenames(credits: string): string[] {
+  return credits
+    .split(/\r?\n/)
+    .flatMap((line) => {
+      const match = line.match(/^"([^"]+)"/);
+      return match ? [match[1]] : [];
+    });
 }
 
 function makeSource(): string {
@@ -33,8 +71,9 @@ function populateSource(sourceRoot: string): string {
     'CREDITS.csv',
     [
       'file,notes,authors,licenses,urls',
-      '"body/bodies/male/walk.png","body","Author","GPL 3.0","https://example.com/body"',
-      '"body/wheelchair/adult/background/wheelchair.png","wheelchair","Author","CC-BY 3.0","https://example.com/wheelchair"',
+      ...FIXTURE_SPRITE_PATHS.map((relativePath) =>
+        creditRow(sourceCreditPath(relativePath)),
+      ),
       '"unrelated/item.png","skip","Other","GPL 3.0","https://example.com/skip"',
       '',
     ].join('\n'),
@@ -64,8 +103,9 @@ describe('upstream real-pixel fixtures', () => {
     );
     expect(provenance.files.every(({ sha256 }) => /^[0-9a-f]{64}$/.test(sha256))).toBe(true);
     const credits = readFileSync(path.join(fixtureRoot, 'CREDITS.csv'), 'utf8');
-    expect(credits).toContain('body/bodies/male/walk.png');
-    expect(credits).toContain('body/wheelchair/adult/background/wheelchair.png');
+    expect([...creditFilenames(credits)].sort()).toEqual(
+      [...FIXTURE_SPRITE_PATHS.map(fixtureCreditPath)].sort(),
+    );
     expect(credits).not.toContain('unrelated/item.png');
     expect(() => verifyUpstreamFixtureIntegrity(fixtureRoot, provenance)).not.toThrow();
   });
@@ -144,5 +184,20 @@ describe('upstream real-pixel fixtures', () => {
     const { fixtureRoot, provenance } = materialize();
     writeFileSync(path.join(fixtureRoot, 'CREDITS.csv'), '');
     expect(() => verifyUpstreamFixtureIntegrity(fixtureRoot, provenance)).toThrow(/CREDITS.csv must be non-empty/);
+  });
+
+  it('rejects fixture credits without exact provenance path matches', () => {
+    const { fixtureRoot, provenance } = materialize();
+    const creditsPath = path.join(fixtureRoot, 'CREDITS.csv');
+    writeFileSync(
+      creditsPath,
+      readFileSync(creditsPath, 'utf8').replace(
+        '"body/bodies/male/combat_idle.png"',
+        '"body/bodies/male/combat.png"',
+      ),
+    );
+    expect(() => verifyUpstreamFixtureIntegrity(fixtureRoot, provenance)).toThrow(
+      /Missing credited fixture row: body\/bodies\/male\/combat_idle\.png/,
+    );
   });
 });

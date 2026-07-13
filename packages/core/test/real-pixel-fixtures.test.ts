@@ -15,6 +15,15 @@ interface FixtureProvenance {
 const here = path.dirname(fileURLToPath(import.meta.url));
 const fixtureRoot = path.join(here, 'fixtures/upstream-pixels');
 
+function creditFilenames(credits: string): string[] {
+  return credits
+    .split(/\r?\n/)
+    .flatMap((line) => {
+      const match = line.match(/^"([^"]+)"/);
+      return match ? [match[1]] : [];
+    });
+}
+
 describe('real-pixel fixture bundle', () => {
   it('is checked in outside upstream with attributed files', () => {
     expect(fixtureRoot).not.toContain(`${path.sep}upstream${path.sep}`);
@@ -28,6 +37,10 @@ describe('real-pixel fixture bundle', () => {
       expect(file.creditsSource).toBe('CREDITS.csv');
       expect(existsSync(path.join(fixtureRoot, file.path))).toBe(true);
     }
-    expect(readFileSync(path.join(fixtureRoot, 'CREDITS.csv'), 'utf8').trim()).not.toBe('');
+    const credits = readFileSync(path.join(fixtureRoot, 'CREDITS.csv'), 'utf8');
+    expect(credits.trim()).not.toBe('');
+    expect([...creditFilenames(credits)].sort()).toEqual(
+      [...provenance.files.map((file) => file.path.replace(/^spritesheets\//, ''))].sort(),
+    );
   });
 });
