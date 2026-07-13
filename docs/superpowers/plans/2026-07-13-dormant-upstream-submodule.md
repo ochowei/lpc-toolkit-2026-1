@@ -909,7 +909,7 @@ rtk git commit -m "docs(plan): record dormant submodule guidance"
 - Consumes: all previous tasks.
 - Produces: final evidence that normal flows have no tracked-submodule dependency and parity still uses the isolated source.
 
-- [ ] **Step 1: Audit live source references and retained gitlink**
+- [x] **Step 1: Audit live source references and retained gitlink**
 
 ```bash
 rtk git ls-files -s upstream
@@ -919,7 +919,7 @@ rtk rg -n "\.\./\.\./upstream|\.\./\.\./\.\./upstream|git submodule update|recur
 
 Expected: both Git commands report mode `160000` and SHA `212abfd...`. The search finds no normal source/test path or setup/CI initialization instruction; optional-reference prose is allowed only when it does not instruct normal initialization.
 
-- [ ] **Step 2: Run complete normal verification**
+- [x] **Step 2: Run complete normal verification**
 
 ```bash
 rtk pnpm verify:upstream-pin
@@ -932,7 +932,7 @@ rtk pnpm --filter @lpc-toolkit/web test:e2e
 
 Expected: every command PASS. The unit/workflow tests are the executable proof that CI's plain checkout does not initialize `upstream/`.
 
-- [ ] **Step 3: Run parity from an isolated temporary checkout**
+- [x] **Step 3: Run parity from an isolated temporary checkout**
 
 Prepare `/private/tmp/lpc-toolkit-upstream-parity` outside the repository and
 outside tracked `upstream/`, at the pinned source SHA, using the same
@@ -945,7 +945,7 @@ LPC_UPSTREAM_PARITY_DIR=/private/tmp/lpc-toolkit-upstream-parity rtk pnpm --filt
 
 Expected: parity PASS; `packages/web/scripts/parity-source.ts` accepts the isolated absolute path and continues rejecting tracked `upstream/`.
 
-- [ ] **Step 4: Confirm scope and worktree cleanliness**
+- [x] **Step 4: Confirm scope and worktree cleanliness**
 
 ```bash
 rtk git status --short
@@ -955,7 +955,7 @@ rtk git diff --stat f76dd4a5c..HEAD
 
 Expected: only this plan's final evidence remains uncommitted; the two pre-existing untracked user files remain untouched; no changes exist inside `upstream/`; no dependency manifest or lockfile change exists beyond the planned package script edits.
 
-- [ ] **Step 5: Record and commit final verification evidence**
+- [x] **Step 5: Record and commit final verification evidence**
 
 Mark Task 6 complete and append the exact PASS results, isolated parity path/source SHA, implementation commit range, retained gitlink SHA, and final scope audit. Commit only the plan:
 
@@ -963,6 +963,14 @@ Mark Task 6 complete and append the exact PASS results, isolated parity path/sou
 rtk git add docs/superpowers/plans/2026-07-13-dormant-upstream-submodule.md
 rtk git commit -m "docs(plan): record dormant submodule verification"
 ```
+
+#### Task 6 execution record
+
+- Verification-only task: no implementation commit was created. The completed implementation range is `6d1b24715..5be3c4131`, with plan evidence through `2de26e82e` before this final record.
+- Git audit: `upstream` remains mode `160000` at `212abfd21493e9957bd556250ac538fa40fe1fc9`; live-reference search found only negative assertions forbidding recursive submodules/tracked upstream paths. Worktree and diff-check were clean; no `upstream/` modifications occurred.
+- Normal verification: `rtk pnpm verify:upstream-pin` PASS after required elevated rerun; `rtk pnpm check:boundaries` PASS; `rtk pnpm test` PASS (75 files, 673 tests); `rtk pnpm build` PASS; `rtk pnpm --filter @lpc-toolkit/web test:e2e` PASS (24 tests). Exact `rtk pnpm typecheck` returned wrapper-level nonzero with bare `tsc` help and `TypeScript: No errors found`; controller rerun `rtk proxy pnpm typecheck`, `rtk proxy pnpm --filter @lpc-toolkit/core typecheck`, and `rtk proxy pnpm --filter @lpc-toolkit/web typecheck` all PASS with no TypeScript diagnostics.
+- Isolated parity: `/private/tmp/lpc-toolkit-upstream-parity` at `212abfd21493e9957bd556250ac538fa40fe1fc9`; isolated `npm ci` completed there; `LPC_UPSTREAM_PARITY_DIR=/private/tmp/lpc-toolkit-upstream-parity rtk pnpm --filter @lpc-toolkit/web test:e2e:parity` PASS (7 tests). Tracked `upstream/` was not used.
+- Review: final verification report captured sandbox/network limitations (tsx IPC EPERM, RTK typecheck wrapper behavior, isolated parity network/install) and all functional gates passed.
 
 ---
 
