@@ -798,7 +798,7 @@ rtk git commit -m "docs(plan): record submodule-free workflows"
 - Consumes: Task 4 lifecycle and CI behavior.
 - Produces: one current documentation contract: `upstream/` is optional read-only provenance, normal workflows require no checkout, parity alone uses a separate checkout.
 
-- [ ] **Step 1: Write failing documentation assertions**
+- [x] **Step 1: Write failing documentation assertions**
 
 Extend `readme-architecture-docs.test.ts` to read `AGENTS.md`, `CLAUDE.md`, and onboarding, then assert:
 
@@ -820,7 +820,7 @@ expect(onboarding).toContain('Do not initialize `upstream/` for normal setup.');
 
 Use variables loaded through the existing `readRepoFile` helper; do not assert against historical specs/plans.
 
-- [ ] **Step 2: Run the documentation contract and verify RED**
+- [x] **Step 2: Run the documentation contract and verify RED**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/web exec vitest run test/readme-architecture-docs.test.ts
@@ -828,7 +828,7 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/readme-architecture-docs
 
 Expected: FAIL because README still requires recursive clone and current governance docs do not define dormant behavior.
 
-- [ ] **Step 3: Update README setup and provenance language**
+- [x] **Step 3: Update README setup and provenance language**
 
 Replace recursive setup with an ordinary clone example and this explicit contract:
 
@@ -842,7 +842,7 @@ research. Parity uses a separate isolated checkout of the same pinned commit.
 
 Keep the existing GPL, attribution, runtime asset, and parity descriptions.
 
-- [ ] **Step 4: Update governance and architecture docs**
+- [x] **Step 4: Update governance and architecture docs**
 
 In both `AGENTS.md` and `CLAUDE.md`, use the same hard rule:
 
@@ -865,7 +865,7 @@ Expand `docs/ARCHITECTURE.md` to name:
 
 Update the console collector comment so it describes an upstream data-quality issue at the pinned source revision, not a normal dependency on the tracked submodule.
 
-- [ ] **Step 5: Run documentation, workflow, and boundary verification**
+- [x] **Step 5: Run documentation, workflow, and boundary verification**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/web exec vitest run test/readme-architecture-docs.test.ts test/package-scripts.test.ts
@@ -875,14 +875,14 @@ rtk git diff --check
 
 Expected: documentation and workflow tests PASS, boundaries PASS, no whitespace errors.
 
-- [ ] **Step 6: Commit Task 5 implementation**
+- [x] **Step 6: Commit Task 5 implementation**
 
 ```bash
 rtk git add README.md AGENTS.md CLAUDE.md docs/ONBOARDING.md docs/ARCHITECTURE.md packages/web/e2e/helpers/console-collector.ts packages/web/test/readme-architecture-docs.test.ts
 rtk git commit -m "docs: make upstream checkout optional"
 ```
 
-- [ ] **Step 7: Record Task 5 evidence in this plan**
+- [x] **Step 7: Record Task 5 evidence in this plan**
 
 Mark Task 5 complete and append concrete implementation, commit, and PASS records. Commit the plan record:
 
@@ -890,6 +890,13 @@ Mark Task 5 complete and append concrete implementation, commit, and PASS record
 rtk git add docs/superpowers/plans/2026-07-13-dormant-upstream-submodule.md
 rtk git commit -m "docs(plan): record dormant submodule guidance"
 ```
+
+#### Task 5 execution record
+
+- Implementation: Updated current README, AGENTS/CLAUDE, onboarding, architecture, console guidance, and documentation contract tests to define `upstream/` as optional read-only provenance; normal workflows do not initialize it, and parity alone uses a separate isolated checkout.
+- Implementation commit: `5be3c4131` (`docs: make upstream checkout optional`).
+- Verification: documentation and workflow tests PASS, 20/20; `rtk pnpm check:boundaries` PASS; `rtk git diff --check` PASS. No historical specs/plans, dependency manifests, lockfiles, or `upstream/` changed.
+- Review: Task-scoped spec-compliance and code-quality review approved with no findings.
 
 ---
 
