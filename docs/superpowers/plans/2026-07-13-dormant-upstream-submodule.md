@@ -70,7 +70,7 @@
 - Consumes: a read-only upstream source directory, target fixture directory, `sourceRepository`, and full `sourceSha`.
 - Produces: `FIXTURE_SPRITE_PATHS`, `UpstreamFixtureProvenance`, `materializeUpstreamTestFixtures(options): UpstreamFixtureProvenance`, `parseUpstreamFixtureProvenance(json): UpstreamFixtureProvenance`, and `verifyUpstreamFixtureIntegrity(fixtureRoot, provenance): void`.
 
-- [ ] **Step 1: Write failing fixture-tool tests**
+- [x] **Step 1: Write failing fixture-tool tests**
 
 Create `packages/web/test/upstream-test-fixtures.test.ts` with temporary directories and these concrete cases:
 
@@ -173,7 +173,7 @@ describe('upstream real-pixel fixtures', () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run:
 
@@ -183,7 +183,7 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/upstream-test-fixtures.t
 
 Expected: FAIL because `../scripts/upstream-test-fixtures` does not exist.
 
-- [ ] **Step 3: Implement the fixture module with the exact 17-file allowlist**
+- [x] **Step 3: Implement the fixture module with the exact 17-file allowlist**
 
 Create `packages/web/scripts/upstream-test-fixtures.ts`. The allowlist must be exactly:
 
@@ -256,7 +256,7 @@ Implementation requirements:
 - Enumerate actual files below `spritesheets/`, reject missing or unexpected paths, verify all SHA-256 values, and require non-empty `CREDITS.csv`.
 - Error messages must name the offending path.
 
-- [ ] **Step 4: Add the explicit maintainer CLI**
+- [x] **Step 4: Add the explicit maintainer CLI**
 
 Create `packages/web/scripts/materialize-upstream-test-fixtures.ts`:
 
@@ -308,7 +308,7 @@ Add this Web package script:
 "materialize-upstream-test-fixtures": "tsx scripts/materialize-upstream-test-fixtures.ts"
 ```
 
-- [ ] **Step 5: Run fixture-tool tests and typecheck**
+- [x] **Step 5: Run fixture-tool tests and typecheck**
 
 Run:
 
@@ -319,14 +319,14 @@ rtk pnpm --filter @lpc-toolkit/web typecheck
 
 Expected: all fixture-tool tests PASS and Web typecheck PASS.
 
-- [ ] **Step 6: Commit Task 1 implementation**
+- [x] **Step 6: Commit Task 1 implementation**
 
 ```bash
 rtk git add packages/web/scripts/upstream-test-fixtures.ts packages/web/scripts/materialize-upstream-test-fixtures.ts packages/web/test/upstream-test-fixtures.test.ts packages/web/package.json
 rtk git commit -m "test(web): add attributed upstream fixture tooling"
 ```
 
-- [ ] **Step 7: Record Task 1 evidence in this plan**
+- [x] **Step 7: Record Task 1 evidence in this plan**
 
 Mark Task 1 checkboxes complete and append an execution record containing the concrete implementation summary, the Task 1 implementation commit from `rtk git rev-parse --short HEAD`, and both exact PASS commands. Commit only the plan update with:
 
@@ -334,6 +334,13 @@ Mark Task 1 checkboxes complete and append an execution record containing the co
 rtk git add docs/superpowers/plans/2026-07-13-dormant-upstream-submodule.md
 rtk git commit -m "docs(plan): record upstream fixture tooling"
 ```
+
+#### Task 1 execution record
+
+- Implementation: Added the exact 17-path attributed fixture allowlist, provenance parsing and SHA-256 integrity verification, source-root overlap protection including symlink aliases, and the explicit maintainer materialization CLI. Added regression coverage for missing/unexpected/hash-mismatched files, empty credits, duplicate provenance paths, ancestor overlap, and symlinked-parent overlap.
+- Implementation commits: `6d1b24715` (`test(web): add attributed upstream fixture tooling`), `15e0b55a7` (`fix(web): harden fixture provenance validation`), `5932c1051` (`fix(web): guard symlinked fixture overlap`).
+- Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/upstream-test-fixtures.test.ts` GREEN, 9/9 tests; `rtk proxy pnpm --filter @lpc-toolkit/web typecheck` PASS; `rtk pnpm check:boundaries` PASS. The exact `rtk pnpm --filter @lpc-toolkit/web typecheck` emitted `TypeScript: No errors found` but returned non-zero because the RTK wrapper does not support filtered `pnpm tsc`; the proxy command is the passing package-scoped verification.
+- Review: Task-scoped spec-compliance and code-quality review approved after the symlink-overlap fix.
 
 ---
 
