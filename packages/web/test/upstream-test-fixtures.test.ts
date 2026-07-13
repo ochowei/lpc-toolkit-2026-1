@@ -54,7 +54,8 @@ function creditFilenames(credits: string): string[] {
     .split(/\r?\n/)
     .flatMap((line) => {
       const match = line.match(/^"([^"]+)"/);
-      return match ? [match[1]] : [];
+      const filename = match?.[1];
+      return filename ? [filename] : [];
     });
 }
 
@@ -64,12 +65,23 @@ function creditFields(line: string): readonly [string, string, string, string, s
     throw new Error(`Malformed credit row: ${line}`);
   }
 
+  const [filePath, notes, authors, licenses, urls] = fields;
+  if (
+    filePath === undefined ||
+    notes === undefined ||
+    authors === undefined ||
+    licenses === undefined ||
+    urls === undefined
+  ) {
+    throw new Error(`Malformed credit row: ${line}`);
+  }
+
   return [
-    fields[0],
-    fields[1],
-    fields[2],
-    fields[3],
-    fields[4],
+    filePath,
+    notes,
+    authors,
+    licenses,
+    urls,
   ];
 }
 

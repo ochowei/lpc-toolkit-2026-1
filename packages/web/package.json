@@ -8,6 +8,7 @@
     "dev": "vite",
     "prepare-assets": "tsx scripts/prepare-assets.ts",
     "materialize-upstream-test-fixtures": "tsx scripts/materialize-upstream-test-fixtures.ts",
+    "verify-upstream-pin": "tsx scripts/verify-upstream-pin.ts",
     "verify-upstream-parity": "tsx scripts/verify-upstream-parity.ts",
     "zip-assets": "tsx scripts/zip-assets.ts",
     "prebuild": "pnpm prepare-assets && pnpm --filter @lpc-toolkit/core build && pnpm --filter @lpc-toolkit/presets build",

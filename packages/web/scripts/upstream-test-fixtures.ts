@@ -152,7 +152,11 @@ function parseCreditsRows(credits: string): {
       throw new Error(`Malformed CREDITS.csv row: ${line}`);
     }
 
-    const [, filename] = match;
+    const filename = match[1];
+    if (!filename) {
+      throw new Error(`Malformed CREDITS.csv row: ${line}`);
+    }
+
     if (rows.has(filename)) {
       throw new Error(`Duplicate CREDITS.csv row: ${filename}`);
     }
