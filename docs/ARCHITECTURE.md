@@ -320,9 +320,16 @@ local tree uses `createDirectoryAssetStore`; the managed compressed cache uses
 inside `packages/cli/` and supply core through its injected image-loading port.
 
 Production asset resolution uses the local tree or pinned managed cache.
-`upstream/` is read-only provenance and reference material. Upstream parity is
-the sole executable comparison and uses a separate isolated checkout; package
-installation inside the submodule is forbidden.
+`upstream/` is an optional read-only provenance dormant gitlink that preserves source
+provenance without participating in normal install, test, build, E2E, package,
+or publish flows. Checked-in Core real-pixel fixtures with credits provide
+fixture provenance for composition and parity-sensitive tests without requiring
+an initialized submodule. Provenance verification is four-way: the dormant
+gitlink pin, the CLI release tag/source SHA, the published asset manifest
+digests, and the checked-in fixture provenance metadata must all agree on the
+same source lineage. The isolated parity checkout is the only executable
+upstream source checkout and uses a separate isolated checkout of the same
+pinned revision; package installation inside the submodule is forbidden.
 
 ## Web Catalog Ownership
 

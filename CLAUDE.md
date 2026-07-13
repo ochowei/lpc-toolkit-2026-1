@@ -13,10 +13,7 @@ sprites, plus a modern React web UI and a CLI built on top of it.
 
 ## Hard rules (do not violate)
 
-1. **`upstream/` is a git submodule, read-only.** Never modify, never
-   commit changes inside it, never run `npm install` or `pnpm install`
-   inside it. It is now legacy/reference, as active assets are migrated
-   to the local `assets/` folder.
+1. **`upstream/` is an optional, read-only git submodule retained as a provenance gitlink.** Never modify or commit inside it, and never install packages inside it. Normal workflows must not require it to be initialized. Active assets use the pinned local/cache-backed `assets/` flow; parity uses a separate isolated checkout.
 
 2. **License is GPL-3.0.** Upstream is GPL-3.0 and we inherit it.
    Do not add dependencies with incompatible licenses. When suggesting
@@ -40,7 +37,7 @@ sprites, plus a modern React web UI and a CLI built on top of it.
 ## Layout
 
 - `assets/` — LPC art assets (spritesheets, definitions, CREDITS.csv) migrated from upstream
-- `upstream/` — git submodule, read-only LPC source (reference material only)
+- `upstream/` — optional read-only provenance/reference LPC source checkout
 - `packages/core/` — pure TypeScript composition logic
 - `packages/web/` — React + Vite browser UI
 - `packages/cli/` — Node CLI (built later)

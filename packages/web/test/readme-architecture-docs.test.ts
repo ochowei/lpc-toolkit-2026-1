@@ -11,6 +11,9 @@ const readRepoFile = (filePath: string) =>
 const readme = readRepoFile('README.md');
 const cliReadme = readRepoFile('packages/cli/README.md');
 const architecture = readRepoFile('docs/ARCHITECTURE.md');
+const agents = readRepoFile('AGENTS.md');
+const claude = readRepoFile('CLAUDE.md');
+const onboarding = readRepoFile('docs/ONBOARDING.md');
 const cliPackage = JSON.parse(readRepoFile('packages/cli/package.json')) as {
   version: string;
 };
@@ -81,6 +84,25 @@ describe('README architecture contract', () => {
     ]) {
       expect(readme).toContain(phrase);
     }
+    for (const document of [readme, architecture, agents, claude, onboarding]) {
+      expect(document).toContain('optional');
+      expect(document).toContain('read-only');
+    }
+    expect(readme).toContain('standard clone does not initialize the submodule');
+    expect(readme).not.toContain('git clone --recurse-submodules');
+    expect(readme).not.toContain('git submodule update --init');
+    expect(architecture).toContain('dormant gitlink');
+    expect(architecture).toContain('fixture provenance');
+    expect(architecture).toContain('separate isolated checkout');
+    expect(agents).toContain(
+      'Normal workflows must not require it to be initialized.',
+    );
+    expect(claude).toContain(
+      'Normal workflows must not require it to be initialized.',
+    );
+    expect(onboarding).toContain(
+      'Do not initialize `upstream/` for normal setup.',
+    );
     expect(readme).not.toContain('tsc build across all packages');
     expect(readme).not.toContain('three-region grid desktop editor');
   });

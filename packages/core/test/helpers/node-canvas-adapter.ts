@@ -23,8 +23,8 @@ export function createNodeCanvasAdapter(): CanvasAdapter {
     loadImage(path: string): Promise<ImageLike> {
       // Step 3.2: real file-backed loading. `@napi-rs/canvas` accepts a
       // filesystem path (or URL / Buffer); compose passes
-      // `joinUrl(spritesheetsBaseUrl, layerPath)`, so tests point
-      // `spritesheetsBaseUrl` at the read-only `upstream/` checkout.
+      // `joinUrl(spritesheetsBaseUrl, layerPath)`, so the caller supplies
+      // a concrete fixture filesystem root or another concrete base path.
       return napiLoadImage(path);
     },
   };

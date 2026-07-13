@@ -12,7 +12,8 @@
     "build": "pnpm -r build",
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "typecheck": "pnpm -r typecheck",
-    "pretest": "pnpm --filter @lpc-toolkit/web prepare-assets",
+    "verify:upstream-pin": "pnpm --filter @lpc-toolkit/web verify-upstream-pin",
+    "pretest": "pnpm --filter @lpc-toolkit/web prepare-assets && pnpm verify:upstream-pin",
     "test": "pnpm -r test"
   },
   "packageManager": "pnpm@9.0.0",
