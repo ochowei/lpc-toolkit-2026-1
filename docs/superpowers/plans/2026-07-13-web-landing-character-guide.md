@@ -33,7 +33,7 @@
 - Consumes: `LandingPageProps` with `onNavigate: (route: NavigableAppRoute) => void` and the existing shared `Button` component.
 - Produces: the unchanged `LandingPage({ onNavigate }: LandingPageProps)` component API with new static guide content.
 
-- [ ] **Step 1: Specify the complete guide and verify RED**
+- [x] **Step 1: Specify the complete guide and verify RED**
 
   Replace the current test body in `packages/web/test/landing-page.test.tsx` with:
 
@@ -94,6 +94,13 @@
   Then update this checkbox with an implementation note, the test commit hash,
   and `Focused landing-page test RED as expected`; include that record in the
   next commit.
+
+  - Implementation note: Replaced the landing-page test with assertions for the
+    ordered named-character workflow, persistent `./characters/` storage,
+    secondary CLI workflows, attribution artifacts, and one Composer action.
+  - Commit: fbca03b139b59a533158858672f1acf40b00f865
+  - Verification: Focused landing-page test RED as expected (assertion failure
+    for the missing named-character guide).
 
 - [ ] **Step 2: Implement the guide and verify GREEN**
 

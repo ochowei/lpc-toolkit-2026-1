@@ -10,25 +10,54 @@ const installCommands = [
   'npx @lpc-toolkit/cli --help',
 ] as const;
 
-const selectionExample = `{
-  "schema": "lpc-toolkit.selection.v1",
-  "name": "hero",
-  "bodyType": "male",
-  "items": {
-    "body": { "name": "Body Color", "recolor": "light" }
-  }
-}`;
-
-const customSelectionCommands = [
-  'lpc-toolkit selection validate --selection selection.json',
-  'lpc-toolkit render --selection selection.json --out ./rendered --animation walk --frames all --bundle zip',
+const characterSteps = [
+  {
+    title: 'Create a starting character',
+    description: 'Start from the farmer preset and save it as hero.',
+    command: 'lpc-toolkit character create hero --preset farmer',
+  },
+  {
+    title: 'Search compatible items',
+    description: 'Find hair choices that work with the stored character.',
+    command: 'lpc-toolkit character search hero --type hair --query braid',
+  },
+  {
+    title: 'Update the character',
+    description: 'Select the braid and apply a brown recolor.',
+    command:
+      'lpc-toolkit character set hero --type hair --item hair_braid --recolor lpcr.brown',
+  },
+  {
+    title: 'Preview the result',
+    description: 'Render an attributed frame for a quick visual check.',
+    command: 'lpc-toolkit character preview hero',
+  },
+  {
+    title: 'Render final output',
+    description: 'Export the walk animation and an attributed ZIP bundle.',
+    command:
+      'lpc-toolkit character render hero --out ./dist/hero --animation walk --bundle zip',
+  },
 ] as const;
 
-const cliCommands = [
-  'lpc-toolkit catalog types',
-  'lpc-toolkit catalog items --type hair',
-  'lpc-toolkit token encode --selection selection.json',
-  'lpc-toolkit web',
+const secondaryCommandGroups = [
+  {
+    title: 'Presets and selection files',
+    commands: [
+      'lpc-toolkit preset render farmer --out ./farmer --animation walk',
+      'lpc-toolkit selection validate --selection selection.json',
+      'lpc-toolkit render --selection selection.json --out ./rendered --animation walk --frames all --bundle zip',
+    ],
+  },
+  {
+    title: 'Explore and share',
+    commands: [
+      'lpc-toolkit catalog types',
+      'lpc-toolkit catalog items --type hair',
+      'lpc-toolkit token encode --selection selection.json',
+      'lpc-toolkit web',
+    ],
+  },
 ] as const;
 
 const codeClassName =
@@ -47,77 +76,56 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               LPC Toolkit
             </h1>
           </div>
-          <Button variant="primary" onClick={() => onNavigate('compose')}>
-            Open Composer
-          </Button>
         </header>
 
-        <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)]">
-          <div className="rounded-md border border-border bg-surface p-5">
-            <h2 className="text-xl font-semibold text-text">CLI quick start</h2>
-            <p className="mt-2 max-w-2xl text-sm text-text-2">
-              Install the published CLI globally, or try it once with npx.
-              Node.js 22 or newer is required.
-            </p>
-            <div className="mt-5 space-y-3">
-              {installCommands.map((command) => (
-                <code key={command} className={codeClassName}>
-                  {command}
-                </code>
-              ))}
-            </div>
+        <section className="rounded-md border border-border bg-surface p-5">
+          <h2 className="text-xl font-semibold text-text">CLI quick start</h2>
+          <p className="mt-2 max-w-2xl text-sm text-text-2">
+            Install the published CLI globally, or try it once with npx.
+            Node.js 22 or newer is required.
+          </p>
+          <div className="mt-5 space-y-3">
+            {installCommands.map((command) => (
+              <code key={command} className={codeClassName}>
+                {command}
+              </code>
+            ))}
           </div>
-
-          <aside className="rounded-md border border-border bg-surface p-5">
-            <h2 className="text-lg font-semibold text-text">Web UI</h2>
-            <p className="mt-2 text-sm text-text-2">
-              Prefer visual composition? Open the browser composer and build a
-              character with live preview, export controls, and attribution.
-            </p>
-            <Button
-              className="mt-5 w-full"
-              variant="primary"
-              onClick={() => onNavigate('compose')}
-            >
-              Open Composer
-            </Button>
-          </aside>
         </section>
 
-        <section>
-          <h2 className="text-xl font-semibold text-text">CLI examples</h2>
-          <div className="mt-4 grid gap-5 lg:grid-cols-2">
-            <article className="rounded-md border border-border bg-surface p-5">
-              <h3 className="text-lg font-semibold text-text">Render a preset</h3>
-              <p className="mt-2 text-sm text-text-2">
-                Generate the built-in farmer and its walking animation in one
-                command.
-              </p>
-              <code className={`${codeClassName} mt-4`}>
-                lpc-toolkit preset render farmer --out ./farmer --animation walk
-              </code>
-            </article>
-
-            <article className="rounded-md border border-border bg-surface p-5">
-              <h3 className="text-lg font-semibold text-text">
-                Render a custom selection
-              </h3>
-              <p className="mt-2 text-sm text-text-2">
-                Save this as <code>selection.json</code>, validate it, then render
-                the sheet, frames, and ZIP bundle.
-              </p>
-              <pre className={`${codeClassName} mt-4`}>
-                <code>{selectionExample}</code>
-              </pre>
-              <div className="mt-3 space-y-3">
-                {customSelectionCommands.map((command) => (
-                  <code key={command} className={codeClassName}>
-                    {command}
-                  </code>
-                ))}
-              </div>
-            </article>
-          </div>
+        <section className="rounded-md border border-border bg-surface p-5">
+          <h2 className="text-xl font-semibold text-text">
+            Create and edit a named character
+          </h2>
+          <p className="mt-2 text-sm text-text-2">
+            Use the named character commands in order to create and update
+            <code className="mx-1">hero</code>. The character is persisted under
+            <code className="mx-1">./characters/</code>, so you do not need to
+            hand-write a selection JSON file.
+          </p>
+          <ol className="mt-5 space-y-4">
+            {characterSteps.map((step, index) => (
+              <li
+                key={step.command}
+                className="rounded-md border border-border bg-surface-2 p-4"
+              >
+                <div className="flex gap-3">
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-sm font-semibold text-[var(--accent-ink)]">
+                    {index + 1}
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="text-lg font-semibold text-text">
+                      {step.title}
+                    </h3>
+                    <p className="mt-1 text-sm text-text-2">{step.description}</p>
+                    <code className={`${codeClassName} mt-3`}>
+                      {step.command}
+                    </code>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ol>
         </section>
 
         <section className="rounded-md border border-border bg-surface p-5">
@@ -131,14 +139,41 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
         </section>
 
         <section className="rounded-md border border-border bg-surface p-5">
-          <h2 className="text-xl font-semibold text-text">Common commands</h2>
-          <div className="mt-4 grid gap-2">
-            {cliCommands.map((command) => (
-              <code key={command} className="block overflow-x-auto rounded-md bg-surface-2 px-3 py-2 font-mono text-sm text-text">
-                {command}
-              </code>
+          <h2 className="text-xl font-semibold text-text">More CLI workflows</h2>
+          <p className="mt-2 text-sm text-text-2">
+            These secondary commands cover presets, explicit selection JSON,
+            catalog exploration, token sharing, and the packaged local web
+            server.
+          </p>
+          <div className="mt-4 space-y-4">
+            {secondaryCommandGroups.map((group) => (
+              <article key={group.title}>
+                <h3 className="text-lg font-semibold text-text">{group.title}</h3>
+                <div className="mt-3 space-y-3">
+                  {group.commands.map((command) => (
+                    <code key={command} className={codeClassName}>
+                      {command}
+                    </code>
+                  ))}
+                </div>
+              </article>
             ))}
           </div>
+        </section>
+
+        <section className="rounded-md border border-border bg-surface p-5">
+          <h2 className="text-xl font-semibold text-text">Web Composer</h2>
+          <p className="mt-2 text-sm text-text-2">
+            Prefer visual composition? Open the browser composer for live
+            preview, export controls, and attribution.
+          </p>
+          <Button
+            className="mt-5"
+            variant="primary"
+            onClick={() => onNavigate('compose')}
+          >
+            Open Composer
+          </Button>
         </section>
       </div>
     </main>
