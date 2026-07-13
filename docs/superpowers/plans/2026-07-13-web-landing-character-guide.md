@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Turn the web landing page into a single-column first-use guide that teaches the complete named-character CLI workflow and contains exactly one Composer link.
+**Goal:** Turn the web landing page into a single-column first-use guide that teaches the complete named-character CLI workflow and contains two clearly positioned Composer links.
 
 **Architecture:** Keep the change local to the existing server-renderable `LandingPage` component and its focused test. Represent the primary workflow as ordered static content, retain secondary CLI examples below it, and preserve the attribution explanation without adding state, hooks, adapters, or dependencies.
 
@@ -14,11 +14,18 @@
 - Show the named-character workflow in this order: `create`, `search`, `set`, `preview`, `render`.
 - Explain that named characters are stored under `./characters/` and avoid hand-written selection JSON.
 - Preserve mandatory metadata plus TXT and CSV attribution guidance for rendered sprites.
-- Render exactly one `Open Composer` action, in the final Web Composer section.
+- Render exactly two `Open Composer` actions: one beside the Logo in the header and one in the final Web Composer section.
 - Keep preset, selection JSON, catalog, token, and `lpc-toolkit web` workflows discoverable as secondary commands.
 - Do not add dependencies, modify `upstream/`, or change CLI, Composer, composition, attribution, or export behavior.
 - Run every terminal command with the `rtk` prefix and use pnpm.
 - After each completed step, check it off and record an implementation note, commit hash, and verification status in this plan.
+
+## Plan Amendment (2026-07-13)
+
+After review, the landing page keeps the existing final Web Composer button and
+adds a second `Open Composer` button beside the `LPC Toolkit` Logo in the
+header. Task 1 records the original single-action guide implementation; Task 2
+below supersedes only its Composer action count and placement.
 
 ---
 
@@ -232,3 +239,107 @@
   - Commit: 53a67bc9de387a1ab535fded67266dfe7e236dbd
   - Verification: Web typecheck PASS; focused landing-page test PASS; boundary
     check PASS; git diff check PASS.
+
+---
+
+### Task 2: Add the Header Composer Entry
+
+**Files:**
+- Modify: `packages/web/test/landing-page.test.tsx`
+- Modify: `packages/web/src/components/landing-page.tsx`
+- Modify: `docs/superpowers/plans/2026-07-13-web-landing-character-guide.md`
+
+**Interfaces:**
+- Consumes: the unchanged `LandingPageProps` and shared `Button` component.
+- Produces: the unchanged `LandingPage({ onNavigate }: LandingPageProps)` API
+  with header and final-section Composer entry points.
+
+- [ ] **Step 1: Specify two Composer actions and verify RED**
+
+  Update the focused test in `packages/web/test/landing-page.test.tsx` so the
+  final assertions read:
+
+  ```tsx
+    const headerStart = html.indexOf('<header');
+    const headerEnd = html.indexOf('</header>');
+    expect(html.slice(headerStart, headerEnd)).toContain('Open Composer');
+    expect(html.match(/Open Composer/g)).toHaveLength(2);
+  ```
+
+  Run:
+
+  ```sh
+  rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx
+  ```
+
+  Expected: FAIL with an assertion failure because the current implementation
+  has only the final-section button and no header Composer action.
+
+  Commit only the test change:
+
+  ```sh
+  rtk git add packages/web/test/landing-page.test.tsx
+  rtk git commit -m "test(web): require header composer action"
+  ```
+
+  Then check off this step with its test commit hash and
+  `Focused landing-page test RED as expected`.
+
+- [ ] **Step 2: Add the header action and verify GREEN**
+
+  In `packages/web/src/components/landing-page.tsx`, keep the existing final
+  Web Composer `Button` unchanged. Add this Button after the Logo wrapper inside
+  the existing header:
+
+  ```tsx
+          <Button
+            className="shrink-0"
+            variant="primary"
+            onClick={() => onNavigate('compose')}
+          >
+            Open Composer
+          </Button>
+  ```
+
+  Keep the header's existing flex layout so the button sits to the right of the
+  Logo on wide screens and wraps safely on narrow screens. Do not add state,
+  hooks, dependencies, responsive grid columns, or unrelated refactors.
+
+  Run:
+
+  ```sh
+  rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx
+  ```
+
+  Expected: PASS with one passing test and exactly two `Open Composer` strings.
+  Commit the production change:
+
+  ```sh
+  rtk git add packages/web/src/components/landing-page.tsx
+  rtk git commit -m "feat(web): add header composer action"
+  ```
+
+  Then record the implementation commit hash and `Focused landing-page test
+  PASS` in this plan.
+
+- [ ] **Step 3: Run final verification and record results**
+
+  Run each command independently:
+
+  ```sh
+  rtk pnpm --filter @lpc-toolkit/web run typecheck
+  rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx
+  rtk pnpm check:boundaries
+  rtk git diff --check main...HEAD
+  ```
+
+  Expected: all commands exit `0`; the focused test reports one passing test;
+  the boundary checker reports no architecture violations; and the diff check
+  emits no whitespace errors. Record the implementation commit hash plus these
+  exact statuses: `Web typecheck PASS; focused landing-page test PASS; boundary
+  check PASS; git diff check PASS.` Commit the completed plan records:
+
+  ```sh
+  rtk git add docs/superpowers/plans/2026-07-13-web-landing-character-guide.md
+  rtk git commit -m "docs(plan): record header composer verification"
+  ```

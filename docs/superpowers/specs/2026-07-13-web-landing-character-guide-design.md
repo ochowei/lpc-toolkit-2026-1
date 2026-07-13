@@ -20,11 +20,13 @@ order a new user needs them:
 4. Render output and mandatory attribution artifacts.
 5. Secondary commands for presets, selection JSON, catalog exploration, token
    conversion, and the packaged local web server.
-6. A final Web Composer section with the page's only `Open Composer` action.
+6. A final Web Composer section with a second `Open Composer` action.
 
-The header no longer contains a Composer button. The current side-by-side CLI
-and Web UI introduction is removed so the page remains a single-column reading
-flow at every viewport width.
+The header contains an `Open Composer` button immediately to the right of the
+LPC Toolkit logo. The final Web Composer section keeps its own `Open Composer`
+button so users can enter the visual workflow either before or after reading
+the guide. The current side-by-side CLI and Web UI introduction is removed so
+the page remains a single-column reading flow at every viewport width.
 
 ## Character Workflow
 
@@ -64,7 +66,7 @@ preview and render descriptions must not imply that attribution is optional.
 The change remains local to `LandingPage`. It does not introduce state, hooks,
 new dependencies, core logic, browser adapters, or changes to composition and
 export behavior. Existing Tailwind utilities and the shared `Button` component
-remain in use.
+remain in use for both Composer entry points.
 
 ## Testing
 
@@ -74,7 +76,8 @@ The server-rendered landing-page test will verify:
 - the page explains `./characters/` persistence;
 - attribution artifacts and the instruction to retain them remain present;
 - secondary CLI workflows remain discoverable;
-- exactly one `Open Composer` action is rendered.
+- exactly two `Open Composer` actions are rendered: one in the header beside the
+  logo and one in the final Web Composer section.
 
 The focused landing-page test is run first for the TDD red/green cycle. After
 implementation, the web package typecheck, focused test, and repository boundary
