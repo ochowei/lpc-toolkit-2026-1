@@ -76,6 +76,13 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               LPC Toolkit
             </h1>
           </div>
+          <Button
+            className="shrink-0"
+            variant="primary"
+            onClick={() => onNavigate('compose')}
+          >
+            Open Composer
+          </Button>
         </header>
 
         <section className="rounded-md border border-border bg-surface p-5">
