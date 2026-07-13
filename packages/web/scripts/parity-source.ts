@@ -1,6 +1,12 @@
+import { existsSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 
 export const PARITY_DIR_ENV = 'LPC_UPSTREAM_PARITY_DIR';
+
+function canonicalizeIfExistingPath(pathValue: string): string {
+  const resolved = path.resolve(pathValue);
+  return existsSync(resolved) ? realpathSync(resolved) : resolved;
+}
 
 export function requireIsolatedParityDir(
   repoRoot: string,
@@ -13,8 +19,10 @@ export function requireIsolatedParityDir(
     throw new Error(`${PARITY_DIR_ENV} must be an absolute path.`);
   }
 
-  const resolved = path.resolve(value);
-  const trackedUpstream = path.resolve(repoRoot, 'upstream');
+  const resolved = canonicalizeIfExistingPath(value);
+  const trackedUpstream = canonicalizeIfExistingPath(
+    path.resolve(repoRoot, 'upstream'),
+  );
   if (
     resolved === trackedUpstream ||
     resolved.startsWith(`${trackedUpstream}${path.sep}`)

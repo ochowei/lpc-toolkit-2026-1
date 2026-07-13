@@ -1014,6 +1014,15 @@ describe('composeSelections', () => {
         },
         { catalog, adapter, spritesheetsBaseUrl: realPixelFixtureBase },
       );
+      expect(wheelOnly.credits.entries.map((entry) => entry.file)).toEqual([
+        'body/wheelchair',
+      ]);
+      expect(wheelOnly.credits.entries.map((entry) => entry.authors)).toEqual([
+        ['Eliza Wyatt'],
+      ]);
+      expect(wheelOnly.credits.resolvedPaths).toEqual([
+        'body/wheelchair/adult/background/black.png',
+      ]);
 
       const blockWith = regionPixels(sheet.canvas, 0, 3456, 128, 256);
       const blockWithout = regionPixels(
