@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { LandingPage } from '../src/components/landing-page';
 
 describe('LandingPage', () => {
-  it('renders public CLI workflows and the composer entry action', () => {
+  it('renders a complete single-entry CLI guide and one composer action', () => {
     const html = renderToStaticMarkup(<LandingPage onNavigate={() => {}} />);
 
     expect(html).toContain('LPC Toolkit');
@@ -11,21 +11,30 @@ describe('LandingPage', () => {
     expect(html).toContain('npm install -g @lpc-toolkit/cli');
     expect(html).toContain('npx @lpc-toolkit/cli --help');
     expect(html).toContain('Node.js 22 or newer');
-    expect(html).toContain('Render a preset');
-    expect(html).toContain(
-      'lpc-toolkit preset render farmer --out ./farmer --animation walk',
-    );
-    expect(html).toContain('Render a custom selection');
-    expect(html).toContain('lpc-toolkit.selection.v1');
-    expect(html).toContain(
-      'lpc-toolkit selection validate --selection selection.json',
-    );
-    expect(html).toContain(
-      'lpc-toolkit render --selection selection.json --out ./rendered --animation walk --frames all --bundle zip',
-    );
+    expect(html).toContain('Create and edit a named character');
+    expect(html).toContain('./characters/');
+
+    const workflowCommands = [
+      'lpc-toolkit character create hero --preset farmer',
+      'lpc-toolkit character search hero --type hair --query braid',
+      'lpc-toolkit character set hero --type hair --item hair_braid --recolor lpcr.brown',
+      'lpc-toolkit character preview hero',
+      'lpc-toolkit character render hero --out ./dist/hero --animation walk --bundle zip',
+    ];
+    const workflowPositions = workflowCommands.map((command) => {
+      expect(html).toContain(command);
+      return html.indexOf(command);
+    });
+    expect(workflowPositions).toEqual([...workflowPositions].sort((a, b) => a - b));
+
+    expect(html).toContain('lpc-toolkit preset render farmer');
+    expect(html).toContain('lpc-toolkit selection validate --selection selection.json');
+    expect(html).toContain('lpc-toolkit catalog types');
+    expect(html).toContain('lpc-toolkit token encode --selection selection.json');
+    expect(html).toContain('lpc-toolkit web');
     expect(html).toContain('.credits.txt');
     expect(html).toContain('.credits.csv');
     expect(html).toContain('Keep both attribution files with exported sprites.');
-    expect(html).toContain('Open Composer');
+    expect(html.match(/Open Composer/g)).toHaveLength(1);
   });
 });
