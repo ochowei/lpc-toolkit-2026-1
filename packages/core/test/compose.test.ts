@@ -22,7 +22,10 @@ import {
 const here = path.dirname(fileURLToPath(import.meta.url));
 const upstreamRoot = path.join(here, '../../../assets/sheet_definitions');
 const customRoot = path.join(here, '../../../assets_custom/sheet_definitions');
-const upstreamBase = path.join(here, '../../../upstream');
+const realPixelFixtureBase = path.join(
+  here,
+  'fixtures/upstream-pixels',
+);
 
 function loadFixture(relPath: FilePath): ItemDefinition {
   const customFile = path.join(customRoot, relPath);
@@ -522,7 +525,7 @@ describe('composeSelections', () => {
   const WALK_Y = 512;
   const SPELLCAST_Y = 0;
 
-  describe('with real upstream spritesheets', () => {
+  describe('with real attributed fixtures', () => {
     const adapter = createNodeCanvasAdapter();
 
     it('composes a body-only male selection into an 832x3456 sheet', async () => {
@@ -535,7 +538,7 @@ describe('composeSelections', () => {
       const sheet = await composeSelections(selections, {
         catalog,
         adapter,
-        spritesheetsBaseUrl: upstreamBase,
+        spritesheetsBaseUrl: realPixelFixtureBase,
       });
 
       expect(sheet.width).toBe(832);
@@ -567,7 +570,7 @@ describe('composeSelections', () => {
       const sheet = await composeSelections(selections, {
         catalog,
         adapter,
-        spritesheetsBaseUrl: upstreamBase,
+        spritesheetsBaseUrl: realPixelFixtureBase,
         animations: ['walk'],
       });
 
@@ -951,7 +954,7 @@ describe('composeSelections', () => {
     });
   });
 
-  describe('custom-animation compositing with real upstream spritesheets', () => {
+  describe('custom-animation compositing with real attributed fixtures', () => {
     const adapter = createNodeCanvasAdapter();
 
     it('composes the wheelchair block below a real body and re-lays its sit frames', async () => {
@@ -971,7 +974,7 @@ describe('composeSelections', () => {
       const sheet = await composeSelections(withBody, {
         catalog,
         adapter,
-        spritesheetsBaseUrl: upstreamBase,
+        spritesheetsBaseUrl: realPixelFixtureBase,
       });
 
       // Variable canvas: 832 × (3456 + wheelchair block 256).
@@ -984,6 +987,7 @@ describe('composeSelections', () => {
         rows: 4,
         cols: 2,
       });
+      expect(sheet.credits.entries.length).toBeGreaterThan(0);
       // The wheelchair block has non-transparent pixels.
       expect(
         hasContent(regionPixels(sheet.canvas, 0, 3456, 128, 256)),
@@ -1008,7 +1012,7 @@ describe('composeSelections', () => {
             },
           },
         },
-        { catalog, adapter, spritesheetsBaseUrl: upstreamBase },
+        { catalog, adapter, spritesheetsBaseUrl: realPixelFixtureBase },
       );
 
       const blockWith = regionPixels(sheet.canvas, 0, 3456, 128, 256);

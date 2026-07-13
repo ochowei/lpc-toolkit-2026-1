@@ -1,0 +1,91 @@
+{
+  "sourceRepository": "ochowei/Universal-LPC-Spritesheet-Character-Generator",
+  "sourceSha": "212abfd21493e9957bd556250ac538fa40fe1fc9",
+  "files": [
+    {
+      "path": "spritesheets/body/bodies/male/backslash.png",
+      "sha256": "bcdf000ae13e79322799036441a10d01369e7bc5bff23255a9aea622835e8a56",
+      "creditsSource": "CREDITS.csv"
+    },
+    {
+      "path": "spritesheets/body/bodies/male/climb.png",
+      "sha256": "9e5aa920ca88dae17aa63b2068d42d2dc6ff45b5c1590b9b3e495667732c68f9",
+      "creditsSource": "CREDITS.csv"
+    },
+    {
+      "path": "spritesheets/body/bodies/male/combat_idle.png",
+      "sha256": "b81626c7e1d4fb479fd53687ca0a0fb94d7600a6a46a1287d46a72ed75fb8e00",
+      "creditsSource": "CREDITS.csv"
+    },
+    {
+      "path": "spritesheets/body/bodies/male/emote.png",
+      "sha256": "ccfd43b427ef44825ab0ab0c8862736d3f5bf18c98250a2b623f7d3d17253632",
+      "creditsSource": "CREDITS.csv"
+    },
+    {
+      "path": "spritesheets/body/bodies/male/halfslash.png",
+      "sha256": "670610b1f20947ceddbe7994ceaaec960fc4c8716f6daab5772872c86e8e6cb7",
+      "creditsSource": "CREDITS.csv"
+    },
+    {
+      "path": "spritesheets/body/bodies/male/hurt.png",
+      "sha256": "417684c67b26467347953542069791af43a607008ddcb9f444a53aca3e10b820",
+      "creditsSource": "CREDITS.csv"
+    },
+    {
+      "path": "spritesheets/body/bodies/male/idle.png",
+      "sha256": "9c3d17def9bd0574e25ce3162a243f18654479e38c04164bc12607429b013fa2",
+      "creditsSource": "CREDITS.csv"
+    },
+    {
+      "path": "spritesheets/body/bodies/male/jump.png",
+      "sha256": "bcfaab14f55a8f741c5e8444efed59d4eb0d21519ee754b8e8e56a7c421a3b4a",
+      "creditsSource": "CREDITS.csv"
+    },
+    {
+      "path": "spritesheets/body/bodies/male/run.png",
+      "sha256": "f8eaec1f9a80b8bad5c402ac4d3215f0a513acfae988dd84a39cb370a78fde92",
+      "creditsSource": "CREDITS.csv"
+    },
+    {
+      "path": "spritesheets/body/bodies/male/shoot.png",
+      "sha256": "9657e0fa29b1974976b037f336625ae5d346554453b81a29d013b9289316961f",
+      "creditsSource": "CREDITS.csv"
+    },
+    {
+      "path": "spritesheets/body/bodies/male/sit.png",
+      "sha256": "ff339e6b3e34894d32db67c61d6a396e2d4286764aa26be79f0660f439317d0c",
+      "creditsSource": "CREDITS.csv"
+    },
+    {
+      "path": "spritesheets/body/bodies/male/slash.png",
+      "sha256": "662e208502b0f060041cd3e8c65b6445117f174e9435b68e619b874e36b0069d",
+      "creditsSource": "CREDITS.csv"
+    },
+    {
+      "path": "spritesheets/body/bodies/male/spellcast.png",
+      "sha256": "fbfe1225c84f362daeb18ed8429cf3764353409d4bf82f1710e53cf17807d040",
+      "creditsSource": "CREDITS.csv"
+    },
+    {
+      "path": "spritesheets/body/bodies/male/thrust.png",
+      "sha256": "9e08026c201c3dac2f99b6d48e41ba9232828df3e9ebb2b0cb4e6fe9acc220e3",
+      "creditsSource": "CREDITS.csv"
+    },
+    {
+      "path": "spritesheets/body/bodies/male/walk.png",
+      "sha256": "1e0e8f0c11ba5f4f7b3d4439fc416802b4227da2fe146c13de3de254d9f87f77",
+      "creditsSource": "CREDITS.csv"
+    },
+    {
+      "path": "spritesheets/body/wheelchair/adult/background/black.png",
+      "sha256": "924226d792d16c61bbac0174a9f34c421f51510520b63ab6e705aa4db4b2b5f4",
+      "creditsSource": "CREDITS.csv"
+    },
+    {
+      "path": "spritesheets/body/wheelchair/adult/foreground/black.png",
+      "sha256": "fef7b1504d0e64e816462791f56c3f790c60697a93d78f643e17b551e266cd45",
+      "creditsSource": "CREDITS.csv"
+    }
+  ]
+}

@@ -18,9 +18,12 @@ import { createNodeCanvasAdapter } from './helpers/node-canvas-adapter.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const assetMetadataBase = path.join(here, '../../../assets');
-const upstreamBase = path.join(here, '../../../upstream');
 const sheetRoot = path.join(assetMetadataBase, 'sheet_definitions');
 const paletteRoot = path.join(assetMetadataBase, 'palette_definitions');
+const realPixelFixtureBase = path.join(
+  here,
+  'fixtures/upstream-pixels',
+);
 
 function loadCatalog(rels: readonly FilePath[]): Catalog {
   const records: Record<FilePath, ItemDefinition> = {};
@@ -59,7 +62,7 @@ function syntheticCatalog(items: ItemDefinition[]): Catalog {
 }
 
 describe('makeResolvePalette', () => {
-  describe('with real upstream data', () => {
+  describe('with real attributed fixtures', () => {
     const palettes = loadRealPalettes();
     const catalog = loadCatalog(['body/body.json']);
     const bodyItem = catalog.byItemId.get('body')!;
@@ -147,7 +150,11 @@ describe('makeResolvePalette', () => {
           body: { typeName: 'body', name: 'Body Color', recolor: 'brown' },
         },
       };
-      const base = { catalog, adapter, spritesheetsBaseUrl: upstreamBase };
+      const base = {
+        catalog,
+        adapter,
+        spritesheetsBaseUrl: realPixelFixtureBase,
+      };
 
       const raw = await composeSelections(selections, base);
       const recolored = await composeSelections(selections, {

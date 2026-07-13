@@ -20,11 +20,11 @@ import type {
 } from '../src/types.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const upstreamBase = path.join(here, '../../../assets');
+const assetsBase = path.join(here, '../../../assets');
 
 function realPalettes(): PaletteMetadata {
   const records: Record<FilePath, unknown> = {};
-  const root = path.join(upstreamBase, 'palette_definitions');
+  const root = path.join(assetsBase, 'palette_definitions');
   const walk = (dir: string, rel: string): void => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
       const abs = path.join(dir, e.name);
@@ -44,7 +44,7 @@ function realBodyCatalog(): Catalog {
   return createCatalog({
     'body/body.json': JSON.parse(
       readFileSync(
-        path.join(upstreamBase, 'sheet_definitions/body/body.json'),
+        path.join(assetsBase, 'sheet_definitions/body/body.json'),
         'utf8',
       ),
     ) as ItemDefinition,
