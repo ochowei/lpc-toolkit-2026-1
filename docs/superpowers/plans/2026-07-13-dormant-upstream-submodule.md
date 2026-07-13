@@ -495,7 +495,7 @@ rtk git commit -m "docs(plan): record core fixture migration"
 - Consumes: Task 1 `parseUpstreamFixtureProvenance` and `verifyUpstreamFixtureIntegrity`, repository gitlink, `asset-release.json`, generated `assets/asset-manifest.json`, and Task 2 fixture provenance.
 - Produces: `parseUpstreamGitlink(output): string`, `readUpstreamGitlink(repoRoot): string`, `verifyUpstreamPin({ repoRoot, gitlinkSha? }): UpstreamPinVerification`, and Web command `verify-upstream-pin`.
 
-- [ ] **Step 1: Write failing pin-verifier tests**
+- [x] **Step 1: Write failing pin-verifier tests**
 
 Create `packages/web/test/upstream-pin.test.ts` with a temp repository fixture that writes:
 
@@ -528,7 +528,7 @@ that shows both repository identifiers. Add missing-manifest and
 malformed-gitlink cases. Reuse Task 1 helpers to generate the fixture tree; do
 not create an actual submodule in tests.
 
-- [ ] **Step 2: Run the focused pin test and verify RED**
+- [x] **Step 2: Run the focused pin test and verify RED**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/web exec vitest run test/upstream-pin.test.ts
@@ -536,7 +536,7 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/upstream-pin.test.ts
 
 Expected: FAIL because `../scripts/upstream-pin` does not exist.
 
-- [ ] **Step 3: Implement the verifier module**
+- [x] **Step 3: Implement the verifier module**
 
 Create `packages/web/scripts/upstream-pin.ts` with these exact public interfaces:
 
@@ -588,7 +588,7 @@ if (pins.some(([, value]) => value !== releaseSha)) {
 }
 ```
 
-- [ ] **Step 4: Add the repository-only CLI wrapper**
+- [x] **Step 4: Add the repository-only CLI wrapper**
 
 Create `packages/web/scripts/verify-upstream-pin.ts`:
 
@@ -613,7 +613,7 @@ Add the Web package script:
 "verify-upstream-pin": "tsx scripts/verify-upstream-pin.ts"
 ```
 
-- [ ] **Step 5: Run verifier tests, real verifier, and Web typecheck**
+- [x] **Step 5: Run verifier tests, real verifier, and Web typecheck**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/web exec vitest run test/upstream-pin.test.ts test/upstream-test-fixtures.test.ts
@@ -623,14 +623,14 @@ rtk pnpm --filter @lpc-toolkit/web typecheck
 
 Expected: tests PASS; CLI reports 17 fixture files and SHA `212abfd...`; typecheck PASS.
 
-- [ ] **Step 6: Commit Task 3 implementation**
+- [x] **Step 6: Commit Task 3 implementation**
 
 ```bash
 rtk git add packages/web/scripts/upstream-pin.ts packages/web/scripts/verify-upstream-pin.ts packages/web/test/upstream-pin.test.ts packages/web/package.json
 rtk git commit -m "feat(web): verify dormant upstream pins"
 ```
 
-- [ ] **Step 7: Record Task 3 evidence in this plan**
+- [x] **Step 7: Record Task 3 evidence in this plan**
 
 Mark Task 3 complete and append concrete implementation, commit, and verification records. Commit the plan record:
 
@@ -638,6 +638,13 @@ Mark Task 3 complete and append concrete implementation, commit, and verificatio
 rtk git add docs/superpowers/plans/2026-07-13-dormant-upstream-submodule.md
 rtk git commit -m "docs(plan): record upstream pin verifier"
 ```
+
+#### Task 3 execution record
+
+- Implementation: Added repository-only four-way pin verification using `git ls-tree HEAD upstream`, release config, prepared asset manifest, and Core fixture provenance; aggregated labeled SHA mismatch errors, source repository mismatch reporting, integrity delegation, and the `verify-upstream-pin` CLI/package script. No verifier path reads `upstream/`.
+- Implementation commit: `15f481221` (`feat(web): verify dormant upstream pins`).
+- Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/upstream-pin.test.ts test/upstream-test-fixtures.test.ts` PASS, 21/21; `rtk pnpm --filter @lpc-toolkit/web verify-upstream-pin` PASS on elevated rerun, reporting 17 fixture files and SHA `212abfd21493e9957bd556250ac538fa40fe1fc9`; Web typecheck underlying `tsc --noEmit` PASS with the RTK filtered-command wrapper caveat; `rtk pnpm check:boundaries` PASS.
+- Review: Task-scoped spec-compliance and code-quality review approved with no findings.
 
 ---
 
