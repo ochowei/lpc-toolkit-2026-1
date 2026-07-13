@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { LandingPage } from '../src/components/landing-page';
 
 describe('LandingPage', () => {
-  it('renders a complete single-entry CLI guide and one composer action', () => {
+  it('renders a complete single-entry CLI guide and two composer actions', () => {
     const html = renderToStaticMarkup(<LandingPage onNavigate={() => {}} />);
 
     expect(html).toContain('LPC Toolkit');
@@ -35,6 +35,9 @@ describe('LandingPage', () => {
     expect(html).toContain('.credits.txt');
     expect(html).toContain('.credits.csv');
     expect(html).toContain('Keep both attribution files with exported sprites.');
-    expect(html.match(/Open Composer/g)).toHaveLength(1);
+    const headerStart = html.indexOf('<header');
+    const headerEnd = html.indexOf('</header>');
+    expect(html.slice(headerStart, headerEnd)).toContain('Open Composer');
+    expect(html.match(/Open Composer/g)).toHaveLength(2);
   });
 });
