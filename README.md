@@ -35,7 +35,7 @@ The core composition pipeline, shared presets, web UI, and CLI are working and t
 
 ```
 assets/            LPC art assets (spritesheets, sheet definitions, palette definitions, CREDITS.csv) migrated from upstream
-upstream/          git submodule, read-only — LPC source (reference material only)
+upstream/          optional read-only git submodule provenance/reference for LPC source research
 packages/core/     pure TypeScript composition logic (no DOM, no fs)
 packages/presets/  shared preset definitions and pure preset-application helpers
 packages/web/      React + Vite browser UI
@@ -46,9 +46,10 @@ packages/cli/      Node CLI with filesystem, canvas, ZIP, and agent-friendly JSO
 
 These constraints are load-bearing — see `AGENTS.md` for the authoritative list.
 
-1. **`upstream/` is a read-only git submodule.** Never modify it, never
-   commit inside it, never run a package manager inside it. It is now legacy/reference,
-   as active assets are migrated to the local `assets/` folder.
+1. **`upstream/` is an optional read-only git submodule.** Never modify it,
+   never commit inside it, never run a package manager inside it. It is now
+   legacy/reference, as active assets are migrated to the local `assets/`
+   folder.
 2. **License is GPL-3.0-or-later.** Upstream is GPL-3.0 and we inherit it. New
    dependencies must be license-compatible.
 3. **Attribution is mandatory.** Every rendered sprite must carry credit
@@ -61,12 +62,10 @@ These constraints are load-bearing — see `AGENTS.md` for the authoritative lis
 
 ## Getting started
 
-The LPC source references a submodule, so clone recursively:
+Use a standard clone:
 
 ```bash
-git clone --recurse-submodules <repo-url>
-# or, if already cloned:
-git submodule update --init
+git clone <repo-url>
 ```
 
 Install dependencies and verify the workspace:
@@ -85,10 +84,12 @@ tarball.
 
 All core art assets (spritesheets, sheet definitions, palette definitions, and
 `CREDITS.csv`) have been migrated from the `upstream/` submodule into the local
-`assets/` folder. The submodule is read-only reference and provenance material.
-Production web and CLI flows use local or pinned/cache-backed assets; parity
-tests use an isolated parity checkout and never install packages inside
-`upstream/`.
+`assets/` folder. The standard clone does not initialize the submodule.
+Install, typecheck, tests, builds, ordinary E2E, CLI packaging, and publish
+validation use pinned local/cache assets and checked-in test fixtures instead.
+`upstream/` is an optional read-only reference; initialize it only for
+deliberate source research. Parity uses an isolated parity checkout: a
+separate isolated checkout of the same pinned commit.
 
 The CLI performs first-time asset preparation from its pinned release download,
 verifies the checksum, and stores a platform cache. Later commands use verified cache reuse.

@@ -21,7 +21,8 @@ Core constraints to internalize early:
 - Canvas and image loading are injected through adapters.
 - GPL-3.0-or-later compatibility matters.
 - Every rendered sprite must preserve attribution metadata.
-- `upstream/` is read-only reference material.
+- `upstream/` is optional read-only reference material.
+- Do not initialize `upstream/` for normal setup.
 
 ## Architecture Layers
 

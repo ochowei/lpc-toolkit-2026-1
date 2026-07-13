@@ -47,8 +47,9 @@ export function isWebGlReadbackWarningText(text: string): boolean {
 
 /**
  * Narrowly anchored allowlist. The only entry today is the catalog
- * data-quality warning; the root cause is in `upstream/` (a read-only
- * git submodule — see CLAUDE.md hard rule). See
+ * data-quality warning; the root cause is an upstream data-quality issue at
+ * the pinned source revision, not a normal runtime dependency on the dormant
+ * gitlink. See
  * docs/superpowers/specs/2026-05-28-e2e-noise-cleanup-design.md §3.3.
  */
 interface ConsoleAllowlistEntry {
