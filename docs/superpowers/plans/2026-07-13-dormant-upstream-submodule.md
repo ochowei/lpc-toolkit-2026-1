@@ -359,7 +359,7 @@ rtk git commit -m "docs(plan): record upstream fixture tooling"
 - Consumes: Task 1 `materialize-upstream-test-fixtures` command and generated fixture layout.
 - Produces: `REAL_PIXEL_FIXTURE_ROOT` local test constant and Core tests that never resolve into tracked `upstream/`.
 
-- [ ] **Step 1: Write the failing Core fixture contract**
+- [x] **Step 1: Write the failing Core fixture contract**
 
 Create `packages/core/test/real-pixel-fixtures.test.ts`:
 
@@ -399,7 +399,7 @@ describe('real-pixel fixture bundle', () => {
 });
 ```
 
-- [ ] **Step 2: Run the Core fixture contract and verify RED**
+- [x] **Step 2: Run the Core fixture contract and verify RED**
 
 Run:
 
@@ -409,7 +409,7 @@ rtk pnpm --filter @lpc-toolkit/core exec vitest run test/real-pixel-fixtures.tes
 
 Expected: FAIL with `ENOENT` for `provenance.json`.
 
-- [ ] **Step 3: Materialize the checked-in fixture bundle from the pinned read-only source**
+- [x] **Step 3: Materialize the checked-in fixture bundle from the pinned read-only source**
 
 Run the Task 1 command against the already initialized, read-only source checkout:
 
@@ -419,7 +419,7 @@ rtk pnpm --filter @lpc-toolkit/web materialize-upstream-test-fixtures --source u
 
 Expected: `wrote 17 attributed PNG fixtures from 212abfd21493e9957bd556250ac538fa40fe1fc9`. Confirm `rtk git status --short upstream` prints nothing.
 
-- [ ] **Step 4: Point Core composition and recolor tests at fixtures**
+- [x] **Step 4: Point Core composition and recolor tests at fixtures**
 
 In both `compose.test.ts` and `recolor-resolve.test.ts`, replace the direct submodule base with:
 
@@ -438,7 +438,7 @@ expect(sheet.credits.entries.length).toBeGreaterThan(0);
 
 Update `node-canvas-adapter.ts` to say the caller supplies either a fixture filesystem root or another concrete path; remove the claim that tests point at `upstream/`.
 
-- [ ] **Step 5: Prove Core no longer references the tracked submodule**
+- [x] **Step 5: Prove Core no longer references the tracked submodule**
 
 Run:
 
@@ -448,7 +448,7 @@ rtk rg -n "\.\./\.\./\.\./upstream|spritesheetsBaseUrl.*upstream|upstreamBase" p
 
 Expected: no matches. Historical comments saying behavior was lifted from upstream are allowed when they do not resolve a filesystem path.
 
-- [ ] **Step 6: Run focused Core verification**
+- [x] **Step 6: Run focused Core verification**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/core exec vitest run test/real-pixel-fixtures.test.ts test/compose.test.ts test/recolor-resolve.test.ts
@@ -458,14 +458,14 @@ rtk pnpm check:boundaries
 
 Expected: all focused tests PASS, Core typecheck PASS, boundaries PASS.
 
-- [ ] **Step 7: Commit Task 2 implementation**
+- [x] **Step 7: Commit Task 2 implementation**
 
 ```bash
 rtk git add packages/core/test/fixtures/upstream-pixels packages/core/test/real-pixel-fixtures.test.ts packages/core/test/compose.test.ts packages/core/test/recolor-resolve.test.ts packages/core/test/helpers/node-canvas-adapter.ts
 rtk git commit -m "test(core): replace submodule pixels with fixtures"
 ```
 
-- [ ] **Step 8: Record Task 2 evidence in this plan**
+- [x] **Step 8: Record Task 2 evidence in this plan**
 
 Mark Task 2 complete and append the concrete implementation note, implementation commit hash, fixture count/size, and exact PASS results. Commit the plan record:
 
@@ -473,6 +473,13 @@ Mark Task 2 complete and append the concrete implementation note, implementation
 rtk git add docs/superpowers/plans/2026-07-13-dormant-upstream-submodule.md
 rtk git commit -m "docs(plan): record core fixture migration"
 ```
+
+#### Task 2 execution record
+
+- Implementation: Materialized exactly 17 real PNG fixtures (124K total) under `packages/core/test/fixtures/upstream-pixels`, with source SHA `212abfd21493e9957bd556250ac538fa40fe1fc9`, exact SHA-256 provenance, minimal credits, and per-row credit payload hashes. Redirected Core compose, wheelchair, recolor, and hash test paths away from `upstream/`; preserved the real-pixel attribution assertions and added a checked-in fixture contract.
+- Implementation commits: `6ca9c0925` (`test(core): replace submodule pixels with fixtures`), `2e3ada4bb` (`test(fixtures): enforce exact fixture credit rows`), `1236c5303` (`fix(fixtures): enforce exact credit payload contract`).
+- Verification: Core focused real-pixel suite `test/real-pixel-fixtures.test.ts test/compose.test.ts test/recolor-resolve.test.ts` PASS (51/51 before the contract-only fix; rerun PASS after the fix); Core typecheck PASS; `rtk pnpm check:boundaries` PASS; Core grep audit found no tracked `upstream` path references; Web fixture-tool tests PASS including exact credit payload regression. The materialization command used the absolute read-only `upstream` path because the filtered package wrapper resolves a relative `--source` from `packages/web`; no files in `upstream/` changed.
+- Review: Task-scoped spec-compliance and code-quality review approved after correcting five legacy credit filename aliases and enforcing exact credit payload hashes.
 
 ---
 
