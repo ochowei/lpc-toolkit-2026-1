@@ -23,6 +23,8 @@ jobs:
       - run: pnpm --filter @lpc-toolkit/cli verify:release-tag
       - run: npm install --global npm@11.5.1
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @lpc-toolkit/web prepare-assets
+      - run: pnpm verify:upstream-pin
       - run: pnpm check:boundaries
       - run: pnpm --filter @lpc-toolkit/cli typecheck
       - run: pnpm --filter @lpc-toolkit/cli test

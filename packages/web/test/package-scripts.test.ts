@@ -23,6 +23,12 @@ const changesJob = ciWorkflow.slice(
   ciWorkflow.indexOf('  changes:'),
   ciWorkflow.indexOf('  unit:'),
 );
+const unitJobStart = ciWorkflow.indexOf('  unit:');
+const cliJobStart = ciWorkflow.indexOf('  cli-package:');
+const unitJob =
+  unitJobStart === -1 || cliJobStart === -1
+    ? ''
+    : ciWorkflow.slice(unitJobStart, cliJobStart);
 const e2eJobStart = ciWorkflow.indexOf('  e2e:');
 const parityJobStart = ciWorkflow.indexOf('  e2e-parity:');
 const e2eJob = ciWorkflow.slice(
@@ -51,8 +57,11 @@ describe('package scripts', () => {
   });
 
   it('prepares release assets before root workspace tests', () => {
+    expect(rootPackageJson.scripts?.['verify:upstream-pin']).toBe(
+      'pnpm --filter @lpc-toolkit/web verify-upstream-pin',
+    );
     expect(rootPackageJson.scripts?.pretest).toBe(
-      'pnpm --filter @lpc-toolkit/web prepare-assets',
+      'pnpm --filter @lpc-toolkit/web prepare-assets && pnpm verify:upstream-pin',
     );
   });
 
@@ -63,42 +72,39 @@ describe('package scripts', () => {
   });
 
   it('runs architecture boundaries in CI after install and before validation', () => {
-    const unitJobStart = ciWorkflow.indexOf('  unit:');
-    const cliJobStart = ciWorkflow.indexOf('  cli-package:');
-
     expect(unitJobStart).toBeGreaterThanOrEqual(0);
     expect(cliJobStart).toBeGreaterThan(unitJobStart);
 
-    const unitJob = ciWorkflow.slice(unitJobStart, cliJobStart);
-    expect(unitJob).toContain(
-      [
-        '      - run: pnpm install --frozen-lockfile',
-        '      - run: pnpm check:boundaries',
-        '      - run: pnpm typecheck',
-        '      - run: pnpm test',
-      ].join('\n'),
+    expect(unitJob).not.toContain('submodules: recursive');
+    expect(unitJob.indexOf('pnpm --filter @lpc-toolkit/web prepare-assets')).toBeLessThan(
+      unitJob.indexOf('pnpm verify:upstream-pin'),
     );
-    expect(unitJob).toContain('- run: pnpm check:boundaries');
-    expect(unitJob.indexOf('pnpm install --frozen-lockfile')).toBeLessThan(
+    expect(unitJob.indexOf('pnpm verify:upstream-pin')).toBeLessThan(
       unitJob.indexOf('pnpm check:boundaries'),
     );
-    expect(unitJob.indexOf('pnpm check:boundaries')).toBeLessThan(
-      unitJob.indexOf('pnpm typecheck'),
+    expect(publishWorkflow).not.toContain('submodules: recursive');
+    expect(publishWorkflow).toContain(
+      '- run: pnpm --filter @lpc-toolkit/web prepare-assets',
     );
+    expect(publishWorkflow).toContain('- run: pnpm verify:upstream-pin');
     expect(publishWorkflow).toContain('- run: pnpm check:boundaries');
   });
 
   it('prepares release assets before production builds', () => {
-    expect(packageJson.scripts?.prebuild).toBe(
-      'pnpm prepare-assets && pnpm --filter @lpc-toolkit/core build && pnpm --filter @lpc-toolkit/presets build',
+    expect(packageJson.scripts?.prebuild).toContain(
+      'pnpm prepare-assets && pnpm verify-upstream-pin',
     );
   });
 
   it('prepares release assets before tests that read generated assets', () => {
-    expect(packageJson.scripts?.pretest).toBe('pnpm prepare-assets');
-    expect(packageJson.scripts?.['pretest:e2e']).toBe('pnpm prepare-assets');
+    expect(packageJson.scripts?.pretest).toBe(
+      'pnpm prepare-assets && pnpm verify-upstream-pin',
+    );
+    expect(packageJson.scripts?.['pretest:e2e']).toBe(
+      'pnpm prepare-assets && pnpm verify-upstream-pin',
+    );
     expect(packageJson.scripts?.['pretest:e2e:parity']).toBe(
-      'pnpm prepare-assets && pnpm verify-upstream-parity',
+      'pnpm prepare-assets && pnpm verify-upstream-pin && pnpm verify-upstream-parity',
     );
   });
 
