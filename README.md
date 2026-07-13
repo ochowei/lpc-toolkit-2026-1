@@ -215,7 +215,7 @@ commands for:
 
 Node.js 22 or newer is required. Install the public CLI package from npm:
 
-The current public package contract is `@lpc-toolkit/cli` version `0.1.2`.
+The current package contract is `@lpc-toolkit/cli` version `0.1.3-alpha-1`.
 
 ```bash
 npm install -g @lpc-toolkit/cli
@@ -263,7 +263,7 @@ pnpm --filter @lpc-toolkit/cli build
 node packages/cli/dist/index.js --help
 pnpm --filter @lpc-toolkit/cli test:package
 pnpm --filter @lpc-toolkit/cli pack --pack-destination /tmp
-pnpm add -g /tmp/lpc-toolkit-cli-0.1.2.tgz
+pnpm add -g /tmp/lpc-toolkit-cli-0.1.3-alpha-1.tgz
 lpc-toolkit --help
 ```
 
@@ -273,8 +273,10 @@ published.
 
 ### Maintainers: RC validation, npm bootstrap, and later releases
 
-Before any stable release, update `packages/cli/package.json` to the intended
-stable version and push a matching `v<version>-rc.<number>` tag. The **CLI
+Before any release-candidate run, update `packages/cli/package.json` to the
+intended release version, including any prerelease suffix, and push a matching
+`v<version>-rc.<number>` tag. For example, package version `0.1.3-alpha-1`
+uses tag `v0.1.3-alpha-1-rc.1`. The **CLI
 Release Candidate** workflow verifies the full CLI package flow on
 `macos-latest` and `windows-latest`; it does not publish npm. Both jobs must pass
 before the matching stable tag is created.

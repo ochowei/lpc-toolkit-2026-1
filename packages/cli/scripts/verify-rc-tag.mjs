@@ -7,17 +7,18 @@ const packageJson = JSON.parse(
   readFileSync(path.join(packageRoot, 'package.json'), 'utf8'),
 );
 const tag = process.env.GITHUB_REF_NAME;
-const match = /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-rc\.(0|[1-9]\d*)$/u.exec(
-  tag ?? '',
-);
+const match =
+  /^v((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?)-rc\.(0|[1-9]\d*)$/u.exec(
+    tag ?? '',
+  );
 
 if (!match) {
   console.error(
-    `RC tag must match vX.Y.Z-rc.N without leading zeroes; received ${tag ?? 'unset'}.`,
+    `RC tag must match vX.Y.Z[-prerelease]-rc.N without leading zeroes; received ${tag ?? 'unset'}.`,
   );
   process.exitCode = 1;
 } else {
-  const baseVersion = `${match[1]}.${match[2]}.${match[3]}`;
+  const baseVersion = match[1];
   if (baseVersion !== packageJson.version) {
     console.error(
       `RC tag base mismatch: expected ${packageJson.version}, received ${baseVersion}.`,

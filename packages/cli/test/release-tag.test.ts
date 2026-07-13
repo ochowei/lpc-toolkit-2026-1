@@ -50,7 +50,7 @@ describe('verify RC tag', () => {
 
     expect(result.status).toBe(1);
     expect(result.stderr).toContain(
-      'RC tag must match vX.Y.Z-rc.N without leading zeroes;',
+      'RC tag must match vX.Y.Z[-prerelease]-rc.N without leading zeroes;',
     );
   });
 
