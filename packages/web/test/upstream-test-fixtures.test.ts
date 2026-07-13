@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -57,6 +58,39 @@ function creditFilenames(credits: string): string[] {
     });
 }
 
+function creditFields(line: string): readonly [string, string, string, string, string] {
+  const fields = [...line.matchAll(/"([^"]*)"/g)].map((match) => match[1]);
+  if (fields.length !== 5) {
+    throw new Error(`Malformed credit row: ${line}`);
+  }
+
+  return [
+    fields[0],
+    fields[1],
+    fields[2],
+    fields[3],
+    fields[4],
+  ];
+}
+
+function creditRows(credits: string): ReadonlyMap<string, string> {
+  const rows = new Map<string, string>();
+
+  for (const line of credits.split(/\r?\n/).slice(1)) {
+    if (line.length === 0) {
+      continue;
+    }
+
+    rows.set(creditFields(line)[0], line);
+  }
+
+  return rows;
+}
+
+function sha256(text: string): string {
+  return createHash('sha256').update(text).digest('hex');
+}
+
 function makeSource(): string {
   const sourceRoot = mkdtempSync(path.join(tmpdir(), 'lpc-upstream-source-'));
   return populateSource(sourceRoot);
@@ -81,20 +115,25 @@ function populateSource(sourceRoot: string): string {
   return sourceRoot;
 }
 
-function materialize(): { fixtureRoot: string; provenance: ReturnType<typeof materializeUpstreamTestFixtures> } {
+function materialize(): {
+  fixtureRoot: string;
+  provenance: ReturnType<typeof materializeUpstreamTestFixtures>;
+  sourceRoot: string;
+} {
+  const sourceRoot = makeSource();
   const fixtureRoot = mkdtempSync(path.join(tmpdir(), 'lpc-core-fixtures-'));
   const provenance = materializeUpstreamTestFixtures({
-    sourceRoot: makeSource(),
+    sourceRoot,
     fixtureRoot,
     sourceRepository: SOURCE_REPOSITORY,
     sourceSha: SOURCE_SHA,
   });
-  return { fixtureRoot, provenance };
+  return { fixtureRoot, provenance, sourceRoot };
 }
 
 describe('upstream real-pixel fixtures', () => {
   it('materializes the exact allowlist with minimal credits and hashes', () => {
-    const { fixtureRoot, provenance } = materialize();
+    const { fixtureRoot, provenance, sourceRoot } = materialize();
 
     expect(provenance.sourceRepository).toBe(SOURCE_REPOSITORY);
     expect(provenance.sourceSha).toBe(SOURCE_SHA);
@@ -102,10 +141,35 @@ describe('upstream real-pixel fixtures', () => {
       FIXTURE_SPRITE_PATHS,
     );
     expect(provenance.files.every(({ sha256 }) => /^[0-9a-f]{64}$/.test(sha256))).toBe(true);
+    expect(
+      provenance.files.every((file) => {
+        const creditRowSha256 = Reflect.get(file, 'creditRowSha256');
+        return (
+          typeof creditRowSha256 === 'string' &&
+          /^[0-9a-f]{64}$/.test(creditRowSha256)
+        );
+      }),
+    ).toBe(true);
+    const sourceRows = creditRows(
+      readFileSync(path.join(sourceRoot, 'CREDITS.csv'), 'utf8'),
+    );
     const credits = readFileSync(path.join(fixtureRoot, 'CREDITS.csv'), 'utf8');
     expect([...creditFilenames(credits)].sort()).toEqual(
       [...FIXTURE_SPRITE_PATHS.map(fixtureCreditPath)].sort(),
     );
+    const fixtureRows = creditRows(credits);
+    for (const file of provenance.files) {
+      const fixturePath = fixtureCreditPath(file.path);
+      const fixtureRow = fixtureRows.get(fixturePath);
+      const sourceRow = sourceRows.get(sourceCreditPath(file.path));
+      expect(fixtureRow).toBeDefined();
+      expect(sourceRow).toBeDefined();
+      expect(creditFields(fixtureRow!)).toEqual([
+        fixturePath,
+        ...creditFields(sourceRow!).slice(1),
+      ]);
+      expect(Reflect.get(file, 'creditRowSha256')).toBe(sha256(fixtureRow!));
+    }
     expect(credits).not.toContain('unrelated/item.png');
     expect(() => verifyUpstreamFixtureIntegrity(fixtureRoot, provenance)).not.toThrow();
   });
@@ -198,6 +262,22 @@ describe('upstream real-pixel fixtures', () => {
     );
     expect(() => verifyUpstreamFixtureIntegrity(fixtureRoot, provenance)).toThrow(
       /Missing credited fixture row: body\/bodies\/male\/combat_idle\.png/,
+    );
+  });
+
+  it('rejects fixture credits with altered non-path payloads', () => {
+    const { fixtureRoot, provenance } = materialize();
+    const creditsPath = path.join(fixtureRoot, 'CREDITS.csv');
+    writeFileSync(
+      creditsPath,
+      readFileSync(creditsPath, 'utf8').replace(
+        creditRow('body/bodies/male/combat_idle.png'),
+        '"body/bodies/male/combat_idle.png","","","",""',
+      ),
+    );
+
+    expect(() => verifyUpstreamFixtureIntegrity(fixtureRoot, provenance)).toThrow(
+      /CREDITS\.csv row mismatch for body\/bodies\/male\/combat_idle\.png/,
     );
   });
 });

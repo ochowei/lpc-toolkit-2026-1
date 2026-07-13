@@ -45,6 +45,7 @@ export interface UpstreamFixtureFile {
   readonly path: string;
   readonly sha256: string;
   readonly creditsSource: 'CREDITS.csv';
+  readonly creditRowSha256: string;
 }
 
 export interface UpstreamFixtureProvenance {
@@ -121,6 +122,10 @@ function hashFile(filePath: string): string {
   return hashBuffer(readFileSync(filePath));
 }
 
+function hashText(text: string): string {
+  return hashBuffer(Buffer.from(text, 'utf8'));
+}
+
 function fixtureCreditPath(relativePath: string): string {
   return relativePath.replace(/^spritesheets\//, '');
 }
@@ -192,10 +197,21 @@ function parseFixtureFile(
     );
   }
 
+  const creditRowSha256 = requireNonEmptyString(
+    record.creditRowSha256,
+    `files[${index}].creditRowSha256`,
+  );
+  if (!/^[0-9a-f]{64}$/.test(creditRowSha256)) {
+    throw new Error(
+      `files[${index}].creditRowSha256 must match /^[0-9a-f]{64}$/`,
+    );
+  }
+
   return {
     path: filePath,
     sha256,
     creditsSource: 'CREDITS.csv',
+    creditRowSha256,
   };
 }
 
@@ -293,6 +309,9 @@ export function materializeUpstreamTestFixtures(
   rmSync(fixtureRoot, { force: true, recursive: true });
   mkdirSync(fixtureRoot, { recursive: true });
 
+  const credits = readMinimalCredits(sourceRoot);
+  const creditRows = parseCreditsRows(credits).rows;
+
   const files = FIXTURE_SPRITE_PATHS.map((relativePath) => {
     const sourcePath = resolveInside(sourceRoot, relativePath);
     if (!statSync(sourcePath).isFile()) {
@@ -303,16 +322,22 @@ export function materializeUpstreamTestFixtures(
     mkdirSync(path.dirname(targetPath), { recursive: true });
     copyFileSync(sourcePath, targetPath);
 
+    const creditRow = creditRows.get(fixtureCreditPath(relativePath));
+    if (!creditRow) {
+      throw new Error(`Missing generated fixture credit row: ${relativePath}`);
+    }
+
     return {
       path: relativePath,
       sha256: hashFile(targetPath),
       creditsSource: 'CREDITS.csv' as const,
+      creditRowSha256: hashText(creditRow),
     };
   });
 
   writeFileSync(
     resolveInside(fixtureRoot, 'CREDITS.csv'),
-    readMinimalCredits(sourceRoot),
+    credits,
   );
 
   const provenance: UpstreamFixtureProvenance = {
@@ -383,6 +408,21 @@ export function verifyUpstreamFixtureIntegrity(
   for (const actualCreditPath of creditRows.keys()) {
     if (!expectedCreditSet.has(actualCreditPath)) {
       throw new Error(`Unexpected credited fixture row: ${actualCreditPath}`);
+    }
+  }
+
+  for (const file of provenance.files) {
+    const creditPath = fixtureCreditPath(file.path);
+    const creditRow = creditRows.get(creditPath);
+    if (!creditRow) {
+      throw new Error(`Missing credited fixture row: ${creditPath}`);
+    }
+
+    const actualCreditRowSha256 = hashText(creditRow);
+    if (actualCreditRowSha256 !== file.creditRowSha256) {
+      throw new Error(
+        `CREDITS.csv row mismatch for ${creditPath}: expected ${file.creditRowSha256}, actual ${actualCreditRowSha256}`,
+      );
     }
   }
 

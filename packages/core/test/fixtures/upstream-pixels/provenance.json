@@ -5,87 +5,104 @@
     {
       "path": "spritesheets/body/bodies/male/backslash.png",
       "sha256": "bcdf000ae13e79322799036441a10d01369e7bc5bff23255a9aea622835e8a56",
-      "creditsSource": "CREDITS.csv"
+      "creditsSource": "CREDITS.csv",
+      "creditRowSha256": "44728f4b6b58e092b3099bc8d1eafa15141ba5711061a6e312f27c099110c920"
     },
     {
       "path": "spritesheets/body/bodies/male/climb.png",
       "sha256": "9e5aa920ca88dae17aa63b2068d42d2dc6ff45b5c1590b9b3e495667732c68f9",
-      "creditsSource": "CREDITS.csv"
+      "creditsSource": "CREDITS.csv",
+      "creditRowSha256": "f8f4e455f16282dcbe4f88f096a370c9f8ac7ce7ca7b5ac5e6953719476969ad"
     },
     {
       "path": "spritesheets/body/bodies/male/combat_idle.png",
       "sha256": "b81626c7e1d4fb479fd53687ca0a0fb94d7600a6a46a1287d46a72ed75fb8e00",
-      "creditsSource": "CREDITS.csv"
+      "creditsSource": "CREDITS.csv",
+      "creditRowSha256": "a91fa6dff677badb09a6159cb12e2c63bb35a48b66a4d5516bc041239d6d91bc"
     },
     {
       "path": "spritesheets/body/bodies/male/emote.png",
       "sha256": "ccfd43b427ef44825ab0ab0c8862736d3f5bf18c98250a2b623f7d3d17253632",
-      "creditsSource": "CREDITS.csv"
+      "creditsSource": "CREDITS.csv",
+      "creditRowSha256": "cadad9f3b6c9835914e12eebf9e2baaa23462f40d0796ed06bb7be3827c5a0c5"
     },
     {
       "path": "spritesheets/body/bodies/male/halfslash.png",
       "sha256": "670610b1f20947ceddbe7994ceaaec960fc4c8716f6daab5772872c86e8e6cb7",
-      "creditsSource": "CREDITS.csv"
+      "creditsSource": "CREDITS.csv",
+      "creditRowSha256": "48b8086dd4d7428d3bb03dd74a62c4b513db75abde12bac2d8ce38dfb9bc5e66"
     },
     {
       "path": "spritesheets/body/bodies/male/hurt.png",
       "sha256": "417684c67b26467347953542069791af43a607008ddcb9f444a53aca3e10b820",
-      "creditsSource": "CREDITS.csv"
+      "creditsSource": "CREDITS.csv",
+      "creditRowSha256": "acc31c967f22e8b222c92e44a91ef2ad0e82b260bbde3a2b942f22c281ab7531"
     },
     {
       "path": "spritesheets/body/bodies/male/idle.png",
       "sha256": "9c3d17def9bd0574e25ce3162a243f18654479e38c04164bc12607429b013fa2",
-      "creditsSource": "CREDITS.csv"
+      "creditsSource": "CREDITS.csv",
+      "creditRowSha256": "254af33db954148a1e6bc153570be4334ba99fc0c58bad003f718c92d65fce14"
     },
     {
       "path": "spritesheets/body/bodies/male/jump.png",
       "sha256": "bcfaab14f55a8f741c5e8444efed59d4eb0d21519ee754b8e8e56a7c421a3b4a",
-      "creditsSource": "CREDITS.csv"
+      "creditsSource": "CREDITS.csv",
+      "creditRowSha256": "a871482f933e7ba1fb5a27f374cf17b3110e3ad0b16088376db38895f2e1e86c"
     },
     {
       "path": "spritesheets/body/bodies/male/run.png",
       "sha256": "f8eaec1f9a80b8bad5c402ac4d3215f0a513acfae988dd84a39cb370a78fde92",
-      "creditsSource": "CREDITS.csv"
+      "creditsSource": "CREDITS.csv",
+      "creditRowSha256": "8f5bbcb9ab126cc0bfd03c208149b07b6575af95156ca5458ed56c0a7bcc2315"
     },
     {
       "path": "spritesheets/body/bodies/male/shoot.png",
       "sha256": "9657e0fa29b1974976b037f336625ae5d346554453b81a29d013b9289316961f",
-      "creditsSource": "CREDITS.csv"
+      "creditsSource": "CREDITS.csv",
+      "creditRowSha256": "116557f0c541c41c0ad12ac086383042c094abf4c7fbdeb467b55a995ad70c00"
     },
     {
       "path": "spritesheets/body/bodies/male/sit.png",
       "sha256": "ff339e6b3e34894d32db67c61d6a396e2d4286764aa26be79f0660f439317d0c",
-      "creditsSource": "CREDITS.csv"
+      "creditsSource": "CREDITS.csv",
+      "creditRowSha256": "9ca1b8d0fb33ea985b6d4e105f857ede65df08d9bc758c0361de1a7faa699890"
     },
     {
       "path": "spritesheets/body/bodies/male/slash.png",
       "sha256": "662e208502b0f060041cd3e8c65b6445117f174e9435b68e619b874e36b0069d",
-      "creditsSource": "CREDITS.csv"
+      "creditsSource": "CREDITS.csv",
+      "creditRowSha256": "cea80ff042293b06e804c98c3fe3c5aab6db9c8b14c96131428d03148016ff44"
     },
     {
       "path": "spritesheets/body/bodies/male/spellcast.png",
       "sha256": "fbfe1225c84f362daeb18ed8429cf3764353409d4bf82f1710e53cf17807d040",
-      "creditsSource": "CREDITS.csv"
+      "creditsSource": "CREDITS.csv",
+      "creditRowSha256": "e6cdda75bc2ff9e4d2dc3616c64083833de6e8d8eaf804e3f27f43e33f558bb6"
     },
     {
       "path": "spritesheets/body/bodies/male/thrust.png",
       "sha256": "9e08026c201c3dac2f99b6d48e41ba9232828df3e9ebb2b0cb4e6fe9acc220e3",
-      "creditsSource": "CREDITS.csv"
+      "creditsSource": "CREDITS.csv",
+      "creditRowSha256": "22a00ec449a880387fb88d6ae224ccd9d0adf24316eaa94d641b1fc560aa9472"
     },
     {
       "path": "spritesheets/body/bodies/male/walk.png",
       "sha256": "1e0e8f0c11ba5f4f7b3d4439fc416802b4227da2fe146c13de3de254d9f87f77",
-      "creditsSource": "CREDITS.csv"
+      "creditsSource": "CREDITS.csv",
+      "creditRowSha256": "6a615049bb5a6d185fd2effd09c70acbd04c2f2fa7ea969e11f2a114a16103d9"
     },
     {
       "path": "spritesheets/body/wheelchair/adult/background/black.png",
       "sha256": "924226d792d16c61bbac0174a9f34c421f51510520b63ab6e705aa4db4b2b5f4",
-      "creditsSource": "CREDITS.csv"
+      "creditsSource": "CREDITS.csv",
+      "creditRowSha256": "a45714f6d624d0473c89929df31955b489b66817ff5ebc19de979f7b9221c492"
     },
     {
       "path": "spritesheets/body/wheelchair/adult/foreground/black.png",
       "sha256": "fef7b1504d0e64e816462791f56c3f790c60697a93d78f643e17b551e266cd45",
-      "creditsSource": "CREDITS.csv"
+      "creditsSource": "CREDITS.csv",
+      "creditRowSha256": "00a5c8b40765481b84a5af623d9aca3014d474eefa19635d05bc4ce2b7637a7c"
     }
   ]
 }
