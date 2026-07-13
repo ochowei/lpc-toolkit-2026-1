@@ -102,7 +102,7 @@
   - Verification: Focused landing-page test RED as expected (assertion failure
     for the missing named-character guide).
 
-- [ ] **Step 2: Implement the guide and verify GREEN**
+- [x] **Step 2: Implement the guide and verify GREEN**
 
   In `packages/web/src/components/landing-page.tsx`, remove `selectionExample`,
   `customSelectionCommands`, and `cliCommands`. Add these exact data constants:
@@ -196,7 +196,14 @@
   commit hash, and `Focused landing-page test PASS`; include that record in the
   final verification commit.
 
-- [ ] **Step 3: Run final verification and record results**
+  - Implementation note: Reworked `LandingPage` into a single-column linear
+    guide with the five-step named-character workflow, persistent character
+    storage guidance, secondary CLI command groups, preserved attribution
+    instructions, and one final Web Composer action.
+  - Commit: 53a67bc9de387a1ab535fded67266dfe7e236dbd
+  - Verification: Focused landing-page test PASS.
+
+- [x] **Step 3: Run final verification and record results**
 
   Run each command independently:
 
@@ -219,3 +226,9 @@
   rtk git add docs/superpowers/plans/2026-07-13-web-landing-character-guide.md
   rtk git commit -m "docs(plan): record landing guide verification"
   ```
+
+  - Implementation note: Completed the required final verification commands
+    independently after the landing guide implementation.
+  - Commit: 53a67bc9de387a1ab535fded67266dfe7e236dbd
+  - Verification: Web typecheck PASS; focused landing-page test PASS; boundary
+    check PASS; git diff check PASS.
