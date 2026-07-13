@@ -291,7 +291,7 @@ below supersedes only its Composer action count and placement.
   - Verification: Focused landing-page test RED as expected (assertion failure
     for the missing header Composer action).
 
-- [ ] **Step 2: Add the header action and verify GREEN**
+- [x] **Step 2: Add the header action and verify GREEN**
 
   In `packages/web/src/components/landing-page.tsx`, keep the existing final
   Web Composer `Button` unchanged. Add this Button after the Logo wrapper inside
@@ -327,6 +327,11 @@ below supersedes only its Composer action count and placement.
 
   Then record the implementation commit hash and `Focused landing-page test
   PASS` in this plan.
+
+  - Implementation note: Added the header Composer Button beside the Logo and
+    preserved the existing final Web Composer Button.
+  - Commit: 02c105346334f6da023af5fc3ce4fbc5a69e6c97
+  - Verification: Focused landing-page test PASS.
 
 - [ ] **Step 3: Run final verification and record results**
 
