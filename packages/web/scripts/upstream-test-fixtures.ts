@@ -3,6 +3,7 @@ import {
   copyFileSync,
   existsSync,
   mkdirSync,
+  realpathSync,
   readFileSync,
   readdirSync,
   rmSync,
@@ -83,6 +84,24 @@ function resolveInside(root: string, relativePath: string): string {
 
 function pathContains(root: string, candidate: string): boolean {
   return candidate === root || candidate.startsWith(`${root}${path.sep}`);
+}
+
+function canonicalizeExistingPath(pathValue: string): string {
+  const resolvedPath = path.resolve(pathValue);
+  const missingSegments: string[] = [];
+  let existingPath = resolvedPath;
+
+  while (!existsSync(existingPath)) {
+    const parentPath = path.dirname(existingPath);
+    if (parentPath === existingPath) {
+      break;
+    }
+
+    missingSegments.unshift(path.basename(existingPath));
+    existingPath = parentPath;
+  }
+
+  return path.join(realpathSync(existingPath), ...missingSegments);
 }
 
 function hashBuffer(buffer: Buffer): string {
@@ -205,8 +224,13 @@ export function materializeUpstreamTestFixtures(
   const sourceSha = requireSha(options.sourceSha, 'sourceSha');
   const sourceRoot = path.resolve(options.sourceRoot);
   const fixtureRoot = path.resolve(options.fixtureRoot);
+  const canonicalSourceRoot = canonicalizeExistingPath(sourceRoot);
+  const canonicalFixtureRoot = canonicalizeExistingPath(fixtureRoot);
 
-  if (pathContains(sourceRoot, fixtureRoot) || pathContains(fixtureRoot, sourceRoot)) {
+  if (
+    pathContains(canonicalSourceRoot, canonicalFixtureRoot) ||
+    pathContains(canonicalFixtureRoot, canonicalSourceRoot)
+  ) {
     throw new Error(
       `fixtureRoot must not overlap sourceRoot: ${fixtureRoot} vs ${sourceRoot}`,
     );

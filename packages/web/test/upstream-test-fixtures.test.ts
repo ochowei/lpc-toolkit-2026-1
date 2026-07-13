@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -87,6 +87,26 @@ describe('upstream real-pixel fixtures', () => {
       }),
     ).toThrow(/must not overlap sourceRoot/);
     expect(existsSync(sourceRoot)).toBe(true);
+  });
+
+  it('rejects a fixture root symlink alias before deleting source files', () => {
+    const overlapRoot = mkdtempSync(path.join(tmpdir(), 'lpc-upstream-symlink-overlap-'));
+    const sourceRoot = populateSource(path.join(overlapRoot, 'source'));
+    const aliasRoot = mkdtempSync(path.join(tmpdir(), 'lpc-upstream-symlink-alias-'));
+    const fixtureAliasRoot = path.join(aliasRoot, 'fixture-link');
+    const preservedFixturePath = path.join(sourceRoot, FIXTURE_SPRITE_PATHS[0]);
+
+    symlinkSync(overlapRoot, fixtureAliasRoot, 'dir');
+
+    expect(() =>
+      materializeUpstreamTestFixtures({
+        sourceRoot,
+        fixtureRoot: path.join(fixtureAliasRoot, 'source'),
+        sourceRepository: SOURCE_REPOSITORY,
+        sourceSha: SOURCE_SHA,
+      }),
+    ).toThrow(/must not overlap sourceRoot/);
+    expect(existsSync(preservedFixturePath)).toBe(true);
   });
 
   it('rejects duplicate provenance file paths during parsing', () => {
