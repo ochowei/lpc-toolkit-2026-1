@@ -81,6 +81,10 @@ function resolveInside(root: string, relativePath: string): string {
   return resolvedPath;
 }
 
+function pathContains(root: string, candidate: string): boolean {
+  return candidate === root || candidate.startsWith(`${root}${path.sep}`);
+}
+
 function hashBuffer(buffer: Buffer): string {
   return createHash('sha256').update(buffer).digest('hex');
 }
@@ -170,17 +174,23 @@ function listFilesRecursively(root: string, prefix = ''): string[] {
 
 function verifyProvenanceAllowlist(provenance: UpstreamFixtureProvenance): void {
   const expectedPaths = new Set<string>(FIXTURE_SPRITE_PATHS);
-  const actualPaths = provenance.files.map((file) => file.path);
+  const actualPaths = new Set<string>();
 
-  for (const expectedPath of FIXTURE_SPRITE_PATHS) {
-    if (!actualPaths.includes(expectedPath)) {
-      throw new Error(`Missing provenance file path: ${expectedPath}`);
+  for (const file of provenance.files) {
+    if (!expectedPaths.has(file.path)) {
+      throw new Error(`Unexpected provenance file path: ${file.path}`);
     }
+
+    if (actualPaths.has(file.path)) {
+      throw new Error(`Duplicate provenance file path: ${file.path}`);
+    }
+
+    actualPaths.add(file.path);
   }
 
-  for (const actualPath of actualPaths) {
-    if (!expectedPaths.has(actualPath)) {
-      throw new Error(`Unexpected provenance file path: ${actualPath}`);
+  for (const expectedPath of FIXTURE_SPRITE_PATHS) {
+    if (!actualPaths.has(expectedPath)) {
+      throw new Error(`Missing provenance file path: ${expectedPath}`);
     }
   }
 }
@@ -196,12 +206,9 @@ export function materializeUpstreamTestFixtures(
   const sourceRoot = path.resolve(options.sourceRoot);
   const fixtureRoot = path.resolve(options.fixtureRoot);
 
-  if (
-    fixtureRoot === sourceRoot ||
-    fixtureRoot.startsWith(`${sourceRoot}${path.sep}`)
-  ) {
+  if (pathContains(sourceRoot, fixtureRoot) || pathContains(fixtureRoot, sourceRoot)) {
     throw new Error(
-      `fixtureRoot must not be inside sourceRoot: ${fixtureRoot}`,
+      `fixtureRoot must not overlap sourceRoot: ${fixtureRoot} vs ${sourceRoot}`,
     );
   }
 

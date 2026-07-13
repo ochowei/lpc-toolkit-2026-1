@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -21,6 +21,10 @@ function write(root: string, relativePath: string, data: string | Buffer): void 
 
 function makeSource(): string {
   const sourceRoot = mkdtempSync(path.join(tmpdir(), 'lpc-upstream-source-'));
+  return populateSource(sourceRoot);
+}
+
+function populateSource(sourceRoot: string): string {
   for (const relativePath of FIXTURE_SPRITE_PATHS) {
     write(sourceRoot, relativePath, Buffer.from(`fixture:${relativePath}`));
   }
@@ -68,6 +72,34 @@ describe('upstream real-pixel fixtures', () => {
 
   it('rejects malformed provenance', () => {
     expect(() => parseUpstreamFixtureProvenance('{}')).toThrow(/sourceRepository/);
+  });
+
+  it('rejects a fixture root that overlaps the source root as an ancestor', () => {
+    const overlapRoot = mkdtempSync(path.join(tmpdir(), 'lpc-upstream-overlap-'));
+    const sourceRoot = populateSource(path.join(overlapRoot, 'source'));
+
+    expect(() =>
+      materializeUpstreamTestFixtures({
+        sourceRoot,
+        fixtureRoot: overlapRoot,
+        sourceRepository: SOURCE_REPOSITORY,
+        sourceSha: SOURCE_SHA,
+      }),
+    ).toThrow(/must not overlap sourceRoot/);
+    expect(existsSync(sourceRoot)).toBe(true);
+  });
+
+  it('rejects duplicate provenance file paths during parsing', () => {
+    const { provenance } = materialize();
+
+    expect(() =>
+      parseUpstreamFixtureProvenance(
+        JSON.stringify({
+          ...provenance,
+          files: [...provenance.files, provenance.files[0]],
+        }),
+      ),
+    ).toThrow(/Duplicate provenance file path/);
   });
 
   it('rejects a missing fixture file', () => {
