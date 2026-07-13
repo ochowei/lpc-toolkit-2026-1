@@ -661,7 +661,7 @@ rtk git commit -m "docs(plan): record upstream pin verifier"
 - Consumes: Task 3 `verify-upstream-pin` command and Task 2 checked-in fixtures.
 - Produces: root `verify:upstream-pin` command; lifecycle ordering `prepare-assets -> verify-upstream-pin -> consuming validation`; submodule-free normal GitHub Actions jobs.
 
-- [ ] **Step 1: Tighten workflow/lifecycle tests first**
+- [x] **Step 1: Tighten workflow/lifecycle tests first**
 
 In `package-scripts.test.ts`, derive `unitJob` once and update expectations to require:
 
@@ -705,7 +705,7 @@ expect(publishWorkflow).toContain('- run: pnpm verify:upstream-pin');
 
 Keep the existing assertions that parity uses its isolated checkout and rejects `../../upstream`.
 
-- [ ] **Step 2: Run package script tests and verify RED**
+- [x] **Step 2: Run package script tests and verify RED**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/web exec vitest run test/package-scripts.test.ts
@@ -713,7 +713,7 @@ rtk pnpm --filter @lpc-toolkit/web exec vitest run test/package-scripts.test.ts
 
 Expected: FAIL on old root lifecycle and `unit` job's `submodules: recursive`.
 
-- [ ] **Step 3: Wire package lifecycle commands**
+- [x] **Step 3: Wire package lifecycle commands**
 
 Set root scripts to:
 
@@ -731,7 +731,7 @@ Set Web lifecycle prefixes to:
 "pretest:e2e:parity": "pnpm prepare-assets && pnpm verify-upstream-pin && pnpm verify-upstream-parity"
 ```
 
-- [ ] **Step 4: Remove normal CI submodule checkout and order verification**
+- [x] **Step 4: Remove normal CI submodule checkout and order verification**
 
 Change the unit checkout to plain:
 
@@ -748,7 +748,7 @@ After `pnpm install --frozen-lockfile`, add:
 
 In `.github/workflows/publish.yml`, add the same two commands after install and before `pnpm check:boundaries`. Do not change the parity job's isolated checkout or its `npm ci --prefix "$LPC_UPSTREAM_PARITY_DIR"` command.
 
-- [ ] **Step 5: Run lifecycle and focused verifier tests**
+- [x] **Step 5: Run lifecycle and focused verifier tests**
 
 ```bash
 rtk pnpm --filter @lpc-toolkit/web exec vitest run test/package-scripts.test.ts test/upstream-pin.test.ts test/parity-source.test.ts
@@ -758,14 +758,14 @@ rtk pnpm check:boundaries
 
 Expected: all focused tests PASS, root pin verification PASS, boundaries PASS.
 
-- [ ] **Step 6: Commit Task 4 implementation**
+- [x] **Step 6: Commit Task 4 implementation**
 
 ```bash
 rtk git add package.json packages/web/package.json .github/workflows/ci.yml .github/workflows/publish.yml packages/web/test/package-scripts.test.ts
 rtk git commit -m "ci: keep upstream submodule dormant"
 ```
 
-- [ ] **Step 7: Record Task 4 evidence in this plan**
+- [x] **Step 7: Record Task 4 evidence in this plan**
 
 Mark Task 4 complete and append concrete implementation, commit, and PASS records. Commit the plan record:
 
@@ -773,6 +773,13 @@ Mark Task 4 complete and append concrete implementation, commit, and PASS record
 rtk git add docs/superpowers/plans/2026-07-13-dormant-upstream-submodule.md
 rtk git commit -m "docs(plan): record submodule-free workflows"
 ```
+
+#### Task 4 execution record
+
+- Implementation: Added root `verify:upstream-pin`, ordered root/Web lifecycle preparation and pin verification, removed recursive submodule checkout from normal unit/publish workflows, and preserved isolated parity checkout plus its upstream dependency install.
+- Implementation commit: `843824b0c` (`ci: keep upstream submodule dormant`).
+- Verification: package lifecycle/workflow tests GREEN, 23 focused tests; `rtk pnpm verify:upstream-pin` PASS on elevated rerun; `rtk pnpm check:boundaries` PASS. RED had the expected four old-contract failures before implementation. No dependency, lockfile, or `upstream/` changes.
+- Review: Task-scoped spec-compliance and code-quality review approved with no findings.
 
 ---
 
