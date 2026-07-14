@@ -144,76 +144,9 @@ interface CanvasAdapter {
 ```
 
 Concrete browser and Node implementations remain outside
-`packages/core/src/`. See
-[`packages/core/README.md`](packages/core/README.md) for package usage and
-[`API.md`](API.md) for exported signatures.
-
-### Example
-
-```ts
-import {
-  createCatalog,
-  createPaletteCatalog,
-  composeSelections,
-  extractAnimation,
-  makeResolvePalette,
-  type CanvasAdapter,
-  type FilePath,
-  type ItemDefinition,
-  type Selections,
-} from '@lpc-toolkit/core';
-
-// The caller loads sheet_definitions and palette_definitions JSON records and
-// supplies an environment-specific canvas adapter.
-declare const records: Readonly<Record<FilePath, ItemDefinition>>;
-declare const paletteRecords: Readonly<Record<FilePath, unknown>>;
-declare const adapter: CanvasAdapter;
-
-// 1. Build the item and palette catalogs from records keyed by file path.
-const { catalog, warnings: catalogWarnings } = createCatalog(records);
-const { palettes, warnings: paletteWarnings } =
-  createPaletteCatalog(paletteRecords);
-console.warn(...catalogWarnings, ...paletteWarnings);
-
-// 2. Recolor-backed assets use `recolor`, not a filename `variant`.
-const selections: Selections = {
-  bodyType: 'male',
-  items: {
-    body: { typeName: 'body', name: 'Body Color', recolor: 'brown' },
-    hair: { typeName: 'hair', name: 'Afro', recolor: 'black' },
-  },
-};
-
-// 3. Compose the standard 832×3456 master sheet. The base URL/path is the
-//    directory that contains `spritesheets/`, such as the prepared `assets/`.
-const sheet = await composeSelections(selections, {
-  catalog,
-  adapter,
-  spritesheetsBaseUrl: '/path/to/repo/assets',
-  resolvePalette: makeResolvePalette(catalog, palettes, selections),
-});
-
-// 4. Crop one animation out of the master sheet.
-const walk = extractAnimation(sheet, 'walk', { adapter });
-
-// Attribution is always available alongside both outputs.
-console.log(sheet.credits.licenses, walk.credits.licenses);
-```
-
-### Public API
-
-[`API.md`](API.md) remains the signature source of truth. The public surface is
-grouped into:
-
-- **Catalog and palettes** — catalog creation, lookup, palettes, and palette
-  resolution.
-- **Selections and tokens** — selection types, hash/token parsing, and
-  serialization.
-- **Composition and animation** — composition, sprite-path resolution, frame
-  helpers, and animation extraction.
-- **Recoloring** — image and pixel recoloring helpers.
-- **Credits and validation** — precise credit manifests, effective licenses,
-  formatting, and asset validation.
+`packages/core/src/`. See the
+[`packages/core/README.md`](packages/core/README.md) for the executable example,
+public API map, attribution contract, and link to full exported signatures.
 
 The standard animation atlas is `832×3456` pixels.
 For custom-animation source sheets, callers must not assume those dimensions:

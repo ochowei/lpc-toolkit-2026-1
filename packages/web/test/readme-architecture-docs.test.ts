@@ -15,6 +15,7 @@ const readRepoFileIfExists = (filePath: string) => {
 const readme = readRepoFile('README.md');
 const contributing = readRepoFileIfExists('CONTRIBUTING.md');
 const cliReadme = readRepoFile('packages/cli/README.md');
+const coreReadme = readRepoFile('packages/core/README.md');
 const architecture = readRepoFile('docs/ARCHITECTURE.md');
 const agents = readRepoFile('AGENTS.md');
 const claude = readRepoFile('CLAUDE.md');
@@ -32,6 +33,7 @@ const maintainedDocuments = new Map([
   ['docs/ONBOARDING.md', onboarding],
   ['docs/RELEASING.md', releasing],
   ['packages/cli/README.md', cliReadme],
+  ['packages/core/README.md', coreReadme],
 ]);
 
 function localMarkdownTargets(filePath: string, source: string): string[] {
@@ -96,8 +98,11 @@ describe('README architecture contract', () => {
     }
   });
 
-  it('categorizes the public core API and links its signature source', () => {
-    expect(readme).toContain('[`API.md`](API.md)');
+  it('routes the public core API to its package guide', () => {
+    expect(readme).toContain(
+      '[`packages/core/README.md`](packages/core/README.md)',
+    );
+    expect(coreReadme).toContain('[`API.md`](../../API.md)');
     for (const category of [
       'Catalog and palettes',
       'Selections and tokens',
@@ -105,7 +110,7 @@ describe('README architecture contract', () => {
       'Recoloring',
       'Credits and validation',
     ]) {
-      expect(readme).toContain(category);
+      expect(coreReadme).toContain(category);
     }
   });
 
