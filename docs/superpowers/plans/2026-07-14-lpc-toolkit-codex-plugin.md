@@ -437,7 +437,9 @@ Update this task with the full commit hash, a short implementation note, and the
 - Consumes: external `lpc-toolkit --version` stdout.
 - Produces: `SUPPORTED_CLI`, `compareSemver(left, right)`, `evaluateVersion(output)`, and `checkCli({ binary, versionArgs, spawn })`; command JSON with `ok`, `installedVersion`, `supportedRange`, `errors`.
 
-- [ ] **Step 1: Write failing compatibility tests**
+- [x] **Step 1: Write failing compatibility tests**
+
+  - Implementation: Added Node test coverage for stable/prerelease ordering, the exact supported range, lower/upper range rejection, and missing executable handling.
 
 Create `plugins/lpc-toolkit/test/check-cli.test.mjs`:
 
@@ -485,7 +487,7 @@ test('reports a missing executable without throwing', () => {
 });
 ```
 
-- [ ] **Step 2: Run compatibility tests to confirm RED**
+- [x] **Step 2: Run compatibility tests to confirm RED**
 
 Run:
 
@@ -495,7 +497,11 @@ rtk node --test plugins/lpc-toolkit/test/check-cli.test.mjs
 
 Expected: FAIL because `check-cli.mjs` does not exist.
 
-- [ ] **Step 3: Implement compatibility checking**
+  - Verification: `rtk node --test plugins/lpc-toolkit/test/check-cli.test.mjs` FAIL as expected with `ERR_MODULE_NOT_FOUND` for `skills/character-authoring/scripts/check-cli.mjs`.
+
+- [x] **Step 3: Implement compatibility checking**
+
+  - Implementation: Added the deterministic checker with exported `SUPPORTED_CLI`, `compareSemver`, `evaluateVersion`, and `checkCli`, structured JSON results, and supported range `>=0.1.3-alpha-1 <0.2.0`.
 
 Create `plugins/lpc-toolkit/skills/character-authoring/scripts/check-cli.mjs`:
 
@@ -608,7 +614,9 @@ if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === imp
 }
 ```
 
-- [ ] **Step 4: Document compatibility and update the skill preflight**
+- [x] **Step 4: Document compatibility and update the skill preflight**
+
+  - Implementation: Documented compatibility recovery behavior and replaced the skill preflight with the structured checker while preserving the reviewed explicit request/acceptance, stated-reason, and workflow-recording requirements for `--allow-partial`.
 
 Create `plugins/lpc-toolkit/skills/character-authoring/references/compatibility.md`:
 
@@ -645,7 +653,7 @@ Replace step 1 of `SKILL.md` with:
    `ok: true`; never install or upgrade the CLI silently.
 ```
 
-- [ ] **Step 5: Run focused verification**
+- [x] **Step 5: Run focused verification**
 
 ```sh
 rtk node --test plugins/lpc-toolkit/test/check-cli.test.mjs
@@ -656,7 +664,16 @@ rtk git diff --check
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit and record Task 2 evidence**
+  - Verification: `rtk node --test plugins/lpc-toolkit/test/check-cli.test.mjs` PASS (4 tests).
+  - Verification: `rtk node --test scripts/verify-codex-plugin.test.mjs` PASS (3 tests).
+  - Verification: `rtk node scripts/verify-codex-plugin.mjs` PASS (`Codex plugin structure is valid.`).
+  - Verification: `rtk env PYTHONPATH=/tmp/lpc-plugin-validator-pyyaml python3 /Users/william/.codex/skills/.system/skill-creator/scripts/quick_validate.py plugins/lpc-toolkit/skills/character-authoring` PASS (`Skill is valid!`).
+  - Verification: `rtk env PYTHONPATH=/tmp/lpc-plugin-validator-pyyaml python3 /Users/william/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/lpc-toolkit` PASS.
+  - Verification: `rtk git diff --check` PASS.
+  - Verification: `rtk pnpm verify` FAIL in the restricted sandbox because `tsx` could not create its IPC socket (`listen EPERM`); the same command was rerun outside the sandbox.
+  - Verification: `rtk pnpm verify` PASS outside the sandbox (core 171, presets 3, CLI 301 with 1 skipped, web 680 with 1 skipped; existing missing-asset/catalog warning noise only).
+
+- [x] **Step 6: Commit and record Task 2 evidence**
 
 ```sh
 rtk git add plugins/lpc-toolkit docs/superpowers/plans/2026-07-14-lpc-toolkit-codex-plugin.md
@@ -664,6 +681,9 @@ rtk git commit -m "feat(plugin): check compatible CLI versions"
 ```
 
 Update this task with the full commit hash, implementation note, and exact verification results before committing.
+
+  - Commit: 792d7224bb4d27aaf1dd413b2c2a1bd8cd2e839b
+  - Implementation: Plugin version `0.1.0` now performs a deterministic external CLI presence/version preflight and stops on missing, malformed, failed, or unsupported CLI results before character operations.
 
 ### Task 3: Define And Test The Agent Character Workflow
 
