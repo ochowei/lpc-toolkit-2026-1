@@ -1095,7 +1095,12 @@ Expected: no whitespace errors; changed files match this plan; stale package-sta
   PASS with 1,155 tests and 1 existing skip; all-package build PASS; diff and
   drift checks PASS.
 
-- [ ] **Step 6: Commit the completed plan record**
+- [x] **Step 6: Commit the completed plan record**
+
+  - Commit: `16eeaaa030974ad0da76a8c4290a96ebbe8b674b`
+  - Verification: The completed implementation and acceptance record was
+    committed on `codex/docs-guidance-restructure`; the follow-up bookkeeping
+    commit records this necessarily post-commit hash and closes the checkbox.
 
 After every task and acceptance step contains its implementation note, full commit hash, and verification result, run:
 
