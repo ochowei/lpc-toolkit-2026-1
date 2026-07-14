@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -13,6 +13,22 @@ function readJson(target, errors, label) {
 
 function requireFile(root, relativePath, errors) {
   if (!existsSync(path.join(root, relativePath))) errors.push(`${relativePath} is missing.`);
+}
+
+function isRegularFileWithin(root, relativePath) {
+  if (typeof relativePath !== 'string') return false;
+  const resolvedRoot = path.resolve(root);
+  const target = path.resolve(resolvedRoot, relativePath);
+  const relative = path.relative(resolvedRoot, target);
+  const contained = relative !== '..'
+    && !relative.startsWith(`..${path.sep}`)
+    && !path.isAbsolute(relative);
+  if (!contained) return false;
+  try {
+    return statSync(target).isFile();
+  } catch {
+    return false;
+  }
 }
 
 export function validatePluginRepository(repoRoot) {
@@ -46,7 +62,7 @@ export function validatePluginRepository(repoRoot) {
 
   for (const field of ['composerIcon', 'logo']) {
     const relative = manifest.interface?.[field];
-    if (typeof relative !== 'string' || !existsSync(path.join(pluginRoot, relative))) {
+    if (!isRegularFileWithin(pluginRoot, relative)) {
       errors.push(`plugin interface ${field} must point to an existing asset.`);
     }
   }

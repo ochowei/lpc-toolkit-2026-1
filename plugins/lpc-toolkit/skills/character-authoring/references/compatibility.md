@@ -2,10 +2,12 @@
 
 Plugin version `0.1.0` supports `@lpc-toolkit/cli >=0.1.3-alpha-1 <0.2.0`.
 
-Before any character operation, resolve this skill's directory and run:
+Before any character operation, resolve this installed skill directory to an
+absolute path named `SKILL_DIR`, then run the checker by that absolute path.
+Do not assume the current working directory is the plugin or skill directory.
 
 ```sh
-node scripts/check-cli.mjs
+node "$SKILL_DIR/scripts/check-cli.mjs"
 ```
 
 Interpret the JSON result:

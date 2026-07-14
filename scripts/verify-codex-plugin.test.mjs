@@ -87,3 +87,34 @@ test('states the character create locator exception in the top-level skill', () 
     /For `character create`, provide the required name and use `--selection` only to choose an output path\. For every other character command, use exactly one locator: a name or `--selection`, never both\./,
   );
 });
+
+test('rejects plugin assets that escape the plugin root', () => {
+  const root = validFixture();
+  try {
+    write(root, 'plugins/outside.svg', '<svg xmlns="http://www.w3.org/2000/svg"/>\n');
+    const manifestPath = path.join(root, 'plugins/lpc-toolkit/.codex-plugin/plugin.json');
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    manifest.interface.composerIcon = '../outside.svg';
+    writeFileSync(manifestPath, JSON.stringify(manifest));
+    assert.deepEqual(validatePluginRepository(root), [
+      'plugin interface composerIcon must point to an existing asset.',
+    ]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('rejects plugin asset paths that name a directory', () => {
+  const root = validFixture();
+  try {
+    const manifestPath = path.join(root, 'plugins/lpc-toolkit/.codex-plugin/plugin.json');
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    manifest.interface.logo = './assets';
+    writeFileSync(manifestPath, JSON.stringify(manifest));
+    assert.deepEqual(validatePluginRepository(root), [
+      'plugin interface logo must point to an existing asset.',
+    ]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

@@ -7,7 +7,13 @@ export const SUPPORTED_CLI = Object.freeze({
   maxExclusive: '0.2.0',
 });
 
-const VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z.-]+))?$/u;
+const IDENTIFIER = '[0-9A-Za-z-]+';
+const VERSION = new RegExp(
+  `^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)`
+    + `(?:-(${IDENTIFIER}(?:\\.${IDENTIFIER})*))?`
+    + `(?:\\+(${IDENTIFIER}(?:\\.${IDENTIFIER})*))?$`,
+  'u',
+);
 const NUMERIC_IDENTIFIER = /^\d+$/u;
 const supportedRange = `>=${SUPPORTED_CLI.min} <${SUPPORTED_CLI.maxExclusive}`;
 
@@ -78,8 +84,16 @@ function failure(code, message, installedVersion = null) {
 export function evaluateVersion(output) {
   const installedVersion = output.trim();
   try {
+    const installed = parseSemver(installedVersion);
+    const minimum = parseSemver(SUPPORTED_CLI.min);
+    const prereleaseAdmitted = installed.prerelease.length === 0 || (
+      installed.major === minimum.major
+      && installed.minor === minimum.minor
+      && installed.patch === minimum.patch
+    );
     const supported = compareSemver(installedVersion, SUPPORTED_CLI.min) >= 0
-      && compareSemver(installedVersion, SUPPORTED_CLI.maxExclusive) < 0;
+      && compareSemver(installedVersion, SUPPORTED_CLI.maxExclusive) < 0
+      && prereleaseAdmitted;
     return supported
       ? { ok: true, installedVersion, supportedRange, errors: [] }
       : failure('cli_version_unsupported', `Installed lpc-toolkit ${installedVersion} is outside ${supportedRange}.`, installedVersion);

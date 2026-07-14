@@ -8,9 +8,10 @@ description: Use when creating, editing, validating, previewing, or rendering LP
 Use `lpc-toolkit` as the only source of catalog, selection, validation, render,
 and attribution behavior.
 
-1. Read `references/compatibility.md`, resolve this skill directory, and run
-   `node scripts/check-cli.mjs`. Continue only when its JSON result has
-   `ok: true`; never install or upgrade the CLI silently.
+1. Read `references/compatibility.md`. Resolve this installed skill directory
+   to an absolute path named `SKILL_DIR`, then run
+   `node "$SKILL_DIR/scripts/check-cli.mjs"`. Continue only when its JSON result
+   has `ok: true`; never install or upgrade the CLI silently.
 
 Read `references/cli-workflow.md` before authoring. Treat
 `references/cli-contract.json` as the tested inventory of commands this skill
