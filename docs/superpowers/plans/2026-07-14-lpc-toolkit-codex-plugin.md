@@ -1153,6 +1153,33 @@ Update this task with the full commit hash, implementation note, and exact verif
 - Verification: `rtk env PYTHONPATH=/tmp/lpc-plugin-validator-pyyaml python3 /Users/william/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/lpc-toolkit` PASS.
 - Verification: `rtk git diff --check` PASS.
 
+#### Full-gate review fix: synchronize the root verify script contract
+
+- Finding: Task 5's full `rtk pnpm verify` exposed that
+  `packages/web/test/package-scripts.test.ts` still expected the pre-plugin root
+  verify script even though `package.json` correctly included
+  `pnpm verify:plugin` after `pnpm check:boundaries`.
+- Initial RED verification (Task 5, narrow escalation): `rtk pnpm verify` FAIL
+  (`packages/web/test/package-scripts.test.ts:82`; 1 failed, 74 test files
+  passed; 680 tests passed, 1 skipped) because the strict expected script
+  omitted `pnpm verify:plugin`.
+- Implementation: Added only `pnpm verify:plugin` to the exact expected script
+  array immediately after `pnpm check:boundaries`; the strict equality
+  assertion remains unchanged.
+- Fix commit: `751a31a879af7ebabcb1b10cb1d60ddb6606fbc7`
+- Focused sandbox attempt: `rtk pnpm --filter @lpc-toolkit/web test -- package-scripts.test.ts` FAIL before Vitest because `tsx` could not create its IPC socket (`listen EPERM`).
+- Focused GREEN verification (narrow escalation): `rtk pnpm --filter @lpc-toolkit/web test -- package-scripts.test.ts` PASS (9 tests).
+- Verification: `rtk pnpm verify:plugin` PASS (11 Node tests; `Codex plugin structure is valid.`).
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- package-metadata.test.ts plugin-contract.test.ts` PASS (29 tests).
+- Verification (narrow escalation): `rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts package-scripts.test.ts` PASS (28 tests).
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+- Verification: `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS.
+- Verification: `rtk pnpm check:boundaries` PASS (`Architecture boundary check passed.`).
+- Verification: `rtk node scripts/verify-codex-plugin.mjs` PASS (`Codex plugin structure is valid.`).
+- Verification: `rtk env PYTHONPATH=/tmp/lpc-plugin-validator-pyyaml python3 /Users/william/.codex/skills/.system/skill-creator/scripts/quick_validate.py plugins/lpc-toolkit/skills/character-authoring` PASS (`Skill is valid!`).
+- Verification: `rtk env PYTHONPATH=/tmp/lpc-plugin-validator-pyyaml python3 /Users/william/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/lpc-toolkit` PASS.
+- Verification: `rtk git diff --check` PASS.
+
 ### Task 5: Verify A Clean Marketplace Installation And Complete The Gate
 
 **Files:**
