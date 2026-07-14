@@ -14,6 +14,17 @@ test('orders stable and prerelease semantic versions', () => {
   assert.equal(compareSemver('0.1.4', '0.1.3'), 1);
 });
 
+test('orders core identifiers beyond Number safe integer precision', () => {
+  assert.equal(compareSemver('9007199254740992.0.0', '9007199254740993.0.0'), -1);
+});
+
+test('orders prerelease identifiers beyond Number safe integer precision', () => {
+  assert.equal(
+    compareSemver('0.1.3-9007199254740992', '0.1.3-9007199254740993'),
+    -1,
+  );
+});
+
 test('accepts the supported beta CLI range', () => {
   assert.deepEqual(SUPPORTED_CLI, {
     min: '0.1.3-alpha-1',

@@ -22,11 +22,17 @@ function parseSemver(input) {
     throw new Error(`Invalid semantic version: ${input}`);
   }
   return {
-    major: Number(match[1]),
-    minor: Number(match[2]),
-    patch: Number(match[3]),
+    major: match[1],
+    minor: match[2],
+    patch: match[3],
     prerelease,
   };
+}
+
+function compareNumericIdentifiers(left, right) {
+  if (left.length !== right.length) return Math.sign(left.length - right.length);
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
 }
 
 function comparePrerelease(left, right) {
@@ -40,11 +46,11 @@ function comparePrerelease(left, right) {
     if (a === undefined) return -1;
     if (b === undefined) return 1;
     if (a === b) continue;
-    const aNumber = NUMERIC_IDENTIFIER.test(a) ? Number(a) : undefined;
-    const bNumber = NUMERIC_IDENTIFIER.test(b) ? Number(b) : undefined;
-    if (aNumber !== undefined && bNumber !== undefined) return Math.sign(aNumber - bNumber);
-    if (aNumber !== undefined) return -1;
-    if (bNumber !== undefined) return 1;
+    const aIsNumeric = NUMERIC_IDENTIFIER.test(a);
+    const bIsNumeric = NUMERIC_IDENTIFIER.test(b);
+    if (aIsNumeric && bIsNumeric) return compareNumericIdentifiers(a, b);
+    if (aIsNumeric) return -1;
+    if (bIsNumeric) return 1;
     return a < b ? -1 : 1;
   }
   return 0;
@@ -54,7 +60,8 @@ export function compareSemver(leftInput, rightInput) {
   const left = parseSemver(leftInput);
   const right = parseSemver(rightInput);
   for (const key of ['major', 'minor', 'patch']) {
-    if (left[key] !== right[key]) return Math.sign(left[key] - right[key]);
+    const precedence = compareNumericIdentifiers(left[key], right[key]);
+    if (precedence !== 0) return precedence;
   }
   return comparePrerelease(left.prerelease, right.prerelease);
 }
