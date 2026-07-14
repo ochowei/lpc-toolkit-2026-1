@@ -139,6 +139,19 @@ CLI code may use Node APIs, `@napi-rs/canvas` (MIT), and `jszip` (MIT) because
 it is a Node runtime package. Those dependencies must not move into
 `packages/core/src/**`.
 
+### `plugins/lpc-toolkit/`
+
+`plugins/lpc-toolkit/` is a Codex distribution and workflow layer around the
+external `lpc-toolkit` executable. It owns plugin installation metadata, one
+focused character-authoring skill, compatibility checks, and command workflow
+references. It does not duplicate CLI product logic, read asset caches on its
+own, or own catalog, selection, validation, rendering, or attribution rules.
+
+The plugin may invoke the public CLI and inspect returned artifact paths. It
+must not import CLI source, add Node runtime behavior to core, suppress credit
+artifacts, install the CLI silently, or introduce MCP/apps/hooks without a new
+approved design.
+
 ### Documentation and Governance
 
 Documentation has explicit ownership:

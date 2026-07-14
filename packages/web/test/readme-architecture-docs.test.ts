@@ -167,6 +167,26 @@ describe('README architecture contract', () => {
   });
 });
 
+describe('Codex plugin documentation contract', () => {
+  it('documents installation, ownership, and verification', () => {
+    for (const phrase of [
+      'codex plugin marketplace add ochowei/lpc-toolkit-2026-1',
+      'codex plugin add lpc-toolkit@lpc-toolkit',
+    ]) expect(readme).toContain(phrase);
+
+    for (const phrase of [
+      '`plugins/lpc-toolkit/`',
+      'external `lpc-toolkit` executable',
+      'does not duplicate CLI product logic',
+    ]) expect(architecture).toContain(phrase);
+
+    for (const phrase of [
+      '`rtk pnpm verify:plugin`',
+      'Codex plugin structure and skill contracts',
+    ]) expect(engineering).toContain(phrase);
+  });
+});
+
 describe('agent guidance contract', () => {
   it('keeps Codex and Claude guidance identical and current', () => {
     expect(claude).toBe(agents);

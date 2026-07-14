@@ -12,7 +12,8 @@
     "build": "pnpm -r build",
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "typecheck": "pnpm -r typecheck",
-    "verify": "pnpm --filter @lpc-toolkit/web prepare-assets && pnpm verify:upstream-pin && pnpm check:boundaries && pnpm typecheck && pnpm -r test",
+    "verify": "pnpm --filter @lpc-toolkit/web prepare-assets && pnpm verify:upstream-pin && pnpm check:boundaries && pnpm verify:plugin && pnpm typecheck && pnpm -r test",
+    "verify:plugin": "node --test plugins/lpc-toolkit/test/check-cli.test.mjs scripts/verify-codex-plugin.test.mjs && node scripts/verify-codex-plugin.mjs",
     "verify:upstream-pin": "pnpm --filter @lpc-toolkit/web verify-upstream-pin",
     "pretest": "pnpm --filter @lpc-toolkit/web prepare-assets && pnpm verify:upstream-pin",
     "test": "pnpm -r test"

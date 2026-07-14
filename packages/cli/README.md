@@ -37,6 +37,25 @@ The character selection is saved under `./characters/`. Preview and render
 commands write the sprite together with metadata and both TXT and CSV credit
 files; keep those attribution artifacts with the generated image.
 
+### Codex Plugin
+
+Install the beta Codex plugin from this repository marketplace:
+
+```sh
+codex plugin marketplace add ochowei/lpc-toolkit-2026-1
+codex plugin add lpc-toolkit@lpc-toolkit
+```
+
+The plugin requires an installed compatible `lpc-toolkit` CLI and does not
+automatically install the CLI. Beta users add the repository marketplace once,
+then install or enable the plugin. Restart the ChatGPT desktop app or start a
+new Codex task if the newly installed skill is not visible. Public Plugins
+Directory distribution can later remove the marketplace-add step.
+
+The plugin guides Codex through JSON search, edit, validate, preview, and render
+workflows. Preview, render, and export outputs preserve metadata plus TXT and
+CSV credits.
+
 ### Character commands and locators
 
 | Command | Purpose |
