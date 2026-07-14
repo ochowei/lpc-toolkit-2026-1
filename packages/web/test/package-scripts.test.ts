@@ -11,6 +11,13 @@ const packageJson = JSON.parse(
 const rootPackageJson = JSON.parse(
   readFileSync(path.join(here, '../../../package.json'), 'utf8'),
 ) as { scripts?: Record<string, string> };
+const expectedVerifyScript = [
+  'pnpm --filter @lpc-toolkit/web prepare-assets',
+  'pnpm verify:upstream-pin',
+  'pnpm check:boundaries',
+  'pnpm typecheck',
+  'pnpm -r test',
+].join(' && ');
 const ciWorkflow = readFileSync(
   path.join(here, '../../../.github/workflows/ci.yml'),
   'utf8',
@@ -71,16 +78,30 @@ describe('package scripts', () => {
     );
   });
 
+  it('shares the main verification gate between local development and CI', () => {
+    expect(rootPackageJson.scripts?.verify).toBe(expectedVerifyScript);
+    expect(unitJob).toContain('- run: pnpm verify');
+    expect(unitJob).not.toContain('- run: pnpm check:boundaries');
+    expect(unitJob).not.toContain('- run: pnpm typecheck');
+    expect(unitJob).not.toContain('- run: pnpm test');
+  });
+
   it('runs architecture boundaries in CI after install and before validation', () => {
     expect(unitJobStart).toBeGreaterThanOrEqual(0);
     expect(cliJobStart).toBeGreaterThan(unitJobStart);
 
     expect(unitJob).not.toContain('submodules: recursive');
-    expect(unitJob.indexOf('pnpm --filter @lpc-toolkit/web prepare-assets')).toBeLessThan(
-      unitJob.indexOf('pnpm verify:upstream-pin'),
+    expect(expectedVerifyScript.indexOf('prepare-assets')).toBeLessThan(
+      expectedVerifyScript.indexOf('verify:upstream-pin'),
     );
-    expect(unitJob.indexOf('pnpm verify:upstream-pin')).toBeLessThan(
-      unitJob.indexOf('pnpm check:boundaries'),
+    expect(expectedVerifyScript.indexOf('verify:upstream-pin')).toBeLessThan(
+      expectedVerifyScript.indexOf('check:boundaries'),
+    );
+    expect(expectedVerifyScript.indexOf('check:boundaries')).toBeLessThan(
+      expectedVerifyScript.indexOf('typecheck'),
+    );
+    expect(expectedVerifyScript.indexOf('typecheck')).toBeLessThan(
+      expectedVerifyScript.indexOf('-r test'),
     );
     expect(publishWorkflow).not.toContain('submodules: recursive');
     expect(publishWorkflow).toContain(

@@ -46,11 +46,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @lpc-toolkit/web prepare-assets
-      - run: pnpm verify:upstream-pin
-      - run: pnpm check:boundaries
-      - run: pnpm typecheck
-      - run: pnpm test
+      - run: pnpm verify
 
   cli-package:
     name: CLI package (ubuntu-latest)
