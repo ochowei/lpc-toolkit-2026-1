@@ -75,3 +75,15 @@ test('requires and records a user reason before allowing partial output', () => 
     /`--allow-partial` only when the user explicitly requests or accepts partial output, states a reason, and the workflow records that reason\./,
   );
 });
+
+test('states the character create locator exception in the top-level skill', () => {
+  const skill = readFileSync(new URL(
+    '../plugins/lpc-toolkit/skills/character-authoring/SKILL.md',
+    import.meta.url,
+  ), 'utf8').replace(/\s+/g, ' ');
+
+  assert.match(
+    skill,
+    /For `character create`, provide the required name and use `--selection` only to choose an output path\. For every other character command, use exactly one locator: a name or `--selection`, never both\./,
+  );
+});

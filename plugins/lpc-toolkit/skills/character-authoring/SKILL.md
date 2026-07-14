@@ -18,7 +18,9 @@ may rely on. Use the narrowest applicable command and preserve its JSON output
 until validation and attribution checks are complete.
 
 2. Use `--json` for every agent-consumed command that supports it.
-3. Start from a named character or explicit `--selection` file, never both.
+3. For `character create`, provide the required name and use `--selection` only
+   to choose an output path. For every other character command, use exactly one
+   locator: a name or `--selection`, never both.
 4. Search narrowly by character type and query before selecting an exact item.
 5. Apply one edit, validate, and resolve structured errors before continuing.
 6. Preview and inspect the returned PNG when visual review is available.
