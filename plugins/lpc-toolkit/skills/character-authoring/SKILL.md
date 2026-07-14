@@ -18,5 +18,6 @@ and attribution behavior.
 7. Render only after validation succeeds.
 8. Verify metadata, credits TXT, and credits CSV before reporting success.
 
-Do not bypass cache integrity, modify `upstream/`, suppress attribution, or use
-`--allow-partial` unless the user explicitly accepts partial output.
+Do not bypass cache integrity, modify `upstream/`, or suppress attribution. Use
+`--allow-partial` only when the user explicitly requests or accepts partial
+output, states a reason, and the workflow records that reason.

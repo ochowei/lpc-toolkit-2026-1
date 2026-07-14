@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -62,4 +62,16 @@ test('rejects forbidden MCP, app, and hook components', () => {
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('requires and records a user reason before allowing partial output', () => {
+  const skill = readFileSync(new URL(
+    '../plugins/lpc-toolkit/skills/character-authoring/SKILL.md',
+    import.meta.url,
+  ), 'utf8').replace(/\s+/g, ' ');
+
+  assert.match(
+    skill,
+    /`--allow-partial` only when the user explicitly requests or accepts partial output, states a reason, and the workflow records that reason\./,
+  );
 });
