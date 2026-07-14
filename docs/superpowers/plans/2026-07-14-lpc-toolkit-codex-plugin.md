@@ -715,7 +715,9 @@ Update this task with the full commit hash, implementation note, and exact verif
 - Consumes: `parseArgs`, `validateCommandOptions`, `helpForCommand`, the current CLI JSON command surface.
 - Produces: schema `lpc-toolkit.codex-plugin.cli-contract.v1` containing `id`, `argv`, and `machineReadable` for every command the skill relies on.
 
-- [ ] **Step 1: Write the failing CLI/plugin contract test**
+- [x] **Step 1: Write the failing CLI/plugin contract test**
+
+  - Implementation: Added the versioned plugin command inventory contract test against the real CLI parser, generated help, and option validator.
 
 Create `packages/cli/test/plugin-contract.test.ts`:
 
@@ -776,7 +778,7 @@ describe('Codex plugin CLI contract', () => {
 });
 ```
 
-- [ ] **Step 2: Run the contract test to confirm RED**
+- [x] **Step 2: Run the contract test to confirm RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- plugin-contract.test.ts
@@ -784,7 +786,11 @@ rtk pnpm --filter @lpc-toolkit/cli test -- plugin-contract.test.ts
 
 Expected: FAIL because `cli-contract.json` does not exist.
 
-- [ ] **Step 3: Add the machine-readable command contract**
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- plugin-contract.test.ts` FAIL as expected with `ENOENT` for the intentionally absent `cli-contract.json`.
+
+- [x] **Step 3: Add the machine-readable command contract**
+
+  - Implementation: Added schema `lpc-toolkit.codex-plugin.cli-contract.v1` with the ten exact command examples and machine-readable flags used by the skill.
 
 Create `plugins/lpc-toolkit/skills/character-authoring/references/cli-contract.json`:
 
@@ -806,7 +812,9 @@ Create `plugins/lpc-toolkit/skills/character-authoring/references/cli-contract.j
 }
 ```
 
-- [ ] **Step 4: Write the exact CLI workflow reference**
+- [x] **Step 4: Write the exact CLI workflow reference**
+
+  - Implementation: Added the create, narrow search/edit, validation, attributed preview, and attributed final-render workflow, then linked it and the tested command inventory from the skill after compatibility preflight. Human-authorized correctness correction: `character create` requires a name and may use `--selection` solely as its output path; every other character command must not receive both locators. Preserved the existing explicit acceptance, stated reason, recorded reason, warnings, and skipped-layer requirements for `--allow-partial`.
 
 Create `plugins/lpc-toolkit/skills/character-authoring/references/cli-workflow.md`:
 
@@ -876,7 +884,7 @@ may rely on. Use the narrowest applicable command and preserve its JSON output
 until validation and attribution checks are complete.
 ```
 
-- [ ] **Step 5: Run focused tests and typecheck**
+- [x] **Step 5: Run focused tests and typecheck**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- plugin-contract.test.ts command-spec.test.ts
@@ -888,7 +896,19 @@ rtk git diff --check
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit and record Task 3 evidence**
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- plugin-contract.test.ts` PASS (10 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- plugin-contract.test.ts command-spec.test.ts` PASS (26 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+  - Verification: `rtk node --test plugins/lpc-toolkit/test/check-cli.test.mjs scripts/verify-codex-plugin.test.mjs` PASS (10 tests).
+  - Verification: `rtk node scripts/verify-codex-plugin.mjs` PASS (`Codex plugin structure is valid.`).
+  - Verification: `rtk env PYTHONPATH=/tmp/lpc-plugin-validator-pyyaml python3 /Users/william/.codex/skills/.system/skill-creator/scripts/quick_validate.py plugins/lpc-toolkit/skills/character-authoring` PASS (`Skill is valid!`).
+  - Verification: `rtk env PYTHONPATH=/tmp/lpc-plugin-validator-pyyaml python3 /Users/william/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/lpc-toolkit` PASS.
+  - Verification: `rtk git diff --check` PASS.
+
+- [x] **Step 6: Commit and record Task 3 evidence**
+
+  - Commit: `fdafccde29ce38be977c200275b09a728a12e9bf`
+  - Implementation: Committed the four Task 3 implementation files separately from this plan evidence.
 
 ```sh
 rtk git add plugins/lpc-toolkit packages/cli/test/plugin-contract.test.ts docs/superpowers/plans/2026-07-14-lpc-toolkit-codex-plugin.md
