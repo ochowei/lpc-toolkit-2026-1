@@ -15,6 +15,7 @@ const expectedVerifyScript = [
   'pnpm --filter @lpc-toolkit/web prepare-assets',
   'pnpm verify:upstream-pin',
   'pnpm check:boundaries',
+  'pnpm verify:plugin',
   'pnpm typecheck',
   'pnpm -r test',
 ].join(' && ');
