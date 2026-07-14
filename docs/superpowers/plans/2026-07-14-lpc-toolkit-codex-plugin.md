@@ -1290,6 +1290,42 @@ rtk git commit -m "docs(plugin): record Codex plugin verification"
 
 Record the bookkeeping commit hash in the final response.
 
+## Whole-Branch Review Fixes
+
+- [x] Resolve the installed compatibility checker independently of the caller's
+  working directory.
+  - Implementation: Both skill documents now require resolving the installed
+    skill directory to an absolute `SKILL_DIR` and invoke
+    `node "$SKILL_DIR/scripts/check-cli.mjs"`; an integration regression runs
+    that absolute checker path successfully from an unrelated temporary cwd.
+- [x] Align compatibility evaluation with the displayed npm SemVer range.
+  - Implementation: The dependency-free parser accepts valid build metadata,
+    preserves it in `installedVersion`, ignores it for precedence, retains
+    arbitrary-precision comparisons and strict invalid-version rules, and
+    admits prereleases only for the `0.1.3` tuple named by the prerelease range
+    comparator. Stable in-range `0.1.x` versions remain supported.
+- [x] Keep declared plugin interface assets inside the plugin root and require
+  regular files.
+  - Implementation: The verifier now resolves asset paths, rejects lexical
+    escapes, and rejects directories while preserving its existing error
+    contract.
+- [x] Correct the Task 5 scratch report's overall outcome.
+  - Implementation: `.superpowers/sdd/task-5-report.md` now reports overall
+    `DONE` and labels both earlier BLOCKED sections as historical attempts; it
+    remains gitignored and is not part of the implementation commit.
+- Implementation commit: `0af021c617bff0fb0afae83972a9fc76fe7be0a8`
+- TDD RED: `rtk node --test plugins/lpc-toolkit/test/check-cli.test.mjs scripts/verify-codex-plugin.test.mjs` FAIL as expected (11 passed, 5 failed): build metadata was invalid, prerelease admission was too broad, docs lacked an absolute `SKILL_DIR` invocation, and escaped/directory assets were accepted.
+- TDD GREEN: `rtk node --test plugins/lpc-toolkit/test/check-cli.test.mjs scripts/verify-codex-plugin.test.mjs` PASS (16 tests).
+- Verification: `rtk node --test plugins/lpc-toolkit/test/check-cli.test.mjs` PASS (10 tests).
+- Verification: `rtk node --test scripts/verify-codex-plugin.test.mjs` PASS (6 tests).
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- plugin-contract.test.ts command-spec.test.ts` PASS (26 tests).
+- Verification: `rtk node scripts/verify-codex-plugin.mjs` PASS (`Codex plugin structure is valid.`).
+- Verification: `rtk env LPC_TOOLKIT_NODE_ENTRY=packages/cli/dist/index.js node plugins/lpc-toolkit/skills/character-authoring/scripts/check-cli.mjs` PASS (`ok: true`, installed `0.1.3-alpha-1`, exact supported range, no errors).
+- Verification: `rtk env PYTHONPATH=/tmp/lpc-plugin-validator-pyyaml python3 /Users/william/.codex/skills/.system/skill-creator/scripts/quick_validate.py plugins/lpc-toolkit/skills/character-authoring` PASS (`Skill is valid!`).
+- Verification: `rtk env PYTHONPATH=/tmp/lpc-plugin-validator-pyyaml python3 /Users/william/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/lpc-toolkit` PASS (`Plugin validation passed`).
+- Verification: `rtk git diff --check` PASS.
+- Verification: `rtk pnpm verify` FAIL in the restricted sandbox because `tsx` could not create its IPC socket (`listen EPERM`); the exact narrow-escalation rerun PASS (plugin 16, core 171, presets 3, CLI 312 with 1 skipped, web 681 with 1 skipped; existing fixture warning noise only).
+
 ## Self-Review
 
 - Spec coverage: Tasks 1–5 cover repository plugin structure, one bundled skill, external CLI ownership, compatibility checking, exact JSON workflow, attribution safeguards, beta marketplace distribution, docs, CI mapping, clean installation, and end-to-end verification.
