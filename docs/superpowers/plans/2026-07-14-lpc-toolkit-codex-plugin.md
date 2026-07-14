@@ -917,6 +917,17 @@ rtk git commit -m "feat(plugin): define tested character workflow"
 
 Update this task with the full commit hash, implementation note, and exact verification results before committing.
 
+- Review fix implementation: Removed the top-level universal locator rule that contradicted the human-authorized `character create` exception. The skill now requires the create name, limits its optional `--selection` to the output path, and requires exactly one locator for every other character command. Added a static regression assertion for the complete conditional rule.
+- Review fix commit: `2d93ae6583fa27d59150f993c175468ca17ae114`
+- Review fix RED verification: `rtk node --test scripts/verify-codex-plugin.test.mjs` FAIL as expected (3 passed, 1 failed) because the top-level skill still contained the universal `never both` rule.
+- Review fix GREEN verification: `rtk node --test scripts/verify-codex-plugin.test.mjs` PASS (4 tests).
+- Review fix verification: `rtk pnpm --filter @lpc-toolkit/cli test -- plugin-contract.test.ts command-spec.test.ts` PASS (26 tests).
+- Review fix verification: `rtk node --test plugins/lpc-toolkit/test/check-cli.test.mjs scripts/verify-codex-plugin.test.mjs` PASS (11 tests).
+- Review fix verification: `rtk node scripts/verify-codex-plugin.mjs` PASS (`Codex plugin structure is valid.`).
+- Review fix verification: `rtk env PYTHONPATH=/tmp/lpc-plugin-validator-pyyaml python3 /Users/william/.codex/skills/.system/skill-creator/scripts/quick_validate.py plugins/lpc-toolkit/skills/character-authoring` PASS (`Skill is valid!`).
+- Review fix verification: `rtk env PYTHONPATH=/tmp/lpc-plugin-validator-pyyaml python3 /Users/william/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/lpc-toolkit` PASS.
+- Review fix verification: `rtk git diff --check` PASS.
+
 ### Task 4: Integrate Documentation, Verification, And CI Ownership
 
 **Files:**
