@@ -11,6 +11,9 @@ const readRepoFileIfExists = (filePath: string) => {
   const absolutePath = path.join(repoRoot, filePath);
   return existsSync(absolutePath) ? readFileSync(absolutePath, 'utf8') : '';
 };
+const rootPackage = JSON.parse(readRepoFile('package.json')) as {
+  license: string;
+};
 
 const readme = readRepoFile('README.md');
 const contributing = readRepoFileIfExists('CONTRIBUTING.md');
@@ -161,6 +164,19 @@ describe('README architecture contract', () => {
     expect(readme).toContain('Character authoring quick start');
     expect(readme).toContain('lpc-toolkit character create hero --preset farmer');
     expect(readme).toContain('[`packages/cli/README.md`](packages/cli/README.md)');
+  });
+});
+
+describe('agent guidance contract', () => {
+  it('keeps Codex and Claude guidance identical and current', () => {
+    expect(claude).toBe(agents);
+    expect(agents).toContain(`**License is ${rootPackage.license}.**`);
+    expect(agents).toContain('`packages/presets/`');
+    expect(agents).toContain('`packages/cli/`');
+    expect(agents).toContain('`rtk pnpm verify`');
+    expect(agents).toContain('docs/ENGINEERING.md');
+    expect(agents).not.toContain('built later');
+    expect(agents).not.toContain('planned CLI');
   });
 });
 
