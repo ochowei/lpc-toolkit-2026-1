@@ -1189,7 +1189,7 @@ Update this task with the full commit hash, implementation note, and exact verif
 - Consumes: local repository marketplace, Codex plugin CLI, built `lpc-toolkit` CLI, common repository verification gate.
 - Produces: recorded clean-install, command workflow, attribution, and full verification evidence.
 
-- [ ] **Step 1: Run the complete repository gate**
+- [x] **Step 1: Run the complete repository gate**
 
 ```sh
 rtk pnpm verify
@@ -1199,7 +1199,14 @@ rtk git diff --check
 
 Expected: PASS. The build warning about the existing Web JSZip static/dynamic import split may remain known noise; no new warning is accepted without investigation.
 
-- [ ] **Step 2: Test the local marketplace with an isolated Codex home**
+  - Verified implementation: `377d46c5c945614e77e348f5e83b26f64b98c118`.
+  - Verification: `rtk pnpm verify` FAIL in the sandbox because `tsx` could not create its IPC socket (`listen EPERM`); the exact narrow-escalation rerun PASS (core 171, presets 3, CLI 312 with 1 skipped, web 681 with 1 skipped; plugin verifier 11 Node tests).
+  - Verification: `rtk pnpm build` FAIL in the sandbox with the same `tsx` IPC `listen EPERM`; the exact narrow-escalation rerun PASS. The known Web JSZip static/dynamic import split warning and Vite large-chunk advisory remained; no new warning was identified.
+  - Verification: `rtk git diff --check` PASS.
+  - Verification: `rtk env PYTHONPATH=/tmp/lpc-plugin-validator-pyyaml python3 /Users/william/.codex/skills/.system/skill-creator/scripts/quick_validate.py plugins/lpc-toolkit/skills/character-authoring` PASS (`Skill is valid!`).
+  - Verification: `rtk env PYTHONPATH=/tmp/lpc-plugin-validator-pyyaml python3 /Users/william/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/lpc-toolkit` PASS (`Plugin validation passed`).
+
+- [x] **Step 2: Test the local marketplace with an isolated Codex home**
 
 Reserve one plan-owned temporary path and fail instead of reusing unknown state:
 
@@ -1223,7 +1230,17 @@ Expected: every command exits zero; the marketplace list contains `lpc-toolkit`,
 rtk node -e "require('node:fs').rmSync('/tmp/lpc-toolkit-codex-plugin-smoke-home',{recursive:true,force:true})"
 ```
 
-- [ ] **Step 3: Run the compatibility checker against the built CLI**
+  - Verification: the original approved reservation command PASS, proving `/tmp/lpc-toolkit-codex-plugin-smoke-home` did not exist.
+  - Prior attempt: the original marketplace-add command FAIL because this Codex CLI requires `CODEX_HOME` to exist; the failure and exact cleanup remain recorded in `.superpowers/sdd/task-5-report.md`.
+  - Approved correction: after explicit human approval, `rtk node -e "require('node:fs').mkdirSync('/tmp/lpc-toolkit-codex-plugin-smoke-home')"` PASS and created only the empty plan-owned directory.
+  - Verification: `rtk env CODEX_HOME=/tmp/lpc-toolkit-codex-plugin-smoke-home codex plugin marketplace add . --json` PASS; JSON reported marketplace `lpc-toolkit`, the repository root, and `alreadyAdded: false`.
+  - Verification: `rtk env CODEX_HOME=/tmp/lpc-toolkit-codex-plugin-smoke-home codex plugin marketplace list --json` PASS; JSON contained the local `lpc-toolkit` marketplace.
+  - Verification: `rtk env CODEX_HOME=/tmp/lpc-toolkit-codex-plugin-smoke-home codex plugin list --available --marketplace lpc-toolkit --json` PASS; JSON exposed `lpc-toolkit@lpc-toolkit` version `0.1.0` as available and not yet installed.
+  - Verification: `rtk env CODEX_HOME=/tmp/lpc-toolkit-codex-plugin-smoke-home codex plugin add lpc-toolkit@lpc-toolkit --json` PASS; JSON reported the expected plugin id, marketplace, version, and isolated installed path.
+  - Verification: `rtk env CODEX_HOME=/tmp/lpc-toolkit-codex-plugin-smoke-home codex plugin list --json` PASS; JSON reported the plugin installed and enabled.
+  - Cleanup: the exact planned `rmSync` command PASS, and a follow-up existence assertion confirmed the isolated home absent.
+
+- [x] **Step 3: Run the compatibility checker against the built CLI**
 
 ```sh
 rtk env LPC_TOOLKIT_NODE_ENTRY=packages/cli/dist/index.js node plugins/lpc-toolkit/skills/character-authoring/scripts/check-cli.mjs
@@ -1231,7 +1248,9 @@ rtk env LPC_TOOLKIT_NODE_ENTRY=packages/cli/dist/index.js node plugins/lpc-toolk
 
 Expected JSON: `ok: true`, installed version `0.1.3-alpha-1`, supported range `>=0.1.3-alpha-1 <0.2.0`. `LPC_TOOLKIT_NODE_ENTRY` is a test-only path through the same checker; normal plugin use resolves the installed `lpc-toolkit` executable.
 
-- [ ] **Step 4: Exercise the plugin-documented character flow in temporary output**
+  - Verification: `rtk env LPC_TOOLKIT_NODE_ENTRY=packages/cli/dist/index.js node plugins/lpc-toolkit/skills/character-authoring/scripts/check-cli.mjs` PASS; JSON reported `ok: true`, installed version `0.1.3-alpha-1`, supported range `>=0.1.3-alpha-1 <0.2.0`, and no errors.
+
+- [x] **Step 4: Exercise the plugin-documented character flow in temporary output**
 
 Use the built CLI entrypoint and paths under `/tmp`:
 
@@ -1246,7 +1265,12 @@ rtk node packages/cli/dist/index.js character render --selection /tmp/lpc-plugin
 
 Expected: each response has `ok: true`. Preview and render outputs contain PNG pixels, metadata JSON, credits TXT, and credits CSV; render also contains the requested animation and ZIP. Run outside the sandbox only if the verified cache is inaccessible, using the narrowest required approval.
 
-- [ ] **Step 5: Record final evidence in this plan**
+  - Verification: the exact six-command `character create/search/set/validate/preview/render` group above PASS; every response JSON reported `ok: true`, search returned `hair_braid`, and the saved selection contained Braid with `lpcr.brown` recolor.
+  - Artifact verification: preview PNG was 64x64 with nonempty PNG image data; render sheet was 832x3456; `animations/walk.png` was 832x256; preview/render metadata parsed as their v1 schemas and listed the expected artifact types; each output contained nonempty credits TXT/CSV with eight entries; and the ZIP had a valid signature and contained the sheet, metadata, both credit files, and requested walk animation.
+  - Known warnings: existing catalog alias warnings for Epaulets and Pauldrons were emitted; no structured command errors occurred.
+  - Cleanup: removed only `/tmp/lpc-plugin-smoke.json`, `/tmp/lpc-plugin-preview`, and `/tmp/lpc-plugin-render`; a final assertion confirmed these paths and the isolated Codex home absent.
+
+- [x] **Step 5: Record final evidence in this plan**
 
 Under this task, add one concise implementation note describing the observed
 marketplace installation and attributed end-to-end result, the full hash of the
@@ -1255,7 +1279,9 @@ command group with its exact observed command and PASS or FAIL result. Do not
 claim public Plugins Directory availability; this task verifies the repository
 marketplace beta only.
 
-- [ ] **Step 6: Commit final plan bookkeeping**
+  - Implementation: Verified implementation commit `377d46c5c945614e77e348f5e83b26f64b98c118` through the complete repository gate, a clean repository-marketplace beta installation, exact built-CLI compatibility, and an attributed end-to-end character workflow with real PNG, metadata, TXT/CSV credit, animation, and ZIP artifacts. This evidence does not claim public Plugins Directory availability.
+
+- [x] **Step 6: Commit final plan bookkeeping**
 
 ```sh
 rtk git add docs/superpowers/plans/2026-07-14-lpc-toolkit-codex-plugin.md
