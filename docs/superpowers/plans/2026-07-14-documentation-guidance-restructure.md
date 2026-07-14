@@ -59,7 +59,11 @@
 - Consumes: existing root scripts `verify:upstream-pin`, `check:boundaries`, and `typecheck`; existing package `pretest` lifecycles.
 - Produces: root script `verify: string` and CI unit command `pnpm verify`; `docs/ENGINEERING.md` becomes the command/quality-gate source of truth.
 
-- [ ] **Step 1: Add the failing package-script and CI contract**
+- [x] **Step 1: Add the failing package-script and CI contract**
+
+  - Implementation note: Added the exact root `verify` script contract, the
+    single CI unit entry-point assertion, and ordered-stage assertions; RED has
+    not yet been run.
 
 In `packages/web/test/package-scripts.test.ts`, add this constant after `rootPackageJson` is parsed:
 
@@ -104,7 +108,11 @@ Update the existing architecture-boundary CI test so its unit-job assertions ins
 
 Remove only the obsolete assertions that require separate prepare, pin, and boundary commands inside `unitJob`. Keep publish-workflow assertions unchanged. Record the edit in this plan before running RED.
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
+
+  - Verification: The sandboxed pretest first hit the expected `tsx` IPC
+    `EPERM`; the approved rerun reached Vitest and confirmed RED with 1 failed
+    assertion and 8 passing tests because `scripts.verify` was `undefined`.
 
 Run:
 
@@ -114,7 +122,12 @@ rtk pnpm --filter @lpc-toolkit/web test -- package-scripts.test.ts
 
 Expected: FAIL because `rootPackageJson.scripts.verify` is undefined and the CI unit job does not contain `pnpm verify`. Record the failing assertion count and message.
 
-- [ ] **Step 3: Implement the shared command and CI call**
+- [x] **Step 3: Implement the shared command and CI call**
+
+  - Implementation note: Added the exact five-stage root `verify` script,
+    replaced the five separate CI unit commands with `pnpm verify`, and created
+    the engineering command/CI matrix without changing publish, E2E, or parity
+    jobs.
 
 Add this exact script to root `package.json` after `typecheck`:
 
@@ -161,7 +174,7 @@ rtk pnpm install --frozen-lockfile
 rtk pnpm verify
 rtk pnpm build
 rtk pnpm check:boundaries
-rtk pnpm typecheck
+rtk pnpm run typecheck
 rtk pnpm test
 ```
 
@@ -171,7 +184,12 @@ Under `CI Mapping`, map `Unit tests` to `pnpm verify`, `CLI package` to CLI type
 
 Under `Asset and Upstream Rules`, state that ordinary install, verify, build, package, and non-parity E2E must not initialize `upstream/`; only the separate pinned parity checkout may install upstream dependencies.
 
-- [ ] **Step 4: Verify GREEN and execute the shared gate**
+- [x] **Step 4: Verify GREEN and execute the shared gate**
+
+  - Verification: Focused package-script suite PASS (1 file, 9 tests). The new
+    `rtk pnpm verify` gate passed asset preparation, source-pin verification,
+    boundaries, all four workspace typechecks, and 1,150 tests with 1 existing
+    skip; existing expected missing-asset/catalog warnings remained non-fatal.
 
 Run:
 
@@ -182,7 +200,13 @@ rtk pnpm verify
 
 Expected: package-script tests PASS; the shared gate prepares or reuses assets, verifies the pin, passes boundaries, typecheck, and all workspace tests. If `tsx` hits sandbox IPC `EPERM`, rerun the affected command with the approved escalation and record both results.
 
-- [ ] **Step 5: Commit Task 1 and record its hash**
+- [x] **Step 5: Commit Task 1 and record its hash**
+
+  - Commit: `81eb12b053710d718b9aee7fd9ed271289b0f14d`
+  - Implementation note: Committed only the shared gate, CI call, executable
+    contract, and engineering guide; this plan record remains unstaged.
+  - Verification: Focused suite PASS (9/9); `pnpm verify` PASS with boundaries,
+    four workspace typechecks, 1,150 tests passed, and 1 existing skip.
 
 Run:
 
@@ -193,6 +217,15 @@ rtk git log -1 --format=%H
 ```
 
 Expected: one commit containing the executable gate, CI wiring, its contract test, and the guide that documents it. Record the full hash, implementation summary, and exact verification results under Task 1.
+
+**Task 1 implementation record:**
+
+- Implementation: Added one ordered root `verify` script, routed the main CI
+  unit job through it, protected the contract with Vitest, and documented the
+  common versus conditional/release gates in `docs/ENGINEERING.md`.
+- Commit: `81eb12b053710d718b9aee7fd9ed271289b0f14d`
+- Verification: RED confirmed with 1 failure and 8 passes; GREEN confirmed with
+  9/9 focused tests. Full shared gate passed 1,150 tests with 1 existing skip.
 
 ---
 
@@ -209,14 +242,26 @@ Expected: one commit containing the executable gate, CI wiring, its contract tes
 - Consumes: `docs/ENGINEERING.md` and the existing CLI release instructions in `README.md`.
 - Produces: public navigation from `README.md`, contributor entry in `CONTRIBUTING.md`, and maintainer release ownership in `docs/RELEASING.md`.
 
-- [ ] **Step 1: Add failing document-ownership and link assertions**
+- [x] **Step 1: Add failing document-ownership and link assertions**
 
-In `packages/web/test/readme-architecture-docs.test.ts`, load the new documents:
+  - Implementation note: Added focused ownership/navigation assertions and a
+    maintained relative-link resolver. Missing new documents read as empty
+    strings so RED will be a contract failure rather than a module-load error.
+
+In `packages/web/test/readme-architecture-docs.test.ts`, add a read helper that
+returns an empty string for a not-yet-created document, then load the new
+documents. This keeps RED as an assertion failure rather than an `ENOENT`
+module-load error:
 
 ```ts
-const contributing = readRepoFile('CONTRIBUTING.md');
+const readRepoFileIfExists = (filePath: string) => {
+  const absolutePath = path.join(repoRoot, filePath);
+  return existsSync(absolutePath) ? readFileSync(absolutePath, 'utf8') : '';
+};
+
+const contributing = readRepoFileIfExists('CONTRIBUTING.md');
 const engineering = readRepoFile('docs/ENGINEERING.md');
-const releasing = readRepoFile('docs/RELEASING.md');
+const releasing = readRepoFileIfExists('docs/RELEASING.md');
 ```
 
 Replace the current README release-contract test with:
@@ -274,7 +319,11 @@ function localMarkdownTargets(filePath: string, source: string): string[] {
 
 Record the edit in this plan before running RED.
 
-- [ ] **Step 2: Run the documentation contract and verify RED**
+- [x] **Step 2: Run the documentation contract and verify RED**
+
+  - Verification: RED confirmed with 1 focused routing assertion failure and
+    12 passing tests; the first missing contract was the root README link to
+    `CONTRIBUTING.md`, not a file-read or syntax error.
 
 Run:
 
@@ -282,9 +331,16 @@ Run:
 rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts
 ```
 
-Expected: FAIL while loading missing `CONTRIBUTING.md` or `docs/RELEASING.md`, proving the new hierarchy is not yet present.
+Expected: FAIL in the focused routing assertion because `CONTRIBUTING.md` and
+`docs/RELEASING.md` are still absent and the root README does not link the new
+hierarchy.
 
-- [ ] **Step 3: Add contribution and release guides and slim the root README**
+- [x] **Step 3: Add contribution and release guides and slim the root README**
+
+  - Implementation note: Added focused contributor and maintainer release
+    entry points and reduced the root README to public setup, package, CLI,
+    architecture, design-reference, and license guidance. The executable core
+    example remains temporarily in root for Task 3's atomic move.
 
 Create `CONTRIBUTING.md` with these top-level sections and concrete policies:
 
@@ -357,7 +413,10 @@ Temporarily retain the existing complete `### Example` block and root public
 API categories so the executable README test remains green until Task 3 moves
 the example and its contract atomically.
 
-- [ ] **Step 4: Verify the hierarchy and links are GREEN**
+- [x] **Step 4: Verify the hierarchy and links are GREEN**
+
+  - Verification: GREEN confirmed with 13/13 focused documentation tests,
+    including workflow ownership and maintained relative-link resolution.
 
 Run:
 
@@ -367,7 +426,11 @@ rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts
 
 Expected: the focused documentation suite PASS, including ownership and local-link assertions. Inspect the test output for zero missing-link failures.
 
-- [ ] **Step 5: Commit Task 2 and record its hash**
+- [x] **Step 5: Commit Task 2 and record its hash**
+
+  - Commit: `392f3794446194658bea0127f4be8b0623d10da9`
+  - Verification: 13/13 focused documentation tests PASS; staged diff check
+    reported no whitespace errors.
 
 Run:
 
@@ -378,6 +441,15 @@ rtk git log -1 --format=%H
 ```
 
 Expected: one documentation hierarchy commit plus its focused contract changes. Record the full hash, implementation summary, and verification result under Task 2.
+
+**Implementation record:**
+
+- Summary: Added contributor and maintainer release entry points, made the root
+  README a public project index, and added ownership plus relative-link
+  contracts for the maintained guidance set.
+- Commit: `392f3794446194658bea0127f4be8b0623d10da9`
+- Verification: RED confirmed with 1 routing failure and 12 passes; GREEN
+  confirmed with 13/13 focused tests and zero missing-link failures.
 
 ---
 
@@ -394,7 +466,11 @@ Expected: one documentation hierarchy commit plus its focused contract changes. 
 - Consumes: the existing public core imports, fixture records, palette records, `CanvasAdapter`, and precise-credit assertions in `readme-example.test.ts`.
 - Produces: a `## Example` TypeScript block in `packages/core/README.md` executed by the existing regression test.
 
-- [ ] **Step 1: Redirect the example test to the package README**
+- [x] **Step 1: Redirect the example test to the package README**
+
+  - Implementation note: Redirected the executable example extractor and API
+    ownership contract to `packages/core/README.md`, and added the package guide
+    to maintained relative-link validation before changing its content.
 
 In `packages/core/test/readme-example.test.ts`, replace the root path:
 
@@ -453,7 +529,11 @@ relative API link joins the maintained-link contract.
 
 Record the edit in this plan before running RED.
 
-- [ ] **Step 2: Run the core example test and verify RED**
+- [x] **Step 2: Run the core example test and verify RED**
+
+  - Verification: Core RED confirmed with the expected missing package README
+    example error (1 failed, 1 passed); documentation RED confirmed with the
+    missing package API link (1 failed, 12 passed).
 
 Run:
 
@@ -466,7 +546,12 @@ Expected: the core test FAILS with `Core package README TypeScript example
 block was not found.` and the documentation contract FAILS because the package
 guide does not yet contain the API categories or root API link target.
 
-- [ ] **Step 3: Expand the core package README with the executable example**
+- [x] **Step 3: Expand the core package README with the executable example**
+
+  - Implementation note: Moved the unchanged executable palette-aware example
+    and five public API categories into the core package guide, documented its
+    injected runtime boundary and attribution contract, and left only the core
+    summary plus package link in the root README.
 
 Replace `packages/core/README.md` with these sections:
 
@@ -498,7 +583,11 @@ manifest and callers must preserve it with rendered output.
 
 Ensure the old complete example no longer exists in root `README.md`.
 
-- [ ] **Step 4: Verify GREEN in core and documentation contracts**
+- [x] **Step 4: Verify GREEN in core and documentation contracts**
+
+  - Verification: Core README example tests PASS 2/2 with visible recolored
+    pixels and precise credits; documentation contracts PASS 13/13 with the
+    package guide included in maintained-link validation.
 
 Run:
 
@@ -509,7 +598,11 @@ rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts
 
 Expected: core example tests PASS with visible recolored pixels and precise credits; documentation contracts PASS with the API categories and package link in their authoritative locations.
 
-- [ ] **Step 5: Commit Task 3 and record its hash**
+- [x] **Step 5: Commit Task 3 and record its hash**
+
+  - Commit: `7486a68852a68eb8ef7ff53a96ef4c7270facd35`
+  - Verification: Core example tests PASS 2/2; documentation contracts PASS
+    13/13; staged diff check reported no whitespace errors.
 
 Run:
 
@@ -520,6 +613,15 @@ rtk git log -1 --format=%H
 ```
 
 Record the full hash, implementation summary, and both focused verification results under Task 3.
+
+**Implementation record:**
+
+- Summary: Made the core package guide own its injected runtime boundary,
+  executable palette-aware example, public API map, and attribution contract;
+  the root README now routes readers there without duplicating the example.
+- Commit: `7486a68852a68eb8ef7ff53a96ef4c7270facd35`
+- Verification: Expected RED observed in both focused suites, then core tests
+  passed 2/2 and documentation contracts passed 13/13 after the move.
 
 ---
 
@@ -535,7 +637,11 @@ Record the full hash, implementation summary, and both focused verification resu
 - Consumes: root package `license`, the common `verify` script, architecture/engineering/onboarding paths, and existing project hard rules.
 - Produces: byte-identical agent entry files with current package status and exact project policy.
 
-- [ ] **Step 1: Add failing synchronization, status, and license contracts**
+- [x] **Step 1: Add failing synchronization, status, and license contracts**
+
+  - Implementation note: Added a package-metadata-backed contract that keeps
+    both Agent entry files identical and requires the current license, four
+    package layout, shared verify gate, and engineering index.
 
 In `packages/web/test/readme-architecture-docs.test.ts`, parse the root package:
 
@@ -564,7 +670,10 @@ describe('agent guidance contract', () => {
 
 Record the edit in this plan before running RED.
 
-- [ ] **Step 2: Run the documentation contract and verify RED**
+- [x] **Step 2: Run the documentation contract and verify RED**
+
+  - Verification: RED confirmed with the new Agent contract failing on the
+    outdated GPL-3.0 text while the other 13 documentation tests passed.
 
 Run:
 
@@ -574,7 +683,12 @@ rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts
 
 Expected: FAIL because the current agent files say `GPL-3.0`, omit presets from the layout, describe the CLI as `built later`, and do not expose `rtk pnpm verify` or the engineering guide.
 
-- [ ] **Step 3: Rewrite `AGENTS.md` and apply the exact same content to `CLAUDE.md`**
+- [x] **Step 3: Rewrite `AGENTS.md` and apply the exact same content to `CLAUDE.md`**
+
+  - Implementation note: Replaced both Agent files with the same current,
+    index-style guidance covering commands, hard rules, all active packages,
+    stable architecture ownership, local extraction rules, approval gates,
+    plan records, and concise working principles.
 
 Use these top-level sections in both files:
 
@@ -625,7 +739,10 @@ surgical-change, and goal-driven meaning.
 Apply the resulting content to both files in one patch; do not use a symlink or
 tool-specific import directive.
 
-- [ ] **Step 4: Verify GREEN and exact equality**
+- [x] **Step 4: Verify GREEN and exact equality**
+
+  - Verification: Documentation contracts PASS 14/14 and
+    `rtk cmp AGENTS.md CLAUDE.md` exits 0 with no output.
 
 Run:
 
@@ -636,7 +753,11 @@ rtk cmp AGENTS.md CLAUDE.md
 
 Expected: documentation contracts PASS and `cmp` exits 0 with no output.
 
-- [ ] **Step 5: Commit Task 4 and record its hash**
+- [x] **Step 5: Commit Task 4 and record its hash**
+
+  - Commit: `0f8ffc1f85ab8153c1c72fba42e728d7e636c19f`
+  - Verification: Documentation contracts PASS 14/14; exact file comparison
+    exits 0; staged diff check reported no whitespace errors.
 
 Run:
 
@@ -647,6 +768,15 @@ rtk git log -1 --format=%H
 ```
 
 Expected: one synchronized agent-guidance commit with its contract test. Record the full hash, implementation summary, and focused verification under Task 4.
+
+**Implementation record:**
+
+- Summary: Converted both Agent files into byte-identical, current navigation
+  indexes while preserving hard rules, architecture-sensitive local guidance,
+  approval boundaries, plan records, and concise working principles.
+- Commit: `0f8ffc1f85ab8153c1c72fba42e728d7e636c19f`
+- Verification: Expected license RED observed first; GREEN passed 14/14 focused
+  tests and `rtk cmp AGENTS.md CLAUDE.md` returned no differences.
 
 ---
 
@@ -662,7 +792,11 @@ Expected: one synchronized agent-guidance commit with its contract test. Record 
 - Consumes: current four-package layout, `rtk pnpm verify`, existing architecture ownership/attribution/asset-store sections, and agent change guidance from Task 4.
 - Produces: runnable first-day onboarding and architecture focused on stable boundaries with links to engineering and agent guidance.
 
-- [ ] **Step 1: Add failing onboarding and ownership-location contracts**
+- [x] **Step 1: Add failing onboarding and ownership-location contracts**
+
+  - Implementation note: Added a first-day onboarding contract for every
+    active package and a location contract that assigns command/CI detail to
+    engineering while architecture retains executable stable boundaries.
 
 Add this test to `packages/web/test/readme-architecture-docs.test.ts`:
 
@@ -702,7 +836,11 @@ requires the detailed `CI unit job` wording from `engineering` rather than
 
 Record the edit in this plan before running RED.
 
-- [ ] **Step 2: Run the documentation contract and verify RED**
+- [x] **Step 2: Run the documentation contract and verify RED**
+
+  - Verification: RED confirmed with two expected failures (missing runnable
+    onboarding prerequisites and missing executable architecture gate) while
+    the other 14 documentation tests passed.
 
 Run:
 
@@ -712,7 +850,12 @@ rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts
 
 Expected: FAIL because onboarding still calls the CLI planned, omits presets/CLI from the guided quality path, has no runnable install/verify commands, and architecture still owns the moved detailed sections.
 
-- [ ] **Step 3: Rewrite onboarding around an executable path**
+- [x] **Step 3: Rewrite onboarding around an executable path**
+
+  - Implementation note: Replaced the exhaustive file inventory with a
+    runnable setup, editor and local CLI starts, current package tour,
+    responsibility routing table, scoped verification examples, contribution
+    cautions, pitfalls, and focused next references.
 
 Replace `docs/ONBOARDING.md` with these top-level sections:
 
@@ -759,7 +902,12 @@ link to `ENGINEERING.md` and include package-scoped examples. Preserve first
 contribution cautions around attribution, adapter contracts, `upstream/`, and
 broad hotspot refactors.
 
-- [ ] **Step 4: Trim moved workflow guidance from architecture**
+- [x] **Step 4: Trim moved workflow guidance from architecture**
+
+  - Implementation note: Replaced command/test detail with the executable
+    boundary gate, removed duplicated React extraction guidance, and assigned
+    contributor, engineering, and release workflows to their focused documents
+    while preserving stable architecture and product invariants.
 
 In `docs/ARCHITECTURE.md`:
 
@@ -789,7 +937,10 @@ package-scoped checks, CI mapping, and isolated parity procedure.
   attribution, catalog ownership, character persistence, and parity contract
   tests.
 
-- [ ] **Step 5: Verify GREEN and the executable boundary gate**
+- [x] **Step 5: Verify GREEN and the executable boundary gate**
+
+  - Verification: Documentation contracts PASS 16/16 and
+    `rtk pnpm check:boundaries` reports `Architecture boundary check passed.`
 
 Run:
 
@@ -800,7 +951,11 @@ rtk pnpm check:boundaries
 
 Expected: documentation contracts PASS; the boundary checker reports success without runtime changes.
 
-- [ ] **Step 6: Commit Task 5 and record its hash**
+- [x] **Step 6: Commit Task 5 and record its hash**
+
+  - Commit: `7199e001571a7234fe7d4d35dd23794a69a4ea07`
+  - Verification: Documentation contracts PASS 16/16; architecture boundary
+    checker PASS; staged diff check reported no whitespace errors.
 
 Run:
 
@@ -811,6 +966,16 @@ rtk git log -1 --format=%H
 ```
 
 Expected: one onboarding/architecture responsibility commit plus its contract changes. Record the full hash, implementation summary, and focused verification under Task 5.
+
+**Implementation record:**
+
+- Summary: Made onboarding an executable first-day path across all four active
+  packages, moved command/CI ownership to engineering and local extraction
+  guidance to Agent indexes, and retained stable boundary/product contracts in
+  architecture.
+- Commit: `7199e001571a7234fe7d4d35dd23794a69a4ea07`
+- Verification: Expected two-test RED observed first; GREEN passed 16/16
+  documentation contracts and the executable architecture boundary gate.
 
 ---
 
@@ -823,7 +988,11 @@ Expected: one onboarding/architecture responsibility commit plus its contract ch
 - Consumes: all five task commits and their focused verification records.
 - Produces: complete acceptance evidence and a clean branch with an auditable plan record.
 
-- [ ] **Step 1: Run focused documentation and executable-example suites**
+- [x] **Step 1: Run focused documentation and executable-example suites**
+
+  - Verification: Fresh post-correction rerun: Core README example PASS 2/2;
+    documentation and package script contracts PASS 26/26 across 2 files;
+    Agent file comparison exits 0 with no output.
 
 Run:
 
@@ -835,18 +1004,42 @@ rtk cmp AGENTS.md CLAUDE.md
 
 Expected: all focused tests PASS and agent files compare equal. Record exact file/test counts.
 
-- [ ] **Step 2: Run architecture and type verification**
+- [x] **Step 2: Run architecture and type verification**
+
+  - Verification: `rtk pnpm check:boundaries` reports success;
+    `rtk pnpm run typecheck` invokes all four workspace package scripts and
+    exits 0 with no TypeScript diagnostics.
+  - Acceptance correction: The planned shorthand `rtk pnpm typecheck`
+    consistently exited 1 because this RTK version replaced the workspace
+    script with a root-level bare `tsc`. `rtk proxy pnpm typecheck` and explicit
+    `rtk pnpm run typecheck` both passed. Added a RED/GREEN contract (1 expected
+    failure, then 17/17 pass) and documented explicit `run` forms for root and
+    package-scoped standalone typechecks.
+  - Acceptance correction commit:
+    `babf0fb28606408f3da47c99a8459fce81ac8da5`
 
 Run:
 
 ```sh
 rtk pnpm check:boundaries
-rtk pnpm typecheck
+rtk pnpm run typecheck
 ```
 
 Expected: both commands exit 0. Record package/typecheck results and the boundary-check success message.
 
-- [ ] **Step 3: Run the shared repository gate**
+- [x] **Step 3: Run the shared repository gate**
+
+  - Initial verification: The gate reached all workspace tests after asset,
+    pin, boundary, and typecheck success, then failed 1 CLI release-workflow
+    assertion because that pre-existing contract still read release guidance
+    from the now-slim root README.
+  - Correction: Redirected the unchanged RC/advisory documentation contract to
+    `docs/RELEASING.md`; focused CLI verification PASS 4/4.
+  - Correction commit: `fa735aad8c8f309ff99c677e7af000bc9d5289f8`
+  - Final verification: Fresh `rtk pnpm verify` exits 0. Asset cache/pin,
+    boundaries, and all four package typechecks pass; core 171, presets 3, CLI
+    301, and web 680 tests pass (1,155 total) with 1 existing CLI platform skip.
+    Expected missing-asset and catalog-warning test stderr produced no failures.
 
 Run:
 
@@ -856,7 +1049,12 @@ rtk pnpm verify
 
 Expected: asset preparation/pin, boundaries, typecheck, and all workspace tests PASS. Record exact test totals and existing skips/warnings separately from failures.
 
-- [ ] **Step 4: Build every workspace package**
+- [x] **Step 4: Build every workspace package**
+
+  - Verification: `rtk pnpm build` exits 0 for core, presets, the production
+    web app, the CLI embedded web build, TypeScript output, vendoring, and
+    release-config copy. Existing Vite JSZip import and large-chunk warnings
+    remain warning-only.
 
 Run:
 
@@ -866,7 +1064,12 @@ rtk pnpm build
 
 Expected: core, presets, web asset preparation/Vite build, and CLI vendoring/build all PASS without initializing `upstream/`.
 
-- [ ] **Step 5: Inspect scope and documentation drift**
+- [x] **Step 5: Inspect scope and documentation drift**
+
+  - Verification: `main...HEAD` diff check has no whitespace errors and lists
+    17 planned or acceptance-correction files (2,348 insertions, 1,015
+    deletions). The stale/release-only phrase scan returns no matches. Branch
+    status shows only this plan record modified.
 
 Run:
 
@@ -878,6 +1081,19 @@ rtk git status --short --branch
 ```
 
 Expected: no whitespace errors; changed files match this plan; stale package-status phrases are absent from maintained entry docs; release-only `Trusted Publisher` wording is absent from root/agent/onboarding entry points; only this plan record is uncommitted before the closing commit.
+
+**Acceptance record:**
+
+- Summary: Verified executable examples and guidance contracts, corrected two
+  acceptance-discovered ownership/tooling gaps, ran the shared repository gate,
+  built all active packages, and audited final scope and stale entry wording.
+- Correction commits:
+  `babf0fb28606408f3da47c99a8459fce81ac8da5`,
+  `fa735aad8c8f309ff99c677e7af000bc9d5289f8`
+- Verification: Focused core 2/2 and documentation/script 26/26 PASS; Agent
+  files compare equal; boundaries and four-package typecheck PASS; shared gate
+  PASS with 1,155 tests and 1 existing skip; all-package build PASS; diff and
+  drift checks PASS.
 
 - [ ] **Step 6: Commit the completed plan record**
 
