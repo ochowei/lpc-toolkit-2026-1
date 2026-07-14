@@ -1129,6 +1129,30 @@ rtk git commit -m "docs(plugin): publish Codex installation workflow"
 
 Update this task with the full commit hash, implementation note, and exact verification results before committing.
 
+#### Review fix: distinguish CLI install or upgrade onboarding
+
+- Finding: The beta onboarding named the external CLI prerequisite but did not
+  give existing older-CLI users an explicit upgrade action or clearly separate
+  CLI install/upgrade, one-time marketplace addition, and plugin installation.
+- Implementation: Both READMEs now present those three actions in order, use
+  `npm install -g '@lpc-toolkit/cli@>=0.1.3-alpha-1 <0.2.0'`, and state the
+  plugin `0.1.0` supported CLI range without changing future-only Public Plugins
+  Directory language or metadata/TXT/CSV attribution requirements.
+- Fix commit: `1f33acea5a5f48da0f249faa4f11146a08dc98cb`
+- RED verification: `rtk pnpm --filter @lpc-toolkit/cli test -- package-metadata.test.ts` FAIL as expected (1 failed, 18 passed) because the CLI README lacked `Install or upgrade the CLI`.
+- RED sandbox attempt: `rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts` FAIL before Vitest because `tsx` could not create its IPC socket (`listen EPERM`).
+- RED verification (narrow escalation): `rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts` FAIL as expected (1 failed, 18 passed) because the root README lacked `Install or upgrade the CLI`.
+- GREEN verification: `rtk pnpm --filter @lpc-toolkit/cli test -- package-metadata.test.ts plugin-contract.test.ts` PASS (29 tests).
+- GREEN verification (narrow escalation): `rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts` PASS (19 tests).
+- Verification: `rtk pnpm verify:plugin` PASS (11 Node tests; `Codex plugin structure is valid.`).
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+- Verification: `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS.
+- Verification: `rtk pnpm check:boundaries` PASS (`Architecture boundary check passed.`).
+- Verification: `rtk node scripts/verify-codex-plugin.mjs` PASS (`Codex plugin structure is valid.`).
+- Verification: `rtk env PYTHONPATH=/tmp/lpc-plugin-validator-pyyaml python3 /Users/william/.codex/skills/.system/skill-creator/scripts/quick_validate.py plugins/lpc-toolkit/skills/character-authoring` PASS (`Skill is valid!`).
+- Verification: `rtk env PYTHONPATH=/tmp/lpc-plugin-validator-pyyaml python3 /Users/william/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/lpc-toolkit` PASS.
+- Verification: `rtk git diff --check` PASS.
+
 ### Task 5: Verify A Clean Marketplace Installation And Complete The Gate
 
 **Files:**
