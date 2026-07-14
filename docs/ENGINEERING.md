@@ -46,18 +46,22 @@ package validation, or npm publication.
 | `rtk pnpm verify` | Run the common asset, boundary, type, and unit-test gate. |
 | `rtk pnpm build` | Build core, presets, web assets/Vite output, and the CLI package. |
 | `rtk pnpm check:boundaries` | Enforce the executable dependency policy. |
-| `rtk pnpm typecheck` | Typecheck all workspace packages. |
+| `rtk pnpm run typecheck` | Typecheck all workspace packages. |
 | `rtk pnpm test` | Run the root test lifecycle and all workspace tests. |
 
 Use the narrowest package command while iterating, then run the common gate
 before handing off a repository-wide change.
+
+Use the explicit `run` form for standalone typechecks. This avoids RTK's
+pnpm-to-tsc shortcut, which does not preserve root workspace or leading
+`--filter` context when the script name is used as shorthand.
 
 ## Change-Specific Checks
 
 ### Core
 
 ```sh
-rtk pnpm --filter @lpc-toolkit/core typecheck
+rtk pnpm --filter @lpc-toolkit/core run typecheck
 rtk pnpm --filter @lpc-toolkit/core test
 ```
 
@@ -68,7 +72,7 @@ implementations.
 ### Presets
 
 ```sh
-rtk pnpm --filter @lpc-toolkit/presets typecheck
+rtk pnpm --filter @lpc-toolkit/presets run typecheck
 rtk pnpm --filter @lpc-toolkit/presets test
 ```
 
@@ -78,7 +82,7 @@ addition to the package tests.
 ### Web
 
 ```sh
-rtk pnpm --filter @lpc-toolkit/web typecheck
+rtk pnpm --filter @lpc-toolkit/web run typecheck
 rtk pnpm --filter @lpc-toolkit/web test
 rtk pnpm --filter @lpc-toolkit/web test:e2e
 ```
@@ -89,7 +93,7 @@ tracked upstream submodule.
 ### CLI
 
 ```sh
-rtk pnpm --filter @lpc-toolkit/cli typecheck
+rtk pnpm --filter @lpc-toolkit/cli run typecheck
 rtk pnpm --filter @lpc-toolkit/cli test
 rtk pnpm --filter @lpc-toolkit/cli build
 rtk pnpm --filter @lpc-toolkit/cli test:package

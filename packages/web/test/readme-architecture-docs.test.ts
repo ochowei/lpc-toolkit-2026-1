@@ -207,6 +207,22 @@ describe('onboarding and engineering ownership contract', () => {
     expect(engineering).toContain('## CI Mapping');
     expect(engineering).toContain('CI unit job');
   });
+
+  it('uses RTK-safe explicit run forms for standalone typechecks', () => {
+    expect(engineering).toContain('`rtk pnpm run typecheck`');
+    for (const packageName of ['core', 'presets', 'web', 'cli']) {
+      expect(engineering).toContain(
+        `rtk pnpm --filter @lpc-toolkit/${packageName} run typecheck`,
+      );
+      expect(engineering).not.toContain(
+        `rtk pnpm --filter @lpc-toolkit/${packageName} typecheck`,
+      );
+    }
+    expect(engineering).not.toContain('`rtk pnpm typecheck`');
+    expect(agents).toContain(
+      'Verification: `rtk pnpm run typecheck` PASS',
+    );
+  });
 });
 
 describe('CLI README character contract', () => {

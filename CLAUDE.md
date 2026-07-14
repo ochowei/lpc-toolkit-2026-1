@@ -149,7 +149,7 @@ Example:
 ```markdown
 - [x] Implement asset validator
   - Commit: abc1234
-  - Verification: `rtk pnpm typecheck` PASS
+  - Verification: `rtk pnpm run typecheck` PASS
 ```
 
 ## Working Principles
