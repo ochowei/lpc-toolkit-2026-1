@@ -169,6 +169,21 @@ describe('README architecture contract', () => {
 
 describe('Codex plugin documentation contract', () => {
   it('documents installation, ownership, and verification', () => {
+    const cliInstall = "npm install -g '@lpc-toolkit/cli@>=0.1.3-alpha-1 <0.2.0'";
+    const marketplaceAdd = 'codex plugin marketplace add ochowei/lpc-toolkit-2026-1';
+    const pluginAdd = 'codex plugin add lpc-toolkit@lpc-toolkit';
+
+    for (const document of [readme, cliReadme]) {
+      expect(document).toContain('Install or upgrade the CLI');
+      expect(document).toContain(cliInstall);
+      expect(document.indexOf(cliInstall)).toBeLessThan(
+        document.indexOf(marketplaceAdd),
+      );
+      expect(document.indexOf(marketplaceAdd)).toBeLessThan(
+        document.indexOf(pluginAdd),
+      );
+    }
+
     for (const phrase of [
       'codex plugin marketplace add ochowei/lpc-toolkit-2026-1',
       'codex plugin add lpc-toolkit@lpc-toolkit',

@@ -39,18 +39,29 @@ files; keep those attribution artifacts with the generated image.
 
 ### Codex Plugin
 
-Install the beta Codex plugin from this repository marketplace:
+1. Install or upgrade the CLI to the range supported by plugin `0.1.0`:
+
+```sh
+npm install -g '@lpc-toolkit/cli@>=0.1.3-alpha-1 <0.2.0'
+```
+
+2. Add the repository marketplace once:
 
 ```sh
 codex plugin marketplace add ochowei/lpc-toolkit-2026-1
+```
+
+3. Install or enable the plugin:
+
+```sh
 codex plugin add lpc-toolkit@lpc-toolkit
 ```
 
 The plugin requires an installed compatible `lpc-toolkit` CLI and does not
-automatically install the CLI. Beta users add the repository marketplace once,
-then install or enable the plugin. Restart the ChatGPT desktop app or start a
-new Codex task if the newly installed skill is not visible. Public Plugins
-Directory distribution can later remove the marketplace-add step.
+automatically install the CLI. Its supported CLI range is
+`>=0.1.3-alpha-1 <0.2.0`. Restart the ChatGPT desktop app or start a new Codex
+task if the newly installed skill is not visible. Public Plugins Directory
+distribution can later remove the marketplace-add step.
 
 The plugin guides Codex through JSON search, edit, validate, preview, and render
 workflows. Preview, render, and export outputs preserve metadata plus TXT and
