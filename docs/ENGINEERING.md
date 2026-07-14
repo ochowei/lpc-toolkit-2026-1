@@ -99,8 +99,30 @@ rtk pnpm --filter @lpc-toolkit/cli build
 rtk pnpm --filter @lpc-toolkit/cli test:package
 ```
 
-CLI render, preview, or bundle changes must retain metadata and TXT/CSV credit
-artifacts and preserve transactional output behavior.
+#### CLI documentation synchronization
+
+For a CLI behavior change, update only the documents whose owned contract
+actually changes; ordinary CLI work does not require editing every document.
+Before handoff, check the applicable items:
+
+- [ ] When commands, subcommands, arguments, defaults, locators, output content
+  or paths, error or recovery guidance, or usage examples change,
+  update `packages/cli/README.md` and the corresponding `--help` or usage text.
+- [ ] When a primary public CLI workflow or quick start changes, check and
+  update the root `README.md`.
+- [ ] When CLI build, typecheck, test, package-validation commands, or their CI
+  mapping change, update this guide.
+- [ ] When the npm package, installation method, versioning, release-candidate,
+  publication, or post-publication verification flow changes, update
+  `docs/RELEASING.md`.
+- [ ] When CLI package ownership, persistence, asset lifecycle, adapter
+  boundaries, or attribution/output contracts change, update
+  `docs/ARCHITECTURE.md`.
+- [ ] Add or update behavior tests, and verify both
+  human-readable and `--json` output contracts.
+- [ ] For render, preview, bundle, or export changes, retain
+  metadata and TXT/CSV credit artifacts;
+  preserve transactional output behavior.
 
 ### Asset tooling
 
