@@ -67,11 +67,15 @@
 - Consumes: Codex plugin manifest and marketplace formats; the installed `lpc-toolkit` binary name.
 - Produces: plugin id `lpc-toolkit`, marketplace id `lpc-toolkit`, skill id `lpc-character-authoring`, and exported `validatePluginRepository(repoRoot): string[]` for structural tests.
 
-- [ ] **Step 1: Invoke the plugin authoring workflow**
+- [x] **Step 1: Invoke the plugin authoring workflow**
 
 Invoke `$plugin-creator` for a local repository plugin named `lpc-toolkit` with one bundled skill and a repository marketplace entry. Do not accept generated MCP, app, hook, dependency, or separate-repository files. Compare its required manifest fields with the exact files below.
 
-- [ ] **Step 2: Write the failing verifier tests**
+  - Implementation: Used the repository-local plugin-creator scaffold with only skill, asset, and marketplace components; confirmed MCP, app, hook, dependency, and separate-repository components are absent.
+
+- [x] **Step 2: Write the failing verifier tests**
+
+  - Implementation: Added structural fixture coverage for the intended lightweight plugin and forbidden MCP, app, and hook components.
 
 Create `scripts/verify-codex-plugin.test.mjs`:
 
@@ -143,7 +147,7 @@ test('rejects forbidden MCP, app, and hook components', () => {
 });
 ```
 
-- [ ] **Step 3: Run the verifier test to confirm RED**
+- [x] **Step 3: Run the verifier test to confirm RED**
 
 Run:
 
@@ -153,7 +157,11 @@ rtk node --test scripts/verify-codex-plugin.test.mjs
 
 Expected: FAIL because `scripts/verify-codex-plugin.mjs` does not exist.
 
-- [ ] **Step 4: Implement the structural verifier**
+  - Verification: `rtk node --test scripts/verify-codex-plugin.test.mjs` FAIL as expected with `ERR_MODULE_NOT_FOUND` for `scripts/verify-codex-plugin.mjs`.
+
+- [x] **Step 4: Implement the structural verifier**
+
+  - Implementation: Added `validatePluginRepository(repoRoot)` plus the executable repository validation entry point.
 
 Create `scripts/verify-codex-plugin.mjs`:
 
@@ -245,7 +253,9 @@ if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === imp
 }
 ```
 
-- [ ] **Step 5: Add the manifest, marketplace, assets, and initial skill**
+- [x] **Step 5: Add the manifest, marketplace, assets, and initial skill**
+
+  - Implementation: Added plugin and marketplace metadata, both SVG presentation assets, and the single character-authoring skill with OpenAI interface metadata.
 
 Create `.agents/plugins/marketplace.json`:
 
@@ -376,7 +386,7 @@ policy:
   allow_implicit_invocation: true
 ```
 
-- [ ] **Step 6: Run focused verification**
+- [x] **Step 6: Run focused verification**
 
 Run:
 
@@ -388,7 +398,14 @@ rtk git diff --check
 
 Expected: PASS; the verifier prints `Codex plugin structure is valid.`
 
-- [ ] **Step 7: Commit and record Task 1 evidence**
+  - Verification: `rtk node --test scripts/verify-codex-plugin.test.mjs` PASS (2 tests).
+  - Verification: `rtk node scripts/verify-codex-plugin.mjs` PASS (`Codex plugin structure is valid.`).
+  - Verification: `rtk git diff --check` PASS.
+  - Verification: `rtk env PYTHONPATH=/tmp/lpc-plugin-validator-pyyaml python3 /Users/william/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/lpc-toolkit` PASS.
+  - Verification: `rtk env PYTHONPATH=/tmp/lpc-plugin-validator-pyyaml python3 /Users/william/.codex/skills/.system/skill-creator/scripts/quick_validate.py plugins/lpc-toolkit/skills/character-authoring` PASS.
+  - Verification: `rtk pnpm verify` PASS (core 171, presets 3, CLI 301 with 1 skipped, web 680 with 1 skipped; existing missing-asset/catalog warning noise only).
+
+- [x] **Step 7: Commit and record Task 1 evidence**
 
 ```sh
 rtk git add .agents/plugins/marketplace.json plugins/lpc-toolkit scripts/verify-codex-plugin.mjs scripts/verify-codex-plugin.test.mjs docs/superpowers/plans/2026-07-14-lpc-toolkit-codex-plugin.md
@@ -396,6 +413,9 @@ rtk git commit -m "feat(plugin): scaffold LPC Toolkit Codex plugin"
 ```
 
 Update this task with the full commit hash, a short implementation note, and the exact PASS/FAIL results before committing.
+
+  - Commit: b5da568231c2b8c2099769e463c9d2a636515b32
+  - Implementation: The repository now exposes installable plugin id `lpc-toolkit`, marketplace id `lpc-toolkit`, and bundled skill id `lpc-character-authoring`, guarded by structural tests and validation.
 
 ### Task 2: Add Deterministic CLI Compatibility Checking
 
