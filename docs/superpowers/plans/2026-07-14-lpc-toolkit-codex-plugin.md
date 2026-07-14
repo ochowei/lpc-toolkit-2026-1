@@ -416,6 +416,14 @@ Update this task with the full commit hash, a short implementation note, and the
 
   - Commit: b5da568231c2b8c2099769e463c9d2a636515b32
   - Implementation: The repository now exposes installable plugin id `lpc-toolkit`, marketplace id `lpc-toolkit`, and bundled skill id `lpc-character-authoring`, guarded by structural tests and validation.
+  - Review fix commit: 3f03cc7b66cc736add8670b09ac7d03408732c30
+  - Review fix: Require explicit request or acceptance plus a stated reason recorded in the workflow before using `--allow-partial`; lock the requirement with a static regression assertion.
+  - Review fix RED: `rtk node --test scripts/verify-codex-plugin.test.mjs` FAIL as expected (2 passed, 1 failed) because the existing skill text did not require or record a reason.
+  - Review fix verification: `rtk node --test scripts/verify-codex-plugin.test.mjs` PASS (3 tests).
+  - Review fix verification: `rtk node scripts/verify-codex-plugin.mjs` PASS (`Codex plugin structure is valid.`).
+  - Review fix verification: `rtk env PYTHONPATH=/tmp/lpc-plugin-validator-pyyaml python3 /Users/william/.codex/skills/.system/skill-creator/scripts/quick_validate.py plugins/lpc-toolkit/skills/character-authoring` PASS.
+  - Review fix verification: `rtk env PYTHONPATH=/tmp/lpc-plugin-validator-pyyaml python3 /Users/william/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/lpc-toolkit` PASS.
+  - Review fix verification: `rtk git diff --check` PASS.
 
 ### Task 2: Add Deterministic CLI Compatibility Checking
 
