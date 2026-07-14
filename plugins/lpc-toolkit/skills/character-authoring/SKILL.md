@@ -8,8 +8,9 @@ description: Use when creating, editing, validating, previewing, or rendering LP
 Use `lpc-toolkit` as the only source of catalog, selection, validation, render,
 and attribution behavior.
 
-1. Run `lpc-toolkit --version`. If the executable is missing, stop and provide
-   the documented npm installation command; never install it silently.
+1. Read `references/compatibility.md`, resolve this skill directory, and run
+   `node scripts/check-cli.mjs`. Continue only when its JSON result has
+   `ok: true`; never install or upgrade the CLI silently.
 2. Use `--json` for every agent-consumed command that supports it.
 3. Start from a named character or explicit `--selection` file, never both.
 4. Search narrowly by character type and query before selecting an exact item.
