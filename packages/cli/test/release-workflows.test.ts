@@ -60,12 +60,12 @@ describe('CLI release workflows', () => {
   });
 
   it('documents tagged RC gates and advisory manual checks', () => {
-    const readme = readRepoFile('README.md');
+    const releaseGuide = readRepoFile('docs/RELEASING.md');
 
-    expect(readme).toContain('v<version>-rc.<number>');
-    expect(readme).toContain('macos-latest');
-    expect(readme).toContain('windows-latest');
-    expect(readme).toContain('advisory');
-    expect(readme).toContain('does not publish npm');
+    expect(releaseGuide).toContain('v<version>-rc.<number>');
+    expect(releaseGuide).toContain('macos-latest');
+    expect(releaseGuide).toContain('windows-latest');
+    expect(releaseGuide).toContain('advisory');
+    expect(releaseGuide).toContain('never publishes npm');
   });
 });
