@@ -223,6 +223,22 @@ describe('onboarding and engineering ownership contract', () => {
       'Verification: `rtk pnpm run typecheck` PASS',
     );
   });
+
+  it('keeps CLI documentation synchronization requirements explicit', () => {
+    for (const phrase of [
+      '#### CLI documentation synchronization',
+      '`packages/cli/README.md`',
+      'the corresponding `--help` or usage text',
+      'root `README.md`',
+      '`docs/RELEASING.md`',
+      '`docs/ARCHITECTURE.md`',
+      'human-readable and `--json` output contracts',
+      'metadata and TXT/CSV credit artifacts',
+      'transactional output behavior',
+    ]) {
+      expect(engineering).toContain(phrase);
+    }
+  });
 });
 
 describe('CLI README character contract', () => {
