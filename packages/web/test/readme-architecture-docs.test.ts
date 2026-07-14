@@ -7,16 +7,44 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../../..');
 const readRepoFile = (filePath: string) =>
   readFileSync(path.join(repoRoot, filePath), 'utf8');
+const readRepoFileIfExists = (filePath: string) => {
+  const absolutePath = path.join(repoRoot, filePath);
+  return existsSync(absolutePath) ? readFileSync(absolutePath, 'utf8') : '';
+};
+const rootPackage = JSON.parse(readRepoFile('package.json')) as {
+  license: string;
+};
 
 const readme = readRepoFile('README.md');
+const contributing = readRepoFileIfExists('CONTRIBUTING.md');
 const cliReadme = readRepoFile('packages/cli/README.md');
+const coreReadme = readRepoFile('packages/core/README.md');
 const architecture = readRepoFile('docs/ARCHITECTURE.md');
 const agents = readRepoFile('AGENTS.md');
 const claude = readRepoFile('CLAUDE.md');
+const engineering = readRepoFile('docs/ENGINEERING.md');
 const onboarding = readRepoFile('docs/ONBOARDING.md');
-const cliPackage = JSON.parse(readRepoFile('packages/cli/package.json')) as {
-  version: string;
-};
+const releasing = readRepoFileIfExists('docs/RELEASING.md');
+
+const maintainedDocuments = new Map([
+  ['README.md', readme],
+  ['CONTRIBUTING.md', contributing],
+  ['AGENTS.md', agents],
+  ['CLAUDE.md', claude],
+  ['docs/ARCHITECTURE.md', architecture],
+  ['docs/ENGINEERING.md', engineering],
+  ['docs/ONBOARDING.md', onboarding],
+  ['docs/RELEASING.md', releasing],
+  ['packages/cli/README.md', cliReadme],
+  ['packages/core/README.md', coreReadme],
+]);
+
+function localMarkdownTargets(filePath: string, source: string): string[] {
+  return [...source.matchAll(/\[[^\]]*\]\(([^)]+)\)/g)]
+    .map((match) => match[1]?.replace(/^<|>$/g, '').split('#')[0] ?? '')
+    .filter((target) => target !== '' && !/^[a-z]+:/i.test(target))
+    .map((target) => path.resolve(repoRoot, path.dirname(filePath), target));
+}
 
 type ClosureTableRow = readonly [string, string, string, string, string];
 
@@ -37,13 +65,28 @@ function parseClosureTableRow(line: string): ClosureTableRow {
 }
 
 describe('README architecture contract', () => {
-  it('documents the current CLI version and tagged release gates', () => {
+  it('routes contributor and maintainer workflows to focused documents', () => {
+    expect(readme).toContain('[`CONTRIBUTING.md`](CONTRIBUTING.md)');
     expect(readme).toContain(
-      `\`@lpc-toolkit/cli\` version \`${cliPackage.version}\``,
+      '[`docs/ENGINEERING.md`](docs/ENGINEERING.md)',
     );
-    expect(readme).toContain('`v<version>-rc.<number>`');
-    expect(readme).toContain('`v<version>`');
-    expect(readme).toContain('npm OIDC');
+    expect(readme).toContain('[`docs/RELEASING.md`](docs/RELEASING.md)');
+    expect(contributing).toContain('[Engineering guide](docs/ENGINEERING.md)');
+    expect(contributing).toContain('[onboarding guide](docs/ONBOARDING.md)');
+    expect(engineering).toContain('`rtk pnpm verify`');
+    expect(releasing).toContain('CLI Release Candidate');
+    expect(releasing).toContain('npm OIDC');
+    expect(readme).not.toContain('Maintainers: RC validation');
+    expect(readme).not.toContain('Trusted Publisher');
+  });
+
+  it('keeps maintained local Markdown links relative and resolvable', () => {
+    for (const [filePath, source] of maintainedDocuments) {
+      expect(source).not.toMatch(/file:\/\/|\/Users\/|[A-Z]:\\/);
+      for (const target of localMarkdownTargets(filePath, source)) {
+        expect(existsSync(target), `${filePath} -> ${target}`).toBe(true);
+      }
+    }
   });
 
   it('documents the current routes and responsive editor regions', () => {
@@ -58,8 +101,11 @@ describe('README architecture contract', () => {
     }
   });
 
-  it('categorizes the public core API and links its signature source', () => {
-    expect(readme).toContain('[`API.md`](API.md)');
+  it('routes the public core API to its package guide', () => {
+    expect(readme).toContain(
+      '[`packages/core/README.md`](packages/core/README.md)',
+    );
+    expect(coreReadme).toContain('[`API.md`](../../API.md)');
     for (const category of [
       'Catalog and palettes',
       'Selections and tokens',
@@ -67,7 +113,7 @@ describe('README architecture contract', () => {
       'Recoloring',
       'Credits and validation',
     ]) {
-      expect(readme).toContain(category);
+      expect(coreReadme).toContain(category);
     }
   });
 
@@ -118,6 +164,64 @@ describe('README architecture contract', () => {
     expect(readme).toContain('Character authoring quick start');
     expect(readme).toContain('lpc-toolkit character create hero --preset farmer');
     expect(readme).toContain('[`packages/cli/README.md`](packages/cli/README.md)');
+  });
+});
+
+describe('agent guidance contract', () => {
+  it('keeps Codex and Claude guidance identical and current', () => {
+    expect(claude).toBe(agents);
+    expect(agents).toContain(`**License is ${rootPackage.license}.**`);
+    expect(agents).toContain('`packages/presets/`');
+    expect(agents).toContain('`packages/cli/`');
+    expect(agents).toContain('`rtk pnpm verify`');
+    expect(agents).toContain('docs/ENGINEERING.md');
+    expect(agents).not.toContain('built later');
+    expect(agents).not.toContain('planned CLI');
+  });
+});
+
+describe('onboarding and engineering ownership contract', () => {
+  it('provides a runnable first-day path for all active packages', () => {
+    for (const phrase of [
+      'Node.js 22',
+      '`rtk pnpm install --frozen-lockfile`',
+      '`rtk pnpm verify`',
+      '`packages/core/`',
+      '`packages/presets/`',
+      '`packages/web/`',
+      '`packages/cli/`',
+      'Where Does This Change Belong?',
+    ]) {
+      expect(onboarding).toContain(phrase);
+    }
+    expect(onboarding).not.toContain('planned CLI');
+  });
+
+  it('keeps command policy in engineering and stable boundaries in architecture', () => {
+    expect(architecture).toContain('## Executable Architecture Gate');
+    expect(architecture).toContain('[Engineering guide](ENGINEERING.md)');
+    expect(architecture).not.toContain(
+      '## Testing and Verification Expectations',
+    );
+    expect(architecture).not.toContain('## Local Extraction Guidance');
+    expect(engineering).toContain('## CI Mapping');
+    expect(engineering).toContain('CI unit job');
+  });
+
+  it('uses RTK-safe explicit run forms for standalone typechecks', () => {
+    expect(engineering).toContain('`rtk pnpm run typecheck`');
+    for (const packageName of ['core', 'presets', 'web', 'cli']) {
+      expect(engineering).toContain(
+        `rtk pnpm --filter @lpc-toolkit/${packageName} run typecheck`,
+      );
+      expect(engineering).not.toContain(
+        `rtk pnpm --filter @lpc-toolkit/${packageName} typecheck`,
+      );
+    }
+    expect(engineering).not.toContain('`rtk pnpm typecheck`');
+    expect(agents).toContain(
+      'Verification: `rtk pnpm run typecheck` PASS',
+    );
   });
 });
 
@@ -175,7 +279,7 @@ describe('architecture ownership contract', () => {
 
   it('documents boundary CI and isolated parity ownership', () => {
     expect(architecture).toContain('`rtk pnpm check:boundaries`');
-    expect(architecture).toContain('CI unit job');
+    expect(engineering).toContain('CI unit job');
     expect(architecture).toContain('read-only provenance');
     expect(architecture).toContain('separate isolated checkout');
   });

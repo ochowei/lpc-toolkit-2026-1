@@ -1,253 +1,156 @@
 # lpc-toolkit Onboarding Guide
 
-## Project Overview
+This guide gets a new contributor from a standard clone to a verified workspace,
+a running editor, and the local CLI. For stable dependency rules, read the
+[Architecture guide](ARCHITECTURE.md); for the complete command matrix, use the
+[Engineering guide](ENGINEERING.md).
 
-`lpc-toolkit` is a TypeScript monorepo for composing LPC character
-spritesheets. It provides an environment-agnostic core library, a React/Vite
-web editor, and a planned CLI.
+## Prerequisites
 
-Primary stack:
+- Node.js 22 or newer
+- pnpm 9, matching the root `packageManager` field
+- Git
+- RTK for terminal commands run by repository Agents
 
-- TypeScript
-- React
-- Vite
-- Tailwind CSS
-- Vitest
-- GitHub Actions
+The repository uses strict TypeScript and pnpm workspaces. Do not substitute
+npm, yarn, or bun for repository install, test, typecheck, or build commands.
 
-Core constraints to internalize early:
+## First-Time Setup
 
-- `packages/core/` must stay browser/Node agnostic.
-- Canvas and image loading are injected through adapters.
-- GPL-3.0-or-later compatibility matters.
-- Every rendered sprite must preserve attribution metadata.
-- `upstream/` is optional read-only reference material.
-- Do not initialize `upstream/` for normal setup.
+Use a standard clone. The optional `upstream/` provenance gitlink is read-only
+and is not part of normal setup. Do not initialize `upstream/` for normal setup.
 
-## Architecture Layers
+```sh
+git clone <repo-url>
+cd lpc-toolkit-2026-1
+rtk pnpm install --frozen-lockfile
+rtk pnpm verify
+```
 
-### Core Composition Library
+`rtk pnpm install --frozen-lockfile` installs exactly the locked workspace.
+`rtk pnpm verify` prepares and verifies the active asset snapshot, checks
+architecture boundaries, typechecks every package, and runs all workspace unit
+tests.
 
-Key files: [`packages/core/src/index.ts`](../packages/core/src/index.ts),
-[`types.ts`](../packages/core/src/types.ts),
-[`adapters.ts`](../packages/core/src/adapters.ts),
-[`catalog.ts`](../packages/core/src/catalog.ts),
-[`frames.ts`](../packages/core/src/frames.ts),
-[`compose.ts`](../packages/core/src/compose.ts),
-[`credits.ts`](../packages/core/src/credits.ts).
+Normal setup, verification, build, packaging, and ordinary browser tests use the
+checked-in or pinned cache-backed asset flow. They do not need the submodule.
 
-This layer owns the reusable sprite engine: catalog modeling, frame selection,
-recoloring, composition, validation, hashing, and credit metadata.
+## Start the Web Editor
 
-### React UI Layer
+```sh
+rtk pnpm --filter @lpc-toolkit/web dev
+```
 
-Key files: [`packages/web/src/App.tsx`](../packages/web/src/App.tsx),
-[`harness.tsx`](../packages/web/src/components/layer-stack/harness.tsx),
-[`layer-row.tsx`](../packages/web/src/components/layer-stack/layer-row.tsx),
-[`sidebar-search.tsx`](../packages/web/src/components/layer-stack/sidebar-search.tsx),
-[`preview-pane.tsx`](../packages/web/src/components/layer-stack/preview-pane.tsx).
+Open the URL printed by Vite. `/` is the landing page and `/compose` is the
+editor. The editor loads the prepared local assets and keeps attribution
+available while composing, previewing, and exporting a sprite.
 
-This layer turns the core engine into an interactive character editor with
-previews, layer controls, search, popovers, filters, and responsive layout.
+## Try the Local CLI
 
-### Web Application Logic
+Build the workspace CLI and invoke its local entry point:
 
-Key files:
-[`packages/web/src/slice/selection.ts`](../packages/web/src/slice/selection.ts),
-[`use-composed-character.ts`](../packages/web/src/hooks/use-composed-character.ts),
-[`use-animation-player.ts`](../packages/web/src/hooks/use-animation-player.ts),
-[`i18n.ts`](../packages/web/src/i18n.ts).
+```sh
+rtk pnpm --filter @lpc-toolkit/cli build
+rtk node packages/cli/dist/index.js --help
+```
 
-This layer coordinates state, derived catalog behavior, animation playback,
-localization, presets, and UI-facing selection models.
+These are repository-development commands. The npm/npx installation examples
+in [`packages/cli/README.md`](../packages/cli/README.md) are for consumers of
+the published package and do not change the workspace package manager.
 
-### Browser and Asset Integration
+## Package Tour
 
-Key files:
-[`browser-canvas-adapter.ts`](../packages/web/src/adapter/browser-canvas-adapter.ts),
-[`asset-source.ts`](../packages/web/src/adapter/asset-source.ts),
-[`zip-loader.ts`](../packages/web/src/adapter/zip-loader.ts),
-[`zip-export.ts`](../packages/web/src/lib/zip-export.ts),
-[`download.ts`](../packages/web/src/lib/download.ts).
+- `packages/core/` contains environment-agnostic catalog, composition,
+  animation, recolor, token, validation, and credit logic. It receives canvas
+  creation and image loading through injected ports.
+- `packages/presets/` contains pure shared outfit definitions and
+  catalog-backed preset application used by web and CLI.
+- `packages/web/` contains the React/Vite editor, browser adapters, asset
+  preparation scripts, Vitest coverage, and Playwright scenarios.
+- `packages/cli/` contains Node commands, character persistence, filesystem and
+  canvas adapters, managed asset caching, render publication, and packaging.
+- `assets/` is the active LPC asset source, including spritesheets, definitions,
+  palettes, and the mandatory `CREDITS.csv`.
+- Package tests live beside their packages; repository-level boundary tooling
+  lives under `scripts/`, and CI workflows live under `.github/workflows/`.
 
-This layer connects browser runtime APIs and packaged assets to the
-environment-neutral core contracts.
+Start at a package's public surface or README, then follow the responsibility
+you need. Avoid reading every file before making a focused change.
 
-### Asset Build Tooling
+## Where Does This Change Belong?
 
-Key files:
-[`asset-release.ts`](../packages/web/scripts/asset-release.ts),
-[`copy-spritesheets.ts`](../packages/web/scripts/copy-spritesheets.ts),
-[`validate-assets.ts`](../packages/web/scripts/validate-assets.ts),
-[`gen-i18n-data.ts`](../packages/web/scripts/gen-i18n-data.ts).
+| Responsibility | Primary location |
+| --- | --- |
+| Reusable composition, animation, selection serialization, validation, and credits | `packages/core/` |
+| Shared preset definitions and pure preset application | `packages/presets/` |
+| Pure browser selection decisions, compatibility, filters, and ordering | `packages/web/src/slice/` |
+| React effects, async composition, animation, and orchestration | `packages/web/src/hooks/` |
+| Presentation, controls, and user-intent dispatch | `packages/web/src/components/` |
+| Browser canvas/assets and ZIP/download/URL/storage bridges | `packages/web/src/adapter/` or `packages/web/src/lib/` |
+| Node commands, persistence, filesystem/canvas integration, and output publication | `packages/cli/` |
+| Asset preparation, validation, generation, and audits | `packages/web/scripts/` |
 
-This layer prepares migrated LPC assets, validates release metadata, copies
-spritesheets, audits thumbnail framing, and generates runtime data.
+If a change crosses several rows, read `docs/ARCHITECTURE.md` and confirm the
+dependency direction before editing. Components should not absorb domain
+decisions, and core should not gain runtime-specific implementations.
 
-### Test and Quality Layer
+## Verification by Change Type
 
-Key areas: [`packages/core/test/`](../packages/core/test/),
-[`packages/web/test/`](../packages/web/test/),
-[`packages/web/e2e/`](../packages/web/e2e/).
+The [Engineering guide](ENGINEERING.md) owns the canonical commands and CI
+mapping. Use package-scoped checks while iterating, for example:
 
-This layer contains Vitest coverage, Playwright scenarios, fixtures, probes,
-and regression tests across core and web behavior.
+```sh
+rtk pnpm --filter @lpc-toolkit/core test
+rtk pnpm --filter @lpc-toolkit/presets test
+rtk pnpm --filter @lpc-toolkit/web test
+rtk pnpm --filter @lpc-toolkit/cli test
+```
 
-### Documentation and Governance
+Architecture-sensitive changes also run:
 
-Key files: [`README.md`](../README.md), [`API.md`](../API.md),
-[`RESEARCH.md`](../RESEARCH.md), [`AGENTS.md`](../AGENTS.md),
-[`CLAUDE.md`](../CLAUDE.md), [`RTK.md`](../RTK.md).
+```sh
+rtk pnpm check:boundaries
+```
 
-This layer explains project purpose, public API, upstream research, contributor
-constraints, and command conventions.
-
-## Key Concepts
-
-- **Environment-agnostic core:** `packages/core` exposes pure composition logic
-  and depends on injected adapters.
-- **Composition pipeline:** Catalog selections become frame draws, recolor
-  operations, composed sheets, and credit manifests.
-- **Attribution as product logic:** Credits are not optional output decoration;
-  they are part of every render workflow.
-- **Selection reducer:** Web UI state is centralized in
-  `packages/web/src/slice/selection.ts`.
-- **Browser boundary:** ZIP loading, downloads, URL sync, image loading, and
-  canvas behavior stay in `packages/web`.
-- **Asset pipeline:** Migrated LPC assets are validated and materialized by
-  scripts before runtime use.
-
-## Guided Tour
-
-1. Read [`README.md`](../README.md) for purpose, package layout, and hard
-   constraints.
-2. Read [`packages/core/src/index.ts`](../packages/core/src/index.ts) with
-   [`API.md`](../API.md) to understand the public API.
-3. Read [`packages/core/src/types.ts`](../packages/core/src/types.ts) and
-   [`adapters.ts`](../packages/core/src/adapters.ts) to understand portability
-   boundaries.
-4. Read [`catalog.ts`](../packages/core/src/catalog.ts),
-   [`frames.ts`](../packages/core/src/frames.ts), and
-   [`animation.ts`](../packages/core/src/animation.ts) to understand spritesheet
-   structure.
-5. Read [`compose.ts`](../packages/core/src/compose.ts),
-   [`recolor.ts`](../packages/core/src/recolor.ts), and
-   [`credits.ts`](../packages/core/src/credits.ts) to understand rendering and
-   attribution.
-6. Read [`packages/web/src/main.tsx`](../packages/web/src/main.tsx) and
-   [`App.tsx`](../packages/web/src/App.tsx) to see browser startup.
-7. Read [`selection.ts`](../packages/web/src/slice/selection.ts), catalog-tree
-   helpers, filters, and [`i18n.ts`](../packages/web/src/i18n.ts) for app state.
-8. Read [`harness.tsx`](../packages/web/src/components/layer-stack/harness.tsx),
-   [`stack-panel.tsx`](../packages/web/src/components/layer-stack/stack-panel.tsx),
-   [`layer-row.tsx`](../packages/web/src/components/layer-stack/layer-row.tsx),
-   and
-   [`sidebar-search.tsx`](../packages/web/src/components/layer-stack/sidebar-search.tsx)
-   for the editor workflow.
-9. Read browser adapters and [`zip-export.ts`](../packages/web/src/lib/zip-export.ts)
-   for asset loading and export.
-10. Read [`asset-release.ts`](../packages/web/scripts/asset-release.ts),
-    [`copy-spritesheets.ts`](../packages/web/scripts/copy-spritesheets.ts), core
-    tests, and [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) for
-    quality gates.
-
-## File Map
-
-### Core
-
-- `packages/core/src/index.ts`: Public package exports.
-- `packages/core/src/types.ts`: Shared domain types and API contracts.
-- `packages/core/src/adapters.ts`: Injected canvas and image-loading contracts.
-- `packages/core/src/catalog.ts`: Catalog construction and asset lookup.
-- `packages/core/src/compose.ts`: Main layered sprite composition pipeline.
-- `packages/core/src/frames.ts`: Animation frame selection and geometry.
-- `packages/core/src/palettes.ts`: Palette definitions and catalog behavior.
-- `packages/core/src/recolor.ts`: Pixel recoloring operations.
-- `packages/core/src/recolor-resolve.ts`: Resolves material and palette choices.
-- `packages/core/src/credits.ts`: Builds mandatory attribution metadata.
-- `packages/core/src/hash.ts`: Serializes and parses shareable composition state.
-
-### Web Application
-
-- `packages/web/src/main.tsx`: Browser entry point.
-- `packages/web/src/App.tsx`: Top-level application startup and asset loading.
-- `packages/web/src/components/layer-stack/harness.tsx`: Main editor
-  orchestration.
-- `packages/web/src/components/layer-stack/layer-row.tsx`: Per-layer editing
-  controls.
-- `packages/web/src/components/layer-stack/preview-pane.tsx`: Character preview
-  and animation controls.
-- `packages/web/src/components/layer-stack/sidebar-search.tsx`: Catalog search,
-  ranking, and keyboard navigation.
-- `packages/web/src/hooks/use-composed-character.ts`: Connects React state to
-  asynchronous core composition.
-- `packages/web/src/hooks/use-animation-player.ts`: Draws synchronized animation
-  frames to preview canvases.
-- `packages/web/src/slice/selection.ts`: Immutable selection operations.
-- `packages/web/src/i18n.ts`: UI and catalog label translation.
-
-### Browser and Export Integration
-
-- `packages/web/src/adapter/browser-canvas-adapter.ts`: Browser implementation
-  of the core canvas contract.
-- `packages/web/src/adapter/asset-source.ts`: Selects and accesses asset
-  sources.
-- `packages/web/src/adapter/zip-loader.ts`: Loads sprite assets from ZIP
-  archives.
-- `packages/web/src/lib/url-hash-sync.ts`: Synchronizes editor state with the
-  URL.
-- `packages/web/src/lib/zip-export.ts`: Exports animation PNGs and attribution
-  metadata.
-- `packages/web/src/lib/download.ts`: Browser download helpers.
-
-### Tooling and Quality
-
-- `packages/web/scripts/asset-release.ts`: Validates and materializes pinned LPC
-  asset releases.
-- `packages/web/scripts/copy-spritesheets.ts`: Copies deterministic spritesheet
-  subsets for the web application.
-- `packages/web/scripts/validate-assets.ts`: Checks asset consistency through
-  the core validator.
-- `packages/web/scripts/gen-i18n-data.ts`: Regenerates catalog-derived
-  translation data.
-- `packages/core/test/`: Core unit and regression tests.
-- `packages/web/test/`: Web unit and integration tests.
-- `packages/web/e2e/`: Playwright browser scenarios.
-- `.github/workflows/ci.yml`: Continuous integration workflow.
-
-## Complexity Hotspots
-
-Approach these files with their associated tests open:
-
-- `packages/core/src/compose.ts`
-- `packages/core/src/catalog.ts`
-- `packages/core/src/types.ts`
-- `packages/core/src/hash.ts`
-- `packages/core/src/palettes.ts`
-- `packages/core/src/recolor.ts`
-- `packages/core/src/recolor-resolve.ts`
-- `packages/web/src/slice/selection.ts`
-- `packages/web/src/hooks/use-composed-character.ts`
-- `packages/web/src/components/layer-stack/harness.tsx`
-- `packages/web/src/components/layer-stack/layer-row.tsx`
-- `packages/web/src/components/layer-stack/sidebar-search.tsx`
-- `packages/web/src/lib/zip-export.ts`
-
-When changing these areas, verify attribution behavior, environment boundaries,
-selection state transitions, and stale asynchronous composition handling.
+Before handoff, run `rtk pnpm verify`. Browser E2E, CLI package validation,
+asset audits, and isolated upstream parity are conditional checks; use the
+engineering guide to decide when they apply.
 
 ## First Contributions
 
-Good first areas:
+Good first contributions are focused documentation corrections, regression
+tests around pure helpers, isolated UI polish, or small fixes with an observable
+failure and a narrow verification path.
 
-- Documentation updates in `README.md`, `API.md`, or `docs/`.
-- Focused UI polish in isolated layer-stack components.
-- Small test additions around reducers, hooks, or pure utility functions.
-- Asset-tooling improvements that do not alter `upstream/`.
+Before changing behavior, keep these constraints visible:
 
-Avoid as first changes:
+- attribution is product logic; generated pixels and their matching credits
+  travel together;
+- core adapter contracts protect browser/Node portability;
+- `upstream/` is not a development or generated-output directory;
+- large files such as `harness.tsx`, `layer-row.tsx`, `selection.ts`, and
+  `compose.ts` are not invitations for broad cleanup.
 
-- Reworking core adapter contracts.
-- Changing attribution behavior.
-- Modifying `upstream/`.
-- Broad refactors in `harness.tsx`, `selection.ts`, or `compose.ts`.
+Discuss new dependencies, architecture reshuffles, backend/auth work, framework
+or license changes, and attribution changes before implementation. See
+[`CONTRIBUTING.md`](../CONTRIBUTING.md) for the full contribution workflow.
+
+## Common Pitfalls
+
+- Initializing or installing packages inside `upstream/` for ordinary work.
+- Moving DOM, Node filesystem, concrete canvas, ZIP, or Vite behavior into core.
+- Rendering or exporting pixels without metadata and TXT/CSV credit artifacts.
+- Putting compatibility or selection policy directly in a React component.
+- Running only a broad command after editing instead of using a focused failing
+  test while iterating.
+- Treating npm/npx consumer examples as repository package-manager commands.
+
+## Next References
+
+- [README](../README.md) — public project overview and quick starts
+- [Architecture guide](ARCHITECTURE.md) — stable ownership and dependency rules
+- [Engineering guide](ENGINEERING.md) — commands, tests, CI, and parity
+- [Core package guide](../packages/core/README.md) — executable library example
+- [CLI package guide](../packages/cli/README.md) — complete command reference
+- [Contributing guide](../CONTRIBUTING.md) — branch and pull request workflow
+- [Agent rules](../AGENTS.md) — non-negotiable repository policy

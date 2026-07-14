@@ -19,7 +19,7 @@ import {
 } from './helpers/node-canvas-adapter.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const readmePath = path.resolve(here, '../../../README.md');
+const readmePath = path.resolve(here, '../README.md');
 const walkOffsetY = 8 * 64;
 
 const records: Readonly<Record<FilePath, ItemDefinition>> = {
@@ -92,9 +92,9 @@ const selections: Selections = {
 
 function readReadmeExample(): string {
   const readme = readFileSync(readmePath, 'utf8');
-  const match = readme.match(/### Example\n\n```ts\n([\s\S]*?)\n```/);
+  const match = readme.match(/## Example\n\n```ts\n([\s\S]*?)\n```/);
   if (!match?.[1]) {
-    throw new Error('README core TypeScript example block was not found.');
+    throw new Error('Core package README TypeScript example block was not found.');
   }
   return match[1];
 }
