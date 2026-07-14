@@ -944,7 +944,11 @@ Update this task with the full commit hash, implementation note, and exact verif
 - Consumes: plugin id `lpc-toolkit`, marketplace id `lpc-toolkit`, repository `ochowei/lpc-toolkit-2026-1`, `verify-codex-plugin.mjs`, and Node plugin tests.
 - Produces: root command `rtk pnpm verify:plugin`; documented beta install flow and architecture/CI ownership.
 
-- [ ] **Step 1: Write failing documentation contract assertions**
+- [x] **Step 1: Write failing documentation contract assertions**
+
+  - Implementation: Added the optional Codex installation contract to the CLI
+    package metadata suite and the installation, ownership, and verification
+    contract to the maintained-document suite before changing documentation.
 
 Add this test to `packages/cli/test/package-metadata.test.ts`:
 
@@ -982,7 +986,11 @@ describe('Codex plugin documentation contract', () => {
 });
 ```
 
-- [ ] **Step 2: Run documentation tests to confirm RED**
+- [x] **Step 2: Run documentation tests to confirm RED**
+
+  - RED verification: `rtk pnpm --filter @lpc-toolkit/cli test -- package-metadata.test.ts` FAIL as expected (1 failed, 18 passed) because the CLI README lacked `codex plugin marketplace add ochowei/lpc-toolkit-2026-1`.
+  - RED sandbox attempt: `rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts` FAIL before Vitest because `tsx` could not create its IPC socket (`listen EPERM`).
+  - RED verification (narrow escalation): `rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts` FAIL as expected (1 failed, 18 passed) because the root README lacked `codex plugin marketplace add ochowei/lpc-toolkit-2026-1`.
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- package-metadata.test.ts
@@ -991,7 +999,10 @@ rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts
 
 Expected: FAIL because the plugin installation and ownership text is absent.
 
-- [ ] **Step 3: Add the root verification command**
+- [x] **Step 3: Add the root verification command**
+
+  - Implementation: Added the exact `verify:plugin` Node test/verifier script
+    and inserted it into `verify` after the architecture boundary gate.
 
 In `package.json`, add:
 
@@ -1005,7 +1016,12 @@ Change `verify` to:
 "verify": "pnpm --filter @lpc-toolkit/web prepare-assets && pnpm verify:upstream-pin && pnpm check:boundaries && pnpm verify:plugin && pnpm typecheck && pnpm -r test"
 ```
 
-- [ ] **Step 4: Document consumer installation**
+- [x] **Step 4: Document consumer installation**
+
+  - Implementation: Documented repository-marketplace beta installation in
+    both consumer READMEs, kept CLI installation separate, included restart and
+    future-directory guidance, and required metadata plus TXT/CSV credits for
+    preview, render, and export outputs.
 
 Add a `### Codex Plugin` subsection after the CLI quick start in both
 `README.md` and `packages/cli/README.md`. Use this exact command block:
@@ -1023,7 +1039,11 @@ State all of the following directly below it:
 - Public Plugins Directory distribution can later remove the marketplace-add step.
 - The plugin guides Codex through JSON search/edit/validate/preview/render and preserves metadata plus TXT/CSV credits.
 
-- [ ] **Step 5: Document architecture and engineering ownership**
+- [x] **Step 5: Document architecture and engineering ownership**
+
+  - Implementation: Defined the plugin as a thin workflow layer around the
+    external CLI and documented its canonical command, focused checks, common
+    gate stage, and CI unit-test ownership.
 
 Add a `### Codex Plugin` subsection after the CLI package section of
 `docs/ARCHITECTURE.md` with this contract:
@@ -1056,7 +1076,10 @@ rtk pnpm --filter @lpc-toolkit/cli test -- plugin-contract.test.ts
 - Add `verify:plugin` as stage 4 of Common Verification Gate and renumber the existing typecheck/test stages.
 - State in CI Mapping that `Unit tests` includes Codex plugin structure and skill contracts through `pnpm verify`.
 
-- [ ] **Step 6: Include plugin changes in CLI package change detection**
+- [x] **Step 6: Include plugin changes in CLI package change detection**
+
+  - Implementation: Added the plugin tree, marketplace manifest, strict
+    verifier, and verifier tests to the existing CLI path filter.
 
 In `.github/workflows/ci.yml`, add these paths under the existing `cli:` filter:
 
@@ -1067,7 +1090,19 @@ In `.github/workflows/ci.yml`, add these paths under the existing `cli:` filter:
               - 'scripts/verify-codex-plugin.test.mjs'
 ```
 
-- [ ] **Step 7: Run focused verification**
+- [x] **Step 7: Run focused verification**
+
+  - GREEN verification: `rtk pnpm verify:plugin` PASS (11 Node tests; `Codex plugin structure is valid.`).
+  - GREEN verification: `rtk pnpm --filter @lpc-toolkit/cli test -- package-metadata.test.ts plugin-contract.test.ts` PASS (29 tests).
+  - GREEN verification (narrow escalation): `rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts` PASS (19 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS.
+  - Verification: `rtk pnpm check:boundaries` PASS (`Architecture boundary check passed.`).
+  - Verification: exact Node assertions for the root `verify`/`verify:plugin` scripts and four CLI CI ownership paths PASS (`Root scripts and CLI CI ownership paths are exact.`).
+  - Verification: `rtk node scripts/verify-codex-plugin.mjs` PASS (`Codex plugin structure is valid.`).
+  - Verification: `rtk env PYTHONPATH=/tmp/lpc-plugin-validator-pyyaml python3 /Users/william/.codex/skills/.system/skill-creator/scripts/quick_validate.py plugins/lpc-toolkit/skills/character-authoring` PASS (`Skill is valid!`).
+  - Verification: `rtk env PYTHONPATH=/tmp/lpc-plugin-validator-pyyaml python3 /Users/william/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/lpc-toolkit` PASS.
+  - Verification: `rtk git diff --check` PASS.
 
 ```sh
 rtk pnpm verify:plugin
@@ -1081,7 +1116,11 @@ rtk git diff --check
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit and record Task 4 evidence**
+- [x] **Step 8: Commit and record Task 4 evidence**
+
+  - Commit: `af1a77a71d7583320e8103338fa80aea2f6d04ff`
+  - Implementation: Committed the eight Task 4 product, test, documentation,
+    and CI configuration files separately from this plan evidence.
 
 ```sh
 rtk git add package.json README.md packages/cli/README.md docs/ARCHITECTURE.md docs/ENGINEERING.md packages/cli/test/package-metadata.test.ts packages/web/test/readme-architecture-docs.test.ts .github/workflows/ci.yml docs/superpowers/plans/2026-07-14-lpc-toolkit-codex-plugin.md
