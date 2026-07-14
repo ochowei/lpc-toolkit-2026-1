@@ -9,6 +9,7 @@ import {
 
 test('orders stable and prerelease semantic versions', () => {
   assert.equal(compareSemver('0.1.3-alpha-1', '0.1.3'), -1);
+  assert.equal(compareSemver('0.1.3-Alpha-1', '0.1.3-alpha-1'), -1);
   assert.equal(compareSemver('0.1.3', '0.1.3'), 0);
   assert.equal(compareSemver('0.1.4', '0.1.3'), 1);
 });
@@ -29,6 +30,12 @@ test('accepts the supported beta CLI range', () => {
 test('rejects older and next-minor CLI versions', () => {
   assert.equal(evaluateVersion('0.1.2').errors[0].code, 'cli_version_unsupported');
   assert.equal(evaluateVersion('0.2.0').errors[0].code, 'cli_version_unsupported');
+});
+
+test('rejects malformed semantic versions', () => {
+  for (const version of ['00.1.4', '0.1.4-alpha..1', '0.1.4-alpha.01']) {
+    assert.equal(evaluateVersion(version).errors[0].code, 'cli_version_invalid');
+  }
 });
 
 test('reports a missing executable without throwing', () => {

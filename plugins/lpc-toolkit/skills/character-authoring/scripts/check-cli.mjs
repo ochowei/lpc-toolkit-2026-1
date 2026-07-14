@@ -7,17 +7,25 @@ export const SUPPORTED_CLI = Object.freeze({
   maxExclusive: '0.2.0',
 });
 
-const VERSION = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/u;
+const VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z.-]+))?$/u;
+const NUMERIC_IDENTIFIER = /^\d+$/u;
 const supportedRange = `>=${SUPPORTED_CLI.min} <${SUPPORTED_CLI.maxExclusive}`;
 
 function parseSemver(input) {
   const match = VERSION.exec(input.trim());
   if (!match) throw new Error(`Invalid semantic version: ${input}`);
+  const prerelease = match[4]?.split('.') ?? [];
+  if (prerelease.some((identifier) => (
+    identifier.length === 0
+      || (NUMERIC_IDENTIFIER.test(identifier) && identifier.length > 1 && identifier.startsWith('0'))
+  ))) {
+    throw new Error(`Invalid semantic version: ${input}`);
+  }
   return {
     major: Number(match[1]),
     minor: Number(match[2]),
     patch: Number(match[3]),
-    prerelease: match[4]?.split('.') ?? [],
+    prerelease,
   };
 }
 
@@ -32,12 +40,12 @@ function comparePrerelease(left, right) {
     if (a === undefined) return -1;
     if (b === undefined) return 1;
     if (a === b) continue;
-    const aNumber = /^\d+$/u.test(a) ? Number(a) : undefined;
-    const bNumber = /^\d+$/u.test(b) ? Number(b) : undefined;
+    const aNumber = NUMERIC_IDENTIFIER.test(a) ? Number(a) : undefined;
+    const bNumber = NUMERIC_IDENTIFIER.test(b) ? Number(b) : undefined;
     if (aNumber !== undefined && bNumber !== undefined) return Math.sign(aNumber - bNumber);
     if (aNumber !== undefined) return -1;
     if (bNumber !== undefined) return 1;
-    return a.localeCompare(b);
+    return a < b ? -1 : 1;
   }
   return 0;
 }
