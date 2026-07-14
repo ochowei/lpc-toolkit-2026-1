@@ -139,15 +139,18 @@ CLI code may use Node APIs, `@napi-rs/canvas` (MIT), and `jszip` (MIT) because
 it is a Node runtime package. Those dependencies must not move into
 `packages/core/src/**`.
 
-### `docs/`, `AGENTS.md`, `CLAUDE.md`
+### Documentation and Governance
 
-These files are governance and contributor guidance:
+Documentation has explicit ownership:
 
-- `docs/` explains architecture, onboarding, decisions, and workflows.
-- `AGENTS.md` contains repository rules for AI agents and contributors.
-- `CLAUDE.md` mirrors `AGENTS.md` when maintained as a mirror.
+- `docs/ARCHITECTURE.md` owns stable package boundaries and design decisions.
+- [`CONTRIBUTING.md`](../CONTRIBUTING.md) owns contributor and pull request flow.
+- [`docs/ENGINEERING.md`](ENGINEERING.md) owns commands, tests, and CI mapping.
+- [`docs/RELEASING.md`](RELEASING.md) owns authorized release operations.
+- `AGENTS.md` and `CLAUDE.md` are identical indexes of non-negotiable Agent
+  rules and change-specific guidance.
 
-Do not treat docs as permission to bypass the hard rules in `AGENTS.md`.
+No document grants permission to bypass the hard rules in `AGENTS.md`.
 
 ## Dependency Direction
 
@@ -362,70 +365,15 @@ The CLI has equivalent Node behavior through CLI-specific adapters and export
 workflows outside core. Do not put CLI filesystem, ZIP, or canvas dependencies
 into `packages/core/src/**`.
 
-## Testing and Verification Expectations
+## Executable Architecture Gate
 
-Use the RTK prefix for repository commands. Common verification commands:
+`rtk pnpm check:boundaries` enforces core isolation, presets purity,
+public-core import ownership, and component workflow boundaries. The main CI
+unit gate invokes it through `pnpm verify`; the publish workflow also runs it
+before packaging or publication.
 
-```bash
-rtk pnpm typecheck
-rtk pnpm test
-rtk pnpm build
-```
-
-`rtk pnpm check:boundaries` is the executable dependency-policy gate. The CI unit job
-runs it after dependency installation and before typecheck and tests;
-the publish workflow also runs it before packaging or publication. It enforces
-core isolation, presets purity, public-core import ownership, and component
-workflow boundaries without changing runtime behavior.
-
-Target package commands when the change is scoped:
-
-```bash
-rtk pnpm --filter @lpc-toolkit/core test
-rtk pnpm --filter @lpc-toolkit/presets test
-rtk pnpm --filter @lpc-toolkit/web test
-rtk pnpm --filter @lpc-toolkit/web typecheck
-rtk pnpm --filter @lpc-toolkit/cli test
-rtk pnpm --filter @lpc-toolkit/cli typecheck
-```
-
-For architecture-boundary changes, verify the specific boundary being touched:
-
-- core changes should typecheck and test without browser or Node runtime imports
-  in `packages/core/src/**`
-- preset changes should verify both preset behavior and at least one consuming
-  surface when behavior changes
-- web composition changes should cover stale async composition, attribution, and
-  export behavior where relevant
-- CLI render changes should verify required metadata/credit artifacts and
-  no-partial-output behavior
-- asset-tooling changes should validate generated assets and preserve credits
-
-## Local Extraction Guidance
-
-Do not perform broad refactors just because a file is large. Extract only when
-there is a clear reusable responsibility, an independently testable unit, or a
-JSX region with a stable visual purpose.
-
-For `packages/web/src/components/layer-stack/harness.tsx`:
-
-- keep it as the top-level editor orchestrator
-- extract hooks for reusable or independently testable UI/effect state
-- extract components for JSX regions with clear visual responsibility
-- do not move domain decisions into it
-- do not move browser adapter logic into it
-
-For `packages/web/src/components/layer-stack/layer-row.tsx`:
-
-- keep it focused on one selected layer row
-- extract subcomponents for row header, actions, style controls, replacement
-  picker, and compatibility notes when those regions need their own names
-- keep item compatibility, ordering, pick/clear decisions, and color option
-  resolution in pure helpers where possible
-
-Prefer small, local extractions over architectural reshuffles. A good extraction
-should make the next change easier without changing public selection behavior,
-composition output, attribution, or export semantics.
+See the [Engineering guide](ENGINEERING.md) for the canonical command matrix,
+package-scoped checks, CI mapping, and isolated parity procedure.
 
 ## Anti-Patterns
 

@@ -180,6 +180,35 @@ describe('agent guidance contract', () => {
   });
 });
 
+describe('onboarding and engineering ownership contract', () => {
+  it('provides a runnable first-day path for all active packages', () => {
+    for (const phrase of [
+      'Node.js 22',
+      '`rtk pnpm install --frozen-lockfile`',
+      '`rtk pnpm verify`',
+      '`packages/core/`',
+      '`packages/presets/`',
+      '`packages/web/`',
+      '`packages/cli/`',
+      'Where Does This Change Belong?',
+    ]) {
+      expect(onboarding).toContain(phrase);
+    }
+    expect(onboarding).not.toContain('planned CLI');
+  });
+
+  it('keeps command policy in engineering and stable boundaries in architecture', () => {
+    expect(architecture).toContain('## Executable Architecture Gate');
+    expect(architecture).toContain('[Engineering guide](ENGINEERING.md)');
+    expect(architecture).not.toContain(
+      '## Testing and Verification Expectations',
+    );
+    expect(architecture).not.toContain('## Local Extraction Guidance');
+    expect(engineering).toContain('## CI Mapping');
+    expect(engineering).toContain('CI unit job');
+  });
+});
+
 describe('CLI README character contract', () => {
   it('documents all character commands and locator/output semantics', () => {
     for (const command of [
@@ -234,7 +263,7 @@ describe('architecture ownership contract', () => {
 
   it('documents boundary CI and isolated parity ownership', () => {
     expect(architecture).toContain('`rtk pnpm check:boundaries`');
-    expect(architecture).toContain('CI unit job');
+    expect(engineering).toContain('CI unit job');
     expect(architecture).toContain('read-only provenance');
     expect(architecture).toContain('separate isolated checkout');
   });
