@@ -1,0 +1,20 @@
+{
+  "name": "lpc-toolkit",
+  "interface": {
+    "displayName": "LPC Toolkit Plugins"
+  },
+  "plugins": [
+    {
+      "name": "lpc-toolkit",
+      "source": {
+        "source": "local",
+        "path": "./plugins/lpc-toolkit"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}
