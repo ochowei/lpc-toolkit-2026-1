@@ -7,16 +7,39 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../../..');
 const readRepoFile = (filePath: string) =>
   readFileSync(path.join(repoRoot, filePath), 'utf8');
+const readRepoFileIfExists = (filePath: string) => {
+  const absolutePath = path.join(repoRoot, filePath);
+  return existsSync(absolutePath) ? readFileSync(absolutePath, 'utf8') : '';
+};
 
 const readme = readRepoFile('README.md');
+const contributing = readRepoFileIfExists('CONTRIBUTING.md');
 const cliReadme = readRepoFile('packages/cli/README.md');
 const architecture = readRepoFile('docs/ARCHITECTURE.md');
 const agents = readRepoFile('AGENTS.md');
 const claude = readRepoFile('CLAUDE.md');
+const engineering = readRepoFile('docs/ENGINEERING.md');
 const onboarding = readRepoFile('docs/ONBOARDING.md');
-const cliPackage = JSON.parse(readRepoFile('packages/cli/package.json')) as {
-  version: string;
-};
+const releasing = readRepoFileIfExists('docs/RELEASING.md');
+
+const maintainedDocuments = new Map([
+  ['README.md', readme],
+  ['CONTRIBUTING.md', contributing],
+  ['AGENTS.md', agents],
+  ['CLAUDE.md', claude],
+  ['docs/ARCHITECTURE.md', architecture],
+  ['docs/ENGINEERING.md', engineering],
+  ['docs/ONBOARDING.md', onboarding],
+  ['docs/RELEASING.md', releasing],
+  ['packages/cli/README.md', cliReadme],
+]);
+
+function localMarkdownTargets(filePath: string, source: string): string[] {
+  return [...source.matchAll(/\[[^\]]*\]\(([^)]+)\)/g)]
+    .map((match) => match[1]?.replace(/^<|>$/g, '').split('#')[0] ?? '')
+    .filter((target) => target !== '' && !/^[a-z]+:/i.test(target))
+    .map((target) => path.resolve(repoRoot, path.dirname(filePath), target));
+}
 
 type ClosureTableRow = readonly [string, string, string, string, string];
 
@@ -37,13 +60,28 @@ function parseClosureTableRow(line: string): ClosureTableRow {
 }
 
 describe('README architecture contract', () => {
-  it('documents the current CLI version and tagged release gates', () => {
+  it('routes contributor and maintainer workflows to focused documents', () => {
+    expect(readme).toContain('[`CONTRIBUTING.md`](CONTRIBUTING.md)');
     expect(readme).toContain(
-      `\`@lpc-toolkit/cli\` version \`${cliPackage.version}\``,
+      '[`docs/ENGINEERING.md`](docs/ENGINEERING.md)',
     );
-    expect(readme).toContain('`v<version>-rc.<number>`');
-    expect(readme).toContain('`v<version>`');
-    expect(readme).toContain('npm OIDC');
+    expect(readme).toContain('[`docs/RELEASING.md`](docs/RELEASING.md)');
+    expect(contributing).toContain('[Engineering guide](docs/ENGINEERING.md)');
+    expect(contributing).toContain('[onboarding guide](docs/ONBOARDING.md)');
+    expect(engineering).toContain('`rtk pnpm verify`');
+    expect(releasing).toContain('CLI Release Candidate');
+    expect(releasing).toContain('npm OIDC');
+    expect(readme).not.toContain('Maintainers: RC validation');
+    expect(readme).not.toContain('Trusted Publisher');
+  });
+
+  it('keeps maintained local Markdown links relative and resolvable', () => {
+    for (const [filePath, source] of maintainedDocuments) {
+      expect(source).not.toMatch(/file:\/\/|\/Users\/|[A-Z]:\\/);
+      for (const target of localMarkdownTargets(filePath, source)) {
+        expect(existsSync(target), `${filePath} -> ${target}`).toBe(true);
+      }
+    }
   });
 
   it('documents the current routes and responsive editor regions', () => {
