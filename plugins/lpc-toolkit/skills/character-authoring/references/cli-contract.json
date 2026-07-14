@@ -1,0 +1,15 @@
+{
+  "schema": "lpc-toolkit.codex-plugin.cli-contract.v1",
+  "commands": [
+    { "id": "version", "argv": ["--version"], "machineReadable": false },
+    { "id": "preset-list", "argv": ["preset", "list", "--json"], "machineReadable": true },
+    { "id": "character-create", "argv": ["character", "create", "hero", "--selection", "hero.json", "--preset", "farmer", "--json"], "machineReadable": true },
+    { "id": "character-show", "argv": ["character", "show", "--selection", "hero.json", "--json"], "machineReadable": true },
+    { "id": "character-search", "argv": ["character", "search", "--selection", "hero.json", "--type", "hair", "--query", "braid", "--json"], "machineReadable": true },
+    { "id": "character-set", "argv": ["character", "set", "--selection", "hero.json", "--type", "hair", "--item", "hair_braid", "--recolor", "lpcr.brown", "--json"], "machineReadable": true },
+    { "id": "character-remove", "argv": ["character", "remove", "--selection", "hero.json", "--type", "hair", "--json"], "machineReadable": true },
+    { "id": "character-validate", "argv": ["character", "validate", "--selection", "hero.json", "--json"], "machineReadable": true },
+    { "id": "character-preview", "argv": ["character", "preview", "--selection", "hero.json", "--out", "preview", "--json"], "machineReadable": true },
+    { "id": "character-render", "argv": ["character", "render", "--selection", "hero.json", "--out", "rendered", "--animation", "walk", "--bundle", "zip", "--json"], "machineReadable": true }
+  ]
+}

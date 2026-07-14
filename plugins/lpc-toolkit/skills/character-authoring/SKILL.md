@@ -11,6 +11,12 @@ and attribution behavior.
 1. Read `references/compatibility.md`, resolve this skill directory, and run
    `node scripts/check-cli.mjs`. Continue only when its JSON result has
    `ok: true`; never install or upgrade the CLI silently.
+
+Read `references/cli-workflow.md` before authoring. Treat
+`references/cli-contract.json` as the tested inventory of commands this skill
+may rely on. Use the narrowest applicable command and preserve its JSON output
+until validation and attribution checks are complete.
+
 2. Use `--json` for every agent-consumed command that supports it.
 3. Start from a named character or explicit `--selection` file, never both.
 4. Search narrowly by character type and query before selecting an exact item.
