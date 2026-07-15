@@ -846,6 +846,25 @@ Record the full hash, implementation note, and exact RED/GREEN results in this t
 - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- catalog-discovery.test.ts catalog-commands.test.ts main-json.test.ts`
   PASS (3 files, 18 tests).
 - Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+- Review fix: Validated animation and license filters against their complete
+  domains before bounding error guidance; normalized absent/malformed animation
+  arrays to `[]` only in discovery summaries; and excluded missing/malformed
+  credit records from catalog discovery with `catalog_warning` guidance. The
+  shared loader catalog remains unchanged so core animation fallbacks and
+  character/render selection semantics are preserved.
+- Review fix commit: c0867fd44471ec92333d0d6e83d5e4a75b9779e2
+- Review verification: `rtk pnpm --filter @lpc-toolkit/cli test -- catalog-commands.test.ts`
+  FAIL (expected RED: 1 file, 3 tests failed and 11 passed; broad malformed
+  discovery threw, a valid eleventh animation returned `unknown_animation`, and
+  animation/license recovery omitted closest values outside the first ten).
+- Review verification: `rtk pnpm --filter @lpc-toolkit/cli test -- catalog-discovery.test.ts catalog-commands.test.ts main-json.test.ts loaders.test.ts`
+  PASS (4 files, 25 tests).
+- Review verification: `rtk pnpm --filter @lpc-toolkit/cli test -- main-human.test.ts character-commands.test.ts main-render-errors.test.ts preview.test.ts render.test.ts`
+  PASS (5 files, 61 tests), confirming render/selection behavior is unchanged.
+- Review verification: `rtk pnpm --filter @lpc-toolkit/cli test` PASS (32 files,
+  334 passed and 1 skipped; loopback-enabled sandbox escalation used for Web
+  server tests).
+- Review verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
 
 ### Task 4: Paginate Character Search And Human Output
 
