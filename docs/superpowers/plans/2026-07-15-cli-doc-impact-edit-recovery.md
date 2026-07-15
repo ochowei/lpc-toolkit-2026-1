@@ -228,7 +228,7 @@ Final evidence before the plan-record commit:
   typechecks passed).
 - Implementation commit: `128fbfefb29f44612df20a73ea2de6ae738edcb0`.
 
-- [ ] **Step 4: Push the approved branch update**
+- [x] **Step 4: Push the approved branch update**
 
 Run:
 
@@ -238,7 +238,11 @@ rtk git push origin codex/cli-agent
 
 Expected: fast-forward push succeeds and creates a new PR `synchronize` workflow run using the current PR body.
 
-- [ ] **Step 5: Observe the new documentation-impact job**
+Push: `rtk git push origin codex/cli-agent` PASS; the branch fast-forwarded to
+`2a66b8ec508690dfe6bf4c3b38294db903527aa5` and created CI run
+`29412827704`.
+
+- [x] **Step 5: Observe the new documentation-impact job**
 
 Read the latest CI run for PR #123 and verify:
 
@@ -247,3 +251,7 @@ CLI documentation impact: success
 ```
 
 If the run is still active, poll without rerunning the old failed job. Report the new run/job URL and any residual failing checks without changing unrelated code.
+
+Remote verification: CI run `29412827704` job `87343708561`, `CLI
+documentation impact`, completed with `success`:
+<https://github.com/ochowei/lpc-toolkit-2026-1/actions/runs/29412827704/job/87343708561>.
