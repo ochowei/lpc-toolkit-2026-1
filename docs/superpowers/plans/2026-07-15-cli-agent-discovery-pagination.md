@@ -54,7 +54,7 @@
 - Consumes: core `ItemDefinition`, `PaletteMetadata`, `BODY_TYPES`, `LICENSE_GROUP_OF`, `LICENSE_GROUP_ORDER`, and existing CLI `FlagValue`/`CliIssue`.
 - Produces: `DiscoveryPagination`, `DiscoveryPage`, `DiscoveryItemSummary`, `DiscoveryItemDetail`, `DiscoveryCandidate<T>`, `DiscoveryResult<T>`, `discoveryPaginationIssue(flags)`, `readDiscoveryPagination(flags)`, `toDiscoveryCandidate(item, palettes)`, `toDiscoveryDetail(item, palettes)`, `discoverItems(candidates, options)`, and `editDistance(left, right)`.
 
-- [ ] **Step 1: Write failing discovery tests**
+- [x] **Step 1: Write failing discovery tests**
 
 Create `packages/cli/test/catalog-discovery.test.ts` with these executable cases:
 
@@ -174,7 +174,7 @@ describe('catalog discovery', () => {
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify RED**
+- [x] **Step 2: Run the tests to verify RED**
 
 Run:
 
@@ -184,7 +184,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- catalog-discovery.test.ts
 
 Expected: FAIL with module resolution for `../src/catalog-discovery.js` because the module does not exist.
 
-- [ ] **Step 3: Implement the discovery module**
+- [x] **Step 3: Implement the discovery module**
 
 Create `packages/cli/src/catalog-discovery.ts` with these exact public shapes and behaviors:
 
@@ -440,7 +440,7 @@ export function discoverItems<T extends DiscoveryItemSummary>(
 
 Move the existing private `editDistance` implementation out of `command-spec.ts`, import it from `./catalog-discovery.js`, and leave `suggestOption` semantics unchanged.
 
-- [ ] **Step 4: Run focused tests and typecheck to verify GREEN**
+- [x] **Step 4: Run focused tests and typecheck to verify GREEN**
 
 Run:
 
@@ -451,7 +451,7 @@ rtk pnpm --filter @lpc-toolkit/cli run typecheck
 
 Expected: PASS for both test files and CLI strict typecheck.
 
-- [ ] **Step 5: Commit Task 1 and record evidence**
+- [x] **Step 5: Commit Task 1 and record evidence**
 
 ```sh
 rtk git add packages/cli/src/catalog-discovery.ts packages/cli/src/command-spec.ts packages/cli/test/catalog-discovery.test.ts
@@ -465,6 +465,16 @@ Copy the full hash into this task as `Commit:`, add a one-sentence implementatio
 rtk git add docs/superpowers/plans/2026-07-15-cli-agent-discovery-pagination.md
 rtk git commit -m "docs(plan): record CLI discovery Task 1"
 ```
+
+- Implementation: Added the pure discovery projection, search, deterministic sort,
+  pagination, bounded suggestion, and validation contract, and reused its normalized
+  edit distance in command option suggestions.
+- Commit: 03e21f0662e371775cb3ef251586ee0c9f8a1200
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- catalog-discovery.test.ts`
+  FAIL (expected RED: `../src/catalog-discovery.js` did not exist).
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- catalog-discovery.test.ts command-spec.test.ts`
+  PASS (2 files, 20 tests).
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
 
 ### Task 2: Add Discovery Options And Preflight Validation
 
