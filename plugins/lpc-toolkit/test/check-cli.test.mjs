@@ -81,6 +81,23 @@ test('rejects malformed semantic versions', () => {
   }
 });
 
+test('documents the local development CLI installation contract', () => {
+  const skillRoot = fileURLToPath(new URL('../skills/character-authoring/', import.meta.url));
+  const compatibility = readFileSync(path.join(skillRoot, 'references/compatibility.md'), 'utf8');
+
+  for (const required of [
+    'rtk pnpm --filter @lpc-toolkit/cli pack --pack-destination /tmp',
+    'npm install -g /tmp/lpc-toolkit-cli-0.1.4-beta-1.tgz',
+    '0.1.4-beta-1 is a development version and is not published to npm',
+  ]) {
+    assert.equal(
+      compatibility.includes(required),
+      true,
+      `missing compatibility guidance: ${required}`,
+    );
+  }
+});
+
 test('documents and runs the checker by resolved absolute skill path from another cwd', () => {
   const skillRoot = fileURLToPath(new URL('../skills/character-authoring/', import.meta.url));
   const skill = readFileSync(path.join(skillRoot, 'SKILL.md'), 'utf8');
