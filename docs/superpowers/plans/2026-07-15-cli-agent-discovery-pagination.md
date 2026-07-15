@@ -865,6 +865,21 @@ Record the full hash, implementation note, and exact RED/GREEN results in this t
   334 passed and 1 skipped; loopback-enabled sandbox escalation used for Web
   server tests).
 - Review verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+- Re-review fix: Kept active raw credit licenses structurally valid even when
+  they are outside the closed core license map; preserved exact raw credits in
+  item detail; projected known exact families as before, classified explicit
+  raw `GPL` prefixes as GPL, and omitted unmapped families such as `OGA-SA`
+  rather than inventing a summary group.
+- Re-review fix commit: 33bcca0b9346eb15c5b0c0e3c31bbf372d55c4fe
+- Re-review verification: `rtk pnpm --filter @lpc-toolkit/cli test -- catalog-commands.test.ts -t "active GPL|unmapped active"`
+  FAIL (expected RED: 1 file, 2 tests failed and 14 skipped; active Large Curls
+  discovery returned no items and active Scarf detail returned `unknown_item`).
+- Re-review verification: `rtk pnpm --filter @lpc-toolkit/cli test -- catalog-discovery.test.ts catalog-commands.test.ts main-json.test.ts loaders.test.ts`
+  PASS (4 files, 27 tests).
+- Re-review verification: `rtk pnpm --filter @lpc-toolkit/cli test` PASS (32
+  files, 336 passed and 1 skipped; loopback-enabled sandbox escalation used for
+  Web server tests).
+- Re-review verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
 
 ### Task 4: Paginate Character Search And Human Output
 
