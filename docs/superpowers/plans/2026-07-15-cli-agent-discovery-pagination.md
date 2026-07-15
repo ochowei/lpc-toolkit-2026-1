@@ -618,7 +618,7 @@ Record the full hash, implementation note, and exact RED/GREEN results in this t
 - Consumes: Task 1 discovery projection/detail/search/page APIs and Task 2 parsed flags.
 - Produces: bounded `catalog items` JSON; full `catalog item.data.item.credits`; stable catalog filter errors with bounded suggestions/available values.
 
-- [ ] **Step 1: Write failing catalog contract tests**
+- [x] **Step 1: Write failing catalog contract tests**
 
 Extend fixtures so at least 22 catalog items exist, then assert:
 
@@ -685,7 +685,7 @@ it.each([
 
 Add one `main-json.test.ts` integration assertion that `catalog items --limit 1 --json` preserves the standard envelope and returns `data.page.limit === 1`.
 
-- [ ] **Step 2: Run focused tests to verify RED**
+- [x] **Step 2: Run focused tests to verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- catalog-commands.test.ts main-json.test.ts
@@ -693,7 +693,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- catalog-commands.test.ts main-json.te
 
 Expected: FAIL because catalog results are unpaged summaries without license/body/credit/page fields and unknown filter domains return empty success.
 
-- [ ] **Step 3: Replace catalog projection and filtering**
+- [x] **Step 3: Replace catalog projection and filtering**
 
 In `catalog-commands.ts`:
 
@@ -808,7 +808,7 @@ function filterIssue(
 
 In `runCatalogCommand`, call `readDiscoveryPagination(parsed.flags)`, return `commandError('catalog items', issue, warnings)` for a filter issue, and pass palettes to both list and detail projection.
 
-- [ ] **Step 4: Run focused tests and typecheck to verify GREEN**
+- [x] **Step 4: Run focused tests and typecheck to verify GREEN**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- catalog-discovery.test.ts catalog-commands.test.ts main-json.test.ts
@@ -817,7 +817,7 @@ rtk pnpm --filter @lpc-toolkit/cli run typecheck
 
 Expected: PASS with bounded pages, exact credits, and structured filter recovery.
 
-- [ ] **Step 5: Commit Task 3 and record evidence**
+- [x] **Step 5: Commit Task 3 and record evidence**
 
 ```sh
 rtk git add packages/cli/src/catalog-commands.ts packages/cli/test/catalog-commands.test.ts packages/cli/test/main-json.test.ts
@@ -826,6 +826,26 @@ rtk git rev-parse HEAD
 ```
 
 Record the full hash, implementation note, and exact RED/GREEN results in this task, check the boxes, and commit the plan record as `docs(plan): record CLI discovery Task 3`.
+
+- Implementation: Replaced the CLI-local catalog summary path with the shared
+  discovery candidate, summary, detail, search, and pagination APIs; retained
+  defensive raw animation/license filtering so GPL-family prefix matching and
+  malformed-loadable records preserve their prior behavior; returned complete
+  normalized item credits; and added bounded stable recovery details for invalid
+  type, body-type, animation, and license filters.
+- Commit: e7fde3204172c36412e1bbe2f81a3055b8b05156
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- catalog-commands.test.ts main-json.test.ts`
+  FAIL (expected RED for catalog behavior: 2 files failed, 9 tests failed and 5
+  passed; all 8 catalog contract failures showed missing bounded pages, discovery
+  summary/detail fields, and filter errors. The first main integration fixture
+  also exposed an unrelated test-harness asset preparation error, corrected
+  before implementation).
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- main-json.test.ts`
+  FAIL (expected corrected RED: 1 test failed and 1 passed because the successful
+  standard envelope returned `data.items` without `data.page.limit`).
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- catalog-discovery.test.ts catalog-commands.test.ts main-json.test.ts`
+  PASS (3 files, 18 tests).
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
 
 ### Task 4: Paginate Character Search And Human Output
 
