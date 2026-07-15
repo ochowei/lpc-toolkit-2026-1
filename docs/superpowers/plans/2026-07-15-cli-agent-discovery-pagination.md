@@ -1132,7 +1132,7 @@ Record the full hash, implementation note, and exact RED/GREEN results in this t
 - Consumes: completed CLI flags and JSON fields from Tasks 1 through 4.
 - Produces: package version `0.1.4-beta-1`; plugin range `>=0.1.4-beta-1 <0.2.0`; bounded search/detail workflow; documentation that describes local beta installation without claiming npm publication.
 
-- [ ] **Step 1: Write failing version, plugin, and documentation assertions**
+- [x] **Step 1: Write failing version, plugin, and documentation assertions**
 
 Update tests first:
 
@@ -1156,7 +1156,7 @@ expect(contract.commands.find(({ id }) => id === 'character-search')?.argv)
 
 In `plugins/lpc-toolkit/test/check-cli.test.mjs`, change the exact minimum to `0.1.4-beta-1`, accept that version and `0.1.4`, and reject `0.1.3` plus unrelated prereleases. In `packages/web/test/readme-architecture-docs.test.ts`, replace the public beta npm-range assertion with local tarball guidance and an explicit `not published to npm` phrase in both READMEs.
 
-- [ ] **Step 2: Run contract tests to verify RED**
+- [x] **Step 2: Run contract tests to verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- package-metadata.test.ts plugin-contract.test.ts
@@ -1166,7 +1166,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts
 
 Expected: FAIL on the old package version, old plugin range, absent catalog-detail command, unbounded workflow, and old npm installation copy.
 
-- [ ] **Step 3: Update the plugin contract and compatibility check**
+- [x] **Step 3: Update the plugin contract and compatibility check**
 
 Set:
 
@@ -1191,7 +1191,7 @@ Update `cli-contract.json` so character search contains `--limit`, `"20"`, and `
 
 Update `cli-workflow.md` to search with `--limit 20`, inspect `page`, fetch more with the returned `nextOffset` only when needed, then run `catalog item <itemId> --json` and inspect exact credits before `character set`. Keep the existing one-edit/validate/preview/render and attribution rules unchanged.
 
-- [ ] **Step 4: Update development version and user documentation**
+- [x] **Step 4: Update development version and user documentation**
 
 Set `packages/cli/package.json` version to `0.1.4-beta-1` only; do not edit release workflows or create tags.
 
@@ -1211,7 +1211,7 @@ npm install -g /tmp/lpc-toolkit-cli-0.1.4-beta-1.tgz
 - preserve the ordinary public `npm install -g @lpc-toolkit/cli` instructions for the latest published stable CLI;
 - preserve metadata plus TXT/CSV credit requirements.
 
-- [ ] **Step 5: Run focused contract checks to verify GREEN**
+- [x] **Step 5: Run focused contract checks to verify GREEN**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- package-metadata.test.ts plugin-contract.test.ts command-spec.test.ts
@@ -1224,7 +1224,7 @@ rtk git diff --check
 
 Expected: PASS. Confirm `rtk git diff --name-only` contains no `.github/workflows/` path.
 
-- [ ] **Step 6: Run the complete repository and package gates**
+- [x] **Step 6: Run the complete repository and package gates**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test
@@ -1236,7 +1236,7 @@ rtk pnpm --filter @lpc-toolkit/cli test:package
 
 Expected: PASS for CLI tests, architecture boundaries, the common verification gate, production build, and packed install smoke. Do not initialize `upstream/`, create a tag, or publish npm.
 
-- [ ] **Step 7: Review the whole branch against the spec**
+- [x] **Step 7: Review the whole branch against the spec**
 
 Run:
 
@@ -1248,7 +1248,7 @@ rtk git diff --stat 40be133f86f2342a09c5949824bdff36acff7279
 
 Inspect every changed file for these observable requirements: default 20 items, explicit all mode, deterministic pagination, no page overlap for unchanged inputs, summary licenses and credit counts, detail credits, preserved character fields, structured filter errors, unchanged render/attribution semantics, version `0.1.4-beta-1`, and no workflow/tag/publication change. Fix only findings traceable to this design, rerun the narrow failing test before its wider gate, and record review-fix commits separately.
 
-- [ ] **Step 8: Commit Task 5 and record final evidence**
+- [x] **Step 8: Commit Task 5 and record final evidence**
 
 ```sh
 rtk git add packages/cli/package.json packages/cli/README.md README.md packages/cli/test/package-metadata.test.ts packages/web/test/readme-architecture-docs.test.ts plugins/lpc-toolkit packages/cli/test/plugin-contract.test.ts
@@ -1264,3 +1264,37 @@ rtk git commit -m "docs(plan): complete CLI agent discovery plan"
 ```
 
 The completed worktree must be clean. The final handoff must report that `0.1.4-beta-1` remains untagged and unpublished.
+
+**Implementation note:** Aligned the development package marker and plugin
+compatibility range at `0.1.4-beta-1`, added the bounded search/detail command
+contract, and documented deterministic discovery plus local tarball installation
+without claiming npm publication. The public stable install path, one-edit /
+validate / preview / render workflow, metadata, TXT/CSV credits, and render /
+selection / attribution semantics remain unchanged. Whole-branch review found no
+additional spec-traceable fixes.
+
+**Implementation commit:** `dfd7865bd66a224c839bcdf462cc4a788ab89383`
+
+**Verification:**
+
+- `rtk pnpm --filter @lpc-toolkit/cli test -- package-metadata.test.ts plugin-contract.test.ts` FAIL (expected RED: old version, install copy, and command inventory).
+- `rtk node --test plugins/lpc-toolkit/test/check-cli.test.mjs` FAIL (expected RED: old minimum and prerelease admission range).
+- `rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts` FAIL (expected RED after sandbox escalation: missing local tarball documentation; the first sandbox attempt also hit the environment's `tsx` IPC `EPERM`).
+- `rtk pnpm --filter @lpc-toolkit/cli test -- package-metadata.test.ts plugin-contract.test.ts command-spec.test.ts` PASS (48 tests).
+- `rtk node --test plugins/lpc-toolkit/test/check-cli.test.mjs` PASS (10 tests).
+- `rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts` PASS outside the sandbox (19 tests; required `tsx` IPC access).
+- `rtk pnpm verify:plugin` PASS (16 tests and plugin structure validation).
+- `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+- `rtk git diff --check` PASS.
+- `rtk git diff --name-only` PASS: no `.github/workflows/` path.
+- `rtk pnpm --filter @lpc-toolkit/cli test` PASS outside the sandbox (342 passed, 1 skipped; the sandbox attempt failed only because localhost bind returned `EPERM`).
+- `rtk pnpm check:boundaries` PASS.
+- `rtk pnpm verify` PASS outside the sandbox (the sandbox attempt failed only because `tsx` IPC returned `EPERM`).
+- `rtk pnpm build` PASS outside the sandbox (the sandbox attempt failed only because `tsx` IPC returned `EPERM`).
+- `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS outside the sandbox; packed and installed `lpc-toolkit-cli-0.1.4-beta-1.tgz` and completed the installed CLI smoke. The sandbox attempt stalled during local install and was interrupted before rerun.
+- `rtk git diff --check` PASS for whole-branch review.
+- `rtk git status --short` PASS: only the expected 11 Task 5 paths were modified before the implementation commit.
+- `rtk git diff --stat 40be133f86f2342a09c5949824bdff36acff7279` PASS: reviewed all 30 changed files against the discovery and preservation requirements.
+- `rtk git diff --name-only 40be133f86f2342a09c5949824bdff36acff7279 -- .github/workflows` PASS: empty output.
+- `rtk git tag --points-at HEAD` PASS: empty output; no development, beta, RC, or stable tag was created.
+- npm publication was not invoked; `0.1.4-beta-1` remains unpublished.
