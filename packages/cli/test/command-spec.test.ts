@@ -50,6 +50,16 @@ describe('helpForCommand', () => {
     expect(previewHelp).toContain('Default: down');
     expect(previewHelp).toContain('Default: 0');
   });
+
+  it('documents discovery pagination options', () => {
+    for (const command of [['catalog', 'items'], ['character', 'search']]) {
+      const help = helpForCommand(command);
+      expect(help).toContain('--limit <count>');
+      expect(help).toContain('Default: 20');
+      expect(help).toContain('--offset <count>');
+      expect(help).toContain('--all');
+    }
+  });
 });
 
 describe('validateCommandOptions', () => {

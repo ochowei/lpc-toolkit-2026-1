@@ -11,6 +11,7 @@ import { assetCacheErrorIssue } from './asset-cache.js';
 import { AssetStoreError } from './asset-store.js';
 import { SelectionOutputError } from './compose-selection.js';
 import { runCatalogCommand } from './catalog-commands.js';
+import { discoveryPaginationIssue } from './catalog-discovery.js';
 import {
   characterCommandNeedsAssets,
   runCharacterCommand,
@@ -121,6 +122,14 @@ function isLoopbackHost(host: string): boolean {
 function preflightAssetCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
   const command = parsed.command[0];
   const subcommand = parsed.command[1];
+
+  if (
+    (command === 'catalog' && subcommand === 'items')
+    || (command === 'character' && subcommand === 'search')
+  ) {
+    const issue = discoveryPaginationIssue(parsed.flags);
+    if (issue) return commandError(parsed.command.join(' '), issue);
+  }
 
   if (command === 'catalog') {
     if (subcommand !== 'types' && subcommand !== 'items' && subcommand !== 'item') {

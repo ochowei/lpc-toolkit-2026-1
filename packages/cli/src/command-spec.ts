@@ -60,6 +60,12 @@ const RENDER_OPTIONS: readonly CommandOptionSpec[] = [
   { name: 'allow-partial', kind: 'boolean', description: 'Allow partial animation output.' },
 ];
 
+const DISCOVERY_OPTIONS: readonly CommandOptionSpec[] = [
+  { name: 'limit', kind: 'value', valueLabel: 'count', description: 'Return 1-100 items. Default: 20.' },
+  { name: 'offset', kind: 'value', valueLabel: 'count', description: 'Skip matching items. Default: 0.' },
+  { name: 'all', kind: 'boolean', description: 'Return all matching items.' },
+];
+
 const COMMAND_SPECS: readonly CommandSpec[] = [
   {
     command: [],
@@ -99,6 +105,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
       { name: 'body-type', kind: 'value', valueLabel: 'type', description: 'Filter by body type.' },
       { name: 'animation', kind: 'value', valueLabel: 'name', description: 'Filter by animation.' },
       { name: 'license', kind: 'value', valueLabel: 'license', description: 'Filter by license.' },
+      ...DISCOVERY_OPTIONS,
     ],
     examples: ['lpc-toolkit catalog items --type hair'],
   },
@@ -244,6 +251,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
       SELECTION_OPTION,
       { name: 'type', kind: 'value', valueLabel: 'type', description: 'Selection type to search.' },
       { name: 'query', kind: 'value', valueLabel: 'text', description: 'Filter matching items.' },
+      ...DISCOVERY_OPTIONS,
     ],
     examples: ['lpc-toolkit character search hero --type hair --query braid'],
   },
