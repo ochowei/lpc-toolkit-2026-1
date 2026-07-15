@@ -32,12 +32,16 @@ describe('Codex plugin CLI contract', () => {
       'character-create',
       'character-show',
       'character-search',
+      'catalog-item',
       'character-set',
       'character-remove',
       'character-validate',
       'character-preview',
       'character-render',
     ]);
+    expect(contract.commands.map(({ id }) => id)).toContain('catalog-item');
+    expect(contract.commands.find(({ id }) => id === 'character-search')?.argv)
+      .toContain('20');
   });
 
   it.each(contract.commands.filter(({ id }) => id !== 'version'))(

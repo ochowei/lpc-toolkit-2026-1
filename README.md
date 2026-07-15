@@ -108,7 +108,8 @@ Create and edit a named character without writing selection JSON by hand:
 
 ```sh
 lpc-toolkit character create hero --preset farmer
-lpc-toolkit character search hero --type hair --query braid
+lpc-toolkit character search hero --type hair --query braid --limit 20
+lpc-toolkit catalog item hair_braid --json
 lpc-toolkit character set hero --type hair --item hair_braid --recolor lpcr.brown
 lpc-toolkit character preview hero
 lpc-toolkit character render hero --out ./dist/hero --animation walk --bundle zip
@@ -120,13 +121,27 @@ metadata plus TXT and CSV attribution. See
 usage, cache locations, local asset precedence, output defaults, and
 troubleshooting.
 
+Catalog and character searches return 20 items by default. Use `--limit 20`
+to set a bounded page size, `--offset 20` (or the returned `page.nextOffset`)
+to continue the same result set, and `--all` only when an explicit unbounded
+result is appropriate. JSON responses include `page.limit`, `page.offset`,
+`page.returned`, `page.total`, `page.hasMore`, and `page.nextOffset`. Search
+summaries report license families and credit counts; run
+`lpc-toolkit catalog item <itemId> --json` to inspect the full matching credits
+before selecting an item. Restart at offset zero after changing the catalog
+source, custom overlay, query filters, or character selection.
+
 ### Codex Plugin
 
-1. Install or upgrade the CLI to the range supported by plugin `0.1.0`:
+1. Install or upgrade the CLI to the range supported by plugin `0.1.0`. From
+   the repository root, pack and install the local development build:
 
 ```sh
-npm install -g '@lpc-toolkit/cli@>=0.1.3-alpha-1 <0.2.0'
+rtk pnpm --filter @lpc-toolkit/cli pack --pack-destination /tmp
+npm install -g /tmp/lpc-toolkit-cli-0.1.4-beta-1.tgz
 ```
+
+0.1.4-beta-1 is a development version and is not published to npm.
 
 2. Add the repository marketplace once:
 
@@ -142,7 +157,7 @@ codex plugin add lpc-toolkit@lpc-toolkit
 
 The plugin requires an installed compatible `lpc-toolkit` CLI and does not
 automatically install the CLI. Its supported CLI range is
-`>=0.1.3-alpha-1 <0.2.0`. Restart the ChatGPT desktop app or start a new Codex
+`>=0.1.4-beta-1 <0.2.0`. Restart the ChatGPT desktop app or start a new Codex
 task if the newly installed skill is not visible. Public Plugins Directory
 distribution can later remove the marketplace-add step.
 

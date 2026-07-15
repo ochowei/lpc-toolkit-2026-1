@@ -51,6 +51,33 @@ before handoff. See `docs/ENGINEERING.md` for conditional checks.
    to npm, yarn, or bun. npm/npx remain valid only for documented public CLI
    consumption or authorized npm publication.
 7. **Prefix terminal commands with RTK.** Follow [RTK.md](RTK.md).
+8. **CLI documentation impact is mandatory.** CLI-sensitive work must evaluate
+   every owned documentation surface before implementation and again before
+   handoff. Record each surface as `update` or `N/A — <reason>`; do not rely on
+   reviewers to discover an omitted help, README, landing, architecture,
+   engineering, release, or plugin contract update.
+
+## CLI Documentation Impact
+
+For changes under `packages/cli/src/`, `packages/cli/scripts/`, the CLI package
+metadata, `plugins/lpc-toolkit/`, `asset-release.json`, or CLI release/publish
+workflows, include this matrix in the implementation plan and reassess it before
+handoff:
+
+```text
+help: update | N/A — <reason>
+cli-readme: update | N/A — <reason>
+root-readme: update | N/A — <reason>
+landing: update | N/A — <reason>
+architecture: update | N/A — <reason>
+engineering: update | N/A — <reason>
+releasing: update | N/A — <reason>
+plugin: update | N/A — <reason>
+```
+
+CLI fixes performed without a checked-in plan must include the same matrix in
+handoff evidence. See `docs/ENGINEERING.md` for ownership, PR declaration, and
+local reproduction details.
 
 ## Repository Layout
 

@@ -38,6 +38,12 @@ describe('parseArgs', () => {
     );
   });
 
+  it('parses all as a boolean flag', () => {
+    expect(parseArgs(['catalog', 'items', '--all']).flags).toEqual(
+      new Map([['all', true]]),
+    );
+  });
+
   it('parses help as a boolean flag before a positional', () => {
     expect(parseArgs(['character', 'set', '--help', 'hero'])).toEqual({
       command: ['character', 'set'],

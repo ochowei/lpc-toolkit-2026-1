@@ -115,10 +115,48 @@ function catalogItemLabel(item: JsonRecord): string | undefined {
 
 function formatCatalogItemDetails(item: JsonRecord, indent: string): readonly string[] {
   return [
+    `${indent}supported body types: ${formatCsv(stringArrayValue(item, 'supportedBodyTypes'))}`,
     `${indent}variants: ${formatCsv(stringArrayValue(item, 'variants'))}`,
     `${indent}recolors: ${formatCsv(stringArrayValue(item, 'recolors'))}`,
     `${indent}animations: ${formatCsv(stringArrayValue(item, 'animations'))}`,
+    `${indent}licenses: ${formatCsv(stringArrayValue(item, 'licenses'))}`,
+    `${indent}credit count: ${numberValue(item, 'creditCount') ?? 0}`,
   ];
+}
+
+function formatDiscoverySuffix(data: JsonRecord): string {
+  const page = data['page'];
+  if (!isRecord(page)) return '';
+  const hasMore = page['hasMore'];
+  const nextOffset = page['nextOffset'];
+  if (hasMore !== true || typeof nextOffset !== 'number') return '';
+  return `More results available; rerun with --offset ${nextOffset}.\n`;
+}
+
+function formatDiscoveryCount(
+  label: string,
+  data: JsonRecord,
+  fallbackReturned: number,
+): string {
+  const page = data['page'];
+  if (!isRecord(page)) return `${label} (${fallbackReturned})`;
+  const returned = numberValue(page, 'returned');
+  const total = numberValue(page, 'total');
+  return typeof returned === 'number' && typeof total === 'number'
+    ? `${label} (${returned} of ${total})`
+    : `${label} (${fallbackReturned})`;
+}
+
+function formatDiscoverySuggestions(data: JsonRecord): string {
+  const suggestions = recordArrayValue(data, 'suggestions');
+  if (!suggestions || suggestions.length === 0) return '';
+  const lines = suggestions.flatMap((suggestion) => {
+    const itemId = stringValue(suggestion, 'itemId');
+    const typeName = stringValue(suggestion, 'typeName');
+    const name = stringValue(suggestion, 'name');
+    return itemId && typeName && name ? [`- ${typeName}/${name} [${itemId}]`] : [];
+  });
+  return lines.length > 0 ? `Suggestions:\n${lines.join('\n')}\n` : '';
 }
 
 function formatCatalogTypes(data: JsonRecord): string | undefined {
@@ -137,7 +175,7 @@ function formatCatalogItems(data: JsonRecord): string | undefined {
     if (!label) return [];
     return [`- ${label}`, ...formatCatalogItemDetails(item, '  ')];
   });
-  return `Catalog items (${items.length})\n${lines.join('\n')}\n`;
+  return `${formatDiscoveryCount('Catalog items', data, items.length)}\n${lines.join('\n')}\n${formatDiscoverySuggestions(data)}${formatDiscoverySuffix(data)}`;
 }
 
 function formatCatalogItem(data: JsonRecord): string | undefined {
@@ -234,7 +272,7 @@ function formatCharacterSearch(data: JsonRecord): string | undefined {
     if (!label) return [];
     return [`- ${label}`, ...formatCatalogItemDetails(item, '  ')];
   });
-  return `Compatible items (${items.length})\n${lines.join('\n')}\n`;
+  return `${formatDiscoveryCount('Compatible items', data, items.length)}\n${lines.join('\n')}\n${formatDiscoverySuggestions(data)}${formatDiscoverySuffix(data)}`;
 }
 
 function formatCharacterSet(data: JsonRecord): string | undefined {

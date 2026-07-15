@@ -213,6 +213,46 @@ describe('asset preparation dispatch', () => {
   });
 
   it.each([
+    ['catalog', 'items', '--limit', '0'],
+    ['catalog', 'items', '--limit', '101'],
+    ['catalog', 'items', '--offset', '-1'],
+    ['catalog', 'items', '--all', '--limit', '10'],
+    ['character', 'search', 'hero', '--type', 'hair', '--all', '--offset', '1'],
+  ])('rejects invalid discovery pagination before assets: %j', async (...argv) => {
+    const prepare = vi.fn(async (_options: PrepareRuntimeAssetsOptions) => runtime);
+    const capture = captureIo(runtime.context.repoRoot);
+    expect(await runCli([...argv, '--json'], capture.io, {
+      prepareRuntimeAssets: prepare,
+    })).toBe(1);
+    expect(prepare).not.toHaveBeenCalled();
+    expect(JSON.parse(capture.stdout.join('')).errors[0]).toMatchObject({
+      code: 'invalid_option',
+    });
+  });
+
+  it('rejects an unsafe numeric offset as structured JSON before assets', async () => {
+    const prepare = vi.fn(async (_options: PrepareRuntimeAssetsOptions) => runtime);
+    const capture = captureIo(runtime.context.repoRoot);
+
+    expect(await runCli([
+      'catalog', 'items', '--offset', '9'.repeat(400), '--json',
+    ], capture.io, { prepareRuntimeAssets: prepare })).toBe(1);
+    expect(prepare).not.toHaveBeenCalled();
+    expect(capture.stderr).toEqual([]);
+    expect(JSON.parse(capture.stdout.join(''))).toMatchObject({
+      ok: false,
+      command: 'catalog items',
+      data: null,
+      warnings: [],
+      errors: [{
+        code: 'invalid_option',
+        message: '--offset must be a non-negative integer.',
+        path: '--offset',
+      }],
+    });
+  });
+
+  it.each([
     ['render', '--selection', 'selection.json', '--out', 'out', '--bundle', 'tar'],
     ['character', 'render', 'hero', '--out', 'out', '--bundle', 'tar'],
   ])('rejects an unsupported bundle value before preparing assets: %j', async (...argv) => {

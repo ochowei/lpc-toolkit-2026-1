@@ -44,6 +44,24 @@ function makeCatalogCwd(): string {
       layer_1: { zPos: 50, male: 'hair/braids/' },
     }),
   );
+  writeFileSync(
+    path.join(root, 'hair', 'bob.json'),
+    JSON.stringify({
+      name: 'Bob',
+      type_name: 'hair',
+      animations: ['walk'],
+      credits: [
+        {
+          file: 'hair/bob',
+          notes: '',
+          authors: ['Artist'],
+          licenses: ['GPL 3.0'],
+          urls: [],
+        },
+      ],
+      layer_1: { zPos: 50, male: 'hair/bob/' },
+    }),
+  );
   return cwd;
 }
 
@@ -87,10 +105,22 @@ describe('human-readable CLI output', () => {
   it('prints catalog item summaries without --json', async () => {
     const output = await runHuman(['catalog', 'items', '--type', 'hair'], makeCatalogCwd());
 
-    expect(output).toContain('Catalog items (1)');
+    expect(output).toContain('Catalog items (2 of 2)');
     expect(output).toContain('- hair/Braids [braids]');
     expect(output).toContain('variants: brown');
     expect(output).toContain('animations: walk, slash');
+    expect(output).toContain('supported body types: male');
+    expect(output).toContain('licenses: GPL');
+    expect(output).toContain('credit count: 1');
+  });
+
+  it('prints the next discovery offset when another catalog page is available', async () => {
+    const output = await runHuman([
+      'catalog', 'items', '--type', 'hair', '--limit', '1',
+    ], makeCatalogCwd());
+
+    expect(output).toContain('Catalog items (1 of 2)');
+    expect(output).toContain('More results available; rerun with --offset 1.');
   });
 
   it('prints one catalog item without --json', async () => {

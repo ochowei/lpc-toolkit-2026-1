@@ -245,6 +245,11 @@ shared package APIs. Do not add CLI conveniences by importing Node APIs into
 `packages/core/src/**`, and do not bypass attribution files when rendering or
 bundling output.
 
+Agent-facing catalog and character search use CLI-owned bounded discovery
+summaries and deterministic pagination. Detail lookup remains the source of
+exact raw credits. Plugins and other clients may sequence public JSON commands.
+They must not duplicate discovery logic or reinterpret attribution data.
+
 The character store owns named selection persistence under `./characters/` and
 explicit selection-file access. Character commands validate a complete
 candidate before atomic mutation, and preview/render stage every pixel,

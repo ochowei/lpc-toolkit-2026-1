@@ -86,4 +86,50 @@ describe('response envelope', () => {
     expect(output).toContain('Did you mean: braids');
     expect(output).toContain('Available: bob, long');
   });
+
+  it('formats discovery counts without a next offset when the page is complete', () => {
+    const output = formatHumanResponse(commandOk('catalog items', {
+      items: [{
+        itemId: 'braids',
+        typeName: 'hair',
+        name: 'Braids',
+        supportedBodyTypes: ['male'],
+        variants: ['brown'],
+        recolors: [],
+        animations: ['walk'],
+        licenses: ['GPL'],
+        creditCount: 1,
+      }],
+      page: {
+        limit: 1,
+        offset: 1,
+        returned: 1,
+        total: 2,
+        hasMore: false,
+        nextOffset: null,
+      },
+    }), '');
+
+    expect(output).toContain('Catalog items (1 of 2)');
+    expect(output).not.toContain('More results available');
+  });
+
+  it('formats bounded suggestions for a successful empty discovery search', () => {
+    const output = formatHumanResponse(commandOk('character search', {
+      items: [],
+      count: 0,
+      page: {
+        limit: 20,
+        offset: 0,
+        returned: 0,
+        total: 0,
+        hasMore: false,
+        nextOffset: null,
+      },
+      suggestions: [{ itemId: 'braids', typeName: 'hair', name: 'Braids' }],
+    }), '');
+
+    expect(output).toContain('Compatible items (0 of 0)');
+    expect(output).toContain('Suggestions:\n- hair/Braids [braids]');
+  });
 });

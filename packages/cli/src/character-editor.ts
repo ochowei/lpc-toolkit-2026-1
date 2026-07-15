@@ -1,18 +1,23 @@
 import {
   BODY_TYPES,
   getDefaultColorSelection,
-  getRecolorVariants,
-  LICENSE_GROUP_OF,
-  type AnimationName,
   type BodyType,
   type Catalog,
   type ItemDefinition,
   type ItemId,
-  type LicenseGroup,
   type PaletteMetadata,
   type Selections,
   type TypeName,
 } from '@lpc-toolkit/core';
+import {
+  discoverItems,
+  editDistance,
+  toDiscoveryCandidate,
+  type DiscoveryCandidate,
+  type DiscoveryItemSummary,
+  type DiscoveryPagination,
+  type DiscoveryResult,
+} from './catalog-discovery.js';
 import { SELECTION_SCHEMA, type SelectionJson } from './selection.js';
 import { validateSelections, type ValidationResult } from './validation.js';
 
@@ -25,21 +30,15 @@ export interface CharacterCatalogContext {
 export interface CharacterSearchInput {
   readonly typeName: TypeName;
   readonly query?: string;
+  readonly pagination: DiscoveryPagination;
 }
 
-export interface CharacterSearchItem {
-  readonly itemId: ItemId;
-  readonly typeName: TypeName;
-  readonly name: string;
-  readonly variants: readonly string[];
-  readonly recolors: readonly string[];
-  readonly animations: readonly AnimationName[];
-  readonly licenses: readonly LicenseGroup[];
+export interface CharacterSearchItem extends DiscoveryItemSummary {
   readonly replacesCurrent: boolean;
+  readonly compatibleBodyType: BodyType;
 }
 
-export interface CharacterSearchResult {
-  readonly items: readonly CharacterSearchItem[];
+export interface CharacterSearchResult extends DiscoveryResult<CharacterSearchItem> {
   readonly count: number;
 }
 
@@ -76,23 +75,6 @@ export class CharacterEditError extends Error {
     if (options.path !== undefined) this.path = options.path;
     if (options.details !== undefined) this.details = options.details;
   }
-}
-
-function itemSupportsBodyType(item: ItemDefinition, bodyType: BodyType): boolean {
-  for (let n = 1; n < 10; n++) {
-    const layer = item[`layer_${n}`];
-    if (!layer) break;
-    if (typeof layer[bodyType] === 'string') return true;
-  }
-  return false;
-}
-
-function itemLicenseFamilies(item: ItemDefinition): readonly LicenseGroup[] {
-  const families = new Set<LicenseGroup>();
-  for (const credit of item.credits) {
-    for (const license of credit.licenses) families.add(LICENSE_GROUP_OF[license]);
-  }
-  return [...families];
 }
 
 function unknownItemError(
@@ -157,33 +139,46 @@ export function searchCharacterItems(
   input: CharacterSearchInput,
   context: CharacterCatalogContext,
 ): CharacterSearchResult {
-  const query = input.query?.trim().toLowerCase();
-  const items: CharacterSearchItem[] = [];
-
-  for (const item of context.catalog.byTypeName.get(input.typeName) ?? []) {
-    if (!item.itemId || !itemSupportsBodyType(item, selections.bodyType)) continue;
-    const displayName = item.display_name ?? item.name;
-    if (
-      query &&
-      !item.itemId.toLowerCase().includes(query) &&
-      !item.name.toLowerCase().includes(query) &&
-      !displayName.toLowerCase().includes(query)
-    ) continue;
-
-    items.push({
-      itemId: item.itemId,
-      typeName: item.type_name,
-      name: displayName,
-      variants: item.variants ?? [],
-      recolors: getRecolorVariants(item, context.palettes),
-      animations: item.animations,
-      licenses: itemLicenseFamilies(item),
-      replacesCurrent: selections.items[input.typeName] !== undefined,
-    });
+  const typeItems = context.catalog.byTypeName.get(input.typeName);
+  if (!typeItems) {
+    const ranked = context.catalog.typeNames
+      .map((typeName) => ({ typeName, distance: editDistance(input.typeName, typeName) }))
+      .sort((left, right) => left.distance - right.distance
+        || (left.typeName < right.typeName ? -1 : left.typeName > right.typeName ? 1 : 0));
+    throw new CharacterEditError(
+      'unknown_type_name',
+      `Unknown type name: ${input.typeName}`,
+      {
+        path: input.typeName,
+        details: {
+          suggestions: ranked.slice(0, 5).map(({ typeName }) => typeName),
+          available: [...context.catalog.typeNames]
+            .sort((left, right) => left < right ? -1 : left > right ? 1 : 0)
+            .slice(0, 10),
+        },
+      },
+    );
   }
 
-  items.sort((left, right) => left.itemId.localeCompare(right.itemId));
-  return { items, count: items.length };
+  const candidates: DiscoveryCandidate<CharacterSearchItem>[] = typeItems.flatMap((item) => {
+    const candidate = toDiscoveryCandidate(item, context.palettes);
+    if (!candidate || !candidate.summary.supportedBodyTypes.includes(selections.bodyType)) {
+      return [];
+    }
+    return [{
+      internalName: candidate.internalName,
+      summary: {
+        ...candidate.summary,
+        replacesCurrent: selections.items[input.typeName] !== undefined,
+        compatibleBodyType: selections.bodyType,
+      },
+    }];
+  });
+  const result = discoverItems(candidates, {
+    ...(input.query === undefined ? {} : { query: input.query }),
+    pagination: input.pagination,
+  });
+  return { ...result, count: result.page.total };
 }
 
 export function setCharacterItem(

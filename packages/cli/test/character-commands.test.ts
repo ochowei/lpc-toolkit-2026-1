@@ -49,6 +49,19 @@ function createFixture(): {
     variants: ['brown'],
     layer_1: { zPos: 50, male: 'hair/braids/' },
   }));
+  writeFileSync(path.join(definitionsRoot, 'hair', 'bob.json'), JSON.stringify({
+    name: 'Bob',
+    type_name: 'hair',
+    animations: ['walk'],
+    credits: [{
+      file: 'hair/bob',
+      notes: '',
+      authors: ['Artist'],
+      licenses: ['GPL 3.0'],
+      urls: [],
+    }],
+    layer_1: { zPos: 50, male: 'hair/bob/' },
+  }));
   const directoryStore = createDirectoryAssetStore(assetsRoot);
   const runtime: RuntimeAssets = {
     context: createRuntimeContext({ cwd, assetsRoot, spritesheetsBaseUrl: directoryStore.baseUrl }),
@@ -318,6 +331,75 @@ describe('character commands', () => {
       'character', 'remove', 'hero', '--type', 'body',
     ])).response.ok).toBe(true);
     expect((await run(fixture, ['character', 'list'])).response.data).toMatchObject({ count: 1 });
+  });
+
+  it('returns a paged character search through the JSON CLI response', async () => {
+    const fixture = createFixture();
+    expect((await run(fixture, ['character', 'create', 'hero'])).response.ok).toBe(true);
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+
+    const code = await runCli(
+      ['character', 'search', 'hero', '--type', 'hair', '--limit', '1', '--json'],
+      {
+        cwd: fixture.cwd,
+        stdout: (text) => stdout.push(text),
+        stderr: (text) => stderr.push(text),
+      },
+    );
+
+    expect(code).toBe(0);
+    expect(stderr).toEqual([]);
+    expect(JSON.parse(stdout.join(''))).toMatchObject({
+      ok: true,
+      command: 'character search',
+      data: {
+        count: 2,
+        items: [{
+          compatibleBodyType: 'male',
+          supportedBodyTypes: ['male'],
+          replacesCurrent: false,
+        }],
+        page: {
+          limit: 1,
+          offset: 0,
+          returned: 1,
+          total: 2,
+          hasMore: true,
+          nextOffset: 1,
+        },
+      },
+    });
+  });
+
+  it('returns bounded recovery guidance for an unknown character search type', async () => {
+    const fixture = createFixture();
+    expect((await run(fixture, ['character', 'create', 'hero'])).response.ok).toBe(true);
+    const definitionsRoot = path.join(fixture.cwd, 'assets', 'sheet_definitions');
+    for (let index = 0; index < 12; index++) {
+      const typeName = `type-${String(index).padStart(2, '0')}`;
+      const typeRoot = path.join(definitionsRoot, typeName);
+      mkdirSync(typeRoot, { recursive: true });
+      writeFileSync(path.join(typeRoot, `item-${index}.json`), JSON.stringify({
+        name: `Item ${index}`,
+        type_name: typeName,
+        animations: ['walk'],
+        credits: [],
+        layer_1: { zPos: 50, male: `${typeName}/item/` },
+      }));
+    }
+
+    const response = (await run(fixture, [
+      'character', 'search', 'hero', '--type', 'haor',
+    ])).response;
+
+    expect(response.errors[0]).toMatchObject({
+      code: 'unknown_type_name',
+      path: 'haor',
+    });
+    expect(response.errors[0]?.details?.suggestions?.[0]).toBe('hair');
+    expect(response.errors[0]?.details?.suggestions).toHaveLength(5);
+    expect(response.errors[0]?.details?.available).toHaveLength(10);
   });
 
   it('does not write an invalid set candidate', async () => {

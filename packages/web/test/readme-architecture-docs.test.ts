@@ -13,6 +13,7 @@ const readRepoFileIfExists = (filePath: string) => {
 };
 const rootPackage = JSON.parse(readRepoFile('package.json')) as {
   license: string;
+  scripts: Record<string, string>;
 };
 
 const readme = readRepoFile('README.md');
@@ -25,6 +26,9 @@ const claude = readRepoFile('CLAUDE.md');
 const engineering = readRepoFile('docs/ENGINEERING.md');
 const onboarding = readRepoFile('docs/ONBOARDING.md');
 const releasing = readRepoFileIfExists('docs/RELEASING.md');
+const pullRequestTemplate = readRepoFileIfExists(
+  '.github/pull_request_template.md',
+);
 
 const maintainedDocuments = new Map([
   ['README.md', readme],
@@ -37,6 +41,7 @@ const maintainedDocuments = new Map([
   ['docs/RELEASING.md', releasing],
   ['packages/cli/README.md', cliReadme],
   ['packages/core/README.md', coreReadme],
+  ['.github/pull_request_template.md', pullRequestTemplate],
 ]);
 
 function localMarkdownTargets(filePath: string, source: string): string[] {
@@ -169,13 +174,19 @@ describe('README architecture contract', () => {
 
 describe('Codex plugin documentation contract', () => {
   it('documents installation, ownership, and verification', () => {
-    const cliInstall = "npm install -g '@lpc-toolkit/cli@>=0.1.3-alpha-1 <0.2.0'";
+    const cliInstall = 'npm install -g /tmp/lpc-toolkit-cli-0.1.4-beta-1.tgz';
     const marketplaceAdd = 'codex plugin marketplace add ochowei/lpc-toolkit-2026-1';
     const pluginAdd = 'codex plugin add lpc-toolkit@lpc-toolkit';
 
     for (const document of [readme, cliReadme]) {
       expect(document).toContain('Install or upgrade the CLI');
+      expect(document).toContain(
+        'rtk pnpm --filter @lpc-toolkit/cli pack --pack-destination /tmp',
+      );
       expect(document).toContain(cliInstall);
+      expect(document).toContain(
+        '0.1.4-beta-1 is a development version and is not published to npm',
+      );
       expect(document.indexOf(cliInstall)).toBeLessThan(
         document.indexOf(marketplaceAdd),
       );
@@ -274,6 +285,45 @@ describe('onboarding and engineering ownership contract', () => {
       expect(engineering).toContain(phrase);
     }
   });
+
+  it('keeps CLI documentation impact enforcement synchronized', () => {
+    for (const phrase of [
+      'CLI docs impact:',
+      'CLI docs surfaces:',
+      'CLI docs reason:',
+    ]) {
+      expect(pullRequestTemplate).toContain(phrase);
+      expect(contributing).toContain(phrase);
+    }
+    expect(pullRequestTemplate).toContain('updated | not-applicable');
+    expect(contributing).toContain(
+      'CLI docs impact: updated | not-applicable',
+    );
+    for (const token of [
+      'help',
+      'cli-readme',
+      'root-readme',
+      'landing',
+      'architecture',
+      'engineering',
+      'releasing',
+      'plugin',
+    ]) {
+      expect(engineering).toContain(`\`${token}\``);
+    }
+    expect(agents).toContain('CLI Documentation Impact');
+    expect(agents).toContain('`update` or `N/A — <reason>`');
+    expect(agents).toContain('before handoff');
+    expect(rootPackage.scripts['check:cli-docs-impact']).toBe(
+      'node scripts/check-cli-doc-impact.mjs',
+    );
+    expect(rootPackage.scripts['verify:cli-docs-policy']).toBe(
+      'node --test scripts/check-cli-doc-impact.test.mjs',
+    );
+    expect(rootPackage.scripts.verify).toContain(
+      'pnpm verify:cli-docs-policy',
+    );
+  });
 });
 
 describe('CLI README character contract', () => {
@@ -343,6 +393,17 @@ describe('architecture ownership contract', () => {
       'transactional attributed preview and render publication',
     ]) {
       expect(architecture).toContain(phrase);
+    }
+  });
+
+  it('documents deterministic CLI discovery and exact credit ownership', () => {
+    for (const pattern of [
+      /bounded discovery\s+summaries/,
+      /deterministic pagination/,
+      /exact\s+raw credits/,
+      /must not duplicate discovery logic/,
+    ]) {
+      expect(architecture).toMatch(pattern);
     }
   });
 });

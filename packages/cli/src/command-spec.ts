@@ -1,4 +1,5 @@
 import type { ParsedArgs } from './args.js';
+import { editDistance } from './catalog-discovery.js';
 import type { CliIssue } from './response.js';
 
 type OptionKind = 'boolean' | 'value' | 'repeatable';
@@ -59,17 +60,25 @@ const RENDER_OPTIONS: readonly CommandOptionSpec[] = [
   { name: 'allow-partial', kind: 'boolean', description: 'Allow partial animation output.' },
 ];
 
+const DISCOVERY_OPTIONS: readonly CommandOptionSpec[] = [
+  { name: 'limit', kind: 'value', valueLabel: 'count', description: 'Return 1-100 items. Default: 20.' },
+  { name: 'offset', kind: 'value', valueLabel: 'count', description: 'Skip matching items. Default: 0.' },
+  { name: 'all', kind: 'boolean', description: 'Return all matching items.' },
+];
+
 const COMMAND_SPECS: readonly CommandSpec[] = [
   {
     command: [],
     usage: 'lpc-toolkit <command> [options]',
-    description: 'Compose, inspect, and render attributed LPC character sprites.',
+    description: 'Compose, discover, inspect, and render attributed LPC character sprites.',
     options: [HELP_OPTION],
     examples: [
       'lpc-toolkit --version',
       'lpc-toolkit -V',
       'lpc-toolkit catalog types',
       'lpc-toolkit character create hero',
+      'lpc-toolkit character search hero --type hair --query braid --limit 20 --json',
+      'lpc-toolkit catalog item hair_braid --json',
     ],
   },
   {
@@ -77,7 +86,11 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
     usage: 'lpc-toolkit catalog <command>',
     description: 'Inspect the LPC asset catalog.',
     options: [HELP_OPTION],
-    examples: ['lpc-toolkit catalog types', 'lpc-toolkit catalog items --type hair', 'lpc-toolkit catalog item hair/braid'],
+    examples: [
+      'lpc-toolkit catalog types',
+      'lpc-toolkit catalog items --type hair --limit 20 --json',
+      'lpc-toolkit catalog item hair_braid --json',
+    ],
   },
   {
     command: ['catalog', 'types'],
@@ -98,15 +111,16 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
       { name: 'body-type', kind: 'value', valueLabel: 'type', description: 'Filter by body type.' },
       { name: 'animation', kind: 'value', valueLabel: 'name', description: 'Filter by animation.' },
       { name: 'license', kind: 'value', valueLabel: 'license', description: 'Filter by license.' },
+      ...DISCOVERY_OPTIONS,
     ],
-    examples: ['lpc-toolkit catalog items --type hair'],
+    examples: ['lpc-toolkit catalog items --type hair --limit 20 --json'],
   },
   {
     command: ['catalog', 'item'],
     usage: 'lpc-toolkit catalog item <item-id-or-type/name>',
     description: 'Show one catalog item.',
     options: [HELP_OPTION, JSON_OPTION],
-    examples: ['lpc-toolkit catalog item hair/braid'],
+    examples: ['lpc-toolkit catalog item hair_braid --json'],
   },
   {
     command: ['selection'],
@@ -243,8 +257,11 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
       SELECTION_OPTION,
       { name: 'type', kind: 'value', valueLabel: 'type', description: 'Selection type to search.' },
       { name: 'query', kind: 'value', valueLabel: 'text', description: 'Filter matching items.' },
+      ...DISCOVERY_OPTIONS,
     ],
-    examples: ['lpc-toolkit character search hero --type hair --query braid'],
+    examples: [
+      'lpc-toolkit character search hero --type hair --query braid --limit 20 --json',
+    ],
   },
   {
     command: ['character', 'set'],
@@ -312,24 +329,6 @@ function findCommandSpec(command: readonly string[]): CommandSpec | undefined {
       spec.command.length === command.length &&
       spec.command.every((part, index) => part === command[index]),
   );
-}
-
-function editDistance(left: string, right: string): number {
-  const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
-  for (let leftIndex = 1; leftIndex <= left.length; leftIndex++) {
-    let diagonal = previous[0]!;
-    previous[0] = leftIndex;
-    for (let rightIndex = 1; rightIndex <= right.length; rightIndex++) {
-      const above = previous[rightIndex]!;
-      previous[rightIndex] = Math.min(
-        previous[rightIndex]! + 1,
-        previous[rightIndex - 1]! + 1,
-        diagonal + (left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1),
-      );
-      diagonal = above;
-    }
-  }
-  return previous[right.length]!;
 }
 
 function suggestOption(

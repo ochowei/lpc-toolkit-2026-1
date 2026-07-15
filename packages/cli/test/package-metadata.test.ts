@@ -43,6 +43,7 @@ describe('CLI package metadata', () => {
   it('declares public npm release metadata', () => {
     const packageJson = readCliPackageJson();
 
+    expect(packageJson.version).toBe('0.1.4-beta-1');
     expect(packageJson).toMatchObject({
       name: '@lpc-toolkit/cli',
       version: expect.stringMatching(
@@ -294,12 +295,20 @@ process.stdout.write(JSON.stringify([
 
   it('documents the optional Codex plugin installation', () => {
     const readme = readCliReadme();
-    const cliInstall = "npm install -g '@lpc-toolkit/cli@>=0.1.3-alpha-1 <0.2.0'";
+    const cliInstall = 'npm install -g /tmp/lpc-toolkit-cli-0.1.4-beta-1.tgz';
     const marketplaceAdd = 'codex plugin marketplace add ochowei/lpc-toolkit-2026-1';
     const pluginAdd = 'codex plugin add lpc-toolkit@lpc-toolkit';
 
     expect(readme).toContain('Install or upgrade the CLI');
     expect(readme).toContain(cliInstall);
+    for (const forbidden of [
+      'npm install -g @lpc-toolkit/cli@0.1.4-beta-1',
+      "npm install -g '@lpc-toolkit/cli@>=0.1.4-beta-1 <0.2.0'",
+    ]) expect(readme).not.toContain(forbidden);
+    expect(readme).toContain('lpc-toolkit-cli-0.1.4-beta-1.tgz');
+    expect(readme).toContain('--limit 20');
+    expect(readme).toContain('--offset 20');
+    expect(readme).toContain('--all');
     expect(readme.indexOf(cliInstall)).toBeLessThan(readme.indexOf(marketplaceAdd));
     expect(readme.indexOf(marketplaceAdd)).toBeLessThan(readme.indexOf(pluginAdd));
     expect(readme).toContain('codex plugin marketplace add ochowei/lpc-toolkit-2026-1');

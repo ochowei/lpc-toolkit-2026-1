@@ -116,20 +116,35 @@ const maleSelections: Selections = {
 };
 
 describe('character editor', () => {
-  it('searches name and item id, filters body type, and sorts by item id', () => {
-    const result = searchCharacterItems(
+  it('searches name and item id, filters body type, and uses discovery pagination', () => {
+    const first = searchCharacterItems(
       maleSelections,
-      { typeName: 'hair', query: 'braid' },
+      {
+        typeName: 'hair',
+        query: 'braid',
+        pagination: { all: false, limit: 1, offset: 0 },
+      },
       context,
     );
 
-    expect(result.items.map((item) => item.itemId)).toEqual(['braid', 'braids']);
-    expect(result.items[0]).toMatchObject({
-      name: 'Single Braid',
+    expect(first.items.map((item) => item.itemId)).toEqual(['braids']);
+    expect(first.items[0]).toMatchObject({
+      name: 'Braids',
       licenses: ['GPL'],
       replacesCurrent: false,
+      compatibleBodyType: 'male',
+      supportedBodyTypes: ['male'],
     });
-    expect(result.count).toBe(2);
+    expect(first.count).toBe(2);
+    expect(first.page).toMatchObject({ total: 2, nextOffset: 1 });
+
+    const all = searchCharacterItems(
+      maleSelections,
+      { typeName: 'hair', pagination: { all: true, limit: 20, offset: 0 } },
+      context,
+    );
+    expect(all.items).toHaveLength(all.count);
+    expect(all.page.limit).toBeNull();
   });
 
   it('sets one type without changing another type', () => {

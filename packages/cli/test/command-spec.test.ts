@@ -50,6 +50,34 @@ describe('helpForCommand', () => {
     expect(previewHelp).toContain('Default: down');
     expect(previewHelp).toContain('Default: 0');
   });
+
+  it('documents discovery pagination options', () => {
+    for (const command of [['catalog', 'items'], ['character', 'search']]) {
+      const help = helpForCommand(command);
+      expect(help).toContain('--limit <count>');
+      expect(help).toContain('Default: 20');
+      expect(help).toContain('--offset <count>');
+      expect(help).toContain('--all');
+    }
+  });
+
+  it('shows the bounded two-stage discovery workflow in help examples', () => {
+    const rootHelp = helpForCommand([]);
+    expect(rootHelp).toContain(
+      'lpc-toolkit character search hero --type hair --query braid --limit 20 --json',
+    );
+    expect(rootHelp).toContain('lpc-toolkit catalog item hair_braid --json');
+
+    expect(helpForCommand(['catalog', 'items'])).toContain(
+      'lpc-toolkit catalog items --type hair --limit 20 --json',
+    );
+    expect(helpForCommand(['catalog', 'item'])).toContain(
+      'lpc-toolkit catalog item hair_braid --json',
+    );
+    expect(helpForCommand(['character', 'search'])).toContain(
+      'lpc-toolkit character search hero --type hair --query braid --limit 20 --json',
+    );
+  });
 });
 
 describe('validateCommandOptions', () => {
@@ -60,6 +88,13 @@ describe('validateCommandOptions', () => {
 
     expect(issue).toMatchObject({ code: 'unknown_option', path: '--tpye' });
     expect(issue?.details?.suggestions).toContain('--type');
+  });
+
+  it('preserves case-sensitive suggestion distance for unknown options', () => {
+    const issue = validateCommandOptions(parseArgs(['catalog', 'items', '--HELP']));
+
+    expect(issue).toMatchObject({ code: 'unknown_option', path: '--HELP' });
+    expect(issue?.details?.suggestions).toEqual([]);
   });
 
   it('rejects a value option without a value', () => {
