@@ -105,10 +105,21 @@ function supportedBodyTypes(item: ItemDefinition): readonly BodyType[] {
   });
 }
 
+function licenseGroupForRawValue(license: string): LicenseGroup | undefined {
+  if (Object.hasOwn(LICENSE_GROUP_OF, license)) {
+    return LICENSE_GROUP_OF[license as keyof typeof LICENSE_GROUP_OF];
+  }
+  const normalized = license.trim().toLowerCase();
+  return normalized === 'gpl' || normalized.startsWith('gpl ') ? 'GPL' : undefined;
+}
+
 function licenseGroups(item: ItemDefinition): readonly LicenseGroup[] {
   const present = new Set<LicenseGroup>();
   for (const credit of item.credits) {
-    for (const license of credit.licenses) present.add(LICENSE_GROUP_OF[license]);
+    for (const license of credit.licenses) {
+      const group = licenseGroupForRawValue(license);
+      if (group !== undefined) present.add(group);
+    }
   }
   return LICENSE_GROUP_ORDER.filter((group) => present.has(group));
 }
@@ -124,19 +135,18 @@ function isStringArray(value: unknown): value is readonly string[] {
   return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
 }
 
-function isCreditEntry(value: unknown): value is CreditEntry {
+function hasCreditEntryStructure(value: unknown): boolean {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
   if (!('file' in value) || typeof value.file !== 'string') return false;
   if (!('notes' in value) || typeof value.notes !== 'string') return false;
   if (!('authors' in value) || !isStringArray(value.authors)) return false;
   if (!('licenses' in value) || !isStringArray(value.licenses)) return false;
-  if (!value.licenses.every((license) => Object.hasOwn(LICENSE_GROUP_OF, license))) return false;
   return 'urls' in value && isStringArray(value.urls);
 }
 
 export function hasDiscoveryCredits(item: ItemDefinition): boolean {
   const credits: unknown = item.credits;
-  return Array.isArray(credits) && credits.every(isCreditEntry);
+  return Array.isArray(credits) && credits.every(hasCreditEntryStructure);
 }
 
 export function toDiscoveryCandidate(

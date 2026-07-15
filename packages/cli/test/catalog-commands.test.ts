@@ -2,6 +2,7 @@ import { createCatalog, createPaletteCatalog, type ItemDefinition } from '@lpc-t
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   getCatalogItem,
@@ -13,6 +14,8 @@ import { parseArgs } from '../src/args.js';
 import { createDirectoryAssetStore } from '../src/asset-store.js';
 import { createRuntimeContext } from '../src/context.js';
 import type { RuntimeAssets } from '../src/runtime-assets.js';
+
+const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
 function createRuntime(cwd: string): RuntimeAssets {
   const assetsRoot = path.join(cwd, 'assets');
@@ -313,6 +316,76 @@ describe('catalog commands', () => {
     expect(animationResponse.errors[0]?.details?.available).toHaveLength(10);
     expect(licenseResponse.errors[0]?.details?.suggestions?.[0]).toBe('OGA-BY 4.0');
     expect(licenseResponse.errors[0]?.details?.available).toHaveLength(10);
+  });
+
+  it('preserves active GPL 3.0+ credits in filtered summaries and item detail', () => {
+    const runtime = createRuntime(repositoryRoot);
+    const listResponse = runCatalogCommand(
+      parseArgs([
+        'catalog', 'items', '--type', 'hair', '--search', 'Large Curls',
+        '--license', 'GPL', '--all',
+      ]),
+      runtime,
+    );
+    const detailResponse = runCatalogCommand(
+      parseArgs(['catalog', 'item', 'hair_curls_large']),
+      runtime,
+    );
+
+    expect(listResponse).toMatchObject({
+      ok: true,
+      data: {
+        items: [
+          {
+            itemId: 'hair_curls_large',
+            licenses: ['CC-BY', 'OGA-BY', 'GPL'],
+          },
+          {
+            itemId: 'hair_curls_large_xlong',
+            licenses: ['CC-BY', 'OGA-BY', 'GPL'],
+          },
+        ],
+      },
+      errors: [],
+    });
+    expect(detailResponse).toMatchObject({
+      ok: true,
+      data: {
+        item: {
+          itemId: 'hair_curls_large',
+          licenses: ['CC-BY', 'OGA-BY', 'GPL'],
+          credits: [{
+            file: 'hair/curls_large',
+            notes: '',
+            authors: ['JaidynReiman'],
+            licenses: ['OGA-BY 3.0+', 'CC-BY 3.0+', 'GPL 3.0+'],
+            urls: ['https://opengameart.org/content/lpc-expanded-xlong-hair'],
+          }],
+        },
+      },
+      errors: [],
+    });
+  });
+
+  it('preserves unmapped active raw licenses without inventing summary groups', () => {
+    const response = runCatalogCommand(
+      parseArgs(['catalog', 'item', 'neck_scarf']),
+      createRuntime(repositoryRoot),
+    );
+
+    expect(response).toMatchObject({
+      ok: true,
+      data: {
+        item: {
+          itemId: 'neck_scarf',
+          licenses: ['CC-BY-SA', 'GPL'],
+          credits: [{
+            licenses: ['OGA-SA 3.0', 'CC-BY-SA 3.0', 'GPL 2.0', 'GPL 3.0'],
+          }],
+        },
+      },
+      errors: [],
+    });
   });
 
   it.each([
