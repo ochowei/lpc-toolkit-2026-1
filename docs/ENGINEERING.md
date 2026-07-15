@@ -31,8 +31,9 @@ The command runs these stages in order:
 1. prepare the pinned web asset snapshot;
 2. verify the release, fixture, and dormant-gitlink source pins;
 3. run `check:boundaries`;
-4. typecheck every workspace package;
-5. run every workspace package's Vitest suite.
+4. run `verify:plugin`;
+5. typecheck every workspace package;
+6. run every workspace package's Vitest suite.
 
 This is the same entry point used by the main CI unit job. It does not include
 the production build, browser E2E, isolated upstream parity, cross-platform CLI
@@ -44,6 +45,7 @@ package validation, or npm publication.
 | --- | --- |
 | `rtk pnpm install --frozen-lockfile` | Install exactly the locked workspace dependencies. |
 | `rtk pnpm verify` | Run the common asset, boundary, type, and unit-test gate. |
+| `rtk pnpm verify:plugin` | Validate Codex plugin structure and skill contracts. |
 | `rtk pnpm build` | Build core, presets, web assets/Vite output, and the CLI package. |
 | `rtk pnpm check:boundaries` | Enforce the executable dependency policy. |
 | `rtk pnpm run typecheck` | Typecheck all workspace packages. |
@@ -99,6 +101,13 @@ rtk pnpm --filter @lpc-toolkit/cli build
 rtk pnpm --filter @lpc-toolkit/cli test:package
 ```
 
+### Codex plugin
+
+```sh
+rtk pnpm verify:plugin
+rtk pnpm --filter @lpc-toolkit/cli test -- plugin-contract.test.ts
+```
+
 #### CLI documentation synchronization
 
 For a CLI behavior change, update only the documents whose owned contract
@@ -150,7 +159,7 @@ Never point this variable at the repository's tracked `upstream/` directory.
 
 | GitHub Actions job | Local equivalent or scope |
 | --- | --- |
-| `Unit tests` | `pnpm verify` |
+| `Unit tests` | `pnpm verify`, including Codex plugin structure and skill contracts |
 | `CLI package` | CLI typecheck, tests, build, and `test:package` |
 | `E2E (web)` | Web `test:e2e` with ordinary local assets |
 | `E2E parity (web)` | A separately provisioned pinned checkout plus `test:e2e:parity` |

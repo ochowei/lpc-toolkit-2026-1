@@ -1,0 +1,6 @@
+interface:
+  display_name: "LPC Character Authoring"
+  short_description: "Create and render attributed LPC characters"
+  default_prompt: "Create an LPC character, preview it, and render the requested attributed artifacts."
+policy:
+  allow_implicit_invocation: true

@@ -120,6 +120,36 @@ metadata plus TXT and CSV attribution. See
 usage, cache locations, local asset precedence, output defaults, and
 troubleshooting.
 
+### Codex Plugin
+
+1. Install or upgrade the CLI to the range supported by plugin `0.1.0`:
+
+```sh
+npm install -g '@lpc-toolkit/cli@>=0.1.3-alpha-1 <0.2.0'
+```
+
+2. Add the repository marketplace once:
+
+```sh
+codex plugin marketplace add ochowei/lpc-toolkit-2026-1
+```
+
+3. Install or enable the plugin:
+
+```sh
+codex plugin add lpc-toolkit@lpc-toolkit
+```
+
+The plugin requires an installed compatible `lpc-toolkit` CLI and does not
+automatically install the CLI. Its supported CLI range is
+`>=0.1.3-alpha-1 <0.2.0`. Restart the ChatGPT desktop app or start a new Codex
+task if the newly installed skill is not visible. Public Plugins Directory
+distribution can later remove the marketplace-add step.
+
+The plugin guides Codex through JSON search, edit, validate, preview, and render
+workflows. Preview, render, and export outputs preserve metadata plus TXT and
+CSV credits.
+
 The CLI performs first-time asset preparation from a pinned release download,
 verifies checksums, and stores a platform cache. Later commands rely on
 verified cache reuse. A valid offline cache needs no network; a missing or invalid

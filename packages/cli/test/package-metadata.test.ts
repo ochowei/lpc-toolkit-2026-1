@@ -291,4 +291,20 @@ process.stdout.write(JSON.stringify([
     expect(readme).not.toContain('lpc-toolkit catalog item braids');
     expect(readme).not.toContain('hair=Braids');
   });
+
+  it('documents the optional Codex plugin installation', () => {
+    const readme = readCliReadme();
+    const cliInstall = "npm install -g '@lpc-toolkit/cli@>=0.1.3-alpha-1 <0.2.0'";
+    const marketplaceAdd = 'codex plugin marketplace add ochowei/lpc-toolkit-2026-1';
+    const pluginAdd = 'codex plugin add lpc-toolkit@lpc-toolkit';
+
+    expect(readme).toContain('Install or upgrade the CLI');
+    expect(readme).toContain(cliInstall);
+    expect(readme.indexOf(cliInstall)).toBeLessThan(readme.indexOf(marketplaceAdd));
+    expect(readme.indexOf(marketplaceAdd)).toBeLessThan(readme.indexOf(pluginAdd));
+    expect(readme).toContain('codex plugin marketplace add ochowei/lpc-toolkit-2026-1');
+    expect(readme).toContain('codex plugin add lpc-toolkit@lpc-toolkit');
+    expect(readme).toContain('requires an installed compatible `lpc-toolkit` CLI');
+    expect(readme).not.toContain('automatically installs the CLI');
+  });
 });

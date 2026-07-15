@@ -1,0 +1,30 @@
+{
+  "name": "lpc-toolkit",
+  "version": "0.1.0",
+  "description": "Create, edit, preview, and render attributed LPC characters through the installed LPC Toolkit CLI.",
+  "author": {
+    "name": "LPC Toolkit maintainers",
+    "url": "https://github.com/ochowei/lpc-toolkit-2026-1"
+  },
+  "homepage": "https://github.com/ochowei/lpc-toolkit-2026-1#command-line-interface",
+  "repository": "https://github.com/ochowei/lpc-toolkit-2026-1",
+  "license": "GPL-3.0-or-later",
+  "keywords": ["lpc", "sprites", "characters", "game-assets", "cli"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "LPC Toolkit",
+    "shortDescription": "Create attributed LPC characters with the CLI",
+    "longDescription": "Guide Codex through catalog search, character editing, validation, visual preview, and attributed sprite rendering with the installed LPC Toolkit CLI.",
+    "developerName": "LPC Toolkit maintainers",
+    "category": "Developer Tools",
+    "capabilities": ["Read", "Write"],
+    "websiteURL": "https://github.com/ochowei/lpc-toolkit-2026-1",
+    "defaultPrompt": [
+      "Create an LPC character from the farmer preset and help me refine the outfit.",
+      "Change my LPC character's hair, preview it, and render an attributed ZIP bundle."
+    ],
+    "brandColor": "#315B3A",
+    "composerIcon": "./assets/icon.svg",
+    "logo": "./assets/logo.svg"
+  }
+}
