@@ -70,13 +70,15 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
   {
     command: [],
     usage: 'lpc-toolkit <command> [options]',
-    description: 'Compose, inspect, and render attributed LPC character sprites.',
+    description: 'Compose, discover, inspect, and render attributed LPC character sprites.',
     options: [HELP_OPTION],
     examples: [
       'lpc-toolkit --version',
       'lpc-toolkit -V',
       'lpc-toolkit catalog types',
       'lpc-toolkit character create hero',
+      'lpc-toolkit character search hero --type hair --query braid --limit 20 --json',
+      'lpc-toolkit catalog item hair_braid --json',
     ],
   },
   {
@@ -84,7 +86,11 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
     usage: 'lpc-toolkit catalog <command>',
     description: 'Inspect the LPC asset catalog.',
     options: [HELP_OPTION],
-    examples: ['lpc-toolkit catalog types', 'lpc-toolkit catalog items --type hair', 'lpc-toolkit catalog item hair/braid'],
+    examples: [
+      'lpc-toolkit catalog types',
+      'lpc-toolkit catalog items --type hair --limit 20 --json',
+      'lpc-toolkit catalog item hair_braid --json',
+    ],
   },
   {
     command: ['catalog', 'types'],
@@ -107,14 +113,14 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
       { name: 'license', kind: 'value', valueLabel: 'license', description: 'Filter by license.' },
       ...DISCOVERY_OPTIONS,
     ],
-    examples: ['lpc-toolkit catalog items --type hair'],
+    examples: ['lpc-toolkit catalog items --type hair --limit 20 --json'],
   },
   {
     command: ['catalog', 'item'],
     usage: 'lpc-toolkit catalog item <item-id-or-type/name>',
     description: 'Show one catalog item.',
     options: [HELP_OPTION, JSON_OPTION],
-    examples: ['lpc-toolkit catalog item hair/braid'],
+    examples: ['lpc-toolkit catalog item hair_braid --json'],
   },
   {
     command: ['selection'],
@@ -253,7 +259,9 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
       { name: 'query', kind: 'value', valueLabel: 'text', description: 'Filter matching items.' },
       ...DISCOVERY_OPTIONS,
     ],
-    examples: ['lpc-toolkit character search hero --type hair --query braid'],
+    examples: [
+      'lpc-toolkit character search hero --type hair --query braid --limit 20 --json',
+    ],
   },
   {
     command: ['character', 'set'],

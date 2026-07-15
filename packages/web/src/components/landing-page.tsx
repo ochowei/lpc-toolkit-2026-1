@@ -10,6 +10,11 @@ const installCommands = [
   'npx @lpc-toolkit/cli --help',
 ] as const;
 
+const developmentInstallCommands = [
+  'rtk pnpm --filter @lpc-toolkit/cli pack --pack-destination /tmp',
+  'npm install -g /tmp/lpc-toolkit-cli-0.1.4-beta-1.tgz',
+] as const;
+
 const characterSteps = [
   {
     title: 'Create a starting character',
@@ -18,12 +23,18 @@ const characterSteps = [
   },
   {
     title: 'Search compatible items',
-    description: 'Find hair choices that work with the stored character.',
-    command: 'lpc-toolkit character search hero --type hair --query braid',
+    description: 'Request a bounded JSON page of hair choices for the stored character.',
+    command:
+      'lpc-toolkit character search hero --type hair --query braid --limit 20 --json',
+  },
+  {
+    title: 'Inspect exact credits',
+    description: 'Review the selected item and its complete raw credit entries.',
+    command: 'lpc-toolkit catalog item hair_braid --json',
   },
   {
     title: 'Update the character',
-    description: 'Select the braid and apply a brown recolor.',
+    description: 'After reviewing credits, select the braid and apply a brown recolor.',
     command:
       'lpc-toolkit character set hero --type hair --item hair_braid --recolor lpcr.brown',
   },
@@ -53,7 +64,7 @@ const secondaryCommandGroups = [
     title: 'Explore and share',
     commands: [
       'lpc-toolkit catalog types',
-      'lpc-toolkit catalog items --type hair',
+      'lpc-toolkit catalog items --type hair --limit 20 --json',
       'lpc-toolkit token encode --selection selection.json',
       'lpc-toolkit web',
     ],
@@ -98,6 +109,17 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               </code>
             ))}
           </div>
+          <p className="mt-5 max-w-2xl text-sm text-text-2">
+            The agent workflow below targets the locally packed development CLI.
+            0.1.4-beta-1 is a development version and is not published to npm.
+          </p>
+          <div className="mt-3 space-y-3">
+            {developmentInstallCommands.map((command) => (
+              <code key={command} className={codeClassName}>
+                {command}
+              </code>
+            ))}
+          </div>
         </section>
 
         <section className="rounded-md border border-border bg-surface p-5">
@@ -133,6 +155,13 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               </li>
             ))}
           </ol>
+          <p className="mt-5 text-sm text-text-2">
+            Searches return 20 items by default. When
+            <code className="mx-1">page.hasMore</code> is true, continue with
+            <code className="mx-1">--offset page.nextOffset</code>. Restart from
+            offset zero after changing the catalog source, custom overlay, query
+            filters, or character selection.
+          </p>
         </section>
 
         <section className="rounded-md border border-border bg-surface p-5">

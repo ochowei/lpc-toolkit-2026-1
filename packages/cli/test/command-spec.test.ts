@@ -60,6 +60,24 @@ describe('helpForCommand', () => {
       expect(help).toContain('--all');
     }
   });
+
+  it('shows the bounded two-stage discovery workflow in help examples', () => {
+    const rootHelp = helpForCommand([]);
+    expect(rootHelp).toContain(
+      'lpc-toolkit character search hero --type hair --query braid --limit 20 --json',
+    );
+    expect(rootHelp).toContain('lpc-toolkit catalog item hair_braid --json');
+
+    expect(helpForCommand(['catalog', 'items'])).toContain(
+      'lpc-toolkit catalog items --type hair --limit 20 --json',
+    );
+    expect(helpForCommand(['catalog', 'item'])).toContain(
+      'lpc-toolkit catalog item hair_braid --json',
+    );
+    expect(helpForCommand(['character', 'search'])).toContain(
+      'lpc-toolkit character search hero --type hair --query braid --limit 20 --json',
+    );
+  });
 });
 
 describe('validateCommandOptions', () => {

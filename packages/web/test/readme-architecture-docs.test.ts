@@ -351,6 +351,17 @@ describe('architecture ownership contract', () => {
       expect(architecture).toContain(phrase);
     }
   });
+
+  it('documents deterministic CLI discovery and exact credit ownership', () => {
+    for (const pattern of [
+      /bounded discovery\s+summaries/,
+      /deterministic pagination/,
+      /exact\s+raw credits/,
+      /must not duplicate discovery logic/,
+    ]) {
+      expect(architecture).toMatch(pattern);
+    }
+  });
 });
 
 describe('audit closure contract', () => {
