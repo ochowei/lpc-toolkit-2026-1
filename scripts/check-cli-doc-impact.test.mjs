@@ -279,10 +279,22 @@ describe('repository integration', () => {
       'utf8',
     );
 
+    assert.match(
+      workflow,
+      /^  pull_request:\n    types: \[opened, synchronize, reopened, edited\]$/mu,
+    );
     assert.match(workflow, /^  cli-docs-impact:$/mu);
     assert.match(workflow, /^    name: CLI documentation impact$/mu);
     assert.match(workflow, /^    if: github\.event_name == 'pull_request'$/mu);
     assert.match(workflow, /^          fetch-depth: 0$/mu);
     assert.match(workflow, /^      - run: node scripts\/check-cli-doc-impact\.mjs$/mu);
+    assert.match(
+      workflow,
+      /^  changes:\n    name: Detect changes\n    if: github\.event_name != 'pull_request' \|\| github\.event\.action != 'edited'$/mu,
+    );
+    assert.match(
+      workflow,
+      /^  unit:\n    name: Unit tests\n    if: github\.event_name != 'pull_request' \|\| github\.event\.action != 'edited'$/mu,
+    );
   });
 });

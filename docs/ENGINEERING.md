@@ -171,6 +171,11 @@ failure locally, save the PR description to a file and run:
 rtk pnpm check:cli-docs-impact -- --base <base-sha> --head <head-sha> --body-file <pr-body-file>
 ```
 
+Editing the pull request body creates a fresh documentation-impact check. That
+`edited` event runs only this policy job; unit, package, and E2E jobs remain
+skipped. Do not rerun the old failed job after correcting the declaration,
+because the rerun retains its original pull-request event context.
+
 The Agent plan/handoff matrix remains the semantic completeness check: CI can
 prove that a declared surface appears in the diff, but cannot infer every
 surface that ought to have been declared.
