@@ -1,30 +1,31 @@
 import {
-  getRecolorVariants,
+  BODY_TYPES,
   type AnimationName,
   type BodyType,
   type Catalog,
   type ItemDefinition,
-  type ItemId,
   type PaletteMetadata,
   type TypeName,
 } from '@lpc-toolkit/core';
 import { flagString, type ParsedArgs } from './args.js';
+import {
+  discoverItems,
+  editDistance,
+  readDiscoveryPagination,
+  toDiscoveryCandidate,
+  toDiscoveryDetail,
+  type DiscoveryItemDetail,
+  type DiscoveryItemSummary,
+  type DiscoveryPagination,
+  type DiscoveryResult,
+} from './catalog-discovery.js';
 import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
-import { commandError, commandOk, type CliResponse } from './response.js';
+import { commandError, commandOk, type CliIssue, type CliResponse } from './response.js';
 import type { RuntimeAssets } from './runtime-assets.js';
 
 export interface CatalogTypesData {
   readonly typeNames: readonly TypeName[];
   readonly count: number;
-}
-
-export interface CatalogItemSummary {
-  readonly itemId: ItemId;
-  readonly typeName: TypeName;
-  readonly name: string;
-  readonly variants: readonly string[];
-  readonly recolors: readonly string[];
-  readonly animations: readonly AnimationName[];
 }
 
 export interface CatalogItemsOptions {
@@ -33,20 +34,12 @@ export interface CatalogItemsOptions {
   readonly bodyType?: BodyType;
   readonly animation?: AnimationName;
   readonly license?: string;
-  readonly palettes?: PaletteMetadata;
+  readonly palettes: PaletteMetadata;
+  readonly pagination: DiscoveryPagination;
 }
 
 export function listCatalogTypes(catalog: Catalog): CatalogTypesData {
   return { typeNames: catalog.typeNames, count: catalog.typeNames.length };
-}
-
-function itemSupportsBodyType(item: ItemDefinition, bodyType: BodyType): boolean {
-  for (let n = 1; n < 10; n++) {
-    const layer = item[`layer_${n}`];
-    if (!layer) break;
-    if (typeof layer[bodyType] === 'string') return true;
-  }
-  return false;
 }
 
 function stringArray(value: unknown): readonly string[] {
@@ -73,59 +66,42 @@ function itemMatchesLicense(item: ItemDefinition, licenseFilter: string): boolea
   if (!normalizedFilter) return true;
 
   return itemLicenses(item).some((license) => {
-      const normalizedLicense = license.toLowerCase();
-      return (
-        normalizedLicense === normalizedFilter ||
-        normalizedLicense.startsWith(`${normalizedFilter} `)
-      );
-    });
-}
-
-function toCatalogItemSummary(
-  item: ItemDefinition,
-  palettes?: PaletteMetadata,
-): CatalogItemSummary | undefined {
-  if (!item.itemId) return undefined;
-  return {
-    itemId: item.itemId,
-    typeName: item.type_name,
-    name: item.name,
-    variants: stringArray(item.variants),
-    recolors: palettes ? getRecolorVariants(item, palettes) : [],
-    animations: itemAnimations(item),
-  };
+    const normalizedLicense = license.toLowerCase();
+    return (
+      normalizedLicense === normalizedFilter ||
+      normalizedLicense.startsWith(`${normalizedFilter} `)
+    );
+  });
 }
 
 export function listCatalogItems(
   catalog: Catalog,
   options: CatalogItemsOptions,
-): { readonly items: readonly CatalogItemSummary[] } {
-  const haystack = options.typeName
+): DiscoveryResult<DiscoveryItemSummary> {
+  const definitions = options.typeName
     ? catalog.byTypeName.get(options.typeName) ?? []
     : [...catalog.byItemId.values()];
-  const search = options.search?.toLowerCase();
-  const items: CatalogItemSummary[] = [];
-
-  for (const item of haystack) {
-    if (search && !item.name.toLowerCase().includes(search)) continue;
-    if (options.bodyType && !itemSupportsBodyType(item, options.bodyType)) continue;
-    if (options.animation && !itemAnimations(item).includes(options.animation)) continue;
-    if (options.license && !itemMatchesLicense(item, options.license)) continue;
-
-    const summary = toCatalogItemSummary(item, options.palettes);
-    if (summary) items.push(summary);
-  }
-
-  return { items };
+  const candidates = definitions.flatMap((item) => {
+    if (options.animation && !itemAnimations(item).includes(options.animation)) return [];
+    if (options.license && !itemMatchesLicense(item, options.license)) return [];
+    const candidate = toDiscoveryCandidate(item, options.palettes);
+    if (!candidate) return [];
+    if (options.bodyType && !candidate.summary.supportedBodyTypes.includes(options.bodyType)) return [];
+    return [candidate];
+  });
+  return discoverItems(candidates, {
+    ...(options.search === undefined ? {} : { query: options.search }),
+    pagination: options.pagination,
+  });
 }
 
 export function getCatalogItem(
   catalog: Catalog,
   itemIdOrTypeName: string,
-  palettes?: PaletteMetadata,
-): CatalogItemSummary | undefined {
+  palettes: PaletteMetadata,
+): DiscoveryItemDetail | undefined {
   const byItemId = catalog.byItemId.get(itemIdOrTypeName);
-  if (byItemId) return toCatalogItemSummary(byItemId, palettes);
+  if (byItemId) return toDiscoveryDetail(byItemId, palettes);
 
   const slash = itemIdOrTypeName.indexOf('/');
   if (slash < 0) return undefined;
@@ -135,7 +111,53 @@ export function getCatalogItem(
   const item = catalog.byTypeName
     .get(typeName)
     ?.find((candidate) => candidate.itemId === nameOrItemId || candidate.name === nameOrItemId);
-  return item ? toCatalogItemSummary(item, palettes) : undefined;
+  return item ? toDiscoveryDetail(item, palettes) : undefined;
+}
+
+function domainIssue(
+  code: string,
+  domainName: string,
+  value: string,
+  candidates: readonly string[],
+): CliIssue {
+  const available = [...new Set(candidates)]
+    .sort((left, right) => left < right ? -1 : left > right ? 1 : 0)
+    .slice(0, 10);
+  const suggestions = [...new Set(candidates)]
+    .map((candidate) => ({ candidate, distance: editDistance(value, candidate) }))
+    .sort((left, right) => left.distance - right.distance
+      || (left.candidate < right.candidate ? -1 : left.candidate > right.candidate ? 1 : 0))
+    .slice(0, 5)
+    .map(({ candidate }) => candidate);
+  return {
+    code,
+    message: `Unknown ${domainName}: ${value}`,
+    path: value,
+    details: { suggestions, available },
+  };
+}
+
+function filterIssue(
+  catalog: Catalog,
+  options: Omit<CatalogItemsOptions, 'pagination' | 'palettes'>,
+): CliIssue | undefined {
+  const available = <T extends string>(values: readonly T[]) => [...new Set(values)].sort().slice(0, 10);
+  if (options.typeName && !catalog.byTypeName.has(options.typeName)) {
+    return domainIssue('unknown_type_name', 'type name', options.typeName, catalog.typeNames);
+  }
+  if (options.bodyType && !BODY_TYPES.includes(options.bodyType as (typeof BODY_TYPES)[number])) {
+    return domainIssue('body_type_invalid', 'body type', options.bodyType, BODY_TYPES);
+  }
+  const items = [...catalog.byItemId.values()];
+  const animations = available(items.flatMap((item) => itemAnimations(item)));
+  if (options.animation && !animations.includes(options.animation)) {
+    return domainIssue('unknown_animation', 'animation', options.animation, animations);
+  }
+  const licenses = available(items.flatMap((item) => itemLicenses(item)));
+  if (options.license && !items.some((item) => itemMatchesLicense(item, options.license!))) {
+    return domainIssue('unknown_license', 'license', options.license, licenses);
+  }
+  return undefined;
 }
 
 export function runCatalogCommand(
@@ -160,16 +182,23 @@ export function runCatalogCommand(
     const bodyType = flagString(parsed.flags, 'body-type');
     const animation = flagString(parsed.flags, 'animation');
     const license = flagString(parsed.flags, 'license');
+    const pagination = readDiscoveryPagination(parsed.flags);
+    const options = {
+      ...(typeName ? { typeName } : {}),
+      ...(search ? { search } : {}),
+      ...(bodyType ? { bodyType } : {}),
+      ...(animation ? { animation } : {}),
+      ...(license ? { license } : {}),
+    };
+    const issue = filterIssue(catalog.catalog, options);
+    if (issue) return commandError('catalog items', issue, warnings);
 
     return commandOk(
       'catalog items',
       listCatalogItems(catalog.catalog, {
-        ...(typeName ? { typeName } : {}),
-        ...(search ? { search } : {}),
-        ...(bodyType ? { bodyType } : {}),
-        ...(animation ? { animation } : {}),
-        ...(license ? { license } : {}),
+        ...options,
         palettes: palettes.palettes,
+        pagination,
       }),
       warnings,
     );

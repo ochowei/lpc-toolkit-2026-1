@@ -1,4 +1,4 @@
-import { createCatalog, type ItemDefinition } from '@lpc-toolkit/core';
+import { createCatalog, createPaletteCatalog, type ItemDefinition } from '@lpc-toolkit/core';
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -70,6 +70,8 @@ const hat: ItemDefinition = {
   layer_1: { zPos: 60, male: 'hat/cap/' },
 };
 
+const palettes = createPaletteCatalog({}).palettes;
+
 describe('catalog commands', () => {
   const catalog = createCatalog({
     'body/body.json': body,
@@ -89,22 +91,74 @@ describe('catalog commands', () => {
         bodyType: 'male',
         animation: 'walk',
         license: 'GPL',
+        pagination: { all: false, limit: 20, offset: 0 },
+        palettes,
       }).items,
     ).toEqual([
       {
         itemId: 'braids',
         typeName: 'hair',
         name: 'Braids',
+        supportedBodyTypes: ['male'],
         variants: ['brown'],
         recolors: [],
         animations: ['walk'],
+        licenses: ['GPL'],
+        creditCount: 1,
       },
     ]);
   });
 
   it('gets one catalog item by item id or type/name', () => {
-    expect(getCatalogItem(catalog, 'braids')?.itemId).toBe('braids');
-    expect(getCatalogItem(catalog, 'hair/Braids')?.itemId).toBe('braids');
+    expect(getCatalogItem(catalog, 'braids', palettes)?.itemId).toBe('braids');
+    expect(getCatalogItem(catalog, 'hair/Braids', palettes)?.itemId).toBe('braids');
+  });
+
+  it('defaults broad discovery to twenty items', () => {
+    const largeCatalog = createCatalog(Object.fromEntries(
+      Array.from({ length: 22 }, (_, index) => [
+        `hair/item-${index}.json`,
+        { ...hair, name: `Hair ${index}` },
+      ]),
+    )).catalog;
+    const result = listCatalogItems(largeCatalog, {
+      pagination: { all: false, limit: 20, offset: 0 },
+      palettes,
+    });
+
+    expect(result.items).toHaveLength(20);
+    expect(result.page).toMatchObject({ total: 22, nextOffset: 20 });
+  });
+
+  it('returns a bounded first page and a non-overlapping second page', () => {
+    const first = listCatalogItems(catalog, {
+      pagination: { all: false, limit: 1, offset: 0 },
+      palettes,
+    });
+    const second = listCatalogItems(catalog, {
+      pagination: { all: false, limit: 1, offset: 1 },
+      palettes,
+    });
+
+    expect(first.items).toHaveLength(1);
+    expect(first.page.nextOffset).toBe(1);
+    expect(second.items[0]?.itemId).not.toBe(first.items[0]?.itemId);
+    expect(second.page.total).toBe(first.page.total);
+  });
+
+  it('returns summary licenses and complete item credits', () => {
+    const summary = listCatalogItems(catalog, {
+      typeName: 'hair',
+      pagination: { all: false, limit: 20, offset: 0 },
+      palettes,
+    }).items[0];
+
+    expect(summary).toMatchObject({
+      supportedBodyTypes: ['male'],
+      licenses: ['GPL'],
+      creditCount: 1,
+    });
+    expect(getCatalogItem(catalog, 'braids', palettes)?.credits).toEqual(hair.credits);
   });
 
   it('returns catalog item command responses', () => {
@@ -157,5 +211,22 @@ describe('catalog commands', () => {
 
     expect(response.ok).toBe(true);
     expect(response.command).toBe('catalog items');
+  });
+
+  it.each([
+    ['type', 'haair', 'unknown_type_name'],
+    ['body-type', 'centaur', 'body_type_invalid'],
+    ['animation', 'wolk', 'unknown_animation'],
+    ['license', 'GQP', 'unknown_license'],
+  ])('returns bounded filter guidance for unknown --%s', (flag, value, code) => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-catalog-'));
+    const response = runCatalogCommand(
+      parseArgs(['catalog', 'items', `--${flag}`, value, '--json']),
+      createRuntime(cwd),
+    );
+
+    expect(response.errors[0]).toMatchObject({ code });
+    expect(response.errors[0]?.details?.suggestions?.length ?? 0).toBeLessThanOrEqual(5);
+    expect(response.errors[0]?.details?.available?.length ?? 0).toBeLessThanOrEqual(10);
   });
 });
