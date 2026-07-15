@@ -14,14 +14,23 @@ lpc-toolkit character create hero --selection hero.json --preset farmer --json
 
 ## Search And Edit
 
-Search one type with a narrow text query. Read the returned `itemId`, variants,
-recolors, animations, and licenses before editing.
+Search one type with a narrow text query and a bounded page. Inspect `page` and
+fetch another page with its returned `nextOffset` only when the current results
+are insufficient. After choosing an `itemId`, fetch its detail and inspect the
+exact credits before editing.
 
 ```sh
-lpc-toolkit character search --selection hero.json --type hair --query braid --json
+lpc-toolkit character search --selection hero.json --type hair --query braid --limit 20 --json
+lpc-toolkit character search --selection hero.json --type hair --query braid --limit 20 --offset <nextOffset> --json
+lpc-toolkit catalog item hair_braid --json
 lpc-toolkit character set --selection hero.json --type hair --item hair_braid --recolor lpcr.brown --json
 lpc-toolkit character validate --selection hero.json --json
 ```
+
+The search summary provides `itemId`, variants, recolors, animations, license
+families, and credit count. Restart at offset zero after changing the catalog
+source, custom overlay, query filters, or character selection; offsets only
+continue an unchanged result set.
 
 Use `character remove` only for a currently selected type. Resolve one
 structured error at a time, using `details.suggestions` and `details.available`.
