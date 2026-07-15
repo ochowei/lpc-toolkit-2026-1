@@ -896,7 +896,7 @@ Record the full hash, implementation note, and exact RED/GREEN results in this t
 - Consumes: Task 1 `DiscoveryPagination`, summary projection, and `discoverItems`.
 - Produces: `CharacterSearchInput.pagination`; paged `CharacterSearchResult` with preserved `count`, `licenses`, and `replacesCurrent`; `compatibleBodyType`; human next-offset and suggestion formatting.
 
-- [ ] **Step 1: Write failing character and human-output tests**
+- [x] **Step 1: Write failing character and human-output tests**
 
 Add assertions equivalent to:
 
@@ -937,7 +937,7 @@ expect(await runHuman([
 
 In `response.test.ts`, create a paged command response and assert the header reports current-page versus total counts and no next-offset line appears when `hasMore` is false.
 
-- [ ] **Step 2: Run focused tests to verify RED**
+- [x] **Step 2: Run focused tests to verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- character-editor.test.ts character-commands.test.ts response.test.ts main-human.test.ts
@@ -945,7 +945,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- character-editor.test.ts character-co
 
 Expected: FAIL because character search has no pagination input/page/compatible-body field and human formatting ignores page metadata.
 
-- [ ] **Step 3: Implement character pagination**
+- [x] **Step 3: Implement character pagination**
 
 In `character-editor.ts`, replace duplicate summary projection with Task 1 helpers and define:
 
@@ -1028,7 +1028,7 @@ pagination: readDiscoveryPagination(parsed.flags),
 
 to `searchCharacterItems`.
 
-- [ ] **Step 4: Implement page-aware human formatting**
+- [x] **Step 4: Implement page-aware human formatting**
 
 In `response.ts`, add:
 
@@ -1079,7 +1079,7 @@ Update catalog and character search headers through `formatDiscoveryCount`, then
 
 This keeps an empty search successful while exposing bounded suggestions.
 
-- [ ] **Step 5: Run focused tests and typecheck to verify GREEN**
+- [x] **Step 5: Run focused tests and typecheck to verify GREEN**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- character-editor.test.ts character-commands.test.ts response.test.ts main-human.test.ts catalog-commands.test.ts
@@ -1088,7 +1088,7 @@ rtk pnpm --filter @lpc-toolkit/cli run typecheck
 
 Expected: PASS with preserved character fields, bounded pages, and actionable human output.
 
-- [ ] **Step 6: Commit Task 4 and record evidence**
+- [x] **Step 6: Commit Task 4 and record evidence**
 
 ```sh
 rtk git add packages/cli/src/character-editor.ts packages/cli/src/character-commands.ts packages/cli/src/response.ts packages/cli/test/character-editor.test.ts packages/cli/test/character-commands.test.ts packages/cli/test/response.test.ts packages/cli/test/main-human.test.ts
@@ -1097,6 +1097,21 @@ rtk git rev-parse HEAD
 ```
 
 Record the full hash, implementation note, and exact RED/GREEN results in this task, check the boxes, and commit the plan record as `docs(plan): record CLI discovery Task 4`.
+
+- Implementation: Routed character search through the shared discovery
+  projection and paginator; preserved total `count`, grouped licenses, and
+  `replacesCurrent`; added `compatibleBodyType`, shared summary fields, and
+  bounded unknown-type recovery; and made catalog/character human output report
+  returned-of-total counts, next offsets, successful empty-search suggestions,
+  supported body types, license groups, and credit counts.
+- Commit: 1a02dff9dc2d4f0d192b0bd0685ebd540f2522ff
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- character-editor.test.ts character-commands.test.ts response.test.ts main-human.test.ts`
+  FAIL (expected RED: 4 files failed, 7 tests failed and 47 passed; failures
+  showed missing character pagination/body summary and unknown-type errors plus
+  human formatting that ignored page counts, suggestions, and next offsets).
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- character-editor.test.ts character-commands.test.ts response.test.ts main-human.test.ts catalog-commands.test.ts`
+  PASS (5 files, 70 tests).
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
 
 ### Task 5: Align Plugin, Documentation, And Development Version
 
