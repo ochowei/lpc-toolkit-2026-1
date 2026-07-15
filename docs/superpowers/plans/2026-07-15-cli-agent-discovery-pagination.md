@@ -1331,3 +1331,29 @@ stable numeric offset and total.
 - `rtk pnpm --filter @lpc-toolkit/cli test -- catalog-discovery.test.ts main-assets.test.ts main-json.test.ts` PASS (3 files, 66 tests).
 - `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
 - `rtk git diff --check` PASS.
+
+## Post-plan documentation and help synchronization
+
+- [x] Align generated CLI help, stable architecture ownership, and the web
+  landing guide with the bounded two-stage agent discovery workflow.
+  - Implementation: Added bounded JSON search examples and exact-credit detail
+    lookup to generated CLI help; documented CLI ownership of deterministic
+    pagination and attribution detail; added the local `0.1.4-beta-1` install,
+    search/detail/set sequence, and continuation guidance to the landing page.
+    The root README already contained the complete contract and was intentionally
+    left unchanged.
+  - Commit: `e2abf7bde7bd446735497c6c7c88a5642c784c12`
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- command-spec.test.ts`
+    PASS (19 tests); `rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx readme-architecture-docs.test.ts`
+    PASS outside the sandbox (21 tests); `rtk pnpm verify` PASS (CLI 347 passed,
+    1 skipped; web 682 passed, 1 skipped); `rtk pnpm build` PASS.
+  - Help smoke: Built `--help`, `catalog items --help`, `catalog item --help`,
+    and `character search --help` all exited 0 and showed the bounded JSON and
+    exact-credit examples.
+  - Browser QA: The local landing page showed the six workflow steps in order,
+    had no horizontal overflow at 1265 px, and produced no console warnings or
+    errors.
+  - TDD evidence: CLI help coverage and the landing/architecture contracts first
+    failed for the missing guidance, then passed after the implementation. The
+    first sandboxed web test attempt hit the environment's `tsx` IPC `EPERM` and
+    was rerun outside the sandbox.
