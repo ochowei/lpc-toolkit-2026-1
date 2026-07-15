@@ -1298,3 +1298,21 @@ additional spec-traceable fixes.
 - `rtk git diff --name-only 40be133f86f2342a09c5949824bdff36acff7279 -- .github/workflows` PASS: empty output.
 - `rtk git tag --points-at HEAD` PASS: empty output; no development, beta, RC, or stable tag was created.
 - npm publication was not invoked; `0.1.4-beta-1` remains unpublished.
+
+**Review fix:** The compatibility reference now includes the executable local
+pack/install commands, the verbatim unpublished-development statement, and the
+ordinary public stable install boundary. Contract coverage requires all three
+pieces of guidance.
+
+**Review-fix commit:** `e7453adc3a8624baaf5d0598617bf3e3ef3a1864`
+
+**Review-fix verification:**
+
+- `rtk node --test plugins/lpc-toolkit/test/check-cli.test.mjs` FAIL (expected RED: missing local pack command; 10 passed, 1 failed).
+- `rtk node --test plugins/lpc-toolkit/test/check-cli.test.mjs` PASS (11 tests).
+- `rtk pnpm verify:plugin` PASS (17 tests and plugin structure validation).
+- `rtk pnpm --filter @lpc-toolkit/cli test -- package-metadata.test.ts plugin-contract.test.ts` PASS (30 tests).
+- `rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts` PASS outside the sandbox (19 tests; required `tsx` IPC access).
+- `rtk git diff --check` PASS.
+- `rtk git diff --name-only HEAD -- .github/workflows` PASS: empty output before the fix commit.
+- No tag or npm publication command was invoked.
