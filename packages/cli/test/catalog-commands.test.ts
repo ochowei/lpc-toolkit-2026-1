@@ -2,7 +2,6 @@ import { createCatalog, createPaletteCatalog, type ItemDefinition } from '@lpc-t
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   getCatalogItem,
@@ -14,8 +13,6 @@ import { parseArgs } from '../src/args.js';
 import { createDirectoryAssetStore } from '../src/asset-store.js';
 import { createRuntimeContext } from '../src/context.js';
 import type { RuntimeAssets } from '../src/runtime-assets.js';
-
-const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
 function createRuntime(cwd: string): RuntimeAssets {
   const assetsRoot = path.join(cwd, 'assets');
@@ -30,6 +27,65 @@ function createRuntime(cwd: string): RuntimeAssets {
     store,
     source: 'working-directory',
   };
+}
+
+function createLicenseRuntime(): RuntimeAssets {
+  const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-catalog-licenses-'));
+  const definitions = [
+    {
+      path: 'hair/curly/hair_curls_large.json',
+      definition: {
+        name: 'Large Curls',
+        type_name: 'hair',
+        credits: [{
+          file: 'hair/curls_large',
+          notes: '',
+          authors: ['JaidynReiman'],
+          licenses: ['OGA-BY 3.0+', 'CC-BY 3.0+', 'GPL 3.0+'],
+          urls: ['https://opengameart.org/content/lpc-expanded-xlong-hair'],
+        }],
+        layer_1: { zPos: 50, male: 'hair/curls_large/' },
+      },
+    },
+    {
+      path: 'hair/curly/hair_curls_large_xlong.json',
+      definition: {
+        name: 'Large Curls Xlong',
+        type_name: 'hair',
+        credits: [{
+          file: 'hair/curls_large_xlong',
+          notes: '',
+          authors: ['JaidynReiman'],
+          licenses: ['OGA-BY 3.0+', 'CC-BY 3.0+', 'GPL 3.0+'],
+          urls: ['https://opengameart.org/content/lpc-expanded-xlong-hair'],
+        }],
+        layer_1: { zPos: 50, male: 'hair/curls_large_xlong/' },
+      },
+    },
+    {
+      path: 'head/neck/neck_scarf.json',
+      definition: {
+        name: 'Scarf',
+        type_name: 'neck',
+        credits: [{
+          file: 'neck/scarf',
+          notes: '',
+          authors: ['Nila122'],
+          licenses: ['OGA-SA 3.0', 'CC-BY-SA 3.0', 'GPL 2.0', 'GPL 3.0'],
+          urls: ['https://opengameart.org/content/more-lpc-clothes-and-hair'],
+        }],
+        layer_1: { zPos: 55, male: 'neck/scarf/' },
+      },
+    },
+  ] as const;
+
+  for (const record of definitions) {
+    const definitionPath = path.join(cwd, 'assets', 'sheet_definitions', record.path);
+    mkdirSync(path.dirname(definitionPath), { recursive: true });
+    writeFileSync(definitionPath, JSON.stringify(record.definition));
+  }
+
+  return createRuntime(cwd);
 }
 
 const body: ItemDefinition = {
@@ -319,7 +375,7 @@ describe('catalog commands', () => {
   });
 
   it('preserves active GPL 3.0+ credits in filtered summaries and item detail', () => {
-    const runtime = createRuntime(repositoryRoot);
+    const runtime = createLicenseRuntime();
     const listResponse = runCatalogCommand(
       parseArgs([
         'catalog', 'items', '--type', 'hair', '--search', 'Large Curls',
@@ -370,7 +426,7 @@ describe('catalog commands', () => {
   it('preserves unmapped active raw licenses without inventing summary groups', () => {
     const response = runCatalogCommand(
       parseArgs(['catalog', 'item', 'neck_scarf']),
-      createRuntime(repositoryRoot),
+      createLicenseRuntime(),
     );
 
     expect(response).toMatchObject({
