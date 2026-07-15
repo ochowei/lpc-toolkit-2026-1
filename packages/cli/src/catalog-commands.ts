@@ -11,6 +11,7 @@ import { flagString, type ParsedArgs } from './args.js';
 import {
   discoverItems,
   editDistance,
+  hasDiscoveryCredits,
   readDiscoveryPagination,
   toDiscoveryCandidate,
   toDiscoveryDetail,
@@ -141,23 +142,31 @@ function filterIssue(
   catalog: Catalog,
   options: Omit<CatalogItemsOptions, 'pagination' | 'palettes'>,
 ): CliIssue | undefined {
-  const available = <T extends string>(values: readonly T[]) => [...new Set(values)].sort().slice(0, 10);
+  const domain = <T extends string>(values: readonly T[]) => [...new Set(values)].sort();
   if (options.typeName && !catalog.byTypeName.has(options.typeName)) {
     return domainIssue('unknown_type_name', 'type name', options.typeName, catalog.typeNames);
   }
   if (options.bodyType && !BODY_TYPES.includes(options.bodyType as (typeof BODY_TYPES)[number])) {
     return domainIssue('body_type_invalid', 'body type', options.bodyType, BODY_TYPES);
   }
-  const items = [...catalog.byItemId.values()];
-  const animations = available(items.flatMap((item) => itemAnimations(item)));
+  const items = [...catalog.byItemId.values()].filter(hasDiscoveryCredits);
+  const animations = domain(items.flatMap((item) => itemAnimations(item)));
   if (options.animation && !animations.includes(options.animation)) {
     return domainIssue('unknown_animation', 'animation', options.animation, animations);
   }
-  const licenses = available(items.flatMap((item) => itemLicenses(item)));
+  const licenses = domain(items.flatMap((item) => itemLicenses(item)));
   if (options.license && !items.some((item) => itemMatchesLicense(item, options.license!))) {
     return domainIssue('unknown_license', 'license', options.license, licenses);
   }
   return undefined;
+}
+
+function discoveryCreditWarnings(catalog: Catalog): readonly CliIssue[] {
+  return [...catalog.byItemId.values()].flatMap((item) => hasDiscoveryCredits(item) ? [] : [{
+    code: 'catalog_warning',
+    message: 'missing or malformed "credits"; excluded from catalog discovery',
+    path: item.sourcePath ?? item.itemId ?? item.name,
+  }]);
 }
 
 export function runCatalogCommand(
@@ -170,7 +179,11 @@ export function runCatalogCommand(
     context.customSheetDefinitionsRoot,
   );
   const palettes = loadPalettesFromRoot(context.paletteDefinitionsRoot);
-  const warnings = [...catalog.warnings, ...palettes.warnings];
+  const warnings = [
+    ...catalog.warnings,
+    ...palettes.warnings,
+    ...discoveryCreditWarnings(catalog.catalog),
+  ];
 
   if (parsed.command[1] === 'types') {
     return commandOk('catalog types', listCatalogTypes(catalog.catalog), warnings);

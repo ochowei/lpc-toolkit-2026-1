@@ -71,6 +71,49 @@ const hat: ItemDefinition = {
 };
 
 const palettes = createPaletteCatalog({}).palettes;
+const licenses = [
+  'CC0',
+  'CC-BY',
+  'CC-BY 3.0',
+  'CC-BY 3.0+',
+  'CC-BY 4.0',
+  'CC-BY-SA 3.0',
+  'CC-BY-SA 4.0',
+  'OGA-BY 3.0',
+  'OGA-BY 3.0+',
+  'OGA-BY 4.0',
+  'GPL 2.0',
+  'GPL 3.0',
+] as const;
+
+function createDomainRuntime(): RuntimeAssets {
+  const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-catalog-'));
+  const definitionsRoot = path.join(cwd, 'assets', 'sheet_definitions', 'hair');
+  mkdirSync(definitionsRoot, { recursive: true });
+  const animations = [
+    ...Array.from({ length: 10 }, (_, index) => `animation-${index}`),
+    'zz-target',
+  ];
+  animations.forEach((animation, index) => {
+    writeFileSync(
+      path.join(definitionsRoot, `item-${index}.json`),
+      JSON.stringify({
+        name: `Item ${index}`,
+        type_name: 'hair',
+        animations: [animation],
+        credits: [{
+          file: `hair/item-${index}`,
+          notes: '',
+          authors: ['Artist'],
+          licenses: index === 0 ? licenses : ['GPL 3.0'],
+          urls: [],
+        }],
+        layer_1: { zPos: 50, male: `hair/item-${index}/` },
+      }),
+    );
+  });
+  return createRuntime(cwd);
+}
 
 describe('catalog commands', () => {
   const catalog = createCatalog({
@@ -203,14 +246,73 @@ describe('catalog commands', () => {
         layer_1: { zPos: 50, male: 'hair/missing-animations/' },
       }),
     );
-
-    const response = runCatalogCommand(
-      parseArgs(['catalog', 'items', '--license', 'GPL', '--animation', 'walk']),
-      createRuntime(cwd),
+    writeFileSync(
+      path.join(definitionsRoot, 'malformed_credits.json'),
+      JSON.stringify({
+        name: 'Malformed Credits',
+        type_name: 'hair',
+        animations: ['walk'],
+        credits: [{ authors: 'Artist' }],
+        layer_1: { zPos: 50, male: 'hair/malformed-credits/' },
+      }),
     );
 
+    const run = () => runCatalogCommand(parseArgs(['catalog', 'items']), createRuntime(cwd));
+
+    expect(run).not.toThrow();
+    const response = run();
     expect(response.ok).toBe(true);
     expect(response.command).toBe('catalog items');
+    expect(response).toMatchObject({
+      data: {
+        items: [{
+          itemId: 'missing_animations',
+          animations: [],
+          creditCount: 1,
+        }],
+      },
+      warnings: expect.arrayContaining([
+        expect.objectContaining({
+          code: 'catalog_warning',
+          path: 'hair/missing_credits.json',
+        }),
+        expect.objectContaining({
+          code: 'catalog_warning',
+          path: 'hair/malformed_credits.json',
+        }),
+      ]),
+    });
+  });
+
+  it('validates animations against the complete domain before bounding guidance', () => {
+    const response = runCatalogCommand(
+      parseArgs(['catalog', 'items', '--animation', 'zz-target']),
+      createDomainRuntime(),
+    );
+
+    expect(response).toMatchObject({
+      ok: true,
+      data: { items: [{ animations: ['zz-target'] }] },
+      errors: [],
+    });
+  });
+
+  it('computes animation and license suggestions from the complete domains', () => {
+    const runtime = createDomainRuntime();
+
+    const animationResponse = runCatalogCommand(
+      parseArgs(['catalog', 'items', '--animation', 'zz-targat']),
+      runtime,
+    );
+    const licenseResponse = runCatalogCommand(
+      parseArgs(['catalog', 'items', '--license', 'OGA-BY 4.x']),
+      runtime,
+    );
+
+    expect(animationResponse.errors[0]?.details?.suggestions?.[0]).toBe('zz-target');
+    expect(animationResponse.errors[0]?.details?.available).toHaveLength(10);
+    expect(licenseResponse.errors[0]?.details?.suggestions?.[0]).toBe('OGA-BY 4.0');
+    expect(licenseResponse.errors[0]?.details?.available).toHaveLength(10);
   });
 
   it.each([

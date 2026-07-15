@@ -113,11 +113,37 @@ function licenseGroups(item: ItemDefinition): readonly LicenseGroup[] {
   return LICENSE_GROUP_ORDER.filter((group) => present.has(group));
 }
 
+function itemAnimations(item: ItemDefinition): readonly AnimationName[] {
+  const animations: unknown = item.animations;
+  return Array.isArray(animations)
+    ? animations.filter((animation): animation is AnimationName => typeof animation === 'string')
+    : [];
+}
+
+function isStringArray(value: unknown): value is readonly string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
+}
+
+function isCreditEntry(value: unknown): value is CreditEntry {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  if (!('file' in value) || typeof value.file !== 'string') return false;
+  if (!('notes' in value) || typeof value.notes !== 'string') return false;
+  if (!('authors' in value) || !isStringArray(value.authors)) return false;
+  if (!('licenses' in value) || !isStringArray(value.licenses)) return false;
+  if (!value.licenses.every((license) => Object.hasOwn(LICENSE_GROUP_OF, license))) return false;
+  return 'urls' in value && isStringArray(value.urls);
+}
+
+export function hasDiscoveryCredits(item: ItemDefinition): boolean {
+  const credits: unknown = item.credits;
+  return Array.isArray(credits) && credits.every(isCreditEntry);
+}
+
 export function toDiscoveryCandidate(
   item: ItemDefinition,
   palettes: PaletteMetadata,
 ): DiscoveryCandidate<DiscoveryItemSummary> | undefined {
-  if (!item.itemId) return undefined;
+  if (!item.itemId || !hasDiscoveryCredits(item)) return undefined;
   return {
     internalName: item.name,
     summary: {
@@ -127,7 +153,7 @@ export function toDiscoveryCandidate(
       supportedBodyTypes: supportedBodyTypes(item),
       variants: item.variants ?? [],
       recolors: getRecolorVariants(item, palettes),
-      animations: item.animations,
+      animations: itemAnimations(item),
       licenses: licenseGroups(item),
       creditCount: item.credits.length,
     },
