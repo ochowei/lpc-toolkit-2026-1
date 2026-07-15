@@ -498,7 +498,7 @@ rtk git commit -m "docs(plan): record CLI discovery Task 1"
 - Consumes: Task 1 `discoveryPaginationIssue(flags)`.
 - Produces: parsed boolean `--all`; documented `--limit`, `--offset`, and `--all` on both search commands; pre-asset structured pagination rejection.
 
-- [ ] **Step 1: Write failing parser, help, and preflight tests**
+- [x] **Step 1: Write failing parser, help, and preflight tests**
 
 Add these assertions:
 
@@ -536,7 +536,7 @@ it.each([
 });
 ```
 
-- [ ] **Step 2: Run focused tests to verify RED**
+- [x] **Step 2: Run focused tests to verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- args.test.ts command-spec.test.ts main-assets.test.ts
@@ -544,7 +544,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- args.test.ts command-spec.test.ts mai
 
 Expected: FAIL because `--all` is parsed as a value option, discovery flags are unknown, and preflight does not validate their ranges or conflicts.
 
-- [ ] **Step 3: Implement parser, command spec, and preflight**
+- [x] **Step 3: Implement parser, command spec, and preflight**
 
 In `args.ts`, add `all` to `BOOLEAN_FLAGS`:
 
@@ -576,7 +576,7 @@ if (
 }
 ```
 
-- [ ] **Step 4: Run focused tests and typecheck to verify GREEN**
+- [x] **Step 4: Run focused tests and typecheck to verify GREEN**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- args.test.ts command-spec.test.ts main-assets.test.ts catalog-discovery.test.ts
@@ -585,7 +585,7 @@ rtk pnpm --filter @lpc-toolkit/cli run typecheck
 
 Expected: PASS; every invalid pagination invocation avoids `prepareRuntimeAssets`.
 
-- [ ] **Step 5: Commit Task 2 and record evidence**
+- [x] **Step 5: Commit Task 2 and record evidence**
 
 ```sh
 rtk git add packages/cli/src/args.ts packages/cli/src/command-spec.ts packages/cli/src/main.ts packages/cli/test/args.test.ts packages/cli/test/command-spec.test.ts packages/cli/test/main-assets.test.ts
@@ -594,6 +594,18 @@ rtk git rev-parse HEAD
 ```
 
 Record the full hash, implementation note, and exact RED/GREEN results in this task, check the boxes, and commit the plan record as `docs(plan): record CLI discovery Task 2`.
+
+- Implementation: Added boolean `--all` parsing, shared bounded discovery help
+  options for both search commands, and structured pagination preflight validation
+  before runtime asset preparation.
+- Commit: 9c9550c80e0f897fa25d6c63d4c5b388d6b201b6
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- args.test.ts command-spec.test.ts main-assets.test.ts`
+  FAIL (expected RED: 2 files failed, 1 passed; 6 tests failed and 73 passed
+  because discovery help was absent and invalid pagination returned
+  `unknown_option` instead of `invalid_option`).
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- args.test.ts command-spec.test.ts main-assets.test.ts catalog-discovery.test.ts`
+  PASS (4 files, 83 tests).
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
 
 ### Task 3: Integrate Bounded Catalog Search And Item Credits
 
