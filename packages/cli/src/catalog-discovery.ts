@@ -184,9 +184,13 @@ function integerIssue(
 ): CliIssue | undefined {
   if (!flags.has(name)) return undefined;
   const value = flagString(flags, name);
+  const parsed = Number(value);
   const valid = name === 'limit'
     ? value !== undefined && /^[1-9]\d*$/u.test(value) && Number(value) <= MAX_DISCOVERY_LIMIT
-    : value !== undefined && /^(?:0|[1-9]\d*)$/u.test(value);
+    : value !== undefined
+      && /^(?:0|[1-9]\d*)$/u.test(value)
+      && Number.isSafeInteger(parsed)
+      && parsed >= 0;
   return valid ? undefined : {
     code: 'invalid_option',
     message: name === 'limit'

@@ -69,6 +69,27 @@ describe('catalog discovery', () => {
     }).items[0]?.itemId).toBe('z-id');
   });
 
+  it('preserves an offset at total on an empty terminal page', () => {
+    const candidates = [
+      toDiscoveryCandidate({ ...braid, itemId: 'a-id' }, palettes)!,
+      toDiscoveryCandidate({ ...braid, itemId: 'b-id' }, palettes)!,
+    ];
+
+    const result = discoverItems(candidates, {
+      pagination: { all: false, limit: 1, offset: 2 },
+    });
+
+    expect(result.items).toEqual([]);
+    expect(result.page).toEqual({
+      limit: 1,
+      offset: 2,
+      returned: 0,
+      total: 2,
+      hasMore: false,
+      nextOffset: null,
+    });
+  });
+
   it('returns all results explicitly and bounded edit-distance suggestions', () => {
     const candidates = Array.from({ length: 7 }, (_, index) => ({
       summary: {
@@ -109,5 +130,28 @@ describe('catalog discovery', () => {
     expect(discoveryPaginationIssue(parseArgs([
       'catalog', 'items', '--offset', '-1',
     ]).flags)).toMatchObject({ code: 'invalid_option', path: '--offset' });
+  });
+
+  it('accepts the maximum discovery limit', () => {
+    const flags = parseArgs(['catalog', 'items', '--limit', '100']).flags;
+
+    expect(discoveryPaginationIssue(flags)).toBeUndefined();
+    expect(readDiscoveryPagination(flags)).toEqual({
+      all: false,
+      limit: 100,
+      offset: 0,
+    });
+  });
+
+  it('rejects an offset outside the safe integer range', () => {
+    const flags = parseArgs([
+      'catalog', 'items', '--offset', '9'.repeat(400),
+    ]).flags;
+
+    expect(discoveryPaginationIssue(flags)).toMatchObject({
+      code: 'invalid_option',
+      message: '--offset must be a non-negative integer.',
+      path: '--offset',
+    });
   });
 });
