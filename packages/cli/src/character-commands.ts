@@ -14,6 +14,7 @@ import {
   setCharacterItem,
   type CharacterCatalogContext,
 } from './character-editor.js';
+import { readDiscoveryPagination } from './catalog-discovery.js';
 import {
   CharacterStoreError,
   listCharacters,
@@ -306,7 +307,11 @@ export async function runCharacterCommand(
       const query = flagString(parsed.flags, 'query');
       const result = searchCharacterItems(
         stored.parsed.selections,
-        { typeName, ...(query === undefined ? {} : { query }) },
+        {
+          typeName,
+          ...(query === undefined ? {} : { query }),
+          pagination: readDiscoveryPagination(parsed.flags),
+        },
         loaded.editor,
       );
       return commandOk('character search', result, loaded.warnings);
