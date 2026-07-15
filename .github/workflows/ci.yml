@@ -6,6 +6,21 @@ on:
   pull_request:
 
 jobs:
+  cli-docs-impact:
+    name: CLI documentation impact
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/check-cli-doc-impact.mjs
+
   changes:
     name: Detect changes
     runs-on: ubuntu-latest

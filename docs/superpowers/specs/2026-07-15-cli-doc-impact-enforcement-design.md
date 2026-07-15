@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-15
 
-**Status:** Proposed
+**Status:** Approved
 
 ## Purpose
 
@@ -242,7 +242,8 @@ paths that would satisfy it. Diagnostics must not print the complete PR body.
 
 ## Documentation Updates
 
-- `AGENTS.md`: add the mandatory Agent matrix and pre-handoff reassessment.
+- `AGENTS.md` and its identical `CLAUDE.md` mirror: add the mandatory Agent
+  matrix and pre-handoff reassessment.
 - `docs/ENGINEERING.md`: retain the detailed ownership checklist, add the token
   mapping, local reproduction command, and CI behavior.
 - `CONTRIBUTING.md`: explain how to complete the PR declaration and recover
@@ -311,4 +312,3 @@ declaration and a failing missing declaration.
   declarations.
 - The same policy vocabulary is locked by tests across Agent rules,
   contributor guidance, the PR template, and CI.
-

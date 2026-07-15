@@ -15,6 +15,7 @@ const expectedVerifyScript = [
   'pnpm --filter @lpc-toolkit/web prepare-assets',
   'pnpm verify:upstream-pin',
   'pnpm check:boundaries',
+  'pnpm verify:cli-docs-policy',
   'pnpm verify:plugin',
   'pnpm typecheck',
   'pnpm -r test',
@@ -99,6 +100,9 @@ describe('package scripts', () => {
       expectedVerifyScript.indexOf('check:boundaries'),
     );
     expect(expectedVerifyScript.indexOf('check:boundaries')).toBeLessThan(
+      expectedVerifyScript.indexOf('verify:cli-docs-policy'),
+    );
+    expect(expectedVerifyScript.indexOf('verify:cli-docs-policy')).toBeLessThan(
       expectedVerifyScript.indexOf('typecheck'),
     );
     expect(expectedVerifyScript.indexOf('typecheck')).toBeLessThan(

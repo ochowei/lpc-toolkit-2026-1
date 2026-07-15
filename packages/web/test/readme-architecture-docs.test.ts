@@ -13,6 +13,7 @@ const readRepoFileIfExists = (filePath: string) => {
 };
 const rootPackage = JSON.parse(readRepoFile('package.json')) as {
   license: string;
+  scripts: Record<string, string>;
 };
 
 const readme = readRepoFile('README.md');
@@ -25,6 +26,9 @@ const claude = readRepoFile('CLAUDE.md');
 const engineering = readRepoFile('docs/ENGINEERING.md');
 const onboarding = readRepoFile('docs/ONBOARDING.md');
 const releasing = readRepoFileIfExists('docs/RELEASING.md');
+const pullRequestTemplate = readRepoFileIfExists(
+  '.github/pull_request_template.md',
+);
 
 const maintainedDocuments = new Map([
   ['README.md', readme],
@@ -37,6 +41,7 @@ const maintainedDocuments = new Map([
   ['docs/RELEASING.md', releasing],
   ['packages/cli/README.md', cliReadme],
   ['packages/core/README.md', coreReadme],
+  ['.github/pull_request_template.md', pullRequestTemplate],
 ]);
 
 function localMarkdownTargets(filePath: string, source: string): string[] {
@@ -279,6 +284,45 @@ describe('onboarding and engineering ownership contract', () => {
     ]) {
       expect(engineering).toContain(phrase);
     }
+  });
+
+  it('keeps CLI documentation impact enforcement synchronized', () => {
+    for (const phrase of [
+      'CLI docs impact:',
+      'CLI docs surfaces:',
+      'CLI docs reason:',
+    ]) {
+      expect(pullRequestTemplate).toContain(phrase);
+      expect(contributing).toContain(phrase);
+    }
+    expect(pullRequestTemplate).toContain('updated | not-applicable');
+    expect(contributing).toContain(
+      'CLI docs impact: updated | not-applicable',
+    );
+    for (const token of [
+      'help',
+      'cli-readme',
+      'root-readme',
+      'landing',
+      'architecture',
+      'engineering',
+      'releasing',
+      'plugin',
+    ]) {
+      expect(engineering).toContain(`\`${token}\``);
+    }
+    expect(agents).toContain('CLI Documentation Impact');
+    expect(agents).toContain('`update` or `N/A — <reason>`');
+    expect(agents).toContain('before handoff');
+    expect(rootPackage.scripts['check:cli-docs-impact']).toBe(
+      'node scripts/check-cli-doc-impact.mjs',
+    );
+    expect(rootPackage.scripts['verify:cli-docs-policy']).toBe(
+      'node --test scripts/check-cli-doc-impact.test.mjs',
+    );
+    expect(rootPackage.scripts.verify).toContain(
+      'pnpm verify:cli-docs-policy',
+    );
   });
 });
 

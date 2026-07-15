@@ -68,6 +68,24 @@ A pull request should:
 - avoid unrelated formatting or refactoring;
 - keep generated pixels and their matching credits together.
 
+When a pull request changes CLI-sensitive production, packaging, release,
+asset-release, or plugin paths, complete the PR template's machine-readable
+documentation declaration:
+
+```text
+CLI docs impact: updated | not-applicable
+CLI docs surfaces: help, cli-readme, root-readme, landing, architecture, engineering, releasing, plugin | none
+CLI docs reason: required for not-applicable
+```
+
+Use `updated` and list each documentation surface present in the diff. If no
+owned documentation contract changes, use `not-applicable`, set surfaces to
+`none`, and provide a concrete reason of at least 20 characters. The CI failure
+lists the sensitive files and any declaration field or surface that needs
+correction. See the
+[Engineering guide](docs/ENGINEERING.md#cli-documentation-synchronization) for
+the surface mapping and local reproduction command.
+
 Resolve review conversations and keep all required checks green before merge.
 
 ## Dependencies, Licensing, and Attribution

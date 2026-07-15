@@ -31,9 +31,10 @@ The command runs these stages in order:
 1. prepare the pinned web asset snapshot;
 2. verify the release, fixture, and dormant-gitlink source pins;
 3. run `check:boundaries`;
-4. run `verify:plugin`;
-5. typecheck every workspace package;
-6. run every workspace package's Vitest suite.
+4. test the CLI documentation-impact policy;
+5. run `verify:plugin`;
+6. typecheck every workspace package;
+7. run every workspace package's Vitest suite.
 
 This is the same entry point used by the main CI unit job. It does not include
 the production build, browser E2E, isolated upstream parity, cross-platform CLI
@@ -45,6 +46,8 @@ package validation, or npm publication.
 | --- | --- |
 | `rtk pnpm install --frozen-lockfile` | Install exactly the locked workspace dependencies. |
 | `rtk pnpm verify` | Run the common asset, boundary, type, and unit-test gate. |
+| `rtk pnpm verify:cli-docs-policy` | Test the CLI documentation-impact parser and path policy. |
+| `rtk pnpm check:cli-docs-impact -- --base <sha> --head <sha> --body-file <file>` | Reproduce the live pull-request documentation-impact check. |
 | `rtk pnpm verify:plugin` | Validate Codex plugin structure and skill contracts. |
 | `rtk pnpm build` | Build core, presets, web assets/Vite output, and the CLI package. |
 | `rtk pnpm check:boundaries` | Enforce the executable dependency policy. |
@@ -133,6 +136,45 @@ Before handoff, check the applicable items:
   metadata and TXT/CSV credit artifacts;
   preserve transactional output behavior.
 
+CLI-sensitive pull requests must include these exact PR-body fields:
+
+```text
+CLI docs impact: updated | not-applicable
+CLI docs surfaces: help, cli-readme, root-readme, landing, architecture, engineering, releasing, plugin | none
+CLI docs reason: required for not-applicable
+```
+
+Use `updated` with every changed surface. Use `not-applicable`, `none`, and a
+specific reason of at least 20 characters only when the implementation is
+internal and changes no owned documentation contract.
+
+The closed surface mapping is:
+
+| Token | Owned path |
+| --- | --- |
+| `help` | `packages/cli/src/command-spec.ts` |
+| `cli-readme` | `packages/cli/README.md` |
+| `root-readme` | `README.md` |
+| `landing` | `packages/web/src/components/landing-page.tsx` |
+| `architecture` | `docs/ARCHITECTURE.md` |
+| `engineering` | `docs/ENGINEERING.md` |
+| `releasing` | `docs/RELEASING.md` |
+| `plugin` | `plugins/lpc-toolkit/skills/**` |
+
+The live check activates for CLI production source, CLI package metadata and
+scripts, the LPC plugin, `asset-release.json`, and CLI release/publish workflow
+changes. Test-only, fixture-only, plan-only, spec-only, and ordinary
+documentation-only diffs do not activate it by themselves. To reproduce a PR
+failure locally, save the PR description to a file and run:
+
+```sh
+rtk pnpm check:cli-docs-impact -- --base <base-sha> --head <head-sha> --body-file <pr-body-file>
+```
+
+The Agent plan/handoff matrix remains the semantic completeness check: CI can
+prove that a declared surface appears in the diff, but cannot infer every
+surface that ought to have been declared.
+
 ### Asset tooling
 
 ```sh
@@ -160,6 +202,7 @@ Never point this variable at the repository's tracked `upstream/` directory.
 | GitHub Actions job | Local equivalent or scope |
 | --- | --- |
 | `Unit tests` | `pnpm verify`, including Codex plugin structure and skill contracts |
+| `CLI documentation impact` | PR-body declaration validated against CLI-sensitive changed paths |
 | `CLI package` | CLI typecheck, tests, build, and `test:package` |
 | `E2E (web)` | Web `test:e2e` with ordinary local assets |
 | `E2E parity (web)` | A separately provisioned pinned checkout plus `test:e2e:parity` |
