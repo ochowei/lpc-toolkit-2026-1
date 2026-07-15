@@ -39,7 +39,7 @@
 - Consumes: GitHub `pull_request` activity type at `github.event.action` and the existing `GITHUB_EVENT_PATH` checker input.
 - Produces: A workflow contract where `edited` runs only `cli-docs-impact`, while `changes` and `unit` skip and downstream `needs` jobs remain skipped.
 
-- [ ] **Step 1: Write the failing workflow integration assertions**
+- [x] **Step 1: Write the failing workflow integration assertions**
 
 Extend the existing `repository integration` test in `scripts/check-cli-doc-impact.test.mjs` with these assertions:
 
@@ -58,7 +58,7 @@ assert.match(
 );
 ```
 
-- [ ] **Step 2: Run the policy test to verify RED**
+- [x] **Step 2: Run the policy test to verify RED**
 
 Run:
 
@@ -68,7 +68,10 @@ rtk pnpm verify:cli-docs-policy
 
 Expected: FAIL in `repository integration` because `.github/workflows/ci.yml` has a bare `pull_request:` trigger and no `edited` isolation guards.
 
-- [ ] **Step 3: Implement the minimal workflow event and isolation change**
+Verification: `rtk pnpm verify:cli-docs-policy` FAIL as expected (18 passed,
+1 failed; the workflow retained a bare `pull_request:` trigger).
+
+- [x] **Step 3: Implement the minimal workflow event and isolation change**
 
 Change the workflow trigger and the two entry jobs to this shape:
 
@@ -102,7 +105,7 @@ skipped. Do not rerun the old failed job after correcting the declaration,
 because the rerun retains its original pull-request event context.
 ```
 
-- [ ] **Step 4: Run focused verification to verify GREEN**
+- [x] **Step 4: Run focused verification to verify GREEN**
 
 Run:
 
@@ -113,7 +116,15 @@ rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts
 
 Expected: PASS for the policy suite and documentation contract tests.
 
-- [ ] **Step 5: Commit the implementation**
+Implementation: Added the four explicit PR activity types, skipped the
+change-detection and unit entry jobs for `edited`, and documented why correcting
+the PR body creates a new check while rerunning an old job does not.
+
+Verification: `rtk pnpm verify:cli-docs-policy` PASS (19 tests);
+`rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts`
+PASS outside the sandbox (21 tests; required `tsx` IPC access).
+
+- [x] **Step 5: Commit the implementation**
 
 Run:
 
@@ -126,6 +137,8 @@ rtk git rev-parse HEAD
 
 Record the full implementation hash, RED result, and focused PASS results under this task.
 
+Commit: `128fbfefb29f44612df20a73ea2de6ae738edcb0`
+
 ### Task 2: Verify, record, push, and observe the fresh PR run
 
 **Files:**
@@ -135,7 +148,7 @@ Record the full implementation hash, RED result, and focused PASS results under 
 - Consumes: The implementation commit from Task 1 and PR #123's already-correct declaration.
 - Produces: A clean pushed branch and a new `synchronize` workflow run whose `CLI documentation impact` job passes.
 
-- [ ] **Step 1: Reassess documentation ownership and inspect the complete diff**
+- [x] **Step 1: Reassess documentation ownership and inspect the complete diff**
 
 Confirm the final matrix remains exactly:
 
@@ -160,7 +173,14 @@ rtk git diff HEAD~1 --stat
 
 Expected: only the three Task 1 paths differ in the implementation commit, with no CLI product, release, or plugin path.
 
-- [ ] **Step 2: Run the common final verification gate**
+Review: The matrix remains unchanged with only `engineering: update`.
+`rtk git diff --check` PASS; `rtk git status --short` showed only this expected
+plan-record edit; `rtk git show --stat HEAD` confirmed the implementation commit
+contains exactly `.github/workflows/ci.yml`, `docs/ENGINEERING.md`, and
+`scripts/check-cli-doc-impact.test.mjs`. `rtk git diff HEAD~1 --stat` also
+included this in-progress plan record, as expected for the working tree.
+
+- [x] **Step 2: Run the common final verification gate**
 
 Run:
 
@@ -170,7 +190,11 @@ rtk pnpm verify
 
 Expected: PASS, including `verify:cli-docs-policy`, plugin checks, all typechecks, and all workspace tests.
 
-- [ ] **Step 3: Record final evidence and commit the completed plan**
+Verification: `rtk pnpm verify` PASS (`verify:cli-docs-policy` 19 tests;
+CLI 347 passed, 1 skipped; web 683 passed, 1 skipped; plugin checks and all
+typechecks passed).
+
+- [x] **Step 3: Record final evidence and commit the completed plan**
 
 Check every completed item in this plan and add:
 
@@ -189,6 +213,20 @@ rtk git status --short --branch
 ```
 
 Expected: the completed-plan commit succeeds and the worktree is clean.
+
+Final evidence before the plan-record commit:
+
+- Baseline: `rtk pnpm verify` PASS (`verify:cli-docs-policy` 19 tests; CLI
+  347 passed, 1 skipped; web 683 passed, 1 skipped).
+- RED: `rtk pnpm verify:cli-docs-policy` FAIL as expected (18 passed, 1
+  failed) before the workflow change.
+- Focused GREEN: `rtk pnpm verify:cli-docs-policy` PASS (19 tests).
+- Documentation contract: `rtk pnpm --filter @lpc-toolkit/web test --
+  readme-architecture-docs.test.ts` PASS (21 tests).
+- Final gate: `rtk pnpm verify` PASS (`verify:cli-docs-policy` 19 tests; CLI
+  347 passed, 1 skipped; web 683 passed, 1 skipped; plugin checks and all
+  typechecks passed).
+- Implementation commit: `128fbfefb29f44612df20a73ea2de6ae738edcb0`.
 
 - [ ] **Step 4: Push the approved branch update**
 
