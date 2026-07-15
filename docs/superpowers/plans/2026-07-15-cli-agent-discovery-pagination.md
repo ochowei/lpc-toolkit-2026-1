@@ -1357,3 +1357,23 @@ stable numeric offset and total.
     failed for the missing guidance, then passed after the implementation. The
     first sandboxed web test attempt hit the environment's `tsx` IPC `EPERM` and
     was rerun outside the sandbox.
+
+- [x] Make raw-license catalog tests independent of ignored local release assets.
+  - Root cause: GitHub Actions run `29400211142`, job `87303035603`, checked out
+    no `assets/` directory because it is a generated ignored output. Two tests
+    introduced in `33bcca0b9346eb15c5b0c0e3c31bbf372d55c4fe` instead read the
+    developer working copy's generated assets, so Ubuntu returned no Large Curls
+    matches and `unknown_item` for `neck_scarf`.
+  - Implementation: Replaced repository-root asset reads with three explicit
+    temporary catalog definition fixtures carrying the same raw credit and
+    license combinations. Production code and workflows remain unchanged.
+  - Commit: `1231191d364ed7dca04e53dfcaed09e332a04b9d`
+  - RED: CI `pnpm --filter @lpc-toolkit/cli test` failed the GPL 3.0+ summary/detail
+    and unmapped raw-license tests at head `041c5b783ecfbff0bcda4103ebac6702fddfb33a`.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- catalog-commands.test.ts`
+    PASS (16 tests); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS;
+    `rtk pnpm --filter @lpc-toolkit/cli test` PASS (347 passed, 1 skipped);
+    `rtk pnpm --filter @lpc-toolkit/cli build` PASS;
+    `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS (packed CLI install
+    smoke); `rtk pnpm verify` PASS (CLI 347 passed, 1 skipped; web 682 passed,
+    1 skipped); `rtk git diff --check` PASS.
