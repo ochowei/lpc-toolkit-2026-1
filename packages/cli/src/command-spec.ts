@@ -1,4 +1,5 @@
 import type { ParsedArgs } from './args.js';
+import { editDistance } from './catalog-discovery.js';
 import type { CliIssue } from './response.js';
 
 type OptionKind = 'boolean' | 'value' | 'repeatable';
@@ -312,24 +313,6 @@ function findCommandSpec(command: readonly string[]): CommandSpec | undefined {
       spec.command.length === command.length &&
       spec.command.every((part, index) => part === command[index]),
   );
-}
-
-function editDistance(left: string, right: string): number {
-  const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
-  for (let leftIndex = 1; leftIndex <= left.length; leftIndex++) {
-    let diagonal = previous[0]!;
-    previous[0] = leftIndex;
-    for (let rightIndex = 1; rightIndex <= right.length; rightIndex++) {
-      const above = previous[rightIndex]!;
-      previous[rightIndex] = Math.min(
-        previous[rightIndex]! + 1,
-        previous[rightIndex - 1]! + 1,
-        diagonal + (left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1),
-      );
-      diagonal = above;
-    }
-  }
-  return previous[right.length]!;
 }
 
 function suggestOption(
