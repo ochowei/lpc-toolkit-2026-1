@@ -204,18 +204,25 @@ implementation locally without requiring a synthetic PR body.
 
 Add a `CLI documentation impact` job to `.github/workflows/ci.yml`:
 
-- run only for `pull_request` events;
+- run for `pull_request` activity types `opened`, `synchronize`, `reopened`, and
+  `edited`;
 - use `actions/checkout` with `fetch-depth: 0`;
 - use Node.js 22;
 - run `node scripts/check-cli-doc-impact.mjs` without installing workspace
   dependencies;
 - request only `contents: read` permission and use no secrets.
 
-The job runs for every pull request so its check name is stable. The script
-quickly succeeds for unrelated diffs. Repository branch protection or the
-repository ruleset must require the `CLI documentation impact` status check to
-make a failure merge-blocking. Changing that external GitHub setting is an
-operational follow-up and is not performed by the repository patch.
+The job runs for every supported pull request activity so its check name is
+stable. The `edited` activity lets an author correct the declaration in the PR
+body and receive a new check using the new event payload. Re-running the old
+failed job is not a recovery path because a rerun retains the original event
+payload. On an `edited` activity, skip the change-detection and unit jobs so the
+dependent package and E2E jobs also remain skipped; changing PR prose must rerun
+only the documentation-impact job. The script quickly succeeds for unrelated
+diffs. Repository branch protection or the repository ruleset must require the
+`CLI documentation impact` status check to make a failure merge-blocking.
+Changing that external GitHub setting is an operational follow-up and is not
+performed by the repository patch.
 
 Pushes to `main` do not run the declaration gate because they have no PR body;
 the normal `pnpm verify` policy tests still run. The repository's protected-PR
@@ -271,7 +278,9 @@ Create `scripts/check-cli-doc-impact.test.mjs` covering:
 10. `not-applicable` with non-`none` surfaces fails;
 11. duplicate fields fail;
 12. a test-only or plan-only diff does not activate the gate;
-13. a mixed excluded/trigger diff requires a declaration.
+13. a mixed excluded/trigger diff requires a declaration;
+14. the workflow listens for PR-body edits and skips the ordinary CI entry jobs
+    for that activity.
 
 Extend repository documentation contract tests to ensure `AGENTS.md`,
 `docs/ENGINEERING.md`, `CONTRIBUTING.md`, and the PR template retain the shared
@@ -310,5 +319,7 @@ declaration and a failing missing declaration.
   handoff.
 - Unrelated pull requests and test-only CLI changes do not require boilerplate
   declarations.
+- Correcting a PR-body declaration creates a fresh documentation-impact check
+  without rerunning unit, package, or E2E jobs.
 - The same policy vocabulary is locked by tests across Agent rules,
   contributor guidance, the PR template, and CI.
