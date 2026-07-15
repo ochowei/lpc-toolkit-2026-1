@@ -1316,3 +1316,18 @@ pieces of guidance.
 - `rtk git diff --check` PASS.
 - `rtk git diff --name-only HEAD -- .github/workflows` PASS: empty output before the fix commit.
 - No tag or npm publication command was invoked.
+
+**Final review fix:** Discovery preflight now rejects offsets that are not safe
+non-negative integers before asset preparation, preventing `Infinity` or unsafe
+rounded values from reaching `data.page`. Pure coverage also locks the accepted
+`--limit 100` boundary and an empty terminal page at `offset === total` with a
+stable numeric offset and total.
+
+**Final review fix commit:** `6f41a4f7f1070559464acaf8d77694baff2727af`
+
+**Final review fix verification:**
+
+- `rtk pnpm --filter @lpc-toolkit/cli test -- catalog-discovery.test.ts main-assets.test.ts` FAIL (expected RED: unsafe offset was accepted by pure validation and CLI preflight; 2 failed, 62 passed).
+- `rtk pnpm --filter @lpc-toolkit/cli test -- catalog-discovery.test.ts main-assets.test.ts main-json.test.ts` PASS (3 files, 66 tests).
+- `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+- `rtk git diff --check` PASS.
