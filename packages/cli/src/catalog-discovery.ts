@@ -75,8 +75,8 @@ function compareText(left: string, right: string): number {
 }
 
 export function editDistance(leftInput: string, rightInput: string): number {
-  const left = normalized(leftInput);
-  const right = normalized(rightInput);
+  const left = leftInput;
+  const right = rightInput;
   const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
   for (let leftIndex = 1; leftIndex <= left.length; leftIndex++) {
     let diagonal = previous[0]!;
@@ -197,9 +197,9 @@ function suggestionDistance<T extends DiscoveryItemSummary>(
   candidate: DiscoveryCandidate<T>,
 ): number {
   return Math.min(
-    editDistance(query, candidate.summary.itemId),
-    editDistance(query, candidate.internalName),
-    editDistance(query, candidate.summary.name),
+    editDistance(normalized(query), normalized(candidate.summary.itemId)),
+    editDistance(normalized(query), normalized(candidate.internalName)),
+    editDistance(normalized(query), normalized(candidate.summary.name)),
   );
 }
 

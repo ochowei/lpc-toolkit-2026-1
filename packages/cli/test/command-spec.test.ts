@@ -62,6 +62,13 @@ describe('validateCommandOptions', () => {
     expect(issue?.details?.suggestions).toContain('--type');
   });
 
+  it('preserves case-sensitive suggestion distance for unknown options', () => {
+    const issue = validateCommandOptions(parseArgs(['catalog', 'items', '--HELP']));
+
+    expect(issue).toMatchObject({ code: 'unknown_option', path: '--HELP' });
+    expect(issue?.details?.suggestions).toEqual([]);
+  });
+
   it('rejects a value option without a value', () => {
     expect(
       validateCommandOptions(parseArgs(['catalog', 'items', '--type'])),
