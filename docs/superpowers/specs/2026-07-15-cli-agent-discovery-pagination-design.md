@@ -7,7 +7,9 @@ any agent that can invoke shell commands. The CLI remains a deterministic
 toolkit: the agent decides which assets fit the user's intent, while the CLI
 provides bounded search, complete selection facts, validation, and attribution.
 
-This work is the feature scope for CLI prerelease `0.1.4-beta-1`.
+This work uses CLI package version `0.1.4-beta-1` during development. Like the
+previous `0.1.3-alpha-1` development version, it is not a tagged or published
+prerelease.
 
 ## Context
 
@@ -233,16 +235,20 @@ bounded search and to verify summary license families, page metadata, and detail
 credits. Because that workflow will rely on the new flags and response fields,
 the repository plugin's compatibility declaration and installed-CLI check move
 their minimum supported CLI version to `0.1.4-beta-1`. Plugin release versioning
-is separate from the CLI prerelease artifact.
+is separate from this CLI development version. Public installation guidance
+must not claim that `0.1.4-beta-1` is available from npm.
 
-## Release Target
+## Development Version And Later Release
 
 Implementation culminates in setting `packages/cli/package.json` to
 `0.1.4-beta-1`, matching the repository's existing `alpha-1` prerelease naming
-style. Cross-platform release-candidate validation uses a tag such as
-`v0.1.4-beta-1-rc.1`. Publication, stable/prerelease tagging, and pushing tags
-require explicit release authorization and are not implied by implementing this
-design.
+style. This is a development marker only: implementation does not create or
+push `v0.1.4-beta-1`, publish it to npm, or change the release workflows.
+
+A later, separately authorized stable release changes the package version to
+`0.1.4`, validates `v0.1.4-rc.1` through the existing cross-platform release
+candidate workflow, and publishes only from `v0.1.4`. That release sequence is
+outside this design and implementation plan.
 
 ## Testing
 
@@ -269,7 +275,9 @@ Contract and regression tests cover:
 - the Codex plugin's tested command inventory and minimum compatible version;
 - unchanged small-result, character mutation, validation, preview, render, and
   attribution behavior;
-- CLI version and prerelease release-tag validation.
+- CLI version reporting and package metadata at `0.1.4-beta-1`;
+- unchanged release workflows and existing release-verifier unit behavior,
+  without creating a beta tag.
 
 Implementation verification runs the narrow CLI and plugin checks while
 iterating, then:
@@ -295,5 +303,5 @@ rtk pnpm verify
   machine-readable outcomes.
 - Preview, render, metadata, credits TXT, credits CSV, and effective-license
   behavior remain unchanged.
-- The completed CLI reports version `0.1.4-beta-1` and passes its prerelease
-  validation gates before any separately authorized publication.
+- The completed CLI reports version `0.1.4-beta-1`; no beta tag or npm
+  publication is created.
