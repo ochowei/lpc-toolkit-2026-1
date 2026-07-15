@@ -467,14 +467,22 @@ rtk git commit -m "docs(plan): record CLI discovery Task 1"
 ```
 
 - Implementation: Added the pure discovery projection, search, deterministic sort,
-  pagination, bounded suggestion, and validation contract, and reused its normalized
-  edit distance in command option suggestions.
+  pagination, bounded suggestion, and validation contract, and reused its raw edit
+  distance in command option suggestions while normalizing only discovery inputs.
 - Commit: 03e21f0662e371775cb3ef251586ee0c9f8a1200
 - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- catalog-discovery.test.ts`
   FAIL (expected RED: `../src/catalog-discovery.js` did not exist).
 - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- catalog-discovery.test.ts command-spec.test.ts`
   PASS (2 files, 20 tests).
 - Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+- Review fix: Restored the pre-existing case-sensitive command option suggestion
+  threshold and kept case-folding/trim behavior at the discovery caller boundary.
+- Fix commit: da330e9e30a6b3511666fe17dd6718200613bd80
+- Review RED: `rtk pnpm --filter @lpc-toolkit/cli test -- command-spec.test.ts`
+  FAIL as expected (1 failed, 16 passed: `--HELP` incorrectly suggested `--help`).
+- Review GREEN: `rtk pnpm --filter @lpc-toolkit/cli test -- catalog-discovery.test.ts command-spec.test.ts`
+  PASS (2 files, 21 tests).
+- Review verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
 
 ### Task 2: Add Discovery Options And Preflight Validation
 
