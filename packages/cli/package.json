@@ -1,6 +1,6 @@
 {
   "name": "@lpc-toolkit/cli",
-  "version": "0.1.3-alpha-1",
+  "version": "0.1.3",
   "description": "Node 22+ CLI for cataloging, validating, and rendering attributed LPC character sprites.",
   "license": "GPL-3.0-or-later",
   "type": "module",
