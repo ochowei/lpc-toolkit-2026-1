@@ -32,6 +32,11 @@ families, and credit count. Restart at offset zero after changing the catalog
 source, custom overlay, query filters, or character selection; offsets only
 continue an unchanged result set.
 
+The `catalog item` detail preserves native identifiers in `animations` and adds
+`compatibleAnimations` plus `unsupportedAnimations`. Treat a compatible base
+as an action the asset can participate in, while retaining the native custom
+name when requesting or describing the actual custom animation output.
+
 Use `character remove` only for a currently selected type. Resolve one
 structured error at a time, using `details.suggestions` and `details.available`.
 
