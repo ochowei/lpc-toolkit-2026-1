@@ -114,11 +114,19 @@ function catalogItemLabel(item: JsonRecord): string | undefined {
 }
 
 function formatCatalogItemDetails(item: JsonRecord, indent: string): readonly string[] {
+  const compatibleAnimations = stringArrayValue(item, 'compatibleAnimations');
+  const unsupportedAnimations = stringArrayValue(item, 'unsupportedAnimations');
   return [
     `${indent}supported body types: ${formatCsv(stringArrayValue(item, 'supportedBodyTypes'))}`,
     `${indent}variants: ${formatCsv(stringArrayValue(item, 'variants'))}`,
     `${indent}recolors: ${formatCsv(stringArrayValue(item, 'recolors'))}`,
     `${indent}animations: ${formatCsv(stringArrayValue(item, 'animations'))}`,
+    ...(compatibleAnimations === undefined ? [] : [
+      `${indent}compatible standard animations: ${formatCsv(compatibleAnimations)}`,
+    ]),
+    ...(unsupportedAnimations === undefined ? [] : [
+      `${indent}unsupported standard animations: ${formatCsv(unsupportedAnimations)}`,
+    ]),
     `${indent}licenses: ${formatCsv(stringArrayValue(item, 'licenses'))}`,
     `${indent}credit count: ${numberValue(item, 'creditCount') ?? 0}`,
   ];

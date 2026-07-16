@@ -129,6 +129,15 @@ describe('human-readable CLI output', () => {
     expect(output).toContain('Catalog item: hair/Braids [braids]');
     expect(output).toContain('variants: brown');
     expect(output).toContain('animations: walk, slash');
+    expect(output).toContain('compatible standard animations: none');
+    expect(output).toContain('unsupported standard animations: spellcast, thrust');
+  });
+
+  it('keeps animation capability fields out of catalog item summaries', async () => {
+    const output = await runHuman(['catalog', 'items', '--type', 'hair'], makeCatalogCwd());
+
+    expect(output).not.toContain('compatible standard animations:');
+    expect(output).not.toContain('unsupported standard animations:');
   });
 
   it('prints encoded tokens without --json', async () => {
