@@ -268,15 +268,18 @@ describe('catalog commands', () => {
       layer_1: hair.layer_1,
     } as unknown as ItemDefinition;
     const malformed = { ...hair, animations: 'walk' } as unknown as ItemDefinition;
+    const mixed = { ...hair, animations: ['walk', 42] } as unknown as ItemDefinition;
     const empty = { ...hair, animations: [] };
     const catalog = createCatalog({
       'hair/missing.json': missing,
       'hair/malformed.json': malformed,
+      'hair/mixed.json': mixed,
       'hair/empty.json': empty,
     }).catalog;
 
     expect(getCatalogItem(catalog, 'missing', palettes)?.animations).toEqual(ANIMATION_DEFAULTS);
     expect(getCatalogItem(catalog, 'malformed', palettes)?.animations).toEqual(ANIMATION_DEFAULTS);
+    expect(getCatalogItem(catalog, 'mixed', palettes)?.animations).toEqual(ANIMATION_DEFAULTS);
     expect(getCatalogItem(catalog, 'empty', palettes)).toMatchObject({
       animations: [],
       compatibleAnimations: [],

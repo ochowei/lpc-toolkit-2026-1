@@ -143,8 +143,8 @@ export function itemAnimationCapabilities(
   item: ItemDefinition,
 ): ItemAnimationCapabilities {
   const raw: unknown = item.animations;
-  const native = Array.isArray(raw)
-    ? [...new Set(raw.filter((name): name is AnimationName => typeof name === 'string'))]
+  const native = Array.isArray(raw) && raw.every((name): name is AnimationName => typeof name === 'string')
+    ? [...new Set(raw)]
     : [...ANIMATION_DEFAULTS];
   const nativeSet = new Set(native);
   const compatibleSet = new Set<AnimationName>();
