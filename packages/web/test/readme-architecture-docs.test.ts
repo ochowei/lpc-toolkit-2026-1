@@ -174,19 +174,14 @@ describe('README architecture contract', () => {
 
 describe('Codex plugin documentation contract', () => {
   it('documents installation, ownership, and verification', () => {
-    const cliInstall = 'npm install -g /tmp/lpc-toolkit-cli-0.1.4-beta-1.tgz';
+    const cliInstall = "npm install -g '@lpc-toolkit/cli@>=0.1.4 <0.2.0'";
     const marketplaceAdd = 'codex plugin marketplace add ochowei/lpc-toolkit-2026-1';
     const pluginAdd = 'codex plugin add lpc-toolkit@lpc-toolkit';
 
     for (const document of [readme, cliReadme]) {
       expect(document).toContain('Install or upgrade the CLI');
-      expect(document).toContain(
-        'rtk pnpm --filter @lpc-toolkit/cli pack --pack-destination /tmp',
-      );
       expect(document).toContain(cliInstall);
-      expect(document).toContain(
-        '0.1.4-beta-1 is a development version and is not published to npm',
-      );
+      expect(document).not.toContain('lpc-toolkit-cli-0.1.4-beta-1.tgz');
       expect(document.indexOf(cliInstall)).toBeLessThan(
         document.indexOf(marketplaceAdd),
       );

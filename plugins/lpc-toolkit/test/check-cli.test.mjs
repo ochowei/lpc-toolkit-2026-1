@@ -30,34 +30,33 @@ test('orders prerelease identifiers beyond Number safe integer precision', () =>
   );
 });
 
-test('accepts the supported beta CLI range', () => {
+test('accepts the supported stable CLI range', () => {
   assert.deepEqual(SUPPORTED_CLI, {
-    min: '0.1.4-beta-1',
+    min: '0.1.4',
     maxExclusive: '0.2.0',
   });
-  assert.deepEqual(evaluateVersion('0.1.4-beta-1\n'), {
+  assert.deepEqual(evaluateVersion('0.1.4\n'), {
     ok: true,
-    installedVersion: '0.1.4-beta-1',
-    supportedRange: '>=0.1.4-beta-1 <0.2.0',
+    installedVersion: '0.1.4',
+    supportedRange: '>=0.1.4 <0.2.0',
     errors: [],
   });
-  assert.equal(evaluateVersion('0.1.4').ok, true);
+  assert.equal(evaluateVersion('0.1.5').ok, true);
 });
 
 test('accepts build metadata without changing precedence or displayed output', () => {
-  assert.equal(compareSemver('0.1.4-beta-1+build.7', '0.1.4-beta-1'), 0);
-  assert.deepEqual(evaluateVersion('0.1.4-beta-1+build.7\n'), {
+  assert.equal(compareSemver('0.1.4+build.7', '0.1.4'), 0);
+  assert.deepEqual(evaluateVersion('0.1.4+build.7\n'), {
     ok: true,
-    installedVersion: '0.1.4-beta-1+build.7',
-    supportedRange: '>=0.1.4-beta-1 <0.2.0',
+    installedVersion: '0.1.4+build.7',
+    supportedRange: '>=0.1.4 <0.2.0',
     errors: [],
   });
-  assert.equal(evaluateVersion('0.1.4-beta-1+build.007').ok, true);
+  assert.equal(evaluateVersion('0.1.4+build.007').ok, true);
 });
 
 test('applies npm prerelease admission rules to the supported range', () => {
-  assert.equal(evaluateVersion('0.1.4-beta-2').ok, true);
-  assert.equal(evaluateVersion('0.1.4').ok, true);
+  assert.equal(evaluateVersion('0.1.4-beta-2').errors[0].code, 'cli_version_unsupported');
   assert.equal(evaluateVersion('0.1.4-alpha.1').errors[0].code, 'cli_version_unsupported');
   assert.equal(evaluateVersion('0.1.5-beta-1').errors[0].code, 'cli_version_unsupported');
   assert.equal(evaluateVersion('0.2.0-alpha.1').errors[0].code, 'cli_version_unsupported');
@@ -81,14 +80,13 @@ test('rejects malformed semantic versions', () => {
   }
 });
 
-test('documents the local development CLI installation contract', () => {
+test('documents the public stable CLI installation contract', () => {
   const skillRoot = fileURLToPath(new URL('../skills/character-authoring/', import.meta.url));
   const compatibility = readFileSync(path.join(skillRoot, 'references/compatibility.md'), 'utf8');
 
   for (const required of [
-    'rtk pnpm --filter @lpc-toolkit/cli pack --pack-destination /tmp',
-    'npm install -g /tmp/lpc-toolkit-cli-0.1.4-beta-1.tgz',
-    '0.1.4-beta-1 is a development version and is not published to npm',
+    "npm install -g '@lpc-toolkit/cli@>=0.1.4 <0.2.0'",
+    'Plugin version `0.1.0` supports `@lpc-toolkit/cli >=0.1.4 <0.2.0`',
   ]) {
     assert.equal(
       compatibility.includes(required),
@@ -109,7 +107,7 @@ test('documents and runs the checker by resolved absolute skill path from anothe
 
   const unrelatedCwd = mkdtempSync(path.join(os.tmpdir(), 'lpc-check-cli-cwd-'));
   const fakeCli = path.join(unrelatedCwd, 'fake-cli.mjs');
-  writeFileSync(fakeCli, "process.stdout.write('0.1.4-beta-1\\n');\n");
+  writeFileSync(fakeCli, "process.stdout.write('0.1.4\\n');\n");
   try {
     const result = spawnSync(
       process.execPath,

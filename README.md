@@ -133,15 +133,11 @@ source, custom overlay, query filters, or character selection.
 
 ### Codex Plugin
 
-1. Install or upgrade the CLI to the range supported by plugin `0.1.0`. From
-   the repository root, pack and install the local development build:
+1. Install or upgrade the CLI to the range supported by plugin `0.1.0`:
 
 ```sh
-rtk pnpm --filter @lpc-toolkit/cli pack --pack-destination /tmp
-npm install -g /tmp/lpc-toolkit-cli-0.1.4-beta-1.tgz
+npm install -g '@lpc-toolkit/cli@>=0.1.4 <0.2.0'
 ```
-
-0.1.4-beta-1 is a development version and is not published to npm.
 
 2. Add the repository marketplace once:
 
@@ -157,7 +153,7 @@ codex plugin add lpc-toolkit@lpc-toolkit
 
 The plugin requires an installed compatible `lpc-toolkit` CLI and does not
 automatically install the CLI. Its supported CLI range is
-`>=0.1.4-beta-1 <0.2.0`. Restart the ChatGPT desktop app or start a new Codex
+`>=0.1.4 <0.2.0`. Restart the ChatGPT desktop app or start a new Codex
 task if the newly installed skill is not visible. Public Plugins Directory
 distribution can later remove the marketplace-add step.
 
