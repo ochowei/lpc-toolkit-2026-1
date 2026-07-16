@@ -143,7 +143,7 @@ before handoff.
 ```text
 help: update
 cli-readme: update
-root-readme: update
+root-readme: N/A — quick start and command usage remain unchanged
 landing: N/A — existing command examples remain valid and promise no output schema
 architecture: N/A — package boundaries and ownership do not change
 engineering: N/A — development and verification commands do not change
@@ -152,9 +152,10 @@ plugin: update
 ```
 
 Update the CLI command description/help to mention animation capabilities,
-document the new human and JSON fields in the CLI README, note the richer item
-inspection in the root README, and update the plugin's CLI workflow reference so
-agents interpret native, compatible, and unsupported arrays correctly.
+document the new human and JSON fields in the CLI README, and update the
+plugin's CLI workflow reference so agents interpret native, compatible, and
+unsupported arrays correctly. The root quick start already delegates detailed
+command behavior to the CLI README and requires no change.
 
 ## Constraints
 
