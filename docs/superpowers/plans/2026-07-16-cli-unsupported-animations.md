@@ -65,7 +65,7 @@ CLI docs surfaces: help, cli-readme, plugin
 - Produces: `DiscoveryItemDetail.compatibleAnimations` and `DiscoveryItemDetail.unsupportedAnimations`.
 - Produces: catalog filtering and validation over the union of native and compatible animation names.
 
-- [ ] **Step 1: Write failing detail-capability tests**
+- [x] **Step 1: Write failing detail-capability tests**
 
 Import `ANIMATION_DEFAULTS` and add fixtures for Wheelchair, `tool_rod`, an unknown custom animation, an explicit empty list, and missing/malformed metadata. Add assertions shaped like:
 
@@ -150,7 +150,7 @@ it('does not infer compatibility for an unknown custom animation', () => {
 
 Change the existing missing-animation discovery expectation from `animations: []` to `animations: ANIMATION_DEFAULTS` so it demonstrates the Core/CLI inconsistency being corrected.
 
-- [ ] **Step 2: Run the detail tests and verify RED**
+- [x] **Step 2: Run the detail tests and verify RED**
 
 Run:
 
@@ -160,7 +160,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- catalog-commands.test.ts
 
 Expected: FAIL because `compatibleAnimations` and `unsupportedAnimations` are absent and missing metadata still produces an empty list.
 
-- [ ] **Step 3: Implement the minimal capability calculator**
+- [x] **Step 3: Implement the minimal capability calculator**
 
 In `catalog-discovery.ts`, extend the Core import and add the following focused interface and helper:
 
@@ -225,11 +225,11 @@ return {
 };
 ```
 
-- [ ] **Step 4: Run the detail tests and verify GREEN**
+- [x] **Step 4: Run the detail tests and verify GREEN**
 
 Run the same focused command. Expected: PASS with no warnings or errors.
 
-- [ ] **Step 5: Write a failing compatible-filter test**
+- [x] **Step 5: Write a failing compatible-filter test**
 
 Add a runtime fixture containing only a credited Wheelchair definition and assert both validation and filtering accept its base:
 
@@ -264,11 +264,11 @@ it('filters custom animations by their compatible standard base', () => {
 });
 ```
 
-- [ ] **Step 6: Run the compatible-filter test and verify RED**
+- [x] **Step 6: Run the compatible-filter test and verify RED**
 
 Run the focused CLI test command. Expected: FAIL with `unknown_animation` or an empty result because filtering still checks native names only.
 
-- [ ] **Step 7: Make catalog filters consume capabilities**
+- [x] **Step 7: Make catalog filters consume capabilities**
 
 In `catalog-commands.ts`, import `itemAnimationCapabilities`, remove the local `itemAnimations`, and use:
 
@@ -295,7 +295,7 @@ const animations = domain(items.flatMap((item) => {
 }));
 ```
 
-- [ ] **Step 8: Run catalog command tests and CLI typecheck**
+- [x] **Step 8: Run catalog command tests and CLI typecheck**
 
 Run:
 
@@ -306,7 +306,7 @@ rtk pnpm --filter @lpc-toolkit/cli run typecheck
 
 Expected: both PASS.
 
-- [ ] **Step 9: Commit the capability model**
+- [x] **Step 9: Commit the capability model**
 
 ```sh
 rtk git add packages/cli/src/catalog-discovery.ts packages/cli/src/catalog-commands.ts packages/cli/test/catalog-commands.test.ts
@@ -314,6 +314,14 @@ rtk git commit -m "feat(cli): report unsupported asset animations"
 ```
 
 After the commit, check this task's boxes and add the full commit hash plus exact PASS commands beneath the task heading.
+
+Implementation note: Added normalized native animation metadata, ordered compatible/unsupported standard capability arrays, registered custom-animation base inference, and compatible animation filtering/validation. Missing or malformed metadata now uses `ANIMATION_DEFAULTS`, while explicit empty arrays remain empty.
+
+Commit: f96f69e6905cb8d6e5da3f92d988ca754db6679d
+
+Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- catalog-commands.test.ts` PASS (22 tests)
+
+Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS
 
 ---
 
@@ -329,7 +337,7 @@ After the commit, check this task's boxes and add the full commit hash plus exac
 - Consumes: optional `compatibleAnimations` and `unsupportedAnimations` detail fields.
 - Produces: two detail-only human lines and help text that names animation capability inspection.
 
-- [ ] **Step 1: Write failing human-output tests**
+- [x] **Step 1: Write failing human-output tests**
 
 Extend the existing `prints one catalog item without --json` test and list-summary test:
 
@@ -345,7 +353,7 @@ expect(output).not.toContain('compatible standard animations:');
 expect(output).not.toContain('unsupported standard animations:');
 ```
 
-- [ ] **Step 2: Run the human-output test and verify RED**
+- [x] **Step 2: Run the human-output test and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- main-human.test.ts
@@ -353,7 +361,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- main-human.test.ts
 
 Expected: FAIL because the new detail fields are not formatted.
 
-- [ ] **Step 3: Format detail-only fields**
+- [x] **Step 3: Format detail-only fields**
 
 In `formatCatalogItemDetails`, append lines only when the fields exist:
 
@@ -378,11 +386,11 @@ return [
 
 Because summary objects omit both fields, list output remains compact without a separate formatter mode.
 
-- [ ] **Step 4: Run the human-output test and verify GREEN**
+- [x] **Step 4: Run the human-output test and verify GREEN**
 
 Run the same focused command. Expected: PASS.
 
-- [ ] **Step 5: Write and verify a failing help-text test**
+- [x] **Step 5: Write and verify a failing help-text test**
 
 Add:
 
@@ -402,7 +410,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- command-spec.test.ts
 
 Expected: FAIL because help still says only `Show one catalog item.`
 
-- [ ] **Step 6: Update the command description and verify GREEN**
+- [x] **Step 6: Update the command description and verify GREEN**
 
 Set the `catalog item` description in `command-spec.ts` to:
 
@@ -419,7 +427,7 @@ rtk pnpm --filter @lpc-toolkit/cli run typecheck
 
 Expected: both PASS.
 
-- [ ] **Step 7: Commit the human and help contract**
+- [x] **Step 7: Commit the human and help contract**
 
 ```sh
 rtk git add packages/cli/src/response.ts packages/cli/src/command-spec.ts packages/cli/test/main-human.test.ts packages/cli/test/command-spec.test.ts
@@ -427,6 +435,14 @@ rtk git commit -m "feat(cli): show animation capabilities in item details"
 ```
 
 After the commit, check this task's boxes and add the full commit hash plus exact PASS commands beneath the task heading.
+
+Implementation note: Human detail output now labels compatible and unsupported standard animation arrays, while compact list summaries omit both fields. Catalog item help describes the richer inspection contract.
+
+Commit: 43d9ac6ac1f9d90b42877c59e92e582fa986cad3
+
+Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- command-spec.test.ts main-human.test.ts` PASS (35 tests)
+
+Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS
 
 ---
 
@@ -440,7 +456,7 @@ After the commit, check this task's boxes and add the full commit hash plus exac
 - Consumes: the final human and JSON field names from Tasks 1–2.
 - Produces: public CLI guidance and agent interpretation rules.
 
-- [ ] **Step 1: Update the CLI README**
+- [x] **Step 1: Update the CLI README**
 
 After the catalog discovery paragraph, add a concrete detail example and semantics:
 
@@ -455,7 +471,7 @@ Definitions without a valid `animations` array use the same standard defaults
 as Core composition; an explicit empty array remains empty.
 ```
 
-- [ ] **Step 2: Update the plugin workflow**
+- [x] **Step 2: Update the plugin workflow**
 
 After the search-summary paragraph, add:
 
@@ -466,7 +482,7 @@ as an action the asset can participate in, while retaining the native custom
 name when requesting or describing the actual custom animation output.
 ```
 
-- [ ] **Step 3: Verify documentation and plugin contracts**
+- [x] **Step 3: Verify documentation and plugin contracts**
 
 Run:
 
@@ -478,7 +494,7 @@ rtk git diff --check
 
 Expected: all PASS with no whitespace errors.
 
-- [ ] **Step 4: Commit the documentation**
+- [x] **Step 4: Commit the documentation**
 
 ```sh
 rtk git add packages/cli/README.md plugins/lpc-toolkit/skills/character-authoring/references/cli-workflow.md
@@ -486,6 +502,16 @@ rtk git commit -m "docs(cli): explain animation capability fields"
 ```
 
 After the commit, check this task's boxes and add the full commit hash plus exact PASS commands beneath the task heading.
+
+Implementation note: Documented native-versus-compatible semantics, unsupported standard animation ordering, default normalization, and the agent-facing interpretation of compatible custom-animation bases.
+
+Commit: 7f764f1ff01559ed127ad1b8140c55a67615bd7e
+
+Verification: `rtk pnpm verify:cli-docs-policy` PASS
+
+Verification: `rtk pnpm verify:plugin` PASS
+
+Verification: `rtk git diff --check` PASS
 
 ---
 
@@ -498,7 +524,7 @@ After the commit, check this task's boxes and add the full commit hash plus exac
 - Consumes: all implementation and documentation from Tasks 1–3.
 - Produces: handoff evidence proving the feature, packaging, plugin, and documentation policy remain valid.
 
-- [ ] **Step 1: Run the complete CLI and common gates**
+- [x] **Step 1: Run the complete CLI and common gates**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli run typecheck
@@ -509,7 +535,7 @@ rtk pnpm verify
 
 Expected: every command PASS.
 
-- [ ] **Step 2: Run build and packed-package smoke verification**
+- [x] **Step 2: Run build and packed-package smoke verification**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli build
@@ -518,7 +544,7 @@ rtk pnpm --filter @lpc-toolkit/cli test:package
 
 Expected: both PASS, proving the bundled Core exports and installed CLI contract work.
 
-- [ ] **Step 3: Reassess the CLI Documentation Impact matrix**
+- [x] **Step 3: Reassess the CLI Documentation Impact matrix**
 
 Confirm the final diff contains `packages/cli/src/command-spec.ts`,
 `packages/cli/README.md`, and
@@ -526,7 +552,7 @@ Confirm the final diff contains `packages/cli/src/command-spec.ts`,
 the root README, landing page, architecture, engineering, and releasing guides
 remain N/A for the reasons recorded above.
 
-- [ ] **Step 4: Record evidence and inspect the final diff**
+- [x] **Step 4: Record evidence and inspect the final diff**
 
 Update this plan after every completed task with checked boxes, concise
 implementation notes, full commit hashes, and exact PASS/FAIL command results.
@@ -540,7 +566,7 @@ rtk git log -5 --oneline
 
 Expected: no whitespace errors, only the plan evidence change remains uncommitted, and the expected focused commits are at the tip.
 
-- [ ] **Step 5: Commit the completed plan record**
+- [x] **Step 5: Commit the completed plan record**
 
 ```sh
 rtk git add docs/superpowers/plans/2026-07-16-cli-unsupported-animations.md
@@ -548,3 +574,21 @@ rtk git commit -m "docs(plan): record CLI animation capability verification"
 ```
 
 After the commit, verify `rtk git status --short` reports a clean worktree.
+
+Implementation note: Updated the existing discovery exact-object expectation for the new detail fields. Reassessed the CLI documentation matrix: help, cli-readme, and plugin are updated; root-readme, landing, architecture, engineering, and releasing remain N/A for the documented reasons.
+
+Commit: 0fc8bc416adeed95e9d8ad88053e9ba4d60d5978 (discovery expectation)
+
+Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS
+
+Verification: `rtk pnpm --filter @lpc-toolkit/cli test` PASS (32 files, 355 passed, 1 skipped; run with escalation for local web-server ports)
+
+Verification: `rtk pnpm verify:plugin` PASS
+
+Verification: `rtk pnpm verify` PASS (workspace typecheck and tests; run with escalation for tsx IPC/local assets)
+
+Verification: `rtk pnpm --filter @lpc-toolkit/cli build` PASS
+
+Verification: `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS (packed CLI install smoke test)
+
+Verification: `rtk git diff --check` PASS; `rtk git status --short` shows only this plan evidence change before its final commit.
