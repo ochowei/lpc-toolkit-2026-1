@@ -42,6 +42,25 @@ describe('catalog discovery', () => {
     });
     expect(toDiscoveryDetail({ ...braid, itemId: 'hair_braid' }, palettes)).toEqual({
       ...candidate.summary,
+      compatibleAnimations: [],
+      unsupportedAnimations: [
+        'spellcast',
+        'thrust',
+        'slash',
+        'shoot',
+        'hurt',
+        'climb',
+        'idle',
+        'jump',
+        'sit',
+        'emote',
+        'run',
+        'watering',
+        'combat',
+        '1h_slash',
+        '1h_backslash',
+        '1h_halfslash',
+      ],
       credits: braid.credits,
     });
   });
