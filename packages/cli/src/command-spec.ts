@@ -118,7 +118,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
   {
     command: ['catalog', 'item'],
     usage: 'lpc-toolkit catalog item <item-id-or-type/name>',
-    description: 'Show one catalog item.',
+    description: 'Show one catalog item with credits and animation capabilities.',
     options: [HELP_OPTION, JSON_OPTION],
     examples: ['lpc-toolkit catalog item hair_braid --json'],
   },

@@ -1,4 +1,9 @@
-import { createCatalog, createPaletteCatalog, type ItemDefinition } from '@lpc-toolkit/core';
+import {
+  ANIMATION_DEFAULTS,
+  createCatalog,
+  createPaletteCatalog,
+  type ItemDefinition,
+} from '@lpc-toolkit/core';
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -216,6 +221,86 @@ describe('catalog commands', () => {
     expect(getCatalogItem(catalog, 'hair/Braids', palettes)?.itemId).toBe('braids');
   });
 
+  it('reports native, compatible, and unsupported animations', () => {
+    const wheelchair: ItemDefinition = {
+      ...hair,
+      name: 'Wheelchair',
+      type_name: 'wheelchair',
+      animations: ['wheelchair'],
+    };
+    const detail = getCatalogItem(
+      createCatalog({ 'body/wheelchair.json': wheelchair }).catalog,
+      'wheelchair',
+      palettes,
+    );
+
+    expect(detail).toMatchObject({
+      animations: ['wheelchair'],
+      compatibleAnimations: ['sit'],
+    });
+    expect(detail?.unsupportedAnimations).not.toContain('sit');
+    expect(detail?.unsupportedAnimations).toContain('walk');
+  });
+
+  it.each([
+    ['tool_rod', 'thrust'],
+    ['slash_oversize', 'slash'],
+  ])('derives the registered base for %s', (customName, baseName) => {
+    const item = { ...hair, name: customName, animations: [customName] } as ItemDefinition;
+    const detail = getCatalogItem(
+      createCatalog({ [`hair/${customName}.json`]: item }).catalog,
+      customName,
+      palettes,
+    );
+
+    expect(detail).toMatchObject({
+      animations: [customName],
+      compatibleAnimations: [baseName],
+    });
+    expect(detail?.unsupportedAnimations).not.toContain(baseName);
+  });
+
+  it('normalizes missing and malformed animations but preserves an empty array', () => {
+    const missing = {
+      name: 'Missing',
+      type_name: 'hair',
+      credits: hair.credits,
+      layer_1: hair.layer_1,
+    } as unknown as ItemDefinition;
+    const malformed = { ...hair, animations: 'walk' } as unknown as ItemDefinition;
+    const mixed = { ...hair, animations: ['walk', 42] } as unknown as ItemDefinition;
+    const empty = { ...hair, animations: [] };
+    const catalog = createCatalog({
+      'hair/missing.json': missing,
+      'hair/malformed.json': malformed,
+      'hair/mixed.json': mixed,
+      'hair/empty.json': empty,
+    }).catalog;
+
+    expect(getCatalogItem(catalog, 'missing', palettes)?.animations).toEqual(ANIMATION_DEFAULTS);
+    expect(getCatalogItem(catalog, 'malformed', palettes)?.animations).toEqual(ANIMATION_DEFAULTS);
+    expect(getCatalogItem(catalog, 'mixed', palettes)?.animations).toEqual(ANIMATION_DEFAULTS);
+    expect(getCatalogItem(catalog, 'empty', palettes)).toMatchObject({
+      animations: [],
+      compatibleAnimations: [],
+    });
+  });
+
+  it('does not infer compatibility for an unknown custom animation', () => {
+    const item = { ...hair, name: 'Unknown', animations: ['unknown_custom'] };
+    const detail = getCatalogItem(
+      createCatalog({ 'hair/unknown.json': item }).catalog,
+      'unknown',
+      palettes,
+    );
+
+    expect(detail).toMatchObject({
+      animations: ['unknown_custom'],
+      compatibleAnimations: [],
+    });
+    expect(detail?.unsupportedAnimations).toContain('sit');
+  });
+
   it('defaults broad discovery to twenty items', () => {
     const largeCatalog = createCatalog(Object.fromEntries(
       Array.from({ length: 22 }, (_, index) => [
@@ -326,7 +411,7 @@ describe('catalog commands', () => {
       data: {
         items: [{
           itemId: 'missing_animations',
-          animations: [],
+          animations: ANIMATION_DEFAULTS,
           creditCount: 1,
         }],
       },
@@ -352,6 +437,35 @@ describe('catalog commands', () => {
     expect(response).toMatchObject({
       ok: true,
       data: { items: [{ animations: ['zz-target'] }] },
+      errors: [],
+    });
+  });
+
+  it('filters custom animations by their compatible standard base', () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-catalog-custom-'));
+    const definitionPath = path.join(
+      cwd,
+      'assets',
+      'sheet_definitions',
+      'body',
+      'wheelchair.json',
+    );
+    mkdirSync(path.dirname(definitionPath), { recursive: true });
+    writeFileSync(definitionPath, JSON.stringify({
+      ...hair,
+      name: 'Wheelchair',
+      type_name: 'wheelchair',
+      animations: ['wheelchair'],
+    }));
+
+    const response = runCatalogCommand(
+      parseArgs(['catalog', 'items', '--animation', 'sit']),
+      createRuntime(cwd),
+    );
+
+    expect(response).toMatchObject({
+      ok: true,
+      data: { items: [{ itemId: 'wheelchair', animations: ['wheelchair'] }] },
       errors: [],
     });
   });

@@ -131,6 +131,15 @@ full credit entries for exact attribution review. Restart from offset zero when
 the catalog source, custom overlay, query filters, or character selection
 changes.
 
+`catalog item <itemId>` keeps `animations` as the asset's native animation
+identifiers. Item detail also reports `compatibleAnimations`, derived from
+registered custom-animation bases such as `wheelchair` → `sit`, and
+`unsupportedAnimations`, the ordered standard animation names supported by
+neither the native nor compatible set. Human output labels the latter fields
+`compatible standard animations` and `unsupported standard animations`.
+Definitions without a valid `animations` array use the same standard defaults
+as Core composition; an explicit empty array remains empty.
+
 Run `lpc-toolkit --help` for the command summary.
 
 ## Local Web UI

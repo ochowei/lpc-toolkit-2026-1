@@ -38,6 +38,12 @@ describe('helpForCommand', () => {
     expect(help).not.toContain('lpc-toolkit character set');
   });
 
+  it('describes catalog item animation capability inspection', () => {
+    expect(helpForCommand(['catalog', 'item'])).toContain(
+      'Show one catalog item with credits and animation capabilities.',
+    );
+  });
+
   it('documents character creation and preview defaults', () => {
     const createHelp = helpForCommand(['character', 'create']);
     expect(createHelp).toContain('Default: male');
