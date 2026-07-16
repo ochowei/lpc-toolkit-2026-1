@@ -1,7 +1,11 @@
 import {
+  ANIMATIONS,
+  ANIMATION_DEFAULTS,
   BODY_TYPES,
   LICENSE_GROUP_OF,
   LICENSE_GROUP_ORDER,
+  customAnimationBase,
+  customAnimations,
   getRecolorVariants,
   type AnimationName,
   type BodyType,
@@ -46,7 +50,15 @@ export interface DiscoveryItemSummary {
 }
 
 export interface DiscoveryItemDetail extends DiscoveryItemSummary {
+  readonly compatibleAnimations: readonly AnimationName[];
+  readonly unsupportedAnimations: readonly AnimationName[];
   readonly credits: readonly CreditEntry[];
+}
+
+export interface ItemAnimationCapabilities {
+  readonly native: readonly AnimationName[];
+  readonly compatible: readonly AnimationName[];
+  readonly unsupported: readonly AnimationName[];
 }
 
 export interface DiscoveryCandidate<T extends DiscoveryItemSummary> {
@@ -124,11 +136,33 @@ function licenseGroups(item: ItemDefinition): readonly LicenseGroup[] {
   return LICENSE_GROUP_ORDER.filter((group) => present.has(group));
 }
 
-function itemAnimations(item: ItemDefinition): readonly AnimationName[] {
-  const animations: unknown = item.animations;
-  return Array.isArray(animations)
-    ? animations.filter((animation): animation is AnimationName => typeof animation === 'string')
-    : [];
+const STANDARD_ANIMATION_NAMES = ANIMATIONS.map((animation) => animation.value);
+const STANDARD_ANIMATION_SET = new Set<AnimationName>(STANDARD_ANIMATION_NAMES);
+
+export function itemAnimationCapabilities(
+  item: ItemDefinition,
+): ItemAnimationCapabilities {
+  const raw: unknown = item.animations;
+  const native = Array.isArray(raw)
+    ? [...new Set(raw.filter((name): name is AnimationName => typeof name === 'string'))]
+    : [...ANIMATION_DEFAULTS];
+  const nativeSet = new Set(native);
+  const compatibleSet = new Set<AnimationName>();
+
+  for (const name of native) {
+    const custom = customAnimations[name];
+    if (!custom) continue;
+    const base = customAnimationBase(custom);
+    if (STANDARD_ANIMATION_SET.has(base) && !nativeSet.has(base)) {
+      compatibleSet.add(base);
+    }
+  }
+
+  const compatible = STANDARD_ANIMATION_NAMES.filter((name) => compatibleSet.has(name));
+  const unsupported = STANDARD_ANIMATION_NAMES.filter(
+    (name) => !nativeSet.has(name) && !compatibleSet.has(name),
+  );
+  return { native, compatible, unsupported };
 }
 
 function isStringArray(value: unknown): value is readonly string[] {
@@ -154,6 +188,7 @@ export function toDiscoveryCandidate(
   palettes: PaletteMetadata,
 ): DiscoveryCandidate<DiscoveryItemSummary> | undefined {
   if (!item.itemId || !hasDiscoveryCredits(item)) return undefined;
+  const capabilities = itemAnimationCapabilities(item);
   return {
     internalName: item.name,
     summary: {
@@ -163,7 +198,7 @@ export function toDiscoveryCandidate(
       supportedBodyTypes: supportedBodyTypes(item),
       variants: item.variants ?? [],
       recolors: getRecolorVariants(item, palettes),
-      animations: itemAnimations(item),
+      animations: capabilities.native,
       licenses: licenseGroups(item),
       creditCount: item.credits.length,
     },
@@ -175,7 +210,14 @@ export function toDiscoveryDetail(
   palettes: PaletteMetadata,
 ): DiscoveryItemDetail | undefined {
   const candidate = toDiscoveryCandidate(item, palettes);
-  return candidate ? { ...candidate.summary, credits: item.credits } : undefined;
+  if (!candidate) return undefined;
+  const capabilities = itemAnimationCapabilities(item);
+  return {
+    ...candidate.summary,
+    compatibleAnimations: capabilities.compatible,
+    unsupportedAnimations: capabilities.unsupported,
+    credits: item.credits,
+  };
 }
 
 function integerIssue(

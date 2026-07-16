@@ -12,6 +12,7 @@ import {
   discoverItems,
   editDistance,
   hasDiscoveryCredits,
+  itemAnimationCapabilities,
   readDiscoveryPagination,
   toDiscoveryCandidate,
   toDiscoveryDetail,
@@ -47,10 +48,6 @@ function stringArray(value: unknown): readonly string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 }
 
-function itemAnimations(item: ItemDefinition): readonly AnimationName[] {
-  return stringArray(item.animations);
-}
-
 function itemLicenses(item: ItemDefinition): readonly string[] {
   const credits: unknown = item.credits;
   if (!Array.isArray(credits)) return [];
@@ -75,6 +72,11 @@ function itemMatchesLicense(item: ItemDefinition, licenseFilter: string): boolea
   });
 }
 
+function itemMatchesAnimation(item: ItemDefinition, animation: AnimationName): boolean {
+  const capabilities = itemAnimationCapabilities(item);
+  return capabilities.native.includes(animation) || capabilities.compatible.includes(animation);
+}
+
 export function listCatalogItems(
   catalog: Catalog,
   options: CatalogItemsOptions,
@@ -83,7 +85,7 @@ export function listCatalogItems(
     ? catalog.byTypeName.get(options.typeName) ?? []
     : [...catalog.byItemId.values()];
   const candidates = definitions.flatMap((item) => {
-    if (options.animation && !itemAnimations(item).includes(options.animation)) return [];
+    if (options.animation && !itemMatchesAnimation(item, options.animation)) return [];
     if (options.license && !itemMatchesLicense(item, options.license)) return [];
     const candidate = toDiscoveryCandidate(item, options.palettes);
     if (!candidate) return [];
@@ -150,7 +152,10 @@ function filterIssue(
     return domainIssue('body_type_invalid', 'body type', options.bodyType, BODY_TYPES);
   }
   const items = [...catalog.byItemId.values()].filter(hasDiscoveryCredits);
-  const animations = domain(items.flatMap((item) => itemAnimations(item)));
+  const animations = domain(items.flatMap((item) => {
+    const capabilities = itemAnimationCapabilities(item);
+    return [...capabilities.native, ...capabilities.compatible];
+  }));
   if (options.animation && !animations.includes(options.animation)) {
     return domainIssue('unknown_animation', 'animation', options.animation, animations);
   }
