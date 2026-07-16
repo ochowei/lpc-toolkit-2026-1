@@ -10,11 +10,6 @@ const installCommands = [
   'npx @lpc-toolkit/cli --help',
 ] as const;
 
-const developmentInstallCommands = [
-  'rtk pnpm --filter @lpc-toolkit/cli pack --pack-destination /tmp',
-  'npm install -g /tmp/lpc-toolkit-cli-0.1.4-beta-1.tgz',
-] as const;
-
 const characterSteps = [
   {
     title: 'Create a starting character',
@@ -104,17 +99,6 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           </p>
           <div className="mt-5 space-y-3">
             {installCommands.map((command) => (
-              <code key={command} className={codeClassName}>
-                {command}
-              </code>
-            ))}
-          </div>
-          <p className="mt-5 max-w-2xl text-sm text-text-2">
-            The agent workflow below targets the locally packed development CLI.
-            0.1.4-beta-1 is a development version and is not published to npm.
-          </p>
-          <div className="mt-3 space-y-3">
-            {developmentInstallCommands.map((command) => (
               <code key={command} className={codeClassName}>
                 {command}
               </code>
