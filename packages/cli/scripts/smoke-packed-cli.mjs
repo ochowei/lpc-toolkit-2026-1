@@ -41,6 +41,21 @@ function runNodeTool(toolPath, args, options = {}) {
   return execFileSync(process.execPath, [toolPath, ...args], options);
 }
 
+function parseViewerData(viewerHtml) {
+  const marker = '<script id="viewer-data" type="application/json">';
+  const markerIndex = viewerHtml.indexOf(marker);
+  assert.notEqual(markerIndex, -1, 'viewer is missing viewer-data marker');
+  const payloadStart = markerIndex + marker.length;
+  const payloadEnd = viewerHtml.indexOf('</script>', payloadStart);
+  assert.notEqual(payloadEnd, -1, 'viewer-data script is missing its closing tag');
+  assert.equal(
+    viewerHtml.indexOf(marker, payloadStart),
+    -1,
+    'viewer must contain exactly one viewer-data payload',
+  );
+  return JSON.parse(viewerHtml.slice(payloadStart, payloadEnd));
+}
+
 function waitForWebUrl(web, timeoutMs) {
   return new Promise((resolve, reject) => {
     let output = '';
@@ -254,10 +269,20 @@ try {
   const sheetFileName = path.basename(sheetArtifact.path);
   const viewerHtml = readFileSync(viewerArtifact.path, 'utf8');
   assert.match(viewerHtml, /id="viewer-data"/u);
-  assert.ok(
-    viewerHtml.includes(sheetFileName),
-    `viewer is missing relative sheet filename ${sheetFileName}`,
+  const viewerData = parseViewerData(viewerHtml);
+  const viewerSheetFileName = viewerData.sheet?.fileName;
+  assert.equal(typeof viewerSheetFileName, 'string', 'viewer-data is missing sheet.fileName');
+  assert.equal(
+    viewerSheetFileName,
+    sheetFileName,
+    'viewer-data sheet filename must match the rendered sheet basename',
   );
+  assert.equal(path.posix.isAbsolute(viewerSheetFileName), false);
+  assert.equal(path.win32.isAbsolute(viewerSheetFileName), false);
+  assert.equal(path.posix.basename(viewerSheetFileName), viewerSheetFileName);
+  assert.equal(path.win32.basename(viewerSheetFileName), viewerSheetFileName);
+  assert.equal(viewerSheetFileName.includes('/'), false, 'viewer sheet filename contains /');
+  assert.equal(viewerSheetFileName.includes('\\'), false, 'viewer sheet filename contains \\');
   const presetArchive = await JSZip.loadAsync(readFileSync(zipArtifact.path));
   assert.ok(
     presetArchive.file(viewerFileName) !== null,
