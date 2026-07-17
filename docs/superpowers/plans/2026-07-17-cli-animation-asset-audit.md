@@ -129,7 +129,7 @@ Reassess the matrix in Task 6 before handoff. If implementation changes an addit
 - Produces: the four capability/folder functions listed under Stable Interfaces.
 - Preserves: current catalog detail arrays and `catalog items --animation` compatibility filtering.
 
-- [ ] **Step 1: Write failing Core capability tests**
+- [x] **Step 1: Write failing Core capability tests**
 
 Create `packages/core/test/animation-capabilities.test.ts` with focused fixtures:
 
@@ -180,7 +180,7 @@ describe('itemAnimationCapabilities', () => {
 });
 ```
 
-- [ ] **Step 2: Run the new test and verify RED**
+- [x] **Step 2: Run the new test and verify RED**
 
 Run:
 
@@ -190,7 +190,7 @@ rtk pnpm --filter @lpc-toolkit/core test -- animation-capabilities.test.ts
 
 Expected: FAIL because `animation-capabilities.ts` does not exist.
 
-- [ ] **Step 3: Implement the shared capability module**
+- [x] **Step 3: Implement the shared capability module**
 
 Create the module with strict normalization and deterministic registry ordering:
 
@@ -270,13 +270,13 @@ export function animationsSupportFolder(
 
 Export these functions and `ItemAnimationCapabilities` from `packages/core/src/index.ts`.
 
-- [ ] **Step 4: Remove duplicate consumers without changing behavior**
+- [x] **Step 4: Remove duplicate consumers without changing behavior**
 
 In `compose.ts` and `asset-validator.ts`, import `animationsSupportFolder`, remove their local `supportsFolder` functions, and replace only those calls. Do not replace `compose.ts`'s private `logicalToFolder`; changing `watering` composition is outside this feature.
 
 In `catalog-discovery.ts`, import `itemAnimationCapabilities` and `ItemAnimationCapabilities` from `@lpc-toolkit/core`, delete the local interface/helper/registry sets, and keep existing projections unchanged. In `catalog-commands.ts`, import `itemAnimationCapabilities` from Core instead of `catalog-discovery.ts`.
 
-- [ ] **Step 5: Run Core and CLI capability tests and verify GREEN**
+- [x] **Step 5: Run Core and CLI capability tests and verify GREEN**
 
 Run:
 
@@ -287,7 +287,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- catalog-commands.test.ts catalog-disc
 
 Expected: PASS; existing catalog JSON capability fields, filters, composition, and validation remain unchanged.
 
-- [ ] **Step 6: Commit the shared rules**
+- [x] **Step 6: Commit the shared rules**
 
 ```sh
 rtk git add packages/core/src/animation-capabilities.ts packages/core/src/compose.ts packages/core/src/validation/asset-validator.ts packages/core/src/index.ts packages/core/test/animation-capabilities.test.ts packages/cli/src/catalog-discovery.ts packages/cli/src/catalog-commands.ts packages/cli/test/catalog-commands.test.ts
@@ -297,7 +297,7 @@ rtk git rev-parse HEAD
 
 Expected: commit succeeds and the final command prints the full product commit hash.
 
-- [ ] **Step 7: Record Task 1 evidence in this plan**
+- [x] **Step 7: Record Task 1 evidence in this plan**
 
 Check Task 1 steps, add `Implementation`, `Commit`, and exact `Verification` PASS lines beneath this task, then commit the plan record:
 
@@ -305,6 +305,16 @@ Check Task 1 steps, add `Implementation`, `Commit`, and exact `Verification` PAS
 rtk git add docs/superpowers/plans/2026-07-17-cli-animation-asset-audit.md
 rtk git commit -m "docs(plan): record animation capability rules"
 ```
+
+Implementation: Added Core animation capability and source-folder helpers, then migrated composition, validation, and CLI catalog consumers to them without changing catalog capability projections or filters.
+
+Commit: dafe79744fa2446a87ff1e27c3a07a742704718d
+
+TDD RED verification: `rtk pnpm --filter @lpc-toolkit/core test -- animation-capabilities.test.ts` FAIL (expected: missing `animation-capabilities.ts`).
+
+Verification: `rtk pnpm --filter @lpc-toolkit/core test -- animation-capabilities.test.ts validation/asset-validator.test.ts compose.test.ts` PASS
+
+Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- catalog-commands.test.ts catalog-discovery.test.ts` PASS
 
 ---
 
