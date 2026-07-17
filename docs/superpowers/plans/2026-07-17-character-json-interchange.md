@@ -327,7 +327,7 @@ export function importSelectionDocument(
 ): ImportedSelectionDocument;
 ```
 
-- [ ] **Step 1: Write failing upstream import tests**
+- [x] **Step 1: Write failing upstream import tests**
 
 Create fixtures entirely in the test; do not read `upstream/`. The core cases
 must include:
@@ -396,7 +396,7 @@ Build `context` with `createCatalog` and inline `PaletteMetadata`. Include a
 metal palette ramps, so the test proves the sub-binding rather than merely
 asserting a primary item.
 
-- [ ] **Step 2: Run focused tests and verify missing exports**
+- [x] **Step 2: Run focused tests and verify missing exports**
 
 Run:
 
@@ -407,7 +407,7 @@ rtk pnpm --filter @lpc-toolkit/core test -- upstream-selection-import.test.ts
 Expected: FAIL because `importSelectionDocument` and the type-specific recolor
 helpers do not exist.
 
-- [ ] **Step 3: Add type-specific recolor helpers**
+- [x] **Step 3: Add type-specific recolor helpers**
 
 Extend `packages/core/src/recolor-resolve.ts` without changing the existing
 `getRecolorVariants` result:
@@ -440,7 +440,7 @@ export function getRecolorVariantsForType(
 Add focused assertions to `recolor-resolve.test.ts` proving primary and `trim`
 lookups, and export these helpers from `packages/core/src/index.ts`.
 
-- [ ] **Step 4: Implement discriminator detection and conversion**
+- [x] **Step 4: Implement discriminator detection and conversion**
 
 Create `packages/core/src/upstream-selection-import.ts`. Use record guards and
 the following exact public error/source contract:
@@ -531,7 +531,7 @@ export function importSelectionDocument(
 
 Export all public types/functions from `packages/core/src/index.ts`.
 
-- [ ] **Step 5: Run core test, type, and boundary gates**
+- [x] **Step 5: Run core test, type, and boundary gates**
 
 Run:
 
@@ -543,7 +543,7 @@ rtk pnpm check:boundaries
 
 Expected: all PASS.
 
-- [ ] **Step 6: Commit and record Task 2**
+- [x] **Step 6: Commit and record Task 2**
 
 ```sh
 rtk git add packages/core/src/upstream-selection-import.ts packages/core/src/recolor-resolve.ts packages/core/src/index.ts packages/core/test/upstream-selection-import.test.ts packages/core/test/recolor-resolve.test.ts
@@ -553,6 +553,22 @@ rtk git rev-parse HEAD
 
 Record the full hash and PASS commands under Task 2, then commit the plan
 record as `docs(plan): record character JSON task 2`.
+
+**Implementation note:** Added pure canonical/upstream-v1/upstream-v2 document
+detection and import, catalog/palette-backed validation, and type-specific
+recolor helpers. Review findings around malformed v1 hash components and
+invalid absolute HTTP(S) authorities were fixed with focused regressions; the
+independent re-review approved the task with no remaining issues.
+
+**Commits:**
+- `d6e56e1db0b93e74f6c3d8e6f769693cbd93216f`
+- `58c5bba470bdfe92912ab09b7eb13d8697ba2a4a`
+
+**Verification:**
+- `rtk pnpm --filter @lpc-toolkit/core test -- upstream-selection-import.test.ts hash.test.ts recolor-resolve.test.ts selection-document.test.ts` PASS (80 tests)
+- `rtk pnpm --filter @lpc-toolkit/core test` PASS (198 tests)
+- `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS
+- `rtk pnpm check:boundaries` PASS
 
 ---
 
