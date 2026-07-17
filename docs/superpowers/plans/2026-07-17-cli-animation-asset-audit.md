@@ -332,7 +332,7 @@ Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- catalog-commands.test.
 - Produces: `planAssetAnimationAudit(options): AssetAnimationAuditPlan` and all immutable plan types exported from Core.
 - Produces: additive `ResolvedLayer.layerNumber: number` metadata.
 
-- [ ] **Step 1: Define failing planner fixtures and assertions**
+- [x] **Step 1: Define failing planner fixtures and assertions**
 
 Create `packages/core/test/asset-animation-audit.test.ts`. Use `createCatalog` and `createPaletteCatalog` to cover a variant/recolor item, shared paths, compatible custom geometry, unsupported custom-only items, and unresolved path substitutions:
 
@@ -400,7 +400,9 @@ Add assertions that:
 - `typeName` and `bodyType` options narrow `itemsScanned` and consumers;
 - assets and unsupported findings sort deterministically.
 
-- [ ] **Step 2: Run the planner test and verify RED**
+- [x] **Step 2: Run the planner test and verify RED**
+
+  - RED verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-animation-audit.test.ts` FAIL (the planner module did not exist).
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/core test -- asset-animation-audit.test.ts
@@ -408,7 +410,9 @@ rtk pnpm --filter @lpc-toolkit/core test -- asset-animation-audit.test.ts
 
 Expected: FAIL because the planner and its types do not exist.
 
-- [ ] **Step 3: Add the immutable plan model**
+- [x] **Step 3: Add the immutable plan model**
+
+  - Added all public immutable audit-plan types and the planner export.
 
 Create these public shapes in `asset-animation-audit.ts`:
 
@@ -487,7 +491,9 @@ export interface PlanAssetAnimationAuditOptions {
 }
 ```
 
-- [ ] **Step 4: Implement geometry and path planning**
+- [x] **Step 4: Implement geometry and path planning**
+
+  - Implemented registry-ordered target planning, geometry, path expansion, consumer merging, unsupported findings, and deterministic ordering.
 
 Implement `standardGeometry(target)` by converting every unique source column in `ANIMATION_CONFIGS[target].cycle` into a cell whose `logicalFrameIndices` are the matching zero-based cycle positions. Use source rows `0..num-1` because each physical animation PNG begins at its own row zero, and use `DIRECTIONS[row]` when present.
 
@@ -509,7 +515,9 @@ Expand raw `${name}` paths over all distinct values in `item.replace_in_path?.[n
 
 Group body types that resolve to the same base path, expand physical `item.variants` or `[undefined]`, attach `getRecolorVariants(item, palettes)`, then deduplicate supported assets by `path + animation + sourceAnimation + geometry`. Merge consumers rather than duplicating physical work.
 
-- [ ] **Step 5: Add layer numbers without changing public composition paths**
+- [x] **Step 5: Add layer numbers without changing public composition paths**
+
+  - Added additive `ResolvedLayer.layerNumber` metadata with coverage for two source layers.
 
 Extend `ResolvedLayer` and its constructor in `compose.ts`:
 
@@ -536,7 +544,11 @@ Add a `resolveLayers` assertion in `compose.test.ts` that two synthetic layers r
 
 Export the planner, options, and all plan types from `index.ts`.
 
-- [ ] **Step 6: Run focused Core tests and verify GREEN**
+- [x] **Step 6: Run focused Core tests and verify GREEN**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-animation-audit.test.ts animation-capabilities.test.ts compose.test.ts validation/asset-validator.test.ts` PASS
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS
+  - Additional verification: `rtk pnpm check:boundaries` PASS
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/core test -- asset-animation-audit.test.ts animation-capabilities.test.ts compose.test.ts validation/asset-validator.test.ts
@@ -545,7 +557,9 @@ rtk pnpm --filter @lpc-toolkit/core run typecheck
 
 Expected: PASS; no boundary or strict-type errors.
 
-- [ ] **Step 7: Commit the Core planner**
+- [x] **Step 7: Commit the Core planner**
+
+  - Product commit: `1fe99826cd94ed5b4ef6a64876e49c6fe9a92876`
 
 ```sh
 rtk git add packages/core/src/asset-animation-audit.ts packages/core/src/compose.ts packages/core/src/index.ts packages/core/test/asset-animation-audit.test.ts packages/core/test/compose.test.ts
@@ -553,7 +567,7 @@ rtk git commit -m "feat(core): plan animation asset audits"
 rtk git rev-parse HEAD
 ```
 
-- [ ] **Step 8: Record Task 2 evidence in this plan**
+- [x] **Step 8: Record Task 2 evidence in this plan**
 
 Record the implementation note, full product commit hash, and both exact PASS commands, then:
 
