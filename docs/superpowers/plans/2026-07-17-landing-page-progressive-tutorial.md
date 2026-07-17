@@ -14,7 +14,7 @@
 - The primary CLI path is exactly install, create `hero` from `farmer`, and preview `hero`.
 - State that Node.js 22 or newer is required.
 - State that the first asset-dependent command downloads approximately 205 MB once, verifies it, and reuses the cache.
-- Keep `hero.preview.png`, `hero.credits.txt`, and `hero.credits.csv` together under `packages/web/src/assets/landing/`.
+- Keep `hero.preview.png`, `hero.credits.txt`, and `hero.credits.csv` together under `packages/web/src/landing-artifacts/`.
 - Import the two credit files with Vite `?url`; do not use `publicDir`, because the CLI embedded build disables it.
 - Keep mandatory metadata plus TXT/CSV attribution guidance for preview and render output.
 - Add no dependency, clipboard state, tabs, accordion, runtime composition, CLI behavior, or Composer-route change.
@@ -24,9 +24,9 @@
 
 ## File Structure
 
-- Create `packages/web/src/assets/landing/hero.preview.png`: CLI-generated 64×64 farmer preview bundled by Vite.
-- Create `packages/web/src/assets/landing/hero.credits.txt`: matching human-readable attribution for the preview.
-- Create `packages/web/src/assets/landing/hero.credits.csv`: matching machine-readable attribution for the preview.
+- Create `packages/web/src/landing-artifacts/hero.preview.png`: CLI-generated 64×64 farmer preview bundled by Vite.
+- Create `packages/web/src/landing-artifacts/hero.credits.txt`: matching human-readable attribution for the preview.
+- Create `packages/web/src/landing-artifacts/hero.credits.csv`: matching machine-readable attribution for the preview.
 - Create `packages/web/test/landing-artifacts.test.ts`: enforce that the preview and both non-empty credit files remain together.
 - Modify `packages/web/test/landing-page.test.tsx`: specify the progressive tutorial, links, output tree, and removed reference content.
 - Modify `packages/web/src/components/landing-page.tsx`: own the static hero, tutorial, output, customization, render, and documentation-link presentation.
@@ -38,9 +38,9 @@
 ### Task 1: Add the Attributed Farmer Preview Set
 
 **Files:**
-- Create: `packages/web/src/assets/landing/hero.preview.png`
-- Create: `packages/web/src/assets/landing/hero.credits.txt`
-- Create: `packages/web/src/assets/landing/hero.credits.csv`
+- Create: `packages/web/src/landing-artifacts/hero.preview.png`
+- Create: `packages/web/src/landing-artifacts/hero.credits.txt`
+- Create: `packages/web/src/landing-artifacts/hero.credits.csv`
 - Create: `packages/web/test/landing-artifacts.test.ts`
 - Modify: `docs/superpowers/specs/2026-07-17-landing-page-progressive-tutorial-design.md`
 - Modify: `docs/superpowers/plans/2026-07-17-landing-page-progressive-tutorial.md`
@@ -49,7 +49,7 @@
 - Consumes: public CLI commands `character create` and `character preview`, the verified managed asset cache, and Vite static-asset imports.
 - Produces: three co-located landing assets named `hero.preview.png`, `hero.credits.txt`, and `hero.credits.csv`; Task 2 imports all three.
 
-- [ ] **Step 1: Write the failing artifact-integrity test**
+- [x] **Step 1: Write the failing artifact-integrity test**
 
 Create `packages/web/test/landing-artifacts.test.ts` with:
 
@@ -59,7 +59,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 function landingArtifact(name: string): string {
-  return fileURLToPath(new URL(`../src/assets/landing/${name}`, import.meta.url));
+  return fileURLToPath(new URL(`../src/landing-artifacts/${name}`, import.meta.url));
 }
 
 describe('landing preview artifacts', () => {
@@ -86,7 +86,7 @@ describe('landing preview artifacts', () => {
 });
 ```
 
-- [ ] **Step 2: Run the artifact test and confirm RED**
+- [x] **Step 2: Run the artifact test and confirm RED**
 
 Run:
 
@@ -95,28 +95,30 @@ rtk pnpm --filter @lpc-toolkit/web test -- landing-artifacts.test.ts
 ```
 
 Expected: FAIL with `ENOENT` for
-`packages/web/src/assets/landing/hero.preview.png`. The failure must be missing
+`packages/web/src/landing-artifacts/hero.preview.png`. The failure must be missing
 artifacts, not a TypeScript or test-discovery error.
 
-- [ ] **Step 3: Generate the preview and copy only the attributed visual set**
+- [x] **Step 3: Generate the preview and copy only the attributed visual set**
 
 Run these commands from the repository root:
 
 ```sh
 rtk mkdir -p /private/tmp/lpc-landing-preview-2026-07-17
-rtk mkdir -p packages/web/src/assets/landing
-rtk pnpm --filter @lpc-toolkit/cli exec tsx src/index.ts character create hero --preset farmer --selection /private/tmp/lpc-landing-preview-2026-07-17/hero.selection.json
-rtk pnpm --filter @lpc-toolkit/cli exec tsx src/index.ts character preview --selection /private/tmp/lpc-landing-preview-2026-07-17/hero.selection.json --out /private/tmp/lpc-landing-preview-2026-07-17/output
-rtk cp /private/tmp/lpc-landing-preview-2026-07-17/output/hero.preview.png packages/web/src/assets/landing/hero.preview.png
-rtk cp /private/tmp/lpc-landing-preview-2026-07-17/output/hero.credits.txt packages/web/src/assets/landing/hero.credits.txt
-rtk cp /private/tmp/lpc-landing-preview-2026-07-17/output/hero.credits.csv packages/web/src/assets/landing/hero.credits.csv
+rtk mkdir -p packages/web/src/landing-artifacts
+rtk lpc-toolkit character create hero --preset farmer --selection /private/tmp/lpc-landing-preview-2026-07-17/hero.selection.json
+rtk lpc-toolkit character preview --selection /private/tmp/lpc-landing-preview-2026-07-17/hero.selection.json --out /private/tmp/lpc-landing-preview-2026-07-17/output
+rtk cp /private/tmp/lpc-landing-preview-2026-07-17/output/hero.preview.png packages/web/src/landing-artifacts/hero.preview.png
+rtk cp /private/tmp/lpc-landing-preview-2026-07-17/output/hero.credits.txt packages/web/src/landing-artifacts/hero.credits.txt
+rtk cp /private/tmp/lpc-landing-preview-2026-07-17/output/hero.credits.csv packages/web/src/landing-artifacts/hero.credits.csv
 ```
 
-Expected: `character create` reports the explicit selection path, `character
-preview` reports four attributed artifacts in the temporary output directory,
-and only the PNG plus matching TXT/CSV credits are copied into web source.
+Expected: installed public CLI version `0.1.4` reports the explicit selection
+path, `character preview` reports four attributed artifacts in the temporary
+output directory, and only the PNG plus matching TXT/CSV credits are copied
+into web source. Source execution is intentionally not used because release
+configuration is bundled beside the built `dist/index.js` entrypoint.
 
-- [ ] **Step 4: Run the artifact test and confirm GREEN**
+- [x] **Step 4: Run the artifact test and confirm GREEN**
 
 Run:
 
@@ -131,12 +133,24 @@ Expected: PASS with one passing test.
 Run:
 
 ```sh
-rtk git add packages/web/src/assets/landing/hero.preview.png packages/web/src/assets/landing/hero.credits.txt packages/web/src/assets/landing/hero.credits.csv packages/web/test/landing-artifacts.test.ts docs/superpowers/specs/2026-07-17-landing-page-progressive-tutorial-design.md docs/superpowers/plans/2026-07-17-landing-page-progressive-tutorial.md
+rtk git add packages/web/src/landing-artifacts/hero.preview.png packages/web/src/landing-artifacts/hero.credits.txt packages/web/src/landing-artifacts/hero.credits.csv packages/web/test/landing-artifacts.test.ts docs/superpowers/specs/2026-07-17-landing-page-progressive-tutorial-design.md docs/superpowers/plans/2026-07-17-landing-page-progressive-tutorial.md
 rtk git commit -m "feat(web): add attributed landing preview"
 ```
 
 After committing, append the implementation note, full hash, and RED/GREEN
 command results under this task before beginning Task 2.
+
+- Implementation note: Added an integrity test, then generated a real 64×64
+  farmer preview with installed public CLI `0.1.4` and copied its matching TXT
+  and CSV credits into Vite-bundled web source. The trackable
+  `src/landing-artifacts/` path avoids the repository-wide ignored `assets/`
+  directory name. Direct `src/index.ts` execution was rejected because release
+  configuration is intentionally bundled beside `dist/index.js`; the plan now
+  uses the installed public entrypoint.
+- Verification: `rtk pnpm --filter @lpc-toolkit/web test -- landing-artifacts.test.ts`
+  RED as expected with `ENOENT` for `hero.preview.png`.
+- Verification: `rtk pnpm --filter @lpc-toolkit/web test -- landing-artifacts.test.ts`
+  PASS (1 test).
 
 ---
 
@@ -230,9 +244,9 @@ preview image, CLI anchor, 205 MB guidance, and reduced reference content.
 Replace `packages/web/src/components/landing-page.tsx` with:
 
 ```tsx
-import heroPreviewUrl from '../assets/landing/hero.preview.png';
-import heroCreditsTxtUrl from '../assets/landing/hero.credits.txt?url';
-import heroCreditsCsvUrl from '../assets/landing/hero.credits.csv?url';
+import heroPreviewUrl from '../landing-artifacts/hero.preview.png';
+import heroCreditsTxtUrl from '../landing-artifacts/hero.credits.txt?url';
+import heroCreditsCsvUrl from '../landing-artifacts/hero.credits.csv?url';
 import type { NavigableAppRoute } from '../lib/app-route';
 import { Button } from './ui/button';
 

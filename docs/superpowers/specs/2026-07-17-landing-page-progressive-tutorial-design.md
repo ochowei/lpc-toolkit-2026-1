@@ -57,7 +57,7 @@ the CLI while keeping attribution with the result.
 The hero displays a real 64×64 farmer preview at a pixel-preserving scale. The
 preview is generated from the public CLI's farmer preset, not hand-drawn or
 substituted with unrelated artwork. The checked-in landing artifacts are kept
-together under `packages/web/src/assets/landing/` so Vite bundles them into
+together under `packages/web/src/landing-artifacts/` so Vite bundles them into
 both the normal web build and the CLI embedded build:
 
 ```text
