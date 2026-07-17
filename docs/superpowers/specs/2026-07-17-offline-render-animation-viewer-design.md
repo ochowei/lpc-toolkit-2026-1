@@ -52,8 +52,8 @@ introduce a second LPC layout model in the CLI or generated JavaScript.
 ### 1. Master sheet with embedded playback manifest (selected)
 
 Generate one HTML artifact that references the existing sibling master sheet.
-Embed CSS, JavaScript, the playback manifest, render information, and complete
-TXT credits into the HTML. This keeps the output compact, works under
+Embed CSS, JavaScript, the playback manifest, a portable render summary, and
+complete TXT credits into the HTML. This keeps the output compact, works under
 `file://`, and preserves the current opt-in behavior for separate animation
 PNGs.
 
@@ -128,7 +128,8 @@ CLI owns a focused viewer generator that receives:
 
 - the safe render base name and sibling sheet filename;
 - the Core playback descriptions;
-- render identity, dimensions, effective license, warnings, and source data;
+- render identity, dimensions, effective license, warnings, and portable source
+  identity such as runtime source, description, and release tag;
 - the complete rendered Credits TXT content;
 - relative filenames for the metadata and credit artifacts.
 
@@ -136,11 +137,13 @@ It returns a complete HTML string. `renderSelection()` publishes that string as
 another staged artifact. The viewer generator does not load assets, inspect the
 catalog, or compose pixels.
 
-The HTML references only the sibling `<name>.sheet.png`. Metadata and full TXT
-credits are embedded so the page does not need to read local JSON or text files,
-which browsers commonly block for `file://` pages. Links to the sheet, metadata,
-TXT credits, and CSV credits remain relative and work in a normal extracted
-directory.
+The HTML references only the sibling `<name>.sheet.png`. A portable metadata
+summary and full TXT credits are embedded so the page does not need to read
+local JSON or text files, which browsers commonly block for `file://` pages.
+Absolute artifact paths and local definition roots from the machine-oriented
+metadata file are not copied into the HTML. Links to the sheet, complete
+metadata, TXT credits, and CSV credits remain relative and work in a normal
+extracted directory.
 
 ### Generated browser runtime
 
@@ -186,7 +189,7 @@ The full area is collapsed initially. Expanding it shows:
 
 - a master spritesheet thumbnail and link to the original PNG;
 - animation frame, direction, frame-size, and layout information;
-- CLI version, render metadata schema, source identity, and warnings;
+- CLI version, render metadata schema, portable source identity, and warnings;
 - the complete Credits TXT content in a readable preformatted region;
 - relative links to Credits TXT, Credits CSV, metadata JSON, and the sheet.
 
@@ -298,7 +301,8 @@ plugin: update
   rules.
 - Four directions remain synchronized, one-direction animations are presented
   honestly, and all playback controls work.
-- The collapsible information area exposes complete metadata, warnings, file
-  links, effective license, and Credits TXT content.
+- The collapsible information area exposes a portable metadata summary,
+  warnings, effective license, complete Credits TXT content, and a relative
+  link to the complete metadata file.
 - Existing separate animation and frame output options, metadata fields,
   attribution files, and strict render behavior do not regress.
