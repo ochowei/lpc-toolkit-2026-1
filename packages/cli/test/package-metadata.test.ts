@@ -24,7 +24,12 @@ interface CliPackageJson {
 
 interface TokenDecodeSnapshot {
   readonly schemaVersion?: unknown;
-  readonly items?: Readonly<Record<string, { readonly name?: unknown }>>;
+  readonly items?: Readonly<Record<string, {
+    readonly name?: unknown;
+    readonly recolors?: Readonly<Record<string, {
+      readonly type_name?: unknown;
+    }>>;
+  }>>;
   readonly materials?: unknown;
 }
 
@@ -43,7 +48,7 @@ describe('CLI package metadata', () => {
   it('declares public npm release metadata', () => {
     const packageJson = readCliPackageJson();
 
-    expect(packageJson.version).toBe('0.1.4');
+    expect(packageJson.version).toBe('0.2.0');
     expect(packageJson).toMatchObject({
       name: '@lpc-toolkit/cli',
       version: expect.stringMatching(
@@ -109,6 +114,10 @@ describe('CLI package metadata', () => {
     expect(
       Object.values(snapshot.items ?? {}).some((item) => item.name === 'Braid'),
     ).toBe(true);
+    expect(
+      snapshot.items?.['hair/braids/hair_long_tied.json']
+        ?.recolors?.color_2?.type_name,
+    ).toBe('hair_tie');
     expect(snapshotSource).not.toContain('"source"');
     expect(snapshotSource).not.toMatch(/#[0-9A-F]{6}/iu);
   });
@@ -291,11 +300,15 @@ process.stdout.write(JSON.stringify([
     expect(readme).toContain('hair=Braid');
     expect(readme).not.toContain('lpc-toolkit catalog item braids');
     expect(readme).not.toContain('hair=Braids');
+    expect(readme).toMatch(
+      /`--help`, `--version`, `token decode`, `preset list`, `character list`,\s+and\s+`character create` without `--preset` do not prepare the managed cache\./u,
+    );
+    expect(readme).not.toContain('`--help`, token encoding');
   });
 
   it('documents the optional Codex plugin installation', () => {
     const readme = readCliReadme();
-    const cliInstall = "npm install -g '@lpc-toolkit/cli@>=0.1.4 <0.2.0'";
+    const cliInstall = "npm install -g '@lpc-toolkit/cli@>=0.2.0 <0.3.0'";
     const marketplaceAdd = 'codex plugin marketplace add ochowei/lpc-toolkit-2026-1';
     const pluginAdd = 'codex plugin add lpc-toolkit@lpc-toolkit';
 

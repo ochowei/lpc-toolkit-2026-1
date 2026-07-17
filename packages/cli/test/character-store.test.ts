@@ -8,13 +8,13 @@ import {
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { SELECTION_SCHEMA, type SelectionJson } from '@lpc-toolkit/core';
 import {
   listCharacters,
   readCharacter,
   resolveCharacterPath,
   writeCharacter,
 } from '../src/character-store.js';
-import { SELECTION_SCHEMA, type SelectionJson } from '../src/selection.js';
 
 const publicationRace = vi.hoisted(() => ({
   afterTemporaryWrite: undefined as (() => void) | undefined,
@@ -162,6 +162,7 @@ describe('character persistence', () => {
       path: target,
       selection: { name: 'custom' },
       parsed: { metadata: { name: 'custom' } },
+      source: 'canonical',
     });
   });
 });

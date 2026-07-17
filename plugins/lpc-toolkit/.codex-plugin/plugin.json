@@ -1,6 +1,6 @@
 {
   "name": "lpc-toolkit",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Create, edit, preview, and render attributed LPC characters through the installed LPC Toolkit CLI.",
   "author": {
     "name": "LPC Toolkit maintainers",

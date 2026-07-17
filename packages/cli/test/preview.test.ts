@@ -8,6 +8,7 @@ import {
 import os from 'node:os';
 import path from 'node:path';
 import { createCanvas, loadImage } from '@napi-rs/canvas';
+import type { SelectionJson } from '@lpc-toolkit/core';
 import { describe, expect, it } from 'vitest';
 import { createDirectoryAssetStore } from '../src/asset-store.js';
 import { createRuntimeContext } from '../src/context.js';
@@ -50,19 +51,20 @@ async function createFixture(items: Readonly<Record<string, { readonly name: str
   writeFileSync(spritePath, await canvas.encode('png'));
 
   const selectionPath = path.join(cwd, 'saved', 'custom.selection.json');
-  writeJson(selectionPath, {
+  const selectionJson: SelectionJson = {
     schema: 'lpc-toolkit.selection.v1',
     name: 'hero',
     bodyType: 'male',
     items,
-  });
+  };
+  writeJson(selectionPath, selectionJson);
   const store = createDirectoryAssetStore(assetsRoot);
   const runtime: RuntimeAssets = {
     context: createRuntimeContext({ cwd, assetsRoot, spritesheetsBaseUrl: store.baseUrl }),
     store,
     source: 'working-directory',
   };
-  return { runtime, cwd, selectionPath };
+  return { runtime, cwd, selectionPath, selectionJson };
 }
 
 describe('renderCharacterPreview', () => {
@@ -131,6 +133,16 @@ describe('renderCharacterPreview', () => {
     expect(existsSync(path.join(result.outDir, 'hero.preview.png'))).toBe(true);
   }, 30000);
 
+  it('uses the canonical in-memory selection without rereading the source path', async () => {
+    const options = await createFixture();
+    writeFileSync(options.selectionPath, '{');
+
+    const result = await renderCharacterPreview(options);
+
+    expect(result.outDir).toBe(path.join(path.dirname(options.selectionPath), 'previews', 'hero'));
+    expect(existsSync(path.join(result.outDir, 'hero.preview.png'))).toBe(true);
+  }, 30000);
+
   it('defaults a named character beneath characters/previews', async () => {
     const options = await createFixture();
     const result = await renderCharacterPreview({ ...options, characterName: 'named-hero' });
@@ -141,11 +153,11 @@ describe('renderCharacterPreview', () => {
 
   it('falls back to the selection file stem when metadata name is empty', async () => {
     const options = await createFixture();
-    const selection = JSON.parse(readFileSync(options.selectionPath, 'utf8')) as Record<string, unknown>;
-    selection.name = '';
-    writeJson(options.selectionPath, selection);
 
-    const result = await renderCharacterPreview(options);
+    const result = await renderCharacterPreview({
+      ...options,
+      selectionJson: { ...options.selectionJson, name: '' },
+    });
 
     expect(result.outDir).toBe(
       path.join(path.dirname(options.selectionPath), 'previews', 'custom.selection'),
@@ -153,30 +165,31 @@ describe('renderCharacterPreview', () => {
     expect(existsSync(path.join(result.outDir, 'custom.selection.preview.png'))).toBe(true);
   }, 30000);
 
-  it('falls back to the selection file stem when metadata name is not a string', async () => {
+  it('rejects a present non-string metadata name without publishing a preview', async () => {
     const options = await createFixture();
-    const selection = JSON.parse(readFileSync(options.selectionPath, 'utf8')) as Record<string, unknown>;
-    selection.name = 42;
-    writeJson(options.selectionPath, selection);
+    const outDir = path.join(options.cwd, 'invalid-name-preview');
 
-    const result = await renderCharacterPreview(options);
-
-    expect(result.outDir).toBe(
-      path.join(path.dirname(options.selectionPath), 'previews', 'custom.selection'),
+    await expect(
+      renderCharacterPreview({
+        ...options,
+        outDir,
+        selectionJson: { ...options.selectionJson, name: 42 } as unknown as SelectionJson,
+      }),
+    ).rejects.toThrow(
+      'Selection JSON name must be a string.',
     );
+    expect(existsSync(outDir)).toBe(false);
   }, 30000);
 
   it.each(['..', ' !!! '])(
     'contains every explicit-selection artifact under the safe file-stem fallback for metadata %j',
     async (name) => {
       const options = await createFixture();
-      const selection = JSON.parse(
-        readFileSync(options.selectionPath, 'utf8'),
-      ) as Record<string, unknown>;
-      selection.name = name;
-      writeJson(options.selectionPath, selection);
 
-      const result = await renderCharacterPreview(options);
+      const result = await renderCharacterPreview({
+        ...options,
+        selectionJson: { ...options.selectionJson, name },
+      });
       const expectedOutDir = path.join(
         path.dirname(options.selectionPath),
         'previews',

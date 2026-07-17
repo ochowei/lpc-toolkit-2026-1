@@ -2,7 +2,6 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
-  readFileSync,
   renameSync,
   rmSync,
   statSync,
@@ -20,13 +19,13 @@ import {
   type AnimationName,
   type CanvasLike,
   type Direction,
+  type SelectionJson,
 } from '@lpc-toolkit/core';
 import { composeSelectionForOutput } from './compose-selection.js';
 import { writeCanvasPng } from './node-canvas-adapter.js';
 import { CLI_VERSION } from './package-info.js';
 import type { CliIssue } from './response.js';
 import type { RuntimeAssets } from './runtime-assets.js';
-import { parseSelectionJson, type SelectionJson } from './selection.js';
 
 export type PreviewErrorCode =
   | 'preview_animation_unavailable'
@@ -72,6 +71,7 @@ export interface CharacterPreviewOptions {
   readonly runtime: RuntimeAssets;
   readonly cwd: string;
   readonly selectionPath: string;
+  readonly selectionJson: SelectionJson;
   readonly outDir?: string;
   readonly characterName?: string;
   readonly animation?: AnimationName;
@@ -90,12 +90,6 @@ function normalizedSafeName(name: string): string | undefined {
   const normalized = name.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
   if (normalized.length === 0 || normalized === '.' || normalized === '..') return undefined;
   return normalized;
-}
-
-function readSelection(selectionPath: string): SelectionJson {
-  const raw = JSON.parse(readFileSync(selectionPath, 'utf8')) as unknown;
-  parseSelectionJson(raw);
-  return raw as SelectionJson;
 }
 
 function outputIdentity(options: CharacterPreviewOptions, selection: SelectionJson): {
@@ -213,7 +207,7 @@ export async function renderCharacterPreview(
   options: CharacterPreviewOptions,
 ): Promise<CharacterPreviewResult> {
   const selectionPath = path.resolve(options.cwd, options.selectionPath);
-  const selectionJson = readSelection(selectionPath);
+  const selectionJson = options.selectionJson;
   const animationName = options.animation ?? 'walk';
   const requestedDirection = options.direction ?? 'down';
   const frameIndex = options.frameIndex ?? 0;

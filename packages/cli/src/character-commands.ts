@@ -1,5 +1,13 @@
 import path from 'node:path';
 import {
+  parseSelectionJson,
+  SELECTION_SCHEMA,
+  SelectionDocumentError,
+  selectionJsonFromCore,
+  type SelectionDocumentImportContext,
+  type SelectionJson,
+} from '@lpc-toolkit/core';
+import {
   flagBoolean,
   flagString,
   flagStrings,
@@ -22,6 +30,7 @@ import {
   resolveCharacterPath,
   writeCharacter,
   type CharacterLocator,
+  type StoredCharacter,
 } from './character-store.js';
 import { SelectionOutputError } from './compose-selection.js';
 import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
@@ -41,11 +50,6 @@ import {
   type CliResponse,
 } from './response.js';
 import type { RuntimeAssets } from './runtime-assets.js';
-import {
-  parseSelectionJson,
-  selectionJsonFromCore,
-  type SelectionJson,
-} from './selection.js';
 import { validateSelections, type ValidationResult } from './validation.js';
 
 export interface CharacterCommandDependencies {
@@ -69,6 +73,7 @@ class CharacterUsageError extends Error {
 
 interface LoadedCharacterContext {
   readonly editor: CharacterCatalogContext;
+  readonly importContext: SelectionDocumentImportContext;
   readonly warnings: readonly CliIssue[];
 }
 
@@ -137,8 +142,21 @@ function loadCharacterContext(runtime: RuntimeAssets): LoadedCharacterContext {
       palettes: palettes.palettes,
       pathExists: (spritePath) => runtime.store.has(spritePath),
     },
+    importContext: {
+      catalog: catalog.catalog,
+      palettes: palettes.palettes,
+    },
     warnings: [...catalog.warnings, ...palettes.warnings],
   };
+}
+
+function normalizationWarnings(stored: StoredCharacter): readonly CliIssue[] {
+  if (stored.source === 'canonical') return [];
+  return [{
+    code: 'selection_format_normalized',
+    message: `Updated ${stored.source} input was written as ${SELECTION_SCHEMA}.`,
+    path: stored.path,
+  }];
 }
 
 function validateCandidate(
@@ -164,6 +182,13 @@ function validationFailure(
 
 function issueFromError(error: unknown): CliIssue {
   if (error instanceof CharacterUsageError) return error.issue;
+  if (error instanceof SelectionDocumentError) {
+    return {
+      code: error.code,
+      message: error.message,
+      ...(error.path === undefined ? {} : { path: error.path }),
+    };
+  }
   if (error instanceof CharacterStoreError || error instanceof CharacterEditError) {
     return {
       code: error.code,
@@ -289,8 +314,8 @@ export async function runCharacterCommand(
     }
 
     if (subcommand === 'show') {
-      const stored = readCharacter(io.cwd, characterLocator(parsed));
       const loaded = loadCharacterContext(requireRuntime(runtime));
+      const stored = readCharacter(io.cwd, characterLocator(parsed), loaded.importContext);
       const validation = validateSelections(stored.parsed.selections, loaded.editor);
       return commandOk('character show', {
         path: stored.path,
@@ -301,8 +326,8 @@ export async function runCharacterCommand(
     }
 
     if (subcommand === 'search') {
-      const stored = readCharacter(io.cwd, characterLocator(parsed));
       const loaded = loadCharacterContext(requireRuntime(runtime));
+      const stored = readCharacter(io.cwd, characterLocator(parsed), loaded.importContext);
       const typeName = requiredFlag(parsed, 'type');
       const query = flagString(parsed.flags, 'query');
       const result = searchCharacterItems(
@@ -319,8 +344,8 @@ export async function runCharacterCommand(
 
     if (subcommand === 'set') {
       const locator = characterLocator(parsed);
-      const stored = readCharacter(io.cwd, locator);
       const loaded = loadCharacterContext(requireRuntime(runtime));
+      const stored = readCharacter(io.cwd, locator, loaded.importContext);
       const typeName = requiredFlag(parsed, 'type');
       const itemRef = requiredFlag(parsed, 'item');
       const variant = flagString(parsed.flags, 'variant');
@@ -341,15 +366,19 @@ export async function runCharacterCommand(
         typeName,
         item: candidate.items[typeName],
         replaced: edited.replaced,
-      }, [...loaded.warnings, ...validation.warnings]);
+      }, [...loaded.warnings, ...validation.warnings, ...normalizationWarnings(stored)]);
     }
 
     if (subcommand === 'remove') {
-      const stored = readCharacter(io.cwd, characterLocator(parsed));
+      const loaded = loadCharacterContext(requireRuntime(runtime));
+      const stored = readCharacter(
+        io.cwd,
+        characterLocator(parsed),
+        loaded.importContext,
+      );
       const typeName = requiredFlag(parsed, 'type');
       const edited = removeCharacterItem(stored.parsed.selections, typeName);
       const candidate = selectionJsonFromCore(edited.selections, stored.selection.name);
-      const loaded = loadCharacterContext(requireRuntime(runtime));
       const validation = validateCandidate(candidate, loaded);
       if (!validation.ok) return validationFailure('character remove', validation, loaded.warnings);
       writeCharacter(stored.path, candidate, 'replace');
@@ -357,12 +386,12 @@ export async function runCharacterCommand(
         path: stored.path,
         selection: candidate,
         typeName,
-      }, [...loaded.warnings, ...validation.warnings]);
+      }, [...loaded.warnings, ...validation.warnings, ...normalizationWarnings(stored)]);
     }
 
     if (subcommand === 'validate') {
-      const stored = readCharacter(io.cwd, characterLocator(parsed));
       const loaded = loadCharacterContext(requireRuntime(runtime));
+      const stored = readCharacter(io.cwd, characterLocator(parsed), loaded.importContext);
       const validation = validateSelections(stored.parsed.selections, loaded.editor);
       if (!validation.ok) return validationFailure('character validate', validation, loaded.warnings);
       return commandOk('character validate', {
@@ -374,13 +403,15 @@ export async function runCharacterCommand(
 
     if (subcommand === 'preview') {
       const locator = characterLocator(parsed);
-      const stored = readCharacter(io.cwd, locator);
+      const loaded = loadCharacterContext(requireRuntime(runtime));
+      const stored = readCharacter(io.cwd, locator, loaded.importContext);
       const frameValue = flagString(parsed.flags, 'frame');
       const outDir = flagString(parsed.flags, 'out');
       const result: CharacterPreviewResult = await dependencies.renderCharacterPreview({
         runtime: requireRuntime(runtime),
         cwd: io.cwd,
         selectionPath: stored.path,
+        selectionJson: stored.selection,
         ...(locator.name === undefined ? {} : { characterName: locator.name }),
         ...(outDir === undefined ? {} : { outDir }),
         animation: flagString(parsed.flags, 'animation') ?? 'walk',
@@ -392,7 +423,8 @@ export async function runCharacterCommand(
 
     if (subcommand === 'render') {
       const locator = characterLocator(parsed);
-      const stored = readCharacter(io.cwd, locator);
+      const loaded = loadCharacterContext(requireRuntime(runtime));
+      const stored = readCharacter(io.cwd, locator, loaded.importContext);
       const result = await dependencies.renderSelection({
         runtime: requireRuntime(runtime),
         cwd: io.cwd,

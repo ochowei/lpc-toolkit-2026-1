@@ -143,6 +143,31 @@ describe('render asset-store error responses', () => {
     ]);
   });
 
+  it('preserves document-context warnings on a typed direct-render failure', async () => {
+    const runtime = await createMissingImageRuntime();
+    writeFileSync(
+      path.join(runtime.context.sheetDefinitionsRoot, 'broken.json'),
+      '{',
+    );
+
+    const response = await runJson([
+      'render', '--selection', 'selection.json', '--out', 'out', '--json',
+    ], runtime);
+
+    expect(response.errors).toEqual([
+      {
+        code: 'asset_image_missing',
+        message: `ZIP asset entry is missing: ${logicalSpritePath}`,
+        path: logicalSpritePath,
+      },
+    ]);
+    expect(response.warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'invalid_json', path: 'broken.json' }),
+      ]),
+    );
+  });
+
   it.each([
     ['human', false],
     ['JSON', true],

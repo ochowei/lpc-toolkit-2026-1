@@ -1,10 +1,10 @@
 # CLI Compatibility
 
-Plugin version `0.1.0` supports `@lpc-toolkit/cli >=0.1.4 <0.2.0`. Install or
+Plugin version `0.2.0` supports `@lpc-toolkit/cli >=0.2.0 <0.3.0`. Install or
 upgrade the compatible public CLI from npm:
 
 ```sh
-npm install -g '@lpc-toolkit/cli@>=0.1.4 <0.2.0'
+npm install -g '@lpc-toolkit/cli@>=0.2.0 <0.3.0'
 ```
 
 Use the checker below to confirm that the installed version is compatible with

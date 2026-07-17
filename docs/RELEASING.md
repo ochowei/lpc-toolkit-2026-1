@@ -24,7 +24,9 @@ rtk pnpm --filter @lpc-toolkit/cli pack --pack-destination /tmp
 
 Install the resulting tarball into a clean prefix. Verify `lpc-toolkit --help`
 and one real asset-dependent command; the package must not require unpublished
-workspace dependencies.
+workspace dependencies. For a full render, verify the offline `.viewer.html`
+beside its sheet, metadata, and TXT/CSV credits, and verify ZIP output contains
+the same portable attributed set.
 
 ## Release Candidate
 
@@ -56,7 +58,10 @@ Install the exact published version into a clean prefix and verify:
 
 - help and version output;
 - a real catalog or render command using the pinned verified asset cache;
-- metadata plus TXT and CSV credit files;
+- a full render whose sheet, offline `.viewer.html`, metadata, and TXT/CSV
+  credits remain together;
+- ZIP render output containing the same portable attributed set after
+  extraction;
 - independence from unpublished workspace packages; and
 - equality between registry version, package version, and release tag.
 

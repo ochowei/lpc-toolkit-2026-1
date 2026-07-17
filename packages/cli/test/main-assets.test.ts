@@ -99,7 +99,6 @@ describe('asset preparation dispatch', () => {
   const runtime = makeRuntimeAssets();
 
   it.each([
-    [['token', 'encode', '--selection', 'selection.json']],
     [['token', 'decode', '--token', 'v1.example']],
     [['preset', 'list']],
     [['character', 'list']],
@@ -113,6 +112,7 @@ describe('asset preparation dispatch', () => {
 
   it.each([
     [['catalog', 'types']],
+    [['token', 'encode', '--selection', 'selection.json']],
     [['selection', 'validate', '--selection', 'selection.json']],
     [['preset', 'materialize', 'villager']],
     [['render', '--selection', 'selection.json', '--out', 'out']],

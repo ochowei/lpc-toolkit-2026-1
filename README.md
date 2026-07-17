@@ -121,6 +121,8 @@ metadata plus TXT and CSV attribution. See
 usage, cache locations, local asset precedence, output defaults, and
 troubleshooting.
 
+Final render output includes a standalone `<name>.viewer.html` offline animation viewer.
+
 Catalog and character searches return 20 items by default. Use `--limit 20`
 to set a bounded page size, `--offset 20` (or the returned `page.nextOffset`)
 to continue the same result set, and `--all` only when an explicit unbounded
@@ -131,12 +133,23 @@ summaries report license families and credit counts; run
 before selecting an item. Restart at offset zero after changing the catalog
 source, custom overlay, query filters, or character selection.
 
+### Character JSON interchange
+
+The web editor's **Save character JSON** action and CLI selection outputs share
+the canonical `lpc-toolkit.selection.v1` format. Web import and any CLI option
+that reads an existing `--selection` file also accept
+upstream version 1 and version 2 JSON. Read-only CLI commands perform that
+conversion in memory without rewriting the source file. Successful CLI mutations
+atomically normalize upstream input to the canonical format. Rendered artifacts
+still obtain credits from the active asset source rather than trusting
+attribution embedded in imported JSON.
+
 ### Codex Plugin
 
-1. Install or upgrade the CLI to the range supported by plugin `0.1.0`:
+1. Install or upgrade the CLI to the range supported by plugin `0.2.0`:
 
 ```sh
-npm install -g '@lpc-toolkit/cli@>=0.1.4 <0.2.0'
+npm install -g '@lpc-toolkit/cli@>=0.2.0 <0.3.0'
 ```
 
 2. Add the repository marketplace once:
@@ -153,7 +166,7 @@ codex plugin add lpc-toolkit@lpc-toolkit
 
 The plugin requires an installed compatible `lpc-toolkit` CLI and does not
 automatically install the CLI. Its supported CLI range is
-`>=0.1.4 <0.2.0`. Restart the ChatGPT desktop app or start a new Codex
+`>=0.2.0 <0.3.0`. Restart the ChatGPT desktop app or start a new Codex
 task if the newly installed skill is not visible. Public Plugins Directory
 distribution can later remove the marketplace-add step.
 

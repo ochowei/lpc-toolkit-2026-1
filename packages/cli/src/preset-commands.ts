@@ -5,12 +5,17 @@ import {
   PRESETS,
   type Preset,
 } from '@lpc-toolkit/presets';
-import type { BodyType, Catalog, PaletteMetadata } from '@lpc-toolkit/core';
+import {
+  selectionJsonFromCore,
+  type BodyType,
+  type Catalog,
+  type PaletteMetadata,
+  type SelectionJson,
+} from '@lpc-toolkit/core';
 import { flagString, type ParsedArgs } from './args.js';
 import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
 import { commandError, commandOk, type CliResponse } from './response.js';
 import type { RuntimeAssets } from './runtime-assets.js';
-import { selectionJsonFromCore, type SelectionJson } from './selection.js';
 
 export interface PresetSummary {
   readonly id: string;

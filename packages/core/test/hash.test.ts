@@ -184,6 +184,29 @@ describe('parseHash', () => {
     ]);
   });
 
+  it('without palettes, recolor sub-types retain the legacy unknown-type warning', () => {
+    const coat: ItemDefinition = {
+      name: 'Coat',
+      type_name: 'coat',
+      animations: ['walk'],
+      credits: [],
+      recolors: {
+        color_1: { material: 'cloth', palettes: ['ulpc'] },
+        color_2: {
+          material: 'metal',
+          palettes: ['ulpc'],
+          type_name: 'trim',
+        },
+      },
+    };
+
+    const decoded = parseHash('#trim=Coat_gold', makeCatalog([coat]));
+
+    expect(decoded.warnings).toEqual([
+      { key: 'trim', value: 'Coat_gold', reason: 'unknown_type_name' },
+    ]);
+  });
+
   it('applies an exact alias redirect', () => {
     const aliases = new Map<TypeName, Map<string, AliasEntry>>([
       [
@@ -290,6 +313,63 @@ describe('parseHash with palettes (Step 4.3 — Q2 closed)', () => {
     recolors: { material: 'cloth', palettes: ['v1'] },
   };
   const tunicCat = makeCatalog([tunic]);
+
+  it('retains a catalog-recognized __proto__ recolor sub-type through hashes and tokens', () => {
+    const protoItem: ItemDefinition = {
+      name: 'Proto Coat',
+      type_name: 'coat',
+      animations: ['walk'],
+      credits: [],
+      recolors: {
+        color_1: { material: 'cloth', palettes: ['v1'] },
+        color_2: {
+          material: 'cloth',
+          palettes: ['v1'],
+          type_name: '__proto__',
+        },
+      },
+    };
+    const catalog = makeCatalog([protoItem]);
+    const hash = 'sex=male&__proto__=Proto_Coat_crimson';
+
+    const parsed = parseHash(hash, catalog, palettes);
+
+    expect(parsed.warnings).toEqual([]);
+    expect(Object.hasOwn(parsed.selections.items, '__proto__')).toBe(true);
+    expect(parsed.selections.items['__proto__']).toEqual({
+      typeName: '__proto__',
+      name: 'Proto Coat',
+      recolor: 'crimson',
+    });
+    expect(serializeHash(parsed.selections)).toBe(hash);
+
+    const token = encodeSelectionToken(parsed.selections);
+    const decoded = decodeSelectionToken(token, catalog, palettes);
+
+    expect(decoded.warnings).toEqual([]);
+    expect(Object.hasOwn(decoded.selections.items, '__proto__')).toBe(true);
+    expect(decoded.selections.items['__proto__']).toEqual(
+      parsed.selections.items['__proto__'],
+    );
+    expect(serializeHash(decoded.selections)).toBe(hash);
+  });
+
+  it('rejects an unknown __proto__ type through hash catalog validation', () => {
+    const decoded = parseHash(
+      '#__proto__=Proto_Coat_crimson',
+      tunicCat,
+      palettes,
+    );
+
+    expect(decoded.selections.items).toEqual({});
+    expect(decoded.warnings).toEqual([
+      {
+        key: '__proto__',
+        value: 'Proto_Coat_crimson',
+        reason: 'unknown_type_name',
+      },
+    ]);
+  });
 
   it('an explicit name_variant|recolor resolves to the recolor (upstream precedence)', () => {
     const r = parseHash('#torso=Tunic_red|crimson', tunicCat, palettes);

@@ -41,6 +41,9 @@ function compactRecolorConfig(config) {
   return {
     material: config.material,
     palettes: config.palettes,
+    ...(typeof config.type_name === 'string'
+      ? { type_name: config.type_name }
+      : {}),
   };
 }
 

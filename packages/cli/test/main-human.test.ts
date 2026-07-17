@@ -280,7 +280,7 @@ describe('human-readable CLI output', () => {
   });
 
   it('prints encoded tokens without --json', async () => {
-    const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-human-token-'));
+    const cwd = makeCatalogCwd();
     writeFileSync(
       path.join(cwd, 'selection.json'),
       JSON.stringify({
@@ -304,6 +304,23 @@ describe('human-readable CLI output', () => {
     expect(output).toContain('"hair"');
     expect(output).toContain('"Braids"');
   });
+
+  it('prints the generated viewer in a successful render response', async () => {
+    const cwd = makeCatalogCwd();
+    writeFileSync(path.join(cwd, 'selection.json'), JSON.stringify({
+      schema: 'lpc-toolkit.selection.v1',
+      name: 'empty-fixture',
+      bodyType: 'male',
+      items: {},
+    }));
+
+    const output = await runHuman([
+      'render', '--selection', 'selection.json', '--out', 'out',
+    ], cwd);
+
+    expect(output).toContain('viewer');
+    expect(output).toContain('.viewer.html');
+  }, 30000);
 
   it('prints preset lists and materialized selections without --json', async () => {
     const listOutput = await runHuman(['preset', 'list'], makeCatalogCwd());
@@ -329,7 +346,7 @@ describe('human-readable CLI output', () => {
     expect(output).toContain('Status: valid');
   });
 
-  it('prints invalid character status and validation issues without --json', async () => {
+  it('prints stable character import validation issues without --json', async () => {
     const cwd = makeCatalogCwd();
     const selectionPath = path.join(cwd, 'saved', 'invalid.selection.json');
     mkdirSync(path.dirname(selectionPath), { recursive: true });
@@ -340,14 +357,12 @@ describe('human-readable CLI output', () => {
       items: { hair: { name: 'Missing Hair' } },
     }));
 
-    const output = await runHuman([
+    const output = await runHumanError([
       'character', 'show', '--selection', selectionPath,
     ], cwd);
 
-    expect(output).toContain(selectionPath);
-    expect(output).toContain('Status: invalid');
-    expect(output).toContain('unknown_item');
-    expect(output).toContain('hair/Missing Hair');
+    expect(output).toContain('unknown_upstream_item');
+    expect(output).toContain('items.hair');
   });
 
   it('prints actionable character mutation and search output without --json', async () => {
@@ -365,6 +380,25 @@ describe('human-readable CLI output', () => {
       .toContain('Character hero is valid.');
     expect(await runHuman(['character', 'remove', 'hero', '--type', 'hair'], cwd))
       .toContain('Updated hero: removed hair');
+  });
+
+  it('prints the normalization warning after mutating upstream input', async () => {
+    const cwd = makeCatalogCwd();
+    const selectionPath = path.join(cwd, 'saved', 'upstream.json');
+    mkdirSync(path.dirname(selectionPath), { recursive: true });
+    writeFileSync(selectionPath, JSON.stringify({
+      version: 2,
+      bodyType: 'male',
+      selections: { body: { itemId: 'body' } },
+    }));
+
+    const output = await runHuman([
+      'character', 'remove', '--selection', selectionPath, '--type', 'body',
+    ], cwd);
+
+    expect(output).toContain('selection_format_normalized');
+    expect(output).toContain('Updated upstream-v2 input was written as lpc-toolkit.selection.v1.');
+    expect(output).toContain(selectionPath);
   });
 
   it.each([

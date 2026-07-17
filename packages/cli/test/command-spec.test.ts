@@ -57,6 +57,27 @@ describe('helpForCommand', () => {
     expect(previewHelp).toContain('Default: 0');
   });
 
+  it('distinguishes selection input help from the create destination', () => {
+    expect(helpForCommand(['character', 'show'])).toContain(
+      '--selection <file>  Read a Toolkit or upstream selection JSON file.',
+    );
+    expect(helpForCommand(['character', 'create'])).toContain(
+      '--selection <file>  Write the new selection to this explicit path.',
+    );
+  });
+
+  it('describes the offline animation viewer for every full render command', () => {
+    for (const command of [
+      ['render'],
+      ['preset', 'render'],
+      ['character', 'render'],
+    ]) {
+      expect(helpForCommand(command)).toContain(
+        'Render an attributed spritesheet with an offline animation viewer.',
+      );
+    }
+  });
+
   it('documents discovery pagination options', () => {
     for (const command of [['catalog', 'items'], ['character', 'search']]) {
       const help = helpForCommand(command);

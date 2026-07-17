@@ -2,7 +2,6 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
-  readFileSync,
   renameSync,
   rmSync,
   statSync,
@@ -14,18 +13,26 @@ import {
   computeEffectiveLicense,
   creditsToCsv,
   creditsToTxt,
+  describeAnimationPlayback,
   extractAnimation,
   extractAnimationFrames,
   type AnimationName,
   type CanvasLike,
+  type SelectionJson,
 } from '@lpc-toolkit/core';
 import { composeSelectionForOutput } from './compose-selection.js';
 import { writeCanvasPng } from './node-canvas-adapter.js';
 import { CLI_VERSION } from './package-info.js';
 import type { CliIssue } from './response.js';
 import type { RuntimeAssets } from './runtime-assets.js';
-import { parseSelectionJson, type SelectionJson } from './selection.js';
+import { renderViewerHtml, type RenderViewerModel } from './viewer.js';
 import { writeZipBundle } from './zip.js';
+
+const RENDER_METADATA_SCHEMA = 'lpc-toolkit.render-metadata.v1' as const;
+const PORTABLE_SOURCE_DESCRIPTIONS: Readonly<Record<RuntimeAssets['source'], string>> = {
+  'working-directory': 'Working-directory assets',
+  'managed-cache': 'Verified managed asset cache',
+};
 
 export interface RenderArtifact {
   readonly type:
@@ -34,6 +41,7 @@ export interface RenderArtifact {
     | 'frame'
     | 'credits_txt'
     | 'credits_csv'
+    | 'viewer'
     | 'metadata'
     | 'zip';
   readonly path: string;
@@ -61,6 +69,10 @@ export interface RenderSelectionResult {
   readonly artifacts: readonly RenderArtifact[];
   readonly warnings: readonly CliIssue[];
   readonly metadataPath: string;
+}
+
+export interface RenderSelectionDependencies {
+  readonly renderViewerHtml: typeof renderViewerHtml;
 }
 
 interface AnimationMetadata {
@@ -169,6 +181,7 @@ function publishStagedFiles(
 
 export async function renderSelection(
   options: RenderSelectionOptions,
+  dependencies: RenderSelectionDependencies = { renderViewerHtml },
 ): Promise<RenderSelectionResult> {
   const { runtime } = options;
   const context = runtime.context;
@@ -192,6 +205,7 @@ export async function renderSelection(
   const sheetPath = path.join(options.outDir, `${baseName}.sheet.png`);
   const creditsTxtPath = path.join(options.outDir, `${baseName}.credits.txt`);
   const creditsCsvPath = path.join(options.outDir, `${baseName}.credits.csv`);
+  const viewerPath = path.join(options.outDir, `${baseName}.viewer.html`);
   const metadataPath = path.join(options.outDir, `${baseName}.metadata.json`);
   const zipPath = path.join(options.outDir, `${baseName}.bundle.zip`);
   const creditsAnimation = options.animations[0] ?? sheet.animations[0] ?? 'walk';
@@ -260,12 +274,23 @@ export async function renderSelection(
     }
   }
 
+  artifacts.push({ type: 'viewer', path: viewerPath });
   artifacts.push({ type: 'metadata', path: metadataPath });
   if (options.bundleZip) {
     artifacts.push({ type: 'zip', path: zipPath });
   }
+  const skippedLayers: readonly CliIssue[] = options.allowPartial
+    ? [
+        ...composed.validationErrors,
+        ...(sheet.missingPaths ?? []).map((missingPath) => ({
+          code: 'missing_sprite_path',
+          message: 'Composed sheet skipped a missing sprite path.',
+          path: missingPath,
+        })),
+      ]
+    : [];
   const metadata = {
-    schema: 'lpc-toolkit.render-metadata.v1',
+    schema: RENDER_METADATA_SCHEMA,
     cliVersion: CLI_VERSION,
     selection: options.selectionJson,
     artifacts,
@@ -294,17 +319,34 @@ export async function renderSelection(
       spritesheetsBaseUrl: runtime.store.baseUrl,
     },
     warnings,
-    skippedLayers: options.allowPartial
-      ? [
-          ...composed.validationErrors,
-          ...(sheet.missingPaths ?? []).map((missingPath) => ({
-            code: 'missing_sprite_path',
-            message: 'Composed sheet skipped a missing sprite path.',
-            path: missingPath,
-          })),
-        ]
-      : [],
+    skippedLayers,
   };
+  const viewerModel: RenderViewerModel = {
+    characterName: options.selectionName,
+    sheet: {
+      fileName: path.basename(sheetPath),
+      width: sheet.width,
+      height: sheet.height,
+    },
+    files: {
+      metadata: path.basename(metadataPath),
+      creditsTxt: path.basename(creditsTxtPath),
+      creditsCsv: path.basename(creditsCsvPath),
+    },
+    cliVersion: CLI_VERSION,
+    metadataSchema: RENDER_METADATA_SCHEMA,
+    effectiveLicense,
+    source: {
+      runtimeSource: runtime.source,
+      description: PORTABLE_SOURCE_DESCRIPTIONS[runtime.source],
+      releaseTag: runtime.releaseTag ?? null,
+    },
+    warnings,
+    skippedLayers,
+    animations: describeAnimationPlayback(sheet),
+    creditsTxt,
+  };
+  const viewerHtml = dependencies.renderViewerHtml(viewerModel);
 
   preflightPublishPaths(options.outDir, artifacts);
 
@@ -339,6 +381,10 @@ export async function renderSelection(
       stagedFiles.push(stagedPath);
     }
 
+    const stagedViewerPath = finalToStagedPath(stagingRoot, options.outDir, viewerPath);
+    writeFileSync(stagedViewerPath, viewerHtml);
+    stagedFiles.push(stagedViewerPath);
+
     const stagedMetadataPath = finalToStagedPath(stagingRoot, options.outDir, metadataPath);
     writeFileSync(stagedMetadataPath, `${JSON.stringify(metadata, null, 2)}\n`);
     stagedFiles.push(stagedMetadataPath);
@@ -359,10 +405,4 @@ export async function renderSelection(
     warnings,
     metadataPath,
   };
-}
-
-export function readSelectionJsonFile(cwd: string, selectionPath: string): SelectionJson {
-  const raw = JSON.parse(readFileSync(path.resolve(cwd, selectionPath), 'utf8')) as unknown;
-  parseSelectionJson(raw);
-  return raw as SelectionJson;
 }

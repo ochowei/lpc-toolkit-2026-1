@@ -36,7 +36,7 @@ const SELECTION_OPTION: CommandOptionSpec = {
   name: 'selection',
   kind: 'value',
   valueLabel: 'file',
-  description: 'Use an explicit selection JSON file.',
+  description: 'Read a Toolkit or upstream selection JSON file.',
 };
 
 const CREATE_SELECTION_OPTION: CommandOptionSpec = {
@@ -160,7 +160,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
   {
     command: ['render'],
     usage: 'lpc-toolkit render --selection <file> --out <directory> [options]',
-    description: 'Render an attributed selection.',
+    description: 'Render an attributed spritesheet with an offline animation viewer.',
     options: [HELP_OPTION, JSON_OPTION, SELECTION_OPTION, ...RENDER_OPTIONS],
     examples: ['lpc-toolkit render --selection hero.json --out rendered'],
   },
@@ -218,7 +218,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
   {
     command: ['preset', 'render'],
     usage: 'lpc-toolkit preset render <preset-id> --out <directory> [options]',
-    description: 'Render an attributed shared preset.',
+    description: 'Render an attributed spritesheet with an offline animation viewer.',
     options: [HELP_OPTION, JSON_OPTION, ...RENDER_OPTIONS],
     examples: ['lpc-toolkit preset render farmer --out rendered'],
   },
@@ -338,7 +338,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
   {
     command: ['character', 'render'],
     usage: 'lpc-toolkit character render (<name> | --selection <file>) --out <directory> [options]',
-    description: 'Render an attributed character selection.',
+    description: 'Render an attributed spritesheet with an offline animation viewer.',
     options: [HELP_OPTION, JSON_OPTION, SELECTION_OPTION, ...RENDER_OPTIONS],
     examples: ['lpc-toolkit character render hero --out rendered --animation walk'],
   },

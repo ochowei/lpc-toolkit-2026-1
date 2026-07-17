@@ -128,6 +128,23 @@ describe('i18n', () => {
       expect(Object.keys(TRANSLATIONS['zh-TW'])).toContain(key);
     }
   });
+
+  it('includes Share / Import keys in both locales', () => {
+    const shareKeys = [
+      'share.title',
+      'share.characterJson',
+      'share.saveJson',
+      'share.importJson',
+      'share.imported',
+      'share.importFailed',
+      'share.sharing',
+    ] satisfies readonly TranslationKey[];
+
+    for (const key of shareKeys) {
+      expect(Object.keys(TRANSLATIONS.en)).toContain(key);
+      expect(Object.keys(TRANSLATIONS['zh-TW'])).toContain(key);
+    }
+  });
 });
 
 describe('label translator', () => {

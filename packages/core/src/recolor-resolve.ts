@@ -532,6 +532,29 @@ export function getRecolorVariants(
   return nr ? nr.variants : [];
 }
 
+export function itemSupportsSelectionType(
+  item: ItemDefinition,
+  typeName: TypeName,
+): boolean {
+  if (item.type_name === typeName) return true;
+  return collectRecolorEntries(item.recolors).some(
+    (entry) => entry.type_name === typeName,
+  );
+}
+
+export function getRecolorVariantsForType(
+  item: ItemDefinition,
+  palettes: PaletteMetadata,
+  typeName: TypeName,
+): readonly string[] {
+  const entry = collectRecolorEntries(item.recolors).find(
+    (candidate) => (candidate.type_name ?? item.type_name) === typeName,
+  );
+  if (!entry) return [];
+  const normalized = normalizeRecolor(entry, palettes.materials);
+  return normalized?.variants ?? [];
+}
+
 /** One recolor option plus the hex ramp behind it — what a swatch UI draws. */
 export interface RecolorSwatch {
   /** The fully-qualified recolor identifier. */
