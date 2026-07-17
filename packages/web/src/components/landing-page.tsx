@@ -1,123 +1,179 @@
-import { Button } from './ui/button';
+import heroPreviewUrl from '../landing-artifacts/hero.preview.png';
+import heroCreditsTxtUrl from '../landing-artifacts/hero.credits.txt?url';
+import heroCreditsCsvUrl from '../landing-artifacts/hero.credits.csv?url';
 import type { NavigableAppRoute } from '../lib/app-route';
+import { Button } from './ui/button';
 
 interface LandingPageProps {
   readonly onNavigate: (route: NavigableAppRoute) => void;
 }
 
-const installCommands = [
-  'npm install -g @lpc-toolkit/cli',
-  'npx @lpc-toolkit/cli --help',
-] as const;
-
-const characterSteps = [
+const quickStartSteps = [
+  {
+    title: 'Install the CLI',
+    description: 'Install the published package globally.',
+    command: 'npm install -g @lpc-toolkit/cli',
+  },
   {
     title: 'Create a starting character',
-    description: 'Start from the farmer preset and save it as hero.',
+    description: 'Start from the built-in farmer preset and save it as hero.',
     command: 'lpc-toolkit character create hero --preset farmer',
   },
   {
-    title: 'Search compatible items',
-    description: 'Request a bounded JSON page of hair choices for the stored character.',
-    command:
-      'lpc-toolkit character search hero --type hair --query braid --limit 20 --json',
+    title: 'Preview the result',
+    description: 'Render one attributed frame using the default walk preview.',
+    command: 'lpc-toolkit character preview hero',
+  },
+] as const;
+
+const customizationSteps = [
+  {
+    title: 'Find compatible hair',
+    description: 'Search the catalog using readable terminal output.',
+    command: 'lpc-toolkit character search hero --type hair --query braid',
   },
   {
     title: 'Inspect exact credits',
-    description: 'Review the selected item and its complete raw credit entries.',
-    command: 'lpc-toolkit catalog item hair_braid --json',
+    description: 'Review the selected item and its complete attribution.',
+    command: 'lpc-toolkit catalog item hair_braid',
   },
   {
-    title: 'Update the character',
-    description: 'After reviewing credits, select the braid and apply a brown recolor.',
+    title: 'Apply the item',
+    description: 'Select the braid and apply its brown recolor.',
     command:
       'lpc-toolkit character set hero --type hair --item hair_braid --recolor lpcr.brown',
   },
-  {
-    title: 'Preview the result',
-    description: 'Render an attributed frame for a quick visual check.',
-    command: 'lpc-toolkit character preview hero',
-  },
-  {
-    title: 'Render final output',
-    description: 'Export the walk animation and an attributed ZIP bundle.',
-    command:
-      'lpc-toolkit character render hero --out ./dist/hero --animation walk --bundle zip',
-  },
 ] as const;
 
-const secondaryCommandGroups = [
-  {
-    title: 'Presets and selection files',
-    commands: [
-      'lpc-toolkit preset render farmer --out ./farmer --animation walk',
-      'lpc-toolkit selection validate --selection selection.json',
-      'lpc-toolkit render --selection selection.json --out ./rendered --animation walk --frames all --bundle zip',
-    ],
-  },
-  {
-    title: 'Explore and share',
-    commands: [
-      'lpc-toolkit catalog types',
-      'lpc-toolkit catalog items --type hair --limit 20 --json',
-      'lpc-toolkit token encode --selection selection.json',
-      'lpc-toolkit web',
-    ],
-  },
-] as const;
+const cliReadmeUrl =
+  'https://github.com/ochowei/lpc-toolkit-2026-1/blob/main/packages/cli/README.md';
 
 const codeClassName =
-  'block overflow-x-auto rounded-md bg-[var(--bg-deep)] px-3 py-2 font-mono text-sm text-text';
+  'block overflow-x-auto whitespace-nowrap rounded-md bg-[var(--bg-deep)] px-3 py-2 font-mono text-sm text-text';
 
 export function LandingPage({ onNavigate }: LandingPageProps) {
   return (
     <main className="min-h-screen bg-app text-text">
       <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-8 px-5 py-6 sm:px-8 lg:px-10">
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
+        <header className="grid items-center gap-8 border-b border-border pb-8 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-mute">
-              Local sprite composition toolkit
-            </p>
-            <h1 className="mt-2 text-3xl font-semibold text-text sm:text-4xl">
               LPC Toolkit
+            </p>
+            <h1 className="mt-3 max-w-3xl text-3xl font-semibold text-text sm:text-5xl">
+              Create attributed LPC characters, visually or from the command line.
             </h1>
+            <p className="mt-4 max-w-2xl text-base text-text-2">
+              Compose game-ready pixel characters, preview the result, and keep
+              the matching licenses and credits with every export.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Button variant="primary" onClick={() => onNavigate('compose')}>
+                Open Composer
+              </Button>
+              <Button asChild>
+                <a href="#cli-quick-start">Use the CLI</a>
+              </Button>
+            </div>
           </div>
-          <Button
-            className="shrink-0"
-            variant="primary"
-            onClick={() => onNavigate('compose')}
-          >
-            Open Composer
-          </Button>
+
+          <figure className="rounded-md border border-border bg-surface p-5 text-center">
+            <div className="flex min-h-56 items-center justify-center rounded-md bg-[var(--bg-deep)]">
+              <img
+                src={heroPreviewUrl}
+                alt="Farmer character preview generated by LPC Toolkit"
+                width={64}
+                height={64}
+                className="size-48 [image-rendering:pixelated]"
+              />
+            </div>
+            <figcaption className="mt-3 text-sm text-text-2">
+              Farmer preset preview ·{' '}
+              <a className="underline hover:text-text" href={heroCreditsTxtUrl}>
+                Read TXT credits
+              </a>{' '}
+              ·{' '}
+              <a className="underline hover:text-text" href={heroCreditsCsvUrl}>
+                Download CSV credits
+              </a>
+            </figcaption>
+          </figure>
         </header>
 
-        <section className="rounded-md border border-border bg-surface p-5">
-          <h2 className="text-xl font-semibold text-text">CLI quick start</h2>
-          <p className="mt-2 max-w-2xl text-sm text-text-2">
-            Install the published CLI globally, or try it once with npx.
-            Node.js 22 or newer is required.
+        <section
+          id="cli-quick-start"
+          className="scroll-mt-6 rounded-md border border-border bg-surface p-5"
+        >
+          <h2 className="text-2xl font-semibold text-text">
+            Preview your first character
+          </h2>
+          <p className="mt-2 max-w-3xl text-sm text-text-2">
+            Run these three commands in order. Node.js 22 or newer is required.
+            To inspect the CLI without installing it, run{' '}
+            <code>npx @lpc-toolkit/cli --help</code>.
           </p>
-          <div className="mt-5 space-y-3">
-            {installCommands.map((command) => (
-              <code key={command} className={codeClassName}>
-                {command}
-              </code>
+          <ol className="mt-5 grid gap-4 lg:grid-cols-3">
+            {quickStartSteps.map((step, index) => (
+              <li
+                key={step.command}
+                className="min-w-0 rounded-md border border-border bg-surface-2 p-4"
+              >
+                <p className="text-xs font-semibold uppercase tracking-wide text-text-mute">
+                  Step {index + 1}
+                </p>
+                <h3 className="mt-2 text-lg font-semibold text-text">
+                  {step.title}
+                </h3>
+                <p className="mt-1 text-sm text-text-2">{step.description}</p>
+                <code className={`${codeClassName} mt-4`}>{step.command}</code>
+              </li>
             ))}
+          </ol>
+          <p className="mt-5 rounded-md border border-border bg-surface-2 p-3 text-sm text-text-2">
+            The first asset-dependent command downloads about 205 MB of pinned
+            assets once, verifies them, and reuses the local cache afterward.
+          </p>
+        </section>
+
+        <section className="grid gap-5 lg:grid-cols-2">
+          <div className="rounded-md border border-border bg-surface p-5">
+            <h2 className="text-xl font-semibold text-text">
+              What preview creates
+            </h2>
+            <p className="mt-2 text-sm text-text-2">
+              Named previews use a predictable directory and keep attribution
+              beside the image.
+            </p>
+            <pre className={`${codeClassName} mt-4`}>
+              <code className="whitespace-pre">{`characters/previews/hero/
+├── hero.preview.png
+├── hero.metadata.json
+├── hero.credits.txt
+└── hero.credits.csv`}</code>
+            </pre>
+          </div>
+          <div className="rounded-md border border-border bg-surface p-5">
+            <h2 className="text-xl font-semibold text-text">
+              Attribution travels with it
+            </h2>
+            <p className="mt-2 text-sm text-text-2">
+              Metadata records the preview settings and effective license. Keep
+              both credit files with the generated sprite. Carry them forward
+              when you copy, modify, or redistribute it.
+            </p>
           </div>
         </section>
 
         <section className="rounded-md border border-border bg-surface p-5">
-          <h2 className="text-xl font-semibold text-text">
-            Create and edit a named character
+          <h2 className="text-2xl font-semibold text-text">
+            Customize the character
           </h2>
           <p className="mt-2 text-sm text-text-2">
-            Use the named character commands in order to create and update
-            <code className="mx-1">hero</code>. The character is persisted under
-            <code className="mx-1">./characters/</code>, so you do not need to
-            hand-write a selection JSON file.
+            Once the first preview works, discover a compatible item, inspect
+            its exact credits, and persist the selection.
           </p>
           <ol className="mt-5 space-y-4">
-            {characterSteps.map((step, index) => (
+            {customizationSteps.map((step, index) => (
               <li
                 key={step.command}
                 className="rounded-md border border-border bg-surface-2 p-4"
@@ -130,7 +186,9 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                     <h3 className="text-lg font-semibold text-text">
                       {step.title}
                     </h3>
-                    <p className="mt-1 text-sm text-text-2">{step.description}</p>
+                    <p className="mt-1 text-sm text-text-2">
+                      {step.description}
+                    </p>
                     <code className={`${codeClassName} mt-3`}>
                       {step.command}
                     </code>
@@ -139,61 +197,42 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               </li>
             ))}
           </ol>
-          <p className="mt-5 text-sm text-text-2">
-            Searches return 20 items by default. When
-            <code className="mx-1">page.hasMore</code> is true, continue with
-            <code className="mx-1">--offset page.nextOffset</code>. Restart from
-            offset zero after changing the catalog source, custom overlay, query
-            filters, or character selection.
-          </p>
         </section>
 
         <section className="rounded-md border border-border bg-surface p-5">
-          <h2 className="text-xl font-semibold text-text">What render creates</h2>
+          <h2 className="text-2xl font-semibold text-text">
+            Render final output
+          </h2>
           <p className="mt-2 text-sm text-text-2">
-            Every render includes the composed sprite sheet, metadata JSON,
-            <code className="mx-1">.credits.txt</code> and
-            <code className="mx-1">.credits.csv</code>. Keep both attribution
-            files with exported sprites.
+            Export the walk sheet and attributed ZIP after the character looks
+            right.
+          </p>
+          <code className={`${codeClassName} mt-4`}>
+            lpc-toolkit character render hero --out ./dist/hero --animation walk
+            --bundle zip
+          </code>
+          <p className="mt-4 text-sm text-text-2">
+            Render output includes the composed sheet, metadata, TXT and CSV
+            credits, and the requested ZIP. Attribution artifacts are required,
+            not optional extras.
           </p>
         </section>
 
         <section className="rounded-md border border-border bg-surface p-5">
           <h2 className="text-xl font-semibold text-text">More CLI workflows</h2>
           <p className="mt-2 text-sm text-text-2">
-            These secondary commands cover presets, explicit selection JSON,
-            catalog exploration, token sharing, and the packaged local web
-            server.
+            Run <code>lpc-toolkit --help</code> for command discovery, or read the{' '}
+            <a
+              className="underline hover:text-text"
+              href={cliReadmeUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              complete CLI guide
+            </a>{' '}
+            for selection files, pagination, tokens, cache locations, and
+            troubleshooting.
           </p>
-          <div className="mt-4 space-y-4">
-            {secondaryCommandGroups.map((group) => (
-              <article key={group.title}>
-                <h3 className="text-lg font-semibold text-text">{group.title}</h3>
-                <div className="mt-3 space-y-3">
-                  {group.commands.map((command) => (
-                    <code key={command} className={codeClassName}>
-                      {command}
-                    </code>
-                  ))}
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="rounded-md border border-border bg-surface p-5">
-          <h2 className="text-xl font-semibold text-text">Web Composer</h2>
-          <p className="mt-2 text-sm text-text-2">
-            Prefer visual composition? Open the browser composer for live
-            preview, export controls, and attribution.
-          </p>
-          <Button
-            className="mt-5"
-            variant="primary"
-            onClick={() => onNavigate('compose')}
-          >
-            Open Composer
-          </Button>
         </section>
       </div>
     </main>

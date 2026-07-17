@@ -97,7 +97,7 @@ describe('App shell routing', () => {
     const html = renderToStaticMarkup(<App />);
 
     expect(html).toContain('LPC Toolkit');
-    expect(html).toContain('CLI quick start');
+    expect(html).toContain('Create attributed LPC characters');
     expect(html).not.toContain('Composer Harness');
     expect(mocks.loadCatalogFromUpstream).not.toHaveBeenCalled();
     expect(mocks.loadPalettesFromUpstream).not.toHaveBeenCalled();
