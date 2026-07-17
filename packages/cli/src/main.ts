@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { SelectionDocumentError } from '@lpc-toolkit/core';
 import {
   flagBoolean,
   flagString,
@@ -20,7 +21,7 @@ import { helpForCommand, validateCommandOptions } from './command-spec.js';
 import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
 import { materializePreset, runPresetCommand } from './preset-commands.js';
 import { CLI_VERSION } from './package-info.js';
-import { readSelectionJsonFile, renderSelection } from './render.js';
+import { renderSelection } from './render.js';
 import {
   commandError,
   commandOk,
@@ -34,6 +35,10 @@ import {
   type RuntimeAssets,
 } from './runtime-assets.js';
 import { runSelectionCommand } from './selection-commands.js';
+import {
+  loadSelectionDocumentContext,
+  readSelectionDocumentFile,
+} from './selection-document-file.js';
 import { runTokenCommand } from './token-commands.js';
 import { startWebServer, validateWebOptions } from './web-server.js';
 
@@ -69,6 +74,13 @@ function renderErrorIssue(
       ...(error.issues[0]?.path === undefined ? {} : { path: error.issues[0].path }),
     };
   }
+  if (error instanceof SelectionDocumentError) {
+    return {
+      code: error.code,
+      message: error.message,
+      ...(error.path === undefined ? {} : { path: error.path }),
+    };
+  }
   return {
     code: 'render_failed',
     message: error instanceof Error ? error.message : fallbackMessage,
@@ -97,6 +109,7 @@ export function commandNeedsAssets(parsed: ParsedArgs): boolean {
   if (parsed.command[0] === 'catalog') return true;
   if (parsed.command[0] === 'selection') return true;
   if (parsed.command[0] === 'render') return true;
+  if (parsed.command[0] === 'token') return parsed.command[1] === 'encode';
   if (parsed.command[0] === 'preset') return parsed.command[1] !== 'list';
   if (parsed.command[0] === 'character') return characterCommandNeedsAssets(parsed);
   if (parsed.command[0] === 'web') return true;
@@ -346,7 +359,7 @@ export async function runCli(
 
   if (parsed.command[0] === 'token') {
     return writeResponse(
-      runTokenCommand(parsed, io.cwd),
+      runTokenCommand(parsed, io.cwd, runtime),
       parsed,
       io,
       'Token command completed.\n',
@@ -374,13 +387,18 @@ export async function runCli(
     }
 
     try {
-      const selectionJson = readSelectionJsonFile(io.cwd, selectionPath);
+      const documentContext = loadSelectionDocumentContext(runtime!);
+      const loaded = readSelectionDocumentFile(
+        io.cwd,
+        selectionPath,
+        documentContext.importContext,
+      );
       const result = await renderSelection({
         runtime: runtime!,
         cwd: io.cwd,
         outDir: path.resolve(io.cwd, outDir),
-        selectionName: selectionJson.name ?? 'sprite',
-        selectionJson,
+        selectionName: loaded.selection.name ?? 'sprite',
+        selectionJson: loaded.selection,
         animations: flagStrings(parsed.flags, 'animation'),
         frames:
           flagString(parsed.flags, 'frames') === 'all'

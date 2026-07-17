@@ -102,7 +102,7 @@ describe('runCli', () => {
 
     expect(code).toBe(1);
     expect(response.ok).toBe(false);
-    expect(response.errors[0]?.code).toBe('invalid_selection_json');
+    expect(response.errors[0]?.code).toBe('unsupported_selection_schema');
     expect(errors).toEqual([]);
   });
 });

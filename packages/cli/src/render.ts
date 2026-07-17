@@ -2,7 +2,6 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
-  readFileSync,
   renameSync,
   rmSync,
   statSync,
@@ -24,7 +23,7 @@ import { writeCanvasPng } from './node-canvas-adapter.js';
 import { CLI_VERSION } from './package-info.js';
 import type { CliIssue } from './response.js';
 import type { RuntimeAssets } from './runtime-assets.js';
-import { parseSelectionJson, type SelectionJson } from './selection.js';
+import type { SelectionJson } from './selection.js';
 import { writeZipBundle } from './zip.js';
 
 export interface RenderArtifact {
@@ -359,10 +358,4 @@ export async function renderSelection(
     warnings,
     metadataPath,
   };
-}
-
-export function readSelectionJsonFile(cwd: string, selectionPath: string): SelectionJson {
-  const raw = JSON.parse(readFileSync(path.resolve(cwd, selectionPath), 'utf8')) as unknown;
-  parseSelectionJson(raw);
-  return raw as SelectionJson;
 }

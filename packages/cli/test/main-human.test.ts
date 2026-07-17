@@ -141,7 +141,7 @@ describe('human-readable CLI output', () => {
   });
 
   it('prints encoded tokens without --json', async () => {
-    const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-human-token-'));
+    const cwd = makeCatalogCwd();
     writeFileSync(
       path.join(cwd, 'selection.json'),
       JSON.stringify({

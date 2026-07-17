@@ -1,11 +1,13 @@
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
+import { SelectionDocumentError } from '@lpc-toolkit/core';
 import type { ParsedArgs } from './args.js';
 import { flagString } from './args.js';
-import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
 import { commandError, commandOk, type CliResponse } from './response.js';
 import type { RuntimeAssets } from './runtime-assets.js';
-import { parseSelectionJson } from './selection.js';
+import {
+  loadSelectionDocumentContext,
+  readSelectionDocumentFile,
+  type LoadedSelectionDocument,
+} from './selection-document-file.js';
 import { validateSelections } from './validation.js';
 
 function errorMessage(error: unknown): string {
@@ -30,41 +32,40 @@ export function runSelectionCommand(
     });
   }
 
-  const context = runtime.context;
-  const catalog = loadCatalogFromRoots(
-    context.sheetDefinitionsRoot,
-    context.customSheetDefinitionsRoot,
-  );
-  const palettes = loadPalettesFromRoot(context.paletteDefinitionsRoot);
-  let selectionSource: string;
+  const documentContext = loadSelectionDocumentContext(runtime);
+  let loaded: LoadedSelectionDocument;
   try {
-    selectionSource = readFileSync(path.resolve(context.repoRoot, selectionPath), 'utf8');
+    loaded = readSelectionDocumentFile(
+      runtime.context.repoRoot,
+      selectionPath,
+      documentContext.importContext,
+    );
   } catch (error) {
+    if (error instanceof SelectionDocumentError) {
+      return commandError(
+        'selection validate',
+        {
+          code: error.code,
+          message: error.message,
+          ...(error.path === undefined ? {} : { path: error.path }),
+        },
+        documentContext.warnings,
+      );
+    }
     return commandError('selection validate', {
       code: 'selection_read_failed',
       message: errorMessage(error),
       path: selectionPath,
-    });
+    }, documentContext.warnings);
   }
 
-  let parsedSelection;
-  try {
-    parsedSelection = parseSelectionJson(JSON.parse(selectionSource) as unknown);
-  } catch (error) {
-    return commandError('selection validate', {
-      code: 'invalid_selection_json',
-      message: errorMessage(error),
-      path: selectionPath,
-    });
-  }
-
-  const validation = validateSelections(parsedSelection.selections, {
-    catalog: catalog.catalog,
-    palettes: palettes.palettes,
+  const validation = validateSelections(loaded.parsed.selections, {
+    catalog: documentContext.importContext.catalog,
+    palettes: documentContext.importContext.palettes,
     pathExists: (spritePath) => runtime.store.has(spritePath),
   });
 
-  const warnings = [...catalog.warnings, ...palettes.warnings, ...validation.warnings];
+  const warnings = [...documentContext.warnings, ...validation.warnings];
   if (!validation.ok) {
     return {
       ok: false,

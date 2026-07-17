@@ -1,6 +1,7 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import {
+  SelectionDocumentError,
   decodeSelectionToken,
   encodeSelectionToken,
   parseHash,
@@ -13,6 +14,12 @@ import { flagString, type ParsedArgs } from './args.js';
 import { createRuntimeContext } from './context.js';
 import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
 import { commandError, commandOk, type CliIssue, type CliResponse } from './response.js';
+import type { RuntimeAssets } from './runtime-assets.js';
+import {
+  loadSelectionDocumentContext,
+  readSelectionDocumentFile,
+  type LoadedSelectionDocument,
+} from './selection-document-file.js';
 import {
   parseSelectionJson,
   selectionJsonFromCore,
@@ -91,6 +98,7 @@ function loadTokenDecodeData(cwd: string): TokenDecodeData {
 export function runTokenCommand(
   parsed: ParsedArgs,
   cwd: string,
+  runtime?: RuntimeAssets,
 ): CliResponse<unknown> {
   if (parsed.command[1] === 'encode') {
     const selectionPath = flagString(parsed.flags, 'selection');
@@ -101,21 +109,39 @@ export function runTokenCommand(
       });
     }
 
-    let selectionJson: ReturnType<typeof parseSelectionJson>;
+    if (!runtime) {
+      return commandError('token encode', {
+        code: 'asset_runtime_required',
+        message: 'Token encoding requires runtime assets.',
+      });
+    }
+
+    const documentContext = loadSelectionDocumentContext(runtime);
+    let loaded: LoadedSelectionDocument;
     try {
-      const selectionSource = readFileSync(path.resolve(cwd, selectionPath), 'utf8');
-      selectionJson = parseSelectionJson(JSON.parse(selectionSource) as unknown);
+      loaded = readSelectionDocumentFile(cwd, selectionPath, documentContext.importContext);
     } catch (error) {
+      if (error instanceof SelectionDocumentError) {
+        return commandError(
+          'token encode',
+          {
+            code: error.code,
+            message: error.message,
+            ...(error.path === undefined ? {} : { path: error.path }),
+          },
+          documentContext.warnings,
+        );
+      }
       return commandError('token encode', {
         code: 'invalid_selection_json',
         message: errorMessage(error),
         path: selectionPath,
-      });
+      }, documentContext.warnings);
     }
 
     return commandOk('token encode', {
-      token: encodeSelectionToken(selectionJson.selections),
-    });
+      token: encodeSelectionToken(loaded.parsed.selections),
+    }, documentContext.warnings);
   }
 
   if (parsed.command[1] === 'decode') {
