@@ -47,7 +47,7 @@ export function validatePluginRepository(repoRoot) {
   if (!manifest || !marketplace) return errors;
 
   if (manifest.name !== 'lpc-toolkit') errors.push('plugin manifest name must be lpc-toolkit.');
-  if (manifest.version !== '0.1.0') errors.push('plugin manifest version must be 0.1.0.');
+  if (manifest.version !== '0.2.0') errors.push('plugin manifest version must be 0.2.0.');
   if (manifest.license !== 'GPL-3.0-or-later') errors.push('plugin manifest license must be GPL-3.0-or-later.');
   if (manifest.skills !== './skills/') errors.push('plugin manifest skills must point to ./skills/.');
 
@@ -82,7 +82,7 @@ export function validatePluginRepository(repoRoot) {
 
   for (const relativePath of ['.mcp.json', '.app.json', 'hooks']) {
     if (existsSync(path.join(pluginRoot, relativePath))) {
-      errors.push(`${pluginRelative}/${relativePath} is forbidden in the first plugin version.`);
+      errors.push(`${pluginRelative}/${relativePath} is forbidden by the lightweight plugin contract.`);
     }
   }
   return errors;

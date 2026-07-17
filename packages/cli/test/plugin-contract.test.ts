@@ -22,6 +22,11 @@ const contractPath = path.resolve(
   '../../../plugins/lpc-toolkit/skills/character-authoring/references/cli-contract.json',
 );
 const contract = JSON.parse(readFileSync(contractPath, 'utf8')) as PluginContract;
+const workflowPath = path.resolve(
+  here,
+  '../../../plugins/lpc-toolkit/skills/character-authoring/references/cli-workflow.md',
+);
+const workflow = readFileSync(workflowPath, 'utf8');
 
 describe('Codex plugin CLI contract', () => {
   it('uses the versioned contract schema', () => {
@@ -55,4 +60,19 @@ describe('Codex plugin CLI contract', () => {
       if (machineReadable) expect(parsed.flags.get('json')).toBe(true);
     },
   );
+
+  it('documents the viewer without relying on commands outside the contract', () => {
+    const contractCommands = new Set(
+      contract.commands
+        .map(({ argv }) => argv.filter((argument) => !argument.startsWith('--')).slice(0, 2))
+        .filter((command) => command.length > 0)
+        .map((command) => command.join(' ')),
+    );
+    const workflowCommands = [...workflow.matchAll(/^lpc-toolkit ([^\n]+)$/gmu)]
+      .map(([, argv]) => argv!.split(/\s+/u).slice(0, 2).join(' '));
+
+    expect(workflow).toContain('.viewer.html');
+    expect(workflowCommands.length).toBeGreaterThan(0);
+    expect(workflowCommands.every((command) => contractCommands.has(command))).toBe(true);
+  });
 });

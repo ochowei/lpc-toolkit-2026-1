@@ -57,6 +57,18 @@ describe('helpForCommand', () => {
     expect(previewHelp).toContain('Default: 0');
   });
 
+  it('describes the offline animation viewer for every full render command', () => {
+    for (const command of [
+      ['render'],
+      ['preset', 'render'],
+      ['character', 'render'],
+    ]) {
+      expect(helpForCommand(command)).toContain(
+        'Render an attributed spritesheet with an offline animation viewer.',
+      );
+    }
+  });
+
   it('documents discovery pagination options', () => {
     for (const command of [['catalog', 'items'], ['character', 'search']]) {
       const help = helpForCommand(command);

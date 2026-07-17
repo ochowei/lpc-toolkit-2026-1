@@ -216,6 +216,10 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             credits, and the requested ZIP. Attribution artifacts are required,
             not optional extras.
           </p>
+          <p className="mt-2 text-sm text-text-2">
+            Final render output also includes <code>hero.viewer.html</code>, a
+            standalone offline animation viewer.
+          </p>
         </section>
 
         <section className="rounded-md border border-border bg-surface p-5">

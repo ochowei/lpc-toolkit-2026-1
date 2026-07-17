@@ -3,8 +3,8 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const SUPPORTED_CLI = Object.freeze({
-  min: '0.1.4',
-  maxExclusive: '0.2.0',
+  min: '0.2.0',
+  maxExclusive: '0.3.0',
 });
 
 const IDENTIFIER = '[0-9A-Za-z-]+';

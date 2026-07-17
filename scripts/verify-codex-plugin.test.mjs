@@ -24,7 +24,7 @@ function validFixture() {
   }));
   write(root, 'plugins/lpc-toolkit/.codex-plugin/plugin.json', JSON.stringify({
     name: 'lpc-toolkit',
-    version: '0.1.0',
+    version: '0.2.0',
     description: 'Create attributed LPC characters with the installed CLI.',
     license: 'GPL-3.0-or-later',
     skills: './skills/',
@@ -55,9 +55,9 @@ test('rejects forbidden MCP, app, and hook components', () => {
     write(root, 'plugins/lpc-toolkit/.app.json', '{}\n');
     write(root, 'plugins/lpc-toolkit/hooks/hooks.json', '{}\n');
     assert.deepEqual(validatePluginRepository(root), [
-      'plugins/lpc-toolkit/.mcp.json is forbidden in the first plugin version.',
-      'plugins/lpc-toolkit/.app.json is forbidden in the first plugin version.',
-      'plugins/lpc-toolkit/hooks is forbidden in the first plugin version.',
+      'plugins/lpc-toolkit/.mcp.json is forbidden by the lightweight plugin contract.',
+      'plugins/lpc-toolkit/.app.json is forbidden by the lightweight plugin contract.',
+      'plugins/lpc-toolkit/hooks is forbidden by the lightweight plugin contract.',
     ]);
   } finally {
     rmSync(root, { recursive: true, force: true });

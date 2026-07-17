@@ -1,0 +1,34 @@
+{
+  "characterName": "Fixture Viewer",
+  "sheet": { "fileName": "fixture.sheet.png", "width": 384, "height": 832 },
+  "files": {
+    "metadata": "fixture.metadata.json",
+    "creditsTxt": "fixture.credits.txt",
+    "creditsCsv": "fixture.credits.csv"
+  },
+  "cliVersion": "0.1.5-test",
+  "metadataSchema": "lpc-toolkit.render-metadata.v1",
+  "effectiveLicense": "GPL 3.0",
+  "source": {
+    "runtimeSource": "fixture",
+    "description": "Browser fixture",
+    "releaseTag": "fixture-assets"
+  },
+  "warnings": [{ "code": "fixture_warning", "message": "Visible warning" }],
+  "skippedLayers": [],
+  "animations": [
+    {
+      "animation": "walk", "kind": "standard", "sourceX": 0, "sourceY": 0,
+      "frameSize": 64, "cycle": [0, 1, 2], "directions": 4
+    },
+    {
+      "animation": "oversized_spell", "kind": "custom", "sourceX": 0, "sourceY": 320,
+      "frameSize": 128, "cycle": [0, 1, 2], "directions": 4
+    },
+    {
+      "animation": "hurt", "kind": "standard", "sourceX": 0, "sourceY": 256,
+      "frameSize": 64, "cycle": [0, 1, 2], "directions": 1
+    }
+  ],
+  "creditsTxt": "Credits for Fixture Viewer\nFixture Artist — GPL 3.0\n"
+}

@@ -236,6 +236,22 @@ async function expectPartialMissingImageOutput(
       path: 'spritesheets/body/bodies/male/walk.png',
     }),
   ]));
+  const viewerHtml = readFileSync(
+    path.join(outDir, 'partial-character.viewer.html'),
+    'utf8',
+  );
+  const viewerDataText = /<script id="viewer-data" type="application\/json">([^<]*)<\/script>/u
+    .exec(viewerHtml)?.[1];
+  expect(viewerDataText).toBeDefined();
+  const viewerModel = JSON.parse(viewerDataText ?? '{}') as {
+    readonly skippedLayers: readonly { readonly code: string; readonly path?: string }[];
+  };
+  expect(viewerModel.skippedLayers).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      code: 'missing_sprite_path',
+      path: 'spritesheets/body/bodies/male/walk.png',
+    }),
+  ]));
 }
 
 describe('renderSelection', () => {
@@ -255,18 +271,37 @@ describe('renderSelection', () => {
       allowPartial: false,
     });
 
-    expect(result.artifacts.map((artifact) => artifact.type)).toContain('sheet');
+    expect(result.artifacts).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'viewer',
+        path: path.join(outDir, 'body-only.viewer.html'),
+      }),
+    ]));
     expect(existsSync(path.join(outDir, 'body-only.sheet.png'))).toBe(true);
+    expect(existsSync(path.join(outDir, 'body-only.viewer.html'))).toBe(true);
     expect(existsSync(path.join(outDir, 'body-only.metadata.json'))).toBe(true);
     expect(existsSync(path.join(outDir, 'body-only.credits.txt'))).toBe(true);
     expect(existsSync(path.join(outDir, 'body-only.credits.csv'))).toBe(true);
+    const html = readFileSync(path.join(outDir, 'body-only.viewer.html'), 'utf8');
+    expect(html).toContain('body-only.sheet.png');
+    expect(html).toContain('Fixture Artist');
+    expect(html).toContain('Working-directory assets');
+    expect(html).not.toContain(runtime.store.description);
+    expect(html).not.toContain(runtime.context.assetsRoot);
+    expect(html).not.toContain(runtime.context.sheetDefinitionsRoot);
     const metadata = JSON.parse(
       readFileSync(path.join(outDir, 'body-only.metadata.json'), 'utf8'),
     ) as {
+      readonly schema: string;
       readonly selection: { readonly name: string };
+      readonly artifacts: readonly { readonly type: string }[];
       readonly source: Readonly<Record<string, unknown>>;
     };
+    expect(metadata.schema).toBe('lpc-toolkit.render-metadata.v1');
     expect(metadata.selection.name).toBe('body-only');
+    expect(metadata.artifacts).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'viewer' }),
+    ]));
     expect(metadata.source).toEqual({
       runtimeSource: 'working-directory',
       description: runtime.store.description,
@@ -326,6 +361,92 @@ describe('renderSelection', () => {
       customOverlayRoot: runtime.context.customAssetsRoot,
       spritesheetsBaseUrl: 'lpc-zip:',
     });
+    const html = readFileSync(path.join(outDir, 'managed-body.viewer.html'), 'utf8');
+    expect(html).toContain('Verified managed asset cache');
+    expect(html).not.toContain(runtime.store.description);
+    expect(html).not.toContain(runtime.context.assetsRoot);
+  }, 30000);
+
+  it('includes the viewer and attributed artifacts in a ZIP bundle', async () => {
+    const cwd = await createFixtureRepo();
+    const outDir = mkdtempSync(path.join(os.tmpdir(), 'lpc-render-bundle-'));
+
+    await renderSelection({
+      runtime: createRuntime(cwd),
+      cwd,
+      outDir,
+      selectionName: 'body-only',
+      selectionJson: bodyOnlySelection,
+      animations: [],
+      frames: [],
+      bundleZip: true,
+      allowPartial: false,
+    });
+
+    const archive = await JSZip.loadAsync(
+      readFileSync(path.join(outDir, 'body-only.bundle.zip')),
+    );
+    expect(Object.keys(archive.files)).toEqual(expect.arrayContaining([
+      'body-only.sheet.png',
+      'body-only.viewer.html',
+      'body-only.metadata.json',
+      'body-only.credits.txt',
+      'body-only.credits.csv',
+    ]));
+  }, 30000);
+
+  it('does not publish artifacts when viewer generation fails', async () => {
+    const cwd = await createFixtureRepo();
+    const outDir = mkdtempSync(path.join(os.tmpdir(), 'lpc-render-viewer-failure-'));
+
+    await expect(renderSelection({
+      runtime: createRuntime(cwd),
+      cwd,
+      outDir,
+      selectionName: 'body-only',
+      selectionJson: bodyOnlySelection,
+      animations: [],
+      frames: [],
+      bundleZip: false,
+      allowPartial: false,
+    }, {
+      renderViewerHtml: () => {
+        throw new Error('viewer fixture failure');
+      },
+    })).rejects.toThrow('viewer fixture failure');
+    expect(listFiles(outDir)).toEqual([]);
+  }, 30000);
+
+  it('preserves prior outputs when the viewer path collides with a directory', async () => {
+    const cwd = await createFixtureRepo();
+    const outDir = mkdtempSync(path.join(os.tmpdir(), 'lpc-render-viewer-collision-'));
+    const priorOutputs = new Map([
+      ['body-only.sheet.png', Buffer.from('prior sheet bytes')],
+      ['body-only.credits.txt', Buffer.from('prior TXT credits')],
+      ['body-only.credits.csv', Buffer.from('prior CSV credits')],
+      ['body-only.metadata.json', Buffer.from('prior metadata')],
+    ]);
+    for (const [fileName, contents] of priorOutputs) {
+      writeFileSync(path.join(outDir, fileName), contents);
+    }
+    mkdirSync(path.join(outDir, 'body-only.viewer.html'));
+
+    await expect(renderSelection({
+      runtime: createRuntime(cwd),
+      cwd,
+      outDir,
+      selectionName: 'body-only',
+      selectionJson: bodyOnlySelection,
+      animations: [],
+      frames: [],
+      bundleZip: false,
+      allowPartial: false,
+    })).rejects.toThrow(/body-only\.viewer\.html/u);
+
+    for (const [fileName, contents] of priorOutputs) {
+      expect(readFileSync(path.join(outDir, fileName))).toEqual(contents);
+    }
+    expect(existsSync(path.join(outDir, 'body-only.viewer.html'))).toBe(true);
   }, 30000);
 
   it('does not leave artifacts when a requested animation is invalid', async () => {
@@ -491,5 +612,21 @@ describe('renderSelection', () => {
     };
     expect(metadata.effectiveLicense).toBeNull();
     expect(metadata.credits).toMatchObject({ entries: 0, resolvedPaths: [] });
+    const viewerHtml = readFileSync(path.join(outDir, 'body-only.viewer.html'), 'utf8');
+    const viewerDataText = /<script id="viewer-data" type="application\/json">([^<]*)<\/script>/u
+      .exec(viewerHtml)?.[1];
+    expect(viewerDataText).toBeDefined();
+    const viewerModel = JSON.parse(viewerDataText ?? '{}') as {
+      readonly animations: readonly unknown[];
+      readonly skippedLayers: readonly { readonly code: string; readonly path?: string }[];
+    };
+    expect(viewerModel.animations).toEqual([]);
+    expect(viewerModel.skippedLayers).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'missing_sprite_path',
+        path: 'spritesheets/body/bodies/male/walk.png',
+      }),
+    ]));
+    expect(viewerHtml).toContain('No playable animations were composed.');
   }, 30000);
 });
