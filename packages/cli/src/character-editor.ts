@@ -1,12 +1,14 @@
 import {
   BODY_TYPES,
   getDefaultColorSelection,
+  SELECTION_SCHEMA,
   type BodyType,
   type Catalog,
   type ItemDefinition,
   type ItemId,
   type PaletteMetadata,
   type Selections,
+  type SelectionJson,
   type TypeName,
 } from '@lpc-toolkit/core';
 import {
@@ -18,7 +20,6 @@ import {
   type DiscoveryPagination,
   type DiscoveryResult,
 } from './catalog-discovery.js';
-import { SELECTION_SCHEMA, type SelectionJson } from './selection.js';
 import { validateSelections, type ValidationResult } from './validation.js';
 
 export interface CharacterCatalogContext {

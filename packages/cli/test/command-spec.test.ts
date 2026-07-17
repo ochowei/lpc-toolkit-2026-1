@@ -57,6 +57,15 @@ describe('helpForCommand', () => {
     expect(previewHelp).toContain('Default: 0');
   });
 
+  it('distinguishes selection input help from the create destination', () => {
+    expect(helpForCommand(['character', 'show'])).toContain(
+      '--selection <file>  Read a Toolkit or upstream selection JSON file.',
+    );
+    expect(helpForCommand(['character', 'create'])).toContain(
+      '--selection <file>  Write the new selection to this explicit path.',
+    );
+  });
+
   it('describes the offline animation viewer for every full render command', () => {
     for (const command of [
       ['render'],

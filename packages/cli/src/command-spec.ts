@@ -36,7 +36,7 @@ const SELECTION_OPTION: CommandOptionSpec = {
   name: 'selection',
   kind: 'value',
   valueLabel: 'file',
-  description: 'Use an explicit selection JSON file.',
+  description: 'Read a Toolkit or upstream selection JSON file.',
 };
 
 const CREATE_SELECTION_OPTION: CommandOptionSpec = {

@@ -1,6 +1,7 @@
 import {
-  getRecolorVariants,
+  getRecolorVariantsForType,
   getSpritePathsForSelections,
+  itemSupportsSelectionType,
   type Catalog,
   type ItemDefinition,
   type PaletteMetadata,
@@ -31,7 +32,10 @@ function findItem(
   typeName: TypeName,
   name: string,
 ): ItemDefinition | undefined {
-  return catalog.byTypeName.get(typeName)?.find((item) => item.name === name);
+  return catalog.byTypeName.get(typeName)?.find((item) => item.name === name)
+    ?? [...catalog.byItemId.values()].find(
+      (item) => item.name === name && itemSupportsSelectionType(item, typeName),
+    );
 }
 
 function isBodyTypeCompatible(item: ItemDefinition, bodyType: string): boolean {
@@ -49,7 +53,8 @@ function validateSelection(
   bodyType: string,
 ): { readonly item?: ItemDefinition; readonly errors: readonly CliIssue[] } {
   const errors: CliIssue[] = [];
-  if (!options.catalog.byTypeName.has(selection.typeName)) {
+  const item = findItem(options.catalog, selection.typeName, selection.name);
+  if (!options.catalog.byTypeName.has(selection.typeName) && !item) {
     errors.push({
       code: 'unknown_type_name',
       message: `Unknown item type: ${selection.typeName}`,
@@ -58,7 +63,6 @@ function validateSelection(
     return { errors };
   }
 
-  const item = findItem(options.catalog, selection.typeName, selection.name);
   if (!item) {
     errors.push({
       code: 'unknown_item',
@@ -68,7 +72,10 @@ function validateSelection(
     return { errors };
   }
 
-  if (selection.variant && !item.variants?.includes(selection.variant)) {
+  if (
+    selection.variant &&
+    (item.type_name !== selection.typeName || !item.variants?.includes(selection.variant))
+  ) {
     errors.push({
       code: 'unknown_variant',
       message: `Unknown variant: ${selection.variant}`,
@@ -77,7 +84,11 @@ function validateSelection(
   }
 
   if (selection.recolor) {
-    const recolors = getRecolorVariants(item, options.palettes);
+    const recolors = getRecolorVariantsForType(
+      item,
+      options.palettes,
+      selection.typeName,
+    );
     if (!recolors.includes(selection.recolor)) {
       errors.push({
         code: 'unknown_recolor',
@@ -87,7 +98,7 @@ function validateSelection(
     }
   }
 
-  if (!isBodyTypeCompatible(item, bodyType)) {
+  if (item.type_name === selection.typeName && !isBodyTypeCompatible(item, bodyType)) {
     errors.push({
       code: 'body_type_incompatible',
       message: `Item is not compatible with body type: ${bodyType}`,
@@ -109,7 +120,11 @@ export function validateSelections(
   for (const selection of Object.values(selections.items)) {
     const result = validateSelection(selection, options, selections.bodyType);
     errors.push(...result.errors);
-    if (result.item && result.errors.length === 0) {
+    if (
+      result.item &&
+      result.item.type_name === selection.typeName &&
+      result.errors.length === 0
+    ) {
       validSelections.add(selection.typeName);
     }
   }

@@ -84,6 +84,8 @@ export type {
 export {
   getRecolorSwatches,
   getRecolorVariants,
+  getRecolorVariantsForType,
+  itemSupportsSelectionType,
   makeResolvePalette,
 } from './recolor-resolve.js';
 export { getDefaultColorSelection } from './selection-defaults.js';
@@ -103,6 +105,26 @@ export { creditsToTxt, creditsToCsv } from './credits-format.js';
 // ==========================================
 // 9. Selection URL State Serializer
 // ==========================================
+export type {
+  ParsedSelectionJson,
+  SelectionJson,
+  SelectionJsonItem,
+} from './selection-document.js';
+export {
+  parseSelectionJson,
+  SELECTION_SCHEMA,
+  selectionJsonFromCore,
+} from './selection-document.js';
+export type {
+  ImportedSelectionDocument,
+  SelectionDocumentErrorCode,
+  SelectionDocumentImportContext,
+  SelectionDocumentSource,
+} from './upstream-selection-import.js';
+export {
+  importSelectionDocument,
+  SelectionDocumentError,
+} from './upstream-selection-import.js';
 export type { HashWarning, ParseHashResult } from './hash.js';
 export {
   decodeSelectionToken,

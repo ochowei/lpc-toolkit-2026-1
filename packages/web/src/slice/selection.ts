@@ -85,10 +85,9 @@ export function sliceReducer(s: SliceState, a: SliceAction): SliceState {
       return { ...s, selections: next };
     }
     case 'apply_selections': {
-      const selections: Record<TypeName, Selection> = {};
-      for (const [typeName, item] of Object.entries(a.selections.items)) {
-        selections[typeName] = item;
-      }
+      const selections = Object.fromEntries(
+        Object.entries(a.selections.items),
+      );
       return {
         ...s,
         bodyType: a.selections.bodyType,
@@ -133,10 +132,9 @@ export function sliceReducer(s: SliceState, a: SliceAction): SliceState {
 
 /** Core's Selection requires `name` to equal ItemDefinition.name. */
 export function toSelections(state: SliceState): Selections {
-  const items: Record<TypeName, Selection> = {};
-  for (const [typeName, selection] of Object.entries(state.selections)) {
-    if (selection.name) items[typeName] = selection;
-  }
+  const items = Object.fromEntries(
+    Object.entries(state.selections).filter(([, selection]) => selection.name),
+  );
   return { bodyType: state.bodyType, items };
 }
 

@@ -68,6 +68,27 @@ describe('bootstrapStateFromHash', () => {
     expect(result.warnings.length).toBe(1);
     expect(result.warnings[0]?.key).toBe('fictional_xyz');
   });
+
+  it('restores a real multi-recolor sub-selection from the URL hash', () => {
+    const result = bootstrapStateFromHash({
+      rawHash: 'sex=male&hair=Long_tied_black&hair_tie=Long_tied_red',
+      catalog,
+      palettes,
+      defaults,
+    });
+
+    expect(result.warnings).toEqual([]);
+    expect(result.state.selections.hair).toMatchObject({
+      typeName: 'hair',
+      name: 'Long tied',
+      recolor: 'black',
+    });
+    expect(result.state.selections.hair_tie).toEqual({
+      typeName: 'hair_tie',
+      name: 'Long tied',
+      recolor: 'red',
+    });
+  });
 });
 
 describe('computeHashWrite', () => {

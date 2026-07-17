@@ -26,6 +26,7 @@ LPC behavior:
 - pure playback descriptions for composed standard and custom animations
 - credits and attribution manifests
 - hash/token serialization and parsing
+- the canonical character document and pure upstream compatibility adapter
 - static asset validation
 - adapter contracts such as `CanvasAdapter`
 
@@ -129,6 +130,8 @@ not modify `upstream/`.
 - filesystem-backed catalog, palette, custom asset, and selection loading
 - filesystem-backed character documents with atomic create and replace in
   `character-store.ts`
+- atomic canonical normalization writes and response warnings for imported
+  upstream character documents
 - catalog-backed character editing, search, and validation decisions
 - transactional attributed preview and render publication
 - Node `CanvasAdapter` wiring through `@napi-rs/canvas`
@@ -259,6 +262,31 @@ metadata, TXT credit, and CSV credit artifact before transactional publication.
 Shared selection parsing, composition, attribution, and preset rules remain in
 core or presets; CLI persistence must not introduce Node filesystem APIs into
 those packages.
+
+## Character JSON Interchange
+
+Core owns the canonical character document schema,
+`lpc-toolkit.selection.v1`, plus the pure upstream compatibility adapter that
+imports upstream version 1 and version 2 documents. The adapter identifies its
+source as `canonical`, `upstream-v1`, or `upstream-v2`, validates the resolved
+selection against the current catalog and palettes, and returns a canonical
+selection payload. Imported `credits` and rendered `layers` are not part of the
+selection contract and are ignored; composition recomputes attribution from the
+active asset source.
+
+The Web owns browser file-picker and download I/O. Components dispatch import
+and save intent, while hooks and browser helpers read a selected file, call the
+Core adapter, apply the validated selection, and download only canonical
+character JSON. The CLI owns filesystem reads and writes, atomic replacement,
+and normalization warnings. Read-only commands may convert an upstream document
+in memory but never rewrite it. After a successful mutation, the CLI atomically
+normalizes upstream input to the canonical format; failed imports or mutations
+leave the original bytes unchanged.
+
+The canonical character document is a portable selection payload, not the CLI
+JSON response envelope. CLI `--json` responses continue to wrap command data,
+warnings, and errors separately, and any character document written to disk is
+canonical regardless of its input format.
 
 Render publication stages the self-contained offline viewer with the attributed
 sheet, metadata, TXT and CSV credits, optional pixel exports, and ZIP before

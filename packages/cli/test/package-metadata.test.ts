@@ -24,7 +24,12 @@ interface CliPackageJson {
 
 interface TokenDecodeSnapshot {
   readonly schemaVersion?: unknown;
-  readonly items?: Readonly<Record<string, { readonly name?: unknown }>>;
+  readonly items?: Readonly<Record<string, {
+    readonly name?: unknown;
+    readonly recolors?: Readonly<Record<string, {
+      readonly type_name?: unknown;
+    }>>;
+  }>>;
   readonly materials?: unknown;
 }
 
@@ -109,6 +114,10 @@ describe('CLI package metadata', () => {
     expect(
       Object.values(snapshot.items ?? {}).some((item) => item.name === 'Braid'),
     ).toBe(true);
+    expect(
+      snapshot.items?.['hair/braids/hair_long_tied.json']
+        ?.recolors?.color_2?.type_name,
+    ).toBe('hair_tie');
     expect(snapshotSource).not.toContain('"source"');
     expect(snapshotSource).not.toMatch(/#[0-9A-F]{6}/iu);
   });
@@ -291,6 +300,10 @@ process.stdout.write(JSON.stringify([
     expect(readme).toContain('hair=Braid');
     expect(readme).not.toContain('lpc-toolkit catalog item braids');
     expect(readme).not.toContain('hair=Braids');
+    expect(readme).toMatch(
+      /`--help`, `--version`, `token decode`, `preset list`, `character list`,\s+and\s+`character create` without `--preset` do not prepare the managed cache\./u,
+    );
+    expect(readme).not.toContain('`--help`, token encoding');
   });
 
   it('documents the optional Codex plugin installation', () => {

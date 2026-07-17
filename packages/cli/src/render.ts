@@ -2,7 +2,6 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
-  readFileSync,
   renameSync,
   rmSync,
   statSync,
@@ -19,13 +18,13 @@ import {
   extractAnimationFrames,
   type AnimationName,
   type CanvasLike,
+  type SelectionJson,
 } from '@lpc-toolkit/core';
 import { composeSelectionForOutput } from './compose-selection.js';
 import { writeCanvasPng } from './node-canvas-adapter.js';
 import { CLI_VERSION } from './package-info.js';
 import type { CliIssue } from './response.js';
 import type { RuntimeAssets } from './runtime-assets.js';
-import { parseSelectionJson, type SelectionJson } from './selection.js';
 import { renderViewerHtml, type RenderViewerModel } from './viewer.js';
 import { writeZipBundle } from './zip.js';
 
@@ -406,10 +405,4 @@ export async function renderSelection(
     warnings,
     metadataPath,
   };
-}
-
-export function readSelectionJsonFile(cwd: string, selectionPath: string): SelectionJson {
-  const raw = JSON.parse(readFileSync(path.resolve(cwd, selectionPath), 'utf8')) as unknown;
-  parseSelectionJson(raw);
-  return raw as SelectionJson;
 }

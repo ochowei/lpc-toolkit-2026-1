@@ -1,4 +1,4 @@
-import type { BodyType, Selection, Selections, TypeName } from '@lpc-toolkit/core';
+import type { BodyType, Selection, Selections, TypeName } from './types.js';
 
 export const SELECTION_SCHEMA = 'lpc-toolkit.selection.v1';
 
@@ -32,6 +32,12 @@ export function parseSelectionJson(value: unknown): ParsedSelectionJson {
   if (value.schema !== SELECTION_SCHEMA) {
     throw new Error(`Unsupported selection schema: ${String(value.schema)}`);
   }
+  if (
+    Object.prototype.hasOwnProperty.call(value, 'name') &&
+    typeof value.name !== 'string'
+  ) {
+    throw new Error('Selection JSON name must be a string.');
+  }
   if (typeof value.bodyType !== 'string') {
     throw new Error('Selection JSON bodyType must be a string.');
   }
@@ -39,7 +45,7 @@ export function parseSelectionJson(value: unknown): ParsedSelectionJson {
     throw new Error('Selection JSON items must be an object.');
   }
 
-  const items: Record<TypeName, Selection> = {};
+  const itemEntries: Array<readonly [TypeName, Selection]> = [];
   for (const [typeName, raw] of Object.entries(value.items)) {
     if (!isRecord(raw) || typeof raw.name !== 'string') {
       throw new Error(`Selection item ${typeName} must include a string name.`);
@@ -50,23 +56,22 @@ export function parseSelectionJson(value: unknown): ParsedSelectionJson {
     if (raw.recolor !== undefined && typeof raw.recolor !== 'string') {
       throw new Error(`Selection item ${typeName} recolor must be a string.`);
     }
-    items[typeName] = {
+    itemEntries.push([typeName, {
       typeName,
       name: raw.name,
       ...(typeof raw.variant === 'string' ? { variant: raw.variant } : {}),
       ...(typeof raw.recolor === 'string' ? { recolor: raw.recolor } : {}),
-    };
+    }]);
   }
+
+  const items = Object.fromEntries(itemEntries);
 
   return {
     metadata: {
       schema: SELECTION_SCHEMA,
       ...(typeof value.name === 'string' ? { name: value.name } : {}),
     },
-    selections: {
-      bodyType: value.bodyType,
-      items,
-    },
+    selections: { bodyType: value.bodyType, items },
   };
 }
 
@@ -74,14 +79,15 @@ export function selectionJsonFromCore(
   selections: Selections,
   name?: string,
 ): SelectionJson {
-  const items: Record<TypeName, SelectionJsonItem> = {};
+  const itemEntries: Array<readonly [TypeName, SelectionJsonItem]> = [];
   for (const [typeName, selection] of Object.entries(selections.items)) {
-    items[typeName] = {
+    itemEntries.push([typeName, {
       name: selection.name,
       ...(selection.variant ? { variant: selection.variant } : {}),
       ...(selection.recolor ? { recolor: selection.recolor } : {}),
-    };
+    }]);
   }
+  const items = Object.fromEntries(itemEntries);
   return {
     schema: SELECTION_SCHEMA,
     ...(name ? { name } : {}),

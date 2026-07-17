@@ -89,6 +89,15 @@ Character rendering is strict by default. Use `--allow-partial` only when
 attributed partial animation output is acceptable; missing paths are reported
 in warnings and metadata rather than silently credited.
 
+`lpc-toolkit.selection.v1` is the canonical saved selection format. Wherever
+`--selection` reads an existing file, the CLI also accepts upstream version 1
+and version 2 selection JSON. Read-only commands import these documents in
+memory without rewriting the source. A successful `character set` or
+`character remove` mutation of upstream input atomically rewrites that file in
+the canonical format and emits the `selection_format_normalized` warning.
+`character create --selection <file>` remains an output destination for the
+new character rather than an input file.
+
 ### Render output
 
 Every successful render writes this attributed artifact set. Entries marked as
@@ -188,7 +197,8 @@ The npm package does not contain the art archive. The first asset-dependent
 command downloads a pinned asset manifest and about 205 MB of compressed assets
 from the project's GitHub release. Download, verification, extraction, and
 ready progress is written to stderr so stdout remains safe for `--json` output.
-`--help`, token encoding, and `preset list` do not prepare the managed cache.
+`--help`, `--version`, `token decode`, `preset list`, `character list`, and
+`character create` without `--preset` do not prepare the managed cache.
 
 The default cache root is platform-specific:
 

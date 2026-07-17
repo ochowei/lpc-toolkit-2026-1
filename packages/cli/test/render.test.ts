@@ -19,6 +19,7 @@ import {
   createZipAssetStore,
 } from '../src/asset-store.js';
 import { createRuntimeContext } from '../src/context.js';
+import { runCli } from '../src/main.js';
 import type { RuntimeAssets } from '../src/runtime-assets.js';
 
 const sheetDefinition = {
@@ -255,6 +256,62 @@ async function expectPartialMissingImageOutput(
 }
 
 describe('renderSelection', () => {
+  it('renders upstream v2 without rewriting the source file', async () => {
+    const cwd = await createFixtureRepo();
+    const runtime = createRuntime(cwd);
+    const selectionPath = path.join(cwd, 'upstream.json');
+    const source = `${JSON.stringify({
+      version: 2,
+      bodyType: 'male',
+      selections: { body: { itemId: 'body' } },
+    }, null, 2)}\n`;
+    writeFileSync(selectionPath, source);
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+
+    const code = await runCli([
+      'render', '--selection', 'upstream.json', '--out', 'out', '--json',
+    ], {
+      cwd,
+      stdout: (text) => stdout.push(text),
+      stderr: (text) => stderr.push(text),
+    }, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+
+    expect(code).toBe(0);
+    expect(JSON.parse(stdout.join(''))).toMatchObject({
+      ok: true,
+      command: 'render',
+    });
+    expect(stderr).toEqual([]);
+    expect(existsSync(path.join(cwd, 'out', 'sprite.sheet.png'))).toBe(true);
+    expect(readFileSync(selectionPath, 'utf8')).toBe(source);
+  }, 30000);
+
+  it('preserves selection import error codes and paths while rendering', async () => {
+    const cwd = await createFixtureRepo();
+    const runtime = createRuntime(cwd);
+    writeFileSync(path.join(cwd, 'upstream.json'), JSON.stringify({ version: 3 }));
+    const stdout: string[] = [];
+
+    const code = await runCli([
+      'render', '--selection', 'upstream.json', '--out', 'out', '--json',
+    ], {
+      cwd,
+      stdout: (text) => stdout.push(text),
+      stderr: () => undefined,
+    }, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+
+    expect(code).toBe(1);
+    expect(JSON.parse(stdout.join('')).errors[0]).toEqual(expect.objectContaining({
+      code: 'unsupported_upstream_version',
+      path: 'version',
+    }));
+  });
+
   it('keeps default directory rendering for a body-only selection', async () => {
     const cwd = await createFixtureRepo();
     const outDir = mkdtempSync(path.join(os.tmpdir(), 'lpc-render-'));
