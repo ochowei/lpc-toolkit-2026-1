@@ -614,7 +614,7 @@ plugin: N/A — no plugin workflow or supported CLI contract changes
   the landing tutorial presentation and its bundled attributed example; it
   does not change any CLI or plugin contract.
 
-- [ ] **Step 5: Commit the completed plan record**
+- [x] **Step 5: Commit the completed plan record**
 
 After adding every exact PASS/FAIL result and the full hashes from Tasks 1 and
 2, run:
@@ -625,3 +625,9 @@ rtk git commit -m "docs(plan): record landing tutorial verification"
 ```
 
 Record this final commit's full hash in the plan before handoff.
+
+- Implementation note: Preserved long commands as single horizontally
+  scrollable lines, aligned the app-shell route assertion with the new landing
+  outcome, and recorded the normal, embedded, responsive, and repository-wide
+  verification evidence above.
+- Commit: `c73ee8c221fad537d7ba015824edfaa5c6b578b6`
