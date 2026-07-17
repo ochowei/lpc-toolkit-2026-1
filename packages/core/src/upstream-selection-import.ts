@@ -271,12 +271,157 @@ function importV2(
   );
 }
 
+function hasValidPercentEncoding(value: string): boolean {
+  for (let index = 0; index < value.length; index++) {
+    if (value[index] !== '%') continue;
+    const escape = value.slice(index + 1, index + 3);
+    if (!/^[0-9a-f]{2}$/i.test(escape)) return false;
+    index += 2;
+  }
+  return true;
+}
+
+function isValidIpv4(value: string): boolean {
+  const parts = value.split('.');
+  return parts.length === 4 && parts.every((part) => {
+    if (!/^(?:0|[1-9][0-9]{0,2})$/.test(part)) return false;
+    return Number(part) <= 255;
+  });
+}
+
+function isValidIpv6(value: string): boolean {
+  if (!value.includes(':') || value.includes(':::')) return false;
+  const compression = value.indexOf('::');
+  if (compression !== value.lastIndexOf('::')) return false;
+
+  const tokens = value
+    .split('::')
+    .flatMap((side) => side === '' ? [] : side.split(':'));
+  let groupCount = 0;
+  for (let index = 0; index < tokens.length; index++) {
+    const token = tokens[index] ?? '';
+    if (token.includes('.')) {
+      if (index !== tokens.length - 1 || !isValidIpv4(token)) return false;
+      groupCount += 2;
+    } else {
+      if (!/^[0-9a-f]{1,4}$/i.test(token)) return false;
+      groupCount += 1;
+    }
+  }
+  return compression >= 0 ? groupCount < 8 : groupCount === 8;
+}
+
+function isValidIpLiteral(value: string): boolean {
+  if (/^v[0-9a-f]+\.[a-z0-9._~!$&'()*+,;=:-]+$/i.test(value)) {
+    return true;
+  }
+  return isValidIpv6(value);
+}
+
+function isValidPort(value: string): boolean {
+  if (!/^[0-9]+$/.test(value)) return false;
+  return Number(value) <= 65_535;
+}
+
+function isValidAuthority(value: string): boolean {
+  const atIndex = value.lastIndexOf('@');
+  if (atIndex >= 0) {
+    if (atIndex === 0 || value.indexOf('@') !== atIndex) return false;
+    const userInfo = value.slice(0, atIndex);
+    if (!/^[a-z0-9._~!$&'()*+,;=:%-]+$/i.test(userInfo)) return false;
+    value = value.slice(atIndex + 1);
+  }
+  if (value.length === 0) return false;
+
+  if (value.startsWith('[')) {
+    const closeIndex = value.indexOf(']');
+    if (closeIndex < 0 || !isValidIpLiteral(value.slice(1, closeIndex))) {
+      return false;
+    }
+    const suffix = value.slice(closeIndex + 1);
+    if (suffix === '') return true;
+    return suffix.startsWith(':') && isValidPort(suffix.slice(1));
+  }
+
+  const colonIndex = value.lastIndexOf(':');
+  let host = value;
+  if (colonIndex >= 0) {
+    if (value.indexOf(':') !== colonIndex) return false;
+    host = value.slice(0, colonIndex);
+    if (!isValidPort(value.slice(colonIndex + 1))) return false;
+  }
+  return (
+    host.length > 0 &&
+    /^[a-z0-9._~!$&'()*+,;=%-]+$/i.test(host)
+  );
+}
+
+function hasValidHashComponents(hash: string): boolean {
+  const components = hash.slice(1).split('&');
+  for (let index = 0; index < components.length; index++) {
+    const component = components[index] ?? '';
+    const equalsIndex = component.indexOf('=');
+    if (
+      component.length === 0 ||
+      equalsIndex <= 0 ||
+      equalsIndex === component.length - 1
+    ) {
+      return false;
+    }
+    let rawKey = component.slice(0, equalsIndex);
+    if (index === 0 && rawKey.startsWith('?')) rawKey = rawKey.slice(1);
+    const rawValue = component.slice(equalsIndex + 1);
+    if (rawKey.length === 0) return false;
+    try {
+      if (
+        decodeURIComponent(rawKey).length === 0 ||
+        decodeURIComponent(rawValue).length === 0
+      ) {
+        return false;
+      }
+    } catch {
+      return false;
+    }
+  }
+  return true;
+}
+
 function absoluteHttpHash(value: unknown): string | undefined {
-  if (typeof value !== 'string' || /\s/.test(value)) return undefined;
-  if (!/^https?:\/\/[^/?#]+(?:[/?#]|$)/i.test(value)) return undefined;
-  const hashIndex = value.indexOf('#');
-  if (hashIndex < 0 || hashIndex === value.length - 1) return undefined;
-  return value.slice(hashIndex);
+  if (typeof value !== 'string') return undefined;
+  if (
+    /[\u0000-\u0020\u007f-\uffff\\]/.test(value) ||
+    !hasValidPercentEncoding(value)
+  ) {
+    return undefined;
+  }
+  const scheme = value.match(/^https?:\/\//i)?.[0];
+  if (!scheme) return undefined;
+
+  const authorityStart = scheme.length;
+  const authorityEndOffset = value
+    .slice(authorityStart)
+    .search(/[/?#]/);
+  const authorityEnd = authorityEndOffset < 0
+    ? value.length
+    : authorityStart + authorityEndOffset;
+  if (!isValidAuthority(value.slice(authorityStart, authorityEnd))) {
+    return undefined;
+  }
+
+  const suffix = value.slice(authorityEnd);
+  if (!/^[a-z0-9\-._~!$&'()*+,;=:@/?%#]*$/i.test(suffix)) {
+    return undefined;
+  }
+  const hashIndex = value.indexOf('#', authorityEnd);
+  if (
+    hashIndex < 0 ||
+    hashIndex === value.length - 1 ||
+    hashIndex !== value.lastIndexOf('#')
+  ) {
+    return undefined;
+  }
+  const hash = value.slice(hashIndex);
+  return hasValidHashComponents(hash) ? hash : undefined;
 }
 
 function importV1(

@@ -269,4 +269,48 @@ describe('importSelectionDocument', () => {
       expect.objectContaining({ code: 'invalid_upstream_selection', path }),
     );
   });
+
+  it.each([
+    'body=Body_Color&coat',
+    'body=Body_Color&=Coat',
+    'body=Body_Color&coat=',
+    'body=Body_Color&&coat=Coat',
+    'body=Body_Color&coat=%ZZ',
+    'body=Body_Color&%ZZ=Coat',
+  ])(
+    'rejects the complete upstream v1 import when hash component %s is malformed',
+    (hash) => {
+      expect(() =>
+        importSelectionDocument(
+          {
+            version: 1,
+            url: `https://example.test/generator/#${hash}`,
+          },
+          context,
+        ),
+      ).toThrowError(
+        expect.objectContaining({
+          code: 'invalid_upstream_selection',
+          path: 'url',
+        }),
+      );
+    },
+  );
+
+  it.each([
+    'https://example.test:bogus/#sex=male&body=Body_Color',
+    'https://example.test:65536/#sex=male&body=Body_Color',
+    'https://example.test:/#sex=male&body=Body_Color',
+    'https:///generator/#sex=male&body=Body_Color',
+    'https://[::1/generator/#sex=male&body=Body_Color',
+    'https://example.test/%ZZ/#sex=male&body=Body_Color',
+  ])('rejects syntactically invalid absolute upstream v1 URL %s', (url) => {
+    expect(() => importSelectionDocument({ version: 1, url }, context))
+      .toThrowError(
+        expect.objectContaining({
+          code: 'invalid_upstream_selection',
+          path: 'url',
+        }),
+      );
+  });
 });
