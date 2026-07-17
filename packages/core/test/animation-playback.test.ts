@@ -25,6 +25,16 @@ describe('describeAnimationPlayback', () => {
     })).toThrow('Unknown composed animation: not-real');
   });
 
+  it.each(['toString', 'constructor', '__proto__'])(
+    'rejects prototype-key standard animation %s',
+    (animation) => {
+      expect(() => describeAnimationPlayback({
+        animations: [animation],
+        customAnimations: undefined,
+      })).toThrow(`Unknown composed animation: ${animation}`);
+    },
+  );
+
   it('appends custom regions in encounter order with sequential cycles', () => {
     expect(describeAnimationPlayback({
       animations: ['walk', 'walk'],

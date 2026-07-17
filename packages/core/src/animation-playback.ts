@@ -17,7 +17,9 @@ export function describeAnimationPlayback(
   const descriptors: AnimationPlaybackDescriptor[] = [];
   const seen = new Set<AnimationName>();
   for (const animation of sheet.animations) {
-    const config = ANIMATION_CONFIGS[animation];
+    const config = Object.hasOwn(ANIMATION_CONFIGS, animation)
+      ? ANIMATION_CONFIGS[animation]
+      : undefined;
     if (!config) throw new Error(`Unknown composed animation: ${animation}`);
     if (seen.has(animation)) continue;
     seen.add(animation);
