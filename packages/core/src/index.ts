@@ -103,6 +103,16 @@ export { creditsToTxt, creditsToCsv } from './credits-format.js';
 // ==========================================
 // 9. Selection URL State Serializer
 // ==========================================
+export type {
+  ParsedSelectionJson,
+  SelectionJson,
+  SelectionJsonItem,
+} from './selection-document.js';
+export {
+  parseSelectionJson,
+  SELECTION_SCHEMA,
+  selectionJsonFromCore,
+} from './selection-document.js';
 export type { HashWarning, ParseHashResult } from './hash.js';
 export {
   decodeSelectionToken,
