@@ -26,7 +26,8 @@ until validation and attribution checks are complete.
 5. Apply one edit, validate, and resolve structured errors before continuing.
 6. Preview and inspect the returned PNG when visual review is available.
 7. Render only after validation succeeds.
-8. Verify metadata, credits TXT, and credits CSV before reporting success.
+8. For a final render, verify the sheet, `.viewer.html`, metadata, credits TXT,
+   and credits CSV, then report the viewer path with the result.
 
 Do not bypass cache integrity, modify `upstream/`, or suppress attribution. Use
 `--allow-partial` only when the user explicitly requests or accepts partial

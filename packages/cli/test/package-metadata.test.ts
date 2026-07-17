@@ -48,7 +48,7 @@ describe('CLI package metadata', () => {
   it('declares public npm release metadata', () => {
     const packageJson = readCliPackageJson();
 
-    expect(packageJson.version).toBe('0.1.4');
+    expect(packageJson.version).toBe('0.2.0');
     expect(packageJson).toMatchObject({
       name: '@lpc-toolkit/cli',
       version: expect.stringMatching(
@@ -308,7 +308,7 @@ process.stdout.write(JSON.stringify([
 
   it('documents the optional Codex plugin installation', () => {
     const readme = readCliReadme();
-    const cliInstall = "npm install -g '@lpc-toolkit/cli@>=0.1.4 <0.2.0'";
+    const cliInstall = "npm install -g '@lpc-toolkit/cli@>=0.2.0 <0.3.0'";
     const marketplaceAdd = 'codex plugin marketplace add ochowei/lpc-toolkit-2026-1';
     const pluginAdd = 'codex plugin add lpc-toolkit@lpc-toolkit';
 

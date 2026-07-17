@@ -23,6 +23,7 @@ LPC behavior:
 - composition and layer resolution
 - recolor and palette swap execution
 - animation extraction and frame slicing
+- pure playback descriptions for composed standard and custom animations
 - credits and attribution manifests
 - hash/token serialization and parsing
 - the canonical character document and pure upstream compatibility adapter
@@ -136,6 +137,7 @@ not modify `upstream/`.
 - Node `CanvasAdapter` wiring through `@napi-rs/canvas`
 - render output staging and atomic publishing
 - metadata, credits, animation, frame, and ZIP artifact writing
+- self-contained offline animation viewer generation
 - token and preset commands for automation
 
 CLI code may use Node APIs, `@napi-rs/canvas` (MIT), and `jszip` (MIT) because
@@ -285,6 +287,11 @@ The canonical character document is a portable selection payload, not the CLI
 JSON response envelope. CLI `--json` responses continue to wrap command data,
 warnings, and errors separately, and any character document written to disk is
 canonical regardless of its input format.
+
+Render publication stages the self-contained offline viewer with the attributed
+sheet, metadata, TXT and CSV credits, optional pixel exports, and ZIP before
+publishing the artifact set transactionally. The viewer uses relative sibling
+filenames and contains no absolute local paths.
 
 ## Presets Package Rules
 

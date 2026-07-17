@@ -166,6 +166,23 @@ describe('human-readable CLI output', () => {
     expect(output).toContain('"Braids"');
   });
 
+  it('prints the generated viewer in a successful render response', async () => {
+    const cwd = makeCatalogCwd();
+    writeFileSync(path.join(cwd, 'selection.json'), JSON.stringify({
+      schema: 'lpc-toolkit.selection.v1',
+      name: 'empty-fixture',
+      bodyType: 'male',
+      items: {},
+    }));
+
+    const output = await runHuman([
+      'render', '--selection', 'selection.json', '--out', 'out',
+    ], cwd);
+
+    expect(output).toContain('viewer');
+    expect(output).toContain('.viewer.html');
+  }, 30000);
+
   it('prints preset lists and materialized selections without --json', async () => {
     const listOutput = await runHuman(['preset', 'list'], makeCatalogCwd());
     expect(listOutput).toContain('Presets (');

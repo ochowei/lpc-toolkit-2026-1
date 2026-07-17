@@ -182,7 +182,7 @@ describe('README architecture contract', () => {
 
 describe('Codex plugin documentation contract', () => {
   it('documents installation, ownership, and verification', () => {
-    const cliInstall = "npm install -g '@lpc-toolkit/cli@>=0.1.4 <0.2.0'";
+    const cliInstall = "npm install -g '@lpc-toolkit/cli@>=0.2.0 <0.3.0'";
     const marketplaceAdd = 'codex plugin marketplace add ochowei/lpc-toolkit-2026-1';
     const pluginAdd = 'codex plugin add lpc-toolkit@lpc-toolkit';
 

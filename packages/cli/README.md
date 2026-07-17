@@ -40,10 +40,10 @@ files; keep those attribution artifacts with the generated image.
 
 ### Codex Plugin
 
-1. Install or upgrade the CLI to the range supported by plugin `0.1.0`:
+1. Install or upgrade the CLI to the range supported by plugin `0.2.0`:
 
 ```sh
-npm install -g '@lpc-toolkit/cli@>=0.1.4 <0.2.0'
+npm install -g '@lpc-toolkit/cli@>=0.2.0 <0.3.0'
 ```
 
 2. Add the repository marketplace once:
@@ -60,7 +60,7 @@ codex plugin add lpc-toolkit@lpc-toolkit
 
 The plugin requires an installed compatible `lpc-toolkit` CLI and does not
 automatically install the CLI. Its supported CLI range is
-`>=0.1.4 <0.2.0`. Restart the ChatGPT desktop app or start a new Codex
+`>=0.2.0 <0.3.0`. Restart the ChatGPT desktop app or start a new Codex
 task if the newly installed skill is not visible. Public Plugins Directory
 distribution can later remove the marketplace-add step.
 
@@ -97,6 +97,32 @@ memory without rewriting the source. A successful `character set` or
 the canonical format and emits the `selection_format_normalized` warning.
 `character create --selection <file>` remains an output destination for the
 new character rather than an input file.
+
+### Render output
+
+Every successful render writes this attributed artifact set. Entries marked as
+optional are present only when their corresponding flag is used:
+
+```text
+<out>/
+├── <name>.sheet.png
+├── <name>.viewer.html
+├── <name>.metadata.json
+├── <name>.credits.txt
+├── <name>.credits.csv
+├── animations/
+│   └── <animation>.png                 optional: --animation
+├── frames/
+│   └── <animation>/<direction>-<frame>.png  optional: --frames
+└── <name>.bundle.zip                   optional: --bundle zip
+```
+
+`<name>.viewer.html` is always produced. Double-click it in the render directory
+to play every composed standard and custom animation offline. When using
+`--bundle zip`, extract the complete ZIP before double-clicking the viewer so its
+relative sheet and artifact links remain beside it. `--animation` and `--frames`
+control only the separate PNG outputs; they do not limit the animations available
+in the viewer.
 
 ## Commands
 
@@ -246,11 +272,11 @@ assets.
 
 ## Attribution and license
 
-Every render writes the composed sheet, a metadata JSON file, and both
-`<name>.credits.txt` and `<name>.credits.csv`. Animation strips, individual
-frames, and ZIP bundles are optional; attribution files and effective-license
-metadata are not. Credits are derived from the selected assets and the pinned
-`CREDITS.csv`.
+Every render writes the composed sheet, offline animation viewer, a metadata JSON
+file, and both `<name>.credits.txt` and `<name>.credits.csv`. Animation strips,
+individual frames, and ZIP bundles are optional; the viewer, attribution files,
+and effective-license metadata are not. Credits are derived from the selected
+assets and the pinned `CREDITS.csv`.
 
 This package is licensed under GPL-3.0-or-later. Keep the generated attribution
 artifacts with rendered sprites and comply with the effective licenses reported

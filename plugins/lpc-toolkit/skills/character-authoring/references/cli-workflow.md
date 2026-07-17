@@ -57,10 +57,14 @@ lpc-toolkit character render --selection hero.json --out rendered --animation wa
 ```
 
 Require `ok: true`, inspect warnings, and verify the artifact list includes the
-requested pixels plus metadata, credits TXT, and credits CSV. Use
-`--allow-partial` only after the user explicitly accepts skipped layers or
-animations; report every returned warning and skipped layer. The user must
-state a reason for partial output, and the workflow must record that reason.
+sheet, `<name>.viewer.html`, metadata, credits TXT, and credits CSV. Report the
+viewer path with the final result. Open the viewer directly from the render
+directory when local inspection is available. For ZIP output, verify the same
+viewer entry is present and tell the user to extract the complete archive before
+opening it so the relative sheet link works offline. Use `--allow-partial` only
+after the user explicitly accepts skipped layers or animations; report every
+returned warning and skipped layer. The user must state a reason for partial
+output, and the workflow must record that reason.
 
 ## Output Discipline
 
