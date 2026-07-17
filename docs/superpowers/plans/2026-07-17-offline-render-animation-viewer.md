@@ -919,9 +919,13 @@ rtk git commit -m "test(cli): verify offline viewer in browser"
     missing `.viewer.html` tutorial copy.
   - Implementation: The installed-package smoke now renders preset `farmer` with JSON
     and ZIP output after verified-cache preparation, requires the viewer/sheet/ZIP
-    artifacts, checks `viewer-data` plus the relative sheet filename, and requires the
-    same viewer entry in the ZIP. Its temporary render directory and cache remain under
-    `finally` cleanup.
+    artifacts, parses exactly one inline `viewer-data` JSON payload, requires
+    `sheet.fileName` to equal the rendered sheet basename, rejects POSIX/Windows
+    absolute paths and separators, and requires the same viewer entry in the ZIP. Its
+    temporary render directory and cache remain under `finally` cleanup.
+  - Review fix: Replaced the weak whole-HTML basename substring assertion, which also
+    accepted an absolute path inside `viewer-data`, with exact parsed-field and
+    cross-platform basename assertions.
 
 After the smoke script has prepared the verified cache, invoke the installed
 CLI with:
@@ -943,7 +947,9 @@ require the same viewer entry. Preserve cache cleanup in `finally`.
     lookup with `ENOTFOUND`; the permitted network rerun reached the smoke assertion and
     exposed a same-block temporary-directory name shadow. Renaming only the new preset
     directory variable resolved the verified root cause, and two subsequent package
-    smoke runs passed.
+    smoke runs passed. After review hardening, reran
+    `rtk pnpm --filter @lpc-toolkit/cli build` PASS and
+    `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS.
 
 Run:
 
@@ -1010,6 +1016,11 @@ mentions `.viewer.html` and still uses only contract-listed commands.
     `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS; `rtk git diff --check` PASS.
     The Web test required the permitted local-process rerun after sandboxed tsx IPC
     creation failed with `listen EPERM`.
+  - Review verification: `rtk node --check packages/cli/scripts/smoke-packed-cli.mjs`
+    PASS; `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS;
+    `rtk pnpm --filter @lpc-toolkit/cli build` PASS;
+    `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS; `rtk git diff --check`
+    PASS.
 
 Run:
 
@@ -1025,6 +1036,7 @@ Expected: PASS.
 - [x] **Step 7: Record the final CLI documentation impact matrix and commit**
 
   - Task commit: e9b049b9107e7bc76819feb208ed6986ca46df48
+  - Review fix commit: 0572f75718ab2a233cf02316256f9b3ef8adc697
   - CLI documentation impact reassessment:
 
     ```text
