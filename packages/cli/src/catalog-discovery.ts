@@ -1,15 +1,13 @@
 import {
-  ANIMATIONS,
-  ANIMATION_DEFAULTS,
   BODY_TYPES,
   LICENSE_GROUP_OF,
   LICENSE_GROUP_ORDER,
-  customAnimationBase,
-  customAnimations,
   getRecolorVariants,
+  itemAnimationCapabilities,
   type AnimationName,
   type BodyType,
   type CreditEntry,
+  type ItemAnimationCapabilities,
   type ItemDefinition,
   type ItemId,
   type LicenseGroup,
@@ -53,12 +51,6 @@ export interface DiscoveryItemDetail extends DiscoveryItemSummary {
   readonly compatibleAnimations: readonly AnimationName[];
   readonly unsupportedAnimations: readonly AnimationName[];
   readonly credits: readonly CreditEntry[];
-}
-
-export interface ItemAnimationCapabilities {
-  readonly native: readonly AnimationName[];
-  readonly compatible: readonly AnimationName[];
-  readonly unsupported: readonly AnimationName[];
 }
 
 export interface DiscoveryCandidate<T extends DiscoveryItemSummary> {
@@ -136,35 +128,6 @@ function licenseGroups(item: ItemDefinition): readonly LicenseGroup[] {
   return LICENSE_GROUP_ORDER.filter((group) => present.has(group));
 }
 
-const STANDARD_ANIMATION_NAMES = ANIMATIONS.map((animation) => animation.value);
-const STANDARD_ANIMATION_SET = new Set<AnimationName>(STANDARD_ANIMATION_NAMES);
-
-export function itemAnimationCapabilities(
-  item: ItemDefinition,
-): ItemAnimationCapabilities {
-  const raw: unknown = item.animations;
-  const native = Array.isArray(raw) && raw.every((name): name is AnimationName => typeof name === 'string')
-    ? [...new Set(raw)]
-    : [...ANIMATION_DEFAULTS];
-  const nativeSet = new Set(native);
-  const compatibleSet = new Set<AnimationName>();
-
-  for (const name of native) {
-    const custom = customAnimations[name];
-    if (!custom) continue;
-    const base = customAnimationBase(custom);
-    if (STANDARD_ANIMATION_SET.has(base) && !nativeSet.has(base)) {
-      compatibleSet.add(base);
-    }
-  }
-
-  const compatible = STANDARD_ANIMATION_NAMES.filter((name) => compatibleSet.has(name));
-  const unsupported = STANDARD_ANIMATION_NAMES.filter(
-    (name) => !nativeSet.has(name) && !compatibleSet.has(name),
-  );
-  return { native, compatible, unsupported };
-}
-
 function isStringArray(value: unknown): value is readonly string[] {
   return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
 }
@@ -188,7 +151,7 @@ export function toDiscoveryCandidate(
   palettes: PaletteMetadata,
 ): DiscoveryCandidate<DiscoveryItemSummary> | undefined {
   if (!item.itemId || !hasDiscoveryCredits(item)) return undefined;
-  const capabilities = itemAnimationCapabilities(item);
+  const capabilities: ItemAnimationCapabilities = itemAnimationCapabilities(item);
   return {
     internalName: item.name,
     summary: {
@@ -211,7 +174,7 @@ export function toDiscoveryDetail(
 ): DiscoveryItemDetail | undefined {
   const candidate = toDiscoveryCandidate(item, palettes);
   if (!candidate) return undefined;
-  const capabilities = itemAnimationCapabilities(item);
+  const capabilities: ItemAnimationCapabilities = itemAnimationCapabilities(item);
   return {
     ...candidate.summary,
     compatibleAnimations: capabilities.compatible,

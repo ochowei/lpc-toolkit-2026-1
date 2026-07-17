@@ -1,4 +1,10 @@
-export type FlagValue = true | string | readonly string[];
+type FlagOccurrence = true | string;
+
+export type FlagValue = FlagOccurrence | readonly FlagOccurrence[];
+
+function isRepeatedFlagValue(value: FlagValue): value is readonly FlagOccurrence[] {
+  return Array.isArray(value);
+}
 
 export interface ParsedArgs {
   readonly command: readonly string[];
@@ -8,21 +14,25 @@ export interface ParsedArgs {
 
 const BOOLEAN_FLAGS = new Set(['all', 'allow-partial', 'help', 'json', 'no-open']);
 
+function acceptsExplicitEmptyValues(command: readonly string[]): boolean {
+  return command[0] === 'catalog' && command[1] === 'audit-animations';
+}
+
 function addFlag(
   flags: Map<string, FlagValue>,
   key: string,
-  value: true | string,
+  value: FlagOccurrence,
 ): void {
   const previous = flags.get(key);
   if (previous === undefined) {
     flags.set(key, value);
     return;
   }
-  if (Array.isArray(previous)) {
-    flags.set(key, [...previous, String(value)]);
+  if (isRepeatedFlagValue(previous)) {
+    flags.set(key, [...previous, value]);
     return;
   }
-  flags.set(key, [String(previous), String(value)]);
+  flags.set(key, [previous, value]);
 }
 
 export function parseArgs(argv: readonly string[]): ParsedArgs {
@@ -37,7 +47,12 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
       seenFlag = true;
       const key = token.slice(2);
       const next = argv[i + 1];
-      if (!BOOLEAN_FLAGS.has(key) && next && !next.startsWith('--')) {
+      if (
+        !BOOLEAN_FLAGS.has(key)
+        && next !== undefined
+        && !next.startsWith('--')
+        && (next.length > 0 || acceptsExplicitEmptyValues(command))
+      ) {
         addFlag(flags, key, next);
         i++;
       } else {
@@ -62,7 +77,7 @@ export function flagString(
 ): string | undefined {
   const value = flags.get(key);
   if (typeof value === 'string') return value;
-  if (Array.isArray(value)) return value[0];
+  if (Array.isArray(value)) return value.find((entry): entry is string => typeof entry === 'string');
   return undefined;
 }
 
@@ -72,7 +87,7 @@ export function flagStrings(
 ): readonly string[] {
   const value = flags.get(key);
   if (typeof value === 'string') return [value];
-  if (Array.isArray(value)) return value;
+  if (Array.isArray(value)) return value.filter((entry): entry is string => typeof entry === 'string');
   return [];
 }
 

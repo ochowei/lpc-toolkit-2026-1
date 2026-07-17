@@ -88,6 +88,17 @@ describe('helpForCommand', () => {
     }
   });
 
+  it('documents animation audit options without discovery pagination', () => {
+    const help = helpForCommand(['catalog', 'audit-animations']);
+
+    expect(help).toContain('lpc-toolkit catalog audit-animations --animation <name>');
+    expect(help).toContain('--animation <name>');
+    expect(help).toContain('--type <typeName>');
+    expect(help).toContain('--body-type <type>');
+    expect(help).not.toContain('--limit');
+    expect(help).not.toContain('--all');
+  });
+
   it('shows the bounded two-stage discovery workflow in help examples', () => {
     const rootHelp = helpForCommand([]);
     expect(rootHelp).toContain(
@@ -154,6 +165,21 @@ describe('validateCommandOptions', () => {
           'walk',
           '--frames',
           'all',
+        ]),
+      ),
+    ).toBeUndefined();
+  });
+
+  it('allows repeated animation audit targets', () => {
+    expect(
+      validateCommandOptions(
+        parseArgs([
+          'catalog',
+          'audit-animations',
+          '--animation',
+          'walk',
+          '--animation',
+          'run',
         ]),
       ),
     ).toBeUndefined();

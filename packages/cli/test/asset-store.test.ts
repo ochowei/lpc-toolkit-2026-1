@@ -93,6 +93,32 @@ describe('directory asset store', () => {
     await expect(store.load('lpc-zip:/spritesheets/body/walk.png')).rejects.toThrow();
   });
 
+  it('preserves a directory read ENOENT through the canvas adapter', async () => {
+    const assetsRoot = mkdtempSync(path.join(os.tmpdir(), 'lpc-directory-store-'));
+    const missingPath = path.join(assetsRoot, logicalSpritePath);
+    const store = createDirectoryAssetStore(assetsRoot);
+    const adapter = createNodeCanvasAdapter({ assetStore: store });
+
+    await expect(adapter.loadImage(missingPath)).rejects.toMatchObject({ systemCode: 'ENOENT' });
+  });
+
+  it('propagates non-ENOENT directory preflight failures', () => {
+    const assetsRoot = mkdtempSync(path.join(os.tmpdir(), 'lpc-directory-store-'));
+    const loopLogicalPath = 'spritesheets/body/loop.png';
+    const loopPath = path.join(assetsRoot, loopLogicalPath);
+    mkdirSync(path.dirname(loopPath), { recursive: true });
+    symlinkSync('loop.png', loopPath, 'file');
+    const store = createDirectoryAssetStore(assetsRoot);
+
+    let failure: unknown;
+    try {
+      store.has(loopLogicalPath);
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure).toMatchObject({ code: 'ELOOP' });
+  });
+
   it.skipIf(process.platform !== 'win32')(
     'loads absolute Windows drive paths instead of treating the drive as a URI scheme',
     async () => {

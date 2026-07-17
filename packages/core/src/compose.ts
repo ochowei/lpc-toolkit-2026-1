@@ -1,4 +1,5 @@
 import type { CanvasAdapter, CanvasLike, ImageLike } from './adapters.js';
+import { animationsSupportFolder } from './animation-capabilities.js';
 import {
   ANIMATIONS,
   ANIMATION_DEFAULTS,
@@ -146,6 +147,7 @@ function replaceInPath(
  * source of truth and cannot drift.
  */
 export interface ResolvedLayer {
+  readonly layerNumber: number;
   readonly itemId: ItemId;
   readonly typeName: TypeName;
   readonly item: ItemDefinition;
@@ -203,6 +205,7 @@ export function resolveLayers(
       if (basePath.includes('${')) continue;
 
       out.push({
+        layerNumber: n,
         itemId,
         typeName,
         item,
@@ -275,27 +278,6 @@ export function getSpritePathsForSelections(
   return out;
 }
 
-/**
- * Does an item's declared `animations` support a given `ANIMATION_OFFSETS`
- * folder key? Mirrors upstream `runRenderCharacter`'s folder→logical gate:
- * `combat_idle` needs `combat`; `backslash` needs `1h_slash` OR
- * `1h_backslash`; `halfslash` needs `1h_halfslash`; everything else is a
- * direct match.
- */
-function supportsFolder(
-  animations: readonly string[],
-  folder: string,
-): boolean {
-  if (folder === 'combat_idle') return animations.includes('combat');
-  if (folder === 'backslash') {
-    return (
-      animations.includes('1h_slash') || animations.includes('1h_backslash')
-    );
-  }
-  if (folder === 'halfslash') return animations.includes('1h_halfslash');
-  return animations.includes(folder);
-}
-
 /** Map a logical animation name (UI / hash namespace) to its on-disk folder. */
 function logicalToFolder(logical: string): string | undefined {
   const entry = ANIMATIONS.find((a) => a.value === logical);
@@ -319,7 +301,7 @@ function firstExistingPath(
 
 function supportedFolders(animations: readonly string[]): string[] {
   return Object.keys(ANIMATION_OFFSETS).filter((folder) =>
-    supportsFolder(animations, folder),
+    animationsSupportFolder(animations, folder),
   );
 }
 
@@ -482,7 +464,7 @@ export async function composeSelections(
     const tail = variantFile ? `/${variantFile}` : '';
 
     for (const [folder, yPos] of Object.entries(ANIMATION_OFFSETS)) {
-      if (!supportsFolder(layer.animations, folder)) continue;
+      if (!animationsSupportFolder(layer.animations, folder)) continue;
       if (allowedFolders && !allowedFolders.has(folder)) continue;
 
       drawItems.push({

@@ -1,5 +1,6 @@
 import type { Catalog, Selections, BodyType } from '../types.js';
 import type { CanvasAdapter, ImageLike } from '../adapters.js';
+import { animationsSupportFolder } from '../animation-capabilities.js';
 import { resolveLayers } from '../compose.js';
 import { ANIMATION_OFFSETS } from '../constants.js';
 
@@ -16,15 +17,6 @@ export interface ValidateAssetsOptions {
   readonly adapter: CanvasAdapter;
   readonly spritesheetsBaseUrl: string;
   readonly getFileSize?: (logicalPath: string) => Promise<number>;
-}
-
-function supportsFolder(animations: readonly string[], folder: string): boolean {
-  if (folder === 'combat_idle') return animations.includes('combat');
-  if (folder === 'backslash') {
-    return animations.includes('1h_slash') || animations.includes('1h_backslash');
-  }
-  if (folder === 'halfslash') return animations.includes('1h_halfslash');
-  return animations.includes(folder);
 }
 
 export async function validateAssets(
@@ -73,7 +65,7 @@ export async function validateAssets(
             }
           } else {
             for (const folder of Object.keys(ANIMATION_OFFSETS)) {
-              if (!supportsFolder(layer.animations, folder)) continue;
+              if (!animationsSupportFolder(layer.animations, folder)) continue;
               pathsToCheck.push(`spritesheets/${layer.basePath}${folder}${tail}.png`);
             }
           }

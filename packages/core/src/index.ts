@@ -212,3 +212,33 @@ export { recolorImage, recolorPixels } from './recolor.js';
 // ==========================================
 export { validateAssets } from './validation/asset-validator.js';
 export type { ValidateAssetsOptions, ValidationIssue } from './validation/asset-validator.js';
+
+// ==========================================
+// 16. Animation Capability Rules
+// ==========================================
+export type { ItemAnimationCapabilities } from './animation-capabilities.js';
+export {
+  animationsSupportFolder,
+  auditAnimationFolder,
+  compatibleAnimationSource,
+  compatibleAnimationSources,
+  itemAnimationCapabilities,
+} from './animation-capabilities.js';
+
+// ==========================================
+// 17. Animation Asset Audit Planner
+// ==========================================
+export type {
+  AnimationAuditConsumer,
+  AnimationAuditFrameCell,
+  AnimationAuditFrameRow,
+  AnimationAuditGeometry,
+  AnimationAuditPlanningError,
+  AssetAnimationAuditPlan,
+  AuditLayerName,
+  PlanAssetAnimationAuditOptions,
+  PlannedAnimationAsset,
+  UnsupportedAnimationFinding,
+  UnsupportedAnimationRequirement,
+} from './asset-animation-audit.js';
+export { planAssetAnimationAudit } from './asset-animation-audit.js';

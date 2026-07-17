@@ -1,4 +1,4 @@
-import { writeFileSync } from 'node:fs';
+import { promises as fs, writeFileSync } from 'node:fs';
 import { createCanvas, loadImage as napiLoadImage } from '@napi-rs/canvas';
 import type { CanvasAdapter, CanvasLike, ImageLike } from '@lpc-toolkit/core';
 import type { AssetStore } from './asset-store.js';
@@ -18,7 +18,7 @@ export function createNodeCanvasAdapter(
       const source = options.assetStore
         ? await options.assetStore.load(sourcePath)
         : sourcePath;
-      return napiLoadImage(source);
+      return napiLoadImage(typeof source === 'string' ? await fs.readFile(source) : source);
     },
   };
 }
