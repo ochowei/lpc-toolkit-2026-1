@@ -77,17 +77,45 @@ test.describe('offline render viewer', () => {
       '192,156,156,255',
     ]);
 
+    await page.getByTestId('animation-select').selectOption('tool_rod');
+    await expect(page.getByTestId('animation-select')).toHaveValue('tool_rod');
+    const customDirectionStages = page.getByTestId('direction-stage');
+    await expect(customDirectionStages).toHaveCount(4);
+    for (const stage of await customDirectionStages.all()) {
+      await expect(stage).toBeVisible();
+    }
+    await expect(page.getByTestId('frame-counter')).toHaveText('Frame 1 / 3 · 8 FPS');
+    const customFirstPixels = await sampleDirectionPixels(page);
+
+    await page.getByTestId('next-frame').click();
+    await expect(page.getByTestId('frame-counter')).toHaveText('Frame 2 / 3 · 8 FPS');
+    const customNextPixels = await sampleDirectionPixels(page);
+    for (const [index, pixel] of customNextPixels.entries()) {
+      expect(pixel).not.toBe(customFirstPixels[index]);
+    }
+
+    await page.getByTestId('previous-frame').click();
+    await expect(page.getByTestId('frame-counter')).toHaveText('Frame 1 / 3 · 8 FPS');
+    await expect.poll(() => sampleDirectionPixels(page)).toEqual(customFirstPixels);
+
     await page.getByTestId('animation-select').selectOption('hurt');
     const singleDirectionStage = page.getByTestId('direction-stage');
     await expect(singleDirectionStage).toHaveCount(1);
     await expect(singleDirectionStage).toBeVisible();
     await expect(singleDirectionStage).toContainText('Single direction');
 
-    await page.getByTestId('viewer-details').locator('summary').click();
-    await expect(page.getByTestId('viewer-details')).toContainText('Fixture Artist — GPL 3.0');
-    await expect(page.getByTestId('viewer-details')).toContainText('Visible warning');
-    await expect(page.getByTestId('viewer-details')).toContainText('GPL 3.0');
-    await expect(page.getByTestId('viewer-details')).toContainText('192 × 320');
+    const viewerDetails = page.getByTestId('viewer-details');
+    expect(await viewerDetails.getAttribute('open')).toBeNull();
+    await viewerDetails.locator('summary').click();
+    await expect(viewerDetails).toHaveAttribute('open', '');
+    await expect(viewerDetails).toContainText('Visible warning');
+    await expect(viewerDetails).toContainText('GPL 3.0');
+    await expect(viewerDetails).toContainText('192 × 320');
+    const creditsText = page.getByTestId('credits-text');
+    await expect(creditsText).toBeVisible();
+    await expect(creditsText).toHaveText(
+      'Credits for Fixture Viewer\nFixture Artist — GPL 3.0\n',
+    );
     await expect(page.locator('#sheet-file-link')).toHaveAttribute('href', 'fixture.sheet.png');
     await expect(page.locator('#metadata-link')).toHaveAttribute('href', 'fixture.metadata.json');
     await expect(page.locator('#credits-txt-link')).toHaveAttribute('href', 'fixture.credits.txt');

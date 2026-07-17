@@ -21,6 +21,10 @@
       "frameSize": 64, "cycle": [0, 1, 2], "directions": 4
     },
     {
+      "animation": "tool_rod", "kind": "custom", "sourceX": 0, "sourceY": 0,
+      "frameSize": 64, "cycle": [0, 1, 2], "directions": 4
+    },
+    {
       "animation": "hurt", "kind": "standard", "sourceX": 0, "sourceY": 256,
       "frameSize": 64, "cycle": [0, 1, 2], "directions": 1
     }
