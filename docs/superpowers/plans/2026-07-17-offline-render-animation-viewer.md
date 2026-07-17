@@ -305,7 +305,10 @@ export interface RenderViewerModel {
 export function renderViewerHtml(model: RenderViewerModel): string;
 ```
 
-- [ ] **Step 1: Write failing generator and serialization tests**
+- [x] **Step 1: Write failing generator and serialization tests**
+
+  - Implementation: Added portability, safe serialization, required hook/accessibility,
+    synchronized direction-grid, fixed-step playback, and browser-JavaScript syntax tests.
 
 Cover exact portability invariants:
 
@@ -346,7 +349,10 @@ expect(html).toContain('data-testid="credits-text"');
 expect(html).toContain('prefers-reduced-motion: reduce');
 ```
 
-- [ ] **Step 2: Run the viewer unit test and verify RED**
+- [x] **Step 2: Run the viewer unit test and verify RED**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- viewer.test.ts`
+    FAIL — `viewer.ts` could not be loaded because the generator did not exist.
 
 Run:
 
@@ -356,7 +362,10 @@ rtk pnpm --filter @lpc-toolkit/cli test -- viewer.test.ts
 
 Expected: FAIL because `viewer.ts` does not exist.
 
-- [ ] **Step 3: Implement safe inline-data serialization and static document structure**
+- [x] **Step 3: Implement safe inline-data serialization and static document structure**
+
+  - Implementation: Added HTML-significant and line-separator JSON escaping, responsive
+    embedded CSS, accessible playback hooks, and collapsed attribution/details content.
 
 Use a JSON serializer that escapes HTML-significant characters and JavaScript line separators:
 
@@ -387,7 +396,11 @@ Use only literal English UI labels defined in one `COPY` object in the browser
 script (`Play`, `Pause`, `Previous frame`, `Next frame`, `Single direction`,
 `Spritesheet details`, `Warnings`, `Credits`). Do not add localization scope.
 
-- [ ] **Step 4: Implement the browser runtime with one playback state**
+- [x] **Step 4: Implement the browser runtime with one playback state**
+
+  - Implementation: Added reduced-motion-aware 8 FPS playback, synchronized four-direction
+    and single-direction canvases, wrapping/scrubbing controls, relative artifact links, and a
+    missing-sheet state that leaves legal artifact links available.
 
 The runtime must parse only the embedded data element and use `textContent` for
 all model-derived display values:
@@ -435,13 +448,20 @@ advances in fixed 8 FPS steps only while playing. The missing-image handler
 must show `Could not load spritesheet: <fileName>` in
 `data-testid="viewer-error"`, hide the stages, and keep artifact links usable.
 
-- [ ] **Step 5: Run the viewer unit test and verify GREEN**
+- [x] **Step 5: Run the viewer unit test and verify GREEN**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- viewer.test.ts`
+    PASS — 5 tests. An additional browser-syntax RED exposed TypeScript annotations in the
+    inline runtime (`Unexpected token ':'`); removing them returned the focused suite to GREEN.
 
 Run the Step 2 command.
 
 Expected: PASS.
 
-- [ ] **Step 6: Add deterministic viewer fixture data**
+- [x] **Step 6: Add deterministic viewer fixture data**
+
+  - Implementation: Added the exact two-animation fixture model and made the generator unit
+    test consume it so Task 4 can reuse one source of fixture truth.
 
 Create `viewer-data.json` with two color-test descriptors and visible legal
 content:
@@ -481,7 +501,25 @@ content:
 Task 4 will use this same model to generate the exact browser fixture and add a
 golden equality assertion without duplicating fixture data.
 
-- [ ] **Step 7: Verify CLI generator types and commit**
+- [x] **Step 7: Verify CLI generator types and commit**
+
+  - Implementation: Completed the pure portable viewer generator, fixture-backed unit tests,
+    and self-review against every Task 2 serialization, DOM, playback, and portability rule.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- viewer.test.ts` PASS — 5 tests;
+    `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS; `rtk git diff --check` PASS.
+  - Commit: 956be7a815d2081b6194717875651cfb517164b2
+  - CLI documentation impact reassessment:
+
+    ```text
+    help: N/A — the pure generator is not wired into a command until Task 3
+    cli-readme: N/A — viewer output documentation is owned by Task 5
+    root-readme: N/A — viewer workflow documentation is owned by Task 5
+    landing: N/A — viewer tutorial copy is owned by Task 5
+    architecture: N/A — viewer publication ownership is documented in Task 5
+    engineering: N/A — no verification command or engineering policy changed
+    releasing: N/A — no package version or publication behavior changed
+    plugin: N/A — viewer handoff contracts are updated in Task 5
+    ```
 
 Run:
 
