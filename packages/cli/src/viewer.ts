@@ -433,7 +433,8 @@ export function renderViewerHtml(model: RenderViewerModel): string {
       function updateFrame() {
         scrubber.value = String(frameIndex);
         frameCounter.textContent =
-          COPY.frame + ' ' + String(frameIndex + 1) + ' / ' + String(selected.cycle.length);
+          COPY.frame + ' ' + String(frameIndex + 1) + ' / ' + String(selected.cycle.length) +
+          ' · 8 FPS';
         if (imageReady) drawFrame();
       }
 
@@ -446,6 +447,7 @@ export function renderViewerHtml(model: RenderViewerModel): string {
         names.forEach((name, directionIndex) => {
           const figure = document.createElement('figure');
           figure.className = 'direction-stage';
+          figure.setAttribute('data-testid', 'direction-stage');
           const canvas = document.createElement('canvas');
           canvas.width = selected.frameSize;
           canvas.height = selected.frameSize;

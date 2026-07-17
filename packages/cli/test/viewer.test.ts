@@ -92,6 +92,7 @@ describe('renderViewerHtml', () => {
     expect(html).toContain('data-testid="previous-frame"');
     expect(html).toContain('data-testid="next-frame"');
     expect(html).toContain('data-testid="frame-scrubber"');
+    expect(html).toContain("figure.setAttribute('data-testid', 'direction-stage')");
     expect(html).toContain('data-testid="viewer-details"');
     expect(html).not.toMatch(/<details[^>]*data-testid="viewer-details"[^>]*\sopen(?:\s|>)/u);
     expect(html).toContain('data-testid="credits-text"');
@@ -109,6 +110,7 @@ describe('renderViewerHtml', () => {
     expect(html).toContain('selected.sourceX + column * selected.frameSize');
     expect(html).toContain('selected.sourceY + directionIndex * selected.frameSize');
     expect(html).toContain('const frameDuration = 1000 / 8;');
+    expect(html).toContain("' · 8 FPS'");
     expect(html).toContain('requestAnimationFrame');
     expect(html).toContain('encodeURI(model.sheet.fileName)');
     expect(html).toContain('Could not load spritesheet: ');
