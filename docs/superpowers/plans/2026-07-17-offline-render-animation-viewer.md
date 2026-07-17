@@ -563,7 +563,11 @@ export async function renderSelection(
 ): Promise<RenderSelectionResult>;
 ```
 
-- [ ] **Step 1: Write failing render integration tests**
+- [x] **Step 1: Write failing render integration tests**
+
+  - Implementation: Extended the body-only render contract to require the viewer artifact,
+    generated file, relative sheet reference, embedded attribution, metadata schema v1 entry,
+    and absence of local runtime roots.
 
 Extend the body-only render test to assert:
 
@@ -584,7 +588,11 @@ expect(html).not.toContain(runtime.context.sheetDefinitionsRoot);
 Parse metadata and assert its artifact array includes `type: 'viewer'` while
 `schema` remains `lpc-toolkit.render-metadata.v1`.
 
-- [ ] **Step 2: Add failing ZIP and rollback tests**
+- [x] **Step 2: Add failing ZIP and rollback tests**
+
+  - Implementation: Added archive-entry verification, an injected viewer-generation failure
+    with an empty output assertion, and a viewer-directory collision that preserves prior
+    sheet, credit, and metadata bytes.
 
 For a bundled render, load the ZIP and require:
 
@@ -610,7 +618,11 @@ expect(listFiles(outDir)).toEqual([]);
 Add a viewer-path directory collision case and assert prior output files are
 restored byte-for-byte.
 
-- [ ] **Step 3: Run focused render tests and verify RED**
+- [x] **Step 3: Run focused render tests and verify RED**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- render.test.ts`
+    FAIL — 4 expected failures: viewer artifact/file absent from directory and ZIP output,
+    injected generator ignored, and viewer collision not preflighted.
 
 Run:
 
@@ -620,7 +632,13 @@ rtk pnpm --filter @lpc-toolkit/cli test -- render.test.ts
 
 Expected: FAIL because no viewer artifact exists and `renderSelection` has no dependency seam.
 
-- [ ] **Step 4: Add viewer artifact and portable model construction**
+- [x] **Step 4: Add viewer artifact and portable model construction**
+
+  - Implementation: Added the viewer artifact type/path, metadata schema constant,
+    dependency seam, playback descriptors, basename-only artifact links, and portable runtime
+    source labels. Specification clarification: `AssetStore.description` embeds local roots,
+    so the viewer maps `working-directory` to `Working-directory assets` and `managed-cache`
+    to `Verified managed asset cache`; detailed metadata source fields remain unchanged.
 
 In `render.ts`:
 
@@ -647,7 +665,7 @@ const viewerModel: RenderViewerModel = {
   effectiveLicense,
   source: {
     runtimeSource: runtime.source,
-    description: runtime.store.description,
+    description: PORTABLE_SOURCE_DESCRIPTIONS[runtime.source],
     releaseTag: runtime.releaseTag ?? null,
   },
   warnings,
@@ -659,27 +677,57 @@ const viewerModel: RenderViewerModel = {
 Call `dependencies.renderViewerHtml(viewerModel)` before preflight publication so
 a generation failure cannot alter existing output.
 
-- [ ] **Step 5: Stage viewer before metadata and include it in ZIP**
+- [x] **Step 5: Stage viewer before metadata and include it in ZIP**
+
+  - Implementation: Generates HTML before preflight, stages it before metadata, and adds the
+    staged viewer to the existing ZIP input list so publication and rollback remain shared.
 
 Write the generated HTML to `finalToStagedPath(...)`, push that staged path into
 `stagedFiles`, then write metadata. Because ZIP already consumes
 `stagedFiles`, the viewer is included without ZIP-specific branching. Ensure
 `preflightPublishPaths()` sees the viewer artifact.
 
-- [ ] **Step 6: Run render tests and verify GREEN**
+- [x] **Step 6: Run render tests and verify GREEN**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- render.test.ts`
+    PASS — 12 tests. The portable-source clarification was separately observed RED as 2
+    expected failures before the fixed-label mapping returned all 12 tests to GREEN.
 
 Run the Step 3 command.
 
 Expected: PASS.
 
-- [ ] **Step 7: Add command-response assertions**
+- [x] **Step 7: Add command-response assertions**
+
+  - Implementation: Added real successful render coverage proving JSON returns an existing
+    viewer artifact and human output names both the viewer type and `.viewer.html` path.
 
 In `main-json.test.ts`, assert the successful render JSON contains a viewer
 artifact and the file exists. In `main-human.test.ts`, assert stdout contains
 both `viewer` and `.viewer.html`. Keep stderr expectations and existing
 metadata/credit assertions unchanged.
 
-- [ ] **Step 8: Verify CLI integration and commit**
+- [x] **Step 8: Verify CLI integration and commit**
+
+  - Implementation: Transactionally integrated the portable offline viewer into the shared
+    render path without changing animation, frame, bundle, partial-render, metadata, or credit
+    behavior; self-review found no unrelated changes, dependencies, `any`, or upstream writes.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- render.test.ts main-json.test.ts main-human.test.ts`
+    PASS — 3 files, 31 tests; `rtk pnpm --filter @lpc-toolkit/cli run typecheck`
+    PASS; `rtk git diff --check` PASS.
+  - Commit: 5e8644361d56f65f396a4d0c05e3d8fabf7bcdd1
+  - CLI documentation impact reassessment (updates remain owned by Task 5):
+
+    ```text
+    help: update — Task 5 documents the always-produced viewer artifact
+    cli-readme: update — Task 5 documents viewer output and usage
+    root-readme: update — Task 5 updates the primary render workflow
+    landing: update — Task 5 adds the viewer tutorial handoff
+    architecture: update — Task 5 records transactional viewer publication and portability
+    engineering: N/A — verification commands and CI mapping do not change
+    releasing: N/A — packaging, versioning, and publication policy do not change
+    plugin: update — Task 5 updates the render verification and handoff contract
+    ```
 
 Run:
 
