@@ -202,4 +202,45 @@ describe('planAssetAnimationAudit', () => {
     ]);
     expect(plan.unsupported.map((finding) => finding.itemId)).toEqual(['alpha', 'zeta']);
   });
+
+  it('sorts nested requirements and planning errors by their canonical consumer fields', () => {
+    const requirementCatalog = createCatalog({
+      'hair/reversed-variants.json': {
+        name: 'Reversed Variants', type_name: 'hair', animations: ['walk'],
+        variants: ['z', 'a'], credits: [],
+        layer_1: { zPos: 10, male: 'hair/reversed/' },
+      },
+    }).catalog;
+    const requirements = planAssetAnimationAudit({
+      catalog: requirementCatalog,
+      palettes,
+      targets: ['run'],
+    }).unsupported[0]?.requirements;
+
+    expect(requirements?.map((requirement) => requirement.expectedPath)).toEqual([
+      'spritesheets/hair/reversed/run/a.png',
+      'spritesheets/hair/reversed/run/z.png',
+    ]);
+
+    const errorCatalog = createCatalog({
+      'alpha.json': {
+        name: 'Alpha', type_name: 'zeta', animations: ['walk'], credits: [],
+        layer_1: { zPos: 10, male: 'hair/${head}/alpha/' },
+      },
+      'beta.json': {
+        name: 'Beta', type_name: 'alpha', animations: ['walk'], credits: [],
+        layer_1: { zPos: 10, male: 'hair/${head}/beta/' },
+      },
+    }).catalog;
+    const errors = planAssetAnimationAudit({
+      catalog: errorCatalog,
+      palettes,
+      targets: ['walk'],
+    }).errors;
+
+    expect(errors.map((error) => `${error.consumer.typeName}/${error.consumer.itemId}`)).toEqual([
+      'alpha/beta',
+      'zeta/alpha',
+    ]);
+  });
 });

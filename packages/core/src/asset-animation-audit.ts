@@ -260,12 +260,52 @@ function assetKey(asset: PlannedAnimationAsset): string {
   return [asset.path, asset.animation, asset.sourceAnimation, JSON.stringify(asset.geometry)].join('\u0000');
 }
 
+function compareValues(left: readonly string[], right: readonly string[]): number {
+  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+    const comparison = (left[index] ?? '').localeCompare(right[index] ?? '');
+    if (comparison !== 0) return comparison;
+  }
+  return 0;
+}
+
+function consumerSortFields(consumer: AnimationAuditConsumer): readonly string[] {
+  return [
+    consumer.typeName,
+    consumer.itemId,
+    consumer.layer,
+    consumer.bodyTypes.join('\u0000'),
+    consumer.variant ?? '',
+    consumer.recolors.join('\u0000'),
+  ];
+}
+
 function sortConsumers(consumers: readonly AnimationAuditConsumer[]): readonly AnimationAuditConsumer[] {
   return [...consumers].sort((left, right) =>
-    `${left.itemId}\u0000${left.layer}\u0000${left.variant ?? ''}`.localeCompare(
-      `${right.itemId}\u0000${right.layer}\u0000${right.variant ?? ''}`,
-    ),
+    compareValues(consumerSortFields(left), consumerSortFields(right)),
   );
+}
+
+function sortRequirements(
+  requirements: readonly UnsupportedAnimationRequirement[],
+): readonly UnsupportedAnimationRequirement[] {
+  return [...requirements].sort((left, right) => compareValues(
+    [
+      left.typeName,
+      left.itemId,
+      left.expectedPath ?? '',
+      left.layer,
+      left.bodyTypes.join('\u0000'),
+      left.variant ?? '',
+    ],
+    [
+      right.typeName,
+      right.itemId,
+      right.expectedPath ?? '',
+      right.layer,
+      right.bodyTypes.join('\u0000'),
+      right.variant ?? '',
+    ],
+  ));
 }
 
 export function planAssetAnimationAudit(
@@ -327,7 +367,7 @@ export function planAssetAnimationAudit(
             animation: target,
             nativeAnimations: capabilities.native,
             compatibleAnimations: capabilities.compatible,
-            requirements,
+            requirements: sortRequirements(requirements),
           });
         }
         continue;
@@ -381,6 +421,11 @@ export function planAssetAnimationAudit(
     unsupported: unsupported.sort((left, right) =>
       `${left.itemId}\u0000${left.animation}`.localeCompare(`${right.itemId}\u0000${right.animation}`),
     ),
-    errors: errors.sort((left, right) => left.message.localeCompare(right.message)),
+    errors: errors.sort((left, right) => {
+      const messageComparison = left.message.localeCompare(right.message);
+      return messageComparison !== 0
+        ? messageComparison
+        : compareValues(consumerSortFields(left.consumer), consumerSortFields(right.consumer));
+    }),
   };
 }
