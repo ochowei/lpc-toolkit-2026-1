@@ -1207,7 +1207,7 @@ rtk git commit -m "docs(plan): record animation audit output"
 - Consumes: all previous task commits.
 - Produces: verified package output, an accurate final documentation-impact matrix, and complete plan evidence.
 
-- [ ] **Step 1: Reassess all eight CLI documentation surfaces**
+- [x] **Step 1: Reassess all eight CLI documentation surfaces**
 
 Compare the implementation diff with the matrix near the top of this plan. Keep the planned result only if each statement remains true:
 
@@ -1224,7 +1224,7 @@ plugin: N/A — character-authoring plugin does not perform asset production aud
 
 If a surface's owned contract changed, update that document, change its matrix entry to `update`, and include its token in `CLI docs surfaces`.
 
-- [ ] **Step 2: Run focused package verification**
+- [x] **Step 2: Run focused package verification**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/core run typecheck
@@ -1238,7 +1238,7 @@ rtk pnpm check:boundaries
 
 Expected: every command exits `0`. The package smoke must recognize the new help entry without requiring network access or an initialized `upstream/` gitlink.
 
-- [ ] **Step 3: Run the repository handoff gate**
+- [x] **Step 3: Run the repository handoff gate**
 
 ```sh
 rtk pnpm verify
@@ -1246,7 +1246,7 @@ rtk pnpm verify
 
 Expected: PASS across asset preparation, source-pin verification, boundaries, CLI docs policy, plugin verification, workspace typechecks, and all unit tests.
 
-- [ ] **Step 4: Review the final diff for scope and safety**
+- [x] **Step 4: Review the final diff for scope and safety**
 
 ```sh
 rtk git status --short
@@ -1256,7 +1256,7 @@ rtk git log --oneline -12
 
 Expected: only the planned Core, CLI, tests, CLI README, design spec, and plan records appear; no asset PNG, dependency, lockfile, `upstream/`, root README, landing, release, or plugin changes appear unless Task 6 explicitly reclassified and documented them.
 
-- [ ] **Step 5: Record final verification evidence**
+- [x] **Step 5: Record final verification evidence**
 
 Update this task with the final documentation matrix, exact PASS commands, and any justified surface reclassification. Commit the plan record:
 
@@ -1267,3 +1267,34 @@ rtk git rev-parse HEAD
 ```
 
 Expected: commit succeeds, and the plan contains no unchecked implementation or verification step.
+
+#### Task 6 final documentation-impact matrix
+
+```text
+help: update — `packages/cli/src/command-spec.ts` adds `catalog audit-animations` help, options, and examples.
+cli-readme: update — `packages/cli/README.md` documents usage, scope, findings, exit behavior, and read-only behavior.
+root-readme: N/A — specialized asset-authoring audit is not a primary quick start.
+landing: N/A — no landing-page workflow change.
+architecture: N/A — existing Core planning and CLI filesystem/runtime boundaries remain unchanged.
+engineering: N/A — repository verification and CI commands do not change.
+releasing: N/A — no package or publication workflow change.
+plugin: N/A — the character-authoring plugin does not perform asset production audits.
+```
+
+CLI docs impact: updated
+
+CLI docs surfaces: help, cli-readme
+
+Final scope inspection: `rtk git diff --name-only dafe79744fa2446a87ff1e27c3a07a742704718d^..HEAD` showed only the planned Core/CLI implementation and tests, CLI README, and plan records. It showed no root README, landing page, architecture, engineering, releasing, plugin, asset, lockfile, dependency, or `upstream/` changes. `rtk git diff --check dafe79744fa2446a87ff1e27c3a07a742704718d^..HEAD` PASS.
+
+Verification:
+
+- `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS.
+- `rtk pnpm --filter @lpc-toolkit/core test` PASS (17 files, 184 tests).
+- `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+- `rtk pnpm --filter @lpc-toolkit/cli test` PASS outside the sandbox (33 files, 384 tests passed, 1 skipped). The initial sandboxed invocation failed only with the known `listen EPERM` restriction in loopback web-server tests; no product failure was found.
+- `rtk pnpm --filter @lpc-toolkit/cli build` PASS.
+- `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS outside the sandbox; the packed install smoke printed `Packed CLI install smoke test passed.` The sandboxed attempt was stopped after it stalled at the script's loopback/cache stage.
+- `rtk pnpm check:boundaries` PASS.
+- `rtk pnpm verify` PASS outside the sandbox: asset preparation, source-pin verification, boundaries, CLI docs policy, plugin verification, workspace typechecks, and all workspace tests passed.
+- `rtk git status --short`, `rtk git diff --stat HEAD~10..HEAD`, and `rtk git log --oneline -12` reviewed before this plan-record commit; the worktree was clean and the committed range contained only planned changes.
