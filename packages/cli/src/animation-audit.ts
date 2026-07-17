@@ -5,11 +5,23 @@ import type {
   AssetAnimationAuditPlan,
   BodyType,
   CanvasAdapter,
+  Catalog,
   PlannedAnimationAsset,
   TypeName,
   UnsupportedAnimationFinding,
 } from '@lpc-toolkit/core';
+import {
+  ANIMATIONS,
+  BODY_TYPES,
+  planAssetAnimationAudit,
+} from '@lpc-toolkit/core';
+import { flagString, flagStrings, type ParsedArgs } from './args.js';
 import { AssetStoreError, type AssetStore } from './asset-store.js';
+import { editDistance } from './catalog-discovery.js';
+import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
+import { createNodeCanvasAdapter } from './node-canvas-adapter.js';
+import { commandError, commandOk, type CliIssue, type CliResponse } from './response.js';
+import type { RuntimeAssets } from './runtime-assets.js';
 
 type Direction = NonNullable<AnimationAuditGeometry['rows'][number]['direction']>;
 
@@ -90,6 +102,102 @@ interface GroupInspectionResult {
 }
 
 const FILESYSTEM_ERROR_CODE = /^E(?!RR_)[A-Z0-9_]+$/u;
+
+export interface AnimationAuditInput {
+  readonly targets: readonly string[];
+  readonly typeName?: string;
+  readonly bodyType?: string;
+}
+
+function domainIssue(
+  code: string,
+  domainName: string,
+  value: string,
+  candidates: readonly string[],
+): CliIssue {
+  const sorted = [...new Set(candidates)].sort((left, right) => left.localeCompare(right));
+  const suggestions = sorted
+    .map((candidate) => ({ candidate, distance: editDistance(value, candidate) }))
+    .sort((left, right) => left.distance - right.distance
+      || left.candidate.localeCompare(right.candidate))
+    .slice(0, 5)
+    .map(({ candidate }) => candidate);
+  return {
+    code,
+    message: `Unknown ${domainName}: ${value}`,
+    path: value,
+    details: { available: sorted.slice(0, 10), suggestions },
+  };
+}
+
+export function auditInputIssue(
+  catalog: Catalog,
+  input: AnimationAuditInput,
+): CliIssue | undefined {
+  const standardAnimations = ANIMATIONS.map(({ value }) => value);
+  const invalidAnimation = input.targets.find((target) => !standardAnimations.includes(target));
+  if (invalidAnimation) {
+    return domainIssue('unknown_animation', 'animation', invalidAnimation, standardAnimations);
+  }
+  if (input.typeName && !catalog.typeNames.includes(input.typeName)) {
+    return domainIssue('unknown_type_name', 'type name', input.typeName, catalog.typeNames);
+  }
+  if (input.bodyType && !(BODY_TYPES as readonly string[]).includes(input.bodyType)) {
+    return domainIssue('body_type_invalid', 'body type', input.bodyType, BODY_TYPES);
+  }
+  return undefined;
+}
+
+export async function runAnimationAuditCommand(
+  parsed: ParsedArgs,
+  runtime: RuntimeAssets,
+): Promise<CliResponse<AssetAnimationAuditReport>> {
+  try {
+    const targets = flagStrings(parsed.flags, 'animation');
+    const typeName = flagString(parsed.flags, 'type');
+    const bodyType = flagString(parsed.flags, 'body-type');
+    const loaded = loadCatalogFromRoots(
+      runtime.context.sheetDefinitionsRoot,
+      runtime.context.customSheetDefinitionsRoot,
+    );
+    const palettes = loadPalettesFromRoot(runtime.context.paletteDefinitionsRoot);
+    const warnings = [...loaded.warnings, ...palettes.warnings];
+    const issue = auditInputIssue(loaded.catalog, {
+      targets,
+      ...(typeName ? { typeName } : {}),
+      ...(bodyType ? { bodyType } : {}),
+    });
+    if (issue) return {
+      ...commandError('catalog audit-animations', issue, warnings),
+      data: null,
+    };
+
+    const plan = planAssetAnimationAudit({
+      catalog: loaded.catalog,
+      palettes: palettes.palettes,
+      targets,
+      ...(typeName ? { typeName } : {}),
+      ...(bodyType ? { bodyType } : {}),
+    });
+    const report = await inspectAssetAnimationPlan(plan, {
+      store: runtime.store,
+      adapter: createNodeCanvasAdapter({ assetStore: runtime.store }),
+      scope: {
+        ...(typeName ? { typeName } : {}),
+        ...(bodyType ? { bodyType } : {}),
+      },
+    });
+    return commandOk('catalog audit-animations', report, warnings);
+  } catch (error) {
+    return {
+      ...commandError('catalog audit-animations', {
+        code: 'animation_audit_failed',
+        message: error instanceof Error ? error.message : 'Animation audit failed.',
+      }),
+      data: null,
+    };
+  }
+}
 
 function storeSource(store: AssetStore, logicalPath: string): string {
   return `${store.baseUrl.replace(/\/$/u, '')}/${logicalPath}`;

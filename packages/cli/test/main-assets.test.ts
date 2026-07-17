@@ -212,6 +212,24 @@ describe('asset preparation dispatch', () => {
     expect(capture.stderr.join('')).toContain('Unknown option: --tpye');
   });
 
+  it('rejects an animation audit without targets before preparing assets', async () => {
+    const prepare = vi.fn(async (_options: PrepareRuntimeAssetsOptions) => runtime);
+    const capture = captureIo(runtime.context.repoRoot);
+
+    expect(await runCli(['catalog', 'audit-animations', '--json'], capture.io, {
+      prepareRuntimeAssets: prepare,
+    })).toBe(1);
+    expect(prepare).not.toHaveBeenCalled();
+    expect(JSON.parse(capture.stdout.join(''))).toMatchObject({
+      ok: false,
+      command: 'catalog audit-animations',
+      errors: [{
+        code: 'missing_argument',
+        path: '--animation',
+      }],
+    });
+  });
+
   it.each([
     ['catalog', 'items', '--limit', '0'],
     ['catalog', 'items', '--limit', '101'],

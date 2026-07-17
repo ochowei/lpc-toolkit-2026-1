@@ -1,3 +1,4 @@
+import { createCatalog, type Catalog } from '@lpc-toolkit/core';
 import { describe, expect, it } from 'vitest';
 import type {
   AnimationAuditConsumer,
@@ -12,7 +13,7 @@ import type {
   ImageLike,
 } from '@lpc-toolkit/core';
 import { AssetStoreError, type AssetStore } from '../src/asset-store.js';
-import { inspectAssetAnimationPlan } from '../src/animation-audit.js';
+import { auditInputIssue, inspectAssetAnimationPlan } from '../src/animation-audit.js';
 
 class MemoryImage implements ImageLike {
   readonly pixels: Uint8ClampedArray;
@@ -118,6 +119,41 @@ function asset(path: string, assetGeometry = singleCellGeometry, itemId = path):
     consumers: [consumer(itemId)],
   };
 }
+
+function auditCatalog(): Catalog {
+  return createCatalog({
+    'hair/braid.json': {
+      name: 'Braid',
+      type_name: 'hair',
+      animations: ['walk'],
+      credits: [],
+      layer_1: { zPos: 50, male: 'hair/braid/' },
+    },
+  }).catalog;
+}
+
+describe('auditInputIssue', () => {
+  it('suggests standard registered animation names', () => {
+    expect(auditInputIssue(auditCatalog(), {
+      targets: ['wlak'],
+    })).toMatchObject({
+      code: 'unknown_animation',
+      path: 'wlak',
+      details: { suggestions: expect.arrayContaining(['walk']) },
+    });
+  });
+
+  it('validates requested type and body type filters', () => {
+    expect(auditInputIssue(auditCatalog(), {
+      targets: ['walk'],
+      typeName: 'hat',
+    })).toMatchObject({ code: 'unknown_type_name', path: 'hat' });
+    expect(auditInputIssue(auditCatalog(), {
+      targets: ['walk'],
+      bodyType: 'robot',
+    })).toMatchObject({ code: 'body_type_invalid', path: 'robot' });
+  });
+});
 
 function memoryAdapter(
   images: ReadonlyMap<string, MemoryImage | Error>,

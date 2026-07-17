@@ -9,6 +9,7 @@ import {
 } from './args.js';
 import { assetCacheErrorIssue } from './asset-cache.js';
 import { AssetStoreError } from './asset-store.js';
+import { runAnimationAuditCommand } from './animation-audit.js';
 import { SelectionOutputError } from './compose-selection.js';
 import { runCatalogCommand } from './catalog-commands.js';
 import { discoveryPaginationIssue } from './catalog-discovery.js';
@@ -132,7 +133,12 @@ function preflightAssetCommand(parsed: ParsedArgs): CliResponse<null> | undefine
   }
 
   if (command === 'catalog') {
-    if (subcommand !== 'types' && subcommand !== 'items' && subcommand !== 'item') {
+    if (
+      subcommand !== 'types'
+      && subcommand !== 'items'
+      && subcommand !== 'item'
+      && subcommand !== 'audit-animations'
+    ) {
       return commandError(parsed.command.join(' '), {
         code: 'unknown_command',
         message: `Unknown catalog command: ${parsed.command.join(' ')}`,
@@ -142,6 +148,13 @@ function preflightAssetCommand(parsed: ParsedArgs): CliResponse<null> | undefine
       return commandError('catalog item', {
         code: 'missing_argument',
         message: 'catalog item requires an item id or type/name.',
+      });
+    }
+    if (subcommand === 'audit-animations' && flagStrings(parsed.flags, 'animation').length === 0) {
+      return commandError('catalog audit-animations', {
+        code: 'missing_argument',
+        message: '--animation is required and may be repeated.',
+        path: '--animation',
       });
     }
   }
@@ -302,8 +315,11 @@ export async function runCli(
   }
 
   if (parsed.command[0] === 'catalog') {
+    const response = parsed.command[1] === 'audit-animations'
+      ? await runAnimationAuditCommand(parsed, runtime!)
+      : runCatalogCommand(parsed, runtime!);
     return writeResponse(
-      runCatalogCommand(parsed, runtime!),
+      response,
       parsed,
       io,
       'Catalog command completed.\n',

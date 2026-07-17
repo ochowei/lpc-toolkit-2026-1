@@ -90,6 +90,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
       'lpc-toolkit catalog types',
       'lpc-toolkit catalog items --type hair --limit 20 --json',
       'lpc-toolkit catalog item hair_braid --json',
+      'lpc-toolkit catalog audit-animations --animation walk --animation run --json',
     ],
   },
   {
@@ -121,6 +122,26 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
     description: 'Show one catalog item with credits and animation capabilities.',
     options: [HELP_OPTION, JSON_OPTION],
     examples: ['lpc-toolkit catalog item hair_braid --json'],
+  },
+  {
+    command: ['catalog', 'audit-animations'],
+    usage: 'lpc-toolkit catalog audit-animations --animation <name> [options]',
+    description: 'Audit selected standard animations and report drawing work.',
+    options: [
+      HELP_OPTION,
+      JSON_OPTION,
+      {
+        name: 'animation',
+        kind: 'repeatable',
+        valueLabel: 'name',
+        description: 'Audit a standard animation; may be repeated.',
+      },
+      { name: 'type', kind: 'value', valueLabel: 'typeName', description: 'Filter by item type.' },
+      { name: 'body-type', kind: 'value', valueLabel: 'type', description: 'Filter by body type.' },
+    ],
+    examples: [
+      'lpc-toolkit catalog audit-animations --animation walk --animation run --json',
+    ],
   },
   {
     command: ['selection'],
