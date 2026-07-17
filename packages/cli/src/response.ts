@@ -392,8 +392,8 @@ function formatAnimationAudit(data: JsonRecord): string | undefined {
 
   const lines = [
     `Animation audit: ${targets.join(', ')}`,
-    `Scanned: ${itemsScanned} items`,
-    `Incomplete: ${incompleteItems} items`,
+    `Scanned: ${itemsScanned} ${itemsScanned === 1 ? 'item' : 'items'}`,
+    `Incomplete: ${incompleteItems} ${incompleteItems === 1 ? 'item' : 'items'}`,
   ];
   if (unsupported.length > 0) {
     lines.push(`Unsupported animations (${unsupportedCount}):`);

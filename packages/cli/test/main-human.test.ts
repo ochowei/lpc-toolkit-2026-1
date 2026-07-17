@@ -4,6 +4,7 @@ import path from 'node:path';
 import { createCanvas } from '@napi-rs/canvas';
 import { describe, expect, it } from 'vitest';
 import { runCli } from '../src/main.js';
+import { formatHumanResponse } from '../src/response.js';
 
 function makeCatalogCwd(): string {
   const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-human-'));
@@ -168,6 +169,33 @@ async function runHumanError(argv: readonly string[], cwd: string): Promise<stri
 }
 
 describe('human-readable CLI output', () => {
+  it('uses singular item summary labels for a one-item animation audit', () => {
+    const output = formatHumanResponse({
+      ok: true,
+      command: 'catalog audit-animations',
+      data: {
+        targets: ['walk'],
+        summary: {
+          itemsScanned: 1,
+          incompleteItems: 1,
+          unsupported: 0,
+          missingFiles: 0,
+          blankFrames: 0,
+          errors: 0,
+        },
+        unsupported: [],
+        missingFiles: [],
+        blankFrames: [],
+        errors: [],
+      },
+      warnings: [],
+      errors: [],
+    }, 'fallback\n');
+
+    expect(output).toContain('Scanned: 1 item\n');
+    expect(output).toContain('Incomplete: 1 item\n');
+  });
+
   it('prints catalog type data without --json', async () => {
     const output = await runHuman(['catalog', 'types'], makeCatalogCwd());
 
