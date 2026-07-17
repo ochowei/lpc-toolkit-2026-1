@@ -905,12 +905,12 @@ Expected: PASS.
 
 - [ ] **Step 4: Inspect a real generated viewer**
 
-Use the installed compatible CLI and the user-provided selection only through
-the documented command contract:
+Use the CLI built from this checkout and the user-provided selection only
+through the documented command contract:
 
 ```sh
-rtk lpc-toolkit character validate --selection /Users/william/Documents/Codex/2026-07-17/lpc-toolkit-plugin-lpc-toolkit-lpc/outputs/magical-fisher-female.json --json
-rtk lpc-toolkit character render --selection /Users/william/Documents/Codex/2026-07-17/lpc-toolkit-plugin-lpc-toolkit-lpc/outputs/magical-fisher-female.json --out /tmp/lpc-viewer-handoff --animation tool_rod --bundle zip --json
+rtk node packages/cli/dist/index.js character validate --selection /Users/william/Documents/Codex/2026-07-17/lpc-toolkit-plugin-lpc-toolkit-lpc/outputs/magical-fisher-female.json --json
+rtk node packages/cli/dist/index.js character render --selection /Users/william/Documents/Codex/2026-07-17/lpc-toolkit-plugin-lpc-toolkit-lpc/outputs/magical-fisher-female.json --out /tmp/lpc-viewer-handoff --animation tool_rod --bundle zip --json
 ```
 
 Require `ok: true`, viewer/sheet/metadata/TXT/CSV paths, no warnings unless
