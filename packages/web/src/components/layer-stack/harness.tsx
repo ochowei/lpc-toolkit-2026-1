@@ -34,7 +34,7 @@ import { TopBar } from './top-bar';
 import { PreviewPane } from './preview-pane';
 import { StackPanel } from './stack-panel';
 import { BodyTypePopover } from './popovers/body-type-popover';
-import { TokenPopover } from './popovers/token-popover';
+import { ShareImportPopover } from './popovers/share-import-popover';
 import { AttributionPopover } from './popovers/attribution-popover';
 import { DownloadPopover } from './popovers/download-popover';
 import { MoreMenuPopover } from './popovers/more-menu-popover';
@@ -134,7 +134,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     () => new Set<AnimationName>(),
   );
   const [status, setStatus] = useState<{ kind: 'info' | 'warn' | 'error'; text: string } | null>(null);
-  const [popover, setPopover] = useState<null | 'bodyType' | 'token' | 'attribution' | 'download' | 'more'>(null);
+  const [popover, setPopover] = useState<null | 'bodyType' | 'share' | 'attribution' | 'download' | 'more'>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const moreMenuAnchorRef = useRef<HTMLButtonElement>(null);
   const [expanded, setExpanded] = useState<TypeName | null>(null);
@@ -592,13 +592,14 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
             });
           }}
         />
-        <TokenPopover
-          open={popover === 'token'}
-          setOpen={(v) => setPopover(v ? 'token' : null)}
+        <ShareImportPopover
+          open={popover === 'share'}
+          setOpen={(v) => setPopover(v ? 'share' : null)}
           state={props.state}
           dispatch={guardedDispatch}
           disabled={isComposing}
           catalog={props.catalog}
+          palettes={props.palettes}
           t={props.t}
           onStatus={(text) => setStatus({ kind: 'info', text })}
           anchorRef={moreMenuAnchorRef}

@@ -5,7 +5,7 @@ import { cn } from '../../../lib/cn';
 import type { Locale, Translator } from '../../../i18n';
 
 /** Secondary popover destinations opened from the compact more menu. */
-export type MoreMenuTarget = 'token' | 'attribution';
+export type MoreMenuTarget = 'share' | 'attribution';
 
 interface Props {
   open: boolean;
@@ -18,7 +18,7 @@ interface Props {
   onSelect: (target: MoreMenuTarget) => void;
   onToggleLocale: () => void;
   onToggleTheme: () => void;
-  /** Forwarded so other popovers (Token / Reset / Attribution) can anchor to the same `⋯` button. */
+  /** Forwarded so other popovers (Share / Import / Attribution) can anchor to the same `⋯` button. */
   anchorRefOut?: RefObject<HTMLButtonElement>;
 }
 
@@ -69,8 +69,8 @@ export function MoreMenuPopover({
         >
           {/* Right-anchored: panel hugs viewport right edge (12px gutter) instead of pos.left,
               because ⋯ sits at the navbar's right end and a left-anchored panel could clip. */}
-          <MenuItem onClick={() => handlePick('token')}>
-            <span>🔗 {t('token.title')}</span>
+          <MenuItem onClick={() => handlePick('share')}>
+            <span>↗ {t('share.title')}</span>
           </MenuItem>
           <MenuItem
             onClick={() => handlePick('attribution')}
