@@ -1298,3 +1298,65 @@ Verification:
 - `rtk pnpm check:boundaries` PASS.
 - `rtk pnpm verify` PASS outside the sandbox: asset preparation, source-pin verification, boundaries, CLI docs policy, plugin verification, workspace typechecks, and all workspace tests passed.
 - `rtk git status --short`, `rtk git diff --stat HEAD~10..HEAD`, and `rtk git log --oneline -12` reviewed before this plan-record commit; the worktree was clean and the committed range contained only planned changes.
+
+#### Task 6 durable verification transcript (review follow-up)
+
+Fresh execution completed at `2026-07-17T11:02:29Z`. Each command below exited `0`; the command output was inspected at execution and the concise result is retained here instead of committing bulky raw test logs.
+
+```text
+$ rtk pnpm --filter @lpc-toolkit/core run typecheck
+exit=0; tsc -p tsconfig.json --noEmit
+
+$ rtk pnpm --filter @lpc-toolkit/core test
+exit=0; Test Files 17 passed; Tests 184 passed
+
+$ rtk pnpm --filter @lpc-toolkit/cli run typecheck
+exit=0; tsc -p tsconfig.json --noEmit
+
+$ rtk pnpm --filter @lpc-toolkit/cli test       # elevated loopback IPC
+exit=0; Test Files 33 passed; Tests 384 passed, 1 skipped
+
+$ rtk pnpm --filter @lpc-toolkit/cli build
+exit=0; core, presets, embedded web, and CLI build completed
+
+$ rtk pnpm --filter @lpc-toolkit/cli test:package  # elevated loopback IPC
+exit=0; local tarball installed; "Packed CLI install smoke test passed."
+
+$ rtk node packages/cli/dist/index.js catalog --help
+exit=0; output includes "lpc-toolkit catalog audit-animations --animation <name> [options]"
+
+$ rtk git submodule status upstream
+exit=0; output "-212abfd21493e9957bd556250ac538fa40fe1fc9 upstream" (leading '-' confirms uninitialized)
+
+$ rtk pnpm check:boundaries
+exit=0; "Architecture boundary check passed."
+
+$ rtk pnpm verify                              # elevated loopback IPC
+exit=0; cache-hit preparation, source-pin verification, boundaries, CLI docs policy,
+        plugin verification, workspace typechecks, and recursive tests completed
+
+$ rtk git status --short
+exit=0; output <empty>
+
+$ rtk git diff --stat HEAD~10..HEAD && rtk git log --oneline -12 && rtk git diff --check HEAD~10..HEAD
+exit=0; planned range only; diff check output <empty>
+```
+
+The elevated CLI gates are intentional: their local web-server checks need loopback IPC. The direct built-CLI help check is asset-free and passed while the optional `upstream/` gitlink remained uninitialized; together with the successful packed-local-install smoke, this verifies the requested help behavior without initializing `upstream/`.
+
+#### Task 6 Step 5 commit evidence (review follow-up)
+
+The initial Task 6 plan-record command sequence completed successfully:
+
+```text
+$ rtk git add docs/superpowers/plans/2026-07-17-cli-animation-asset-audit.md
+exit=0
+$ rtk git commit -m "docs(plan): record animation audit verification"
+exit=0; 1 file changed, 36 insertions(+), 5 deletions(-)
+$ rtk git rev-parse HEAD
+exit=0; 8a62e08454a44838e9822b1e8b354649c811227b
+$ rtk git status --short
+exit=0; output <empty>
+```
+
+`8a62e08454a44838e9822b1e8b354649c811227b` is the prior Task 6 plan-record commit. This follow-up plan-record commit deliberately records that hash, resolving the self-reference limitation of the initial commit.
