@@ -184,3 +184,14 @@ export { recolorImage, recolorPixels } from './recolor.js';
 // ==========================================
 export { validateAssets } from './validation/asset-validator.js';
 export type { ValidateAssetsOptions, ValidationIssue } from './validation/asset-validator.js';
+
+// ==========================================
+// 16. Animation Capability Rules
+// ==========================================
+export type { ItemAnimationCapabilities } from './animation-capabilities.js';
+export {
+  animationsSupportFolder,
+  auditAnimationFolder,
+  compatibleAnimationSource,
+  itemAnimationCapabilities,
+} from './animation-capabilities.js';

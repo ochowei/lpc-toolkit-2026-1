@@ -1,5 +1,6 @@
 import {
   BODY_TYPES,
+  itemAnimationCapabilities,
   type AnimationName,
   type BodyType,
   type Catalog,
@@ -12,7 +13,6 @@ import {
   discoverItems,
   editDistance,
   hasDiscoveryCredits,
-  itemAnimationCapabilities,
   readDiscoveryPagination,
   toDiscoveryCandidate,
   toDiscoveryDetail,
