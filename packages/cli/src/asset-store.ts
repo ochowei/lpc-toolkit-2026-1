@@ -70,8 +70,9 @@ function isRegularFileInsideRoot(root: string, candidate: string): boolean {
     return (
       isInsideRoot(root, canonicalCandidate) && statSync(canonicalCandidate).isFile()
     );
-  } catch {
-    return false;
+  } catch (error) {
+    if (systemErrorCode(error) === 'ENOENT') return false;
+    throw error;
   }
 }
 

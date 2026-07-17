@@ -262,6 +262,46 @@ describe('inspectAssetAnimationPlan', () => {
     expect(report.summary.incompleteItems).toBe(0);
   });
 
+  it('reports a preflight filesystem failure as an asset-read error', async () => {
+    const deniedPath = 'spritesheets/hair/preflight-denied/walk.png';
+    const deniedAtPreflight = Object.assign(new Error('Permission denied.'), { code: 'EACCES' });
+    const store: AssetStore = {
+      kind: 'directory',
+      baseUrl: '/fixture-assets',
+      description: 'fixture',
+      has: () => { throw deniedAtPreflight; },
+      load: async (sourcePath) => sourcePath,
+    };
+    const fixtures = memoryAdapter(new Map());
+
+    const report = await inspectAssetAnimationPlan(plan([asset(deniedPath)]), {
+      store,
+      adapter: fixtures.adapter,
+    });
+
+    expect(report.missingFiles).toEqual([]);
+    expect(report.errors).toEqual([
+      expect.objectContaining({ kind: 'asset_read_failed', path: deniedPath }),
+    ]);
+  });
+
+  it('reports previously unlisted filesystem codes as asset-read errors', async () => {
+    const overflowPath = 'spritesheets/hair/overflow/walk.png';
+    const overflowAtLoad = Object.assign(new Error('Integer overflow.'), { code: 'EOVERFLOW' });
+    const fixtures = memoryAdapter(new Map([
+      [`/fixture-assets/${overflowPath}`, overflowAtLoad],
+    ]));
+
+    const report = await inspectAssetAnimationPlan(plan([asset(overflowPath)]), {
+      store: storeFor(new Set([overflowPath])),
+      adapter: fixtures.adapter,
+    });
+
+    expect(report.errors).toEqual([
+      expect.objectContaining({ kind: 'asset_read_failed', path: overflowPath }),
+    ]);
+  });
+
   it('ignores unreferenced transparent columns and retains repeated logical indices once', async () => {
     const path = 'spritesheets/hair/repeated/walk.png';
     const repeatedGeometry = geometry([{

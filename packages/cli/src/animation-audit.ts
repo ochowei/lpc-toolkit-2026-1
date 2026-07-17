@@ -89,22 +89,7 @@ interface GroupInspectionResult {
   readonly error?: AnimationAuditInspectionError;
 }
 
-const FILESYSTEM_ERROR_CODES = new Set([
-  'EACCES',
-  'EBUSY',
-  'EIO',
-  'EISDIR',
-  'ELOOP',
-  'EMFILE',
-  'ENAMETOOLONG',
-  'ENFILE',
-  'ENOENT',
-  'ENOSPC',
-  'ENOTDIR',
-  'EPERM',
-  'EROFS',
-  'ESTALE',
-]);
+const FILESYSTEM_ERROR_CODE = /^E(?!RR_)[A-Z0-9_]+$/u;
 
 function storeSource(store: AssetStore, logicalPath: string): string {
   return `${store.baseUrl.replace(/\/$/u, '')}/${logicalPath}`;
@@ -122,7 +107,7 @@ function filesystemErrorCode(error: unknown): string | undefined {
         ? (error as { readonly code?: unknown }).code
         : undefined
     );
-  return typeof code === 'string' && FILESYSTEM_ERROR_CODES.has(code) ? code : undefined;
+  return typeof code === 'string' && FILESYSTEM_ERROR_CODE.test(code) ? code : undefined;
 }
 
 function groupAssets(assets: readonly PlannedAnimationAsset[]): readonly InspectionGroup[] {
@@ -197,17 +182,42 @@ function groupConsumers(group: InspectionGroup): readonly AnimationAuditConsumer
   return group.assets.flatMap(({ asset }) => asset.consumers);
 }
 
+function missingResult(group: InspectionGroup): GroupInspectionResult {
+  return {
+    results: group.assets.map(({ index, asset }) => ({
+      index,
+      result: { missingFiles: [missingFinding(asset)], blankFrames: [] },
+    })),
+  };
+}
+
+function inspectionFailure(
+  group: InspectionGroup,
+  error: unknown,
+): GroupInspectionResult {
+  const systemCode = filesystemErrorCode(error);
+  if (systemCode === 'ENOENT') return missingResult(group);
+  return {
+    results: [],
+    error: {
+      kind: error instanceof AssetStoreError || systemCode
+        ? 'asset_read_failed'
+        : 'image_decode_failed',
+      message: errorMessage(error),
+      path: group.path,
+      consumers: groupConsumers(group),
+    },
+  };
+}
+
 async function inspectGroup(
   group: InspectionGroup,
   options: InspectAssetAnimationPlanOptions,
 ): Promise<GroupInspectionResult> {
-  if (!options.store.has(group.path)) {
-    return {
-      results: group.assets.map(({ index, asset }) => ({
-        index,
-        result: { missingFiles: [missingFinding(asset)], blankFrames: [] },
-      })),
-    };
+  try {
+    if (!options.store.has(group.path)) return missingResult(group);
+  } catch (error) {
+    return inspectionFailure(group, error);
   }
 
   try {
@@ -219,26 +229,7 @@ async function inspectGroup(
       })),
     };
   } catch (error) {
-    const systemCode = filesystemErrorCode(error);
-    if (systemCode === 'ENOENT') {
-      return {
-        results: group.assets.map(({ index, asset }) => ({
-          index,
-          result: { missingFiles: [missingFinding(asset)], blankFrames: [] },
-        })),
-      };
-    }
-    return {
-      results: [],
-      error: {
-        kind: error instanceof AssetStoreError || systemCode
-          ? 'asset_read_failed'
-          : 'image_decode_failed',
-        message: errorMessage(error),
-        path: group.path,
-        consumers: groupConsumers(group),
-      },
-    };
+    return inspectionFailure(group, error);
   }
 }
 
