@@ -12,10 +12,17 @@ export class AssetStoreError extends Error {
     readonly code: AssetStoreErrorCode,
     message: string,
     readonly path: string,
+    readonly systemCode?: string,
   ) {
     super(message);
     this.name = 'AssetStoreError';
   }
+}
+
+function systemErrorCode(error: unknown): string | undefined {
+  if (!error || typeof error !== 'object' || !('code' in error)) return undefined;
+  const { code } = error as { readonly code?: unknown };
+  return typeof code === 'string' ? code : undefined;
 }
 
 export interface AssetStore {
@@ -93,15 +100,29 @@ export function createDirectoryAssetStore(assetsRoot: string): AssetStore {
         throw new Error(`Invalid directory asset path: ${sourcePath}`);
       }
       const candidate = path.resolve(sourcePath);
-      if (
-        !isInsideRoot(resolvedRoot, candidate) ||
-        !isRegularFileInsideRoot(canonicalRoot, candidate)
-      ) {
+      if (!isInsideRoot(resolvedRoot, candidate)) {
         throw new Error(
-          `Directory asset is outside the asset root, missing, or not a regular file: ${sourcePath}`,
+          `Directory asset is outside the asset root: ${sourcePath}`,
         );
       }
-      return candidate;
+      try {
+        const canonicalCandidate = realpathSync.native(candidate);
+        if (!isInsideRoot(canonicalRoot, canonicalCandidate) || !statSync(canonicalCandidate).isFile()) {
+          throw new Error(
+            `Directory asset is outside the asset root or not a regular file: ${sourcePath}`,
+          );
+        }
+        return candidate;
+      } catch (error) {
+        const code = systemErrorCode(error);
+        if (!code) throw error;
+        throw new AssetStoreError(
+          'asset_image_missing',
+          `Unable to read directory asset: ${sourcePath}`,
+          sourcePath,
+          code,
+        );
+      }
     },
   };
 }

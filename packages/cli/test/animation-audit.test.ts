@@ -224,6 +224,44 @@ describe('inspectAssetAnimationPlan', () => {
     expect(report.summary.incompleteItems).toBe(0);
   });
 
+  it('turns an adapter ENOENT after presence checks into a missing-file finding', async () => {
+    const missingPath = 'spritesheets/hair/disappeared/walk.png';
+    const missingAtLoad = Object.assign(new Error('File disappeared.'), { code: 'ENOENT' });
+    const fixtures = memoryAdapter(new Map([
+      [`/fixture-assets/${missingPath}`, missingAtLoad],
+    ]));
+
+    const report = await inspectAssetAnimationPlan(plan([asset(missingPath)]), {
+      store: storeFor(new Set([missingPath])),
+      adapter: fixtures.adapter,
+    });
+
+    expect(report.missingFiles).toEqual([
+      expect.objectContaining({ path: missingPath }),
+    ]);
+    expect(report.errors).toEqual([]);
+    expect(report.summary.incompleteItems).toBe(1);
+  });
+
+  it('reports non-ENOENT adapter filesystem failures as asset-read errors', async () => {
+    const deniedPath = 'spritesheets/hair/denied/walk.png';
+    const deniedAtLoad = Object.assign(new Error('Permission denied.'), { code: 'EACCES' });
+    const fixtures = memoryAdapter(new Map([
+      [`/fixture-assets/${deniedPath}`, deniedAtLoad],
+    ]));
+
+    const report = await inspectAssetAnimationPlan(plan([asset(deniedPath)]), {
+      store: storeFor(new Set([deniedPath])),
+      adapter: fixtures.adapter,
+    });
+
+    expect(report.missingFiles).toEqual([]);
+    expect(report.errors).toEqual([
+      expect.objectContaining({ kind: 'asset_read_failed', path: deniedPath }),
+    ]);
+    expect(report.summary.incompleteItems).toBe(0);
+  });
+
   it('ignores unreferenced transparent columns and retains repeated logical indices once', async () => {
     const path = 'spritesheets/hair/repeated/walk.png';
     const repeatedGeometry = geometry([{

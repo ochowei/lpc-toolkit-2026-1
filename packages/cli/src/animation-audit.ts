@@ -89,12 +89,40 @@ interface GroupInspectionResult {
   readonly error?: AnimationAuditInspectionError;
 }
 
+const FILESYSTEM_ERROR_CODES = new Set([
+  'EACCES',
+  'EBUSY',
+  'EIO',
+  'EISDIR',
+  'ELOOP',
+  'EMFILE',
+  'ENAMETOOLONG',
+  'ENFILE',
+  'ENOENT',
+  'ENOSPC',
+  'ENOTDIR',
+  'EPERM',
+  'EROFS',
+  'ESTALE',
+]);
+
 function storeSource(store: AssetStore, logicalPath: string): string {
   return `${store.baseUrl.replace(/\/$/u, '')}/${logicalPath}`;
 }
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function filesystemErrorCode(error: unknown): string | undefined {
+  const code = error instanceof AssetStoreError
+    ? error.systemCode
+    : (
+      error && typeof error === 'object' && 'code' in error
+        ? (error as { readonly code?: unknown }).code
+        : undefined
+    );
+  return typeof code === 'string' && FILESYSTEM_ERROR_CODES.has(code) ? code : undefined;
 }
 
 function groupAssets(assets: readonly PlannedAnimationAsset[]): readonly InspectionGroup[] {
@@ -191,10 +219,21 @@ async function inspectGroup(
       })),
     };
   } catch (error) {
+    const systemCode = filesystemErrorCode(error);
+    if (systemCode === 'ENOENT') {
+      return {
+        results: group.assets.map(({ index, asset }) => ({
+          index,
+          result: { missingFiles: [missingFinding(asset)], blankFrames: [] },
+        })),
+      };
+    }
     return {
       results: [],
       error: {
-        kind: error instanceof AssetStoreError ? 'asset_read_failed' : 'image_decode_failed',
+        kind: error instanceof AssetStoreError || systemCode
+          ? 'asset_read_failed'
+          : 'image_decode_failed',
         message: errorMessage(error),
         path: group.path,
         consumers: groupConsumers(group),
