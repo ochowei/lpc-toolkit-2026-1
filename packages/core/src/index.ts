@@ -84,6 +84,8 @@ export type {
 export {
   getRecolorSwatches,
   getRecolorVariants,
+  getRecolorVariantsForType,
+  itemSupportsSelectionType,
   makeResolvePalette,
 } from './recolor-resolve.js';
 export { getDefaultColorSelection } from './selection-defaults.js';
@@ -113,6 +115,16 @@ export {
   SELECTION_SCHEMA,
   selectionJsonFromCore,
 } from './selection-document.js';
+export type {
+  ImportedSelectionDocument,
+  SelectionDocumentErrorCode,
+  SelectionDocumentImportContext,
+  SelectionDocumentSource,
+} from './upstream-selection-import.js';
+export {
+  importSelectionDocument,
+  SelectionDocumentError,
+} from './upstream-selection-import.js';
 export type { HashWarning, ParseHashResult } from './hash.js';
 export {
   decodeSelectionToken,

@@ -4,7 +4,12 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { createCatalog } from '../src/catalog.js';
 import { createPaletteCatalog } from '../src/palettes.js';
-import { getRecolorSwatches, makeResolvePalette } from '../src/recolor-resolve.js';
+import {
+  getRecolorSwatches,
+  getRecolorVariantsForType,
+  itemSupportsSelectionType,
+  makeResolvePalette,
+} from '../src/recolor-resolve.js';
 import { composeSelections } from '../src/compose.js';
 import type { CanvasLike } from '../src/adapters.js';
 import type {
@@ -420,5 +425,61 @@ describe('getRecolorSwatches', () => {
       layer_1: { zPos: 1, male: 't/' },
     };
     expect(getRecolorSwatches(item, palettes)).toEqual([]);
+  });
+});
+
+describe('type-specific recolor metadata', () => {
+  const palettes = createPaletteCatalog({
+    'cloth/meta_cloth.json': {
+      type: 'material',
+      default: 'v1',
+      base: 'blue',
+    },
+    'cloth/cloth_v1.json': {
+      blue: ['#0000ff'],
+      red: ['#ff0000'],
+    },
+    'metal/meta_metal.json': {
+      type: 'material',
+      default: 'v1',
+      base: 'iron',
+    },
+    'metal/metal_v1.json': {
+      iron: ['#777777'],
+      gold: ['#d4af37'],
+    },
+  }).palettes;
+  const coat: ItemDefinition = {
+    name: 'Coat',
+    type_name: 'coat',
+    animations: ['walk'],
+    credits: [],
+    recolors: {
+      color_1: { material: 'cloth', palettes: ['v1'] },
+      color_2: {
+        material: 'metal',
+        palettes: ['v1'],
+        type_name: 'trim',
+      },
+    },
+    layer_1: { zPos: 1, male: 'coat/' },
+  };
+
+  it('recognizes both the primary item type and recolor sub-binding type', () => {
+    expect(itemSupportsSelectionType(coat, 'coat')).toBe(true);
+    expect(itemSupportsSelectionType(coat, 'trim')).toBe(true);
+    expect(itemSupportsSelectionType(coat, 'lining')).toBe(false);
+  });
+
+  it('returns variants for the requested primary or sub-binding type', () => {
+    expect(getRecolorVariantsForType(coat, palettes, 'coat')).toEqual([
+      'blue',
+      'red',
+    ]);
+    expect(getRecolorVariantsForType(coat, palettes, 'trim')).toEqual([
+      'iron',
+      'gold',
+    ]);
+    expect(getRecolorVariantsForType(coat, palettes, 'lining')).toEqual([]);
   });
 });
