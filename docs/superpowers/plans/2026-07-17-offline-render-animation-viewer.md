@@ -1303,9 +1303,80 @@ rtk git commit -m "docs(plan): record offline viewer verification"
   landing: update
   architecture: update
   engineering: N/A — verification commands and CI mapping do not change
-  releasing: N/A — packaging, versioning, and publication policy do not change
+  releasing: update
   plugin: update
   ```
 
 - [x] Focused checks, Playwright, `pnpm verify`, build, and packed CLI smoke all pass. Initial
   sandbox IPC/network failures were rerun unchanged with the required permissions and passed.
+
+---
+
+## Final Review Remediation And 0.2.0 Alignment
+
+- [x] Reject inherited prototype-key animation names through the documented unknown-animation
+  error rather than attempting to read inherited object properties.
+  - Implementation: Guarded standard animation configuration lookup with own-property semantics
+    and added regressions for `toString`, `constructor`, and `__proto__`.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core test` PASS — 178 tests;
+    `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS; `rtk pnpm check:boundaries` PASS.
+  - Commit: 8a95a91ef6c313cd0633bcada29d67f15ee0b198
+
+- [x] Make the offline viewer truthful and usable for empty and partial output, match the approved
+  responsive layout, and keep playback work bounded after background suspension.
+  - Implementation: Added a no-playable-animations state with disabled controls and usable
+    details; dedicated skipped-layer information; frame size, source layout, and explicit cycle
+    columns; explicit desktop 2-by-2, narrow one-column, and single-stage layouts; integer display
+    scaling for 64- and 128-pixel frames; and constant-time catch-up with one redraw. The exact
+    fixture now uses a distinct nonzero-origin 128-pixel custom animation and includes an empty
+    partial viewer.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- viewer.test.ts render.test.ts`
+    PASS — 67 tests; `rtk pnpm --filter @lpc-toolkit/web test:e2e -- render-viewer.spec.ts`
+    PASS — 5 direct-`file://` Chromium tests; CLI/Web typechecks PASS; deterministic fixture
+    regeneration PASS; `rtk pnpm build` PASS.
+  - Commit: 06004fdc0b9eac8fa9da2ffecfbddf5b080e2e47
+
+- [x] Align the first public viewer-capable CLI and plugin contract at `0.2.0`.
+  - Implementation: Set CLI and plugin versions to `0.2.0`; changed the plugin-supported CLI
+    range to `>=0.2.0 <0.3.0`; updated checker constants, compatibility documentation, manifest,
+    tests, top-level `render` help, package metadata, root/CLI documentation, and release
+    verification guidance. No tag, push, pull request, marketplace mutation, or publication was
+    performed.
+  - Skill validation: A fresh agent using the pre-change skill snapshot incorrectly accepted CLI
+    `0.1.4` while requiring viewer-era artifacts (RED). A separate fresh agent using the current
+    skill correctly rejected `0.1.4`, required `>=0.2.0 <0.3.0`, avoided automatic upgrade, and
+    retrieved the complete sheet/viewer/metadata/TXT/CSV/ZIP/path checklist (GREEN).
+  - Verification: `rtk pnpm verify:plugin` PASS — 17 tests and valid structure; official plugin
+    and skill validators PASS in an ephemeral PyYAML environment; CLI contract tests PASS — 109;
+    `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS for the packed installed `0.2.0`
+    tarball.
+  - Release audit: `v0.2.0` does not exist, the next candidate would be `v0.2.0-rc.1`, and the
+    only current transition blocker is the externally managed detached HEAD.
+  - Commits: b00cda4699f8c07e02f100bf711adff5c1713ccf;
+    fbf6122e687f50b654b927ffb06367d85e293683;
+    51f00f4ceb8e4e36ceef17a63604e1fb5604b180
+
+- [x] Run fresh final gates and inspect a new real render from the user-provided selection.
+  - Verification: `rtk pnpm verify` PASS — Core 178, Presets 3, CLI 417 passed/1 skipped, Web
+    684 passed/1 skipped; `rtk pnpm build` PASS; direct-file Chromium PASS — 5 tests; packed CLI
+    smoke PASS; release audit and plugin/skill validators PASS.
+  - Real render: `character validate --json` and strict `character render --animation tool_rod
+    --bundle zip --json` PASS at `/tmp/lpc-viewer-final.GZ2crr` without `--allow-partial`.
+    Output contains seven artifacts, a 1664-by-4736 sheet, 18 playback descriptors, a 128-pixel
+    13-frame four-direction `tool_rod`, complete 5,740-byte embedded Credits TXT, relative
+    artifact basenames, and the viewer inside the ZIP. Static checks found no absolute local
+    paths, external resources, or network APIs. The same 35 existing catalog alias warnings were
+    reported; no selection, partial-render, skipped-layer, or viewer warning occurred.
+
+Final CLI documentation impact reassessment:
+
+```text
+help: update
+cli-readme: update
+root-readme: update
+landing: update
+architecture: update
+engineering: N/A — verification commands and CI mapping do not change
+releasing: update
+plugin: update
+```
