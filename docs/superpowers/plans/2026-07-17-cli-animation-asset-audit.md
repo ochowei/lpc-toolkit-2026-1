@@ -1051,6 +1051,16 @@ Two parser/validation findings were corrected after review.
 - Commit: `6953b5c6e111716b3601045ab201ae9c1ff1d783` — `fix(cli): validate empty and repeated audit options`.
 - The parser now preserves valueless repeated occurrences for option validation, and explicit empty `--type`/`--body-type` values are forwarded to the required domain checks.
 
+#### Task 4 review follow-up 2
+
+The audit empty-value parser support was contained after it regressed existing catalog discovery parsing.
+
+- RED: `rtk pnpm --filter @lpc-toolkit/cli test -- main-assets.test.ts` FAIL — `catalog items --type "" --json` returned an unfiltered success instead of rejecting the valueless option before asset preparation.
+- GREEN: `rtk pnpm --filter @lpc-toolkit/cli test -- args.test.ts catalog-commands.test.ts command-spec.test.ts animation-audit.test.ts main-assets.test.ts main-json.test.ts` PASS (129 tests).
+- GREEN: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+- Commit: `fbf91dca7a3ff7132378dcf1f426d8e2bfef9d30` — `fix(cli): preserve catalog empty option handling`.
+- Explicit empty string values are now accepted only while parsing `catalog audit-animations`; all existing catalog commands retain their prior valueless-option rejection.
+
 ---
 
 ### Task 5: Add the human worklist and public CLI documentation
