@@ -409,7 +409,8 @@ export function validateCommandOptions(parsed: ParsedArgs): CliIssue | undefined
         details: { suggestions: suggestOption(name, spec.options) },
       };
     }
-    if (option.kind !== 'boolean' && value === true) {
+    const occurrences = Array.isArray(value) ? value : [value];
+    if (option.kind !== 'boolean' && occurrences.some((occurrence) => occurrence === true)) {
       return {
         code: 'invalid_option',
         message: `--${name} requires a value.`,

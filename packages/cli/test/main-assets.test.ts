@@ -231,6 +231,24 @@ describe('asset preparation dispatch', () => {
   });
 
   it.each([
+    ['--animation', '--animation', 'walk'],
+    ['--animation', 'walk', '--animation'],
+  ])('rejects a malformed repeated animation option before preparing assets: %j', async (...flags) => {
+    const prepare = vi.fn(async (_options: PrepareRuntimeAssetsOptions) => runtime);
+    const capture = captureIo(runtime.context.repoRoot);
+
+    expect(await runCli(['catalog', 'audit-animations', ...flags, '--json'], capture.io, {
+      prepareRuntimeAssets: prepare,
+    })).toBe(1);
+    expect(prepare).not.toHaveBeenCalled();
+    expect(JSON.parse(capture.stdout.join(''))).toMatchObject({
+      ok: false,
+      command: 'catalog audit-animations',
+      errors: [{ code: 'invalid_option', path: '--animation' }],
+    });
+  });
+
+  it.each([
     ['catalog', 'items', '--limit', '0'],
     ['catalog', 'items', '--limit', '101'],
     ['catalog', 'items', '--offset', '-1'],

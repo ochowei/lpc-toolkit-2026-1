@@ -139,10 +139,10 @@ export function auditInputIssue(
   if (invalidAnimation) {
     return domainIssue('unknown_animation', 'animation', invalidAnimation, standardAnimations);
   }
-  if (input.typeName && !catalog.typeNames.includes(input.typeName)) {
+  if (input.typeName !== undefined && !catalog.typeNames.includes(input.typeName)) {
     return domainIssue('unknown_type_name', 'type name', input.typeName, catalog.typeNames);
   }
-  if (input.bodyType && !(BODY_TYPES as readonly string[]).includes(input.bodyType)) {
+  if (input.bodyType !== undefined && !(BODY_TYPES as readonly string[]).includes(input.bodyType)) {
     return domainIssue('body_type_invalid', 'body type', input.bodyType, BODY_TYPES);
   }
   return undefined;
@@ -164,8 +164,8 @@ export async function runAnimationAuditCommand(
     const warnings = [...loaded.warnings, ...palettes.warnings];
     const issue = auditInputIssue(loaded.catalog, {
       targets,
-      ...(typeName ? { typeName } : {}),
-      ...(bodyType ? { bodyType } : {}),
+      ...(typeName !== undefined ? { typeName } : {}),
+      ...(bodyType !== undefined ? { bodyType } : {}),
     });
     if (issue) return {
       ...commandError('catalog audit-animations', issue, warnings),
@@ -176,15 +176,15 @@ export async function runAnimationAuditCommand(
       catalog: loaded.catalog,
       palettes: palettes.palettes,
       targets,
-      ...(typeName ? { typeName } : {}),
-      ...(bodyType ? { bodyType } : {}),
+      ...(typeName !== undefined ? { typeName } : {}),
+      ...(bodyType !== undefined ? { bodyType } : {}),
     });
     const report = await inspectAssetAnimationPlan(plan, {
       store: runtime.store,
       adapter: createNodeCanvasAdapter({ assetStore: runtime.store }),
       scope: {
-        ...(typeName ? { typeName } : {}),
-        ...(bodyType ? { bodyType } : {}),
+        ...(typeName !== undefined ? { typeName } : {}),
+        ...(bodyType !== undefined ? { bodyType } : {}),
       },
     });
     return commandOk('catalog audit-animations', report, warnings);

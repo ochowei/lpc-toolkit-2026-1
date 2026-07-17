@@ -128,6 +128,8 @@ describe('main json behavior', () => {
     [['--animation', 'wlak'], 'unknown_animation', 'wlak'],
     [['--animation', 'walk', '--type', 'hat'], 'unknown_type_name', 'hat'],
     [['--animation', 'walk', '--body-type', 'robot'], 'body_type_invalid', 'robot'],
+    [['--animation', 'walk', '--type', ''], 'unknown_type_name', ''],
+    [['--animation', 'walk', '--body-type', ''], 'body_type_invalid', ''],
   ])('returns structured animation audit validation errors for %j', async (flags, code, pathValue) => {
     const stdout: string[] = [];
     const runtime = createRuntime();
