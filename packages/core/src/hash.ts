@@ -323,7 +323,7 @@ export function parseHash(
 
   const warnings: HashWarning[] = [];
   const unknownKeys: TypeName[] = [];
-  const items: Record<TypeName, Selection> = {};
+  const itemEntries: Array<readonly [TypeName, Selection]> = [];
   let bodyType: BodyType = DEFAULT_BODY_TYPE;
 
   for (let [key, value] of params) {
@@ -365,14 +365,19 @@ export function parseHash(
       unknownKeys.push(key);
       continue;
     }
-    items[typeName] = buildSelection(
+    itemEntries.push([
       typeName,
-      foundItem,
-      matchedVariant,
-      matchedRecolor,
-      palettes,
-    );
+      buildSelection(
+        typeName,
+        foundItem,
+        matchedVariant,
+        matchedRecolor,
+        palettes,
+      ),
+    ]);
   }
+
+  const items = Object.fromEntries(itemEntries);
 
   // Q2 (Step 4.3): the recolor-variant match is now folded into
   // `resolveHashParam` (gated on `palettes`), using `getRecolorVariants`

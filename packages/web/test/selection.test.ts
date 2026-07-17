@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { createCatalog, type ItemDefinition } from '@lpc-toolkit/core';
+import {
+  createCatalog,
+  createPaletteCatalog,
+  parseHash,
+  type ItemDefinition,
+  type Selections,
+} from '@lpc-toolkit/core';
 import {
   orderedSelectionEntries,
   pickInitialSelections,
@@ -30,6 +36,41 @@ function makeFullCatalog() {
     'head/face_neutral.json': defn('Neutral', 'expression'),
     'hair/hair_a.json': defn('Hair A', 'hair'),
   }).catalog;
+}
+
+function decodedPrototypeSelection(): Selections {
+  const catalog = createCatalog({
+    'torso/proto-coat.json': {
+      ...defn('Proto Coat', 'coat'),
+      recolors: {
+        color_1: { material: 'cloth', palettes: ['v1'] },
+        color_2: {
+          material: 'cloth',
+          palettes: ['v1'],
+          type_name: '__proto__',
+        },
+      },
+    },
+  }).catalog;
+  const palettes = createPaletteCatalog({
+    'cloth/meta_cloth.json': {
+      type: 'material',
+      default: 'v1',
+      base: 'white',
+    },
+    'cloth/cloth_v1.json': {
+      white: ['#ffffff'],
+      crimson: ['#dc143c'],
+    },
+  }).palettes;
+  const decoded = parseHash(
+    '#sex=male&__proto__=Proto_Coat_crimson',
+    catalog,
+    palettes,
+  );
+  expect(decoded.warnings).toEqual([]);
+  expect(Object.hasOwn(decoded.selections.items, '__proto__')).toBe(true);
+  return decoded.selections;
 }
 
 describe('pickInitialSelections', () => {
@@ -160,6 +201,26 @@ describe('toSelections', () => {
     const sel = toSelections(state);
     expect('zoom' in sel).toBe(false);
   });
+
+  it('retains a validated __proto__ selection when mapping state to core', () => {
+    const decoded = decodedPrototypeSelection();
+    const state: SliceState = {
+      bodyType: decoded.bodyType,
+      selections: decoded.items,
+      anim: 'walk',
+      dir: 'down',
+      playing: true,
+      zoom: 4,
+      layout: 'single',
+    };
+
+    const selections = toSelections(state);
+
+    expect(Object.hasOwn(selections.items, '__proto__')).toBe(true);
+    expect(selections.items['__proto__']).toEqual(
+      decoded.items['__proto__'],
+    );
+  });
 });
 
 describe('sliceReducer', () => {
@@ -219,6 +280,29 @@ describe('sliceReducer', () => {
       zoom: 4,
       layout: 'single',
     });
+  });
+
+  it('applies a validated __proto__ selection without losing it', () => {
+    const decoded = decodedPrototypeSelection();
+    const s0: SliceState = {
+      bodyType: 'male',
+      selections: {},
+      anim: 'slash',
+      dir: 'left',
+      playing: false,
+      zoom: 4,
+      layout: 'single',
+    };
+
+    const applied = sliceReducer(s0, {
+      type: 'apply_selections',
+      selections: decoded,
+    });
+
+    expect(Object.hasOwn(applied.selections, '__proto__')).toBe(true);
+    expect(applied.selections['__proto__']).toEqual(
+      decoded.items['__proto__'],
+    );
   });
 
   it('preserves decoded selection variants for sprite path composition', () => {
