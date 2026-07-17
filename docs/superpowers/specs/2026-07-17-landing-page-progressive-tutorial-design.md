@@ -57,7 +57,8 @@ the CLI while keeping attribution with the result.
 The hero displays a real 64×64 farmer preview at a pixel-preserving scale. The
 preview is generated from the public CLI's farmer preset, not hand-drawn or
 substituted with unrelated artwork. The checked-in landing artifacts are kept
-together under `packages/web/public/landing/`:
+together under `packages/web/src/assets/landing/` so Vite bundles them into
+both the normal web build and the CLI embedded build:
 
 ```text
 hero.preview.png
@@ -65,12 +66,13 @@ hero.credits.txt
 hero.credits.csv
 ```
 
-The page links to `/landing/hero.credits.txt` and
-`/landing/hero.credits.csv` beside the image. The credit files preserve the
-matching source and license entries from the active `CREDITS.csv`. These files
-are generated as one attributed visual set; the implementation must not add
-the PNG without its matching credits. The later CLI output example still shows
-the metadata JSON produced by `character preview`.
+The component imports the PNG normally and imports both credit files with
+Vite's `?url` suffix, then links those bundled URLs beside the image. The
+credit files preserve the matching source and license entries from the active
+`CREDITS.csv`. These files are generated as one attributed visual set; the
+implementation must not add the PNG without its matching credits. The later
+CLI output example still shows the metadata JSON produced by
+`character preview`.
 
 The hero has exactly two decisions:
 
