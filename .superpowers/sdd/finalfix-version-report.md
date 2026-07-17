@@ -20,7 +20,7 @@ rtk node /Users/william/.agents/skills/releasing-lpc-toolkit/scripts/audit-relea
   --version 0.2.0
 ```
 
-Result at `b00cda4699f8c07e02f100bf711adff5c1713ccf`:
+Final result at `fbf6122e687f50b654b927ffb06367d85e293683`:
 
 - CLI package: `0.2.0`
 - plugin manifest: `0.2.0`
@@ -30,11 +30,14 @@ Result at `b00cda4699f8c07e02f100bf711adff5c1713ccf`:
 - next computed RC: `v0.2.0-rc.1`
 - `upstream/` changed: no
 - `asset-release.json` changed: no
-- expected blockers: `detached_head`, `worktree_dirty`
+- worktree clean: yes
+- remaining blocker: `detached_head`
 
-The dirty entries belong to concurrent viewer work and were neither staged nor
-committed here. Detached HEAD is the expected shared-worktree environment. No
-release transition was attempted.
+An earlier audit at `b00cda4699f8c07e02f100bf711adff5c1713ccf`
+also reported `worktree_dirty` because concurrent viewer runtime edits had not
+yet been committed. That blocker was transient and historical: the final audit
+is clean. Detached HEAD is the expected shared-worktree environment. No release
+transition was attempted.
 
 ## RED / GREEN Evidence
 
@@ -48,6 +51,11 @@ RED was observed before production changes:
   manifest `0.1.0`.
 - repository verification later exposed one additional RED assertion in the
   root README documentation contract for `>=0.1.4 <0.2.0`.
+- fresh baseline agent `/root/plugin_skill_baseline_eval`, using only the
+  pre-change snapshot at `8a95a91`, decided `Proceed: CLI 0.1.4 is compatible`
+  from the old `>=0.1.4 <0.2.0` guidance while also requiring the viewer,
+  sheet, metadata, TXT credits, and CSV credits. This reproduced the old
+  version/capability contradiction in actual skill use.
 
 GREEN evidence:
 
@@ -57,11 +65,17 @@ GREEN evidence:
 - root README documentation contract: 21 passed;
 - full CLI suite: 417 passed, 1 skipped;
 - full repository `rtk pnpm verify`: PASS.
+- fresh current agent `/root/plugin_skill_current_eval`, using only the current
+  skill, stopped CLI `0.1.4` with `cli_version_unsupported`, required
+  `>=0.2.0 <0.3.0`, did not auto-upgrade, and then retrieved the complete
+  sheet/viewer/metadata/TXT/CSV/ZIP and path-verification checklist.
 
-The existing checker test is also the concise skill application/retrieval test:
-it resolves the installed skill by absolute path and executes the checker from
-an unrelated working directory. The CLI plugin-contract test parses every
-documented command against the generated command specification.
+The isolated baseline/current agent pair above is the Writing Skills
+application/retrieval RED/GREEN evidence. Separately, the Node checker test is
+executable checker validation: it resolves the installed skill by absolute path
+and executes the checker from an unrelated working directory. The CLI
+plugin-contract test mechanically parses every documented command against the
+generated command specification.
 
 ## Version and Contract Surfaces
 
@@ -132,7 +146,9 @@ on DNS or local socket restrictions. No repository dependency was added.
 
 - `b00cda4699f8c07e02f100bf711adff5c1713ccf` —
   `chore(release): align CLI and plugin 0.2.0`
+- `fbf6122e687f50b654b927ffb06367d85e293683` —
+  `docs(release): record 0.2.0 alignment evidence`
 
-Remaining release blockers are intentional: the worktree is detached and has
-concurrent uncommitted viewer files. Stable `v0.2.0` must remain absent until a
-separately authorized RC and stable release workflow occurs.
+The worktree is clean. The only remaining release blocker is the intentional
+detached HEAD. Stable `v0.2.0` must remain absent until a separately authorized
+RC and stable release workflow occurs.
