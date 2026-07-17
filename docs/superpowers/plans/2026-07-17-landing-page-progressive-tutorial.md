@@ -128,7 +128,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- landing-artifacts.test.ts
 
 Expected: PASS with one passing test.
 
-- [ ] **Step 5: Commit the attributed visual set**
+- [x] **Step 5: Commit the attributed visual set**
 
 Run:
 
@@ -151,6 +151,7 @@ command results under this task before beginning Task 2.
   RED as expected with `ENOENT` for `hero.preview.png`.
 - Verification: `rtk pnpm --filter @lpc-toolkit/web test -- landing-artifacts.test.ts`
   PASS (1 test).
+- Commit: `f1810b9ab02df2a37d9e59bb8da0f9d168f1c557`
 
 ---
 
@@ -165,7 +166,7 @@ command results under this task before beginning Task 2.
 - Consumes: `LandingPageProps.onNavigate(route: NavigableAppRoute): void`, the existing `Button` component with `asChild`, and Task 1's three bundled asset URLs.
 - Produces: unchanged `LandingPage({ onNavigate }: LandingPageProps): JSX.Element`; one Composer callback action, one `#cli-quick-start` anchor, and bundled credit links.
 
-- [ ] **Step 1: Replace the focused test with progressive-tutorial expectations**
+- [x] **Step 1: Replace the focused test with progressive-tutorial expectations**
 
 Replace `packages/web/test/landing-page.test.tsx` with:
 
@@ -228,7 +229,7 @@ describe('LandingPage', () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused page test and confirm RED**
+- [x] **Step 2: Run the focused page test and confirm RED**
 
 Run:
 
@@ -239,7 +240,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx
 Expected: FAIL because the current page lacks the outcome headline, attributed
 preview image, CLI anchor, 205 MB guidance, and reduced reference content.
 
-- [ ] **Step 3: Implement the progressive landing page**
+- [x] **Step 3: Implement the progressive landing page**
 
 Replace `packages/web/src/components/landing-page.tsx` with:
 
@@ -465,7 +466,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
 }
 ```
 
-- [ ] **Step 4: Run focused tests and confirm GREEN**
+- [x] **Step 4: Run focused tests and confirm GREEN**
 
 Run:
 
@@ -486,6 +487,20 @@ rtk git commit -m "feat(web): add progressive landing tutorial"
 
 After committing, append the implementation note, full hash, and RED/GREEN
 command results under this task before beginning Task 3.
+
+- Implementation note: Replaced the linear reference inventory with an
+  outcome-led hero, one Composer action, a CLI anchor, three-command quick
+  start, bundled farmer preview and credit links, exact preview output tree,
+  secondary customization, one final render command, and a canonical README
+  link. Removed landing-level pagination, selection-file, and token reference
+  content.
+- Verification: `rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx`
+  RED as expected at the missing outcome headline.
+- Verification: `rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifacts.test.ts`
+  initially FAIL because the required attribution sentence contained an added
+  clause before its period; production copy was split without weakening it.
+- Verification: `rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifacts.test.ts`
+  PASS (2 tests).
 
 ---
 
