@@ -49,7 +49,7 @@ const cliReadmeUrl =
   'https://github.com/ochowei/lpc-toolkit-2026-1/blob/main/packages/cli/README.md';
 
 const codeClassName =
-  'block overflow-x-auto rounded-md bg-[var(--bg-deep)] px-3 py-2 font-mono text-sm text-text';
+  'block overflow-x-auto whitespace-nowrap rounded-md bg-[var(--bg-deep)] px-3 py-2 font-mono text-sm text-text';
 
 export function LandingPage({ onNavigate }: LandingPageProps) {
   return (
@@ -145,7 +145,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               beside the image.
             </p>
             <pre className={`${codeClassName} mt-4`}>
-              <code>{`characters/previews/hero/
+              <code className="whitespace-pre">{`characters/previews/hero/
 ├── hero.preview.png
 ├── hero.metadata.json
 ├── hero.credits.txt

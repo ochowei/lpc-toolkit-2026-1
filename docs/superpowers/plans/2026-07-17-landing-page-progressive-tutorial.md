@@ -29,6 +29,7 @@
 - Create `packages/web/src/landing-artifacts/hero.credits.csv`: matching machine-readable attribution for the preview.
 - Create `packages/web/test/landing-artifacts.test.ts`: enforce that the preview and both non-empty credit files remain together.
 - Modify `packages/web/test/landing-page.test.tsx`: specify the progressive tutorial, links, output tree, and removed reference content.
+- Modify `packages/web/test/app-shell.test.tsx`: keep the `/` route integration assertion aligned with the new outcome headline.
 - Modify `packages/web/src/components/landing-page.tsx`: own the static hero, tutorial, output, customization, render, and documentation-link presentation.
 - Modify `docs/superpowers/specs/2026-07-17-landing-page-progressive-tutorial-design.md`: record the embedded-build asset-location correction.
 - Modify `docs/superpowers/plans/2026-07-17-landing-page-progressive-tutorial.md`: record completed steps, commits, verification, and the final documentation-impact reassessment.
@@ -159,6 +160,7 @@ command results under this task before beginning Task 2.
 
 **Files:**
 - Modify: `packages/web/test/landing-page.test.tsx`
+- Modify: `packages/web/test/app-shell.test.tsx`
 - Modify: `packages/web/src/components/landing-page.tsx`
 - Modify: `docs/superpowers/plans/2026-07-17-landing-page-progressive-tutorial.md`
 
@@ -476,7 +478,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifac
 
 Expected: PASS with both focused test files and two passing tests.
 
-- [ ] **Step 5: Commit the progressive tutorial**
+- [x] **Step 5: Commit the progressive tutorial**
 
 Run:
 
@@ -501,6 +503,7 @@ command results under this task before beginning Task 3.
   clause before its period; production copy was split without weakening it.
 - Verification: `rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifacts.test.ts`
   PASS (2 tests).
+- Commit: `35aadc4cbba617aeec2678d579e075bb97399d79`
 
 ---
 
@@ -513,7 +516,7 @@ command results under this task before beginning Task 3.
 - Consumes: Task 1's attributed assets and Task 2's `LandingPage` implementation.
 - Produces: verification evidence for the web package, embedded CLI build input, architecture boundary, responsive layout, and repository-wide gate.
 
-- [ ] **Step 1: Run focused and package checks**
+- [x] **Step 1: Run focused and package checks**
 
 Run each command independently:
 
@@ -529,7 +532,17 @@ Expected: every command exits zero. Confirm both build output directories
 contain emitted `hero.preview`, `hero.credits`, or hashed equivalents referenced
 by the built HTML/JavaScript.
 
-- [ ] **Step 2: Verify desktop and 375-pixel rendering in a browser**
+- Verification: `rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifacts.test.ts`
+  PASS (2 tests).
+- Verification: `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS.
+- Verification: `rtk pnpm --filter @lpc-toolkit/web build` PASS. The normal
+  bundle contains the inline preview PNG and CSV data plus an emitted credits
+  TXT asset; only the repository's existing Vite chunk warnings were reported.
+- Verification: `rtk pnpm --filter @lpc-toolkit/web build:embedded` PASS. The
+  embedded bundle contains the same attributed preview artifacts.
+- Verification: `rtk pnpm check:boundaries` PASS.
+
+- [x] **Step 2: Verify desktop and 375-pixel rendering in a browser**
 
 Start the local page:
 
@@ -546,7 +559,20 @@ Inspect `/` at the default desktop viewport and at 375×844. Confirm:
 - the TXT and CSV links resolve successfully; and
 - the page presents one `h1` with ordered `h2`/`h3` sections.
 
-- [ ] **Step 3: Run the common repository gate**
+- Verification: desktop browser inspection PASS at 1265 pixels wide: one
+  `h1`, six `h2` elements, six `h3` elements, ten code blocks, a loaded 64×64
+  preview, a working `#cli-quick-start` anchor, and no horizontal overflow.
+- Verification: responsive browser inspection PASS at the browser's 360-pixel
+  client width for the requested 375×844 viewport: page `scrollWidth` equals
+  `clientWidth`, all seven long command blocks scroll internally, the output
+  tree preserves line breaks, and the preview remains fully visible.
+- Verification: local HTTP requests for `hero.credits.txt` and
+  `hero.credits.csv` PASS with the expected eight matching attribution rows.
+- Implementation note: Added non-wrapping, horizontally scrollable command
+  blocks and preserved whitespace in the generated-file tree after visual
+  inspection exposed mobile command wrapping.
+
+- [x] **Step 3: Run the common repository gate**
 
 Run:
 
@@ -558,7 +584,18 @@ Expected: PASS for asset preparation, source-pin verification, boundaries,
 CLI documentation policy tests, plugin verification, workspace typechecks, and
 workspace Vitest suites.
 
-- [ ] **Step 4: Reassess CLI documentation impact**
+- Verification: the first `rtk pnpm verify` run FAILed only because
+  `packages/web/test/app-shell.test.tsx` still asserted the removed
+  `CLI quick start` heading. The integration assertion was updated to the new
+  outcome headline.
+- Verification: `rtk pnpm --filter @lpc-toolkit/web test -- app-shell.test.tsx landing-page.test.tsx landing-artifacts.test.ts`
+  PASS (5 tests).
+- Verification: the second `rtk pnpm verify` run PASSed: core 171 tests,
+  presets 3 tests, CLI 355 passed with 1 skipped, and web 684 passed with 1
+  skipped, together with source pins, boundaries, documentation policy,
+  plugin verification, and workspace typechecks.
+
+- [x] **Step 4: Reassess CLI documentation impact**
 
 Record this final matrix unless verification exposes a changed contract:
 
@@ -572,6 +609,10 @@ engineering: N/A — no command, test, or CI mapping changes
 releasing: N/A — no package, version, or publication changes
 plugin: N/A — no plugin workflow or supported CLI contract changes
 ```
+
+- Final reassessment: unchanged from the matrix above. This work updates only
+  the landing tutorial presentation and its bundled attributed example; it
+  does not change any CLI or plugin contract.
 
 - [ ] **Step 5: Commit the completed plan record**
 

@@ -34,6 +34,7 @@ describe('LandingPage', () => {
     expect(html).toContain('npx @lpc-toolkit/cli --help');
     expect(html).toContain('Node.js 22 or newer');
     expect(html).toContain('about 205 MB');
+    expect(html).toContain('overflow-x-auto whitespace-nowrap');
     expect(html).toContain('characters/previews/hero/');
     expect(html).toContain('hero.metadata.json');
     expect(html).toContain('Keep both credit files with the generated sprite.');
