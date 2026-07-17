@@ -92,7 +92,7 @@ plugin: N/A — plugin command workflow continues to use canonical selection fil
 - Consumes: core `BodyType`, `Selection`, `Selections`, and `TypeName`.
 - Produces: `SELECTION_SCHEMA`, `SelectionJsonItem`, `SelectionJson`, `ParsedSelectionJson`, `parseSelectionJson(value)`, and `selectionJsonFromCore(selections, name?)` exported from `@lpc-toolkit/core`.
 
-- [ ] **Step 1: Write the failing core compatibility tests**
+- [x] **Step 1: Write the failing core compatibility tests**
 
 Create `packages/core/test/selection-document.test.ts` with the existing CLI
 contract plus a normalized round trip:
@@ -144,7 +144,7 @@ describe('selection document', () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused test and verify the missing module failure**
+- [x] **Step 2: Run the focused test and verify the missing module failure**
 
 Run:
 
@@ -154,7 +154,7 @@ rtk pnpm --filter @lpc-toolkit/core test -- selection-document.test.ts
 
 Expected: FAIL because `../src/selection-document.js` does not exist.
 
-- [ ] **Step 3: Implement the canonical core module without changing behavior**
+- [x] **Step 3: Implement the canonical core module without changing behavior**
 
 Create `packages/core/src/selection-document.ts` by moving the current CLI
 implementation with these exact public declarations:
@@ -254,7 +254,7 @@ Export the values and types from `packages/core/src/index.ts`. Keep the CLI
 copy temporarily so Task 1 is independently green; Task 4 removes it after all
 consumers migrate.
 
-- [ ] **Step 4: Run core tests, typecheck, and boundaries**
+- [x] **Step 4: Run core tests, typecheck, and boundaries**
 
 Run:
 
@@ -266,7 +266,7 @@ rtk pnpm check:boundaries
 
 Expected: all PASS.
 
-- [ ] **Step 5: Commit and record Task 1**
+- [x] **Step 5: Commit and record Task 1**
 
 Commit product changes:
 
@@ -278,6 +278,18 @@ rtk git rev-parse HEAD
 
 Record the full hash and PASS commands under Task 1 in this plan, then commit
 the record as `docs(plan): record character JSON task 1`.
+
+**Implementation note:** Added the environment-agnostic canonical selection
+document parser/serializer to core, preserved the exact v1 schema behavior,
+and exported the new public contract. Independent task review found the task
+spec compliant and approved with no issues.
+
+**Commit:** `50b06e65ed2a900517d220e99b64b4315db61cec`
+
+**Verification:**
+- `rtk pnpm --filter @lpc-toolkit/core test -- selection-document.test.ts` PASS (6 tests)
+- `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS
+- `rtk pnpm check:boundaries` PASS
 
 ---
 
