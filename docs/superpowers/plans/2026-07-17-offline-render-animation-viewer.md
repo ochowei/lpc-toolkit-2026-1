@@ -760,7 +760,11 @@ rtk git commit -m "feat(cli): publish viewer with rendered artifacts"
 - Consumes: built `packages/cli/dist/viewer.js` and Task 2 `viewer-data.json`.
 - Produces: a committed exact generator fixture that Web Playwright opens via `file://` without importing CLI code.
 
-- [ ] **Step 1: Write the deterministic fixture generator**
+- [x] **Step 1: Write the deterministic fixture generator**
+
+  - Implementation: Added a fixed-path ESM generator that reads the shared viewer model,
+    imports the built CLI viewer, and paints a deterministic 192 × 320 RGBA sheet with
+    distinct opaque 64 × 64 cells and black 8 × 8 corner markers before writing both fixtures.
 
 Create an ESM script that:
 
@@ -774,7 +778,12 @@ Create an ESM script that:
 Use `fileURLToPath(import.meta.url)`, `path.resolve()`, `readFileSync()`, and
 `writeFileSync()`; do not accept output paths or mutate production assets.
 
-- [ ] **Step 2: Build CLI and generate the exact fixture**
+- [x] **Step 2: Build CLI and generate the exact fixture**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli build` PASS;
+    `rtk node packages/cli/scripts/generate-viewer-browser-fixture.mjs` PASS;
+    `rtk file packages/cli/test/fixtures/viewer/fixture.sheet.png` PASS —
+    192 × 320, 8-bit/color RGBA, non-interlaced PNG.
 
 Run:
 
@@ -785,7 +794,11 @@ rtk node packages/cli/scripts/generate-viewer-browser-fixture.mjs
 
 Expected: both fixture files are created; `file` reports a 192×320 RGBA PNG.
 
-- [ ] **Step 3: Add and pass the golden generator test**
+- [x] **Step 3: Add and pass the golden generator test**
+
+  - TDD: The exact equality assertion first failed with `ENOENT` while the committed HTML
+    fixture was absent; after generation, `rtk pnpm --filter @lpc-toolkit/cli test -- viewer.test.ts`
+    PASS — 1 file, 51 tests.
 
 Add a unit assertion that `renderViewerHtml(JSON.parse(viewer-data.json))`
 equals the committed `fixture.viewer.html`, then run:
@@ -796,7 +809,14 @@ rtk pnpm --filter @lpc-toolkit/cli test -- viewer.test.ts
 
 Expected: PASS and exact equality between the generator output and committed HTML.
 
-- [ ] **Step 4: Write failing Playwright coverage against the exact fixture**
+- [x] **Step 4: Write failing Playwright coverage against the exact fixture**
+
+  - TDD: The first exact `file://` run failed because generated direction stages had no
+    `data-testid="direction-stage"`; focused viewer tests separately failed for that hook and
+    the absent ` · 8 FPS` suffix. The approved minimal Task 2 correction adds both contracts.
+  - Implementation: Browser coverage verifies autoplay, all controls, synchronized four-stage
+    pixel changes and restoration, the visible one-direction stage, details and relative links,
+    reduced-motion initialization, and the visible missing-sheet error.
 
 Use `pathToFileURL()` to open the checked-in HTML. Tests must assert:
 
@@ -817,7 +837,13 @@ navigation and assert the initial toggle accessible name is `Play`. For missing
 sheet behavior, copy only the HTML to a temporary directory, open that copy,
 and assert `Could not load spritesheet: fixture.sheet.png` is visible.
 
-- [ ] **Step 5: Run Playwright and verify GREEN**
+- [x] **Step 5: Run Playwright and verify GREEN**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web test:e2e -- render-viewer.spec.ts`
+    PASS — 3 Chromium tests. The sandboxed attempt failed before Playwright at tsx IPC socket
+    creation (`listen EPERM`); rerunning the exact command with local process permission passed.
+    Direct `getImageData` was unavailable for the `file://`-loaded sheet, so typed Playwright
+    screenshots verify the rendered direction pixels without weakening direct-file coverage.
 
 Run:
 
@@ -828,7 +854,26 @@ rtk pnpm --filter @lpc-toolkit/web test:e2e -- render-viewer.spec.ts
 Expected: PASS in Chromium. The existing Web dev server may start but the test
 navigates to `file://` and makes no request to it.
 
-- [ ] **Step 6: Verify fixture determinism and commit**
+- [x] **Step 6: Verify fixture determinism and commit**
+
+  - Verification: After staging the exact fixtures, reran
+    `rtk node packages/cli/scripts/generate-viewer-browser-fixture.mjs`, then
+    `rtk git diff --exit-code -- packages/cli/test/fixtures/viewer/fixture.viewer.html packages/cli/test/fixtures/viewer/fixture.sheet.png`
+    PASS with zero fixture diff; `rtk git diff --check` PASS.
+  - Corrective commit: 08c777ba062c2564e44942330dd22f5b6d060855
+  - Task commit: 93ed3604d4e35b656b70bc64e0dd1bd8473de431
+  - CLI documentation impact reassessment (owned viewer documentation remains Task 5 scope):
+
+    ```text
+    help: update — Task 5 documents the always-produced viewer artifact
+    cli-readme: update — Task 5 documents viewer output and direct-file usage
+    root-readme: update — Task 5 updates the primary render workflow
+    landing: update — Task 5 adds the viewer tutorial handoff
+    architecture: update — Task 5 records transactional viewer publication and portability
+    engineering: N/A — verification commands and CI mapping do not change
+    releasing: N/A — packaging, versioning, and publication policy do not change
+    plugin: update — Task 5 updates render verification and handoff
+    ```
 
 Run the fixture generator a second time, then:
 
