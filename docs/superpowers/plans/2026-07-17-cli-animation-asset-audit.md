@@ -737,6 +737,9 @@ Implementation note: Implemented path-grouped inspection, referenced-cell alpha
 scanning, stable output restoration, and filesystem-aware load classification;
 directory-store and Node-canvas boundaries now retain `ENOENT`/filesystem codes
 so missing files remain findings and read failures are not decode failures.
+The final review correction makes directory `has()` suppress only verified
+`ENOENT`, routes other preflight filesystem failures into the inspector, and
+recognizes all non-`ERR_*` `E...` system codes as asset-read failures.
 
 - [x] **Step 5: Run inspector tests and verify GREEN**
 
@@ -755,6 +758,8 @@ Verification note:
   (9 tests plus one platform skip; verifies directory adapter preserves
   load-time `ENOENT`).
 - `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+- Final review correction: `rtk pnpm --filter @lpc-toolkit/cli test -- animation-audit.test.ts asset-store.test.ts`
+  PASS (18 tests, one existing platform skip); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
 
 - [x] **Step 6: Commit the inspector**
 
@@ -770,6 +775,8 @@ Commit note:
   (`feat(cli): inspect animation audit assets`).
 - Review correction: `a667a4fd5878c239533f69489799c84642e42ddc`
   (`fix(cli): classify animation audit read failures`).
+- Final preflight correction: `c5046f7c9bd615180d4ebb35fea290e3932da2a4`
+  (`fix(cli): preserve animation audit preflight errors`).
 
 - [x] **Step 7: Record Task 3 evidence in this plan**
 
@@ -801,6 +808,15 @@ Review-fix verification:
 
 - `rtk pnpm --filter @lpc-toolkit/cli test -- animation-audit.test.ts asset-store.test.ts` PASS
   (15 tests, one existing platform skip).
+- `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+
+Final preflight-fix verification:
+
+- RED: `rtk pnpm --filter @lpc-toolkit/cli test -- animation-audit.test.ts asset-store.test.ts`
+  FAIL (preflight `EACCES` escaped, directory `ELOOP` was suppressed, and
+  `EOVERFLOW` was labeled `image_decode_failed`).
+- GREEN: `rtk pnpm --filter @lpc-toolkit/cli test -- animation-audit.test.ts asset-store.test.ts`
+  PASS (18 tests, one existing platform skip).
 - `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
 
 CLI documentation impact reassessment for Task 3:
