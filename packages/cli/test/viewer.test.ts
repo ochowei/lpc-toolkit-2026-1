@@ -4,6 +4,46 @@ import viewerData from './fixtures/viewer/viewer-data.json';
 
 const model = viewerData as RenderViewerModel;
 
+const viewerFileFields = [
+  'sheet.fileName',
+  'files.metadata',
+  'files.creditsTxt',
+  'files.creditsCsv',
+] as const;
+
+const unsafeFileNames = [
+  '/tmp/fixture.sheet.png',
+  'C:\\temp\\fixture.sheet.png',
+  'https://example.com/fixture.sheet.png',
+  'javascript:alert(1)',
+  '../fixture.sheet.png',
+  './fixture.sheet.png',
+  'nested/fixture.sheet.png',
+  'nested\\fixture.sheet.png',
+  '',
+  '.',
+  '..',
+] as const;
+
+type ViewerFileField = (typeof viewerFileFields)[number];
+
+function withViewerFile(field: ViewerFileField, fileName: string): RenderViewerModel {
+  if (field === 'sheet.fileName') {
+    return { ...model, sheet: { ...model.sheet, fileName } };
+  }
+  if (field === 'files.metadata') {
+    return { ...model, files: { ...model.files, metadata: fileName } };
+  }
+  if (field === 'files.creditsTxt') {
+    return { ...model, files: { ...model.files, creditsTxt: fileName } };
+  }
+  return { ...model, files: { ...model.files, creditsCsv: fileName } };
+}
+
+const unsafeViewerFiles = viewerFileFields.flatMap((field) =>
+  unsafeFileNames.map((fileName) => [field, fileName] as const),
+);
+
 describe('renderViewerHtml', () => {
   it('embeds one portable model and no network or absolute paths', () => {
     const html = renderViewerHtml(model);
@@ -18,6 +58,14 @@ describe('renderViewerHtml', () => {
     expect(html).not.toContain('/Users/');
     expect(html).not.toContain('C:\\');
   });
+
+  it.each(unsafeViewerFiles)(
+    'rejects unsafe portable viewer filename %s=%j before emitting HTML',
+    (field, fileName) => {
+      expect(() => renderViewerHtml(withViewerFile(field, fileName)))
+        .toThrow(/must be a portable relative basename/u);
+    },
+  );
 
   it('cannot terminate the data script with credit or warning text', () => {
     const html = renderViewerHtml({
@@ -72,5 +120,15 @@ describe('renderViewerHtml', () => {
 
     expect(runtime).toBeDefined();
     expect(() => new Function(runtime ?? '')).not.toThrow();
+  });
+
+  it('keeps generated document title copy in COPY and assigns model text via textContent', () => {
+    const html = renderViewerHtml(model);
+
+    expect(html).toContain('<title id="viewer-document-title">LPC Toolkit</title>');
+    expect(html).toContain("viewerTitle: 'Animation viewer'");
+    expect(html).toContain("document.getElementById('viewer-document-title').textContent =");
+    expect(html).toContain("model.characterName + ' — ' + COPY.viewerTitle");
+    expect(html).not.toContain('document.title = model.characterName');
   });
 });

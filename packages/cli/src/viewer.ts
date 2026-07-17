@@ -26,6 +26,23 @@ export interface RenderViewerModel {
   readonly creditsTxt: string;
 }
 
+const urlSchemePattern = /^[a-zA-Z][a-zA-Z\d+.-]*:/u;
+
+function assertPortableViewerFileName(label: string, fileName: string): void {
+  if (
+    fileName.length === 0 ||
+    fileName === '.' ||
+    fileName === '..' ||
+    fileName.includes('/') ||
+    fileName.includes('\\') ||
+    urlSchemePattern.test(fileName)
+  ) {
+    throw new Error(
+      `${label} must be a portable relative basename: ${JSON.stringify(fileName)}`,
+    );
+  }
+}
+
 function inlineJson(value: unknown): string {
   const escaped: Readonly<Record<string, string>> = {
     '<': '\\u003c',
@@ -41,12 +58,17 @@ function inlineJson(value: unknown): string {
 }
 
 export function renderViewerHtml(model: RenderViewerModel): string {
+  assertPortableViewerFileName('sheet.fileName', model.sheet.fileName);
+  assertPortableViewerFileName('files.metadata', model.files.metadata);
+  assertPortableViewerFileName('files.creditsTxt', model.files.creditsTxt);
+  assertPortableViewerFileName('files.creditsCsv', model.files.creditsCsv);
+
   return `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>LPC Toolkit offline animation viewer</title>
+  <title id="viewer-document-title">LPC Toolkit</title>
   <style>
     :root {
       color-scheme: light dark;
@@ -231,6 +253,7 @@ export function renderViewerHtml(model: RenderViewerModel): string {
       'use strict';
 
       const COPY = Object.freeze({
+        viewerTitle: 'Animation viewer',
         play: 'Play',
         pause: 'Pause',
         previousFrame: 'Previous frame',
@@ -284,7 +307,8 @@ export function renderViewerHtml(model: RenderViewerModel): string {
       const viewerError = document.getElementById('viewer-error');
 
       document.getElementById('viewer-title').textContent = model.characterName;
-      document.title = model.characterName;
+      document.getElementById('viewer-document-title').textContent =
+        model.characterName + ' — ' + COPY.viewerTitle;
       document.getElementById('animation-label').textContent = COPY.animation;
       animationSelect.setAttribute('aria-label', COPY.animation);
       previousFrame.textContent = COPY.previousFrame;
