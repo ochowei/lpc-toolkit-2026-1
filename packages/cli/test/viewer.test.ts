@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { renderViewerHtml, type RenderViewerModel } from '../src/viewer.js';
 import viewerData from './fixtures/viewer/viewer-data.json';
@@ -45,6 +47,15 @@ const unsafeViewerFiles = viewerFileFields.flatMap((field) =>
 );
 
 describe('renderViewerHtml', () => {
+  it('matches the committed browser fixture exactly', () => {
+    const fixtureHtml = readFileSync(
+      fileURLToPath(new URL('./fixtures/viewer/fixture.viewer.html', import.meta.url)),
+      'utf8',
+    );
+
+    expect(renderViewerHtml(model)).toBe(fixtureHtml);
+  });
+
   it('embeds one portable model and no network or absolute paths', () => {
     const html = renderViewerHtml(model);
 
