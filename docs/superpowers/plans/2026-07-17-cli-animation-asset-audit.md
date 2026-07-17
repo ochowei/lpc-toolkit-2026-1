@@ -596,7 +596,7 @@ rtk git commit -m "docs(plan): record Core animation audit planner"
 - Produces: `inspectAssetAnimationPlan(plan, options): Promise<AssetAnimationAuditReport>`.
 - Preserves: report findings as successful data, including per-path read/decode errors.
 
-- [ ] **Step 1: Write failing inspector tests**
+- [x] **Step 1: Write failing inspector tests**
 
 Create injected store and canvas-adapter fixtures. Use an in-memory canvas for opaque/transparent cells and make `store.has()` independent from `adapter.loadImage()` so missing and corrupt cases differ:
 
@@ -635,7 +635,7 @@ it('separates missing, blank, and unreadable files and keeps findings successful
 
 Also test that unreferenced transparent columns are ignored, repeated cycle columns are scanned once but retain every logical frame index, shared physical paths are loaded once, maximum concurrent `loadImage` calls never exceeds the injected limit, and output order remains plan order despite out-of-order promise completion.
 
-- [ ] **Step 2: Run the inspector test and verify RED**
+- [x] **Step 2: Run the inspector test and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- animation-audit.test.ts
@@ -643,7 +643,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- animation-audit.test.ts
 
 Expected: FAIL because `animation-audit.ts` does not exist.
 
-- [ ] **Step 3: Define report types and bounded inspection options**
+- [x] **Step 3: Define report types and bounded inspection options**
 
 Use these report shapes in `animation-audit.ts`:
 
@@ -705,7 +705,7 @@ export interface InspectAssetAnimationPlanOptions {
 }
 ```
 
-- [ ] **Step 4: Implement cell scanning and concurrency**
+- [x] **Step 4: Implement cell scanning and concurrency**
 
 Join a logical path to a store source with:
 
@@ -721,7 +721,7 @@ Implement a local ordered worker pool that launches at most `options.concurrency
 
 Map each `plan.errors` record into report `errors` with `consumers: [error.consumer]`, compute missing/blank/decode findings, and derive `incompleteItems` from distinct item IDs appearing in unsupported findings or consumers of missing/blank findings. Do not count inspection errors as proven incomplete items.
 
-- [ ] **Step 5: Run inspector tests and verify GREEN**
+- [x] **Step 5: Run inspector tests and verify GREEN**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- animation-audit.test.ts
@@ -730,7 +730,7 @@ rtk pnpm --filter @lpc-toolkit/cli run typecheck
 
 Expected: PASS, including the maximum-concurrency assertion.
 
-- [ ] **Step 6: Commit the inspector**
+- [x] **Step 6: Commit the inspector**
 
 ```sh
 rtk git add packages/cli/src/animation-audit.ts packages/cli/test/animation-audit.test.ts
@@ -738,13 +738,40 @@ rtk git commit -m "feat(cli): inspect animation audit assets"
 rtk git rev-parse HEAD
 ```
 
-- [ ] **Step 7: Record Task 3 evidence in this plan**
+- [x] **Step 7: Record Task 3 evidence in this plan**
 
 Record implementation, full product commit hash, and both PASS commands, then commit the plan update:
 
 ```sh
 rtk git add docs/superpowers/plans/2026-07-17-cli-animation-asset-audit.md
 rtk git commit -m "docs(plan): record CLI animation inspection"
+```
+
+Implementation note: Added the CLI-only asynchronous inspector with injected
+asset-store/canvas seams, per-path read/decode failures as successful report
+data, referenced-cell alpha scanning, and path-grouped bounded loading that
+preserves plan-order findings.
+
+Commit: `faa676e359a2300db772b229962f7b3eb1bd48f5`
+
+Verification:
+
+- `rtk pnpm --filter @lpc-toolkit/cli test -- animation-audit.test.ts` PASS
+  (RED before implementation: FAIL because `animation-audit.ts` did not exist;
+  GREEN: 4 tests passed, including bounded concurrency and shared-path loading).
+- `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS
+
+CLI documentation impact reassessment for Task 3:
+
+```text
+help: N/A — no command is wired until Task 4
+cli-readme: N/A — no public command contract exists yet
+root-readme: N/A — no primary workflow changes
+landing: N/A — no landing-page workflow changes
+architecture: N/A — established Core-plan/CLI-runtime boundary is preserved
+engineering: N/A — verification and CI commands are unchanged
+releasing: N/A — package and publication flows are unchanged
+plugin: N/A — plugin behavior is unchanged
 ```
 
 ---
