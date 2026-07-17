@@ -635,6 +635,10 @@ it('separates missing, blank, and unreadable files and keeps findings successful
 
 Also test that unreferenced transparent columns are ignored, repeated cycle columns are scanned once but retain every logical frame index, shared physical paths are loaded once, maximum concurrent `loadImage` calls never exceeds the injected limit, and output order remains plan order despite out-of-order promise completion.
 
+Implementation note: Added in-memory adapter/store coverage for missing, blank,
+decode, read, shared-path, cell-selection, bounded-concurrency, and plan-order
+outcomes; review follow-up adds adapter-thrown `ENOENT` and `EACCES` cases.
+
 - [x] **Step 2: Run the inspector test and verify RED**
 
 ```sh
@@ -642,6 +646,11 @@ rtk pnpm --filter @lpc-toolkit/cli test -- animation-audit.test.ts
 ```
 
 Expected: FAIL because `animation-audit.ts` does not exist.
+
+Verification note: `rtk pnpm --filter @lpc-toolkit/cli test -- animation-audit.test.ts`
+was observed FAIL before the original implementation because the module did not
+exist; the review follow-up was observed FAIL for the new `ENOENT` missing-file
+and `EACCES` asset-read expectations.
 
 - [x] **Step 3: Define report types and bounded inspection options**
 
@@ -705,6 +714,9 @@ export interface InspectAssetAnimationPlanOptions {
 }
 ```
 
+Implementation note: Defined immutable report finding/error/summary types and
+the injected store, canvas-adapter, scope, and bounded-concurrency options.
+
 - [x] **Step 4: Implement cell scanning and concurrency**
 
 Join a logical path to a store source with:
@@ -721,6 +733,11 @@ Implement a local ordered worker pool that launches at most `options.concurrency
 
 Map each `plan.errors` record into report `errors` with `consumers: [error.consumer]`, compute missing/blank/decode findings, and derive `incompleteItems` from distinct item IDs appearing in unsupported findings or consumers of missing/blank findings. Do not count inspection errors as proven incomplete items.
 
+Implementation note: Implemented path-grouped inspection, referenced-cell alpha
+scanning, stable output restoration, and filesystem-aware load classification;
+directory-store and Node-canvas boundaries now retain `ENOENT`/filesystem codes
+so missing files remain findings and read failures are not decode failures.
+
 - [x] **Step 5: Run inspector tests and verify GREEN**
 
 ```sh
@@ -730,6 +747,15 @@ rtk pnpm --filter @lpc-toolkit/cli run typecheck
 
 Expected: PASS, including the maximum-concurrency assertion.
 
+Verification note:
+
+- `rtk pnpm --filter @lpc-toolkit/cli test -- animation-audit.test.ts` PASS
+  (original GREEN: 4 tests; review follow-up: 6 tests).
+- `rtk pnpm --filter @lpc-toolkit/cli test -- asset-store.test.ts` PASS
+  (9 tests plus one platform skip; verifies directory adapter preserves
+  load-time `ENOENT`).
+- `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+
 - [x] **Step 6: Commit the inspector**
 
 ```sh
@@ -737,6 +763,13 @@ rtk git add packages/cli/src/animation-audit.ts packages/cli/test/animation-audi
 rtk git commit -m "feat(cli): inspect animation audit assets"
 rtk git rev-parse HEAD
 ```
+
+Commit note:
+
+- Original inspector: `faa676e359a2300db772b229962f7b3eb1bd48f5`
+  (`feat(cli): inspect animation audit assets`).
+- Review correction: `a667a4fd5878c239533f69489799c84642e42ddc`
+  (`fix(cli): classify animation audit read failures`).
 
 - [x] **Step 7: Record Task 3 evidence in this plan**
 
@@ -746,6 +779,9 @@ Record implementation, full product commit hash, and both PASS commands, then co
 rtk git add docs/superpowers/plans/2026-07-17-cli-animation-asset-audit.md
 rtk git commit -m "docs(plan): record CLI animation inspection"
 ```
+
+Plan-record commit: `c4c4cdcb27dbc15e2634545e7745dcb7fa50826c`
+(`docs(plan): record CLI animation inspection`).
 
 Implementation note: Added the CLI-only asynchronous inspector with injected
 asset-store/canvas seams, per-path read/decode failures as successful report
@@ -760,6 +796,12 @@ Verification:
   (RED before implementation: FAIL because `animation-audit.ts` did not exist;
   GREEN: 4 tests passed, including bounded concurrency and shared-path loading).
 - `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS
+
+Review-fix verification:
+
+- `rtk pnpm --filter @lpc-toolkit/cli test -- animation-audit.test.ts asset-store.test.ts` PASS
+  (15 tests, one existing platform skip).
+- `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
 
 CLI documentation impact reassessment for Task 3:
 
