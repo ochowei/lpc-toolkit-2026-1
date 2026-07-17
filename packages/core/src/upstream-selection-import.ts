@@ -218,7 +218,7 @@ function importV2(
     );
   }
 
-  const items: Record<TypeName, Selection> = {};
+  const itemEntries: Array<readonly [TypeName, Selection]> = [];
   for (const [typeName, rawSelection] of Object.entries(record.selections)) {
     const path = `selections.${typeName}`;
     if (!isRecord(rawSelection)) {
@@ -256,13 +256,15 @@ function importV2(
       rawSelection.recolor,
       `${path}.recolor`,
     );
-    items[typeName] = {
+    itemEntries.push([typeName, {
       typeName,
       name: item.name,
       ...(variant ? { variant } : {}),
       ...(recolor ? { recolor } : {}),
-    };
+    }]);
   }
+
+  const items = Object.fromEntries(itemEntries);
 
   return importedDocument(
     'upstream-v2',

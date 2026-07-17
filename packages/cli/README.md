@@ -171,7 +171,8 @@ The npm package does not contain the art archive. The first asset-dependent
 command downloads a pinned asset manifest and about 205 MB of compressed assets
 from the project's GitHub release. Download, verification, extraction, and
 ready progress is written to stderr so stdout remains safe for `--json` output.
-`--help`, token encoding, and `preset list` do not prepare the managed cache.
+`--help`, `--version`, `token decode`, `preset list`, `character list`, and
+`character create` without `--preset` do not prepare the managed cache.
 
 The default cache root is platform-specific:
 

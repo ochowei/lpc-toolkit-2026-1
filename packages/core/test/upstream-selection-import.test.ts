@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   createCatalog,
+  decodeSelectionToken,
+  encodeSelectionToken,
   importSelectionDocument,
+  parseHash,
+  serializeHash,
   type FilePath,
   type ItemDefinition,
   type PaletteMetadata,
@@ -128,6 +132,48 @@ describe('importSelectionDocument', () => {
     });
   });
 
+  it('round-trips imported multi-recolor selections through hashes and tokens', () => {
+    const imported = importSelectionDocument({
+      version: 2,
+      bodyType: 'male',
+      selections: {
+        coat: { itemId: 'coat', recolor: 'ulpc.blue' },
+        trim: { itemId: 'coat', subId: 1, recolor: 'ulpc.gold' },
+      },
+    }, context);
+    const expected = imported.parsed.selections;
+
+    const hash = serializeHash(expected);
+    const decodedHash = parseHash(hash, context.catalog, context.palettes);
+    const token = encodeSelectionToken(expected);
+    const decodedToken = decodeSelectionToken(
+      token,
+      context.catalog,
+      context.palettes,
+    );
+
+    expect(decodedHash.warnings).toEqual([]);
+    expect(decodedHash.selections).toEqual(expected);
+    expect(decodedToken.warnings).toEqual([]);
+    expect(decodedToken.selections).toEqual(expected);
+  });
+
+  it.each([
+    ['invalid sub-recolor', 'ulpc.silver'],
+    ['primary variant on a sub-selection', 'long'],
+  ])('rejects %s while decoding a hash', (_label, value) => {
+    const decoded = parseHash(
+      `sex=male&trim=Coat_${value}`,
+      context.catalog,
+      context.palettes,
+    );
+
+    expect(decoded.selections.items).toEqual({});
+    expect(decoded.warnings).toEqual([
+      { key: 'trim', value: `Coat_${value}`, reason: 'unknown_item' },
+    ]);
+  });
+
   it('imports upstream v1 through its absolute URL hash', () => {
     const result = importSelectionDocument({
       version: 1,
@@ -175,6 +221,74 @@ describe('importSelectionDocument', () => {
         trim: { name: 'Coat', recolor: 'ulpc.gold' },
       },
     });
+  });
+
+  it('maps a present non-string canonical name to invalid_selection_json', () => {
+    expect(() => importSelectionDocument({
+      schema: 'lpc-toolkit.selection.v1',
+      name: 7,
+      bodyType: 'male',
+      items: {},
+    }, context)).toThrowError(
+      expect.objectContaining({ code: 'invalid_selection_json' }),
+    );
+  });
+
+  it('rejects a canonical __proto__ type instead of importing a partial candidate', () => {
+    const value = JSON.parse(`{
+      "schema": "lpc-toolkit.selection.v1",
+      "bodyType": "male",
+      "items": {
+        "body": { "name": "Body Color", "recolor": "ulpc.light" },
+        "__proto__": { "name": "Coat" }
+      }
+    }`) as unknown;
+
+    expect(() => importSelectionDocument(value, context)).toThrowError(
+      expect.objectContaining({
+        code: 'unknown_upstream_item',
+        path: 'items.__proto__',
+      }),
+    );
+  });
+
+  it('preserves an upstream v2 __proto__ selection through catalog validation', () => {
+    const protoContext: SelectionDocumentImportContext = {
+      catalog: createCatalog({
+        ...catalogRecords,
+        'torso/proto.json': {
+          name: 'Proto Coat',
+          type_name: 'coat',
+          animations: ['walk'],
+          credits: [],
+          recolors: {
+            color_1: { material: 'cloth', palettes: ['ulpc'] },
+            color_2: {
+              material: 'metal',
+              palettes: ['ulpc'],
+              type_name: '__proto__',
+            },
+          },
+          layer_1: { zPos: 10, male: 'torso/proto/' },
+        },
+      }).catalog,
+      palettes,
+    };
+    const value = JSON.parse(`{
+      "version": 2,
+      "bodyType": "male",
+      "selections": {
+        "body": { "itemId": "body", "recolor": "ulpc.light" },
+        "__proto__": { "itemId": "proto", "recolor": "ulpc.missing" }
+      }
+    }`) as unknown;
+
+    expect(() => importSelectionDocument(value, protoContext)).toThrowError(
+      expect.objectContaining({
+        code: 'invalid_selection_recolor',
+        path: 'selections.__proto__.recolor',
+      }),
+    );
   });
 
   it.each([

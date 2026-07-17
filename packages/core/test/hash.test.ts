@@ -184,6 +184,29 @@ describe('parseHash', () => {
     ]);
   });
 
+  it('without palettes, recolor sub-types retain the legacy unknown-type warning', () => {
+    const coat: ItemDefinition = {
+      name: 'Coat',
+      type_name: 'coat',
+      animations: ['walk'],
+      credits: [],
+      recolors: {
+        color_1: { material: 'cloth', palettes: ['ulpc'] },
+        color_2: {
+          material: 'metal',
+          palettes: ['ulpc'],
+          type_name: 'trim',
+        },
+      },
+    };
+
+    const decoded = parseHash('#trim=Coat_gold', makeCatalog([coat]));
+
+    expect(decoded.warnings).toEqual([
+      { key: 'trim', value: 'Coat_gold', reason: 'unknown_type_name' },
+    ]);
+  });
+
   it('applies an exact alias redirect', () => {
     const aliases = new Map<TypeName, Map<string, AliasEntry>>([
       [

@@ -1,4 +1,7 @@
-import { getRecolorVariants } from './recolor-resolve.js';
+import {
+  getRecolorVariantsForType,
+  itemSupportsSelectionType,
+} from './recolor-resolve.js';
 import type {
   AliasEntry,
   BodyType,
@@ -98,6 +101,24 @@ interface ResolveResult {
   readonly matchedRecolor: string;
 }
 
+function itemsForSelectionType(
+  typeName: TypeName,
+  catalog: Catalog,
+  includeRecolorSubTypes: boolean,
+): readonly ItemDefinition[] {
+  const items = [...(catalog.byTypeName.get(typeName) ?? [])];
+  if (!includeRecolorSubTypes) return items;
+  for (const item of catalog.byItemId.values()) {
+    if (
+      item.type_name !== typeName &&
+      itemSupportsSelectionType(item, typeName)
+    ) {
+      items.push(item);
+    }
+  }
+  return items;
+}
+
 /**
  * Port of upstream `resolveHashParamFromHashMatch` in
  * `state/resolve-hash-param.ts`. Match precedence within a name match
@@ -137,7 +158,11 @@ function resolveHashParam(
   catalog: Catalog,
   palettes: PaletteMetadata | undefined,
 ): ResolveResult {
-  const items = catalog.byTypeName.get(typeName) ?? [];
+  const items = itemsForSelectionType(
+    typeName,
+    catalog,
+    palettes !== undefined,
+  );
   const parts = nameAndVariant.split('_');
 
   for (let i = 1; i <= parts.length; i++) {
@@ -155,7 +180,11 @@ function resolveHashParam(
       let matchedRecolor = '';
 
       // Match Priority 1: Physical item variants list
-      if (item.variants && item.variants.length > 0) {
+      if (
+        item.type_name === typeName &&
+        item.variants &&
+        item.variants.length > 0
+      ) {
         for (const variant of item.variants) {
           if (variant.toLowerCase() === variantToMatch) {
             foundItem = item;
@@ -168,7 +197,11 @@ function resolveHashParam(
 
       // Match Priority 2: Recolor palette expanded variants (overrides variant on overlap)
       if (palettes) {
-        const recolorVariants = getRecolorVariants(item, palettes);
+        const recolorVariants = getRecolorVariantsForType(
+          item,
+          palettes,
+          typeName,
+        );
         for (const variant of recolorVariants) {
           const vl = variant.toLowerCase();
           if (
@@ -217,11 +250,19 @@ function buildSelection(
 ): Selection {
   const variant =
     matchedVariant ||
-    (matchedRecolor !== '' ? '' : (item.variants?.[0] ?? ''));
+    (
+      item.type_name === typeName && matchedRecolor === ''
+        ? (item.variants?.[0] ?? '')
+        : ''
+    );
   
   let recolor = matchedRecolor;
   if (!recolor && (!item.variants || item.variants.length === 0) && palettes) {
-    const recolorVariants = getRecolorVariants(item, palettes);
+    const recolorVariants = getRecolorVariantsForType(
+      item,
+      palettes,
+      typeName,
+    );
     if (recolorVariants.length > 0) {
       recolor = recolorVariants[0] ?? '';
     }
@@ -304,7 +345,10 @@ export function parseHash(
       }
     }
 
-    if (!catalog.byTypeName.has(typeName)) {
+    if (
+      itemsForSelectionType(typeName, catalog, palettes !== undefined)
+        .length === 0
+    ) {
       warnings.push({ key, value, reason: 'unknown_type_name' });
       unknownKeys.push(key);
       continue;
@@ -333,10 +377,10 @@ export function parseHash(
   // Q2 (Step 4.3): the recolor-variant match is now folded into
   // `resolveHashParam` (gated on `palettes`), using `getRecolorVariants`
   // (= upstream `recolors[0].variants`, palette-expanded). The upstream
-  // multi-recolor `recolors[i].type_name` sub-binding has no loop in this
-  // upstream snapshot and no real data uses it; `recolors[0]` faithfully
-  // covers the single-entry case. Without `palettes`, recolor-only items
-  // still surface as `unknown_item` (backward-compatible).
+  // Multi-recolor `recolors[i].type_name` sub-bindings resolve through the
+  // same type-aware recolor helpers used by canonical import validation.
+  // Without `palettes`, recolor-only items still surface as `unknown_item`
+  // (backward-compatible).
 
   return {
     selections: { bodyType, items },

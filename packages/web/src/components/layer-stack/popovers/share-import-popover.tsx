@@ -166,7 +166,11 @@ export function ShareImportPopover({
           disabled={disabled || !paste.trim()}
           onClick={() => {
             try {
-              const decoded = decodeSelectionToken(paste.trim(), catalog);
+              const decoded = decodeSelectionToken(
+                paste.trim(),
+                catalog,
+                palettes,
+              );
               if (decoded.warnings.length > 0) {
                 onStatus(t('token.unresolved'));
                 return;

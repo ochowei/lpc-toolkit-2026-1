@@ -165,17 +165,20 @@ describe('renderCharacterPreview', () => {
     expect(existsSync(path.join(result.outDir, 'custom.selection.preview.png'))).toBe(true);
   }, 30000);
 
-  it('falls back to the selection file stem when metadata name is not a string', async () => {
+  it('rejects a present non-string metadata name without publishing a preview', async () => {
     const options = await createFixture();
+    const outDir = path.join(options.cwd, 'invalid-name-preview');
 
-    const result = await renderCharacterPreview({
-      ...options,
-      selectionJson: { ...options.selectionJson, name: 42 } as unknown as SelectionJson,
-    });
-
-    expect(result.outDir).toBe(
-      path.join(path.dirname(options.selectionPath), 'previews', 'custom.selection'),
+    await expect(
+      renderCharacterPreview({
+        ...options,
+        outDir,
+        selectionJson: { ...options.selectionJson, name: 42 } as unknown as SelectionJson,
+      }),
+    ).rejects.toThrow(
+      'Selection JSON name must be a string.',
     );
+    expect(existsSync(outDir)).toBe(false);
   }, 30000);
 
   it.each(['..', ' !!! '])(

@@ -50,6 +50,9 @@ describe('ShareImportPopover boundaries', () => {
     expect(source).toContain('copySelectionToken');
     expect(source).toContain('copySelectionLink');
     expect(source).toContain('dispatchRef.current');
+    expect(source).toMatch(
+      /decodeSelectionToken\(\s*paste\.trim\(\),\s*catalog,\s*palettes,\s*\)/,
+    );
     expect(source.match(/onClick=/g)).toHaveLength(5);
   });
 });

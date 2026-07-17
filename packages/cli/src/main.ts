@@ -28,6 +28,7 @@ import {
   formatProgress,
   formatHumanResponse,
   formatJsonResponse,
+  type CliIssue,
   type CliResponse,
 } from './response.js';
 import {
@@ -386,8 +387,10 @@ export async function runCli(
       );
     }
 
+    let documentWarnings: readonly CliIssue[] = [];
     try {
       const documentContext = loadSelectionDocumentContext(runtime!);
+      documentWarnings = documentContext.warnings;
       const loaded = readSelectionDocumentFile(
         io.cwd,
         selectionPath,
@@ -418,6 +421,7 @@ export async function runCli(
         commandError(
           'render',
           renderErrorIssue(error, 'Render failed.', selectionPath),
+          documentWarnings,
         ),
         parsed,
         io,
