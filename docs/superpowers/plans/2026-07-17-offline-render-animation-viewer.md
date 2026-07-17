@@ -84,7 +84,7 @@ export function describeAnimationPlayback(
 ): readonly AnimationPlaybackDescriptor[];
 ```
 
-- [ ] **Step 1: Write failing tests for standard and one-direction descriptors**
+- [x] **Step 1: Write failing tests for standard and one-direction descriptors**
 
 Create tests with this exact behavioral shape:
 
@@ -118,7 +118,9 @@ describe('describeAnimationPlayback', () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused Core test and verify RED**
+- [x] **Step 2: Run the focused Core test and verify RED**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core test -- animation-playback.test.ts` FAIL — missing `animation-playback.ts` module.
 
 Run:
 
@@ -128,7 +130,7 @@ rtk pnpm --filter @lpc-toolkit/core test -- animation-playback.test.ts
 
 Expected: FAIL because `animation-playback.ts` does not exist.
 
-- [ ] **Step 3: Implement the standard descriptor path**
+- [x] **Step 3: Implement the standard descriptor path**
 
 Create `animation-playback.ts` with strict immutable output:
 
@@ -172,13 +174,15 @@ export function describeAnimationPlayback(
 
 Export the interface and function from `packages/core/src/index.ts` in the animation section.
 
-- [ ] **Step 4: Run the focused test and verify GREEN**
+- [x] **Step 4: Run the focused test and verify GREEN**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core test -- animation-playback.test.ts` PASS — 2 tests.
 
 Run the Step 2 command.
 
 Expected: PASS for the two standard tests.
 
-- [ ] **Step 5: Add failing custom-region and ordering tests**
+- [x] **Step 5: Add failing custom-region and ordering tests**
 
 Add tests that assert:
 
@@ -215,11 +219,13 @@ it('keeps a standard name once when a custom map collides', () => {
 });
 ```
 
-- [ ] **Step 6: Run the focused test and verify RED**
+- [x] **Step 6: Run the focused test and verify RED**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core test -- animation-playback.test.ts` FAIL — custom descriptors absent.
 
 Expected: FAIL because custom regions are absent.
 
-- [ ] **Step 7: Add custom descriptions without duplicating standard names**
+- [x] **Step 7: Add custom descriptions without duplicating standard names**
 
 Before returning, append:
 
@@ -239,7 +245,11 @@ for (const [animation, region] of sheet.customAnimations ?? []) {
 }
 ```
 
-- [ ] **Step 8: Verify Core and commit**
+- [x] **Step 8: Verify Core and commit**
+
+  - Implementation: Added immutable standard and custom playback descriptors, ordered deduplication, and public Core exports.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core test -- animation-playback.test.ts` PASS — 4 tests; `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS; `rtk pnpm check:boundaries` PASS.
+  - Commit: pending implementation commit hash.
 
 Run:
 

@@ -118,13 +118,19 @@ export type { ExtractAnimationOptions } from './animation.js';
 export { extractAnimation } from './animation.js';
 
 // ==========================================
-// 11. Individual Frame Slicer
+// 11. Animation Playback Descriptions
+// ==========================================
+export type { AnimationPlaybackDescriptor } from './animation-playback.js';
+export { describeAnimationPlayback } from './animation-playback.js';
+
+// ==========================================
+// 12. Individual Frame Slicer
 // ==========================================
 export { extractAnimationFrames } from './frames.js';
 export type { ExtractFramesOptions, FrameSlice } from './frames.js';
 
 // ==========================================
-// 12. Custom Animations Layout Config
+// 13. Custom Animations Layout Config
 // ==========================================
 export type {
   AnimationRowsLayout,
@@ -138,7 +144,7 @@ export {
 } from './custom-animations.js';
 
 // ==========================================
-// 13. System Constants and Configurations
+// 14. System Constants and Configurations
 // ==========================================
 export type {
   AnimationConfig,
@@ -169,7 +175,7 @@ export {
 } from './constants.js';
 
 // ==========================================
-// 14. Image & Pixel Recolor Core
+// 15. Image & Pixel Recolor Core
 // ==========================================
 export type {
   ColorHex,
@@ -180,7 +186,7 @@ export type {
 export { recolorImage, recolorPixels } from './recolor.js';
 
 // ==========================================
-// 15. Static Asset Validator
+// 16. Static Asset Validator
 // ==========================================
 export { validateAssets } from './validation/asset-validator.js';
 export type { ValidateAssetsOptions, ValidationIssue } from './validation/asset-validator.js';
