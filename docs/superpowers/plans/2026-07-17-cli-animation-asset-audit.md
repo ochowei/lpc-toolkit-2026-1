@@ -1041,6 +1041,16 @@ rtk git add docs/superpowers/plans/2026-07-17-cli-animation-asset-audit.md
 rtk git commit -m "docs(plan): record animation audit command"
 ```
 
+#### Task 4 review follow-up
+
+Two parser/validation findings were corrected after review.
+
+- RED: `rtk pnpm --filter @lpc-toolkit/cli test -- main-assets.test.ts main-json.test.ts` FAIL — explicit empty filters returned `invalid_option` instead of their domain errors, and leading/trailing valueless repeated `--animation` occurrences reached asset preparation.
+- GREEN: `rtk pnpm --filter @lpc-toolkit/cli test -- main-assets.test.ts main-json.test.ts command-spec.test.ts animation-audit.test.ts catalog-commands.test.ts` PASS (123 tests).
+- GREEN: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+- Commit: `6953b5c6e111716b3601045ab201ae9c1ff1d783` — `fix(cli): validate empty and repeated audit options`.
+- The parser now preserves valueless repeated occurrences for option validation, and explicit empty `--type`/`--body-type` values are forwarded to the required domain checks.
+
 ---
 
 ### Task 5: Add the human worklist and public CLI documentation
