@@ -109,6 +109,66 @@ describe('planAssetAnimationAudit', () => {
     ]);
   });
 
+  it('plans native and custom walk sources together for the normal bow', () => {
+    const catalog = createCatalog({
+      'weapon/ranged/bow/normal.json': {
+        name: 'Normal',
+        type_name: 'weapon',
+        animations: ['walk', 'shoot', 'hurt', 'walk_128'],
+        variants: ['light'],
+        credits: [],
+        layer_1: {
+          zPos: -1,
+          male: 'weapon/ranged/bow/normal/universal/background/',
+        },
+        layer_2: {
+          zPos: 140,
+          male: 'weapon/ranged/bow/normal/universal/foreground/',
+        },
+        layer_3: {
+          zPos: -1,
+          custom_animation: 'walk_128',
+          male: 'weapon/ranged/bow/normal/walk/background/',
+        },
+        layer_4: {
+          zPos: 141,
+          custom_animation: 'walk_128',
+          male: 'weapon/ranged/bow/normal/walk/foreground/',
+        },
+      },
+    }).catalog;
+
+    const plan = planAssetAnimationAudit({ catalog, palettes, targets: ['walk'] });
+
+    expect(plan.unsupported).toEqual([]);
+    expect(plan.assets.map(({ path, sourceAnimation, consumers }) => ({
+      path,
+      sourceAnimation,
+      layer: consumers[0]?.layer,
+    }))).toEqual([
+      {
+        path: 'spritesheets/weapon/ranged/bow/normal/universal/background/walk/light.png',
+        sourceAnimation: 'walk',
+        layer: 'layer_1',
+      },
+      {
+        path: 'spritesheets/weapon/ranged/bow/normal/universal/foreground/walk/light.png',
+        sourceAnimation: 'walk',
+        layer: 'layer_2',
+      },
+      {
+        path: 'spritesheets/weapon/ranged/bow/normal/walk/background/light.png',
+        sourceAnimation: 'walk_128',
+        layer: 'layer_3',
+      },
+      {
+        path: 'spritesheets/weapon/ranged/bow/normal/walk/foreground/light.png',
+        sourceAnimation: 'walk_128',
+        layer: 'layer_4',
+      },
+    ]);
+  });
+
   it('plans every compatible custom source for the longsword slash target', () => {
     const catalog = createCatalog({
       'weapon/sword/longsword.json': {

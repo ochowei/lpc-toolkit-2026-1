@@ -327,7 +327,7 @@ export function planAssetAnimationAudit(
 
     for (const target of targets) {
       const native = capabilities.native.includes(target);
-      const compatibleSources = native ? [] : compatibleAnimationSources(item, target);
+      const compatibleSources = compatibleAnimationSources(item, target);
       if (!native && compatibleSources.length === 0) {
         const requirements: UnsupportedAnimationRequirement[] = [];
         const ordinaryGroups = groups.filter((group) => !group.customAnimation);
@@ -373,7 +373,10 @@ export function planAssetAnimationAudit(
         continue;
       }
 
-      for (const compatibleSource of native ? [undefined] : compatibleSources) {
+      for (const compatibleSource of [
+        ...(native ? [undefined] : []),
+        ...compatibleSources,
+      ]) {
         const sourceAnimation = compatibleSource
           ?? (VIRTUAL_ANIMATION_MAP[target as keyof typeof VIRTUAL_ANIMATION_MAP] ?? target);
         const geometry = compatibleSource ? customGeometry(compatibleSource) : standardGeometry(target);
