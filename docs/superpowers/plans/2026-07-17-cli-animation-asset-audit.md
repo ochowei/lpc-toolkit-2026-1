@@ -569,6 +569,13 @@ rtk git rev-parse HEAD
 
 - [x] **Step 8: Record Task 2 evidence in this plan**
 
+  - Implementation: Added the pure Core asset-animation audit planner with immutable public types, standard/custom geometry, path expansion, recolor-aware consumer grouping, deterministic findings, and additive `ResolvedLayer.layerNumber` metadata.
+  - Commit: `1fe99826cd94ed5b4ef6a64876e49c6fe9a92876`
+  - Follow-up deterministic-ordering fix: `a46a2ed25c9e2e389ab12cc36ae8d19a2232e142`
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-animation-audit.test.ts animation-capabilities.test.ts compose.test.ts validation/asset-validator.test.ts` PASS
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS
+  - Verification: `rtk pnpm check:boundaries` PASS
+
 Record the implementation note, full product commit hash, and both exact PASS commands, then:
 
 ```sh
