@@ -1360,3 +1360,36 @@ exit=0; output <empty>
 ```
 
 `8a62e08454a44838e9822b1e8b354649c811227b` is the prior Task 6 plan-record commit. This follow-up plan-record commit deliberately records that hash, resolving the self-reference limitation of the initial commit.
+
+---
+
+## Final-review fixes — 2026-07-17
+
+- [x] **Fix both Important final-review findings**
+  - Implementation: Core now resolves every custom source compatible with a logical target, preserves the legacy single-source helper for existing consumers, and expands one physical requirement per matching source geometry. `backslash` explicitly supplies `1h_slash` and `1h_backslash`; `halfslash` supplies `1h_halfslash`. Virtual animation compatibility remains unchanged.
+  - Regression coverage: Core uses active longsword and arming-sword shapes; CLI inspection verifies missing reverse-slash longsword PNGs are reported.
+  - Product commit: `32ea2722a57c3463bb3c59e2d64745ec8416ace1` — `fix(core): audit every compatible animation source`.
+  - TDD RED: `rtk pnpm --filter @lpc-toolkit/core test -- asset-animation-audit.test.ts` FAIL (two new cases: reverse-slash sources omitted; one-handed aliases unsupported).
+  - TDD RED: `rtk pnpm --filter @lpc-toolkit/cli test -- animation-audit.test.ts` FAIL (reverse-slash PNGs omitted from missing-file findings).
+  - GREEN: `rtk pnpm --filter @lpc-toolkit/core test -- asset-animation-audit.test.ts animation-capabilities.test.ts` PASS (14 tests).
+  - GREEN: `rtk pnpm --filter @lpc-toolkit/cli test -- animation-audit.test.ts catalog-commands.test.ts catalog-discovery.test.ts` PASS (40 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core test` PASS (17 files, 186 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test` PASS outside the sandbox for loopback web-server tests (33 files, 385 tests passed, 1 skipped).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+  - Verification: `rtk pnpm check:boundaries` PASS.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS outside the sandbox; packed install smoke passed.
+  - Verification: `rtk pnpm verify` PASS outside the sandbox; full asset, pin, boundary, plugin, typecheck, and recursive-test gate completed.
+
+### Final-review-fix documentation impact
+
+```text
+help: N/A — existing command help and option contract are unchanged.
+cli-readme: N/A — existing command documentation remains accurate.
+root-readme: N/A — no primary workflow change.
+landing: N/A — no landing-page workflow change.
+architecture: N/A — Core remains pure and package boundaries are unchanged.
+engineering: N/A — verification and CI commands are unchanged.
+releasing: N/A — package and publication workflows are unchanged.
+plugin: N/A — plugin behavior and contracts are unchanged.
+```
