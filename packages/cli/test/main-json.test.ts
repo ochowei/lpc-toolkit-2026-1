@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -10,7 +10,8 @@ import type { RuntimeAssets } from '../src/runtime-assets.js';
 function createRuntime(): RuntimeAssets {
   const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-main-json-'));
   const assetsRoot = path.join(cwd, 'assets');
-  mkdirSync(assetsRoot, { recursive: true });
+  mkdirSync(path.join(assetsRoot, 'sheet_definitions'), { recursive: true });
+  mkdirSync(path.join(assetsRoot, 'palette_definitions'), { recursive: true });
   const store = createDirectoryAssetStore(assetsRoot);
   return {
     context: createRuntimeContext({ cwd, assetsRoot, spritesheetsBaseUrl: store.baseUrl }),
@@ -61,4 +62,40 @@ describe('main json behavior', () => {
     });
     expect(code).toBe(0);
   });
+
+  it('reports the generated viewer in a successful render response', async () => {
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const runtime = createRuntime();
+    writeFileSync(path.join(runtime.context.repoRoot, 'selection.json'), JSON.stringify({
+      schema: 'lpc-toolkit.selection.v1',
+      name: 'empty-fixture',
+      bodyType: 'male',
+      items: {},
+    }));
+
+    const code = await runCli([
+      'render', '--selection', 'selection.json', '--out', 'out', '--json',
+    ], {
+      cwd: runtime.context.repoRoot,
+      stdout: (text) => stdout.push(text),
+      stderr: (text) => stderr.push(text),
+    }, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+
+    const response = JSON.parse(stdout.join('')) as {
+      readonly data: {
+        readonly artifacts: readonly { readonly type: string; readonly path: string }[];
+      };
+    };
+    const viewer = response.data.artifacts.find((artifact) => artifact.type === 'viewer');
+    expect(viewer).toEqual({
+      type: 'viewer',
+      path: path.join(runtime.context.repoRoot, 'out', 'empty-fixture.viewer.html'),
+    });
+    expect(existsSync(viewer!.path)).toBe(true);
+    expect(code).toBe(0);
+    expect(stderr).toEqual([]);
+  }, 30000);
 });
