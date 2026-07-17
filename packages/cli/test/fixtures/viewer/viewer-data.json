@@ -1,6 +1,6 @@
 {
   "characterName": "Fixture Viewer",
-  "sheet": { "fileName": "fixture.sheet.png", "width": 192, "height": 320 },
+  "sheet": { "fileName": "fixture.sheet.png", "width": 384, "height": 832 },
   "files": {
     "metadata": "fixture.metadata.json",
     "creditsTxt": "fixture.credits.txt",
@@ -15,14 +15,15 @@
     "releaseTag": "fixture-assets"
   },
   "warnings": [{ "code": "fixture_warning", "message": "Visible warning" }],
+  "skippedLayers": [],
   "animations": [
     {
       "animation": "walk", "kind": "standard", "sourceX": 0, "sourceY": 0,
       "frameSize": 64, "cycle": [0, 1, 2], "directions": 4
     },
     {
-      "animation": "tool_rod", "kind": "custom", "sourceX": 0, "sourceY": 0,
-      "frameSize": 64, "cycle": [0, 1, 2], "directions": 4
+      "animation": "oversized_spell", "kind": "custom", "sourceX": 0, "sourceY": 320,
+      "frameSize": 128, "cycle": [0, 1, 2], "directions": 4
     },
     {
       "animation": "hurt", "kind": "standard", "sourceX": 0, "sourceY": 256,

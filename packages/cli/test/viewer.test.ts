@@ -5,6 +5,16 @@ import { renderViewerHtml, type RenderViewerModel } from '../src/viewer.js';
 import viewerData from './fixtures/viewer/viewer-data.json';
 
 const model = viewerData as RenderViewerModel;
+const partialModel: RenderViewerModel = {
+  ...model,
+  characterName: 'Partial Fixture Viewer',
+  animations: [],
+  skippedLayers: [{
+    code: 'missing_sprite_path',
+    message: 'Composed sheet skipped a missing sprite path.',
+    path: 'spritesheets/body/missing.png',
+  }],
+};
 
 const viewerFileFields = [
   'sheet.fileName',
@@ -54,6 +64,15 @@ describe('renderViewerHtml', () => {
     );
 
     expect(renderViewerHtml(model)).toBe(fixtureHtml);
+  });
+
+  it('matches the committed no-animation partial browser fixture exactly', () => {
+    const fixtureHtml = readFileSync(
+      fileURLToPath(new URL('./fixtures/viewer/partial.viewer.html', import.meta.url)),
+      'utf8',
+    );
+
+    expect(renderViewerHtml(partialModel)).toBe(fixtureHtml);
   });
 
   it('embeds one portable model and no network or absolute paths', () => {
@@ -110,21 +129,59 @@ describe('renderViewerHtml', () => {
     expect(html).toContain('data-testid="viewer-error"');
     expect(html).toContain('prefers-reduced-motion: reduce');
     expect(html).toContain('image-rendering: pixelated');
+    expect(html).toContain('data-testid="partial-output"');
   });
 
-  it('contains synchronized direction-grid and fixed-step playback behavior', () => {
+  it('contains explicit responsive direction layouts and integer canvas scaling', () => {
     const html = renderViewerHtml(model);
 
     expect(html).toContain("['North', 'West', 'South', 'East']");
     expect(html).toContain("singleDirection: 'Single direction'");
+    expect(html).toContain('grid-template-columns: repeat(2, minmax(0, 1fr))');
+    expect(html).toContain('.direction-stages.single-direction');
+    expect(html).toContain('grid-template-columns: 1fr;');
+    expect(html).toContain('Math.floor(192 / selected.frameSize)');
+    expect(html).toContain("canvas.style.width = String(displaySize) + 'px'");
+    expect(html).toContain("canvas.style.height = String(displaySize) + 'px'");
+  });
+
+  it('contains synchronized modulo playback with one update for elapsed catch-up', () => {
+    const html = renderViewerHtml(model);
+
     expect(html).toContain('selected.cycle[frameIndex] || 0');
     expect(html).toContain('selected.sourceX + column * selected.frameSize');
     expect(html).toContain('selected.sourceY + directionIndex * selected.frameSize');
     expect(html).toContain('const frameDuration = 1000 / 8;');
+    expect(html).toContain('const elapsedSteps = Math.floor(accumulator / frameDuration);');
+    expect(html).toContain('frameIndex = (frameIndex + elapsedSteps) % selected.cycle.length;');
+    expect(html).not.toContain('while (accumulator >= frameDuration)');
     expect(html).toContain("' · 8 FPS'");
     expect(html).toContain('requestAnimationFrame');
     expect(html).toContain('encodeURI(model.sheet.fileName)');
     expect(html).toContain('Could not load spritesheet: ');
+  });
+
+  it('renders complete animation layout details and dedicated partial-output data', () => {
+    const html = renderViewerHtml(partialModel);
+
+    expect(html).toContain("frameSize: 'Frame size'");
+    expect(html).toContain("sourceLayout: 'Source origin / layout'");
+    expect(html).toContain("cycle: 'Cycle'");
+    expect(html).toContain("partialOutput: 'Partial output'");
+    expect(html).toContain('model.skippedLayers');
+    expect(html).toContain('spritesheets/body/missing.png');
+  });
+
+  it('emits an explicit disabled no-animation state without dereferencing a selection', () => {
+    const html = renderViewerHtml(partialModel);
+
+    expect(html).toContain("noPlayableAnimations: 'No playable animations were composed.'");
+    expect(html).toContain('const hasPlayableAnimations = model.animations.length > 0;');
+    expect(html).toContain('animationSelect.disabled = true;');
+    expect(html).toContain('playbackToggle.disabled = true;');
+    expect(html).toContain('previousFrame.disabled = true;');
+    expect(html).toContain('nextFrame.disabled = true;');
+    expect(html).toContain('scrubber.disabled = true;');
   });
 
   it('emits browser JavaScript without TypeScript-only syntax', () => {

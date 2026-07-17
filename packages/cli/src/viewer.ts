@@ -22,6 +22,7 @@ export interface RenderViewerModel {
     readonly releaseTag: string | null;
   };
   readonly warnings: readonly CliIssue[];
+  readonly skippedLayers: readonly CliIssue[];
   readonly animations: readonly AnimationPlaybackDescriptor[];
   readonly creditsTxt: string;
 }
@@ -105,9 +106,13 @@ export function renderViewerHtml(model: RenderViewerModel): string {
     }
     .direction-stages {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 1rem;
       margin-bottom: 1rem;
+    }
+    .direction-stages.single-direction {
+      grid-template-columns: minmax(0, 24rem);
+      justify-content: center;
     }
     .direction-stage {
       display: grid;
@@ -124,9 +129,7 @@ export function renderViewerHtml(model: RenderViewerModel): string {
       image-rendering: crisp-edges;
     }
     canvas {
-      width: min(100%, 12rem);
-      height: auto;
-      aspect-ratio: 1;
+      display: block;
       background:
         linear-gradient(45deg, #bbb 25%, transparent 25%),
         linear-gradient(-45deg, #bbb 25%, transparent 25%),
@@ -169,6 +172,8 @@ export function renderViewerHtml(model: RenderViewerModel): string {
     }
     [hidden] { display: none !important; }
     @media (max-width: 42rem) {
+      .direction-stages,
+      .direction-stages.single-direction { grid-template-columns: 1fr; }
       .details-grid { grid-template-columns: 1fr; }
       .playback-controls > button { flex: 1 1 auto; }
     }
@@ -224,6 +229,9 @@ export function renderViewerHtml(model: RenderViewerModel): string {
                 <tr>
                   <th id="animation-column" scope="col"></th>
                   <th id="kind-column" scope="col"></th>
+                  <th id="frame-size-column" scope="col"></th>
+                  <th id="source-layout-column" scope="col"></th>
+                  <th id="cycle-column" scope="col"></th>
                   <th id="frames-column" scope="col"></th>
                   <th id="directions-column" scope="col"></th>
                 </tr>
@@ -235,6 +243,10 @@ export function renderViewerHtml(model: RenderViewerModel): string {
           <p id="source-summary"></p>
           <h2 id="warnings-heading"></h2>
           <ul id="warnings-list"></ul>
+          <section id="partial-output" data-testid="partial-output" hidden>
+            <h2 id="partial-output-heading"></h2>
+            <ul id="partial-output-list"></ul>
+          </section>
           <h2 id="artifacts-heading"></h2>
           <nav class="artifact-links" aria-labelledby="artifacts-heading">
             <a id="metadata-link"></a>
@@ -267,6 +279,9 @@ export function renderViewerHtml(model: RenderViewerModel): string {
         artifacts: 'Artifacts',
         source: 'Portable source',
         kind: 'Kind',
+        frameSize: 'Frame size',
+        sourceLayout: 'Source origin / layout',
+        cycle: 'Cycle',
         frames: 'Frames',
         directions: 'Directions',
         frame: 'Frame',
@@ -278,6 +293,8 @@ export function renderViewerHtml(model: RenderViewerModel): string {
         custom: 'custom',
         license: 'license',
         none: 'None',
+        partialOutput: 'Partial output',
+        noPlayableAnimations: 'No playable animations were composed.',
         missingSheet: 'Could not load spritesheet: ',
         directionNames: Object.freeze(['North', 'West', 'South', 'East']),
       });
@@ -288,9 +305,11 @@ export function renderViewerHtml(model: RenderViewerModel): string {
       const image = new Image();
       image.src = encodeURI(model.sheet.fileName);
 
-      let selected = model.animations[0];
+      const hasPlayableAnimations = model.animations.length > 0;
+      let selected = model.animations[0] || null;
       let frameIndex = 0;
-      let playing = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      let playing = hasPlayableAnimations &&
+        !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       let lastTime = performance.now();
       let accumulator = 0;
       const frameDuration = 1000 / 8;
@@ -320,10 +339,14 @@ export function renderViewerHtml(model: RenderViewerModel): string {
       document.getElementById('animation-table-heading').textContent = COPY.animations;
       document.getElementById('animation-column').textContent = COPY.animation;
       document.getElementById('kind-column').textContent = COPY.kind;
+      document.getElementById('frame-size-column').textContent = COPY.frameSize;
+      document.getElementById('source-layout-column').textContent = COPY.sourceLayout;
+      document.getElementById('cycle-column').textContent = COPY.cycle;
       document.getElementById('frames-column').textContent = COPY.frames;
       document.getElementById('directions-column').textContent = COPY.directions;
       document.getElementById('source-heading').textContent = COPY.source;
       document.getElementById('warnings-heading').textContent = COPY.warnings;
+      document.getElementById('partial-output-heading').textContent = COPY.partialOutput;
       document.getElementById('artifacts-heading').textContent = COPY.artifacts;
       document.getElementById('credits-heading').textContent = COPY.credits;
 
@@ -369,9 +392,16 @@ export function renderViewerHtml(model: RenderViewerModel): string {
       const animationTableBody = document.getElementById('animation-table-body');
       for (const descriptor of model.animations) {
         const row = document.createElement('tr');
+        const sourceColumns = descriptor.cycle.length === 0
+          ? 0
+          : Math.max(...descriptor.cycle) + 1;
         const values = [
           descriptor.animation,
           descriptor.kind,
+          String(descriptor.frameSize) + ' × ' + String(descriptor.frameSize),
+          String(descriptor.sourceX) + ', ' + String(descriptor.sourceY) + ' · ' +
+            String(sourceColumns) + ' columns × ' + String(descriptor.directions) + ' rows',
+          descriptor.cycle.length === 0 ? COPY.none : descriptor.cycle.join(' → '),
           String(descriptor.cycle.length),
           String(descriptor.directions),
         ];
@@ -401,6 +431,15 @@ export function renderViewerHtml(model: RenderViewerModel): string {
           warningsList.append(item);
         }
       }
+      const partialOutputSection = document.getElementById('partial-output');
+      const partialOutputList = document.getElementById('partial-output-list');
+      partialOutputSection.hidden = model.skippedLayers.length === 0;
+      for (const skippedLayer of model.skippedLayers) {
+        const item = document.createElement('li');
+        item.textContent = skippedLayer.code + ': ' + skippedLayer.message +
+          (skippedLayer.path ? ' (' + skippedLayer.path + ')' : '');
+        partialOutputList.append(item);
+      }
       document.getElementById('credits-text').textContent = model.creditsTxt;
 
       function updateToggle() {
@@ -411,6 +450,7 @@ export function renderViewerHtml(model: RenderViewerModel): string {
       }
 
       function drawFrame() {
+        if (!selected) return;
         const column = selected.cycle[frameIndex] || 0;
         for (const stage of stages) {
           const context = stage.context;
@@ -431,6 +471,7 @@ export function renderViewerHtml(model: RenderViewerModel): string {
       }
 
       function updateFrame() {
+        if (!selected) return;
         scrubber.value = String(frameIndex);
         frameCounter.textContent =
           COPY.frame + ' ' + String(frameIndex + 1) + ' / ' + String(selected.cycle.length) +
@@ -439,8 +480,10 @@ export function renderViewerHtml(model: RenderViewerModel): string {
       }
 
       function configureStages() {
+        if (!selected) return;
         directionStages.replaceChildren();
         stages = [];
+        directionStages.classList.toggle('single-direction', selected.directions === 1);
         const names = selected.directions === 1
           ? [COPY.singleDirection]
           : COPY.directionNames;
@@ -451,6 +494,10 @@ export function renderViewerHtml(model: RenderViewerModel): string {
           const canvas = document.createElement('canvas');
           canvas.width = selected.frameSize;
           canvas.height = selected.frameSize;
+          const displayScale = Math.max(1, Math.floor(192 / selected.frameSize));
+          const displaySize = selected.frameSize * displayScale;
+          canvas.style.width = String(displaySize) + 'px';
+          canvas.style.height = String(displaySize) + 'px';
           canvas.setAttribute('aria-label', name);
           const caption = document.createElement('figcaption');
           caption.textContent = name;
@@ -464,7 +511,8 @@ export function renderViewerHtml(model: RenderViewerModel): string {
       }
 
       function selectAnimation() {
-        selected = model.animations[animationSelect.selectedIndex] || model.animations[0];
+        selected = model.animations[animationSelect.selectedIndex] || model.animations[0] || null;
+        if (!selected) return;
         frameIndex = 0;
         accumulator = 0;
         scrubber.max = String(Math.max(0, selected.cycle.length - 1));
@@ -474,27 +522,31 @@ export function renderViewerHtml(model: RenderViewerModel): string {
 
       animationSelect.addEventListener('change', selectAnimation);
       playbackToggle.addEventListener('click', () => {
+        if (!selected) return;
         playing = !playing;
         accumulator = 0;
         lastTime = performance.now();
         updateToggle();
       });
       previousFrame.addEventListener('click', () => {
+        if (!selected) return;
         frameIndex = (frameIndex - 1 + selected.cycle.length) % selected.cycle.length;
         updateFrame();
       });
       nextFrame.addEventListener('click', () => {
+        if (!selected) return;
         frameIndex = (frameIndex + 1) % selected.cycle.length;
         updateFrame();
       });
       scrubber.addEventListener('input', () => {
+        if (!selected) return;
         frameIndex = Number.parseInt(scrubber.value, 10);
         updateFrame();
       });
 
       image.addEventListener('load', () => {
         imageReady = true;
-        drawFrame();
+        if (selected) drawFrame();
       });
       image.addEventListener('error', () => {
         imageReady = false;
@@ -506,18 +558,33 @@ export function renderViewerHtml(model: RenderViewerModel): string {
       function tick(now) {
         const elapsed = now - lastTime;
         lastTime = now;
-        if (playing && imageReady) {
-          accumulator += elapsed;
-          while (accumulator >= frameDuration) {
-            frameIndex = (frameIndex + 1) % selected.cycle.length;
-            accumulator -= frameDuration;
+        if (playing && imageReady && selected) {
+          accumulator += Math.max(0, elapsed);
+          const elapsedSteps = Math.floor(accumulator / frameDuration);
+          if (elapsedSteps > 0) {
+            accumulator %= frameDuration;
+            frameIndex = (frameIndex + elapsedSteps) % selected.cycle.length;
             updateFrame();
           }
         }
         requestAnimationFrame(tick);
       }
 
-      selectAnimation();
+      if (hasPlayableAnimations) {
+        selectAnimation();
+      } else {
+        animationSelect.disabled = true;
+        playbackToggle.disabled = true;
+        previousFrame.disabled = true;
+        nextFrame.disabled = true;
+        scrubber.disabled = true;
+        scrubber.min = '0';
+        scrubber.max = '0';
+        scrubber.value = '0';
+        viewerError.textContent = COPY.noPlayableAnimations;
+        viewerError.hidden = false;
+        frameCounter.textContent = COPY.noPlayableAnimations;
+      }
       updateToggle();
       requestAnimationFrame(tick);
     })();

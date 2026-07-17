@@ -280,6 +280,16 @@ export async function renderSelection(
   if (options.bundleZip) {
     artifacts.push({ type: 'zip', path: zipPath });
   }
+  const skippedLayers: readonly CliIssue[] = options.allowPartial
+    ? [
+        ...composed.validationErrors,
+        ...(sheet.missingPaths ?? []).map((missingPath) => ({
+          code: 'missing_sprite_path',
+          message: 'Composed sheet skipped a missing sprite path.',
+          path: missingPath,
+        })),
+      ]
+    : [];
   const metadata = {
     schema: RENDER_METADATA_SCHEMA,
     cliVersion: CLI_VERSION,
@@ -310,16 +320,7 @@ export async function renderSelection(
       spritesheetsBaseUrl: runtime.store.baseUrl,
     },
     warnings,
-    skippedLayers: options.allowPartial
-      ? [
-          ...composed.validationErrors,
-          ...(sheet.missingPaths ?? []).map((missingPath) => ({
-            code: 'missing_sprite_path',
-            message: 'Composed sheet skipped a missing sprite path.',
-            path: missingPath,
-          })),
-        ]
-      : [],
+    skippedLayers,
   };
   const viewerModel: RenderViewerModel = {
     characterName: options.selectionName,
@@ -342,6 +343,7 @@ export async function renderSelection(
       releaseTag: runtime.releaseTag ?? null,
     },
     warnings,
+    skippedLayers,
     animations: describeAnimationPlayback(sheet),
     creditsTxt,
   };

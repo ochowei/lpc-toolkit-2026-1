@@ -236,6 +236,22 @@ async function expectPartialMissingImageOutput(
       path: 'spritesheets/body/bodies/male/walk.png',
     }),
   ]));
+  const viewerHtml = readFileSync(
+    path.join(outDir, 'partial-character.viewer.html'),
+    'utf8',
+  );
+  const viewerDataText = /<script id="viewer-data" type="application\/json">([^<]*)<\/script>/u
+    .exec(viewerHtml)?.[1];
+  expect(viewerDataText).toBeDefined();
+  const viewerModel = JSON.parse(viewerDataText ?? '{}') as {
+    readonly skippedLayers: readonly { readonly code: string; readonly path?: string }[];
+  };
+  expect(viewerModel.skippedLayers).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      code: 'missing_sprite_path',
+      path: 'spritesheets/body/bodies/male/walk.png',
+    }),
+  ]));
 }
 
 describe('renderSelection', () => {
@@ -596,5 +612,21 @@ describe('renderSelection', () => {
     };
     expect(metadata.effectiveLicense).toBeNull();
     expect(metadata.credits).toMatchObject({ entries: 0, resolvedPaths: [] });
+    const viewerHtml = readFileSync(path.join(outDir, 'body-only.viewer.html'), 'utf8');
+    const viewerDataText = /<script id="viewer-data" type="application\/json">([^<]*)<\/script>/u
+      .exec(viewerHtml)?.[1];
+    expect(viewerDataText).toBeDefined();
+    const viewerModel = JSON.parse(viewerDataText ?? '{}') as {
+      readonly animations: readonly unknown[];
+      readonly skippedLayers: readonly { readonly code: string; readonly path?: string }[];
+    };
+    expect(viewerModel.animations).toEqual([]);
+    expect(viewerModel.skippedLayers).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'missing_sprite_path',
+        path: 'spritesheets/body/bodies/male/walk.png',
+      }),
+    ]));
+    expect(viewerHtml).toContain('No playable animations were composed.');
   }, 30000);
 });
