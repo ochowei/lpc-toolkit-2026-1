@@ -850,7 +850,8 @@ plugin: N/A — plugin behavior is unchanged
 - Produces: `runAnimationAuditCommand(parsed, runtime)` and public `catalog audit-animations` JSON behavior.
 - Preserves: synchronous `runCatalogCommand` for `types`, `items`, and `item`.
 
-- [ ] **Step 1: Write failing help, preflight, and JSON tests**
+- [x] **Step 1: Write failing help, preflight, and JSON tests**
+  - Added focused help, repeatable-target, no-asset preflight, validation, JSON-envelope, and custom-definition-overlay coverage.
 
 Add command-spec assertions:
 
@@ -886,7 +887,8 @@ expect(code).toBe(0);
 
 Also test unknown animation suggestions, unknown type, invalid body type, and base definition overridden by a matching `assets_custom/sheet_definitions` record.
 
-- [ ] **Step 2: Run command tests and verify RED**
+- [x] **Step 2: Run command tests and verify RED**
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- command-spec.test.ts main-assets.test.ts main-json.test.ts animation-audit.test.ts` FAIL as expected (9 missing-command/runner assertions).
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- command-spec.test.ts main-assets.test.ts main-json.test.ts animation-audit.test.ts
@@ -894,7 +896,8 @@ rtk pnpm --filter @lpc-toolkit/cli test -- command-spec.test.ts main-assets.test
 
 Expected: FAIL because the command spec, dispatch, preflight, and runner are absent.
 
-- [ ] **Step 3: Add the command specification**
+- [x] **Step 3: Add the command specification**
+  - Added the repeatable `--animation` command contract and catalog-group example without discovery pagination options.
 
 Add this `COMMAND_SPECS` entry and include the command in catalog-group examples:
 
@@ -921,7 +924,8 @@ Add this `COMMAND_SPECS` entry and include the command in catalog-group examples
 },
 ```
 
-- [ ] **Step 4: Implement validation and the async runner**
+- [x] **Step 4: Implement validation and the async runner**
+  - Added bounded deterministic input diagnostics and an async runner using merged base/custom definitions, palette loading, the active runtime `AssetStore`, and the Node canvas adapter.
 
 In `animation-audit.ts`, validate targets against `ANIMATIONS.map(({ value }) => value)`, type against `catalog.typeNames`, and body type against `BODY_TYPES`. Return the established codes `unknown_animation`, `unknown_type_name`, and `body_type_invalid`, with at most ten sorted `available` values and five edit-distance `suggestions`.
 
@@ -978,7 +982,8 @@ return commandError('catalog audit-animations', {
 });
 ```
 
-- [ ] **Step 5: Add preflight and dispatch without making existing catalog commands async**
+- [x] **Step 5: Add preflight and dispatch without making existing catalog commands async**
+  - Missing `--animation` now fails before asset preparation; only `catalog audit-animations` uses the async runner.
 
 In `preflightAssetCommand`, accept `audit-animations` as a known catalog subcommand and add:
 
@@ -1005,7 +1010,9 @@ const response = parsed.command[1] === 'audit-animations'
 return writeResponse(response, parsed, io, 'Catalog command completed.\n');
 ```
 
-- [ ] **Step 6: Run command tests and verify GREEN**
+- [x] **Step 6: Run command tests and verify GREEN**
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- command-spec.test.ts main-assets.test.ts main-json.test.ts animation-audit.test.ts catalog-commands.test.ts` PASS (119 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- command-spec.test.ts main-assets.test.ts main-json.test.ts animation-audit.test.ts catalog-commands.test.ts
@@ -1014,7 +1021,8 @@ rtk pnpm --filter @lpc-toolkit/cli run typecheck
 
 Expected: PASS; findings return code `0`, invalid input returns code `1`, and existing catalog tests remain green.
 
-- [ ] **Step 7: Commit command wiring**
+- [x] **Step 7: Commit command wiring**
+  - Commit: `f7fb847f6321caeaefcd9d636ef0b058d10158d0` — `feat(cli): add animation asset audit command`.
 
 ```sh
 rtk git add packages/cli/src/animation-audit.ts packages/cli/src/command-spec.ts packages/cli/src/main.ts packages/cli/test/animation-audit.test.ts packages/cli/test/command-spec.test.ts packages/cli/test/main-assets.test.ts packages/cli/test/main-json.test.ts
@@ -1022,7 +1030,9 @@ rtk git commit -m "feat(cli): add animation asset audit command"
 rtk git rev-parse HEAD
 ```
 
-- [ ] **Step 8: Record Task 4 evidence in this plan**
+- [x] **Step 8: Record Task 4 evidence in this plan**
+  - Recorded the full product commit and exact RED/GREEN verification evidence.
+  - CLI documentation impact reassessment: help: update; cli-readme: N/A — Task 5 owns the public command documentation; root-readme: N/A — specialized audit is not a primary quick start; landing: N/A — no landing workflow; architecture: N/A — boundaries unchanged; engineering: N/A — commands and CI unchanged; releasing: N/A — release flow unchanged; plugin: N/A — plugin workflow unchanged.
 
 Record implementation, full commit hash, and both PASS commands, then:
 
