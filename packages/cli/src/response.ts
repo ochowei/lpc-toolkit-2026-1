@@ -316,6 +316,154 @@ function formatRender(data: JsonRecord, label = 'Render'): string | undefined {
   return `${label} complete. Artifacts (${artifacts.length})\n${lines.join('\n')}\nMetadata: ${metadataPath}\n`;
 }
 
+function formatAnimationAuditConsumer(consumer: JsonRecord, indent: string): readonly string[] {
+  const itemId = stringValue(consumer, 'itemId');
+  const typeName = stringValue(consumer, 'typeName');
+  const layer = stringValue(consumer, 'layer');
+  const bodyTypes = stringArrayValue(consumer, 'bodyTypes');
+  const variant = nullableStringValue(consumer, 'variant');
+  const recolors = stringArrayValue(consumer, 'recolors');
+  if (!itemId || !typeName || !layer || !bodyTypes || !recolors) return [];
+  return [
+    `${indent}item: ${typeName}/${itemId}`,
+    `${indent}layer: ${layer}`,
+    `${indent}body types: ${formatCsv(bodyTypes)}`,
+    `${indent}variant: ${variant ?? 'default'}`,
+    `${indent}derived recolors: ${formatCsv(recolors)}`,
+  ];
+}
+
+function formatAnimationAuditUnsupported(finding: JsonRecord): readonly string[] {
+  const itemId = stringValue(finding, 'itemId');
+  const typeName = stringValue(finding, 'typeName');
+  const animation = stringValue(finding, 'animation');
+  const requirements = recordArrayValue(finding, 'requirements');
+  if (!itemId || !typeName || !animation || !requirements) return [];
+  const nativeAnimations = stringArrayValue(finding, 'nativeAnimations');
+  const compatibleAnimations = stringArrayValue(finding, 'compatibleAnimations');
+  return [
+    `- ${typeName}/${itemId}`,
+    `  unsupported: ${animation}`,
+    ...(nativeAnimations ? [`  native animations: ${formatCsv(nativeAnimations)}`] : []),
+    ...(compatibleAnimations ? [`  compatible animations: ${formatCsv(compatibleAnimations)}`] : []),
+    ...requirements.flatMap((requirement) => {
+      const expectedPath = stringValue(requirement, 'expectedPath');
+      const reason = stringValue(requirement, 'manualReviewReason');
+      const consumer = formatAnimationAuditConsumer(requirement, '    ');
+      return [
+        ...(expectedPath ? [`  expected: ${expectedPath}`] : []),
+        ...(!expectedPath && reason ? [`  manual review: ${reason}`] : []),
+        ...consumer,
+      ];
+    }),
+  ];
+}
+
+function formatAnimationAuditConsumers(consumers: readonly JsonRecord[], indent: string): readonly string[] {
+  return consumers.flatMap((consumer) => formatAnimationAuditConsumer(consumer, indent));
+}
+
+function formatAnimationAudit(data: JsonRecord): string | undefined {
+  const targets = stringArrayValue(data, 'targets');
+  const summary = data['summary'];
+  const unsupported = recordArrayValue(data, 'unsupported');
+  const missingFiles = recordArrayValue(data, 'missingFiles');
+  const blankFrames = recordArrayValue(data, 'blankFrames');
+  const errors = recordArrayValue(data, 'errors');
+  if (!targets || !isRecord(summary) || !unsupported || !missingFiles || !blankFrames || !errors) {
+    return undefined;
+  }
+  const itemsScanned = numberValue(summary, 'itemsScanned');
+  const incompleteItems = numberValue(summary, 'incompleteItems');
+  const unsupportedCount = numberValue(summary, 'unsupported');
+  const missingFilesCount = numberValue(summary, 'missingFiles');
+  const blankFramesCount = numberValue(summary, 'blankFrames');
+  const errorsCount = numberValue(summary, 'errors');
+  if ([
+    itemsScanned,
+    incompleteItems,
+    unsupportedCount,
+    missingFilesCount,
+    blankFramesCount,
+    errorsCount,
+  ].some((value) => value === undefined)) {
+    return undefined;
+  }
+
+  const lines = [
+    `Animation audit: ${targets.join(', ')}`,
+    `Scanned: ${itemsScanned} items`,
+    `Incomplete: ${incompleteItems} items`,
+  ];
+  if (unsupported.length > 0) {
+    lines.push(`Unsupported animations (${unsupportedCount}):`);
+    lines.push(...unsupported.flatMap(formatAnimationAuditUnsupported));
+  }
+  if (missingFiles.length > 0) {
+    lines.push(`Missing files (${missingFilesCount}):`);
+    lines.push(...missingFiles.flatMap((finding) => {
+      const path = stringValue(finding, 'path');
+      const animation = stringValue(finding, 'animation');
+      const sourceAnimation = stringValue(finding, 'sourceAnimation');
+      const consumers = recordArrayValue(finding, 'consumers');
+      if (!path || !animation || !sourceAnimation || !consumers) return [];
+      return [
+        `- ${path}`,
+        `  animation: ${animation}`,
+        ...(sourceAnimation !== animation ? [`  source animation: ${sourceAnimation}`] : []),
+        ...formatAnimationAuditConsumers(consumers, '  '),
+      ];
+    }));
+  }
+  if (blankFrames.length > 0) {
+    lines.push(`Blank frames (${blankFramesCount}):`);
+    lines.push(...blankFrames.flatMap((finding) => {
+      const path = stringValue(finding, 'path');
+      const animation = stringValue(finding, 'animation');
+      const sourceAnimation = stringValue(finding, 'sourceAnimation');
+      const sourceRow = numberValue(finding, 'sourceRow');
+      const direction = stringValue(finding, 'direction');
+      const frames = recordArrayValue(finding, 'frames');
+      const consumers = recordArrayValue(finding, 'consumers');
+      if (!path || !animation || !sourceAnimation || sourceRow === undefined || !frames || !consumers) {
+        return [];
+      }
+      const frameLines = frames.flatMap((frame) => {
+        const sourceColumn = numberValue(frame, 'sourceColumn');
+        const logicalFrameIndices = frame['logicalFrameIndices'];
+        if (sourceColumn === undefined || !Array.isArray(logicalFrameIndices)) return [];
+        const indices = logicalFrameIndices.filter((index): index is number => typeof index === 'number');
+        if (indices.length !== logicalFrameIndices.length) return [];
+        return [
+          `  ${animation}/${direction ?? `row ${sourceRow}`}: source column ${sourceColumn}; logical frames: ${indices.join(', ')}`,
+        ];
+      });
+      return [
+        `- ${path}`,
+        ...(sourceAnimation !== animation ? [`  source animation: ${sourceAnimation}`] : []),
+        ...frameLines,
+        ...formatAnimationAuditConsumers(consumers, '  '),
+      ];
+    }));
+  }
+  if (errors.length > 0) {
+    lines.push(`Inspection errors (${errorsCount}):`);
+    lines.push(...errors.flatMap((error) => {
+      const kind = stringValue(error, 'kind');
+      const message = stringValue(error, 'message');
+      const errorPath = stringValue(error, 'path');
+      const consumers = recordArrayValue(error, 'consumers');
+      if (!kind || !message || !consumers) return [];
+      return [
+        `- ${kind}: ${message}`,
+        ...(errorPath ? [`  path: ${errorPath}`] : []),
+        ...formatAnimationAuditConsumers(consumers, '  '),
+      ];
+    }));
+  }
+  return `${lines.join('\n')}\n`;
+}
+
 function formatHumanData(response: CliResponse<unknown>): string | undefined {
   const data = response.data;
   if (!isRecord(data)) return undefined;
@@ -327,6 +475,8 @@ function formatHumanData(response: CliResponse<unknown>): string | undefined {
       return formatCatalogItems(data);
     case 'catalog item':
       return formatCatalogItem(data);
+    case 'catalog audit-animations':
+      return formatAnimationAudit(data);
     case 'token encode':
       return formatTokenEncode(data);
     case 'token decode':

@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { createCanvas } from '@napi-rs/canvas';
 import { describe, expect, it } from 'vitest';
 import { runCli } from '../src/main.js';
 
@@ -60,6 +61,79 @@ function makeCatalogCwd(): string {
         },
       ],
       layer_1: { zPos: 50, male: 'hair/bob/' },
+    }),
+  );
+  return cwd;
+}
+
+async function makeAnimationAuditCwd(options: { readonly decodeError?: boolean } = {}): Promise<string> {
+  const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-human-audit-'));
+  const assetsRoot = path.join(cwd, 'assets');
+  const definitionsRoot = path.join(assetsRoot, 'sheet_definitions', 'hair');
+  mkdirSync(definitionsRoot, { recursive: true });
+  mkdirSync(path.join(assetsRoot, 'palette_definitions'), { recursive: true });
+  writeFileSync(path.join(assetsRoot, 'CREDITS.csv'), 'file,authors,licenses\n');
+  writeFileSync(
+    path.join(definitionsRoot, 'hair_braid.json'),
+    JSON.stringify({
+      name: 'Hair Braid',
+      type_name: 'hair',
+      animations: ['walk'],
+      credits: [],
+      variants: ['brown'],
+      layer_1: { zPos: 50, male: 'hair/braid/' },
+    }),
+  );
+  writeFileSync(
+    path.join(definitionsRoot, 'hair_bob.json'),
+    JSON.stringify({
+      name: 'Hair Bob',
+      type_name: 'hair',
+      animations: [],
+      credits: [],
+      layer_1: { zPos: 50, male: 'hair/bob/' },
+    }),
+  );
+
+  const blankPath = path.join(assetsRoot, 'spritesheets', 'hair', 'braid', 'walk', 'brown.png');
+  mkdirSync(path.dirname(blankPath), { recursive: true });
+  writeFileSync(blankPath, await createCanvas(832, 3456).encode('png'));
+
+  if (options.decodeError) {
+    writeFileSync(
+      path.join(definitionsRoot, 'hair_corrupt.json'),
+      JSON.stringify({
+        name: 'Hair Corrupt',
+        type_name: 'hair',
+        animations: ['walk'],
+        credits: [],
+        layer_1: { zPos: 50, male: 'hair/corrupt/' },
+      }),
+    );
+    const corruptPath = path.join(assetsRoot, 'spritesheets', 'hair', 'corrupt', 'walk.png');
+    mkdirSync(path.dirname(corruptPath), { recursive: true });
+    writeFileSync(corruptPath, 'not a PNG');
+  }
+
+  return cwd;
+}
+
+function makeManualReviewAuditCwd(): string {
+  const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-human-audit-review-'));
+  const assetsRoot = path.join(cwd, 'assets');
+  const definitionsRoot = path.join(assetsRoot, 'sheet_definitions', 'hair');
+  mkdirSync(definitionsRoot, { recursive: true });
+  mkdirSync(path.join(assetsRoot, 'palette_definitions'), { recursive: true });
+  mkdirSync(path.join(assetsRoot, 'spritesheets'), { recursive: true });
+  writeFileSync(path.join(assetsRoot, 'CREDITS.csv'), 'file,authors,licenses\n');
+  writeFileSync(
+    path.join(definitionsRoot, 'hair_custom.json'),
+    JSON.stringify({
+      name: 'Hair Custom',
+      type_name: 'hair',
+      animations: [],
+      credits: [],
+      layer_1: { zPos: 50, male: 'hair/custom/', custom_animation: 'wheelchair' },
     }),
   );
   return cwd;
@@ -138,6 +212,43 @@ describe('human-readable CLI output', () => {
 
     expect(output).not.toContain('compatible standard animations:');
     expect(output).not.toContain('unsupported standard animations:');
+  });
+
+  it('prints an actionable animation drawing worklist without --json', async () => {
+    const output = await runHuman([
+      'catalog', 'audit-animations', '--animation', 'walk', '--animation', 'run', '--body-type', 'male',
+    ], await makeAnimationAuditCwd());
+
+    expect(output).toContain('Animation audit: walk, run');
+    expect(output).toContain('Scanned: 2 items');
+    expect(output).toContain('Incomplete: 2 items');
+    expect(output).toContain('hair_braid');
+    expect(output).toContain('unsupported: run');
+    expect(output).toContain('expected: spritesheets/hair/braid/run/brown.png');
+    expect(output).toContain('layer: layer_1');
+    expect(output).toContain('body types: male');
+    expect(output).toContain('walk/down: source column 3');
+  });
+
+  it('prints manual-review reasons without inventing a sprite path', async () => {
+    const output = await runHuman([
+      'catalog', 'audit-animations', '--animation', 'run', '--body-type', 'male',
+    ], makeManualReviewAuditCwd());
+
+    expect(output).toContain('Item has only custom-animation layers; choose a standard layout before drawing.');
+    expect(output).not.toContain('expected:');
+  });
+
+  it('prints decode failures after drawing findings', async () => {
+    const output = await runHuman([
+      'catalog', 'audit-animations', '--animation', 'walk', '--animation', 'run', '--body-type', 'male',
+    ], await makeAnimationAuditCwd({ decodeError: true }));
+
+    expect(output).toContain('Inspection errors (1)');
+    expect(output).toContain('image_decode_failed');
+    expect(output.indexOf('walk/down: source column 3')).toBeLessThan(
+      output.indexOf('Inspection errors (1)'),
+    );
   });
 
   it('prints encoded tokens without --json', async () => {

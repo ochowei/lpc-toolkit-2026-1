@@ -136,6 +136,33 @@ neither the native nor compatible set. Human output labels the latter fields
 Definitions without a valid `animations` array use the same standard defaults
 as Core composition; an explicit empty array remains empty.
 
+### Animation asset audit
+
+Use `catalog audit-animations` to produce a complete, unpaginated drawing
+worklist for a chosen catalog scope. Supply at least one registered standard
+animation; repeat `--animation` to audit more than one animation.
+
+```sh
+lpc-toolkit catalog audit-animations \
+  --animation walk \
+  --animation run \
+  --type weapon \
+  --body-type male \
+  --json
+```
+
+The report is complete for the selected `--type` and `--body-type` scope; it
+does not use discovery pagination. Its finding categories have distinct
+meanings: `unsupported` identifies item animations that require drawing work,
+`missingFiles` identifies expected PNGs that are absent, `blankFrames`
+identifies referenced transparent source cells, and `errors` identifies assets
+that could not be inspected. These findings exit successfully. Invalid input or
+fatal runtime asset preparation instead fails the command.
+
+Runtime recolors listed in a finding are dependent outputs, not additional PNG
+files to draw. The command reads the current runtime asset store and catalog
+definition overlay, and writes nothing.
+
 Run `lpc-toolkit --help` for the command summary.
 
 ## Local Web UI
