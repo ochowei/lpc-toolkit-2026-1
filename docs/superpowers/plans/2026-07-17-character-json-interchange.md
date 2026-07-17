@@ -1386,7 +1386,7 @@ approved the task with no remaining issues.
 - Consumes: completed Core, CLI, and Web behavior.
 - Produces: discoverable user documentation, stable package-boundary documentation, final verification evidence, and the reassessed CLI documentation matrix.
 
-- [ ] **Step 1: Write failing documentation-contract assertions**
+- [x] **Step 1: Write failing documentation-contract assertions**
 
 Extend `packages/web/test/readme-architecture-docs.test.ts` with exact ownership
 and interchange phrases:
@@ -1401,7 +1401,7 @@ it('documents the shared character JSON interchange contract', () => {
 });
 ```
 
-- [ ] **Step 2: Run the docs contract and verify it fails**
+- [x] **Step 2: Run the docs contract and verify it fails**
 
 Run:
 
@@ -1411,7 +1411,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts
 
 Expected: FAIL until README and architecture text are updated.
 
-- [ ] **Step 3: Update root README and architecture ownership**
+- [x] **Step 3: Update root README and architecture ownership**
 
 Add a concise root README section that states:
 
@@ -1435,7 +1435,7 @@ Do not add the workflow to the landing page: it is not part of the landing
 tutorial. Do not edit Engineering, Releasing, or plugin contracts because
 commands, CI mapping, publication, and plugin workflow do not change.
 
-- [ ] **Step 4: Run focused cross-package checks**
+- [x] **Step 4: Run focused cross-package checks**
 
 Run:
 
@@ -1452,7 +1452,7 @@ rtk pnpm check:boundaries
 
 Expected: all PASS.
 
-- [ ] **Step 5: Run browser and repository-wide gates**
+- [x] **Step 5: Run browser and repository-wide gates**
 
 Run:
 
@@ -1466,7 +1466,7 @@ rtk git diff --check
 Expected: all PASS. Do not run isolated upstream parity; this feature uses
 fixtures and normal workflows must not require the upstream checkout.
 
-- [ ] **Step 6: Reassess and record the CLI documentation matrix**
+- [x] **Step 6: Reassess and record the CLI documentation matrix**
 
 Record this final matrix under Task 7, changing a decision only if the actual
 implementation changed that surface:
@@ -1482,7 +1482,7 @@ releasing: N/A — package installation, versioning, and publication do not chan
 plugin: N/A — plugin command workflow continues to use canonical selection files
 ```
 
-- [ ] **Step 7: Commit docs and final plan evidence**
+- [x] **Step 7: Commit docs and final plan evidence**
 
 ```sh
 rtk git add README.md docs/ARCHITECTURE.md packages/web/test/readme-architecture-docs.test.ts docs/superpowers/plans/2026-07-17-character-json-interchange.md
@@ -1493,6 +1493,43 @@ rtk git rev-parse HEAD
 Record the full hash and every PASS command in this plan. If recording the hash
 changes the plan after the product/docs commit, commit that final record as
 `docs(plan): record character JSON verification`.
+
+**Implementation note:** Added discoverable root documentation and stable
+architecture ownership for the single canonical character document and pure
+upstream adapter. The documentation contract passed after RED→GREEN, every
+focused/package/browser/repository gate passed, and all non-owning CLI
+documentation surfaces were reassessed without speculative edits.
+
+**Product/docs commit:** `60e721c3b144eceb4cda7b36f25dec91dbedd6b4`
+
+**Final CLI documentation matrix:**
+
+```text
+help: update
+cli-readme: update
+root-readme: update
+landing: N/A — landing tutorial does not document selection-file interchange
+architecture: update
+engineering: N/A — commands and CI/verification mapping remain unchanged
+releasing: N/A — package installation, versioning, and publication do not change
+plugin: N/A — plugin command workflow continues to use canonical selection files
+```
+
+**Verification:**
+- `rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts` PASS (22 tests)
+- `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS
+- `rtk pnpm --filter @lpc-toolkit/core test` PASS (210 tests)
+- `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS
+- `rtk pnpm --filter @lpc-toolkit/cli test` PASS (369 tests, 1 existing skip)
+- `rtk pnpm --filter @lpc-toolkit/cli build` PASS
+- `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS
+- `rtk pnpm --filter @lpc-toolkit/web test` PASS (693 tests, 1 existing skip)
+- `rtk pnpm check:boundaries` PASS
+- `rtk pnpm --filter @lpc-toolkit/web test:e2e` PASS (25 Chromium tests)
+- `rtk pnpm verify` PASS
+- `rtk pnpm build` PASS (pre-existing Vite warnings only)
+- `rtk git diff --check` PASS
+- `rtk pnpm check:cli-docs-impact -- --base 48611feea --head 60e721c3b144eceb4cda7b36f25dec91dbedd6b4 --body-file /tmp/lpc-toolkit-task-7-cli-docs-body-019f6f69.md` PASS
 
 ## Final Handoff Evidence
 
