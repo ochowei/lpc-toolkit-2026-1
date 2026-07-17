@@ -40,10 +40,10 @@ files; keep those attribution artifacts with the generated image.
 
 ### Codex Plugin
 
-1. Install or upgrade the CLI to the range supported by plugin `0.1.0`:
+1. Install or upgrade the CLI to the range supported by plugin `0.2.0`:
 
 ```sh
-npm install -g '@lpc-toolkit/cli@>=0.1.4 <0.2.0'
+npm install -g '@lpc-toolkit/cli@>=0.2.0 <0.3.0'
 ```
 
 2. Add the repository marketplace once:
@@ -60,7 +60,7 @@ codex plugin add lpc-toolkit@lpc-toolkit
 
 The plugin requires an installed compatible `lpc-toolkit` CLI and does not
 automatically install the CLI. Its supported CLI range is
-`>=0.1.4 <0.2.0`. Restart the ChatGPT desktop app or start a new Codex
+`>=0.2.0 <0.3.0`. Restart the ChatGPT desktop app or start a new Codex
 task if the newly installed skill is not visible. Public Plugins Directory
 distribution can later remove the marketplace-add step.
 

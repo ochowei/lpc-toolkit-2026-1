@@ -139,7 +139,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
   {
     command: ['render'],
     usage: 'lpc-toolkit render --selection <file> --out <directory> [options]',
-    description: 'Render an attributed selection.',
+    description: 'Render an attributed spritesheet with an offline animation viewer.',
     options: [HELP_OPTION, JSON_OPTION, SELECTION_OPTION, ...RENDER_OPTIONS],
     examples: ['lpc-toolkit render --selection hero.json --out rendered'],
   },

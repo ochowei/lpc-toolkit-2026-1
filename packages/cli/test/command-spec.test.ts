@@ -59,6 +59,7 @@ describe('helpForCommand', () => {
 
   it('describes the offline animation viewer for every full render command', () => {
     for (const command of [
+      ['render'],
       ['preset', 'render'],
       ['character', 'render'],
     ]) {

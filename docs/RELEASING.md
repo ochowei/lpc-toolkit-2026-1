@@ -29,6 +29,8 @@ Install the resulting `/tmp/lpc-toolkit-cli-<version>.tgz` into a clean prefix
 and verify `lpc-toolkit --help` plus one real asset-dependent command. The CLI
 build vendors the local core and presets runtime output into `dist/`, so the
 tarball does not require those workspace packages to be published separately.
+The `0.2.0` release scope adds an offline animation viewer to every full render;
+this describes the prepared capability and does not indicate npm publication.
 
 ## Release Candidate Validation
 
@@ -92,7 +94,10 @@ prefix. Verify:
 - `lpc-toolkit --help` reports the expected package version and commands;
 - a catalog or render command prepares or reuses the pinned verified asset
   cache;
-- render output includes metadata and both TXT and CSV credit files;
+- render output includes the sheet, offline `.viewer.html`, metadata, and both
+  TXT and CSV credit files beside one another;
+- a ZIP render contains the viewer together with its sheet, metadata, and TXT
+  and CSV credit files so the extracted viewer works offline;
 - the package does not require unpublished workspace dependencies;
 - the registry entry and release tag identify the same version.
 
