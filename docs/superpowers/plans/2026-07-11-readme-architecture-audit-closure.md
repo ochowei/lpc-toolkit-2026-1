@@ -302,7 +302,6 @@ Record commit and verification under Task 3.
 ### Task 4: Execute the Final Acceptance Gate
 
 **Files:**
-- Create: `.superpowers/sdd/plan6-final-report.md`
 - Modify: `docs/README-ARCHITECTURE-AUDIT-CLOSURE.md`
 - Modify: `docs/superpowers/plans/2026-07-11-readme-architecture-audit-closure.md`
 
@@ -372,23 +371,29 @@ rtk git status --short
 Inspect `README.md` API categories against root `API.md` and `packages/core/src/index.ts`; inspect documented CLI version against `packages/cli/package.json`. Expected: no uncommitted task files, and only the preserved audit temp file remains untracked.
 
 - [x] **Step 5: Record final evidence and commit**
-  - Implementation: Added the final report and permanent closure acceptance section with exact counts, warnings, provisioning, parity SHA, and scope.
+  - Implementation: Recorded the permanent closure acceptance evidence with exact counts, warnings, provisioning, parity SHA, and scope.
   - Commit: `f0dee9558`
   - Verification: evidence commit created; final documentation contract 9/9 PASS.
 
-Write `.superpowers/sdd/plan6-final-report.md` with exact commands, exit statuses, test/build/E2E counts, isolated parity source SHA/path, scope audit, and any intentional skips. Update closure rows with final command results and the plan with per-step commits/verifications.
+Record exact commands, exit statuses, test/build/E2E counts, isolated parity
+source SHA/path, scope audit, and any intentional skips directly in this plan.
+Update the permanent closure record with final command results and this plan
+with per-step commits and verification.
 
-```bash
-rtk git add -f .superpowers/sdd/plan6-final-report.md
-rtk git add docs/README-ARCHITECTURE-AUDIT-CLOSURE.md docs/superpowers/plans/2026-07-11-readme-architecture-audit-closure.md
-rtk git commit -m "docs(plan): record audit remediation closure"
-```
+The original evidence commit also included a redundant temporary SDD report.
+That duplicate was later removed after the permanent plan and closure record
+were confirmed to retain the durable evidence; its history remains available
+through commit `f0dee9558`.
 
 - [x] **Step 6: Request final read-only review**
   - Implementation: Reviewed the exact Plan 6 diff, fixed invalid closure commands and stale README contradictions through a RED/GREEN contract cycle, then completed a clean re-review.
   - Commit: `b4b6925aa`
   - Verification: final re-review PASS — Critical 0, Important 0, Minor 0; documentation accuracy, finding evidence, verification completeness, and upstream/scope all PASS; Ready to close YES.
 
-Give the reviewer the original remediation design, this plan, closure matrix, final report, and exact merge-base-to-HEAD diff package. Require separate verdicts for documentation accuracy, finding-by-finding evidence, verification completeness, unchanged `upstream/`, and readiness to close the audit.
+Give the reviewer the original remediation design, this plan, closure matrix,
+final evidence recorded above, and exact merge-base-to-HEAD diff package.
+Require separate verdicts for documentation accuracy, finding-by-finding
+evidence, verification completeness, unchanged `upstream/`, and readiness to
+close the audit.
 
 Expected: no Critical or Important issues before branch completion options are offered.

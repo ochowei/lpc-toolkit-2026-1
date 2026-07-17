@@ -1231,7 +1231,7 @@ rtk node -e "require('node:fs').rmSync('/tmp/lpc-toolkit-codex-plugin-smoke-home
 ```
 
   - Verification: the original approved reservation command PASS, proving `/tmp/lpc-toolkit-codex-plugin-smoke-home` did not exist.
-  - Prior attempt: the original marketplace-add command FAIL because this Codex CLI requires `CODEX_HOME` to exist; the failure and exact cleanup remain recorded in `.superpowers/sdd/task-5-report.md`.
+  - Prior attempt: the original marketplace-add command FAIL because this Codex CLI requires `CODEX_HOME` to exist; the approved correction and exact cleanup are recorded directly below.
   - Approved correction: after explicit human approval, `rtk node -e "require('node:fs').mkdirSync('/tmp/lpc-toolkit-codex-plugin-smoke-home')"` PASS and created only the empty plan-owned directory.
   - Verification: `rtk env CODEX_HOME=/tmp/lpc-toolkit-codex-plugin-smoke-home codex plugin marketplace add . --json` PASS; JSON reported marketplace `lpc-toolkit`, the repository root, and `alreadyAdded: false`.
   - Verification: `rtk env CODEX_HOME=/tmp/lpc-toolkit-codex-plugin-smoke-home codex plugin marketplace list --json` PASS; JSON contained the local `lpc-toolkit` marketplace.
@@ -1309,10 +1309,6 @@ Record the bookkeeping commit hash in the final response.
   - Implementation: The verifier now resolves asset paths, rejects lexical
     escapes, and rejects directories while preserving its existing error
     contract.
-- [x] Correct the Task 5 scratch report's overall outcome.
-  - Implementation: `.superpowers/sdd/task-5-report.md` now reports overall
-    `DONE` and labels both earlier BLOCKED sections as historical attempts; it
-    remains gitignored and is not part of the implementation commit.
 - Implementation commit: `0af021c617bff0fb0afae83972a9fc76fe7be0a8`
 - TDD RED: `rtk node --test plugins/lpc-toolkit/test/check-cli.test.mjs scripts/verify-codex-plugin.test.mjs` FAIL as expected (11 passed, 5 failed): build metadata was invalid, prerelease admission was too broad, docs lacked an absolute `SKILL_DIR` invocation, and escaped/directory assets were accepted.
 - TDD GREEN: `rtk node --test plugins/lpc-toolkit/test/check-cli.test.mjs scripts/verify-codex-plugin.test.mjs` PASS (16 tests).
