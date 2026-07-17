@@ -1180,13 +1180,12 @@ Expected: PASS.
     `rtk unzip -p /tmp/lpc-viewer-handoff/magical-fisher-female.bundle.zip
     magical-fisher-female.viewer.html | rtk shasum -a 256` PASS for sheet, viewer, metadata,
     TXT, CSV, and `animations/tool_rod.png` — all six file payloads byte-identical. The executed
-    `rtk node -e '<viewer invariant assertions>'
-    /tmp/lpc-viewer-handoff/magical-fisher-female.viewer.html
-    /tmp/lpc-viewer-handoff/magical-fisher-female.credits.txt` static parse PASS — the 5,740-byte
-    Credits TXT equals the embedded viewer credits exactly; all four artifact references are
-    relative basenames; no POSIX/Windows absolute local path, `file://`, external resource tag,
-    network API, external script, or external stylesheet is present. The full assertion source,
-    hashes, and per-entry commands are preserved in `.superpowers/sdd/task-6-report.md`.
+    Node-based static invariant parsing PASS — the 5,740-byte Credits TXT equals the embedded
+    viewer credits exactly; all four artifact references are relative basenames; no
+    POSIX/Windows absolute local path, `file://`, external resource tag, network API, external
+    script, or external stylesheet is present. `.superpowers/sdd/task-6-report.md` preserves the
+    asserted invariant results and artifact hashes; it does not claim to preserve the complete
+    inline assertion source or every expanded per-entry command.
   - Warnings: Both validate and render reported the same 35 existing `catalog_warning` items:
     3 unmatched Epaulets metal aliases and 32 unmatched Pauldrons color/metal aliases. There
     were no render-selection, missing-layer, partial-output, or viewer warnings.
@@ -1200,6 +1199,31 @@ Expected: PASS.
     Chromium E2E PASS (3 tests) plus this real viewer's standard/custom manifest, complete
     credits, portable links, and no-network static checks.
   - Commit: f410bc41a60ab9ce9a474ac05e6a330fbbb50c8c
+
+  - Review finding: The original exact fixture contained only standard `walk` and `hurt`
+    descriptors, so its browser suite did not directly exercise a custom descriptor. The details
+    coverage also checked descendant text after a click without proving initial collapse,
+    subsequent expansion, or exact complete visible credits.
+  - Review RED: `rtk pnpm --filter @lpc-toolkit/web test:e2e -- render-viewer.spec.ts`
+    FAIL — `tool_rod` was absent from the animation selector while the other 2 tests passed;
+    after adding the fixture descriptor, `rtk pnpm --filter @lpc-toolkit/cli test --
+    viewer.test.ts` FAIL — 1 golden mismatch with 50 tests passing because the committed HTML
+    was intentionally stale.
+  - Review implementation: Added a custom `tool_rod` descriptor over the fixture's existing
+    painted 64-pixel cells, regenerated the exact HTML, and expanded direct-`file://` browser
+    coverage to prove four visible custom stages, 3-frame 8 FPS next/previous pixel change and
+    restoration, subsequent one-direction `hurt`, closed then open details state, and the exact
+    complete visible fixture credit text while retaining metadata and relative-link assertions.
+  - Review verification: `rtk pnpm --filter @lpc-toolkit/cli test -- viewer.test.ts` PASS —
+    51 tests; `rtk pnpm --filter @lpc-toolkit/web test:e2e -- render-viewer.spec.ts` PASS —
+    3 Chromium tests; `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS;
+    `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS; `rtk pnpm --filter
+    @lpc-toolkit/cli build` PASS; two consecutive
+    `rtk node packages/cli/scripts/generate-viewer-browser-fixture.mjs` outputs retained identical
+    viewer HTML SHA-256 `2f4dd00a6c6c42e338397b2ba5129045d50b396434eb8ff033b257106be32934`
+    and sheet PNG SHA-256 `3a8c511fff8ac22375a6ec40affd23657b8f29d82c1d633ae2c05ae53acba47d`;
+    `rtk git diff --check` PASS.
+  - Review fix commit: 3e2849e595d122317fbfc452d9f2625984d637bf
 
 Use the CLI built from this checkout and the user-provided selection only
 through the documented command contract:
@@ -1222,8 +1246,9 @@ collapsed details, complete credits, and no network requests. Do not use
   - Verification: `rtk git diff --check` PASS; `rtk git status --short` PASS — only this
     intentional plan-record update remained before commit (`.superpowers/sdd/task-6-report.md`
     is ignored handoff evidence).
-  - Commit: f410bc41a60ab9ce9a474ac05e6a330fbbb50c8c (verified implementation base; the
-    evidence-only plan commit follows this update)
+  - Commit: f410bc41a60ab9ce9a474ac05e6a330fbbb50c8c (verified implementation base);
+    073fe66048c0b7a6d5b9284a7335b5477574aace (initial Task 6 evidence plan);
+    3e2849e595d122317fbfc452d9f2625984d637bf (review evidence correction)
 
 For every completed task, add beneath its final checkbox:
 
@@ -1258,14 +1283,15 @@ rtk git commit -m "docs(plan): record offline viewer verification"
 - [x] Bundled ZIP contains the same viewer with usable relative links after extraction. Real ZIP
   hashes match disk and the packed smoke plus exact fixture prove portable basename use.
 - [x] Four-direction, one-direction, standard, and custom animations behave as specified.
-  Composite evidence: direct-file Chromium exercises synchronized standard and one-direction
-  playback and controls; the real viewer exposes 16 standard and 2 custom descriptors, including
+  Direct-file Chromium now exercises synchronized standard, custom `tool_rod`, and one-direction
+  playback plus controls; the real viewer exposes 16 standard and 2 custom descriptors, including
   the inspected four-row, 13-frame `tool_rod` output.
 - [x] Viewer HTML contains no absolute local paths, external resources, or network calls. Static
   parsing of the real HTML and the direct-file fixture/browser tests both pass.
 - [x] Complete Credits TXT is directly readable in the collapsed details UI after expansion.
-  Chromium proves the details interaction; the real viewer's embedded text exactly equals the
-  complete 5,740-byte Credits TXT. The exact real file was not directly opened in Browser Use.
+  Chromium proves details are initially collapsed, become open after activation, and display the
+  exact complete fixture credits; the real viewer's embedded text exactly equals the complete
+  5,740-byte Credits TXT. The exact real file was not directly opened in Browser Use.
 - [x] Existing animation/frame output selection and strict/partial render semantics are unchanged.
   Complete Core, CLI, Web, render-transaction, and repository suites pass.
 - [x] CLI documentation impact matrix is reassessed and recorded:
