@@ -1533,13 +1533,49 @@ plugin: N/A — plugin command workflow continues to use canonical selection fil
 
 ## Final Handoff Evidence
 
-The implementation handoff must report:
+**Whole-branch review:** Ready to merge — no Critical, Important, or Minor
+findings remain after two consolidated hardening waves.
 
-- the canonical/interchange interfaces and source discriminators;
-- every implementation commit and plan-record commit;
-- the exact verification commands and PASS results;
-- the final CLI documentation matrix;
-- confirmation that `upstream/` was not initialized or modified;
-- confirmation that read-only upstream inputs remained unchanged and mutation
-  normalization was atomic;
-- confirmation that attribution still comes from the active asset source.
+**Final hardening commits:**
+- `f7fa50cff09b0c29fadb89942811d828bed779f6` — strict metadata, safe canonical
+  records, recolor-subtype hash/token round trips, CLI docs, and render warnings.
+- `4731e62bc99721b8eb4cc3c03e8739f1d9c6efce` — safe prototype-sensitive keys
+  through `parseHash`, Web state application, and `toSelections`.
+
+**Feature commit ledger:**
+- `ad9d33979207982097a07970aefb4c4c4ff38285` — design specification.
+- `45347941a076076838478fb9b19288b3987d67e0` — implementation plan.
+- `50b06e65ed2a900517d220e99b64b4315db61cec` — Task 1 implementation.
+- `e5ce86c663eba8392c1f5330dded47c8a0676720` — Task 1 plan record.
+- `d6e56e1db0b93e74f6c3d8e6f769693cbd93216f` and
+  `58c5bba470bdfe92912ab09b7eb13d8697ba2a4a` — Task 2 implementation/fix.
+- `d6a3aa1d7f410b6dbd4cfe289640a3a964904d09` — Task 2 plan record.
+- `ed7d0397bc9007fde86517970855e179678c8656` — Task 3 implementation.
+- `3715c51b85202292d8c9efa14064058cced92ddd` — Task 3 plan record.
+- `ed166b36c828303fab8a9f9a84f96dd29cc9715b` — Task 4 implementation.
+- `788d827bc9b6d04c67e240854ce9b60935611d73` — Task 4 plan record.
+- `5def7affa7310091dff64b8e2bfdb6bd9edbddb6` — Task 5 implementation.
+- `637ceb04c5ab9a38de4657fa112f5e64e1e534c1` — Task 5 plan record.
+- `b45307a642e49ef54d0b0f9a7186e59a91a32d3c` and
+  `98f6a1b6d4f0682924581a986bd940b01e252365` — Task 6 implementation/fix.
+- `02559990818bbb1b7e0190f0529c6ceccb97d0ba` — Task 6 plan record.
+- `60e721c3b144eceb4cda7b36f25dec91dbedd6b4` — Task 7 docs/tests.
+- `e0aeb1f7b401c29a6cb750367a949259534937d4` — Task 7 verification record.
+
+**Fresh completion verification:**
+- `rtk pnpm verify` PASS — Core 227 tests; Presets 3 tests; CLI 370 tests
+  passed with 1 existing skip; Web 696 tests passed with 1 existing skip;
+  typechecks, boundaries, CLI docs policy, and plugin checks passed.
+- `rtk pnpm build` PASS — Core, Presets, Web production/embedded, and CLI;
+  pre-existing Vite JSZip/chunk-size warnings only.
+- `rtk pnpm --filter @lpc-toolkit/web test:e2e` PASS — 25 Chromium tests.
+- `rtk git diff --check` PASS.
+
+**Contract confirmation:** Core owns the exact canonical discriminator
+`lpc-toolkit.selection.v1` and the pure `canonical` / `upstream-v1` /
+`upstream-v2` adapter. Web and CLI writes emit canonical documents. Read-only
+upstream inputs remain byte-for-byte unchanged; successful `character
+set/remove` normalization uses the existing atomic writer, and failed imports
+or mutations do not publish changes. Imported layers and credits are ignored,
+so every render/export continues to derive attribution from the active asset
+source. The dormant `upstream/` gitlink was not initialized or modified.
