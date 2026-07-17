@@ -1176,6 +1176,13 @@ rtk git rev-parse HEAD
 
   - CLI documentation impact reassessment: help: N/A — Task 4 already updated the owned command help; cli-readme: update; root-readme: N/A — specialized asset-authoring audit is not a primary quick start; landing: N/A — no landing-page workflow change; architecture: N/A — existing Core planning and CLI runtime boundaries remain unchanged; engineering: N/A — repository verification and CI commands do not change; releasing: N/A — no package or publication workflow change; plugin: N/A — character-authoring plugin does not perform asset production audits.
 
+#### Task 5 review follow-up — singular summary grammar
+
+- RED: `rtk pnpm --filter @lpc-toolkit/cli test -- main-human.test.ts` FAIL — the new one-item assertion received `Scanned: 1 items` and `Incomplete: 1 items`.
+- GREEN: `rtk pnpm --filter @lpc-toolkit/cli test -- main-human.test.ts` PASS (19 tests).
+- GREEN: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+- Commit: `e7e63fed9f1f7f5cfdcebfa44575c60e4b00e7da` — `fix(cli): singular audit summary labels`.
+
 Record implementation, full commit hash, and both PASS commands, then:
 
 ```sh
