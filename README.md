@@ -131,6 +131,17 @@ summaries report license families and credit counts; run
 before selecting an item. Restart at offset zero after changing the catalog
 source, custom overlay, query filters, or character selection.
 
+### Character JSON interchange
+
+The web editor's **Save character JSON** action and CLI selection outputs share
+the canonical `lpc-toolkit.selection.v1` format. Web import and any CLI option
+that reads an existing `--selection` file also accept
+upstream version 1 and version 2 JSON. Read-only CLI commands perform that
+conversion in memory without rewriting the source file. Successful CLI mutations
+atomically normalize upstream input to the canonical format. Rendered artifacts
+still obtain credits from the active asset source rather than trusting
+attribution embedded in imported JSON.
+
 ### Codex Plugin
 
 1. Install or upgrade the CLI to the range supported by plugin `0.1.0`:

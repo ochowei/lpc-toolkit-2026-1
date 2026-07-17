@@ -70,6 +70,14 @@ function parseClosureTableRow(line: string): ClosureTableRow {
 }
 
 describe('README architecture contract', () => {
+  it('documents the shared character JSON interchange contract', () => {
+    expect(readme).toContain('lpc-toolkit.selection.v1');
+    expect(readme).toContain('upstream version 1 and version 2 JSON');
+    expect(architecture).toContain('canonical character document');
+    expect(architecture).toContain('upstream compatibility adapter');
+    expect(architecture).toContain('active asset source');
+  });
+
   it('routes contributor and maintainer workflows to focused documents', () => {
     expect(readme).toContain('[`CONTRIBUTING.md`](CONTRIBUTING.md)');
     expect(readme).toContain(
