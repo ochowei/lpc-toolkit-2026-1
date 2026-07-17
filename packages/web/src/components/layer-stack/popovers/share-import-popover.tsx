@@ -2,24 +2,25 @@ import { useMemo, useRef, useState, type ChangeEvent, type RefObject } from 'rea
 import {
   decodeSelectionToken,
   encodeSelectionToken,
-  serializeHash,
   type Catalog,
   type PaletteMetadata,
 } from '@lpc-toolkit/core';
 import { Button } from '../../ui/button';
 import { usePopover } from './use-popover';
 import { toSelections, type SliceAction, type SliceState } from '../../../slice/selection';
+import { saveCharacterDocument } from '../../../lib/character-document';
 import {
-  importCharacterDocument,
-  saveCharacterDocument,
-} from '../../../lib/character-document';
+  copySelectionLink,
+  copySelectionToken,
+} from '../../../lib/selection-sharing';
+import { useLatestCharacterDocumentImporter } from '../../../hooks/use-latest-character-document-import';
 import type { Translator } from '../../../i18n';
 
 interface Props {
   open: boolean;
   setOpen: (value: boolean) => void;
   state: SliceState;
-  dispatch: (action: SliceAction) => void;
+  dispatch: (action: SliceAction) => boolean | void;
   disabled: boolean;
   catalog: Catalog;
   palettes: PaletteMetadata;
@@ -43,6 +44,9 @@ export function ShareImportPopover({
 }: Props) {
   const { panelRef, pos } = usePopover(open, () => setOpen(false), anchorRef);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dispatchRef = useRef(dispatch);
+  dispatchRef.current = dispatch;
+  const importLatest = useLatestCharacterDocumentImporter();
   const token = useMemo(() => encodeSelectionToken(toSelections(state)), [state]);
   const [paste, setPaste] = useState('');
 
@@ -52,15 +56,26 @@ export function ShareImportPopover({
     if (!file) return;
 
     try {
-      const imported = await importCharacterDocument(file, { catalog, palettes });
-      dispatch({ type: 'apply_selections', selections: imported.parsed.selections });
+      await importLatest({
+        file,
+        context: { catalog, palettes },
+        apply: (selections) => dispatchRef.current({
+          type: 'apply_selections',
+          selections,
+        }),
+        onApplied: () => {
+          setOpen(false);
+          onStatus(`${t('share.imported')} ✓`);
+        },
+        onRejected: () => {
+          onStatus(`${t('share.importFailed')}: ${t('composition.loading')}`);
+        },
+        onFailed: (message) => {
+          onStatus(`${t('share.importFailed')}: ${message}`);
+        },
+      });
+    } finally {
       input.value = '';
-      setOpen(false);
-      onStatus(`${t('share.imported')} ✓`);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      input.value = '';
-      onStatus(`${t('share.importFailed')}: ${message}`);
     }
   };
 
@@ -114,7 +129,7 @@ export function ShareImportPopover({
           size="sm"
           onClick={async () => {
             try {
-              await navigator.clipboard.writeText(token);
+              await copySelectionToken(token);
               onStatus(`${t('token.copy')} ✓`);
             } catch {
               onStatus(t('token.copyFailed'));
@@ -126,10 +141,8 @@ export function ShareImportPopover({
         <Button
           size="sm"
           onClick={async () => {
-            const hash = serializeHash(toSelections(state));
-            const url = `${window.location.origin}${window.location.pathname}#${hash}`;
             try {
-              await navigator.clipboard.writeText(url);
+              await copySelectionLink(toSelections(state));
               onStatus(`${t('token.copyLink')} ✓`);
             } catch {
               onStatus(t('token.copyFailed'));

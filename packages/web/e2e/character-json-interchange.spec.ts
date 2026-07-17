@@ -27,8 +27,10 @@ test('saved canonical JSON restores the complete Web selection', async ({ page }
 
   await page.getByRole('button', { name: 'More' }).click();
   await page.getByRole('menuitem', { name: /Share \/ Import/ }).click();
-  await page.locator('input[type="file"][accept="application/json,.json"]')
-    .setInputFiles(savedPath);
+  const fileChooserPromise = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: 'Import character JSON' }).click();
+  const fileChooser = await fileChooserPromise;
+  await fileChooser.setFiles(savedPath);
 
   await expect(page.getByText('Character JSON imported. ✓', { exact: true }))
     .toBeVisible();
