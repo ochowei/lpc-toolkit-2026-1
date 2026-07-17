@@ -14,6 +14,10 @@ export interface ParsedArgs {
 
 const BOOLEAN_FLAGS = new Set(['all', 'allow-partial', 'help', 'json', 'no-open']);
 
+function acceptsExplicitEmptyValues(command: readonly string[]): boolean {
+  return command[0] === 'catalog' && command[1] === 'audit-animations';
+}
+
 function addFlag(
   flags: Map<string, FlagValue>,
   key: string,
@@ -43,7 +47,12 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
       seenFlag = true;
       const key = token.slice(2);
       const next = argv[i + 1];
-      if (!BOOLEAN_FLAGS.has(key) && next !== undefined && !next.startsWith('--')) {
+      if (
+        !BOOLEAN_FLAGS.has(key)
+        && next !== undefined
+        && !next.startsWith('--')
+        && (next.length > 0 || acceptsExplicitEmptyValues(command))
+      ) {
         addFlag(flags, key, next);
         i++;
       } else {
