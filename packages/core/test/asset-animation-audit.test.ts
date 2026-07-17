@@ -109,6 +109,124 @@ describe('planAssetAnimationAudit', () => {
     ]);
   });
 
+  it('plans every compatible custom source for the longsword slash target', () => {
+    const catalog = createCatalog({
+      'weapon/sword/longsword.json': {
+        name: 'Longsword',
+        type_name: 'weapon',
+        animations: ['slash_oversize', 'slash_reverse_oversize'],
+        variants: ['longsword'],
+        credits: [],
+        layer_1: {
+          zPos: -1,
+          custom_animation: 'slash_oversize',
+          male: 'weapon/sword/longsword/attack_slash/behind/',
+        },
+        layer_2: {
+          zPos: 150,
+          custom_animation: 'slash_oversize',
+          male: 'weapon/sword/longsword/attack_slash/',
+        },
+        layer_3: {
+          zPos: -1,
+          custom_animation: 'slash_reverse_oversize',
+          male: 'weapon/sword/longsword/attack_slash_reverse/behind/',
+        },
+        layer_4: {
+          zPos: 150,
+          custom_animation: 'slash_reverse_oversize',
+          male: 'weapon/sword/longsword/attack_slash_reverse/',
+        },
+      },
+    }).catalog;
+
+    const plan = planAssetAnimationAudit({ catalog, palettes, targets: ['slash'] });
+
+    expect(plan.unsupported).toEqual([]);
+    expect(plan.assets.map(({ path, sourceAnimation, consumers }) => ({
+      path,
+      sourceAnimation,
+      layer: consumers[0]?.layer,
+    }))).toEqual([
+      {
+        path: 'spritesheets/weapon/sword/longsword/attack_slash_reverse/behind/longsword.png',
+        sourceAnimation: 'slash_reverse_oversize',
+        layer: 'layer_3',
+      },
+      {
+        path: 'spritesheets/weapon/sword/longsword/attack_slash_reverse/longsword.png',
+        sourceAnimation: 'slash_reverse_oversize',
+        layer: 'layer_4',
+      },
+      {
+        path: 'spritesheets/weapon/sword/longsword/attack_slash/behind/longsword.png',
+        sourceAnimation: 'slash_oversize',
+        layer: 'layer_1',
+      },
+      {
+        path: 'spritesheets/weapon/sword/longsword/attack_slash/longsword.png',
+        sourceAnimation: 'slash_oversize',
+        layer: 'layer_2',
+      },
+    ]);
+  });
+
+  it('maps backslash and halfslash custom bases to their registered logical targets', () => {
+    const catalog = createCatalog({
+      'weapon/sword/arming.json': {
+        name: 'Arming Sword',
+        type_name: 'weapon',
+        animations: ['slash_128', 'backslash_128', 'halfslash_128'],
+        variants: ['steel'],
+        credits: [],
+        layer_1: {
+          zPos: 8,
+          custom_animation: 'slash_128',
+          male: 'weapon/sword/arming/attack_slash/bg/',
+        },
+        layer_2: {
+          zPos: 8,
+          custom_animation: 'backslash_128',
+          male: 'weapon/sword/arming/attack_backslash/bg/',
+        },
+        layer_3: {
+          zPos: 8,
+          custom_animation: 'halfslash_128',
+          male: 'weapon/sword/arming/attack_halfslash/bg/',
+        },
+      },
+    }).catalog;
+
+    const plan = planAssetAnimationAudit({
+      catalog,
+      palettes,
+      targets: ['1h_slash', '1h_backslash', '1h_halfslash'],
+    });
+
+    expect(plan.unsupported).toEqual([]);
+    expect(plan.assets.map(({ animation, sourceAnimation, path }) => ({
+      animation,
+      sourceAnimation,
+      path,
+    }))).toEqual([
+      {
+        animation: '1h_backslash',
+        sourceAnimation: 'backslash_128',
+        path: 'spritesheets/weapon/sword/arming/attack_backslash/bg/steel.png',
+      },
+      {
+        animation: '1h_slash',
+        sourceAnimation: 'backslash_128',
+        path: 'spritesheets/weapon/sword/arming/attack_backslash/bg/steel.png',
+      },
+      {
+        animation: '1h_halfslash',
+        sourceAnimation: 'halfslash_128',
+        path: 'spritesheets/weapon/sword/arming/attack_halfslash/bg/steel.png',
+      },
+    ]);
+  });
+
   it('emits one manual-review requirement when an unsupported item has only custom layers', () => {
     const catalog = createCatalog({
       'chairs/wheelchair.json': {

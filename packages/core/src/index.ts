@@ -193,6 +193,7 @@ export {
   animationsSupportFolder,
   auditAnimationFolder,
   compatibleAnimationSource,
+  compatibleAnimationSources,
   itemAnimationCapabilities,
 } from './animation-capabilities.js';
 

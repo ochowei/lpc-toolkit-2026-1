@@ -1,4 +1,9 @@
-import { createCatalog, type Catalog } from '@lpc-toolkit/core';
+import {
+  createCatalog,
+  createPaletteCatalog,
+  planAssetAnimationAudit,
+  type Catalog,
+} from '@lpc-toolkit/core';
 import { describe, expect, it } from 'vitest';
 import type {
   AnimationAuditConsumer,
@@ -193,6 +198,61 @@ function memoryAdapter(
 }
 
 describe('inspectAssetAnimationPlan', () => {
+  it('reports missing reverse-slash longsword PNGs from every compatible custom source', async () => {
+    const catalog = createCatalog({
+      'weapon/sword/longsword.json': {
+        name: 'Longsword',
+        type_name: 'weapon',
+        animations: ['slash_oversize', 'slash_reverse_oversize'],
+        variants: ['longsword'],
+        credits: [],
+        layer_1: {
+          zPos: -1,
+          custom_animation: 'slash_oversize',
+          male: 'weapon/sword/longsword/attack_slash/behind/',
+        },
+        layer_2: {
+          zPos: 150,
+          custom_animation: 'slash_oversize',
+          male: 'weapon/sword/longsword/attack_slash/',
+        },
+        layer_3: {
+          zPos: -1,
+          custom_animation: 'slash_reverse_oversize',
+          male: 'weapon/sword/longsword/attack_slash_reverse/behind/',
+        },
+        layer_4: {
+          zPos: 150,
+          custom_animation: 'slash_reverse_oversize',
+          male: 'weapon/sword/longsword/attack_slash_reverse/',
+        },
+      },
+    }).catalog;
+    const plan = planAssetAnimationAudit({
+      catalog,
+      palettes: createPaletteCatalog({}).palettes,
+      targets: ['slash'],
+    });
+    const existingPaths = [
+      'spritesheets/weapon/sword/longsword/attack_slash/behind/longsword.png',
+      'spritesheets/weapon/sword/longsword/attack_slash/longsword.png',
+    ];
+    const fixtures = memoryAdapter(new Map(existingPaths.map((path) => [
+      `/fixture-assets/${path}`,
+      new MemoryImage(1152, 768, [], 192),
+    ])));
+
+    const report = await inspectAssetAnimationPlan(plan, {
+      store: storeFor(new Set(existingPaths)),
+      adapter: fixtures.adapter,
+    });
+
+    expect(report.missingFiles.map(({ path }) => path)).toEqual([
+      'spritesheets/weapon/sword/longsword/attack_slash_reverse/behind/longsword.png',
+      'spritesheets/weapon/sword/longsword/attack_slash_reverse/longsword.png',
+    ]);
+  });
+
   it('separates missing, blank, and unreadable files and keeps findings successful', async () => {
     const missingPath = 'spritesheets/hair/missing/walk.png';
     const blankPath = 'spritesheets/hair/blank/walk.png';

@@ -13,7 +13,12 @@ export interface ItemAnimationCapabilities {
 }
 
 const STANDARD_NAMES = ANIMATIONS.map(({ value }) => value);
-const STANDARD_SET = new Set<AnimationName>(STANDARD_NAMES);
+
+const CUSTOM_BASE_ALIASES: Readonly<Record<AnimationName, string>> = {
+  '1h_slash': 'backslash',
+  '1h_backslash': 'backslash',
+  '1h_halfslash': 'halfslash',
+};
 
 function nativeAnimations(item: ItemDefinition): readonly AnimationName[] {
   const raw: unknown = item.animations;
@@ -26,22 +31,26 @@ export function compatibleAnimationSource(
   item: ItemDefinition,
   target: AnimationName,
 ): AnimationName | undefined {
-  return nativeAnimations(item).find((name) => {
+  return compatibleAnimationSources(item, target)[0];
+}
+
+export function compatibleAnimationSources(
+  item: ItemDefinition,
+  target: AnimationName,
+): readonly AnimationName[] {
+  const targetBase = CUSTOM_BASE_ALIASES[target] ?? target;
+  return nativeAnimations(item).filter((name) => {
     const definition = customAnimations[name];
-    return definition !== undefined && customAnimationBase(definition) === target;
+    return definition !== undefined && customAnimationBase(definition) === targetBase;
   });
 }
 
 export function itemAnimationCapabilities(item: ItemDefinition): ItemAnimationCapabilities {
   const native = nativeAnimations(item);
   const nativeSet = new Set(native);
-  const compatibleSet = new Set<AnimationName>();
-  for (const name of native) {
-    const definition = customAnimations[name];
-    if (!definition) continue;
-    const base = customAnimationBase(definition);
-    if (STANDARD_SET.has(base) && !nativeSet.has(base)) compatibleSet.add(base);
-  }
+  const compatibleSet = new Set(STANDARD_NAMES.filter((target) =>
+    !nativeSet.has(target) && compatibleAnimationSources(item, target).length > 0,
+  ));
   return {
     native,
     compatible: STANDARD_NAMES.filter((name) => compatibleSet.has(name)),

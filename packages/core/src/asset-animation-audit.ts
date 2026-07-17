@@ -1,6 +1,6 @@
 import {
   auditAnimationFolder,
-  compatibleAnimationSource,
+  compatibleAnimationSources,
   itemAnimationCapabilities,
 } from './animation-capabilities.js';
 import {
@@ -327,8 +327,8 @@ export function planAssetAnimationAudit(
 
     for (const target of targets) {
       const native = capabilities.native.includes(target);
-      const compatibleSource = native ? undefined : compatibleAnimationSource(item, target);
-      if (!native && !compatibleSource) {
+      const compatibleSources = native ? [] : compatibleAnimationSources(item, target);
+      if (!native && compatibleSources.length === 0) {
         const requirements: UnsupportedAnimationRequirement[] = [];
         const ordinaryGroups = groups.filter((group) => !group.customAnimation);
         for (const group of ordinaryGroups) {
@@ -373,39 +373,42 @@ export function planAssetAnimationAudit(
         continue;
       }
 
-      const sourceAnimation = compatibleSource ?? (VIRTUAL_ANIMATION_MAP[target as keyof typeof VIRTUAL_ANIMATION_MAP] ?? target);
-      const geometry = compatibleSource ? customGeometry(compatibleSource) : standardGeometry(target);
-      const applicableGroups = compatibleSource
-        ? groups.filter((group) => group.customAnimation === compatibleSource)
-        : groups.filter((group) => !group.customAnimation);
-      for (const group of applicableGroups) {
-        for (const variant of variantsFor(item)) {
-          const consumer = consumerFor(itemId, typeName, group, variant, recolors);
-          if (!group.basePath) {
-            errors.push({
-              kind: 'path_resolution_requires_selection',
-              message: unresolvedReason(group.unresolvedToken ?? 'path'),
-              consumer,
-            });
-            continue;
-          }
-          const variantFile = variant?.replaceAll(' ', '_');
-          const path = compatibleSource
-            ? `spritesheets/${group.basePath}${variantFile ?? ''}.png`
-            : `spritesheets/${group.basePath}${auditAnimationFolder(target)}${variantFile ? `/${variantFile}` : ''}.png`;
-          const asset: PlannedAnimationAsset = {
-            path,
-            animation: target,
-            sourceAnimation,
-            geometry,
-            consumers: [consumer],
-          };
-          const key = assetKey(asset);
-          const existing = assets.get(key);
-          if (existing) {
-            assets.set(key, { ...existing, consumers: [...existing.consumers, consumer] });
-          } else {
-            assets.set(key, asset);
+      for (const compatibleSource of native ? [undefined] : compatibleSources) {
+        const sourceAnimation = compatibleSource
+          ?? (VIRTUAL_ANIMATION_MAP[target as keyof typeof VIRTUAL_ANIMATION_MAP] ?? target);
+        const geometry = compatibleSource ? customGeometry(compatibleSource) : standardGeometry(target);
+        const applicableGroups = compatibleSource
+          ? groups.filter((group) => group.customAnimation === compatibleSource)
+          : groups.filter((group) => !group.customAnimation);
+        for (const group of applicableGroups) {
+          for (const variant of variantsFor(item)) {
+            const consumer = consumerFor(itemId, typeName, group, variant, recolors);
+            if (!group.basePath) {
+              errors.push({
+                kind: 'path_resolution_requires_selection',
+                message: unresolvedReason(group.unresolvedToken ?? 'path'),
+                consumer,
+              });
+              continue;
+            }
+            const variantFile = variant?.replaceAll(' ', '_');
+            const path = compatibleSource
+              ? `spritesheets/${group.basePath}${variantFile ?? ''}.png`
+              : `spritesheets/${group.basePath}${auditAnimationFolder(target)}${variantFile ? `/${variantFile}` : ''}.png`;
+            const asset: PlannedAnimationAsset = {
+              path,
+              animation: target,
+              sourceAnimation,
+              geometry,
+              consumers: [consumer],
+            };
+            const key = assetKey(asset);
+            const existing = assets.get(key);
+            if (existing) {
+              assets.set(key, { ...existing, consumers: [...existing.consumers, consumer] });
+            } else {
+              assets.set(key, asset);
+            }
           }
         }
       }
