@@ -1044,7 +1044,7 @@ export async function importCharacterDocument(
 ): Promise<ImportedSelectionDocument>;
 ```
 
-- [ ] **Step 1: Write failing browser-workflow tests**
+- [x] **Step 1: Write failing browser-workflow tests**
 
 Create `packages/web/test/character-document.test.ts`:
 
@@ -1085,7 +1085,7 @@ it('rejects malformed JSON without producing a candidate', async () => {
 });
 ```
 
-- [ ] **Step 2: Run focused Web test and verify missing module failure**
+- [x] **Step 2: Run focused Web test and verify missing module failure**
 
 Run:
 
@@ -1095,7 +1095,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- character-document.test.ts
 
 Expected: FAIL because `character-document.ts` does not exist.
 
-- [ ] **Step 3: Implement file import and canonical Blob save**
+- [x] **Step 3: Implement file import and canonical Blob save**
 
 Create `packages/web/src/lib/character-document.ts`:
 
@@ -1138,7 +1138,7 @@ export async function importCharacterDocument(
 This module does not dispatch React actions and does not accept imported
 credits or layers.
 
-- [ ] **Step 4: Run Web focused tests and typecheck**
+- [x] **Step 4: Run Web focused tests and typecheck**
 
 Run:
 
@@ -1149,7 +1149,7 @@ rtk pnpm --filter @lpc-toolkit/web run typecheck
 
 Expected: all PASS.
 
-- [ ] **Step 5: Commit and record Task 5**
+- [x] **Step 5: Commit and record Task 5**
 
 ```sh
 rtk git add packages/web/src/lib/character-document.ts packages/web/test/character-document.test.ts
@@ -1159,6 +1159,19 @@ rtk git rev-parse HEAD
 
 Record the full hash and PASS commands under Task 5, then commit the plan
 record as `docs(plan): record character JSON task 5`.
+
+**Implementation note:** Added the focused Web browser boundary for canonical
+JSON Blob downloads and canonical/upstream text-file import through the core
+adapter. The module returns a complete candidate without mutating React state
+or restoring untrusted credits/layers. Independent review approved the task
+with no issues.
+
+**Commit:** `5def7affa7310091dff64b8e2bfdb6bd9edbddb6`
+
+**Verification:**
+- `rtk pnpm --filter @lpc-toolkit/web test -- character-document.test.ts` PASS (3 tests)
+- `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS
+- `rtk pnpm check:boundaries` PASS
 
 ---
 
