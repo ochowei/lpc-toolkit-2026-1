@@ -34,4 +34,4 @@ tests, build, ordinary web E2E, README/documentation contracts, and isolated
 upstream parity all passing. The isolated parity run used the separate checkout
 at commit `212abfd21493e9957bd556250ac538fa40fe1fc9`; the read-only submodule was
 not used or modified. Exact counts, warnings, source provisioning, and scope are
-recorded in `.superpowers/sdd/plan6-final-report.md`.
+recorded in [Plan 6 Task 4](superpowers/plans/2026-07-11-readme-architecture-audit-closure.md#task-4-execute-the-final-acceptance-gate).

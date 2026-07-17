@@ -557,7 +557,8 @@ After both task records are complete:
   invalid asset commands before preparation.
 - Fix verification: CLI tests 153 PASS with 1 existing skip; CLI and workspace
   typechecks, CLI build/package smoke, boundaries, and workspace tests PASS;
-  focused TDD evidence is recorded in `.superpowers/sdd/cli-rc-final-fix-report.md`.
+  the focused TDD result is retained here with the fix commit, and the
+  underlying diff remains available in Git history.
 - Re-review verdict: `Ready to merge? Yes`; no Critical, Important, or Minor
   findings remain. Hosted macOS/Windows validation remains the authorized
   post-merge RC/manual gate and was not dispatched.

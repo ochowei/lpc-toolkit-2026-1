@@ -1191,8 +1191,9 @@ platform-specific skip); core PASS (167); Web color options PASS (8);
 architecture boundaries and `git diff --check` PASS; packed installed-package
 smoke PASS with `Packed CLI install smoke test passed.` Sandbox-only localhost,
 tsx IPC, and npm DNS failures were rerun through the approved permission path
-and passed. Complete RED/GREEN and gate evidence is recorded in
-`.superpowers/sdd/final-fix-report.md`. The unrelated untracked
+and passed. The exact RED/GREEN commands and gate results are summarized in the
+task and final-review records above; the implementation commits retain the
+underlying diff in Git history. The unrelated untracked
 `docs/README-ARCHITECTURE-AUDIT.tmp.md` remains untouched.
 
 Second final re-review implementation note: commit
@@ -1211,8 +1212,8 @@ core and 6 failed/31 passed for focused CLI. GREEN passed core 50 and CLI 37.
 All core/CLI/presets/Web typechecks passed; full core passed 168; full CLI
 passed 294 with 1 platform-specific skip; full Web passed 649; presets passed
 3; boundaries and `git diff --check` passed; packed installed-package smoke
-passed. Full command and behavior evidence is appended to
-`.superpowers/sdd/final-fix-report.md`. All final checklist items above remain
+passed. The complete command results and behavior evidence are summarized in
+the final-review record above. All final checklist items above remain
 satisfied, including exact composed credit manifests and no pre-validation
 writes.
 

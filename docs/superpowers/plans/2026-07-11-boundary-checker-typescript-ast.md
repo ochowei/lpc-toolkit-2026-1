@@ -280,7 +280,6 @@ recognized. Checker, typecheck, diff, and scope audit pass.
 **Files:**
 - Modify: `docs/superpowers/plans/2026-07-11-boundary-checker-typescript-ast.md`
 - Modify: `docs/superpowers/plans/2026-07-11-boundary-checker-ci-enforcement.md`
-- Create: `.superpowers/sdd/plan5-ast-final-report.md`
 
 **Interfaces:**
 - Consumes: the completed AST checker and all workspace test suites.
@@ -321,8 +320,8 @@ rtk git status --short
 
 Expected: implementation changes are limited to the checker, boundary tests, plan/evidence files; no manifest, lockfile, runtime source, asset, or `upstream/` changes. Preserve `docs/README-ARCHITECTURE-AUDIT.tmp.md` as an untracked user file.
 
-Implementation note: The `894277f67..HEAD` audit listed only
-`.superpowers/sdd/plan5-ast-task-2-report.md`, this AST plan,
+Implementation note: The `894277f67..HEAD` audit listed only the temporary
+Task 2 verification evidence, this AST plan,
 `packages/web/test/boundary-check.test.ts`, and
 `scripts/check-boundaries.mjs`. No manifest, lockfile, runtime source, asset,
 or `upstream/` path changed. The untracked user audit file remained untouched.
@@ -333,10 +332,11 @@ or `upstream/` path changed. The untracked user audit file remained untouched.
 
 - [x] **Step 3: Record closure evidence**
 
-In `.superpowers/sdd/plan5-ast-final-report.md`, record:
+Record the closure evidence directly in this plan and the Plan 5
+CI-enforcement plan:
 
 ```md
-# Plan 5 AST Final Report
+### Plan 5 AST final evidence
 
 - Focused boundary/workflow tests: PASS (<exact count>)
 - Full tests: PASS (<files/tests/skips>)
@@ -351,24 +351,24 @@ Update both plan documents with implementation notes, commit hashes, and verific
 
 Implementation note: Fresh focused verification passed `2` files and all
 `79` tests (`71` boundary fixtures and `8` workflow/package contracts). Closure
-evidence is recorded in `.superpowers/sdd/plan5-ast-final-report.md`. Final
-review remains pending.
+evidence is recorded in both permanent plan documents. Final review remains
+pending.
 
 - Commit: `b8b636c9f7ee41bf054a37be893c248e4eb6a289`
 - Verification: focused boundary/workflow tests PASS (`2` files, `79` tests);
-  final report and both plan updates recorded; independent final review pending.
+  both plan updates recorded; independent final review pending.
 
 - [x] **Step 4: Commit verification evidence**
 
-```bash
-rtk git add .superpowers/sdd/plan5-ast-final-report.md docs/superpowers/plans/2026-07-11-boundary-checker-typescript-ast.md docs/superpowers/plans/2026-07-11-boundary-checker-ci-enforcement.md
-rtk git commit -m "docs(plan): record AST boundary verification"
-```
+The original evidence commit included a redundant temporary SDD report. That
+duplicate was later removed after its durable results were confirmed in both
+plan documents; the commit and its underlying diff remain available in Git
+history.
 
 Record the evidence commit hash and exact verification results under Task 3.
 
-Implementation note: Committed the final report and both plan updates without
-staging the preserved untracked audit file.
+Implementation note: Committed the closure evidence and both plan updates
+without staging the preserved untracked audit file.
 
 - Evidence commit: `b8b636c9f7ee41bf054a37be893c248e4eb6a289`
 - Verification: focused tests PASS (`2` files, `79` tests); full tests PASS
@@ -378,7 +378,12 @@ staging the preserved untracked audit file.
 
 - [x] **Step 5: Request final read-only review**
 
-Give the reviewer the design, this plan, the Plan 5 plan, the exact base/head range, and the final report. Require explicit inspection of AST parse diagnostics, runtime-identifier reference filtering, import/export/dynamic-import coverage, parenthesized awaited imports, `.then()` parameter ownership, package subpaths, and absence of generic identifier false positives.
+Give the reviewer the design, this plan, the Plan 5 plan, the exact base/head
+range, and the final evidence recorded above. Require explicit inspection of
+AST parse diagnostics, runtime-identifier reference filtering,
+import/export/dynamic-import coverage, parenthesized awaited imports, `.then()`
+parameter ownership, package subpaths, and absence of generic identifier false
+positives.
 
 Expected: no Critical or Important issues before branch completion options are offered.
 
