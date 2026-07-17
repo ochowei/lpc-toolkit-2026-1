@@ -1393,3 +1393,23 @@ engineering: N/A — verification and CI commands are unchanged.
 releasing: N/A — package and publication workflows are unchanged.
 plugin: N/A — plugin behavior and contracts are unchanged.
 ```
+
+---
+
+## Final-review follow-up — coexisting native and custom sources
+
+- [x] **Audit native and compatible custom layers together**
+  - Implementation: unsupported capability classification remains `!native && compatibleSources.length === 0`; physical planning now adds ordinary native layers and every compatible custom source independently. This matches active composition without altering composition behavior or asset-key deduplication.
+  - Regression coverage: an active normal-bow-shaped fixture declares native `walk` plus `walk_128` background/foreground layers and asserts exactly four distinct planned PNGs.
+  - Product commit: `227cb4be2c69dcd22ed790d8fa227114226c6e43` — `fix(core): audit native and custom animation layers`.
+  - TDD RED: `rtk pnpm --filter @lpc-toolkit/core test -- asset-animation-audit.test.ts` FAIL (the two `walk_128` bow PNGs were omitted).
+  - GREEN: `rtk pnpm --filter @lpc-toolkit/core test -- asset-animation-audit.test.ts` PASS (11 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- animation-audit.test.ts catalog-commands.test.ts catalog-discovery.test.ts` PASS (40 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+  - Verification: `rtk pnpm check:boundaries` PASS.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core test` PASS (17 files, 187 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test` PASS outside the sandbox for loopback web-server tests (33 files, 385 tests passed, 1 skipped).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS outside the sandbox; packed install smoke passed.
+  - Verification: `rtk pnpm verify` PASS outside the sandbox; full asset, pin, boundary, plugin, typecheck, and recursive-test gate completed.
+  - Documentation impact: N/A — no public CLI command, output, help, README, package, architecture, engineering, release, landing, or plugin contract changed.
