@@ -605,7 +605,7 @@ export function readSelectionDocumentFile(
 ): LoadedSelectionDocument;
 ```
 
-- [ ] **Step 1: Write the failing CLI boundary tests**
+- [x] **Step 1: Write the failing CLI boundary tests**
 
 Create `packages/cli/test/selection-document-file.test.ts` using a temporary
 file and a small `createCatalog` context:
@@ -638,7 +638,7 @@ it('preserves core error codes and paths', () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused CLI test and verify the missing module failure**
+- [x] **Step 2: Run the focused CLI test and verify the missing module failure**
 
 Run:
 
@@ -648,7 +648,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- selection-document-file.test.ts
 
 Expected: FAIL because `selection-document-file.ts` does not exist.
 
-- [ ] **Step 3: Implement the centralized Node I/O boundary**
+- [x] **Step 3: Implement the centralized Node I/O boundary**
 
 Create `packages/cli/src/selection-document-file.ts` with filesystem handling
 only around the pure core API:
@@ -712,7 +712,7 @@ export function readSelectionDocumentFile(
 
 Do not write from this module.
 
-- [ ] **Step 4: Migrate selection validate, top-level render, and token encode**
+- [x] **Step 4: Migrate selection validate, top-level render, and token encode**
 
 - `selection validate`: load one document context, read through the new helper,
   then retain existing filesystem-backed `validateSelections` checks.
@@ -744,7 +744,7 @@ if (parsed.command[0] === 'token') {
 Add/update assertions proving upstream `selection validate`, `render`, and
 `token encode` accept the fixture and leave it byte-for-byte unchanged.
 
-- [ ] **Step 5: Run focused CLI gates**
+- [x] **Step 5: Run focused CLI gates**
 
 Run:
 
@@ -756,7 +756,7 @@ rtk pnpm --filter @lpc-toolkit/cli run typecheck
 Expected: all PASS; `main-assets.test.ts` places only token encode in the
 asset-dependent table.
 
-- [ ] **Step 6: Commit and record Task 3**
+- [x] **Step 6: Commit and record Task 3**
 
 ```sh
 rtk git add packages/cli/src/selection-document-file.ts packages/cli/src/selection-commands.ts packages/cli/src/token-commands.ts packages/cli/src/render.ts packages/cli/src/main.ts packages/cli/test/selection-document-file.test.ts packages/cli/test/token-commands.test.ts packages/cli/test/main-assets.test.ts packages/cli/test/render.test.ts packages/cli/test/main-json.test.ts
@@ -766,6 +766,21 @@ rtk git rev-parse HEAD
 
 Record the full hash and PASS commands under Task 3, then commit the plan
 record as `docs(plan): record character JSON task 3`.
+
+**Implementation note:** Added the centralized read-only CLI file boundary and
+migrated selection validation, top-level rendering, and token encoding to the
+core importer while preserving typed errors, source bytes, attribution, and
+the CLI response envelope. Independent review approved the task. One minor
+render import-error warning propagation inconsistency is recorded in the SDD
+ledger for final whole-branch triage.
+
+**Commit:** `ed7d0397bc9007fde86517970855e179678c8656`
+
+**Verification:**
+- `rtk pnpm --filter @lpc-toolkit/cli test -- selection-document-file.test.ts token-commands.test.ts main-assets.test.ts render.test.ts main-json.test.ts` PASS (80 tests)
+- `rtk pnpm --filter @lpc-toolkit/cli test -- smoke.test.ts main-human.test.ts` PASS (19 tests)
+- `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS
+- `rtk pnpm --filter @lpc-toolkit/cli test` PASS (363 tests, 1 existing skip; controller rerun with localhost permission)
 
 ---
 
