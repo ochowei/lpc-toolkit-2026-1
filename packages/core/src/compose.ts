@@ -147,6 +147,7 @@ function replaceInPath(
  * source of truth and cannot drift.
  */
 export interface ResolvedLayer {
+  readonly layerNumber: number;
   readonly itemId: ItemId;
   readonly typeName: TypeName;
   readonly item: ItemDefinition;
@@ -204,6 +205,7 @@ export function resolveLayers(
       if (basePath.includes('${')) continue;
 
       out.push({
+        layerNumber: n,
         itemId,
         typeName,
         item,

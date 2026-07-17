@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { createCatalog } from '../src/catalog.js';
-import { composeSelections, getSpritePathsForSelections } from '../src/compose.js';
+import { composeSelections, getSpritePathsForSelections, resolveLayers } from '../src/compose.js';
 import { computeEffectiveLicense } from '../src/credits.js';
 import type { CanvasAdapter, CanvasLike, ImageLike } from '../src/adapters.js';
 import type { PaletteSwap } from '../src/recolor.js';
@@ -483,6 +483,28 @@ describe('getSpritePathsForSelections', () => {
       );
       expect(layers).toEqual([]);
     });
+  });
+});
+
+describe('resolveLayers', () => {
+  it('includes one-based source layer numbers without changing public sprite paths', () => {
+    const catalog = createCatalog({
+      'hair/two-layers.json': {
+        name: 'Two Layers',
+        type_name: 'hair',
+        animations: ['walk'],
+        credits: [],
+        layer_1: { zPos: 10, male: 'hair/two-layers/back/' },
+        layer_2: { zPos: 20, male: 'hair/two-layers/front/' },
+      },
+    }).catalog;
+
+    const selections: Selections = {
+      bodyType: 'male',
+      items: { hair: { typeName: 'hair', name: 'Two Layers' } },
+    };
+
+    expect(resolveLayers(selections, catalog).map((layer) => layer.layerNumber)).toEqual([1, 2]);
   });
 });
 
