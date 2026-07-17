@@ -1,0 +1,502 @@
+import type { AnimationPlaybackDescriptor } from '@lpc-toolkit/core';
+import type { CliIssue } from './response.js';
+
+export interface RenderViewerModel {
+  readonly characterName: string;
+  readonly sheet: {
+    readonly fileName: string;
+    readonly width: number;
+    readonly height: number;
+  };
+  readonly files: {
+    readonly metadata: string;
+    readonly creditsTxt: string;
+    readonly creditsCsv: string;
+  };
+  readonly cliVersion: string;
+  readonly metadataSchema: 'lpc-toolkit.render-metadata.v1';
+  readonly effectiveLicense: string | null;
+  readonly source: {
+    readonly runtimeSource: string;
+    readonly description: string;
+    readonly releaseTag: string | null;
+  };
+  readonly warnings: readonly CliIssue[];
+  readonly animations: readonly AnimationPlaybackDescriptor[];
+  readonly creditsTxt: string;
+}
+
+function inlineJson(value: unknown): string {
+  const escaped: Readonly<Record<string, string>> = {
+    '<': '\\u003c',
+    '>': '\\u003e',
+    '&': '\\u0026',
+    '\u2028': '\\u2028',
+    '\u2029': '\\u2029',
+  };
+  return JSON.stringify(value).replace(
+    /[<>&\u2028\u2029]/gu,
+    (character) => escaped[character]!,
+  );
+}
+
+export function renderViewerHtml(model: RenderViewerModel): string {
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LPC Toolkit offline animation viewer</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+      background: Canvas;
+      color: CanvasText;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    main { width: min(72rem, 100%); margin: 0 auto; padding: clamp(1rem, 3vw, 2rem); }
+    header { margin-bottom: 1.5rem; }
+    h1, h2, h3, p { margin-top: 0; }
+    .viewer-toolbar, .playback-controls, .artifact-links {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .viewer-toolbar { margin-bottom: 1rem; }
+    select, button, input { font: inherit; }
+    select, button {
+      min-height: 2.75rem;
+      border: 1px solid color-mix(in srgb, CanvasText 35%, transparent);
+      border-radius: 0.45rem;
+      padding: 0.5rem 0.75rem;
+      background: Canvas;
+      color: CanvasText;
+    }
+    button { cursor: pointer; }
+    button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible {
+      outline: 0.2rem solid Highlight;
+      outline-offset: 0.15rem;
+    }
+    .direction-stages {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    .direction-stage {
+      display: grid;
+      justify-items: center;
+      gap: 0.5rem;
+      margin: 0;
+      padding: 1rem;
+      border: 1px solid color-mix(in srgb, CanvasText 22%, transparent);
+      border-radius: 0.65rem;
+      background: color-mix(in srgb, Canvas 94%, CanvasText);
+    }
+    canvas, .sheet-thumbnail {
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+    canvas {
+      width: min(100%, 12rem);
+      height: auto;
+      aspect-ratio: 1;
+      background:
+        linear-gradient(45deg, #bbb 25%, transparent 25%),
+        linear-gradient(-45deg, #bbb 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #bbb 75%),
+        linear-gradient(-45deg, transparent 75%, #bbb 75%);
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+      background-size: 16px 16px;
+    }
+    .playback-controls { margin-bottom: 1.5rem; }
+    .frame-scrubber { flex: 1 1 15rem; }
+    .viewer-error {
+      padding: 0.75rem 1rem;
+      border: 1px solid #b91c1c;
+      border-radius: 0.45rem;
+      color: #b91c1c;
+    }
+    details {
+      border-top: 1px solid color-mix(in srgb, CanvasText 25%, transparent);
+      padding-top: 1rem;
+    }
+    summary { cursor: pointer; font-weight: 700; }
+    .details-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+      gap: 1.5rem;
+      margin-top: 1rem;
+    }
+    .sheet-thumbnail { display: block; max-width: 100%; max-height: 20rem; }
+    .table-scroll { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 0.5rem; border-bottom: 1px solid color-mix(in srgb, CanvasText 18%, transparent); text-align: left; }
+    pre {
+      max-height: 24rem;
+      overflow: auto;
+      padding: 1rem;
+      border-radius: 0.45rem;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      background: color-mix(in srgb, Canvas 90%, CanvasText);
+    }
+    [hidden] { display: none !important; }
+    @media (max-width: 42rem) {
+      .details-grid { grid-template-columns: 1fr; }
+      .playback-controls > button { flex: 1 1 auto; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1 id="viewer-title"></h1>
+    </header>
+    <section aria-labelledby="viewer-title">
+      <div class="viewer-toolbar">
+        <label id="animation-label" for="animation-select"></label>
+        <select id="animation-select" data-testid="animation-select"></select>
+      </div>
+      <p id="viewer-error" class="viewer-error" data-testid="viewer-error" role="alert" hidden></p>
+      <div id="direction-stages" class="direction-stages" data-testid="direction-stages"></div>
+      <div class="playback-controls">
+        <button id="previous-frame" data-testid="previous-frame" type="button"></button>
+        <button id="playback-toggle" data-testid="playback-toggle" type="button"></button>
+        <button id="next-frame" data-testid="next-frame" type="button"></button>
+        <output id="frame-counter" data-testid="frame-counter" for="frame-scrubber"></output>
+        <input id="frame-scrubber" class="frame-scrubber" data-testid="frame-scrubber" type="range" min="0" step="1">
+      </div>
+    </section>
+    <details data-testid="viewer-details">
+      <summary>
+        <span id="details-label"></span>
+        <span aria-hidden="true"> — </span>
+        <span id="sheet-summary"></span>
+        <span aria-hidden="true"> — </span>
+        <span id="animation-summary"></span>
+        <span aria-hidden="true"> — </span>
+        <span id="license-summary"></span>
+      </summary>
+      <div class="details-grid">
+        <section>
+          <a id="sheet-link"><img id="sheet-thumbnail" class="sheet-thumbnail"></a>
+          <p><a id="sheet-file-link"></a></p>
+        </section>
+        <section>
+          <h2 id="animation-table-heading"></h2>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th id="animation-column" scope="col"></th>
+                  <th id="kind-column" scope="col"></th>
+                  <th id="frames-column" scope="col"></th>
+                  <th id="directions-column" scope="col"></th>
+                </tr>
+              </thead>
+              <tbody id="animation-table-body"></tbody>
+            </table>
+          </div>
+          <h2 id="source-heading"></h2>
+          <p id="source-summary"></p>
+          <h2 id="warnings-heading"></h2>
+          <ul id="warnings-list"></ul>
+          <h2 id="artifacts-heading"></h2>
+          <nav class="artifact-links" aria-labelledby="artifacts-heading">
+            <a id="metadata-link"></a>
+            <a id="credits-txt-link"></a>
+            <a id="credits-csv-link"></a>
+          </nav>
+          <h2 id="credits-heading"></h2>
+          <pre id="credits-text" data-testid="credits-text"></pre>
+        </section>
+      </div>
+    </details>
+  </main>
+  <script id="viewer-data" type="application/json">${inlineJson(model)}</script>
+  <script>
+    (() => {
+      'use strict';
+
+      const COPY = Object.freeze({
+        play: 'Play',
+        pause: 'Pause',
+        previousFrame: 'Previous frame',
+        nextFrame: 'Next frame',
+        singleDirection: 'Single direction',
+        details: 'Spritesheet details',
+        warnings: 'Warnings',
+        credits: 'Credits',
+        animation: 'Animation',
+        animations: 'Animations',
+        artifacts: 'Artifacts',
+        source: 'Portable source',
+        kind: 'Kind',
+        frames: 'Frames',
+        directions: 'Directions',
+        frame: 'Frame',
+        metadata: 'Metadata JSON',
+        creditsTxt: 'Credits TXT',
+        creditsCsv: 'Credits CSV',
+        sheetThumbnail: 'Spritesheet thumbnail',
+        standard: 'standard',
+        custom: 'custom',
+        license: 'license',
+        none: 'None',
+        missingSheet: 'Could not load spritesheet: ',
+        directionNames: Object.freeze(['North', 'West', 'South', 'East']),
+      });
+
+      const dataNode = document.getElementById('viewer-data');
+      if (!dataNode) throw new Error('Missing viewer data.');
+      const model = JSON.parse(dataNode.textContent || '{}');
+      const image = new Image();
+      image.src = encodeURI(model.sheet.fileName);
+
+      let selected = model.animations[0];
+      let frameIndex = 0;
+      let playing = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      let lastTime = performance.now();
+      let accumulator = 0;
+      const frameDuration = 1000 / 8;
+      let imageReady = false;
+      let stages = [];
+
+      const animationSelect = document.getElementById('animation-select');
+      const playbackToggle = document.getElementById('playback-toggle');
+      const previousFrame = document.getElementById('previous-frame');
+      const nextFrame = document.getElementById('next-frame');
+      const scrubber = document.getElementById('frame-scrubber');
+      const frameCounter = document.getElementById('frame-counter');
+      const directionStages = document.getElementById('direction-stages');
+      const viewerError = document.getElementById('viewer-error');
+
+      document.getElementById('viewer-title').textContent = model.characterName;
+      document.title = model.characterName;
+      document.getElementById('animation-label').textContent = COPY.animation;
+      animationSelect.setAttribute('aria-label', COPY.animation);
+      previousFrame.textContent = COPY.previousFrame;
+      previousFrame.setAttribute('aria-label', COPY.previousFrame);
+      nextFrame.textContent = COPY.nextFrame;
+      nextFrame.setAttribute('aria-label', COPY.nextFrame);
+      scrubber.setAttribute('aria-label', COPY.frame);
+      document.getElementById('details-label').textContent = COPY.details;
+      document.getElementById('animation-table-heading').textContent = COPY.animations;
+      document.getElementById('animation-column').textContent = COPY.animation;
+      document.getElementById('kind-column').textContent = COPY.kind;
+      document.getElementById('frames-column').textContent = COPY.frames;
+      document.getElementById('directions-column').textContent = COPY.directions;
+      document.getElementById('source-heading').textContent = COPY.source;
+      document.getElementById('warnings-heading').textContent = COPY.warnings;
+      document.getElementById('artifacts-heading').textContent = COPY.artifacts;
+      document.getElementById('credits-heading').textContent = COPY.credits;
+
+      const sheetFile = encodeURI(model.sheet.fileName);
+      const sheetLink = document.getElementById('sheet-link');
+      const sheetFileLink = document.getElementById('sheet-file-link');
+      const thumbnail = document.getElementById('sheet-thumbnail');
+      sheetLink.href = sheetFile;
+      sheetFileLink.href = sheetFile;
+      sheetFileLink.textContent = model.sheet.fileName;
+      thumbnail.src = sheetFile;
+      thumbnail.alt = COPY.sheetThumbnail;
+
+      const metadataLink = document.getElementById('metadata-link');
+      metadataLink.href = encodeURI(model.files.metadata);
+      metadataLink.textContent = COPY.metadata;
+      const creditsTxtLink = document.getElementById('credits-txt-link');
+      creditsTxtLink.href = encodeURI(model.files.creditsTxt);
+      creditsTxtLink.textContent = COPY.creditsTxt;
+      const creditsCsvLink = document.getElementById('credits-csv-link');
+      creditsCsvLink.href = encodeURI(model.files.creditsCsv);
+      creditsCsvLink.textContent = COPY.creditsCsv;
+
+      const standardCount = model.animations.filter((animation) => animation.kind === 'standard').length;
+      const customCount = model.animations.filter((animation) => animation.kind === 'custom').length;
+      document.getElementById('sheet-summary').textContent =
+        String(model.sheet.width) + ' × ' + String(model.sheet.height);
+      document.getElementById('animation-summary').textContent =
+        String(standardCount) + ' ' + COPY.standard + ', ' +
+        String(customCount) + ' ' + COPY.custom;
+      document.getElementById('license-summary').textContent =
+        COPY.license + ': ' + (model.effectiveLicense || COPY.none);
+
+      const sourceParts = [
+        model.source.runtimeSource,
+        model.source.description,
+        model.source.releaseTag,
+        'CLI ' + model.cliVersion,
+        model.metadataSchema,
+      ].filter((value) => value !== null && value !== '');
+      document.getElementById('source-summary').textContent = sourceParts.join(' — ');
+
+      const animationTableBody = document.getElementById('animation-table-body');
+      for (const descriptor of model.animations) {
+        const row = document.createElement('tr');
+        const values = [
+          descriptor.animation,
+          descriptor.kind,
+          String(descriptor.cycle.length),
+          String(descriptor.directions),
+        ];
+        for (const value of values) {
+          const cell = document.createElement('td');
+          cell.textContent = value;
+          row.append(cell);
+        }
+        animationTableBody.append(row);
+
+        const option = document.createElement('option');
+        option.value = descriptor.animation;
+        option.textContent = descriptor.animation;
+        animationSelect.append(option);
+      }
+
+      const warningsList = document.getElementById('warnings-list');
+      if (model.warnings.length === 0) {
+        const item = document.createElement('li');
+        item.textContent = COPY.none;
+        warningsList.append(item);
+      } else {
+        for (const warning of model.warnings) {
+          const item = document.createElement('li');
+          item.textContent = warning.code + ': ' + warning.message +
+            (warning.path ? ' (' + warning.path + ')' : '');
+          warningsList.append(item);
+        }
+      }
+      document.getElementById('credits-text').textContent = model.creditsTxt;
+
+      function updateToggle() {
+        const label = playing ? COPY.pause : COPY.play;
+        playbackToggle.textContent = label;
+        playbackToggle.setAttribute('aria-label', label);
+        playbackToggle.setAttribute('aria-pressed', String(playing));
+      }
+
+      function drawFrame() {
+        const column = selected.cycle[frameIndex] || 0;
+        for (const stage of stages) {
+          const context = stage.context;
+          const directionIndex = stage.directionIndex;
+          context.clearRect(0, 0, selected.frameSize, selected.frameSize);
+          context.drawImage(
+            image,
+            selected.sourceX + column * selected.frameSize,
+            selected.sourceY + directionIndex * selected.frameSize,
+            selected.frameSize,
+            selected.frameSize,
+            0,
+            0,
+            selected.frameSize,
+            selected.frameSize,
+          );
+        }
+      }
+
+      function updateFrame() {
+        scrubber.value = String(frameIndex);
+        frameCounter.textContent =
+          COPY.frame + ' ' + String(frameIndex + 1) + ' / ' + String(selected.cycle.length);
+        if (imageReady) drawFrame();
+      }
+
+      function configureStages() {
+        directionStages.replaceChildren();
+        stages = [];
+        const names = selected.directions === 1
+          ? [COPY.singleDirection]
+          : COPY.directionNames;
+        names.forEach((name, directionIndex) => {
+          const figure = document.createElement('figure');
+          figure.className = 'direction-stage';
+          const canvas = document.createElement('canvas');
+          canvas.width = selected.frameSize;
+          canvas.height = selected.frameSize;
+          canvas.setAttribute('aria-label', name);
+          const caption = document.createElement('figcaption');
+          caption.textContent = name;
+          figure.append(canvas, caption);
+          directionStages.append(figure);
+          const context = canvas.getContext('2d');
+          if (!context) throw new Error('Could not create viewer canvas context.');
+          context.imageSmoothingEnabled = false;
+          stages.push({ context, directionIndex });
+        });
+      }
+
+      function selectAnimation() {
+        selected = model.animations[animationSelect.selectedIndex] || model.animations[0];
+        frameIndex = 0;
+        accumulator = 0;
+        scrubber.max = String(Math.max(0, selected.cycle.length - 1));
+        configureStages();
+        updateFrame();
+      }
+
+      animationSelect.addEventListener('change', selectAnimation);
+      playbackToggle.addEventListener('click', () => {
+        playing = !playing;
+        accumulator = 0;
+        lastTime = performance.now();
+        updateToggle();
+      });
+      previousFrame.addEventListener('click', () => {
+        frameIndex = (frameIndex - 1 + selected.cycle.length) % selected.cycle.length;
+        updateFrame();
+      });
+      nextFrame.addEventListener('click', () => {
+        frameIndex = (frameIndex + 1) % selected.cycle.length;
+        updateFrame();
+      });
+      scrubber.addEventListener('input', () => {
+        frameIndex = Number.parseInt(scrubber.value, 10);
+        updateFrame();
+      });
+
+      image.addEventListener('load', () => {
+        imageReady = true;
+        drawFrame();
+      });
+      image.addEventListener('error', () => {
+        imageReady = false;
+        viewerError.textContent = COPY.missingSheet + model.sheet.fileName;
+        viewerError.hidden = false;
+        directionStages.hidden = true;
+      });
+
+      function tick(now) {
+        const elapsed = now - lastTime;
+        lastTime = now;
+        if (playing && imageReady) {
+          accumulator += elapsed;
+          while (accumulator >= frameDuration) {
+            frameIndex = (frameIndex + 1) % selected.cycle.length;
+            accumulator -= frameDuration;
+            updateFrame();
+          }
+        }
+        requestAnimationFrame(tick);
+      }
+
+      selectAnimation();
+      updateToggle();
+      requestAnimationFrame(tick);
+    })();
+  </script>
+</body>
+</html>
+`;
+}
