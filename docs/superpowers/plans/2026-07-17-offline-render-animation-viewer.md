@@ -910,7 +910,18 @@ rtk git commit -m "test(cli): verify offline viewer in browser"
 - Consumes: final viewer artifact contract from Task 3.
 - Produces: public and plugin documentation aligned with the shipped output.
 
-- [ ] **Step 1: Extend the installed-package smoke path**
+- [x] **Step 1: Extend the installed-package smoke path**
+
+  - TDD: Added the owned help, landing, and plugin workflow assertions first.
+    `rtk pnpm --filter @lpc-toolkit/cli test -- command-spec.test.ts plugin-contract.test.ts`
+    failed with the missing viewer help/workflow copy, and the permitted rerun of
+    `rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx` failed with the
+    missing `.viewer.html` tutorial copy.
+  - Implementation: The installed-package smoke now renders preset `farmer` with JSON
+    and ZIP output after verified-cache preparation, requires the viewer/sheet/ZIP
+    artifacts, checks `viewer-data` plus the relative sheet filename, and requires the
+    same viewer entry in the ZIP. Its temporary render directory and cache remain under
+    `finally` cleanup.
 
 After the smoke script has prepared the verified cache, invoke the installed
 CLI with:
@@ -923,7 +934,16 @@ Assert exit status zero, parse stdout, require a viewer artifact, read the HTML,
 require the relative sheet filename and `viewer-data`, and load the ZIP to
 require the same viewer entry. Preserve cache cleanup in `finally`.
 
-- [ ] **Step 2: Run package smoke with the installed viewer assertion**
+- [x] **Step 2: Run package smoke with the installed viewer assertion**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli build` PASS;
+    `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS — pack, isolated install,
+    verified-cache preparation, preset render, HTML portability checks, and ZIP viewer
+    entry all completed. The sandboxed package attempt failed during npm dependency
+    lookup with `ENOTFOUND`; the permitted network rerun reached the smoke assertion and
+    exposed a same-block temporary-directory name shadow. Renaming only the new preset
+    directory variable resolved the verified root cause, and two subsequent package
+    smoke runs passed.
 
 Run:
 
@@ -935,7 +955,12 @@ rtk pnpm --filter @lpc-toolkit/cli test:package
 Expected: PASS, proving Task 3 behavior survives package build, packing,
 installation, verified-cache preparation, render, and ZIP creation.
 
-- [ ] **Step 3: Update help and CLI README**
+- [x] **Step 3: Update help and CLI README**
+
+  - Implementation: Preset and character render help now promise an attributed
+    spritesheet with an offline animation viewer. The CLI README records the exact
+    output tree, always-produced viewer, direct double-click and extracted-ZIP usage,
+    and the separate-PNG-only effect of `--animation` and `--frames`.
 
 Change both preset and character render descriptions to say they render an
 attributed spritesheet with an offline animation viewer. In the CLI README,
@@ -943,14 +968,24 @@ show the exact output tree including `<name>.viewer.html`, state that it is
 always produced, explain direct double-click and ZIP extraction, and explicitly
 state that `--animation` and `--frames` still control only separate PNG output.
 
-- [ ] **Step 4: Update root README and landing tutorial**
+- [x] **Step 4: Update root README and landing tutorial**
+
+  - Implementation: The primary CLI workflow and landing render tutorial now identify
+    the standalone offline viewer; the landing test requires `.viewer.html` and
+    `offline` in rendered copy.
 
 Add one concise sentence to the primary CLI workflow and landing tutorial:
 final render output includes a standalone offline animation viewer. Update
 `landing-page.test.tsx` to assert `.viewer.html` and `offline` are present in
 the rendered tutorial copy.
 
-- [ ] **Step 5: Update architecture and plugin workflow**
+- [x] **Step 5: Update architecture and plugin workflow**
+
+  - Implementation: Architecture now owns pure playback descriptions in Core and
+    self-contained viewer generation plus transactional, relative-path-only publication
+    in CLI. The plugin requires sheet/viewer/metadata/TXT/CSV verification and viewer-path
+    reporting. `cli-contract.json` was not changed, and its test proves documented
+    workflow commands remain contract-listed.
 
 In `docs/ARCHITECTURE.md`:
 
@@ -965,7 +1000,16 @@ report the viewer path. Do not add or change a command in
 `cli-contract.json`. Extend `plugin-contract.test.ts` to assert the workflow
 mentions `.viewer.html` and still uses only contract-listed commands.
 
-- [ ] **Step 6: Verify docs, plugin, and focused package behavior**
+- [x] **Step 6: Verify docs, plugin, and focused package behavior**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- command-spec.test.ts plugin-contract.test.ts`
+    PASS — 2 files, 33 tests; `rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx`
+    PASS — 1 file, 1 test; `rtk pnpm verify:plugin` PASS — 17 tests and plugin structure;
+    `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS; focused
+    `rtk pnpm --filter @lpc-toolkit/cli run typecheck` and
+    `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS; `rtk git diff --check` PASS.
+    The Web test required the permitted local-process rerun after sandboxed tsx IPC
+    creation failed with `listen EPERM`.
 
 Run:
 
@@ -978,7 +1022,21 @@ rtk pnpm --filter @lpc-toolkit/cli test:package
 
 Expected: PASS.
 
-- [ ] **Step 7: Record the final CLI documentation impact matrix and commit**
+- [x] **Step 7: Record the final CLI documentation impact matrix and commit**
+
+  - Task commit: e9b049b9107e7bc76819feb208ed6986ca46df48
+  - CLI documentation impact reassessment:
+
+    ```text
+    help: update
+    cli-readme: update
+    root-readme: update
+    landing: update
+    architecture: update
+    engineering: N/A — verification commands and CI mapping do not change
+    releasing: N/A — packaging, versioning, and publication policy do not change
+    plugin: update
+    ```
 
 Keep this exact reassessment in the completed plan notes:
 
