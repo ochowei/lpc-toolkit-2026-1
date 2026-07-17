@@ -1081,7 +1081,20 @@ rtk git commit -m "docs(cli): document offline render viewer"
 - Consumes: all prior tasks.
 - Produces: verified repository state and complete handoff evidence.
 
-- [ ] **Step 1: Run package-focused typechecks and tests**
+- [x] **Step 1: Run package-focused typechecks and tests**
+
+  - Implementation: Verified strict types and the complete Core, CLI, and Web unit suites at
+    implementation base `f410bc41a60ab9ce9a474ac05e6a330fbbb50c8c` without changing
+    production code.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS;
+    `rtk pnpm --filter @lpc-toolkit/core test` PASS — 175 tests;
+    `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS;
+    `rtk pnpm --filter @lpc-toolkit/cli test` FAIL in the sandbox — 13 localhost
+    `listen EPERM` failures, then the unchanged permitted rerun PASS — 413 passed and 1
+    skipped; `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS;
+    `rtk pnpm --filter @lpc-toolkit/web test` FAIL in the sandbox — tsx IPC
+    `listen EPERM`, then the unchanged permitted rerun PASS — 684 passed and 1 skipped.
+  - Commit: f410bc41a60ab9ce9a474ac05e6a330fbbb50c8c
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/core run typecheck
@@ -1094,7 +1107,15 @@ rtk pnpm --filter @lpc-toolkit/web test
 
 Expected: PASS for every command.
 
-- [ ] **Step 2: Run browser, plugin, and architecture checks**
+- [x] **Step 2: Run browser, plugin, and architecture checks**
+
+  - Implementation: Re-ran the exact direct-file Chromium fixture suite plus plugin and
+    architecture gates against the completed implementation.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web test:e2e -- render-viewer.spec.ts`
+    FAIL in the sandbox — tsx IPC `listen EPERM`, then the unchanged permitted rerun PASS —
+    3 Chromium tests; `rtk pnpm verify:plugin` PASS — 17 tests and valid structure;
+    `rtk pnpm check:boundaries` PASS.
+  - Commit: f410bc41a60ab9ce9a474ac05e6a330fbbb50c8c
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/web test:e2e -- render-viewer.spec.ts
@@ -1104,7 +1125,17 @@ rtk pnpm check:boundaries
 
 Expected: PASS.
 
-- [ ] **Step 3: Run common, build, and packed-package gates**
+- [x] **Step 3: Run common, build, and packed-package gates**
+
+  - Implementation: Verified the common repository gate, production build, and isolated packed
+    CLI install/render smoke without weakening any command.
+  - Verification: `rtk pnpm verify` FAIL in the sandbox — tsx IPC `listen EPERM`, then the
+    unchanged permitted rerun PASS; `rtk pnpm build` FAIL in the sandbox — tsx IPC
+    `listen EPERM`, then the unchanged permitted rerun PASS; `rtk pnpm --filter
+    @lpc-toolkit/cli test:package` FAIL in the sandbox — npm registry `ENOTFOUND`, then the
+    unchanged network-permitted rerun PASS — packed CLI install smoke passed. Build output
+    retained the known Vite JSZip dynamic/static import and chunk-size warnings.
+  - Commit: f410bc41a60ab9ce9a474ac05e6a330fbbb50c8c
 
 ```sh
 rtk pnpm verify
@@ -1114,7 +1145,61 @@ rtk pnpm --filter @lpc-toolkit/cli test:package
 
 Expected: PASS.
 
-- [ ] **Step 4: Inspect a real generated viewer**
+- [ ] **Step 4: Inspect a real generated viewer** — direct Browser Use opening remains blocked
+  by the environment URL security policy; all CLI, artifact, ZIP, and static viewer checks pass.
+
+  - Implementation: Built and validated the supplied strict selection without
+    `--allow-partial`, rendered `tool_rod` plus ZIP to the exact task-owned temporary target,
+    inspected the real sheet and animation PNGs, parsed metadata and inline viewer data,
+    compared all ZIP payload hashes with disk, and verified complete embedded credits and
+    portable resource behavior. The render produced a 1664 x 4736 sheet, schema
+    `lpc-toolkit.render-metadata.v1`, seven result artifacts, 16 standard plus 2 custom viewer
+    descriptors, four-direction 13-frame `tool_rod`, one-direction `hurt` and `climb`, no
+    skipped or missing layers, and GPL 3.0 as the effective license.
+  - Verification: `rtk node packages/cli/dist/index.js character validate --selection
+    /Users/william/Documents/Codex/2026-07-17/lpc-toolkit-plugin-lpc-toolkit-lpc/outputs/magical-fisher-female.json
+    --json` PASS — `ok: true`, `valid: true`; `rtk node packages/cli/dist/index.js character
+    render --selection
+    /Users/william/Documents/Codex/2026-07-17/lpc-toolkit-plugin-lpc-toolkit-lpc/outputs/magical-fisher-female.json
+    --out /tmp/lpc-viewer-handoff --animation tool_rod --bundle zip --json` PASS — `ok: true`;
+    `rtk file /tmp/lpc-viewer-handoff/magical-fisher-female.sheet.png
+    /tmp/lpc-viewer-handoff/magical-fisher-female.viewer.html
+    /tmp/lpc-viewer-handoff/magical-fisher-female.metadata.json
+    /tmp/lpc-viewer-handoff/magical-fisher-female.credits.txt
+    /tmp/lpc-viewer-handoff/magical-fisher-female.credits.csv
+    /tmp/lpc-viewer-handoff/animations/tool_rod.png
+    /tmp/lpc-viewer-handoff/magical-fisher-female.bundle.zip` PASS; `rtk unzip -l
+    /tmp/lpc-viewer-handoff/magical-fisher-female.bundle.zip` PASS — seven entries including
+    the viewer and animation; `rtk shasum -a 256
+    /tmp/lpc-viewer-handoff/magical-fisher-female.sheet.png
+    /tmp/lpc-viewer-handoff/magical-fisher-female.viewer.html
+    /tmp/lpc-viewer-handoff/magical-fisher-female.metadata.json
+    /tmp/lpc-viewer-handoff/magical-fisher-female.credits.txt
+    /tmp/lpc-viewer-handoff/magical-fisher-female.credits.csv
+    /tmp/lpc-viewer-handoff/animations/tool_rod.png` PASS; each exact archive check of the form
+    `rtk unzip -p /tmp/lpc-viewer-handoff/magical-fisher-female.bundle.zip
+    magical-fisher-female.viewer.html | rtk shasum -a 256` PASS for sheet, viewer, metadata,
+    TXT, CSV, and `animations/tool_rod.png` — all six file payloads byte-identical. The executed
+    `rtk node -e '<viewer invariant assertions>'
+    /tmp/lpc-viewer-handoff/magical-fisher-female.viewer.html
+    /tmp/lpc-viewer-handoff/magical-fisher-female.credits.txt` static parse PASS — the 5,740-byte
+    Credits TXT equals the embedded viewer credits exactly; all four artifact references are
+    relative basenames; no POSIX/Windows absolute local path, `file://`, external resource tag,
+    network API, external script, or external stylesheet is present. The full assertion source,
+    hashes, and per-entry commands are preserved in `.superpowers/sdd/task-6-report.md`.
+  - Warnings: Both validate and render reported the same 35 existing `catalog_warning` items:
+    3 unmatched Epaulets metal aliases and 32 unmatched Pauldrons color/metal aliases. There
+    were no render-selection, missing-layer, partial-output, or viewer warnings.
+  - Browser limitation: Browser-client setup succeeded, the selected Chrome documentation was
+    read completely, and prescribed `browser-troubleshooting` was followed. Browser Use then
+    rejected direct navigation to
+    `file:///tmp/lpc-viewer-handoff/magical-fisher-female.viewer.html` under its URL security
+    policy and explicitly prohibited alternate-surface or raw-protocol workarounds. Therefore
+    this checkbox remains open and this record does not claim that the exact real viewer was
+    manually opened. Composite UI evidence is the exact generated fixture's direct-`file://`
+    Chromium E2E PASS (3 tests) plus this real viewer's standard/custom manifest, complete
+    credits, portable links, and no-network static checks.
+  - Commit: f410bc41a60ab9ce9a474ac05e6a330fbbb50c8c
 
 Use the CLI built from this checkout and the user-provided selection only
 through the documented command contract:
@@ -1130,7 +1215,15 @@ browser, verify four-direction `tool_rod`, a standard animation, controls,
 collapsed details, complete credits, and no network requests. Do not use
 `--allow-partial`.
 
-- [ ] **Step 5: Update the checked-in plan record and commit evidence**
+- [x] **Step 5: Update the checked-in plan record and commit evidence**
+
+  - Implementation: Reassessed every Task 6 and handoff item, recording the environment-only
+    Browser Use limitation separately from passing product evidence; no production file changed.
+  - Verification: `rtk git diff --check` PASS; `rtk git status --short` PASS — only this
+    intentional plan-record update remained before commit (`.superpowers/sdd/task-6-report.md`
+    is ignored handoff evidence).
+  - Commit: f410bc41a60ab9ce9a474ac05e6a330fbbb50c8c (verified implementation base; the
+    evidence-only plan commit follows this update)
 
 For every completed task, add beneath its final checkbox:
 
@@ -1160,11 +1253,33 @@ rtk git commit -m "docs(plan): record offline viewer verification"
 
 ## Handoff Checklist
 
-- [ ] Every render directory contains sheet, viewer, metadata, Credits TXT, and Credits CSV.
-- [ ] Bundled ZIP contains the same viewer with usable relative links after extraction.
-- [ ] Four-direction, one-direction, standard, and custom animations behave as specified.
-- [ ] Viewer HTML contains no absolute local paths, external resources, or network calls.
-- [ ] Complete Credits TXT is directly readable in the collapsed details UI after expansion.
-- [ ] Existing animation/frame output selection and strict/partial render semantics are unchanged.
-- [ ] CLI documentation impact matrix is reassessed and recorded.
-- [ ] Focused checks, Playwright, `pnpm verify`, build, and packed CLI smoke all pass.
+- [x] Every render directory contains sheet, viewer, metadata, Credits TXT, and Credits CSV.
+  Real strict output and render integration tests both verify the five-file attributed set.
+- [x] Bundled ZIP contains the same viewer with usable relative links after extraction. Real ZIP
+  hashes match disk and the packed smoke plus exact fixture prove portable basename use.
+- [x] Four-direction, one-direction, standard, and custom animations behave as specified.
+  Composite evidence: direct-file Chromium exercises synchronized standard and one-direction
+  playback and controls; the real viewer exposes 16 standard and 2 custom descriptors, including
+  the inspected four-row, 13-frame `tool_rod` output.
+- [x] Viewer HTML contains no absolute local paths, external resources, or network calls. Static
+  parsing of the real HTML and the direct-file fixture/browser tests both pass.
+- [x] Complete Credits TXT is directly readable in the collapsed details UI after expansion.
+  Chromium proves the details interaction; the real viewer's embedded text exactly equals the
+  complete 5,740-byte Credits TXT. The exact real file was not directly opened in Browser Use.
+- [x] Existing animation/frame output selection and strict/partial render semantics are unchanged.
+  Complete Core, CLI, Web, render-transaction, and repository suites pass.
+- [x] CLI documentation impact matrix is reassessed and recorded:
+
+  ```text
+  help: update
+  cli-readme: update
+  root-readme: update
+  landing: update
+  architecture: update
+  engineering: N/A — verification commands and CI mapping do not change
+  releasing: N/A — packaging, versioning, and publication policy do not change
+  plugin: update
+  ```
+
+- [x] Focused checks, Playwright, `pnpm verify`, build, and packed CLI smoke all pass. Initial
+  sandbox IPC/network failures were rerun unchanged with the required permissions and passed.
