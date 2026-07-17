@@ -249,7 +249,7 @@ for (const [animation, region] of sheet.customAnimations ?? []) {
 
   - Implementation: Added immutable standard and custom playback descriptors, ordered deduplication, and public Core exports.
   - Verification: `rtk pnpm --filter @lpc-toolkit/core test -- animation-playback.test.ts` PASS — 4 tests; `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS; `rtk pnpm check:boundaries` PASS.
-  - Commit: pending implementation commit hash.
+  - Commit: c6b53c4611982983df49af562a5c0c575ffb7403
 
 Run:
 
