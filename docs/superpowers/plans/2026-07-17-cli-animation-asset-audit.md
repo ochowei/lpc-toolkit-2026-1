@@ -1075,7 +1075,9 @@ The audit empty-value parser support was contained after it regressed existing c
 - Produces: item-grouped human output with summary, expected paths, blank cells, manual-review reasons, and inspection errors.
 - Documents: successful findings, filters, read-only behavior, and no-pagination contract.
 
-- [ ] **Step 1: Write failing human-output tests**
+- [x] **Step 1: Write failing human-output tests**
+
+  - Added deterministic CLI fixtures for unsupported paths, blank referenced cells, manual-review requirements, and PNG decode failures.
 
 Add one fixture that yields unsupported and blank findings and one with a decode error. Assert exact stable labels rather than the fallback success text:
 
@@ -1093,7 +1095,9 @@ expect(output).toContain('walk/down: source column 3');
 
 Add assertions that a manual-review finding prints its reason and omits `expected:`, while decode failures print under `Inspection errors` after drawing findings.
 
-- [ ] **Step 2: Run the human test and verify RED**
+- [x] **Step 2: Run the human test and verify RED**
+
+  - RED: `rtk pnpm --filter @lpc-toolkit/cli test -- main-human.test.ts` FAIL — the new cases received `Catalog command completed.` because no audit human formatter existed.
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- main-human.test.ts
@@ -1101,7 +1105,9 @@ rtk pnpm --filter @lpc-toolkit/cli test -- main-human.test.ts
 
 Expected: FAIL because `formatHumanData` has no `catalog audit-animations` formatter.
 
-- [ ] **Step 3: Implement deterministic human formatting**
+- [x] **Step 3: Implement deterministic human formatting**
+
+  - Added safe report parsing and ordered worklist output for unsupported paths/manual review, missing files, blank cells, and inspection errors without changing JSON responses or exit behavior.
 
 Add `formatAnimationAudit(data: JsonRecord): string | undefined` to `response.ts`. Parse `targets`, `summary`, `unsupported`, `missingFiles`, `blankFrames`, and `errors` with existing safe record helpers. Return `undefined` if required summary fields are malformed.
 
@@ -1120,7 +1126,9 @@ case 'catalog audit-animations':
   return formatAnimationAudit(data);
 ```
 
-- [ ] **Step 4: Document the public command**
+- [x] **Step 4: Document the public command**
+
+  - Documented the repeatable scope flags, complete unpaginated report, category meanings, successful findings, recolor dependents, and read-only runtime-store/overlay behavior.
 
 Add an `Animation asset audit` subsection near catalog discovery in `packages/cli/README.md` containing:
 
@@ -1142,7 +1150,10 @@ State explicitly:
 - runtime recolors are dependents, not extra PNG files;
 - the command reads the current runtime store and catalog definition overlay and writes nothing.
 
-- [ ] **Step 5: Run human and documentation-adjacent tests and verify GREEN**
+- [x] **Step 5: Run human and documentation-adjacent tests and verify GREEN**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- main-human.test.ts command-spec.test.ts main-json.test.ts` PASS (49 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- main-human.test.ts command-spec.test.ts main-json.test.ts
@@ -1151,7 +1162,9 @@ rtk pnpm --filter @lpc-toolkit/cli run typecheck
 
 Expected: PASS with stable human labels and unchanged existing formatters.
 
-- [ ] **Step 6: Commit human output and docs**
+- [x] **Step 6: Commit human output and docs**
+
+  - Commit: `b1cf6f39c923d1ce0d99f0fd3ca2161c0bbc4298` — `feat(cli): format animation audit reports`.
 
 ```sh
 rtk git add packages/cli/src/response.ts packages/cli/test/main-human.test.ts packages/cli/README.md
@@ -1159,7 +1172,9 @@ rtk git commit -m "feat(cli): format animation audit reports"
 rtk git rev-parse HEAD
 ```
 
-- [ ] **Step 7: Record Task 5 evidence in this plan**
+- [x] **Step 7: Record Task 5 evidence in this plan**
+
+  - CLI documentation impact reassessment: help: N/A — Task 4 already updated the owned command help; cli-readme: update; root-readme: N/A — specialized asset-authoring audit is not a primary quick start; landing: N/A — no landing-page workflow change; architecture: N/A — existing Core planning and CLI runtime boundaries remain unchanged; engineering: N/A — repository verification and CI commands do not change; releasing: N/A — no package or publication workflow change; plugin: N/A — character-authoring plugin does not perform asset production audits.
 
 Record implementation, full commit hash, and both PASS commands, then:
 
