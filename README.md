@@ -121,6 +121,8 @@ metadata plus TXT and CSV attribution. See
 usage, cache locations, local asset precedence, output defaults, and
 troubleshooting.
 
+Final render output includes a standalone `<name>.viewer.html` offline animation viewer.
+
 Catalog and character searches return 20 items by default. Use `--limit 20`
 to set a bounded page size, `--offset 20` (or the returned `page.nextOffset`)
 to continue the same result set, and `--all` only when an explicit unbounded

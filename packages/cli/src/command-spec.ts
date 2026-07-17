@@ -197,7 +197,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
   {
     command: ['preset', 'render'],
     usage: 'lpc-toolkit preset render <preset-id> --out <directory> [options]',
-    description: 'Render an attributed shared preset.',
+    description: 'Render an attributed spritesheet with an offline animation viewer.',
     options: [HELP_OPTION, JSON_OPTION, ...RENDER_OPTIONS],
     examples: ['lpc-toolkit preset render farmer --out rendered'],
   },
@@ -317,7 +317,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
   {
     command: ['character', 'render'],
     usage: 'lpc-toolkit character render (<name> | --selection <file>) --out <directory> [options]',
-    description: 'Render an attributed character selection.',
+    description: 'Render an attributed spritesheet with an offline animation viewer.',
     options: [HELP_OPTION, JSON_OPTION, SELECTION_OPTION, ...RENDER_OPTIONS],
     examples: ['lpc-toolkit character render hero --out rendered --animation walk'],
   },

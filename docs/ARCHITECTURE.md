@@ -23,6 +23,7 @@ LPC behavior:
 - composition and layer resolution
 - recolor and palette swap execution
 - animation extraction and frame slicing
+- pure playback descriptions for composed standard and custom animations
 - credits and attribution manifests
 - hash/token serialization and parsing
 - static asset validation
@@ -133,6 +134,7 @@ not modify `upstream/`.
 - Node `CanvasAdapter` wiring through `@napi-rs/canvas`
 - render output staging and atomic publishing
 - metadata, credits, animation, frame, and ZIP artifact writing
+- self-contained offline animation viewer generation
 - token and preset commands for automation
 
 CLI code may use Node APIs, `@napi-rs/canvas` (MIT), and `jszip` (MIT) because
@@ -257,6 +259,11 @@ metadata, TXT credit, and CSV credit artifact before transactional publication.
 Shared selection parsing, composition, attribution, and preset rules remain in
 core or presets; CLI persistence must not introduce Node filesystem APIs into
 those packages.
+
+Render publication stages the self-contained offline viewer with the attributed
+sheet, metadata, TXT and CSV credits, optional pixel exports, and ZIP before
+publishing the artifact set transactionally. The viewer uses relative sibling
+filenames and contains no absolute local paths.
 
 ## Presets Package Rules
 

@@ -89,6 +89,32 @@ Character rendering is strict by default. Use `--allow-partial` only when
 attributed partial animation output is acceptable; missing paths are reported
 in warnings and metadata rather than silently credited.
 
+### Render output
+
+Every successful render writes this attributed artifact set. Entries marked as
+optional are present only when their corresponding flag is used:
+
+```text
+<out>/
+├── <name>.sheet.png
+├── <name>.viewer.html
+├── <name>.metadata.json
+├── <name>.credits.txt
+├── <name>.credits.csv
+├── animations/
+│   └── <animation>.png                 optional: --animation
+├── frames/
+│   └── <animation>/<direction>-<frame>.png  optional: --frames
+└── <name>.bundle.zip                   optional: --bundle zip
+```
+
+`<name>.viewer.html` is always produced. Double-click it in the render directory
+to play every composed standard and custom animation offline. When using
+`--bundle zip`, extract the complete ZIP before double-clicking the viewer so its
+relative sheet and artifact links remain beside it. `--animation` and `--frames`
+control only the separate PNG outputs; they do not limit the animations available
+in the viewer.
+
 ## Commands
 
 Commands print human-readable output by default. Add `--json` when a command is
@@ -236,11 +262,11 @@ assets.
 
 ## Attribution and license
 
-Every render writes the composed sheet, a metadata JSON file, and both
-`<name>.credits.txt` and `<name>.credits.csv`. Animation strips, individual
-frames, and ZIP bundles are optional; attribution files and effective-license
-metadata are not. Credits are derived from the selected assets and the pinned
-`CREDITS.csv`.
+Every render writes the composed sheet, offline animation viewer, a metadata JSON
+file, and both `<name>.credits.txt` and `<name>.credits.csv`. Animation strips,
+individual frames, and ZIP bundles are optional; the viewer, attribution files,
+and effective-license metadata are not. Credits are derived from the selected
+assets and the pinned `CREDITS.csv`.
 
 This package is licensed under GPL-3.0-or-later. Keep the generated attribution
 artifacts with rendered sprites and comply with the effective licenses reported

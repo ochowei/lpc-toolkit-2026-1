@@ -47,6 +47,9 @@ describe('LandingPage', () => {
     ];
     for (const command of customizationCommands) expect(html).toContain(command);
 
+    expect(html).toContain('.viewer.html');
+    expect(html).toContain('offline');
+
     expect(html).toContain(
       'https://github.com/ochowei/lpc-toolkit-2026-1/blob/main/packages/cli/README.md',
     );

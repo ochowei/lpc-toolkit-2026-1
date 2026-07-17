@@ -10,6 +10,7 @@ import {
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import JSZip from 'jszip';
 import {
   installedCliInvocation,
   isExpectedWebTermination,
@@ -67,6 +68,7 @@ let packDir;
 let installPrefix;
 let emptyCwd;
 let cacheRoot;
+let presetRenderDir;
 
 try {
   packDir = mkdtempSync(path.join(os.tmpdir(), 'lpc-toolkit-pack-'));
@@ -219,6 +221,49 @@ try {
     `unexpected web server termination: ${JSON.stringify(webResult)}`,
   );
 
+  presetRenderDir = mkdtempSync(path.join(os.tmpdir(), 'lpc-toolkit-render-'));
+  const presetRenderInvocation = installedCliInvocation({
+    platform: process.platform,
+    nodePath: process.execPath,
+    shimPath: installedBinPath,
+    targetPath: installedBinTargetPath,
+    args: [
+      'preset', 'render', 'farmer', '--out', presetRenderDir, '--bundle', 'zip', '--json',
+    ],
+  });
+  const presetRenderResult = spawnSync(
+    presetRenderInvocation.command,
+    presetRenderInvocation.args,
+    {
+      cwd: emptyCwd,
+      encoding: 'utf8',
+      env: { ...process.env, LPC_TOOLKIT_CACHE_DIR: cacheRoot },
+    },
+  );
+  assert.equal(presetRenderResult.status, 0, presetRenderResult.stderr);
+  const presetRenderOutput = JSON.parse(presetRenderResult.stdout);
+  const presetArtifacts = presetRenderOutput.data?.artifacts;
+  assert.ok(Array.isArray(presetArtifacts), 'preset render JSON is missing artifacts');
+  const viewerArtifact = presetArtifacts.find(({ type }) => type === 'viewer');
+  const sheetArtifact = presetArtifacts.find(({ type }) => type === 'sheet');
+  const zipArtifact = presetArtifacts.find(({ type }) => type === 'zip');
+  assert.equal(typeof viewerArtifact?.path, 'string', 'preset render is missing viewer artifact');
+  assert.equal(typeof sheetArtifact?.path, 'string', 'preset render is missing sheet artifact');
+  assert.equal(typeof zipArtifact?.path, 'string', 'preset render is missing ZIP artifact');
+  const viewerFileName = path.basename(viewerArtifact.path);
+  const sheetFileName = path.basename(sheetArtifact.path);
+  const viewerHtml = readFileSync(viewerArtifact.path, 'utf8');
+  assert.match(viewerHtml, /id="viewer-data"/u);
+  assert.ok(
+    viewerHtml.includes(sheetFileName),
+    `viewer is missing relative sheet filename ${sheetFileName}`,
+  );
+  const presetArchive = await JSZip.loadAsync(readFileSync(zipArtifact.path));
+  assert.ok(
+    presetArchive.file(viewerFileName) !== null,
+    `preset render ZIP is missing ${viewerFileName}`,
+  );
+
   function runInstalled(args) {
     const invocation = installedCliInvocation({
       platform: process.platform,
@@ -287,6 +332,9 @@ try {
     }
     if (cacheRoot !== undefined) {
       rmSync(cacheRoot, { recursive: true, force: true });
+    }
+    if (presetRenderDir !== undefined) {
+      rmSync(presetRenderDir, { recursive: true, force: true });
     }
   }
 }
