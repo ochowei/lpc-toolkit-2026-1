@@ -1191,7 +1191,7 @@ with no issues.
 - Consumes: Task 5 save/import functions, `toSelections`, catalog, palettes, existing token/hash APIs, and the existing `apply_selections` action.
 - Produces: one Share / Import popover with canonical save, canonical/upstream import, Copy Link, Copy Token, and Paste Token.
 
-- [ ] **Step 1: Write failing presentation and i18n tests**
+- [x] **Step 1: Write failing presentation and i18n tests**
 
 Create a source-boundary test matching the existing popover convention:
 
@@ -1226,7 +1226,7 @@ const shareKeys = [
 ] satisfies readonly TranslationKey[];
 ```
 
-- [ ] **Step 2: Run focused tests and verify missing UI/copy**
+- [x] **Step 2: Run focused tests and verify missing UI/copy**
 
 Run:
 
@@ -1236,7 +1236,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- share-import-popover.test.ts i18n.tes
 
 Expected: FAIL because the component and translation keys do not exist.
 
-- [ ] **Step 3: Implement the Share / Import popover**
+- [x] **Step 3: Implement the Share / Import popover**
 
 Start from the current Token popover behavior and add:
 
@@ -1277,7 +1277,7 @@ Use these user-facing labels:
 
 Retain existing token-specific copy keys for token actions.
 
-- [ ] **Step 4: Wire the popover through the More menu and harness**
+- [x] **Step 4: Wire the popover through the More menu and harness**
 
 - Rename `MoreMenuTarget` from `'token' | 'attribution'` to
   `'share' | 'attribution'`.
@@ -1287,7 +1287,7 @@ Retain existing token-specific copy keys for token actions.
 - Replace the More menu label/icon with `↗ {t('share.title')}`.
 - Remove the old Token popover file after imports are updated.
 
-- [ ] **Step 5: Add the browser round-trip E2E test**
+- [x] **Step 5: Add the browser round-trip E2E test**
 
 Create `packages/web/e2e/character-json-interchange.spec.ts`:
 
@@ -1328,7 +1328,7 @@ test('saved canonical JSON restores the complete Web selection', async ({ page }
 });
 ```
 
-- [ ] **Step 6: Run Web unit, type, and focused E2E gates**
+- [x] **Step 6: Run Web unit, type, and focused E2E gates**
 
 Run:
 
@@ -1340,7 +1340,7 @@ rtk pnpm --filter @lpc-toolkit/web test:e2e -- character-json-interchange.spec.t
 
 Expected: all PASS and the downloaded JSON filename is exact.
 
-- [ ] **Step 7: Commit and record Task 6**
+- [x] **Step 7: Commit and record Task 6**
 
 Stage the new/removed popover, Web library wiring, translations, tests, and E2E
 spec, then commit:
@@ -1352,6 +1352,24 @@ rtk git rev-parse HEAD
 
 Record the full hash and PASS commands under Task 6, then commit the plan
 record as `docs(plan): record character JSON task 6`.
+
+**Implementation note:** Replaced the Token entry with Share / Import while
+preserving token workflows, added canonical save and atomic imported-selection
+application, complete translations, and a visible-button Playwright round
+trip. Review findings moved clipboard/location I/O behind Web-lib ports and
+added rejected-apply plus latest-only async guards. Independent re-review
+approved the task with no remaining issues.
+
+**Commits:**
+- `b45307a642e49ef54d0b0f9a7186e59a91a32d3c`
+- `98f6a1b6d4f0682924581a986bd940b01e252365`
+
+**Verification:**
+- `rtk pnpm --filter @lpc-toolkit/web test -- share-import-popover.test.ts character-document.test.ts i18n.test.ts selection.test.ts` PASS (62 tests)
+- `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS
+- `rtk pnpm check:boundaries` PASS
+- `rtk pnpm --filter @lpc-toolkit/web test:e2e -- character-json-interchange.spec.ts` PASS (1 Chromium test)
+- `rtk pnpm verify` PASS
 
 ---
 
