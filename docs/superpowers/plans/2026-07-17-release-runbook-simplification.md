@@ -36,7 +36,7 @@
 - Consumes: `.github/workflows/cli-release-candidate.yml`, `.github/workflows/publish.yml`, `packages/cli/scripts/verify-rc-tag.mjs`, and `packages/cli/scripts/verify-release-tag.mjs` as executable contracts.
 - Produces: A standalone maintainer runbook retaining the current local package, RC, stable publication, public verification, attribution, and immutable-state requirements.
 
-- [ ] **Step 1: Establish the focused documentation-contract baseline**
+- [x] **Step 1: Establish the focused documentation-contract baseline**
 
 Run:
 
@@ -46,7 +46,9 @@ rtk pnpm --filter @lpc-toolkit/cli test -- release-workflows.test.ts
 
 Expected: PASS for `packages/cli/test/release-workflows.test.ts`, including the tagged RC gate and advisory manual-run assertions. Record the exact test count and result beneath this step.
 
-- [ ] **Step 2: Replace `docs/RELEASING.md` with the approved thin runbook**
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- release-workflows.test.ts` PASS — 1 test file, 4 tests.
+
+- [x] **Step 2: Replace `docs/RELEASING.md` with the approved thin runbook**
 
 Replace the complete file with:
 
@@ -120,7 +122,9 @@ and record the immutable external state before proposing recovery.
 
 After applying the replacement, record that only `docs/RELEASING.md` changed in this step.
 
-- [ ] **Step 3: Run focused and repository-wide verification**
+- Implementation: Replaced only `docs/RELEASING.md`; workflows, verifier scripts, package metadata, plugin files, attribution paths, and `upstream/` were not changed.
+
+- [x] **Step 3: Run focused and repository-wide verification**
 
 Run:
 
@@ -138,7 +142,13 @@ Expected:
 
 Record each exact command and PASS, FAIL, or expected-environment-blocker result beneath this step.
 
-- [ ] **Step 4: Review scope and documentation impact**
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- release-workflows.test.ts` PASS — 1 test file, 4 tests.
+- Audit: `rtk node /Users/william/.agents/skills/releasing-lpc-toolkit/scripts/audit-release.mjs --repo .` CONTRACT PASS — `releaseContracts.missingRequiredFiles` was empty; expected managed-worktree blockers were `detached_head` and `worktree_dirty` while the documentation edit was uncommitted.
+- Verification: first `rtk pnpm verify` run FAIL — `packages/web/test/readme-architecture-docs.test.ts` required the contiguous phrase `CLI Release Candidate`, which the approved prose had split across a Markdown line break.
+- Repair verification: `rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts` PASS — 1 test file, 21 tests; `rtk pnpm --filter @lpc-toolkit/cli test -- release-workflows.test.ts` remained PASS — 1 test file, 4 tests.
+- Verification: final `rtk pnpm verify` PASS — boundaries, CLI docs policy (19 tests), plugin contract (17 tests), all typechecks, core (171 tests), presets (3 tests), CLI (355 passed, 1 skipped), and web (684 passed, 1 skipped).
+
+- [x] **Step 4: Review scope and documentation impact**
 
 Run:
 
@@ -149,6 +159,8 @@ rtk git status --short
 ```
 
 Expected: no whitespace errors; the release guide is the only implementation file changed; workflow, verifier, package, plugin, attribution, and `upstream/` files are untouched.
+
+- Scope: PASS — `rtk git diff --check` reported no errors; `docs/RELEASING.md` is the only implementation file, reduced from 100 to 66 lines. The execution plan contains only required progress evidence; all excluded paths remain untouched.
 
 Record this final matrix beneath the step:
 
@@ -163,7 +175,7 @@ releasing: update — simplified the maintainer runbook without changing its con
 plugin: N/A — no installed skill or plugin contract changes
 ```
 
-- [ ] **Step 5: Commit the runbook simplification**
+- [x] **Step 5: Commit the runbook simplification**
 
 Run:
 
@@ -175,7 +187,10 @@ rtk git rev-parse HEAD
 
 Expected: one focused documentation commit. Append the full hash printed by `rtk git rev-parse HEAD` beneath this step, together with the exact verification commands and their results.
 
-- [ ] **Step 6: Commit the completed plan record**
+- Commit: `907f75dd6b65b510d34e9c728bfe758bb680a22f`
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- release-workflows.test.ts` PASS; `rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts` PASS; `rtk pnpm verify` PASS; release audit required-file contract PASS with expected managed-worktree state recorded in Step 3.
+
+- [x] **Step 6: Commit the completed plan record**
 
 Run:
 
@@ -185,3 +200,5 @@ rtk git commit -m "docs(plan): record release runbook verification"
 ```
 
 Expected: the plan checkboxes, implementation commit hash, and verification evidence are committed without modifying the runbook implementation commit.
+
+- Plan record: all checkboxes, the implementation commit hash, focused verification, full verification, audit result, and documentation-impact matrix are recorded here for the final plan-record commit.
