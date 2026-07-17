@@ -801,7 +801,7 @@ ledger for final whole-branch triage.
 - Consumes: Task 3 context/file reader and Task 1 canonical exports.
 - Produces: character read results with `source`, canonical in-memory preview/render input, and warning code `selection_format_normalized` after successful upstream mutation.
 
-- [ ] **Step 1: Write failing character read/mutation tests**
+- [x] **Step 1: Write failing character read/mutation tests**
 
 Add an upstream fixture to `character-commands.test.ts` and cover both read-only
 and mutation behavior:
@@ -850,7 +850,7 @@ it.each([
 Retain and extend the existing invalid-candidate test so an upstream source is
 also byte-for-byte unchanged when validation fails.
 
-- [ ] **Step 2: Run focused character tests and verify failure**
+- [x] **Step 2: Run focused character tests and verify failure**
 
 Run:
 
@@ -861,7 +861,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- character-store.test.ts character-com
 Expected: FAIL because `readCharacter` is canonical-only and preview rereads
 the upstream file.
 
-- [ ] **Step 3: Make character reads context-aware and keep list independent**
+- [x] **Step 3: Make character reads context-aware and keep list independent**
 
 Extend `StoredCharacter` with `source: SelectionDocumentSource`. Change
 `readCharacter` to accept an optional `SelectionDocumentImportContext`:
@@ -901,7 +901,7 @@ Preserve the existing typed filesystem error mapping around both branches.
 Expose `importContext` from `loadCharacterContext`, load the context before
 every existing-character read, and pass it into `readCharacter`.
 
-- [ ] **Step 4: Stop preview from rereading the source path**
+- [x] **Step 4: Stop preview from rereading the source path**
 
 Change `CharacterPreviewOptions` to include both the canonical in-memory
 document and the original path used only for output identity:
@@ -924,7 +924,7 @@ Remove `readSelection` from `preview.ts`; use `options.selectionJson` throughout
 `character preview` passes `stored.selection`. Update preview unit tests to
 assert this exact input.
 
-- [ ] **Step 5: Add atomic normalization warnings and stable import errors**
+- [x] **Step 5: Add atomic normalization warnings and stable import errors**
 
 Add this CLI warning helper next to the character command orchestration:
 
@@ -948,7 +948,7 @@ Update CLI validation for recolor sub-bindings: use
 standalone sprite path for a sub-binding because its primary item owns the
 layer.
 
-- [ ] **Step 6: Remove the CLI schema duplicate and update help/CLI README**
+- [x] **Step 6: Remove the CLI schema duplicate and update help/CLI README**
 
 Import canonical types/functions directly from `@lpc-toolkit/core` in every
 remaining CLI consumer, then remove `packages/cli/src/selection.ts` and its
@@ -977,7 +977,7 @@ Add CLI README text stating:
 
 Add help assertions for both input and create descriptions.
 
-- [ ] **Step 7: Run CLI package gates**
+- [x] **Step 7: Run CLI package gates**
 
 Run:
 
@@ -989,7 +989,7 @@ rtk pnpm --filter @lpc-toolkit/cli build
 
 Expected: all PASS; no source or test imports `./selection.js`.
 
-- [ ] **Step 8: Commit and record Task 4**
+- [x] **Step 8: Commit and record Task 4**
 
 Stage the exact modified CLI source/tests plus `packages/cli/README.md`, commit
 as:
@@ -1001,6 +1001,21 @@ rtk git rev-parse HEAD
 
 Record the full hash and PASS commands under Task 4, then commit the plan
 record as `docs(plan): record character JSON task 4`.
+
+**Implementation note:** Migrated character reads and mutations to the shared
+import boundary, normalized successful upstream mutations atomically, switched
+preview to canonical in-memory input, made CLI validation sub-recolor aware,
+removed the duplicate CLI schema module, and updated help plus the CLI README.
+Independent review approved the task with no issues.
+
+**Commit:** `ed166b36c828303fab8a9f9a84f96dd29cc9715b`
+
+**Verification:**
+- `rtk pnpm --filter @lpc-toolkit/cli test -- character-store.test.ts character-commands.test.ts preview.test.ts command-spec.test.ts main-human.test.ts main-json.test.ts validation.test.ts` PASS (100 tests)
+- `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS
+- `rtk pnpm --filter @lpc-toolkit/cli build` PASS (pre-existing Vite warnings only)
+- `rtk pnpm --filter @lpc-toolkit/cli test` PASS (369 tests, 1 existing skip; localhost permission required)
+- `rtk pnpm verify:cli-docs-policy` PASS (19 tests)
 
 ---
 
