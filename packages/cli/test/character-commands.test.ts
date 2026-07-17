@@ -84,7 +84,84 @@ async function run(
   };
 }
 
+function writeUpstreamCharacter(
+  fixture: ReturnType<typeof createFixture>,
+  selectionPath: string,
+  selections: Readonly<Record<string, Readonly<Record<string, unknown>>>> = {
+    body: { itemId: 'body' },
+  },
+): string {
+  const targetPath = path.join(fixture.cwd, selectionPath);
+  const original = `${JSON.stringify({
+    version: 2,
+    bodyType: 'male',
+    selections,
+  }, null, 2)}\n`;
+  mkdirSync(path.dirname(targetPath), { recursive: true });
+  writeFileSync(targetPath, original);
+  return original;
+}
+
 describe('character commands', () => {
+  it('shows upstream input as canonical without rewriting the source', async () => {
+    const fixture = createFixture();
+    const original = writeUpstreamCharacter(fixture, 'saved/upstream.json');
+    const response = (await run(fixture, [
+      'character', 'show', '--selection', 'saved/upstream.json', '--json',
+    ])).response;
+
+    expect(response).toMatchObject({
+      ok: true,
+      data: {
+        selection: {
+          schema: 'lpc-toolkit.selection.v1',
+          bodyType: 'male',
+          items: { body: { name: 'Body Color' } },
+        },
+      },
+    });
+    expect(readFileSync(path.join(fixture.cwd, 'saved/upstream.json'), 'utf8')).toBe(original);
+  });
+
+  it.each([
+    ['set', ['--type', 'hair', '--item', 'braids']],
+    ['remove', ['--type', 'body']],
+  ] as const)('normalizes upstream input after successful character %s', async (command, args) => {
+    const fixture = createFixture();
+    writeUpstreamCharacter(fixture, 'saved/upstream.json');
+    const response = (await run(fixture, [
+      'character', command, '--selection', 'saved/upstream.json', ...args, '--json',
+    ])).response;
+
+    expect(response.ok).toBe(true);
+    expect(response.warnings).toContainEqual(expect.objectContaining({
+      code: 'selection_format_normalized',
+      path: path.join(fixture.cwd, 'saved/upstream.json'),
+    }));
+    expect(JSON.parse(readFileSync(
+      path.join(fixture.cwd, 'saved/upstream.json'),
+      'utf8',
+    ))).toMatchObject({ schema: 'lpc-toolkit.selection.v1' });
+  });
+
+  it('keeps upstream bytes unchanged when import validation fails', async () => {
+    const fixture = createFixture();
+    const original = writeUpstreamCharacter(fixture, 'saved/upstream.json', {
+      body: { itemId: 'body' },
+      hair: { itemId: 'missing' },
+    });
+
+    const response = (await run(fixture, [
+      'character', 'remove', '--selection', 'saved/upstream.json', '--type', 'body', '--json',
+    ])).response;
+
+    expect(response).toMatchObject({
+      ok: false,
+      errors: [{ code: 'unknown_upstream_item', path: 'selections.hair.itemId' }],
+    });
+    expect(readFileSync(path.join(fixture.cwd, 'saved/upstream.json'), 'utf8')).toBe(original);
+  });
+
   it('overrides a preset body type only when --body-type is explicit', async () => {
     const implicitFixture = createFixture();
     const explicitFixture = createFixture();
@@ -237,6 +314,10 @@ describe('character commands', () => {
     expect(renderCharacterPreview).toHaveBeenCalledWith(expect.objectContaining({
       runtime: fixture.runtime,
       cwd: fixture.cwd,
+      selectionJson: expect.objectContaining({
+        schema: 'lpc-toolkit.selection.v1',
+        name: 'hero',
+      }),
       characterName: 'hero',
       animation: 'walk',
       direction: 'down',
@@ -270,7 +351,7 @@ describe('character commands', () => {
     });
   });
 
-  it('maps strict preview selection validation to the stable output error code', async () => {
+  it('preserves strict preview import validation errors', async () => {
     const fixture = createFixture();
     const selectionPath = path.join(fixture.cwd, 'saved', 'invalid.selection.json');
     mkdirSync(path.dirname(selectionPath), { recursive: true });
@@ -288,8 +369,8 @@ describe('character commands', () => {
     );
 
     expect(response.errors[0]).toMatchObject({
-      code: 'selection_output_invalid',
-      path: 'hair/Missing Hair',
+      code: 'unknown_upstream_item',
+      path: 'items.hair',
     });
   });
 
@@ -452,41 +533,47 @@ describe('character commands', () => {
     ])).response.errors[0]).toMatchObject({ code: 'unexpected_argument' });
   });
 
-  it('keeps bytes unchanged when production remove yields an invalid candidate', async () => {
-    const fixture = createFixture();
-    const heroPath = path.join(fixture.cwd, 'characters', 'hero.selection.json');
-    mkdirSync(path.dirname(heroPath), { recursive: true });
-    const original = `${JSON.stringify({
-      schema: 'lpc-toolkit.selection.v1',
-      name: 'hero',
-      bodyType: 'male',
-      items: {
-        body: { name: 'Body Color' },
-        hair: { name: 'Missing Hair' },
-      },
-    }, null, 2)}\n`;
-    writeFileSync(heroPath, original);
-    const stdout: string[] = [];
-    const stderr: string[] = [];
+  it.each(['canonical', 'upstream-v2'] as const)(
+    'keeps %s bytes unchanged when production remove yields an invalid candidate',
+    async (source) => {
+      const fixture = createFixture();
+      const heroPath = path.join(fixture.cwd, 'saved', 'hero.json');
+      mkdirSync(path.dirname(heroPath), { recursive: true });
+      const original = `${JSON.stringify(source === 'canonical' ? {
+        schema: 'lpc-toolkit.selection.v1',
+        bodyType: 'male',
+        items: { body: { name: 'Body Color' }, hair: { name: 'Braids' } },
+      } : {
+        version: 2,
+        bodyType: 'male',
+        selections: { body: { itemId: 'body' }, hair: { itemId: 'braids' } },
+      }, null, 2)}\n`;
+      writeFileSync(heroPath, original);
+      const stdout: string[] = [];
+      const stderr: string[] = [];
 
-    const code = await runCli(
-      ['character', 'remove', 'hero', '--type', 'body', '--json'],
-      {
-        cwd: fixture.cwd,
-        stdout: (text) => stdout.push(text),
-        stderr: (text) => stderr.push(text),
-      },
-    );
+      const code = await runCli(
+        [
+          'character', 'remove', '--selection', heroPath,
+          '--type', 'body', '--json',
+        ],
+        {
+          cwd: fixture.cwd,
+          stdout: (text) => stdout.push(text),
+          stderr: (text) => stderr.push(text),
+        },
+      );
 
-    expect(code).toBe(1);
-    expect(JSON.parse(stdout.join(''))).toMatchObject({
-      ok: false,
-      command: 'character remove',
-      errors: [{ code: 'unknown_item', path: 'hair/Missing Hair' }],
-    });
-    expect(stderr).toEqual([]);
-    expect(readFileSync(heroPath, 'utf8')).toBe(original);
-  });
+      expect(code).toBe(1);
+      expect(JSON.parse(stdout.join(''))).toMatchObject({
+        ok: false,
+        command: 'character remove',
+        errors: [{ code: 'missing_sprite_path', path: 'hair/Braids' }],
+      });
+      expect(stderr).toEqual([]);
+      expect(readFileSync(heroPath, 'utf8')).toBe(original);
+    },
+  );
 
   it('maps typed store errors directly to CLI issues', async () => {
     const fixture = createFixture();

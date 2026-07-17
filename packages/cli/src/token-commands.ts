@@ -5,10 +5,13 @@ import {
   decodeSelectionToken,
   encodeSelectionToken,
   parseHash,
+  parseSelectionJson,
+  selectionJsonFromCore,
   type Catalog,
   type HashWarning,
   type PaletteMetadata,
   type ParseHashResult,
+  type SelectionJson,
 } from '@lpc-toolkit/core';
 import { flagString, type ParsedArgs } from './args.js';
 import { createRuntimeContext } from './context.js';
@@ -20,11 +23,6 @@ import {
   readSelectionDocumentFile,
   type LoadedSelectionDocument,
 } from './selection-document-file.js';
-import {
-  parseSelectionJson,
-  selectionJsonFromCore,
-  type SelectionJson,
-} from './selection.js';
 import {
   loadBundledTokenDecodeData,
   type TokenDecodeData,

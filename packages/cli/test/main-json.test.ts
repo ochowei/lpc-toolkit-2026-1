@@ -35,6 +35,40 @@ function createRuntime(): RuntimeAssets {
 }
 
 describe('main json behavior', () => {
+  it('reports normalization in the JSON envelope after an upstream character mutation', async () => {
+    const runtime = createRuntime();
+    const selectionPath = path.join(runtime.context.repoRoot, 'upstream.json');
+    writeFileSync(selectionPath, JSON.stringify({
+      version: 2,
+      bodyType: 'male',
+      selections: { body: { itemId: 'body' } },
+    }));
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+
+    const code = await runCli([
+      'character', 'remove', '--selection', selectionPath, '--type', 'body', '--json',
+    ], {
+      cwd: runtime.context.repoRoot,
+      stdout: (text) => stdout.push(text),
+      stderr: (text) => stderr.push(text),
+    }, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+
+    expect(code).toBe(0);
+    expect(stderr).toEqual([]);
+    expect(JSON.parse(stdout.join(''))).toMatchObject({
+      ok: true,
+      command: 'character remove',
+      warnings: [{
+        code: 'selection_format_normalized',
+        path: selectionPath,
+      }],
+      errors: [],
+    });
+  });
+
   it('writes machine-readable unknown command errors to stdout', async () => {
     const stdout: string[] = [];
     const stderr: string[] = [];

@@ -57,6 +57,15 @@ describe('helpForCommand', () => {
     expect(previewHelp).toContain('Default: 0');
   });
 
+  it('distinguishes selection input help from the create destination', () => {
+    expect(helpForCommand(['character', 'show'])).toContain(
+      '--selection <file>  Read a Toolkit or upstream selection JSON file.',
+    );
+    expect(helpForCommand(['character', 'create'])).toContain(
+      '--selection <file>  Write the new selection to this explicit path.',
+    );
+  });
+
   it('documents discovery pagination options', () => {
     for (const command of [['catalog', 'items'], ['character', 'search']]) {
       const help = helpForCommand(command);

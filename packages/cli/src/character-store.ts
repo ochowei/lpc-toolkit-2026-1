@@ -11,9 +11,14 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import {
   parseSelectionJson,
+  SelectionDocumentError,
+  selectionJsonFromCore,
   type ParsedSelectionJson,
+  type SelectionDocumentImportContext,
+  type SelectionDocumentSource,
   type SelectionJson,
-} from './selection.js';
+} from '@lpc-toolkit/core';
+import { readSelectionDocumentFile } from './selection-document-file.js';
 
 const CHARACTER_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/u;
 const SELECTION_FILE_SUFFIX = '.selection.json';
@@ -45,6 +50,7 @@ export interface StoredCharacter {
   readonly path: string;
   readonly selection: SelectionJson;
   readonly parsed: ParsedSelectionJson;
+  readonly source: SelectionDocumentSource;
 }
 
 export type CharacterListEntry =
@@ -104,8 +110,41 @@ export function resolveCharacterPath(cwd: string, input: CharacterLocator): stri
   return path.join(cwd, 'characters', `${input.name}${SELECTION_FILE_SUFFIX}`);
 }
 
-export function readCharacter(cwd: string, input: CharacterLocator): StoredCharacter {
+export function readCharacter(
+  cwd: string,
+  input: CharacterLocator,
+  importContext?: SelectionDocumentImportContext,
+): StoredCharacter {
   const targetPath = resolveCharacterPath(cwd, input);
+  if (importContext) {
+    try {
+      const loaded = readSelectionDocumentFile(cwd, targetPath, importContext);
+      return {
+        path: loaded.path,
+        selection: loaded.selection,
+        parsed: loaded.parsed,
+        source: loaded.source,
+      };
+    } catch (error) {
+      if (error instanceof SelectionDocumentError) throw error;
+      if (isNodeError(error) && error.code === 'ENOENT') {
+        throw new CharacterStoreError(
+          'character_not_found',
+          `Character does not exist: ${targetPath}`,
+          targetPath,
+        );
+      }
+      if (isNodeError(error)) {
+        throw new CharacterStoreError(
+          'character_read_failed',
+          `Failed to read character ${targetPath}: ${errorMessage(error)}`,
+          targetPath,
+        );
+      }
+      throw error;
+    }
+  }
+
   let contents: string;
   try {
     contents = readFileSync(targetPath, 'utf8');
@@ -125,9 +164,14 @@ export function readCharacter(cwd: string, input: CharacterLocator): StoredChara
   }
 
   try {
-    const selection = JSON.parse(contents) as unknown;
-    const parsed = parseSelectionJson(selection);
-    return { path: targetPath, selection: selection as SelectionJson, parsed };
+    const value = JSON.parse(contents) as unknown;
+    const parsed = parseSelectionJson(value);
+    return {
+      path: targetPath,
+      selection: selectionJsonFromCore(parsed.selections, parsed.metadata.name),
+      parsed,
+      source: 'canonical',
+    };
   } catch (error) {
     throw new CharacterStoreError(
       'character_invalid',

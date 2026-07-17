@@ -1,21 +1,19 @@
 import {
   composeSelections,
   makeResolvePalette,
+  parseSelectionJson,
   type CanvasAdapter,
   type Catalog,
   type ComposedSheet,
   type PaletteMetadata,
+  type ParsedSelectionJson,
+  type SelectionJson,
 } from '@lpc-toolkit/core';
 import { AssetStoreError } from './asset-store.js';
 import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
 import { createNodeCanvasAdapter } from './node-canvas-adapter.js';
 import type { CliIssue } from './response.js';
 import type { RuntimeAssets } from './runtime-assets.js';
-import {
-  parseSelectionJson,
-  type ParsedSelectionJson,
-  type SelectionJson,
-} from './selection.js';
 import { validateSelections } from './validation.js';
 
 export interface ComposeSelectionOptions {

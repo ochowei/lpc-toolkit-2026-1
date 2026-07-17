@@ -89,6 +89,15 @@ Character rendering is strict by default. Use `--allow-partial` only when
 attributed partial animation output is acceptable; missing paths are reported
 in warnings and metadata rather than silently credited.
 
+`lpc-toolkit.selection.v1` is the canonical saved selection format. Wherever
+`--selection` reads an existing file, the CLI also accepts upstream version 1
+and version 2 selection JSON. Read-only commands import these documents in
+memory without rewriting the source. A successful `character set` or
+`character remove` mutation of upstream input atomically rewrites that file in
+the canonical format and emits the `selection_format_normalized` warning.
+`character create --selection <file>` remains an output destination for the
+new character rather than an input file.
+
 ## Commands
 
 Commands print human-readable output by default. Add `--json` when a command is

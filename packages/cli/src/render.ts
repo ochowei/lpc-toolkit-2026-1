@@ -17,13 +17,13 @@ import {
   extractAnimationFrames,
   type AnimationName,
   type CanvasLike,
+  type SelectionJson,
 } from '@lpc-toolkit/core';
 import { composeSelectionForOutput } from './compose-selection.js';
 import { writeCanvasPng } from './node-canvas-adapter.js';
 import { CLI_VERSION } from './package-info.js';
 import type { CliIssue } from './response.js';
 import type { RuntimeAssets } from './runtime-assets.js';
-import type { SelectionJson } from './selection.js';
 import { writeZipBundle } from './zip.js';
 
 export interface RenderArtifact {
