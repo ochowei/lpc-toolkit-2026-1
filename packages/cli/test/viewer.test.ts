@@ -39,6 +39,13 @@ const unsafeFileNames = [
 
 type ViewerFileField = (typeof viewerFileFields)[number];
 
+function readFixtureHtml(fileName: string): string {
+  return readFileSync(
+    fileURLToPath(new URL(`./fixtures/viewer/${fileName}`, import.meta.url)),
+    'utf8',
+  ).replace(/\r\n/gu, '\n');
+}
+
 function withViewerFile(field: ViewerFileField, fileName: string): RenderViewerModel {
   if (field === 'sheet.fileName') {
     return { ...model, sheet: { ...model.sheet, fileName } };
@@ -58,19 +65,13 @@ const unsafeViewerFiles = viewerFileFields.flatMap((field) =>
 
 describe('renderViewerHtml', () => {
   it('matches the committed browser fixture exactly', () => {
-    const fixtureHtml = readFileSync(
-      fileURLToPath(new URL('./fixtures/viewer/fixture.viewer.html', import.meta.url)),
-      'utf8',
-    );
+    const fixtureHtml = readFixtureHtml('fixture.viewer.html');
 
     expect(renderViewerHtml(model)).toBe(fixtureHtml);
   });
 
   it('matches the committed no-animation partial browser fixture exactly', () => {
-    const fixtureHtml = readFileSync(
-      fileURLToPath(new URL('./fixtures/viewer/partial.viewer.html', import.meta.url)),
-      'utf8',
-    );
+    const fixtureHtml = readFixtureHtml('partial.viewer.html');
 
     expect(renderViewerHtml(partialModel)).toBe(fixtureHtml);
   });
