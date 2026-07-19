@@ -394,6 +394,10 @@ expand the description, long description, keywords, and default prompts to
 include identifying incomplete animation assets and producing drawing
 worklists.
 
+Update the root README's Codex Plugin section from plugin `0.2.0` to `0.2.1`
+and mention the new audit workflow. The public CLI installation range remains
+unchanged.
+
 Add `agents/openai.yaml` for the audit skill with implicit invocation enabled
 and UI text focused on auditing LPC animation assets. Update character skill UI
 metadata only if needed to make the composition boundary unambiguous.
@@ -477,7 +481,7 @@ Tests or static assertions should confirm that the documentation requires:
 ```text
 help: N/A — no CLI command or help behavior changes
 cli-readme: N/A — existing audit command documentation remains accurate
-root-readme: N/A — no primary CLI quick-start change
+root-readme: update — align the documented plugin version and capability summary
 landing: N/A — no product landing workflow change
 architecture: N/A — no package boundary or runtime architecture change
 engineering: N/A — no repository verification command changes
