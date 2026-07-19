@@ -926,7 +926,7 @@ After the product commit, update this task's checkboxes and add the required ful
 - Produces: plugin version `0.2.1`, accurate public prompts/descriptions, and synchronized compatibility prose.
 - Preserves: plugin name, source path, license, icons, marketplace identity, CLI range, and lightweight component prohibitions.
 
-- [ ] **Step 1: Write failing presentation and version assertions**
+- [x] **Step 1: Write failing presentation and version assertions**
 
 Extend `scripts/verify-codex-plugin.test.mjs` and `check-cli.test.mjs` to require:
 
@@ -949,7 +949,7 @@ Plugin version `0.2.1` supports `@lpc-toolkit/cli >=0.2.0 <0.3.0`
 Add a README assertion that the Codex Plugin section contains plugin `0.2.1`,
 `catalog audit-animations`, and `drawing worklist`.
 
-- [ ] **Step 2: Run focused tests to verify they fail**
+- [x] **Step 2: Run focused tests to verify they fail**
 
 Run:
 
@@ -960,7 +960,7 @@ rtk node --test plugins/lpc-toolkit/test/check-cli.test.mjs scripts/verify-codex
 Expected: FAIL because the manifest, verifier, references, and README still
 name `0.2.0` and character-only presentation.
 
-- [ ] **Step 3: Update manifest and verifier version contracts**
+- [x] **Step 3: Update manifest and verifier version contracts**
 
 Set manifest and verifier fixture/assertion versions to `0.2.1`. Use this
 plugin presentation:
@@ -984,7 +984,7 @@ plugin presentation:
 Preserve every existing manifest field not shown, including author, URLs,
 license, category, capabilities, icons, logo, and brand color.
 
-- [ ] **Step 4: Synchronize compatibility prose and root README**
+- [x] **Step 4: Synchronize compatibility prose and root README**
 
 Change both compatibility references from plugin `0.2.0` to `0.2.1` without
 changing `>=0.2.0 <0.3.0`. In the README Codex Plugin section:
@@ -995,7 +995,7 @@ changing `>=0.2.0 <0.3.0`. In the README Codex Plugin section:
   run `catalog audit-animations`, preserve structured findings, and produce a
   bounded drawing worklist without modifying source assets.
 
-- [ ] **Step 5: Run focused and plugin verification**
+- [x] **Step 5: Run focused and plugin verification**
 
 Run:
 
@@ -1007,7 +1007,7 @@ rtk pnpm verify:plugin
 Expected: PASS with manifest `0.2.1`, synchronized compatibility text, two
 skills, and correct public presentation.
 
-- [ ] **Step 6: Commit the plugin presentation**
+- [x] **Step 6: Commit the plugin presentation**
 
 ```sh
 rtk git add README.md plugins/lpc-toolkit/.codex-plugin/plugin.json plugins/lpc-toolkit/skills/animation-asset-audit/references/compatibility.md plugins/lpc-toolkit/skills/character-authoring/references/compatibility.md plugins/lpc-toolkit/test/check-cli.test.mjs scripts/verify-codex-plugin.mjs scripts/verify-codex-plugin.test.mjs
@@ -1015,6 +1015,17 @@ rtk git commit -m "docs(plugin): publish animation audit workflow"
 ```
 
 After the product commit, update this task's checkboxes and add the required full hash, implementation note, and verification results; commit that update separately.
+
+**Implementation record:**
+
+- Product commit: `0e1b649687f3d8eff56c3ed6fbb5518e1afaee23` — `docs(plugin): publish animation audit workflow`.
+- Implementation: Published plugin `0.2.1` with the two-workflow description,
+  prompts, keywords, and README capability summary. The verifier fixture and
+  runtime contract now require `0.2.1`; both skill compatibility references use
+  the final plugin version while preserving `@lpc-toolkit/cli >=0.2.0 <0.3.0`.
+- RED verification: `rtk node --test plugins/lpc-toolkit/test/check-cli.test.mjs scripts/verify-codex-plugin.test.mjs` FAIL — 19 passed, 2 failed as expected because the compatibility references and manifest still presented `0.2.0`.
+- GREEN verification: `rtk node --test plugins/lpc-toolkit/test/check-cli.test.mjs scripts/verify-codex-plugin.test.mjs` PASS — 21 passed, 0 failed.
+- Plugin verification: `rtk pnpm verify:plugin` PASS — 34 passed, 0 failed; `Codex plugin structure is valid.`
 
 ---
 
