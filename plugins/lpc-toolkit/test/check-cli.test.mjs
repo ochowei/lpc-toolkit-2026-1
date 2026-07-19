@@ -80,19 +80,21 @@ test('rejects malformed semantic versions', () => {
   }
 });
 
-test('documents the public stable CLI installation contract', () => {
-  const skillRoot = fileURLToPath(new URL('../skills/character-authoring/', import.meta.url));
-  const compatibility = readFileSync(path.join(skillRoot, 'references/compatibility.md'), 'utf8');
+test('documents the public stable CLI installation contract for both workflows', () => {
+  for (const skillName of ['animation-asset-audit', 'character-authoring']) {
+    const skillRoot = fileURLToPath(new URL(`../skills/${skillName}/`, import.meta.url));
+    const compatibility = readFileSync(path.join(skillRoot, 'references/compatibility.md'), 'utf8');
 
-  for (const required of [
-    "npm install -g '@lpc-toolkit/cli@>=0.2.0 <0.3.0'",
-    'Plugin version `0.2.0` supports `@lpc-toolkit/cli >=0.2.0 <0.3.0`',
-  ]) {
-    assert.equal(
-      compatibility.includes(required),
-      true,
-      `missing compatibility guidance: ${required}`,
-    );
+    for (const required of [
+      "npm install -g '@lpc-toolkit/cli@>=0.2.0 <0.3.0'",
+      'Plugin version `0.2.1` supports `@lpc-toolkit/cli >=0.2.0 <0.3.0`',
+    ]) {
+      assert.equal(
+        compatibility.includes(required),
+        true,
+        `missing ${skillName} compatibility guidance: ${required}`,
+      );
+    }
   }
 });
 

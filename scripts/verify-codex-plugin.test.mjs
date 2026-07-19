@@ -24,8 +24,8 @@ function validFixture() {
   }));
   write(root, 'plugins/lpc-toolkit/.codex-plugin/plugin.json', JSON.stringify({
     name: 'lpc-toolkit',
-    version: '0.2.0',
-    description: 'Create attributed LPC characters with the installed CLI.',
+    version: '0.2.1',
+    description: 'Create attributed LPC characters and audit incomplete animation assets with the installed CLI.',
     license: 'GPL-3.0-or-later',
     skills: './skills/',
     interface: {
@@ -46,6 +46,34 @@ test('accepts the intended lightweight plugin structure', () => {
     assert.deepEqual(validatePluginRepository(root), []);
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('publishes the two-workflow presentation', () => {
+  const manifest = JSON.parse(readFileSync(new URL(
+    '../plugins/lpc-toolkit/.codex-plugin/plugin.json',
+    import.meta.url,
+  ), 'utf8'));
+  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  const codexPluginSection = readme.split('### Codex Plugin', 2)[1]?.split('## ', 1)[0] ?? '';
+
+  assert.equal(manifest.version, '0.2.1');
+  assert.match(manifest.description, /audit/u);
+  assert.match(manifest.interface.longDescription, /drawing worklist/u);
+  assert.equal(
+    manifest.interface.defaultPrompt.some((prompt) => /incomplete.*animation/iu.test(prompt)),
+    true,
+  );
+  for (const required of [
+    'plugin `0.2.1`',
+    'catalog audit-animations',
+    'drawing worklist',
+  ]) {
+    assert.equal(
+      codexPluginSection.includes(required),
+      true,
+      `missing Codex Plugin presentation: ${required}`,
+    );
   }
 });
 

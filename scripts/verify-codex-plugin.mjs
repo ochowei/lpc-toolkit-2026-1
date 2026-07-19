@@ -47,7 +47,7 @@ export function validatePluginRepository(repoRoot) {
   if (!manifest || !marketplace) return errors;
 
   if (manifest.name !== 'lpc-toolkit') errors.push('plugin manifest name must be lpc-toolkit.');
-  if (manifest.version !== '0.2.0') errors.push('plugin manifest version must be 0.2.0.');
+  if (manifest.version !== '0.2.1') errors.push('plugin manifest version must be 0.2.1.');
   if (manifest.license !== 'GPL-3.0-or-later') errors.push('plugin manifest license must be GPL-3.0-or-later.');
   if (manifest.skills !== './skills/') errors.push('plugin manifest skills must point to ./skills/.');
 
