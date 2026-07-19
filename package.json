@@ -15,7 +15,7 @@
     "typecheck": "pnpm -r typecheck",
     "verify": "pnpm --filter @lpc-toolkit/web prepare-assets && pnpm verify:upstream-pin && pnpm check:boundaries && pnpm verify:cli-docs-policy && pnpm verify:plugin && pnpm typecheck && pnpm -r test",
     "verify:cli-docs-policy": "node --test scripts/check-cli-doc-impact.test.mjs",
-    "verify:plugin": "node --test plugins/lpc-toolkit/test/check-cli.test.mjs scripts/verify-codex-plugin.test.mjs && node scripts/verify-codex-plugin.mjs",
+    "verify:plugin": "node --test plugins/lpc-toolkit/test/check-cli.test.mjs plugins/lpc-toolkit/test/animation-asset-audit.test.mjs scripts/verify-codex-plugin.test.mjs && node scripts/verify-codex-plugin.mjs",
     "verify:upstream-pin": "pnpm --filter @lpc-toolkit/web verify-upstream-pin",
     "pretest": "pnpm --filter @lpc-toolkit/web prepare-assets && pnpm verify:upstream-pin",
     "test": "pnpm -r test"
