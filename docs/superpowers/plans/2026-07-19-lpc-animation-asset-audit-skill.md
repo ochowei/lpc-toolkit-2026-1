@@ -605,7 +605,11 @@ After the product commit, update this task's checkboxes and add the required ful
 - Produces: a discoverable `lpc-animation-asset-audit` skill and tested CLI contract.
 - Preserves: the existing character contract command inventory and all lightweight-plugin prohibitions.
 
-- [ ] **Step 1: Write failing trigger, workflow, compatibility, and two-skill tests**
+- [x] **Step 1: Write failing trigger, workflow, compatibility, and two-skill tests**
+
+  - Implementation: Added audit trigger/workflow/checker-parity assertions,
+    exact two-skill verifier fixtures, and shared character/audit CLI contract
+    coverage before creating the new skill files.
 
 Extend `animation-asset-audit.test.mjs` to read the new skill files and assert these exact requirements:
 
@@ -654,7 +658,10 @@ Extend `packages/cli/test/plugin-contract.test.ts` with an audit contract path,
 an expected ID list, and the same `parseArgs` / `validateCommandOptions` /
 `helpForCommand` checks used by the character contract.
 
-- [ ] **Step 2: Run focused tests to verify they fail**
+- [x] **Step 2: Run focused tests to verify they fail**
+
+  - Verification: `rtk node --test plugins/lpc-toolkit/test/animation-asset-audit.test.mjs scripts/verify-codex-plugin.test.mjs` FAIL — 12 tests passed and 10 failed for the absent audit skill/checker/workflow and the verifier's old one-skill contract.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- plugin-contract.test.ts` FAIL — 1 suite failed before collection because the audit CLI contract did not exist.
 
 Run:
 
@@ -665,7 +672,11 @@ rtk pnpm --filter @lpc-toolkit/cli test -- plugin-contract.test.ts
 
 Expected: FAIL because the skill files and audit contract do not exist and the verifier still requires exactly one skill.
 
-- [ ] **Step 3: Create the skill-local compatibility contract**
+- [x] **Step 3: Create the skill-local compatibility contract**
+
+  - Implementation: Added the audit compatibility reference at plugin version
+    `0.2.0` and a byte-for-byte self-contained checker copy; both checker files
+    have SHA-256 `65c89b434ee703d84b7742f766980aaa57a18bbe1c1568e23e3330bc27f9646b`.
 
 Create `scripts/check-cli.mjs` as a byte-for-byte copy of the existing
 `plugins/lpc-toolkit/skills/character-authoring/scripts/check-cli.mjs`. Do not
@@ -681,7 +692,10 @@ The required preflight remains:
 node "$SKILL_DIR/scripts/check-cli.mjs"
 ```
 
-- [ ] **Step 4: Create the tested audit CLI contract**
+- [x] **Step 4: Create the tested audit CLI contract**
+
+  - Implementation: Added the versioned five-command audit inventory ending in
+    the scoped, machine-readable `catalog audit-animations` command.
 
 Create `references/cli-contract.json` exactly as:
 
@@ -698,7 +712,11 @@ Create `references/cli-contract.json` exactly as:
 }
 ```
 
-- [ ] **Step 5: Create the audit workflow and top-level skill**
+- [x] **Step 5: Create the audit workflow and top-level skill**
+
+  - Implementation: Added discoverable skill metadata, bounded non-mutating
+    audit sequencing, structured finding semantics, worklist verification, and
+    OpenAI interface metadata.
 
 Create `references/audit-workflow.md` with these imperative sections and exact
 semantics:
@@ -793,7 +811,11 @@ policy:
   allow_implicit_invocation: true
 ```
 
-- [ ] **Step 6: Tighten the character-authoring boundary**
+- [x] **Step 6: Tighten the character-authoring boundary**
+
+  - Implementation: Routed source-asset animation audits and drawing worklists
+    to `lpc-animation-asset-audit` from the character skill description and
+    opening workflow without expanding the character CLI inventory.
 
 Append this sentence to the existing character skill description and add the
 same routing rule after its opening paragraph:
@@ -804,7 +826,11 @@ Use lpc-animation-asset-audit for source-asset animation audits and drawing work
 
 Do not add `catalog audit-animations` to the character contract or workflow.
 
-- [ ] **Step 7: Generalize the lightweight plugin verifier to the exact two-skill set**
+- [x] **Step 7: Generalize the lightweight plugin verifier to the exact two-skill set**
+
+  - Implementation: Replaced the one-skill count with a sorted exact-name
+    comparison for `animation-asset-audit` and `character-authoring` while
+    retaining manifest version `0.2.0` and all lightweight prohibitions.
 
 Replace the one-skill count check in `scripts/verify-codex-plugin.mjs` with a
 sorted name comparison:
@@ -826,7 +852,11 @@ if (JSON.stringify(skillNames) !== JSON.stringify(expectedSkills)) {
 Keep the manifest version assertion at `0.2.0` until Task 3 so this task's
 existing manifest remains valid.
 
-- [ ] **Step 8: Extend the CLI contract test to both inventories**
+- [x] **Step 8: Extend the CLI contract test to both inventories**
+
+  - Implementation: Preserved the exact character inventory and viewer check,
+    added the exact audit IDs, and ran shared argument validation/help assertions
+    over both non-version inventories.
 
 Refactor `packages/cli/test/plugin-contract.test.ts` to read `characterContract`
 and `auditContract` separately. Preserve the existing exact character ID test.
@@ -846,7 +876,11 @@ Run the shared generated-option/help assertion over
 `[...characterContract.commands, ...auditContract.commands]`, excluding both
 `version` records. Preserve the existing character workflow/viewer assertion.
 
-- [ ] **Step 9: Run focused and plugin verification**
+- [x] **Step 9: Run focused and plugin verification**
+
+  - Verification: `rtk node --test plugins/lpc-toolkit/test/animation-asset-audit.test.mjs scripts/verify-codex-plugin.test.mjs` PASS — 22 tests passed, 0 failed.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- plugin-contract.test.ts` PASS — 17 tests passed, 0 failed.
+  - Verification: `rtk pnpm verify:plugin` PASS — 33 tests passed, 0 failed; plugin structure valid with exactly two discoverable skills.
 
 Run:
 
@@ -860,7 +894,12 @@ Expected: PASS; exactly two skills are discoverable, both compatibility
 contracts are aligned, both CLI inventories validate, and the plugin remains
 lightweight.
 
-- [ ] **Step 10: Commit the audit skill**
+- [x] **Step 10: Commit the audit skill**
+
+  - Commit: bea40726feeac3d0cae0404536b39a969762c716
+  - Implementation: Committed the audit skill, self-contained compatibility
+    contract, bounded workflow, routing boundary, exact two-skill verifier, and
+    dual CLI contract coverage as `feat(plugin): add animation asset audit skill`.
 
 ```sh
 rtk git add plugins/lpc-toolkit/skills/animation-asset-audit plugins/lpc-toolkit/skills/character-authoring/SKILL.md plugins/lpc-toolkit/test/animation-asset-audit.test.mjs scripts/verify-codex-plugin.mjs scripts/verify-codex-plugin.test.mjs packages/cli/test/plugin-contract.test.ts
