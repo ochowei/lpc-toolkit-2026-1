@@ -99,29 +99,38 @@ test('documents the public stable CLI installation contract for both workflows',
 });
 
 test('documents and runs the checker by resolved absolute skill path from another cwd', () => {
-  const skillRoot = fileURLToPath(new URL('../skills/character-authoring/', import.meta.url));
-  const skill = readFileSync(path.join(skillRoot, 'SKILL.md'), 'utf8');
-  const compatibility = readFileSync(path.join(skillRoot, 'references/compatibility.md'), 'utf8');
-  for (const documentation of [skill, compatibility]) {
-    assert.match(documentation, /SKILL_DIR/);
-    assert.match(documentation, /node "\$SKILL_DIR\/scripts\/check-cli\.mjs"/);
-  }
+  const skillRoots = ['animation-asset-audit', 'character-authoring'].map((skillName) => (
+    fileURLToPath(new URL(`../skills/${skillName}/`, import.meta.url))
+  ));
+  const checkerSources = skillRoots.map((skillRoot) => (
+    readFileSync(path.join(skillRoot, 'scripts/check-cli.mjs'))
+  ));
+  assert.equal(Buffer.compare(checkerSources[0], checkerSources[1]), 0);
 
   const unrelatedCwd = mkdtempSync(path.join(os.tmpdir(), 'lpc-check-cli-cwd-'));
   const fakeCli = path.join(unrelatedCwd, 'fake-cli.mjs');
   writeFileSync(fakeCli, "process.stdout.write('0.2.0\\n');\n");
   try {
-    const result = spawnSync(
-      process.execPath,
-      [path.join(skillRoot, 'scripts/check-cli.mjs')],
-      {
-        cwd: unrelatedCwd,
-        encoding: 'utf8',
-        env: { ...process.env, LPC_TOOLKIT_NODE_ENTRY: fakeCli },
-      },
-    );
-    assert.equal(result.status, 0, result.stderr);
-    assert.equal(JSON.parse(result.stdout).ok, true);
+    for (const skillRoot of skillRoots) {
+      const skill = readFileSync(path.join(skillRoot, 'SKILL.md'), 'utf8');
+      const compatibility = readFileSync(path.join(skillRoot, 'references/compatibility.md'), 'utf8');
+      for (const documentation of [skill, compatibility]) {
+        assert.match(documentation, /SKILL_DIR/);
+        assert.match(documentation, /node "\$SKILL_DIR\/scripts\/check-cli\.mjs"/);
+      }
+
+      const result = spawnSync(
+        process.execPath,
+        [path.join(skillRoot, 'scripts/check-cli.mjs')],
+        {
+          cwd: unrelatedCwd,
+          encoding: 'utf8',
+          env: { ...process.env, LPC_TOOLKIT_NODE_ENTRY: fakeCli },
+        },
+      );
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(JSON.parse(result.stdout).ok, true);
+    }
   } finally {
     rmSync(unrelatedCwd, { recursive: true, force: true });
   }

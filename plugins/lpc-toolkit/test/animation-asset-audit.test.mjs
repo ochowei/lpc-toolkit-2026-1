@@ -10,6 +10,12 @@ import {
 const fixtureUrl = new URL('./fixtures/audit-report.json', import.meta.url);
 const report = JSON.parse(readFileSync(fixtureUrl, 'utf8'));
 
+function reportWithData(patch) {
+  const candidate = structuredClone(report);
+  Object.assign(candidate.data, patch);
+  return candidate;
+}
+
 function run(argv, readFile = () => JSON.stringify(report)) {
   let output = '';
   const exitCode = runAuditReportReader(argv, {
@@ -75,6 +81,176 @@ test('returns stable failures for invalid reports and options', () => {
       .errors[0].code,
     'pagination_invalid',
   );
+});
+
+test('rejects malformed nested findings without throwing in any consuming view', () => {
+  const malformedFindings = [
+    ['unsupported', [{}]],
+    ['unsupported', [{ ...report.data.unsupported[0], requirements: [{}] }]],
+    ['missingFiles', [{}]],
+    ['missingFiles', [{ ...report.data.missingFiles[0], consumers: [{}] }]],
+    ['blankFrames', [{}]],
+    ['blankFrames', [{ ...report.data.blankFrames[0], frames: [{}] }]],
+    ['errors', [{}]],
+    ['errors', [{ ...report.data.errors[0], consumers: [{}] }]],
+  ];
+
+  for (const [category, findings] of malformedFindings) {
+    const candidate = reportWithData({ [category]: findings });
+    const views = [
+      { view: 'types' },
+      { view: 'findings', category },
+      { view: 'worklist' },
+    ];
+    for (const options of views) {
+      let result;
+      assert.doesNotThrow(() => {
+        result = projectAuditReport(candidate, options);
+      }, `${category} ${options.view}`);
+      assert.equal(result.ok, false, `${category} ${options.view}`);
+      assert.equal(result.errors.at(0)?.code, 'report_shape_invalid');
+    }
+  }
+});
+
+test('rejects options that are unsupported by the selected projection view', () => {
+  for (const options of [
+    { view: 'summary', category: 'missingFiles' },
+    { view: 'summary', itemId: 'weapon_sword' },
+    { view: 'summary', limit: 1 },
+    { view: 'summary', offset: 1 },
+    { view: 'types', category: 'missingFiles' },
+    { view: 'types', itemId: 'weapon_sword' },
+    { view: 'types', limit: 1 },
+    { view: 'types', offset: 1 },
+    { view: 'worklist', category: 'missingFiles' },
+    { view: 'summary', unknown: true },
+  ]) {
+    const result = projectAuditReport(report, options);
+    assert.equal(result.ok, false, JSON.stringify(options));
+    assert.equal(result.errors.at(0)?.code, 'helper_usage_invalid');
+  }
+});
+
+test('rejects view-specific CLI options before reading the report', () => {
+  for (const argv of [
+    ['audit-report.json', 'summary', '--category', 'missingFiles'],
+    ['audit-report.json', 'summary', '--item', 'weapon_sword'],
+    ['audit-report.json', 'summary', '--limit', '1'],
+    ['audit-report.json', 'summary', '--offset', '1'],
+    ['audit-report.json', 'types', '--category', 'missingFiles'],
+    ['audit-report.json', 'types', '--item', 'weapon_sword'],
+    ['audit-report.json', 'types', '--limit', '1'],
+    ['audit-report.json', 'types', '--offset', '1'],
+    ['audit-report.json', 'worklist', '--category', 'missingFiles'],
+  ]) {
+    let reads = 0;
+    const execution = run(argv, () => {
+      reads += 1;
+      return JSON.stringify(report);
+    });
+    assert.equal(execution.exitCode, 1);
+    assert.equal(execution.result.errors[0].code, 'helper_usage_invalid');
+    assert.equal(reads, 0);
+  }
+});
+
+test('bounds more than 100 findings with deterministic continuation pages', () => {
+  const missingFiles = Array.from({ length: 105 }, (_, index) => ({
+    ...structuredClone(report.data.missingFiles[0]),
+    path: `spritesheets/weapon/sword/run/steel-${index}.png`,
+    consumers: [{
+      ...structuredClone(report.data.missingFiles[0].consumers[0]),
+      itemId: `weapon_sword_${index}`,
+      recolors: ['lpcr.red', 'lpcr.blue'],
+    }],
+  }));
+  const largeReport = reportWithData({
+    unsupported: [],
+    missingFiles,
+    blankFrames: [],
+    errors: [],
+  });
+
+  const first = projectAuditReport(largeReport, { view: 'worklist' });
+  assert.deepEqual(first.page, {
+    limit: 20,
+    offset: 0,
+    returned: 20,
+    total: 105,
+    hasMore: true,
+    nextOffset: 20,
+  });
+  assert.equal(first.data.length, 20);
+  assert.equal(first.data[0].finding.consumers[0].recolors[1], 'lpcr.blue');
+
+  const continuation = projectAuditReport(largeReport, {
+    view: 'worklist', offset: first.page.nextOffset,
+  });
+  assert.equal(continuation.data[0].finding.path, missingFiles[20].path);
+  assert.equal(continuation.page.nextOffset, 40);
+
+  const finalPage = projectAuditReport(largeReport, {
+    view: 'worklist', offset: 100,
+  });
+  assert.deepEqual(finalPage.page, {
+    limit: 20,
+    offset: 100,
+    returned: 5,
+    total: 105,
+    hasMore: false,
+    nextOffset: null,
+  });
+  assert.deepEqual(
+    projectAuditReport(largeReport, { view: 'worklist' }),
+    first,
+  );
+  assert.equal(largeReport.data.missingFiles.length, 105);
+});
+
+test('preserves manual review, shared consumers, recolors, and blank source cells', () => {
+  const manualRequirement = {
+    ...structuredClone(report.data.unsupported[0].requirements[0]),
+    pathConfidence: 'manual-review',
+    manualReviewReason: 'Choose a standard layout before drawing.',
+  };
+  delete manualRequirement.expectedPath;
+  const sharedConsumers = [
+    structuredClone(report.data.missingFiles[0].consumers[0]),
+    {
+      ...structuredClone(report.data.missingFiles[0].consumers[0]),
+      itemId: 'weapon_sword_alt',
+      recolors: ['lpcr.gold'],
+    },
+  ];
+  const blankFrames = [{ sourceColumn: 0, logicalFrameIndices: [0, 2] }, {
+    sourceColumn: 5,
+    logicalFrameIndices: [1, 3, 4],
+  }];
+  const evidenceReport = reportWithData({
+    unsupported: [{
+      ...structuredClone(report.data.unsupported[0]),
+      requirements: [manualRequirement],
+    }],
+    missingFiles: [{
+      ...structuredClone(report.data.missingFiles[0]),
+      consumers: sharedConsumers,
+    }],
+    blankFrames: [{
+      ...structuredClone(report.data.blankFrames[0]),
+      sourceRow: 0,
+      frames: blankFrames,
+    }],
+  });
+
+  const worklist = projectAuditReport(evidenceReport, {
+    view: 'worklist', limit: 20,
+  });
+  assert.deepEqual(worklist.data[0].finding.requirements[0], manualRequirement);
+  assert.deepEqual(worklist.data[1].finding.consumers, sharedConsumers);
+  assert.equal(worklist.data[1].finding.consumers[1].recolors[0], 'lpcr.gold');
+  assert.equal(worklist.data[2].finding.sourceRow, 0);
+  assert.deepEqual(worklist.data[2].finding.frames, blankFrames);
 });
 
 test('reads a summary and writes exactly one newline-terminated JSON result', () => {
@@ -143,6 +319,44 @@ test('routes audit requests to a focused non-mutating skill', () => {
   assert.match(skill, /Do not add, edit, generate, or repair sprite assets/u);
 });
 
+test('validates both skill frontmatter and OpenAI agent metadata contracts', () => {
+  const expectedSkills = [{
+    directory: 'animation-asset-audit',
+    name: 'lpc-animation-asset-audit',
+    description: 'Use when identifying LPC assets with incomplete animation support, missing animation PNGs, transparent animation frames, or when producing or verifying a bounded animation drawing worklist through the installed lpc-toolkit CLI. Do not use for character outfit authoring, non-LPC sprites, unrelated raster editing, or source-asset mutation.',
+    displayName: 'LPC Animation Asset Audit',
+    shortDescription: 'Find incomplete LPC animation assets',
+    defaultPrompt: 'Audit selected LPC animations and produce a bounded drawing worklist from the structured findings.',
+  }, {
+    directory: 'character-authoring',
+    name: 'lpc-character-authoring',
+    description: 'Use when creating, editing, validating, previewing, or rendering LPC characters through the installed lpc-toolkit CLI. Do not use for unrelated image editing or non-LPC sprites. Use lpc-animation-asset-audit for source-asset animation audits and drawing worklists.',
+    displayName: 'LPC Character Authoring',
+    shortDescription: 'Create and render attributed LPC characters',
+    defaultPrompt: 'Create an LPC character, preview it, and render the requested attributed artifacts.',
+  }];
+
+  for (const expected of expectedSkills) {
+    const root = new URL(`../skills/${expected.directory}/`, import.meta.url);
+    const skill = readFileSync(new URL('SKILL.md', root), 'utf8');
+    const frontmatter = skill.match(/^---\n(?<body>[\s\S]*?)\n---/u)?.groups?.body;
+    assert.equal(frontmatter?.match(/^name: (?<value>.+)$/mu)?.groups?.value, expected.name);
+    assert.equal(
+      frontmatter?.match(/^description: (?<value>.+)$/mu)?.groups?.value,
+      expected.description,
+    );
+
+    const agent = readFileSync(new URL('agents/openai.yaml', root), 'utf8');
+    const yamlValue = (key) => agent.match(
+      new RegExp(`^\\s*${key}: "(?<value>[^"]+)"$`, 'mu'),
+    )?.groups?.value;
+    assert.equal(yamlValue('display_name'), expected.displayName);
+    assert.equal(yamlValue('short_description'), expected.shortDescription);
+    assert.equal(yamlValue('default_prompt'), expected.defaultPrompt);
+    assert.match(agent, /^policy:\n  allow_implicit_invocation: true$/mu);
+  }
+});
+
 test('keeps compatibility ranges identical and checkers self-contained', async () => {
   const audit = await import('../skills/animation-asset-audit/scripts/check-cli.mjs');
   const character = await import('../skills/character-authoring/scripts/check-cli.mjs');
@@ -156,10 +370,11 @@ test('keeps compatibility ranges identical and checkers self-contained', async (
 test('documents safe report preservation and finding interpretation', () => {
   const workflow = readFileSync(new URL(
     '../skills/animation-asset-audit/references/audit-workflow.md', import.meta.url,
-  ), 'utf8');
+  ), 'utf8').replace(/\s+/gu, ' ');
   for (const required of [
     '--json', 'unsupported', 'missingFiles', 'blankFrames', 'errors',
     'pathConfidence', 'manual-review', 'recolors', 'same target and scope',
-    'Exit code zero', 'upstream/',
+    'Exit code zero', 'upstream/', 'user-supplied report path',
+    'task-specific temporary directory', 'report that path while it remains available',
   ]) assert.equal(workflow.includes(required), true, `missing ${required}`);
 });

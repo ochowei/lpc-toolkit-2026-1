@@ -9,11 +9,12 @@ request. Never assume every item must support every registered animation.
 
 ## Preserve One Structured Audit
 
-Run `catalog audit-animations` once with `--json`. Preserve complete stdout in
-a task-owned report outside `upstream/` and the managed asset cache; keep stderr
-separate. Require `ok: true`, the expected command name, all four finding
-arrays, and no top-level errors. Exit code zero means the audit ran, not that
-the scope is complete.
+Run `catalog audit-animations` once with `--json`. Prefer a user-supplied report
+path. Otherwise create a task-specific temporary directory and report that path
+while it remains available. Preserve complete stdout there, outside `upstream/`
+and the managed asset cache, and keep stderr separate. Require `ok: true`, the
+expected command name, all four finding arrays, and no top-level errors.
+Exit code zero means the audit ran, not that the scope is complete.
 
 Use `node "$SKILL_DIR/scripts/read-audit-report.mjs" <report> <view>` for bounded
 agent reads. Continue an unchanged local page with its returned `nextOffset`.
