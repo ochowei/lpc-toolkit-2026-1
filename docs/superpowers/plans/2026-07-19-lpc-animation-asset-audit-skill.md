@@ -1128,3 +1128,50 @@ only the plan record:
 rtk git add docs/superpowers/plans/2026-07-19-lpc-animation-asset-audit-skill.md
 rtk git commit -m "docs(plan): record animation audit skill verification"
 ```
+
+#### Post-fix final verification
+
+- Fix commit: `28f86c65f2b8e7438194f00af5274c2e6e4fb118` — `fix(plugin): harden animation audit reader`.
+- Implementation: Hardened complete nested audit-report validation, enforced
+  view-specific direct and CLI option contracts before report reads, expanded
+  deterministic bounded-page and evidence-preservation coverage, verified both
+  compatibility checkers byte-for-byte and from an unrelated working directory,
+  and documented durable report-path handoff. No CLI production, package
+  dependency, asset, Core, web, attribution, or `upstream/` behavior changed.
+- Verification: `rtk node --test plugins/lpc-toolkit/test/animation-asset-audit.test.mjs plugins/lpc-toolkit/test/check-cli.test.mjs scripts/verify-codex-plugin.test.mjs` PASS — 40 tests passed, 0 failed.
+- Verification: `rtk pnpm verify:plugin` PASS — 40 tests passed, 0 failed; `Codex plugin structure is valid.`
+- Verification: `rtk pnpm verify` FAIL in the sandbox only — `tsx` could not
+  create its temporary IPC pipe (`listen EPERM`).
+- Verification: `rtk pnpm verify` PASS after required IPC escalation — asset
+  preparation/source pins, boundaries, CLI docs policy (19 tests), plugin
+  verification (40 tests), all workspace typechecks, and all package tests
+  passed (core 252; presets 3; CLI 467 with 1 skipped; web 696 with 1 skipped).
+- Verification: `rtk git diff --check` PASS — no whitespace errors.
+- Scope review: `rtk git diff --check 09d38c3251ea660d7dc13780a98592632f83fd76..HEAD`,
+  `rtk git diff --stat 09d38c3251ea660d7dc13780a98592632f83fd76..HEAD`,
+  `rtk git diff --name-only 09d38c3251ea660d7dc13780a98592632f83fd76..HEAD`,
+  and `rtk rg -n "upstream/|allow-partial|asset mutation|0\.2\.0" plugins/lpc-toolkit README.md`
+  PASS — the final branch remains confined to the planned plugin, plugin tests
+  and fixture, verifier, package test registration, CLI contract test, README,
+  and plan; every `0.2.0` match is a correct CLI range/semver reference and all
+  plugin-version references remain `0.2.1`.
+
+Final CLI documentation impact reassessment:
+
+```text
+help: N/A — no CLI command or help behavior changes
+cli-readme: N/A — existing audit command documentation remains accurate
+root-readme: update — plugin version and audit capability are documented
+landing: N/A — no product landing workflow change
+architecture: N/A — no runtime or package boundary change
+engineering: N/A — public verification command names remain unchanged
+releasing: N/A — no CLI publication workflow change
+plugin: update — audit workflow guidance, report reader contract, metadata coverage, and tests changed
+```
+
+Final PR declaration:
+
+```text
+CLI docs impact: updated
+CLI docs surfaces: root-readme, plugin
+```
