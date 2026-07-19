@@ -142,7 +142,9 @@ Reassess this matrix in Task 4 before handoff. If the implementation changes an 
 - Produces: `AUDIT_CATEGORIES`, `projectAuditReport`, and `runAuditReportReader` exactly as defined under Stable Interfaces.
 - Preserves: every returned finding, nested requirement, consumer, recolor, and blank-frame coordinate without mutation.
 
-- [ ] **Step 1: Add a representative audit report fixture**
+- [x] **Step 1: Add a representative audit report fixture**
+
+  - Implementation: Added the representative successful audit envelope with concrete evidence for all four finding categories.
 
 Create `plugins/lpc-toolkit/test/fixtures/audit-report.json` with this shape and concrete records for every category:
 
@@ -226,7 +228,9 @@ Create `plugins/lpc-toolkit/test/fixtures/audit-report.json` with this shape and
 }
 ```
 
-- [ ] **Step 2: Write failing projection and validation tests**
+- [x] **Step 2: Write failing projection and validation tests**
+
+  - Implementation: Added projection, validation, pagination, injected-I/O, malformed-file, and output-newline coverage.
 
 Create `plugins/lpc-toolkit/test/animation-asset-audit.test.mjs`. Read the fixture once and add tests that assert:
 
@@ -305,7 +309,9 @@ for valid `summary`, malformed JSON, unreadable file, unknown view, missing
 category, repeated/unknown options, non-integer limit/offset, and JSON output
 ending in one newline.
 
-- [ ] **Step 3: Run the focused test to verify it fails**
+- [x] **Step 3: Run the focused test to verify it fails**
+
+  - Verification: `rtk node --test plugins/lpc-toolkit/test/animation-asset-audit.test.mjs` FAIL — expected `ERR_MODULE_NOT_FOUND` for `read-audit-report.mjs` before implementation.
 
 Run:
 
@@ -315,7 +321,9 @@ rtk node --test plugins/lpc-toolkit/test/animation-asset-audit.test.mjs
 
 Expected: FAIL because `read-audit-report.mjs` does not exist.
 
-- [ ] **Step 4: Implement the report reader**
+- [x] **Step 4: Implement the report reader**
+
+  - Implementation: Added bounded projection, shape validation, stable failures, CLI argument parsing, injected I/O, and newline-terminated JSON output without mutating findings.
 
 Create `read-audit-report.mjs` with small focused helpers:
 
@@ -532,7 +540,9 @@ if (process.argv[1]
 
 The helper writes exactly one JSON object plus newline to stdout and no prose.
 
-- [ ] **Step 5: Run focused tests and verify they pass**
+- [x] **Step 5: Run focused tests and verify they pass**
+
+  - Verification: `rtk node --test plugins/lpc-toolkit/test/animation-asset-audit.test.mjs` PASS — 10 tests passed, 0 failed.
 
 Run:
 
@@ -542,7 +552,10 @@ rtk node --test plugins/lpc-toolkit/test/animation-asset-audit.test.mjs
 
 Expected: PASS for all helper projection, pagination, shape, file, JSON, and option tests.
 
-- [ ] **Step 6: Register the test in the repository plugin gate**
+- [x] **Step 6: Register the test in the repository plugin gate**
+
+  - Implementation: Registered `animation-asset-audit.test.mjs` explicitly in `verify:plugin`.
+  - Verification: `rtk pnpm verify:plugin` PASS — 27 tests passed, 0 failed; plugin structure valid with one discoverable skill at this boundary.
 
 Change `package.json` so `verify:plugin` runs the new test explicitly:
 
@@ -558,7 +571,10 @@ rtk pnpm verify:plugin
 
 Expected: PASS; the plugin still contains one discoverable skill at this task boundary, while the report helper tests are now part of the standard gate.
 
-- [ ] **Step 7: Commit the report reader**
+- [x] **Step 7: Commit the report reader**
+
+  - Commit: de309c83e50c5b71f6c18cbbe6cbf4ade017d537
+  - Implementation: Committed the bounded reader, fixture, focused tests, and plugin-gate registration as `feat(plugin): add bounded animation audit reader`.
 
 ```sh
 rtk git add package.json plugins/lpc-toolkit/skills/animation-asset-audit/scripts/read-audit-report.mjs plugins/lpc-toolkit/test/animation-asset-audit.test.mjs plugins/lpc-toolkit/test/fixtures/audit-report.json
