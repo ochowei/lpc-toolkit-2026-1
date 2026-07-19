@@ -1039,7 +1039,11 @@ After the product commit, update this task's checkboxes and add the required ful
 - Consumes: the complete two-skill plugin from Tasks 1-3.
 - Produces: final verification evidence and an accurate CLI documentation impact declaration.
 
-- [ ] **Step 1: Run the focused plugin tests**
+- [x] **Step 1: Run the focused plugin tests**
+
+  - Verification: `rtk node --test plugins/lpc-toolkit/test/animation-asset-audit.test.mjs plugins/lpc-toolkit/test/check-cli.test.mjs scripts/verify-codex-plugin.test.mjs` PASS — 34 tests passed, 0 failed.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- plugin-contract.test.ts` PASS — 1 file and 17 tests passed.
+  - Verification: `rtk pnpm verify:plugin` PASS — 34 tests passed, 0 failed; `Codex plugin structure is valid.`
 
 ```sh
 rtk node --test plugins/lpc-toolkit/test/animation-asset-audit.test.mjs plugins/lpc-toolkit/test/check-cli.test.mjs scripts/verify-codex-plugin.test.mjs
@@ -1050,7 +1054,10 @@ rtk pnpm verify:plugin
 Expected: PASS for helper behavior, skill/static contracts, both CLI inventories,
 plugin structure, compatibility parity, and presentation.
 
-- [ ] **Step 2: Run the repository verification gate**
+- [x] **Step 2: Run the repository verification gate**
+
+  - Verification: `rtk pnpm verify` FAIL in the sandbox only — `tsx` could not create its temporary IPC pipe (`listen EPERM`).
+  - Verification: `rtk pnpm verify` PASS after required IPC escalation — assets/source pins, boundaries, CLI docs policy (19 tests), plugin verification (34 tests), all workspace typechecks, and all package tests passed (core 252; presets 3; CLI 467 with 1 skipped; web 696 with 1 skipped).
 
 ```sh
 rtk pnpm verify
@@ -1059,7 +1066,10 @@ rtk pnpm verify
 Expected: PASS. Do not weaken a failing gate. Fix only failures caused by this
 change and rerun the narrowest failing command before rerunning `verify`.
 
-- [ ] **Step 3: Reassess the CLI documentation matrix**
+- [x] **Step 3: Reassess the CLI documentation matrix**
+
+  - Reassessment: Confirmed the matrix below remains accurate. No owned CLI command/help, package, architecture, engineering, release, or landing contract changed. `README.md` records plugin `0.2.1` and the audit capability; the plugin skill/workflow/contract/metadata are updated.
+  - PR declaration: `CLI docs impact: updated`; `CLI docs surfaces: root-readme, plugin`.
 
 Confirm before handoff:
 
@@ -1081,7 +1091,12 @@ CLI docs impact: updated
 CLI docs surfaces: root-readme, plugin
 ```
 
-- [ ] **Step 4: Review the final diff for forbidden scope**
+- [x] **Step 4: Review the final diff for forbidden scope**
+
+  - Verification: `rtk git status --short` PASS — clean before recording Task 4 evidence.
+  - Verification: `rtk git diff --check` PASS — no whitespace errors.
+  - Verification: `rtk git diff --stat 09d38c3251ea660d7dc13780a98592632f83fd76..HEAD` PASS — only the planned plugin, test/fixture, verifier, package-script, CLI contract-test, README, and plan files changed.
+  - Verification: `rtk rg -n "upstream/|allow-partial|asset mutation|0\.2\.0" plugins/lpc-toolkit README.md` PASS — reviewed all matches; `0.2.0` remains only the compatible CLI minimum/range or semver-test value, while plugin-version references are `0.2.1`.
 
 Run:
 
@@ -1098,7 +1113,11 @@ web, `upstream/`, or attribution behavior changed. Review every `0.2.0` match:
 CLI minimum/range references remain correct, while plugin-version references
 must be `0.2.1`.
 
-- [ ] **Step 5: Record final evidence**
+- [x] **Step 5: Record final evidence**
+
+  - Product commits verified: `de309c83e50c5b71f6c18cbbe6cbf4ade017d537` (`feat(plugin): add bounded animation audit reader`), `bea40726feeac3d0cae0404536b39a969762c716` (`feat(plugin): add animation asset audit skill`), and `0e1b649687f3d8eff56c3ed6fbb5518e1afaee23` (`docs(plugin): publish animation audit workflow`). Their implementation notes and red/green command records are retained in Tasks 1–3 above.
+  - Implementation: Reassessed the complete plugin, documentation impact, version references, and forbidden scope; no scoped defect required a product change.
+  - Final report: `.superpowers/sdd/task-4-report.md`.
 
 Update every completed checkbox in this plan. For each product task, record its
 full product commit hash, implementation note, and exact PASS/FAIL commands.
