@@ -1,0 +1,10 @@
+{
+  "schema": "lpc-toolkit.codex-plugin.cli-contract.v1",
+  "commands": [
+    { "id": "version", "argv": ["--version"], "machineReadable": false },
+    { "id": "catalog-types", "argv": ["catalog", "types", "--json"], "machineReadable": true },
+    { "id": "catalog-items", "argv": ["catalog", "items", "--type", "hair", "--limit", "20", "--json"], "machineReadable": true },
+    { "id": "catalog-item", "argv": ["catalog", "item", "hair_braid", "--json"], "machineReadable": true },
+    { "id": "catalog-audit-animations", "argv": ["catalog", "audit-animations", "--animation", "walk", "--animation", "run", "--type", "weapon", "--body-type", "male", "--json"], "machineReadable": true }
+  ]
+}

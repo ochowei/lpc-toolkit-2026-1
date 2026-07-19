@@ -33,6 +33,7 @@ function validFixture() {
       logo: './assets/logo.svg',
     },
   }));
+  write(root, 'plugins/lpc-toolkit/skills/animation-asset-audit/SKILL.md', `---\nname: lpc-animation-asset-audit\ndescription: Audit LPC animation assets.\n---\n`);
   write(root, 'plugins/lpc-toolkit/skills/character-authoring/SKILL.md', `---\nname: lpc-character-authoring\ndescription: Create LPC characters.\n---\n`);
   write(root, 'plugins/lpc-toolkit/assets/icon.svg', '<svg xmlns="http://www.w3.org/2000/svg"/>\n');
   write(root, 'plugins/lpc-toolkit/assets/logo.svg', '<svg xmlns="http://www.w3.org/2000/svg"/>\n');
@@ -43,6 +44,35 @@ test('accepts the intended lightweight plugin structure', () => {
   const root = validFixture();
   try {
     assert.deepEqual(validatePluginRepository(root), []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+for (const skillName of ['animation-asset-audit', 'character-authoring']) {
+  test(`rejects a plugin missing the intended ${skillName} skill`, () => {
+    const root = validFixture();
+    try {
+      rmSync(path.join(root, `plugins/lpc-toolkit/skills/${skillName}`), {
+        recursive: true,
+        force: true,
+      });
+      assert.deepEqual(validatePluginRepository(root), [
+        'plugin skills must be exactly: animation-asset-audit, character-authoring.',
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+}
+
+test('rejects an unexpected bundled skill', () => {
+  const root = validFixture();
+  try {
+    write(root, 'plugins/lpc-toolkit/skills/unexpected/SKILL.md', `---\nname: unexpected\ndescription: Unexpected.\n---\n`);
+    assert.deepEqual(validatePluginRepository(root), [
+      'plugin skills must be exactly: animation-asset-audit, character-authoring.',
+    ]);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -130,3 +130,36 @@ test('reports non-integer reader pagination options', () => {
   assert.equal(offset.exitCode, 1);
   assert.equal(offset.result.errors[0].code, 'pagination_invalid');
 });
+
+test('routes audit requests to a focused non-mutating skill', () => {
+  const skill = readFileSync(new URL(
+    '../skills/animation-asset-audit/SKILL.md', import.meta.url,
+  ), 'utf8').replace(/\s+/gu, ' ');
+  assert.match(skill, /name: lpc-animation-asset-audit/u);
+  assert.match(skill, /incomplete animation support/u);
+  assert.match(skill, /missing animation PNGs/u);
+  assert.match(skill, /transparent animation frames/u);
+  assert.match(skill, /drawing worklist/u);
+  assert.match(skill, /Do not add, edit, generate, or repair sprite assets/u);
+});
+
+test('keeps compatibility ranges identical and checkers self-contained', async () => {
+  const audit = await import('../skills/animation-asset-audit/scripts/check-cli.mjs');
+  const character = await import('../skills/character-authoring/scripts/check-cli.mjs');
+  assert.deepEqual(audit.SUPPORTED_CLI, character.SUPPORTED_CLI);
+  assert.notEqual(
+    new URL('../skills/animation-asset-audit/scripts/check-cli.mjs', import.meta.url).href,
+    new URL('../skills/character-authoring/scripts/check-cli.mjs', import.meta.url).href,
+  );
+});
+
+test('documents safe report preservation and finding interpretation', () => {
+  const workflow = readFileSync(new URL(
+    '../skills/animation-asset-audit/references/audit-workflow.md', import.meta.url,
+  ), 'utf8');
+  for (const required of [
+    '--json', 'unsupported', 'missingFiles', 'blankFrames', 'errors',
+    'pathConfidence', 'manual-review', 'recolors', 'same target and scope',
+    'Exit code zero', 'upstream/',
+  ]) assert.equal(workflow.includes(required), true, `missing ${required}`);
+});
