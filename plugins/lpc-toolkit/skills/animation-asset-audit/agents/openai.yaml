@@ -1,0 +1,6 @@
+interface:
+  display_name: "LPC Animation Asset Audit"
+  short_description: "Find incomplete LPC animation assets"
+  default_prompt: "Audit selected LPC animations and produce a bounded drawing worklist from the structured findings."
+policy:
+  allow_implicit_invocation: true

@@ -1,12 +1,14 @@
 ---
 name: lpc-character-authoring
-description: Use when creating, editing, validating, previewing, or rendering LPC characters through the installed lpc-toolkit CLI. Do not use for unrelated image editing or non-LPC sprites.
+description: Use when creating, editing, validating, previewing, or rendering LPC characters through the installed lpc-toolkit CLI. Do not use for unrelated image editing or non-LPC sprites. Use lpc-animation-asset-audit for source-asset animation audits and drawing worklists.
 ---
 
 # LPC Character Authoring
 
 Use `lpc-toolkit` as the only source of catalog, selection, validation, render,
 and attribution behavior.
+
+Use lpc-animation-asset-audit for source-asset animation audits and drawing worklists.
 
 1. Read `references/compatibility.md`. Resolve this installed skill directory
    to an absolute path named `SKILL_DIR`, then run

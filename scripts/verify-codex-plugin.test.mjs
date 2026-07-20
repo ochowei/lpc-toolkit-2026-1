@@ -24,8 +24,8 @@ function validFixture() {
   }));
   write(root, 'plugins/lpc-toolkit/.codex-plugin/plugin.json', JSON.stringify({
     name: 'lpc-toolkit',
-    version: '0.2.0',
-    description: 'Create attributed LPC characters with the installed CLI.',
+    version: '0.2.1',
+    description: 'Create attributed LPC characters and audit incomplete animation assets with the installed CLI.',
     license: 'GPL-3.0-or-later',
     skills: './skills/',
     interface: {
@@ -33,6 +33,7 @@ function validFixture() {
       logo: './assets/logo.svg',
     },
   }));
+  write(root, 'plugins/lpc-toolkit/skills/animation-asset-audit/SKILL.md', `---\nname: lpc-animation-asset-audit\ndescription: Audit LPC animation assets.\n---\n`);
   write(root, 'plugins/lpc-toolkit/skills/character-authoring/SKILL.md', `---\nname: lpc-character-authoring\ndescription: Create LPC characters.\n---\n`);
   write(root, 'plugins/lpc-toolkit/assets/icon.svg', '<svg xmlns="http://www.w3.org/2000/svg"/>\n');
   write(root, 'plugins/lpc-toolkit/assets/logo.svg', '<svg xmlns="http://www.w3.org/2000/svg"/>\n');
@@ -43,6 +44,63 @@ test('accepts the intended lightweight plugin structure', () => {
   const root = validFixture();
   try {
     assert.deepEqual(validatePluginRepository(root), []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('publishes the two-workflow presentation', () => {
+  const manifest = JSON.parse(readFileSync(new URL(
+    '../plugins/lpc-toolkit/.codex-plugin/plugin.json',
+    import.meta.url,
+  ), 'utf8'));
+  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  const codexPluginSection = readme.split('### Codex Plugin', 2)[1]?.split('## ', 1)[0] ?? '';
+
+  assert.equal(manifest.version, '0.2.1');
+  assert.match(manifest.description, /audit/u);
+  assert.match(manifest.interface.longDescription, /drawing worklist/u);
+  assert.equal(
+    manifest.interface.defaultPrompt.some((prompt) => /incomplete.*animation/iu.test(prompt)),
+    true,
+  );
+  for (const required of [
+    'plugin `0.2.1`',
+    'catalog audit-animations',
+    'drawing worklist',
+  ]) {
+    assert.equal(
+      codexPluginSection.includes(required),
+      true,
+      `missing Codex Plugin presentation: ${required}`,
+    );
+  }
+});
+
+for (const skillName of ['animation-asset-audit', 'character-authoring']) {
+  test(`rejects a plugin missing the intended ${skillName} skill`, () => {
+    const root = validFixture();
+    try {
+      rmSync(path.join(root, `plugins/lpc-toolkit/skills/${skillName}`), {
+        recursive: true,
+        force: true,
+      });
+      assert.deepEqual(validatePluginRepository(root), [
+        'plugin skills must be exactly: animation-asset-audit, character-authoring.',
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+}
+
+test('rejects an unexpected bundled skill', () => {
+  const root = validFixture();
+  try {
+    write(root, 'plugins/lpc-toolkit/skills/unexpected/SKILL.md', `---\nname: unexpected\ndescription: Unexpected.\n---\n`);
+    assert.deepEqual(validatePluginRepository(root), [
+      'plugin skills must be exactly: animation-asset-audit, character-authoring.',
+    ]);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

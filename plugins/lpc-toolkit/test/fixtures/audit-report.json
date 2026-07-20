@@ -1,0 +1,77 @@
+{
+  "ok": true,
+  "command": "catalog audit-animations",
+  "data": {
+    "targets": ["walk", "run"],
+    "scope": { "typeName": "weapon", "bodyType": "male" },
+    "summary": {
+      "itemsScanned": 3,
+      "incompleteItems": 3,
+      "unsupported": 1,
+      "missingFiles": 1,
+      "blankFrames": 1,
+      "errors": 1
+    },
+    "unsupported": [{
+      "itemId": "weapon_bow",
+      "typeName": "weapon",
+      "animation": "run",
+      "nativeAnimations": ["walk"],
+      "compatibleAnimations": [],
+      "requirements": [{
+        "expectedPath": "spritesheets/weapon/bow/run/wood.png",
+        "pathConfidence": "inferred",
+        "itemId": "weapon_bow",
+        "typeName": "weapon",
+        "layer": "layer_1",
+        "bodyTypes": ["male"],
+        "variant": "wood",
+        "recolors": ["lpcr.brown"]
+      }]
+    }],
+    "missingFiles": [{
+      "path": "spritesheets/weapon/sword/run/steel.png",
+      "animation": "run",
+      "sourceAnimation": "run",
+      "consumers": [{
+        "itemId": "weapon_sword",
+        "typeName": "weapon",
+        "layer": "layer_1",
+        "bodyTypes": ["male"],
+        "variant": "steel",
+        "recolors": []
+      }]
+    }],
+    "blankFrames": [{
+      "path": "spritesheets/weapon/axe/walk/iron.png",
+      "animation": "walk",
+      "sourceAnimation": "walk",
+      "sourceRow": 2,
+      "direction": "down",
+      "frames": [{ "sourceColumn": 3, "logicalFrameIndices": [2] }],
+      "consumers": [{
+        "itemId": "weapon_axe",
+        "typeName": "weapon",
+        "layer": "layer_1",
+        "bodyTypes": ["male"],
+        "variant": "iron",
+        "recolors": []
+      }]
+    }],
+    "errors": [{
+      "kind": "image_decode_failed",
+      "message": "PNG decode failed",
+      "path": "spritesheets/weapon/mace/run/iron.png",
+      "consumers": [{
+        "itemId": "weapon_mace",
+        "typeName": "weapon",
+        "layer": "layer_1",
+        "bodyTypes": ["male"],
+        "variant": "iron",
+        "recolors": []
+      }]
+    }]
+  },
+  "warnings": [],
+  "errors": []
+}

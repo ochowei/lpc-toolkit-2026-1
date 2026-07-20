@@ -146,7 +146,7 @@ attribution embedded in imported JSON.
 
 ### Codex Plugin
 
-1. Install or upgrade the CLI to the range supported by plugin `0.2.0`:
+1. Install or upgrade the CLI to the range supported by plugin `0.2.1`:
 
 ```sh
 npm install -g '@lpc-toolkit/cli@>=0.2.0 <0.3.0'
@@ -173,6 +173,9 @@ distribution can later remove the marketplace-add step.
 The plugin guides Codex through JSON search, edit, validate, preview, and render
 workflows. Preview, render, and export outputs preserve metadata plus TXT and
 CSV credits.
+
+The plugin can run `catalog audit-animations`, preserve structured findings, and
+produce a bounded drawing worklist without modifying source assets.
 
 The CLI performs first-time asset preparation from a pinned release download,
 verifies checksums, and stores a platform cache. Later commands rely on

@@ -8,10 +8,10 @@ npm install -g '@lpc-toolkit/cli@>=0.2.0 <0.3.0'
 ```
 
 Use the checker below to confirm that the installed version is compatible with
-this plugin before authoring a character.
+this plugin before auditing animation assets.
 
-Before any character operation, resolve this installed skill directory to an
-absolute path named `SKILL_DIR`, then run the checker by that absolute path.
+Before any animation audit operation, resolve this installed skill directory to
+an absolute path named `SKILL_DIR`, then run the checker by that absolute path.
 Do not assume the current working directory is the plugin or skill directory.
 
 ```sh
