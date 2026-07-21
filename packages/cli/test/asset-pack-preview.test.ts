@@ -19,7 +19,10 @@ import {
   type SelectionJson,
 } from '@lpc-toolkit/core';
 import { afterEach, describe, expect, it } from 'vitest';
-import { previewAssetPack } from '../src/asset-pack-preview.js';
+import {
+  previewAssetPack,
+  previewValidationDirectoryName,
+} from '../src/asset-pack-preview.js';
 import { syncLinkedAssetPack } from '../src/asset-pack-sync.js';
 import { loadActiveAssetPackBaseline } from '../src/asset-pack-validation.js';
 import { createDirectoryAssetStore } from '../src/asset-store.js';
@@ -264,6 +267,13 @@ afterEach(() => {
 });
 
 describe('previewAssetPack', () => {
+  it('uses a Windows-safe validation directory component', () => {
+    const hex = 'a'.repeat(64);
+
+    expect(previewValidationDirectoryName(`sha256:${hex}`)).toBe(`sha256-${hex}`);
+    expect(previewValidationDirectoryName(`sha256:${hex}`)).not.toMatch(/[<>:"/\\|?*]/u);
+  });
+
   it('freshly compiles the stable first local asset over linked state and publishes a default attributed preview', async () => {
     const fixture = createPreviewFixture();
     const packRoot = path.join(fixture.workspace.packsRoot, 'acme.preview-hair');
@@ -431,17 +441,73 @@ describe('previewAssetPack', () => {
 
     const txt = readFileSync(path.join(result.outDir, 'braid.credits.txt'), 'utf8');
     const csv = readFileSync(path.join(result.outDir, 'braid.credits.csv'), 'utf8');
-    expect(txt).toContain('Base Hair Artist');
-    expect(txt).toContain('Pack Artist');
-    expect(csv).toContain('Base Hair Artist');
-    expect(csv).toContain('Pack Artist');
+    for (const attribution of [
+      'Base Hair Artist',
+      'https://example.com/base-hair',
+      'Original braid.',
+      'Pack Artist',
+      'https://example.com/pack-artist',
+      'Artist pack contribution.',
+    ]) {
+      expect(txt).toContain(attribution);
+      expect(csv).toContain(attribution);
+    }
     expect(JSON.parse(readFileSync(result.metadataPath, 'utf8'))).toMatchObject({
       credits: {
+        creditEntries: expect.arrayContaining([
+          expect.objectContaining({
+            authors: BASE_HAIR_CREDIT.authors,
+            urls: BASE_HAIR_CREDIT.urls,
+            notes: BASE_HAIR_CREDIT.notes,
+          }),
+          expect.objectContaining({
+            authors: PACK_CREDITS.authors,
+            urls: PACK_CREDITS.urls,
+            notes: PACK_CREDITS.notes,
+          }),
+        ]),
         resolvedPaths: expect.arrayContaining(['hair/braid/climb.png']),
       },
     });
     expect(validationEntries(fixture.workspace)).toEqual([]);
   }, 30000);
+
+  it.each(['missing', 'invalid'] as const)(
+    'previews a valid same-ID replacement without validating the %s old source',
+    async (oldSourceState) => {
+      const fixture = createPreviewFixture();
+      const oldRoot = path.join(fixture.workspace.packsRoot, 'old-preview-hair');
+      const newRoot = path.join(fixture.workspace.packsRoot, 'new-preview-hair');
+      writeNewItemPack({ root: oldRoot, assets: [newItem('old-braid')] });
+      writeNewItemPack({ root: newRoot, version: '1.1.0', assets: [newItem('new-braid')] });
+
+      const synced = await syncLinkedAssetPack({
+        packDirectory: oldRoot,
+        workspace: fixture.workspace,
+        runtime: fixture.runtime,
+      });
+      expect(synced.ok).toBe(true);
+      const outputBefore = snapshotTree(fixture.workspace.outputRoot);
+      const registryBefore = readFileSync(fixture.workspace.registryPath);
+      if (oldSourceState === 'missing') {
+        rmSync(oldRoot, { recursive: true, force: true });
+      } else {
+        writeFileSync(path.join(oldRoot, 'asset-pack.json'), '{');
+      }
+
+      const result = await previewAssetPack({
+        packDirectory: newRoot,
+        workspace: fixture.workspace,
+        runtime: fixture.runtime,
+      });
+
+      expect(result.assetId).toBe('new-braid');
+      expect(snapshotTree(fixture.workspace.outputRoot)).toEqual(outputBefore);
+      expect(readFileSync(fixture.workspace.registryPath)).toEqual(registryBefore);
+      expect(validationEntries(fixture.workspace)).toEqual([]);
+    },
+    30000,
+  );
 
   it('validates the current source again before previewing', async () => {
     const fixture = createPreviewFixture();

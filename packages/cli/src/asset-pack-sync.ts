@@ -777,25 +777,6 @@ export async function prepareLinkedAssetPackDesiredState(options: {
   const registryResult = readRegistryDocument(options.workspace, marker.workspaceId);
   if (!registryResult.ok) return registryResult;
 
-  const currentValidated: ValidatedLinkedAssetPack[] = [];
-  for (const entry of registryResult.document.entries) {
-    const validated = await validateLinkedPack(
-      entry.sourceDirectory,
-      options.runtime,
-      options.workspace,
-      entry.packId,
-    );
-    if (!validated.ok) return validated;
-    currentValidated.push(validated.validated);
-  }
-
-  const publishedOutputFailure = auditPublishedManagedOutput({
-    workspace: options.workspace,
-    markerBytes,
-    generatedDigests: registryResult.document.generatedDigests,
-  });
-  if (publishedOutputFailure) return publishedOutputFailure;
-
   const requestedResult = await validateLinkedPack(
     options.packDirectory,
     options.runtime,
@@ -807,9 +788,24 @@ export async function prepareLinkedAssetPackDesiredState(options: {
     .filter((entry) => entry.packId !== requested.loaded.pack.id)
     .sort((left, right) => left.packId.localeCompare(right.packId));
 
-  const retainedValidated = currentValidated
-    .filter((pack) => pack.loaded.pack.id !== requested.loaded.pack.id)
-    .filter((pack) => retainedEntries.some((entry) => entry.packId === pack.loaded.pack.id));
+  const retainedValidated: ValidatedLinkedAssetPack[] = [];
+  for (const entry of retainedEntries) {
+    const validated = await validateLinkedPack(
+      entry.sourceDirectory,
+      options.runtime,
+      options.workspace,
+      entry.packId,
+    );
+    if (!validated.ok) return validated;
+    retainedValidated.push(validated.validated);
+  }
+
+  const publishedOutputFailure = auditPublishedManagedOutput({
+    workspace: options.workspace,
+    markerBytes,
+    generatedDigests: registryResult.document.generatedDigests,
+  });
+  if (publishedOutputFailure) return publishedOutputFailure;
 
   const validatedPacks = [
     ...retainedValidated,

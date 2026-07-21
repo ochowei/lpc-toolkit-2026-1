@@ -269,6 +269,7 @@ export async function renderCharacterPreview(
       csv: creditsCsvPath,
       licenses: sheet.credits.licenses,
       entries: sheet.credits.entries.length,
+      creditEntries: sheet.credits.entries,
       resolvedPaths: sheet.credits.resolvedPaths,
     },
   };

@@ -95,6 +95,10 @@ function desiredStateFailure(
   );
 }
 
+export function previewValidationDirectoryName(contentDigest: string): string {
+  return contentDigest.replaceAll(':', '-');
+}
+
 function targetIdentity(asset: NormalizedAssetPackAsset): PreviewTarget {
   if (asset.kind === 'new-item') {
     return { assetId: asset.localId, itemId: asset.itemId };
@@ -238,7 +242,7 @@ export async function previewAssetPack(options: {
   const overlayRoot = path.join(
     options.workspace.stateRoot,
     'validation',
-    desiredState.requested.loaded.contentDigest,
+    previewValidationDirectoryName(desiredState.requested.loaded.contentDigest),
   );
 
   rmSync(overlayRoot, { recursive: true, force: true });
