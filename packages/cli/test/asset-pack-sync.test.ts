@@ -1395,6 +1395,32 @@ describe('syncLinkedAssetPack', () => {
     expect(snapshotFile(fixture.workspace.registryPath)).toEqual(beforeRegistry);
   });
 
+  it('rejects requested linked packs when packsRoot is a symlink without mutating managed output', async () => {
+    const fixture = createWorkspaceFixture();
+    const outsideRoot = createDirectory('lpc-asset-pack-sync-root-symlink-');
+    const outsidePack = path.join(outsideRoot, 'acme.wind-braid');
+    writeNewItemPack(outsidePack, {
+      packId: 'acme.wind-braid',
+      displayName: 'Wind Braid',
+      localId: 'wind-braid',
+      color: '#aa5500',
+    });
+    rmSync(fixture.workspace.packsRoot, { recursive: true, force: true });
+    symlinkSync(outsideRoot, fixture.workspace.packsRoot, process.platform === 'win32' ? 'junction' : 'dir');
+    const beforeOutput = snapshotTree(fixture.workspace.outputRoot);
+    const beforeRegistry = snapshotFile(fixture.workspace.registryPath);
+
+    const failed = expectFailure(await syncLinkedAssetPack({
+      packDirectory: path.join(fixture.workspace.packsRoot, 'acme.wind-braid'),
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+    }));
+
+    expect(failed.diagnostics[0]?.message).toContain('invalid containment root');
+    expect(snapshotTree(fixture.workspace.outputRoot)).toEqual(beforeOutput);
+    expect(snapshotFile(fixture.workspace.registryPath)).toEqual(beforeRegistry);
+  });
+
   it('refuses to sync into an unowned output root', async () => {
     const fixture = createWorkspaceFixture();
     const packRoot = path.join(fixture.workspace.packsRoot, 'acme.wind-braid');

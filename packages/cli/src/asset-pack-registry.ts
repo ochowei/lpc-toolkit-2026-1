@@ -282,6 +282,10 @@ function sortedDigestRecord(
 
 function containedPath(root: string, candidate: string, label: string): string {
   const resolvedRoot = path.resolve(root);
+  const rootStats = lstatSync(resolvedRoot);
+  if (rootStats.isSymbolicLink() || !rootStats.isDirectory()) {
+    throw new Error(`${label} has an invalid containment root: ${resolvedRoot}.`);
+  }
   const resolved = path.resolve(candidate);
   const relative = path.relative(resolvedRoot, resolved);
   if (relative === '' || relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
@@ -576,19 +580,23 @@ function verifyInstallReceipt(directory: string, workspaceId: string, entry: Ass
   const payloadDigests = sortedDigestRecord(
     receipt.payloadDigests,
     'Installed asset-pack receipt.payloadDigests',
-    'source',
+    'generic',
   );
-  if (!pathsEqual(Object.keys(payloadDigests), Object.keys(entry.sourceDigests))) {
+  const expectedPayloadPaths = ['asset-pack.json', ...Object.keys(entry.sourceDigests)]
+    .sort((left, right) => left.localeCompare(right));
+  if (!pathsEqual(Object.keys(payloadDigests), expectedPayloadPaths)) {
     throw new Error(`Installed asset-pack receipt payload coverage does not match registry source payload: ${receiptPath}.`);
   }
   for (const [sourcePath, digest] of Object.entries(entry.sourceDigests)) {
     if (payloadDigests[sourcePath] !== digest) {
       throw new Error(`Installed asset-pack receipt payload digest does not match registry source payload: ${sourcePath}.`);
     }
-    const bytes = readRegularManagedFile(directory, sourcePath, 'Installed asset-pack payload');
+  }
+  for (const [payloadPath, digest] of Object.entries(payloadDigests)) {
+    const bytes = readRegularManagedFile(directory, payloadPath, 'Installed asset-pack payload');
     const actual = `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
     if (actual !== digest) {
-      throw new Error(`Installed asset-pack payload digest does not match its receipt: ${sourcePath}.`);
+      throw new Error(`Installed asset-pack payload digest does not match its receipt: ${payloadPath}.`);
     }
   }
 }

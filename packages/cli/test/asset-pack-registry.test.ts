@@ -302,6 +302,8 @@ function installedEntryFixture(workspace: ReturnType<typeof initializeAssetWorks
   readonly entry: RegistryFixtureEntry;
   readonly sourcePath: string;
   readonly sourceBytes: Buffer;
+  readonly manifestPath: 'asset-pack.json';
+  readonly manifestBytes: Buffer;
   readonly receiptPath: string;
 } {
   const linked = linkedEntry(workspace);
@@ -318,6 +320,9 @@ function installedEntryFixture(workspace: ReturnType<typeof initializeAssetWorks
   const sourceFile = path.join(installedDirectory, sourcePath);
   mkdirSync(path.dirname(sourceFile), { recursive: true });
   writeFileSync(sourceFile, sourceBytes);
+  const manifestPath = 'asset-pack.json' as const;
+  const manifestBytes = Buffer.from('{"installed":true}\n');
+  writeFileSync(path.join(installedDirectory, manifestPath), manifestBytes);
   const { sourceDirectory: _sourceDirectory, ...base } = linked;
   const entry: RegistryFixtureEntry = {
     ...base,
@@ -336,9 +341,12 @@ function installedEntryFixture(workspace: ReturnType<typeof initializeAssetWorks
     archiveDigest: entry.archiveDigest,
     contentDigest: entry.contentDigest,
     installedAt: '2026-07-22T00:00:00.000Z',
-    payloadDigests: entry.sourceDigests,
+    payloadDigests: {
+      [manifestPath]: sha256(manifestBytes),
+      ...entry.sourceDigests,
+    },
   }, null, 2)}\n`);
-  return { entry, sourcePath, sourceBytes, receiptPath };
+  return { entry, sourcePath, sourceBytes, manifestPath, manifestBytes, receiptPath };
 }
 
 afterEach(() => {
@@ -499,6 +507,33 @@ describe('readAssetPackRegistry', () => {
     const linkedRoot = path.join(workspace.packsRoot, 'linked');
     symlinkSync(outside, linkedRoot, process.platform === 'win32' ? 'junction' : 'dir');
     expectInvalid(workspace, v2Document(workspace, [{ ...entry, sourceDirectory: path.join(linkedRoot, 'pack') }]));
+  });
+
+  it('rejects symlinked linked and installed containment roots before reading external paths', () => {
+    const linkedWorkspace = workspaceFixture();
+    const linkedOutside = mkdtempSync(path.join(os.tmpdir(), 'lpc-asset-pack-registry-linked-root-outside-'));
+    temporaryDirectories.push(linkedOutside);
+    const linked = linkedEntry(linkedWorkspace);
+    rmSync(linkedWorkspace.packsRoot, { recursive: true, force: true });
+    symlinkSync(linkedOutside, linkedWorkspace.packsRoot, process.platform === 'win32' ? 'junction' : 'dir');
+    expectInvalidMessage(
+      linkedWorkspace,
+      v2Document(linkedWorkspace, [linked]),
+      'invalid containment root',
+    );
+
+    const installedWorkspace = workspaceFixture();
+    const installedFixture = installedEntryFixture(installedWorkspace);
+    const installedOutside = mkdtempSync(path.join(os.tmpdir(), 'lpc-asset-pack-registry-installed-root-outside-'));
+    temporaryDirectories.push(installedOutside);
+    const installedRoot = path.join(installedWorkspace.stateRoot, 'installed');
+    rmSync(installedRoot, { recursive: true, force: true });
+    symlinkSync(installedOutside, installedRoot, process.platform === 'win32' ? 'junction' : 'dir');
+    expectInvalidMessage(
+      installedWorkspace,
+      v2Document(installedWorkspace, [installedFixture.entry]),
+      'invalid containment root',
+    );
   });
 
   it('rejects installed source escape, receipt mismatch, and entry field cross-contamination', () => {
@@ -695,16 +730,29 @@ describe('readAssetPackRegistry', () => {
       }, null, 2)}\n`);
     };
 
+    const expectedPayloadDigests = {
+      [fixture.manifestPath]: sha256(fixture.manifestBytes),
+      ...fixture.entry.sourceDigests,
+    };
+
     writeReceipt({});
     expect(readAssetPackRegistry({ workspace, markerWorkspaceId: workspaceId(workspace) })).toMatchObject({ ok: false });
     writeReceipt({
-      ...fixture.entry.sourceDigests,
+      ...expectedPayloadDigests,
       'sprites/extra.png': digest,
     });
     expect(readAssetPackRegistry({ workspace, markerWorkspaceId: workspaceId(workspace) })).toMatchObject({ ok: false });
     writeReceipt({ [fixture.sourcePath]: digest });
     expect(readAssetPackRegistry({ workspace, markerWorkspaceId: workspaceId(workspace) })).toMatchObject({ ok: false });
-    writeReceipt(fixture.entry.sourceDigests);
+    writeReceipt({
+      [fixture.manifestPath]: digest,
+      ...fixture.entry.sourceDigests,
+    });
+    expect(readAssetPackRegistry({ workspace, markerWorkspaceId: workspaceId(workspace) })).toMatchObject({ ok: false });
+    writeReceipt(expectedPayloadDigests);
+    writeFileSync(path.join(fixture.entry.installedDirectory!, fixture.manifestPath), 'tampered manifest');
+    expect(readAssetPackRegistry({ workspace, markerWorkspaceId: workspaceId(workspace) })).toMatchObject({ ok: false });
+    writeFileSync(path.join(fixture.entry.installedDirectory!, fixture.manifestPath), fixture.manifestBytes);
     writeFileSync(path.join(fixture.entry.installedDirectory!, fixture.sourcePath), 'tampered');
     expect(readAssetPackRegistry({ workspace, markerWorkspaceId: workspaceId(workspace) })).toMatchObject({ ok: false });
     writeFileSync(path.join(fixture.entry.installedDirectory!, fixture.sourcePath), fixture.sourceBytes);
@@ -715,10 +763,16 @@ describe('readAssetPackRegistry', () => {
     symlinkSync(path.join(outside, 'receipt.json'), fixture.receiptPath, 'file');
     expect(readAssetPackRegistry({ workspace, markerWorkspaceId: workspaceId(workspace) })).toMatchObject({ ok: false });
     unlinkSync(fixture.receiptPath);
-    writeReceipt(fixture.entry.sourceDigests);
+    writeReceipt(expectedPayloadDigests);
     const sourceFile = path.join(fixture.entry.installedDirectory!, fixture.sourcePath);
     unlinkSync(sourceFile);
     symlinkSync(path.join(outside, 'payload.png'), sourceFile, 'file');
+    expect(readAssetPackRegistry({ workspace, markerWorkspaceId: workspaceId(workspace) })).toMatchObject({ ok: false });
+    unlinkSync(sourceFile);
+    writeFileSync(sourceFile, fixture.sourceBytes);
+    const manifestFile = path.join(fixture.entry.installedDirectory!, fixture.manifestPath);
+    unlinkSync(manifestFile);
+    symlinkSync(path.join(outside, 'manifest.json'), manifestFile, 'file');
     expect(readAssetPackRegistry({ workspace, markerWorkspaceId: workspaceId(workspace) })).toMatchObject({ ok: false });
   });
 

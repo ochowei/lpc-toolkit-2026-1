@@ -21,6 +21,8 @@ Final hardening fix wave:
 - Acknowledgements and replacements are round-tripped through Core parsing and normalization, then checked for canonical ordering and uniqueness. Invalid diagnostic codes, reasons, subjects, replacement pack IDs, version ranges, and asset keys are rejected.
 - Installed receipts now require exact source-payload coverage and matching digests, read only regular non-symlink files, and reject forged, missing, extra, tampered, or symlinked payload evidence.
 - Managed-output snapshots lstat every traversed component and reject symbolic links, FIFOs, and other non-regular leaves. Audit reports those conditions as stable managed-output ownership diagnostics instead of following an outside target.
+- Containment now lstat-validates `packsRoot` and `stateRoot/installed` themselves as regular directories before resolving linked or installed entries. Root-symlink regressions prove linked sync cannot read external packs or publish output, and installed-registry reads fail before external receipt or payload traversal.
+- Installed receipt coverage now includes `asset-pack.json` alongside every sprite/source payload path. The registry hashes every covered regular file, including the manifest, and rejects missing, extra, digest-mismatched, tampered, or symlinked manifest entries.
 
 TDD evidence:
 
@@ -28,10 +30,12 @@ TDD evidence:
 - GREEN: each regression passed after the minimal shared containment, canonical projection, strict relationship, and retained-v1 comparison changes.
 - RED: exact-credit, Core-semantic, canonical-path, receipt-payload, and managed-output symlink/FIFO regressions failed against the previous reader; extension re-sync exposed the valid inherited-catalog credit case and was corrected by definition-owned credit reconstruction.
 - GREEN: the focused registry, sync, and workspace suite passes with the exact compiler-row and receipt/output-audit checks enabled.
+- RED: root-symlink containment was accepted and a valid receipt containing `asset-pack.json` was rejected.
+- GREEN: root validation rejects those external containment roots before traversal, while exact receipt coverage verifies the manifest and source bytes.
 
 Verification:
 
-- `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-registry.test.ts asset-pack-sync.test.ts asset-workspace.test.ts` — PASS: 3 files, 64 tests.
+- `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-registry.test.ts asset-pack-sync.test.ts asset-workspace.test.ts` — PASS: 3 files, 66 tests.
 - `rtk pnpm --filter @lpc-toolkit/cli run typecheck` — PASS: `tsc -p tsconfig.json --noEmit`.
 - `rtk git diff --check` — PASS.
 
