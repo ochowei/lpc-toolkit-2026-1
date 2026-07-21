@@ -861,7 +861,9 @@ Then update this task's plan record and commit it separately.
 - Consumes: directory `loadAssetPackFiles`, `validateAssetPackPayload`, `assetPackSourceFromNormalized`, and deterministic archive writer.
 - Produces: `packAssetPack` and `PackAssetPackResult` for Task 12.
 
-- [ ] **Step 1: Write failing packaging tests**
+- [x] **Step 1: Write failing packaging tests**
+
+  - Implementation: Added new/extend, normalization, acknowledgement, compatibility, fresh-pixel, digest, mtime, deterministic-byte, and no-mutation packaging coverage.
 
 Cover valid new/extend packs, default sibling archive name, normalized manifest rather than artist byte order, persisted acknowledgements, exact checksums, fresh pixel validation, supported/unsupported minimum CLI and capability declarations, unacknowledged warning failure, missing/changed source failure, identical output bytes across two runs, source manifest/PNG mtime preservation, and no write to workspace output/base/cache/upstream sentinels.
 
@@ -872,11 +874,15 @@ expect(first).toMatchObject({ packId: 'acme.hair', version: '1.0.0' });
 expect(readFileSync(first.archivePath)).toEqual(readFileSync(second.archivePath));
 ```
 
-- [ ] **Step 2: Write failing publication rollback tests**
+- [x] **Step 2: Write failing publication rollback tests**
+
+  - Implementation: Added before/after-backup failure, first-publication failure, owned sibling cleanup, foreign sentinel preservation, and directory/symlink/FIFO target tests.
 
 Pre-create the target archive, inject failure before and after backup rename, and assert the previous archive is restored byte-for-byte. A failed first publication leaves no final archive. Temporary/backup paths stay beside the target and are removed only when owned by the current invocation.
 
-- [ ] **Step 3: Run the focused test and verify RED**
+- [x] **Step 3: Run the focused test and verify RED**
+
+  - Verification: Packaging tests were RED before the new compatibility and packaging modules existed.
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-packaging.test.ts
@@ -884,11 +890,15 @@ rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-packaging.test.ts
 
 Expected: FAIL because packaging orchestration does not exist.
 
-- [ ] **Step 4: Implement the shared CLI compatibility gate**
+- [x] **Step 4: Implement the shared CLI compatibility gate**
+
+  - Implementation: Added stable CLI-version/capability diagnostics and applied the gate to both directory and captured-payload validation.
 
 Create `checkAssetPackCompatibility(pack, cliVersion)` returning stable `asset_cli_version_incompatible` or `asset_capability_unsupported` diagnostics. Call it from payload/directory validation so `asset validate`, packaging, inspection, desired-state loading, and doctor converge on one decision.
 
-- [ ] **Step 5: Implement normalized archive assembly**
+- [x] **Step 5: Implement normalized archive assembly**
+
+  - Implementation: Added one-snapshot validation/archive assembly, acknowledgement-preserving normalized manifests, locale-independent ordering, exact captured source bytes, and deterministic archive publication.
 
 Load one immutable directory snapshot, validate that same snapshot, reject `valid: false`, reconstruct the complete normalized source including acknowledgements, encode recursively sorted two-space JSON plus newline, and call `createDeterministicAssetPackArchive` with exact captured source bytes.
 
@@ -915,11 +925,15 @@ export type PackAssetPackResult =
   | { readonly ok: false; readonly diagnostics: readonly AssetPackLifecycleDiagnostic[] };
 ```
 
-- [ ] **Step 6: Implement sibling atomic publication**
+- [x] **Step 6: Implement sibling atomic publication**
+
+  - Implementation: Added exclusive sibling temporary/backup publication, digest verification, rollback, target type/symlink safety, and ownership-aware cleanup.
 
 The target is `path.join(path.dirname(packRoot), `${pack.id}-${pack.version}.lpc-assets.zip`)`. Write and close a unique sibling temporary file, verify its digest, move an existing regular target to a unique backup, rename temporary to target, restore on error, and reject directories/symlinks/special targets.
 
-- [ ] **Step 7: Verify GREEN**
+- [x] **Step 7: Verify GREEN**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-packaging.test.ts asset-pack-files.test.ts asset-pack-validation.test.ts` PASS (29 tests); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS; `rtk git diff --check` PASS.
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-packaging.test.ts asset-pack-files.test.ts asset-pack-validation.test.ts
@@ -928,12 +942,21 @@ rtk pnpm --filter @lpc-toolkit/cli run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit product code**
+- [x] **Step 8: Commit product code**
+
+  - Commits: `3d19d418afd5ded2548446d50e61d8dc40551020`, `5e987c4c52b8e33d033aed84f27e2d7588fd39a4`
 
 ```sh
 rtk git add packages/cli/src/asset-pack-compatibility.ts packages/cli/src/asset-pack-packaging.ts packages/cli/src/asset-pack-validation.ts packages/cli/test/asset-pack-packaging.test.ts packages/cli/test/asset-pack-validation.test.ts
 rtk git commit -m "feat(cli): package deterministic asset archives"
 ```
+
+Task 4 record:
+
+- Implementation: Added shared compatibility gating, one-snapshot deterministic archive packaging, locale-independent normalized manifest ordering, acknowledgement/attribution preservation, and atomic sibling publication with rollback and mutation-boundary coverage.
+- Product/fix commits: `3d19d418afd5ded2548446d50e61d8dc40551020`, `5e987c4c52b8e33d033aed84f27e2d7588fd39a4`.
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-packaging.test.ts asset-pack-files.test.ts asset-pack-validation.test.ts` PASS (29 tests); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS; `rtk git diff --check` PASS.
+- Review: Initial review found locale-ordering and coverage gaps; final reviewer APPROVED with no Critical or Important findings after the fix wave.
 
 Then update this task's plan record and commit it separately.
 
