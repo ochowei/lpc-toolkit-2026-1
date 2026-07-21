@@ -4,6 +4,7 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
@@ -111,39 +112,54 @@ function isInsideRoot(root: string, candidate: string): boolean {
   );
 }
 
+function isAllowedRootAliasSymlink(target: string): boolean {
+  if (process.platform !== 'darwin') return false;
+  if (path.dirname(target) !== path.parse(target).root) return false;
+
+  try {
+    return realpathSync.native(target) === path.join('/private', path.basename(target));
+  } catch {
+    return false;
+  }
+}
+
 function assertExistingDirectoryPath(target: string): void {
   const absoluteTarget = path.resolve(target);
   let current = absoluteTarget;
-  const missingSegments: string[] = [];
 
-  while (!existsSync(current)) {
-    missingSegments.unshift(current);
+  while (true) {
+    if (existsSync(current)) {
+      const stats = lstatSync(current);
+      if (stats.isSymbolicLink()) {
+        if (!isAllowedRootAliasSymlink(current)) {
+          throw new AssetWorkspaceError(
+            `Refusing to initialize through a symlinked workspace path: ${current}`,
+          );
+        }
+      } else if (!stats.isDirectory()) {
+        throw new AssetWorkspaceError(`Workspace path is not a directory: ${current}`);
+      }
+    }
+
     const parent = path.dirname(current);
     if (parent === current) break;
     current = parent;
   }
+}
 
-  for (const entry of [current, ...missingSegments]) {
-    if (!existsSync(entry)) continue;
-    const stats = lstatSync(entry);
-    if (stats.isSymbolicLink()) {
-      throw new AssetWorkspaceError(
-        `Refusing to initialize through a symlinked workspace path: ${entry}`,
-      );
-    }
-    if (!stats.isDirectory()) {
-      throw new AssetWorkspaceError(`Workspace path is not a directory: ${entry}`);
-    }
-  }
+function assertSafeWorkspaceRoot(root: string): string {
+  const absoluteRoot = path.resolve(root);
+  assertExistingDirectoryPath(absoluteRoot);
+  return absoluteRoot;
 }
 
 function ensureWorkspaceRoot(root: string): void {
-  assertExistingDirectoryPath(root);
-  mkdirSync(root, { recursive: true });
+  const absoluteRoot = assertSafeWorkspaceRoot(root);
+  mkdirSync(absoluteRoot, { recursive: true });
 }
 
 function ensureDirectoryUnderRoot(root: string, subpath: string): void {
-  const absoluteRoot = path.resolve(root);
+  const absoluteRoot = assertSafeWorkspaceRoot(root);
   const absolutePath = path.resolve(absoluteRoot, subpath);
   if (!isInsideRoot(absoluteRoot, absolutePath)) {
     throw new AssetWorkspaceError(
@@ -176,7 +192,7 @@ function ensureDirectoryUnderRoot(root: string, subpath: string): void {
 }
 
 function assertSafeExistingSubpath(root: string, subpath: string): void {
-  const absoluteRoot = path.resolve(root);
+  const absoluteRoot = assertSafeWorkspaceRoot(root);
   const absolutePath = path.resolve(absoluteRoot, subpath);
   if (!isInsideRoot(absoluteRoot, absolutePath)) {
     throw new AssetWorkspaceError(
@@ -192,7 +208,7 @@ function resolveConfiguredDirectory(root: string, configuredPath: string): strin
       `Asset workspace path escapes the workspace root: ${configuredPath}`,
     );
   }
-  const absoluteRoot = path.resolve(root);
+  const absoluteRoot = assertSafeWorkspaceRoot(root);
   const resolved = path.resolve(absoluteRoot, configuredPath);
   if (!isInsideRoot(absoluteRoot, resolved)) {
     throw new AssetWorkspaceError(
@@ -204,7 +220,7 @@ function resolveConfiguredDirectory(root: string, configuredPath: string): strin
 }
 
 function createWorkspace(root: string, config: AssetWorkspaceConfig): AssetWorkspace {
-  const absoluteRoot = path.resolve(root);
+  const absoluteRoot = assertSafeWorkspaceRoot(root);
   const packsRoot = resolveConfiguredDirectory(absoluteRoot, config.packsDirectory);
   const outputRoot = resolveConfiguredDirectory(absoluteRoot, config.outputDirectory);
   const stateRoot = resolveConfiguredDirectory(absoluteRoot, config.stateDirectory);

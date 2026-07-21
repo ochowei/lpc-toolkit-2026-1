@@ -144,3 +144,72 @@ Self-review:
 - The ancestry validator deliberately starts at the nearest existing path segment so it still rejects user-created symlink escapes without treating the macOS `/var` tempdir alias as an invalid workspace path.
 - Reopen and discovery now validate all configured internal directories, not just the managed output directory, which closes the `stateDirectory` and `packsDirectory` escape gap the reviewer called out.
 - The exact-key enforcement is limited to the v1 config and output-marker files requested here; no later-task registry behavior or schema ownership was widened.
+
+---
+
+## Remaining Important finding follow-up — 2026-07-21
+
+Status: complete
+
+Files changed:
+
+- `packages/cli/src/asset-workspace.ts`
+- `packages/cli/test/asset-workspace.test.ts`
+- `.superpowers/sdd/task-5-report.md`
+
+Fix commit summary:
+
+- `2f22c67e93cbf82ae761b2ce0ee35f5696895257` — `fix(cli): reject symlinked-ancestor workspace reopen and discovery`
+
+What changed:
+
+- Hardened the shared workspace-root ancestry check so an already-existing workspace root is rejected when any ancestor in the requested path is a symlink escape.
+- Applied that shared root validation before configured path resolution in fresh init, idempotent reopen, implicit discovery, and explicit workspace-path resolution.
+- Preserved the valid macOS top-level `/var` tempdir alias behavior so ordinary temp-backed workspaces still reopen and discover cleanly.
+- Added regressions for re-opening, implicit discovery, and explicit resolution of an existing workspace through a symlinked ancestor.
+
+RED evidence:
+
+1. Added these regression tests in `packages/cli/test/asset-workspace.test.ts` before changing production code:
+   - rejects re-opening an existing workspace through a symlinked ancestor
+   - rejects discovering an existing workspace through a symlinked ancestor
+   - rejects explicitly resolving an existing workspace through a symlinked ancestor
+
+2. Ran the required focused RED command before touching `packages/cli/src/asset-workspace.ts`:
+
+   - Command: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-workspace.test.ts`
+   - Result: FAIL
+   - Evidence:
+     - `test/asset-workspace.test.ts (18 tests | 3 failed)`
+     - `initializeAssetWorkspace > rejects re-opening an existing workspace through a symlinked ancestor`
+     - `findAssetWorkspace > rejects discovering an existing workspace through a symlinked ancestor`
+     - `findAssetWorkspace > rejects explicitly resolving an existing workspace through a symlinked ancestor`
+     - `expected [Function] to throw an error`
+
+GREEN evidence:
+
+1. Re-ran the focused workspace suite after the production fix:
+
+   - Command: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-workspace.test.ts`
+   - Result: PASS
+   - Evidence:
+     - `✓ test/asset-workspace.test.ts (18 tests)`
+     - `Tests 18 passed (18)`
+
+2. Ran the required CLI typecheck:
+
+   - Command: `rtk pnpm --filter @lpc-toolkit/cli run typecheck`
+   - Result: PASS
+   - Evidence:
+     - `tsc -p tsconfig.json --noEmit`
+
+Self-review:
+
+- The root cause was limited to existing workspace roots: the prior symlink walk only examined the target itself when the workspace already existed, so a symlinked parent alias was never inspected on reopen or discovery.
+- Moving the root ancestry guard into shared workspace-root validation keeps init and both discovery paths aligned without changing config shape, marker shape, or discovery fallback rules.
+- The only behavior carve-out is for the macOS top-level `/var` alias to `/private/var`; without that, the repo's tempdir-backed valid workspaces would falsely fail. The guard still rejects user-created symlink ancestors beneath that alias.
+- Explicit path resolution now fails on the same symlinked-ancestor escape as implicit discovery, which matches the intended containment rule while preserving valid explicit resolution for normal paths.
+
+Concerns:
+
+- None.

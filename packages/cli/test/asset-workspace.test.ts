@@ -204,6 +204,23 @@ describe('initializeAssetWorkspace', () => {
     );
   });
 
+  it('rejects re-opening an existing workspace through a symlinked ancestor', () => {
+    const home = createDirectory('lpc-asset-workspace-home-');
+    const outside = createDirectory('lpc-asset-workspace-outside-');
+    const realWorkspace = path.join(outside, 'workspace');
+    const linkedParent = path.join(home, 'linked-parent');
+    initializeAssetWorkspace(realWorkspace);
+    symlinkSync(
+      outside,
+      linkedParent,
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+
+    expect(() => initializeAssetWorkspace(path.join(linkedParent, 'workspace'))).toThrow(
+      'Refusing to initialize through a symlinked workspace path',
+    );
+  });
+
   it('rejects workspace configs with unknown keys', () => {
     const target = createWorkspaceTarget();
     writeWorkspaceConfig(target, {
@@ -315,5 +332,40 @@ describe('findAssetWorkspace', () => {
     expect(() => findAssetWorkspace(nested)).toThrow(
       'Refusing to initialize through a symlinked workspace path',
     );
+  });
+
+  it('rejects discovering an existing workspace through a symlinked ancestor', () => {
+    const home = createDirectory('lpc-asset-workspace-home-');
+    const outside = createDirectory('lpc-asset-workspace-outside-');
+    const realWorkspace = path.join(outside, 'workspace');
+    const linkedParent = path.join(home, 'linked-parent');
+    initializeAssetWorkspace(realWorkspace);
+    symlinkSync(
+      outside,
+      linkedParent,
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+
+    expect(() =>
+      findAssetWorkspace(path.join(linkedParent, 'workspace', 'artist-packs', 'acme.hair')),
+    ).toThrow('Refusing to initialize through a symlinked workspace path');
+  });
+
+  it('rejects explicitly resolving an existing workspace through a symlinked ancestor', () => {
+    const home = createDirectory('lpc-asset-workspace-home-');
+    const outside = createDirectory('lpc-asset-workspace-outside-');
+    const realWorkspace = path.join(outside, 'workspace');
+    const runner = path.join(home, 'runner');
+    initializeAssetWorkspace(realWorkspace);
+    mkdirSync(runner, { recursive: true });
+    symlinkSync(
+      outside,
+      path.join(home, 'linked-parent'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+
+    expect(() =>
+      findAssetWorkspace(runner, '../linked-parent/workspace'),
+    ).toThrow('Refusing to initialize through a symlinked workspace path');
   });
 });
