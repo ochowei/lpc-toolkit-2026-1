@@ -506,7 +506,7 @@ Task 1 record:
 - Modify: `packages/core/src/asset-animation-audit.ts`
 - Modify: `packages/core/src/index.ts`
 
-- [ ] **Step 1: Write failing geometry and acknowledgement tests**
+- [x] **Step 1: Write failing geometry and acknowledgement tests**
 
 Test exact `walk` and `climb` cropped PNG dimensions from `ANIMATION_CONFIGS`, required versus optional transparent cells, registered type/animation/body/material/palette/variant checks, missing/decode errors, multi-layer mismatch, inferred-path warning, partial coverage warnings, and stale acknowledgements.
 
@@ -532,7 +532,7 @@ it('invalidates an acknowledgement after a sprite digest changes', () => {
 });
 ```
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-validation.test.ts
@@ -540,17 +540,17 @@ rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-validation.test.ts
 
 Expected: FAIL because validation and exported geometry do not exist.
 
-- [ ] **Step 3: Export the existing standard geometry calculator**
+- [x] **Step 3: Export the existing standard geometry calculator**
 
 Rename the private helper in `asset-animation-audit.ts` to exported `standardAnimationGeometry`; keep audit plan output byte-for-byte equivalent and add no second animation table.
 
-- [ ] **Step 4: Implement pure validation over injected inspections**
+- [x] **Step 4: Implement pure validation over injected inspections**
 
 Compute expected width as `(largest referenced source column + 1) * frameSize` and height as `rows.length * frameSize`. Match cells by stable key `<row>:<column>`. Emit the approved error/warning codes and an acknowledgement template containing the exact code, structured subject, and content digest. The template leaves `reason` empty for the artist; schema validation rejects it until the artist supplies a non-empty explanation.
 
 Warnings without a matching persisted non-empty-reason acknowledgement make `ok: false`; acknowledged warnings remain in `diagnostics` but no longer block. Errors always block.
 
-- [ ] **Step 5: Verify audit regression and GREEN**
+- [x] **Step 5: Verify audit regression and GREEN**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-validation.test.ts asset-animation-audit.test.ts
@@ -559,7 +559,7 @@ rtk pnpm --filter @lpc-toolkit/core run typecheck
 
 Expected: PASS, including unchanged animation-audit tests.
 
-- [ ] **Step 6: Commit product code**
+- [x] **Step 6: Commit product code**
 
 ```sh
 rtk git add packages/core/src/asset-pack-validation.ts packages/core/src/asset-animation-audit.ts packages/core/src/index.ts packages/core/test/asset-pack-validation.test.ts
@@ -567,6 +567,12 @@ rtk git commit -m "feat(core): validate artist asset pack sources"
 ```
 
 Then update this task's plan record and commit it separately.
+
+Task 2 record:
+
+- Implementation: Added pure registered-geometry/pixel-result validation, warning acknowledgement templates and blocking, digest stability/invalidation behavior, and the exported shared animation geometry helper without duplicating the audit table.
+- Product commit: `7cb1aacf5ca5a77184b618291597f51079951c3`.
+- Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-validation.test.ts` PASS (20/20 RED/GREEN cycle); `rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-validation.test.ts asset-animation-audit.test.ts` PASS; `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS; `rtk pnpm check:boundaries` PASS; reviewer APPROVED.
 
 ---
 
