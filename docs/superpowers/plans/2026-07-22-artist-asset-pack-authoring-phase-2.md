@@ -1083,15 +1083,21 @@ Then update this task's plan record and commit it separately.
 - Consumes: Phase 1 v1 registry bytes, managed output marker, payload snapshots, compile ownership, and Stable Interfaces.
 - Produces: strict v2 document/entry APIs for Tasks 7–12.
 
-- [ ] **Step 1: Write failing v1 migration tests**
+- [x] **Step 1: Write failing v1 migration tests**
+
+  - Implementation: Added empty/populated v1 fidelity, migration, digest/source drift, identity, and no-mutation coverage.
 
 Load an empty v1 registry and a populated linked v1 registry. Assert the registry reader returns strict v1 values plus `needsMigration: true`; generalized state then validates each linked source, preserves pack/version/digests, derives acknowledgements/destinations/replacements/credits, and writes only v2 on the next sync. Invalid v1 digests/source mismatch fail during desired-state preparation rather than being migrated.
 
-- [ ] **Step 2: Write failing v2 strictness and ownership tests**
+- [x] **Step 2: Write failing v2 strictness and ownership tests**
+
+  - Implementation: Added strict field/path/digest/receipt/ownership/credit/attribution, symlink/special-file, conflict, and nested ordering/tamper coverage.
 
 Cover unknown document/entry fields, wrong workspace ID, duplicate pack IDs, unsorted duplicates, invalid digest formats, generated-digest coverage mismatch, compile digest mismatch, linked path symlink/escape, installed path outside `stateRoot/installed`, installed receipt mismatch, entry kind/field cross-contamination, logical destination conflict, and generated credit ordering.
 
-- [ ] **Step 3: Run focused tests and verify RED**
+- [x] **Step 3: Run focused tests and verify RED**
+
+  - Verification: Initial registry test run was RED because v2 registry APIs did not exist.
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-registry.test.ts asset-pack-sync.test.ts
@@ -1099,19 +1105,27 @@ rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-registry.test.ts asset-pac
 
 Expected: FAIL because v2 registry APIs do not exist.
 
-- [ ] **Step 4: Extract registry parsing from sync**
+- [x] **Step 4: Extract registry parsing from sync**
+
+  - Implementation: Added strict v1/v2 parsing, migration markers, canonical paths, ownership/receipt/output auditing, and attribution-preserving registry APIs.
 
 Move Phase 1 exact-key/digest/marker logic into `asset-pack-registry.ts`. Read v1 without mutating or enriching it, return a migration-needed marker, and accept v2 only when every path/digest/credit relationship is exact. Task 7 performs source-backed enrichment. Keep generated output auditing available as a separate exported function so doctor can reuse it.
 
-- [ ] **Step 5: Build deterministic v2 entries**
+- [x] **Step 5: Build deterministic v2 entries**
+
+  - Implementation: Added typed canonical compile projection/digest, per-entry generated sprite/destination/credit ownership, exact generated digest coverage, and normalized acknowledgements/replacements.
 
 Create entries only from validated payload plus compiler output. `generatedPaths` is compiler ownership; `logicalDestinations` is owned sprite destinations; `generatedCredits` filters compiled credits by owned logical prefixes; acknowledgements/replacements copy normalized values. `compileDigest` hashes canonical definitions, sprite source/destination/digests, credits, and ownership for the complete generation.
 
-- [ ] **Step 6: Keep sync behavior passing during extraction**
+- [x] **Step 6: Keep sync behavior passing during extraction**
+
+  - Implementation: Updated linked sync to reject outside/symlink roots before publication and migrate v1 state to strict v2 without creating installed entries.
 
 Update `syncLinkedAssetPack` to call registry APIs while it still uses the Phase 1 publisher. A successful sync from v1 writes v2; a subsequent sync reads v2. No installed entry is created by sync.
 
-- [ ] **Step 7: Verify GREEN**
+- [x] **Step 7: Verify GREEN**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-registry.test.ts asset-pack-sync.test.ts asset-workspace.test.ts` PASS (66 tests); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS; `rtk git diff --check` PASS.
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-registry.test.ts asset-pack-sync.test.ts asset-workspace.test.ts
@@ -1120,12 +1134,21 @@ rtk pnpm --filter @lpc-toolkit/cli run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit product code**
+- [x] **Step 8: Commit product code**
+
+  - Commits: `894315f00f487849cd0638bb41105c1d188b2497`, `2e6f1f1117123a5da8b95ee5d7b34a8730ac942e`, `e2b1f190af809cbad3c1e2c643746a5f5f942fe7`, `f8c4bb5f710c98d74f2165911f08e60e3218bbbe`.
 
 ```sh
 rtk git add packages/cli/src/asset-pack-registry.ts packages/cli/src/asset-workspace.ts packages/cli/src/asset-pack-sync.ts packages/cli/test/asset-pack-registry.test.ts packages/cli/test/asset-workspace.test.ts packages/cli/test/asset-pack-sync.test.ts
 rtk git commit -m "feat(cli): migrate asset registry to lifecycle v2"
 ```
+
+Task 6 record:
+
+- Implementation: Added strict registry v2, v1 migration, typed compile digest/ownership projections, linked/installed containment and receipt verification, attribution integrity, output auditing, and sync migration safety.
+- Product/fix commits: `894315f00f487849cd0638bb41105c1d188b2497`, `2e6f1f1117123a5da8b95ee5d7b34a8730ac942e`, `e2b1f190af809cbad3c1e2c643746a5f5f942fe7`, `f8c4bb5f710c98d74f2165911f08e60e3218bbbe`.
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-registry.test.ts asset-pack-sync.test.ts asset-workspace.test.ts` PASS (66 tests); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS; `rtk git diff --check` PASS.
+- Review: Initial reviews found eight Important integrity/path issues across two waves; final reviewer APPROVED with no Critical or Important findings after all fix waves.
 
 Then update this task's plan record and commit it separately.
 
