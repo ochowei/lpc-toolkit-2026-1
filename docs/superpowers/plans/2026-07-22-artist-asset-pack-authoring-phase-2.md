@@ -551,7 +551,9 @@ Reassess this matrix in Task 13 before handoff.
 - Consumes: completed Phase 1 `AssetPackSource`, `NormalizedAssetPack`, replacements, and compiler ownership.
 - Produces: every Core interface under Stable Interfaces, used by Tasks 2, 4, 5, and 9.
 
-- [ ] **Step 1: Write failing SemVer and lifecycle tests**
+- [x] **Step 1: Write failing SemVer and lifecycle tests**
+
+  - Implementation: Added focused SemVer precedence, comparator range, stable asset-key, and lifecycle replacement tests.
 
 Cover core precedence, numeric versus string prerelease identifiers, build metadata equality, malformed input, all five replacement comparators, compound ranges, stable new/extend asset keys, greater-version upgrade, same-version equality, self-replacement-authorized downgrade, incomplete asset coverage, wrong pack ID, and unmatched installed version.
 
@@ -562,7 +564,9 @@ expect(assetPackAssetKeys(packWithNewAndExtend)).toEqual(['hair_messy', 'moon-br
 expect(assetPackLifecycleReplacementAllows(downgrade, installed)).toBe(true);
 ```
 
-- [ ] **Step 2: Write failing compatibility and round-trip tests**
+- [x] **Step 2: Write failing compatibility and round-trip tests**
+
+  - Implementation: Added strict compatibility parsing, absent-field preservation, normalized-source round-trip, acknowledgement, and compiler range regression coverage.
 
 Assert exact compatibility keys, semantic minimum version, unique non-empty capability strings, unknown fields rejected, absent compatibility preserved as absent, normalized source property/array ordering, complete acknowledgement preservation, and this round trip:
 
@@ -572,7 +576,9 @@ expect(normalizeAssetPack(parseOk(assetPackSourceFromNormalized(normalized))))
   .toEqual(normalized);
 ```
 
-- [ ] **Step 3: Run the focused tests and verify RED**
+- [x] **Step 3: Run the focused tests and verify RED**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-version.test.ts asset-pack-schema.test.ts` FAIL (16 expected failures: missing Phase 2 exports and compatibility parsing).
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-version.test.ts asset-pack-schema.test.ts
@@ -580,7 +586,9 @@ rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-version.test.ts asset-pac
 
 Expected: FAIL because the Phase 2 interfaces do not exist.
 
-- [ ] **Step 4: Implement strict SemVer and share range matching**
+- [x] **Step 4: Implement strict SemVer and share range matching**
+
+  - Implementation: Added the strict pure SemVer/lifecycle module and made the compiler consume its shared range matcher.
 
 Move the complete precedence logic from `asset-pack-compile.ts` into the new module. Return `undefined` for invalid values; never fall back to lexical ordering. Make the compiler call `assetPackVersionRangeMatches` and preserve existing replacement tests.
 
@@ -598,11 +606,15 @@ export function assetPackLifecycleReplacementAllows(
 }
 ```
 
-- [ ] **Step 5: Implement compatibility parsing and source reconstruction**
+- [x] **Step 5: Implement compatibility parsing and source reconstruction**
+
+  - Implementation: Added strict compatibility normalization/content projection and deterministic source reconstruction while preserving acknowledgement digest exclusion.
 
 Add `compatibility` to the top-level exact-key set, normalized model, content projection, and reconstructed source. Sort capabilities, replacements, acknowledgements, assets, layers, sprites, bodies, variants, and override keys with their Phase 1 semantic order; omit optional empty fields rather than inventing defaults.
 
-- [ ] **Step 6: Verify GREEN and Core boundaries**
+- [x] **Step 6: Verify GREEN and Core boundaries**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-version.test.ts asset-pack-schema.test.ts asset-pack-compile.test.ts` PASS (60 tests); `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS; `rtk pnpm check:boundaries` PASS.
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-version.test.ts asset-pack-schema.test.ts asset-pack-compile.test.ts
@@ -612,7 +624,9 @@ rtk pnpm check:boundaries
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit product code**
+- [x] **Step 7: Commit product code**
+
+  - Commit: `9b7ccc74c4339f7643368827869fce662a2a7ab5`
 
 ```sh
 rtk git add packages/core/src/asset-pack-version.ts packages/core/src/asset-pack-schema.ts packages/core/src/asset-pack-model.ts packages/core/src/asset-pack-compile.ts packages/core/src/index.ts packages/core/test/asset-pack-version.test.ts packages/core/test/asset-pack-schema.test.ts packages/core/test/asset-pack-compile.test.ts
