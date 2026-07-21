@@ -34,6 +34,17 @@ function readJson(filePath: string): unknown {
   return JSON.parse(readFileSync(filePath, 'utf8')) as unknown;
 }
 
+function writeWorkspaceConfig(
+  target: string,
+  config: Record<string, string | number | boolean>,
+): void {
+  mkdirSync(target, { recursive: true });
+  writeFileSync(
+    path.join(target, 'lpc-asset-workspace.json'),
+    `${JSON.stringify(config, null, 2)}\n`,
+  );
+}
+
 afterEach(() => {
   for (const directory of temporaryDirectories.splice(0)) {
     rmSync(directory, { recursive: true, force: true });
@@ -141,6 +152,93 @@ describe('initializeAssetWorkspace', () => {
     expect(existsSync(path.join(target, 'lpc-asset-workspace.json'))).toBe(false);
     expect(readdirSync(outside)).toEqual([]);
   });
+
+  it('refuses a workspace target whose existing parent path is a symlink', () => {
+    const home = createDirectory('lpc-asset-workspace-home-');
+    const outside = createDirectory('lpc-asset-workspace-outside-');
+    const linkedParent = path.join(home, 'linked-parent');
+    symlinkSync(
+      outside,
+      linkedParent,
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+    const target = path.join(linkedParent, 'workspace');
+
+    expect(() => initializeAssetWorkspace(target)).toThrow(
+      'Refusing to initialize through a symlinked workspace path',
+    );
+    expect(existsSync(path.join(outside, 'workspace'))).toBe(false);
+  });
+
+  it('rejects reopened configs whose state directory traverses a symlinked parent', () => {
+    const target = createWorkspaceTarget();
+    const outside = createDirectory('lpc-asset-workspace-outside-');
+    const linked = path.join(target, 'linked-state');
+    mkdirSync(target, { recursive: true });
+    symlinkSync(
+      outside,
+      linked,
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+    writeWorkspaceConfig(target, {
+      schema: ASSET_WORKSPACE_SCHEMA,
+      packsDirectory: 'artist-packs',
+      outputDirectory: 'assets_custom',
+      stateDirectory: 'linked-state/internal',
+    });
+    mkdirSync(path.join(target, 'assets_custom'), { recursive: true });
+    writeFileSync(
+      path.join(target, 'assets_custom', '.lpc-toolkit-managed.json'),
+      `${JSON.stringify(
+        {
+          schema: ASSET_OUTPUT_MARKER_SCHEMA,
+          workspaceId: 'workspace-1',
+        },
+        null,
+        2,
+      )}\n`,
+    );
+
+    expect(() => initializeAssetWorkspace(target)).toThrow(
+      'Refusing to initialize through a symlinked workspace path',
+    );
+  });
+
+  it('rejects workspace configs with unknown keys', () => {
+    const target = createWorkspaceTarget();
+    writeWorkspaceConfig(target, {
+      schema: ASSET_WORKSPACE_SCHEMA,
+      packsDirectory: 'artist-packs',
+      outputDirectory: 'assets_custom',
+      stateDirectory: '.lpc-toolkit/asset-packs',
+      extraField: 'nope',
+    });
+
+    expect(() => initializeAssetWorkspace(target)).toThrow(
+      'Asset workspace config contains unknown keys',
+    );
+  });
+
+  it('rejects output markers with unknown keys', () => {
+    const target = createWorkspaceTarget();
+    mkdirSync(path.join(target, 'assets_custom'), { recursive: true });
+    writeFileSync(
+      path.join(target, 'assets_custom', '.lpc-toolkit-managed.json'),
+      `${JSON.stringify(
+        {
+          schema: ASSET_OUTPUT_MARKER_SCHEMA,
+          workspaceId: 'workspace-1',
+          extraField: true,
+        },
+        null,
+        2,
+      )}\n`,
+    );
+
+    expect(() => initializeAssetWorkspace(target)).toThrow(
+      'Asset output marker contains unknown keys',
+    );
+  });
 });
 
 describe('findAssetWorkspace', () => {
@@ -184,23 +282,38 @@ describe('findAssetWorkspace', () => {
 
   it('rejects configs whose relative directories escape the workspace root', () => {
     const target = createWorkspaceTarget();
-    mkdirSync(target, { recursive: true });
-    writeFileSync(
-      path.join(target, 'lpc-asset-workspace.json'),
-      `${JSON.stringify(
-        {
-          schema: ASSET_WORKSPACE_SCHEMA,
-          packsDirectory: '../artist-packs',
-          outputDirectory: 'assets_custom',
-          stateDirectory: '.lpc-toolkit/asset-packs',
-        },
-        null,
-        2,
-      )}\n`,
-    );
+    writeWorkspaceConfig(target, {
+      schema: ASSET_WORKSPACE_SCHEMA,
+      packsDirectory: '../artist-packs',
+      outputDirectory: 'assets_custom',
+      stateDirectory: '.lpc-toolkit/asset-packs',
+    });
 
     expect(() => findAssetWorkspace(target)).toThrow(
       'Asset workspace path escapes the workspace root',
+    );
+  });
+
+  it('rejects discovered configs whose output directory traverses a symlinked parent', () => {
+    const target = createWorkspaceTarget();
+    const outside = createDirectory('lpc-asset-workspace-outside-');
+    const nested = path.join(target, 'artist-packs', 'acme.hair');
+    mkdirSync(target, { recursive: true });
+    symlinkSync(
+      outside,
+      path.join(target, 'linked-output'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+    writeWorkspaceConfig(target, {
+      schema: ASSET_WORKSPACE_SCHEMA,
+      packsDirectory: 'artist-packs',
+      outputDirectory: 'linked-output/custom',
+      stateDirectory: '.lpc-toolkit/asset-packs',
+    });
+    mkdirSync(nested, { recursive: true });
+
+    expect(() => findAssetWorkspace(nested)).toThrow(
+      'Refusing to initialize through a symlinked workspace path',
     );
   });
 });

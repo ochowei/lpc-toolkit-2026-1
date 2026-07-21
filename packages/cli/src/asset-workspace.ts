@@ -41,6 +41,15 @@ interface AssetOutputMarker {
   readonly workspaceId: string;
 }
 
+const WORKSPACE_CONFIG_KEYS = [
+  'schema',
+  'packsDirectory',
+  'outputDirectory',
+  'stateDirectory',
+] as const;
+
+const OUTPUT_MARKER_KEYS = ['schema', 'workspaceId'] as const;
+
 class AssetWorkspaceError extends Error {
   constructor(message: string) {
     super(message);
@@ -78,6 +87,20 @@ function requireString(
   return value;
 }
 
+function assertExactKeys(
+  record: Record<string, unknown>,
+  expectedKeys: readonly string[],
+  label: string,
+): void {
+  const expected = new Set(expectedKeys);
+  const unknownKeys = Object.keys(record).filter((key) => !expected.has(key));
+  if (unknownKeys.length > 0) {
+    throw new AssetWorkspaceError(
+      `${label} contains unknown keys: ${unknownKeys.join(', ')}`,
+    );
+  }
+}
+
 function isInsideRoot(root: string, candidate: string): boolean {
   const relative = path.relative(root, candidate);
   return (
@@ -88,17 +111,35 @@ function isInsideRoot(root: string, candidate: string): boolean {
   );
 }
 
+function assertExistingDirectoryPath(target: string): void {
+  const absoluteTarget = path.resolve(target);
+  let current = absoluteTarget;
+  const missingSegments: string[] = [];
+
+  while (!existsSync(current)) {
+    missingSegments.unshift(current);
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+
+  for (const entry of [current, ...missingSegments]) {
+    if (!existsSync(entry)) continue;
+    const stats = lstatSync(entry);
+    if (stats.isSymbolicLink()) {
+      throw new AssetWorkspaceError(
+        `Refusing to initialize through a symlinked workspace path: ${entry}`,
+      );
+    }
+    if (!stats.isDirectory()) {
+      throw new AssetWorkspaceError(`Workspace path is not a directory: ${entry}`);
+    }
+  }
+}
+
 function ensureWorkspaceRoot(root: string): void {
+  assertExistingDirectoryPath(root);
   mkdirSync(root, { recursive: true });
-  const stats = lstatSync(root);
-  if (stats.isSymbolicLink()) {
-    throw new AssetWorkspaceError(
-      `Refusing to initialize through a symlinked workspace path: ${root}`,
-    );
-  }
-  if (!stats.isDirectory()) {
-    throw new AssetWorkspaceError(`Workspace path is not a directory: ${root}`);
-  }
 }
 
 function ensureDirectoryUnderRoot(root: string, subpath: string): void {
@@ -142,26 +183,7 @@ function assertSafeExistingSubpath(root: string, subpath: string): void {
       `Asset workspace path escapes the workspace root: ${subpath}`,
     );
   }
-
-  const relative = path.relative(absoluteRoot, absolutePath);
-  if (relative === '') return;
-
-  let current = absoluteRoot;
-  for (const segment of relative.split(path.sep)) {
-    current = path.join(current, segment);
-    if (!existsSync(current)) return;
-    const stats = lstatSync(current);
-    if (stats.isSymbolicLink()) {
-      throw new AssetWorkspaceError(
-        `Refusing to initialize through a symlinked workspace path: ${current}`,
-      );
-    }
-    if (!stats.isDirectory()) {
-      throw new AssetWorkspaceError(
-        `Workspace path is not a directory: ${current}`,
-      );
-    }
-  }
+  assertExistingDirectoryPath(absolutePath);
 }
 
 function resolveConfiguredDirectory(root: string, configuredPath: string): string {
@@ -177,6 +199,7 @@ function resolveConfiguredDirectory(root: string, configuredPath: string): strin
       `Asset workspace path escapes the workspace root: ${configuredPath}`,
     );
   }
+  assertExistingDirectoryPath(resolved);
   return resolved;
 }
 
@@ -210,6 +233,7 @@ function readWorkspaceConfig(root: string, explicit: boolean): AssetWorkspaceCon
   }
 
   const record = asObject(readJsonFile(configPath));
+  assertExactKeys(record, WORKSPACE_CONFIG_KEYS, 'Asset workspace config');
   const schema = requireString(
     record,
     'schema',
@@ -244,6 +268,7 @@ function readOutputMarker(outputRoot: string): AssetOutputMarker | undefined {
   if (!existsSync(markerPath)) return undefined;
 
   const record = asObject(readJsonFile(markerPath));
+  assertExactKeys(record, OUTPUT_MARKER_KEYS, 'Asset output marker');
   const schema = requireString(
     record,
     'schema',
