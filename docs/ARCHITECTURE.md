@@ -400,6 +400,35 @@ artist-packs/<pack-id>/asset-pack.json + sprites/
   -> manager-owned assets_custom/ plus registry.json
 ```
 
+For the documented new `acme.fantasy-hair` item plus the `hair_messy` climb
+extension, linked sync generates this exact overlay layout:
+
+```text
+assets_custom/
+├── .lpc-toolkit-managed.json
+├── CREDITS.csv
+├── sheet_definitions/
+│   └── hair/
+│       ├── acme.fantasy-hair--moon-braid.json
+│       └── hair_messy.json
+└── spritesheets/
+    ├── hair/
+    │   └── messy/
+    │       └── climb.png
+    └── packages/
+        └── acme.fantasy-hair/
+            └── moon-braid/
+                └── foreground/
+                    └── male-female/
+                        ├── climb.png
+                        └── walk.png
+```
+
+Every definition, PNG, `CREDITS.csv`, and `.lpc-toolkit-managed.json` in that
+tree is generated manager output. Artists edit only the manifest and source
+PNGs below `artist-packs/<pack-id>/`, then resync; generated output is never an
+authoring input.
+
 The compile baseline is the active base catalog plus any explicitly supplied
 unmanaged baseline, with this workspace's manager-generated output excluded.
 That exclusion prevents the generated overlay from changing its own baseline
@@ -431,9 +460,13 @@ them into `ComposedSheet.credits`, and preview/render publication writes the
 PNG plus metadata and TXT/CSV credit artifacts from that frozen manifest.
 
 Linked sync stages the complete generated overlay and registry, validates all
-paths and credits, and only then publishes. Any caught in-process publication
-failure restores the previous manager-owned output and registry byte-for-byte.
-Persistent crash journaling and recovery are outside that rollback boundary.
+paths and credits, and only then publishes. Normal caught publication failures
+restore the previous manager-owned output and registry bytes. If rollback
+itself fails, the command returns `asset_publish_failed` with the original
+publication error, the rollback error, and the backup/staging recovery paths
+that still exist. It retains those paths and stops without guessing at or
+deleting further state. Persistent crash journaling and automated recovery are
+outside the Phase 1 rollback boundary.
 
 Phase 1 includes workspace initialization, new and audit-derived scaffolding,
 validation, attributed preview, linked sync, and overlay rendering only.

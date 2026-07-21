@@ -95,6 +95,36 @@ mismatched, or tampered ownership data; it never adopts unknown output. The
 artist source in `artist-packs/` remains authoritative. `assets_custom/` and
 `.lpc-toolkit/asset-packs/` are reproducible manager-owned state.
 
+After syncing the example `acme.fantasy-hair` new-item pack and an
+`acme.messy-climb` extension for `hair_messy`, the generated output has this
+exact shape:
+
+```text
+assets_custom/
+├── .lpc-toolkit-managed.json
+├── CREDITS.csv
+├── sheet_definitions/
+│   └── hair/
+│       ├── acme.fantasy-hair--moon-braid.json
+│       └── hair_messy.json
+└── spritesheets/
+    ├── hair/
+    │   └── messy/
+    │       └── climb.png
+    └── packages/
+        └── acme.fantasy-hair/
+            └── moon-braid/
+                └── foreground/
+                    └── male-female/
+                        ├── climb.png
+                        └── walk.png
+```
+
+The definitions under `sheet_definitions/`, complete animation PNGs under
+`spritesheets/`, merged `CREDITS.csv`, and management marker are all generated
+and owned by the CLI. Do not edit them. Edit `asset-pack.json` or the source
+PNGs under `artist-packs/<pack-id>/sprites/`, then run `asset sync` again.
+
 Workspace creation needs no base assets. The first later command that needs
 catalog data or pixels prepares or reuses the existing pinned, verified managed
 cache with the workspace root as its working context. A valid cache is reused
@@ -139,9 +169,12 @@ flag.
 Sync compiles every active linked pack in deterministic order and rejects path,
 semantic-field, baseline-digest, credit, or ownership conflicts instead of
 using last-write-wins. It stages the complete overlay and registry before
-publication. If an in-process publication step fails, it rolls the previous
-manager-owned output and registry back byte-for-byte; persistent crash journals
-and recovery are not part of Phase 1.
+publication. Normal caught publication failures restore the previous
+manager-owned output and registry bytes. If rollback itself fails, the command
+returns `asset_publish_failed` with the original publication error, the rollback
+error, and the existing backup/staging recovery paths. It retains those paths
+and stops without guessing at or deleting any further state. Persistent crash
+journals and automated recovery are not part of Phase 1.
 
 Human-readable successes go to stdout. Human diagnostics and cache progress go
 to stderr. With `--json`, the response envelope is written to stdout and

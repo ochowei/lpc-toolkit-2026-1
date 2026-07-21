@@ -388,22 +388,44 @@ describe('public CLI no-repository artist workflow', () => {
     expectSuccessfulData(await runJson<AssetPackSyncSuccess>([
       'asset', 'sync', newPack.packRoot,
     ], workspaceRoot, prepare));
-    const firstDefinitionPath = path.join(
-      workspace.outputRoot,
+    const firstRegistry = readJson<RegistryDocument>(workspace.registryPath);
+    const firstPackEntry = firstRegistry.entries.find(
+      ({ packId }) => packId === 'acme.fantasy-hair',
+    );
+    expect(firstPackEntry).toBeDefined();
+    if (!firstPackEntry) throw new Error('Expected first linked pack registry entry.');
+    const firstPackClimbPath =
+      'spritesheets/packages/acme.fantasy-hair/moon-braid/foreground/male-female/climb.png';
+    expect(firstPackEntry.generatedPaths).toEqual([
       'sheet_definitions/hair/acme.fantasy-hair--moon-braid.json',
-    );
-    const firstSpritePath = path.join(
-      workspace.outputRoot,
+      firstPackClimbPath,
       'spritesheets/packages/acme.fantasy-hair/moon-braid/foreground/male-female/walk.png',
+    ]);
+    const firstPackGeneratedBytes = new Map(firstPackEntry.generatedPaths.map(
+      (generatedPath) => [
+        generatedPath,
+        readFileSync(path.join(workspace.outputRoot, generatedPath)),
+      ] as const,
+    ));
+    const firstCreditsPath = path.join(workspace.outputRoot, 'CREDITS.csv');
+    const firstPackCreditEntry = readFileSync(firstCreditsPath, 'utf8')
+      .split('\n')
+      .find((line) => line.startsWith(`"${firstPackClimbPath}"`));
+    expect(firstPackCreditEntry).toBe(
+      `"${firstPackClimbPath}","","New Hair Artist","CC-BY-SA 4.0","https://example.test/acme/fantasy-hair"`,
     );
-    const firstDefinition = readFileSync(firstDefinitionPath);
-    const firstSprite = readFileSync(firstSpritePath);
+    if (!firstPackCreditEntry) throw new Error('Expected first pack credit entry.');
 
     expectSuccessfulData(await runJson<AssetPackSyncSuccess>([
       'asset', 'sync', extensionPack.packRoot,
     ], workspaceRoot, prepare));
-    expect(readFileSync(firstDefinitionPath)).toEqual(firstDefinition);
-    expect(readFileSync(firstSpritePath)).toEqual(firstSprite);
+    for (const [generatedPath, expectedBytes] of firstPackGeneratedBytes) {
+      expect(
+        readFileSync(path.join(workspace.outputRoot, generatedPath)),
+        `second sync changed first-pack output ${generatedPath}`,
+      ).toEqual(expectedBytes);
+    }
+    expect(readFileSync(firstCreditsPath, 'utf8').split('\n')).toContain(firstPackCreditEntry);
 
     const registry = readJson<RegistryDocument>(workspace.registryPath);
     expect(registry.entries.map(({ packId }) => packId)).toEqual([
