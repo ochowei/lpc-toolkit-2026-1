@@ -10,6 +10,7 @@ import path from 'node:path';
 import {
   compileAssetPacks,
   creditsToCsv,
+  type AssetPackCompilePlan,
   type AssetPackDiagnostic,
   type CreditEntry,
   type CreditsManifest,
@@ -105,10 +106,26 @@ interface RegistryDocument {
   readonly generatedDigests: Readonly<Record<string, string>>;
 }
 
-interface ValidatedLinkedPack {
+export interface ValidatedLinkedAssetPack {
   readonly sourceDirectory: string;
   readonly loaded: AssetPackFilesSuccess;
+  readonly diagnostics: readonly AssetPackSyncDiagnostic[];
 }
+
+export interface LinkedAssetPackDesiredState {
+  readonly ok: true;
+  readonly requested: ValidatedLinkedAssetPack;
+  readonly packs: readonly ValidatedLinkedAssetPack[];
+  readonly compilePlan: AssetPackCompilePlan;
+  readonly registry: readonly LinkedAssetPackRegistryEntry[];
+  readonly warnings: readonly AssetPackSyncDiagnostic[];
+  readonly workspaceId: string;
+  readonly markerBytes: Buffer;
+}
+
+export type LinkedAssetPackDesiredStateResult =
+  | LinkedAssetPackDesiredState
+  | AssetPackSyncFailure;
 
 const DEFAULT_FILE_OPS: AssetPublicationFileOps = {
   mkdirSync,
@@ -500,7 +517,7 @@ async function validateLinkedPack(
   expectedPackId?: string,
 ): Promise<AssetPackSyncFailure | {
   readonly ok: true;
-  readonly validated: ValidatedLinkedPack;
+  readonly validated: ValidatedLinkedAssetPack;
 }> {
   let loaded: ReturnType<typeof loadAssetPackFiles>;
   try {
@@ -547,6 +564,7 @@ async function validateLinkedPack(
     validated: {
       sourceDirectory: path.resolve(packDirectory),
       loaded,
+      diagnostics: report.diagnostics.map((diagnostic) => toSyncDiagnostic(diagnostic)),
     },
   };
 }
@@ -733,13 +751,11 @@ function publishStagedGeneration(options: {
   }
 }
 
-export async function syncLinkedAssetPack(options: {
+export async function prepareLinkedAssetPackDesiredState(options: {
   readonly packDirectory: string;
   readonly workspace: AssetWorkspace;
   readonly runtime: RuntimeAssets;
-  readonly fileOps?: AssetPublicationFileOps;
-}): Promise<AssetPackSyncResult> {
-  const fileOps = options.fileOps ?? DEFAULT_FILE_OPS;
+}): Promise<LinkedAssetPackDesiredStateResult> {
   const publishFailure = preflightPublish(options.workspace);
   if (publishFailure) return publishFailure;
 
@@ -761,7 +777,7 @@ export async function syncLinkedAssetPack(options: {
   const registryResult = readRegistryDocument(options.workspace, marker.workspaceId);
   if (!registryResult.ok) return registryResult;
 
-  const currentValidated: ValidatedLinkedPack[] = [];
+  const currentValidated: ValidatedLinkedAssetPack[] = [];
   for (const entry of registryResult.document.entries) {
     const validated = await validateLinkedPack(
       entry.sourceDirectory,
@@ -842,6 +858,50 @@ export async function syncLinkedAssetPack(options: {
     }]);
   }
 
+  return {
+    ok: true,
+    requested,
+    packs: validatedPacks,
+    compilePlan,
+    registry: registryEntries,
+    warnings: [
+      ...validatedPacks.flatMap((pack) => pack.diagnostics),
+      ...compilePlan.diagnostics
+        .filter((diagnostic) => diagnostic.severity === 'warning')
+        .map((diagnostic) => toSyncDiagnostic(diagnostic)),
+    ],
+    workspaceId: marker.workspaceId,
+    markerBytes,
+  };
+}
+
+export async function syncLinkedAssetPack(options: {
+  readonly packDirectory: string;
+  readonly workspace: AssetWorkspace;
+  readonly runtime: RuntimeAssets;
+  readonly fileOps?: AssetPublicationFileOps;
+}): Promise<AssetPackSyncResult> {
+  const fileOps = options.fileOps ?? DEFAULT_FILE_OPS;
+  const desiredState = await prepareLinkedAssetPackDesiredState(options);
+  if (!desiredState.ok) return desiredState;
+  const {
+    compilePlan,
+    markerBytes,
+    packs: validatedPacks,
+    registry: registryEntries,
+    requested,
+    workspaceId,
+  } = desiredState;
+  const linked = registryEntries.find((entry) => entry.packId === requested.loaded.pack.id);
+  if (!linked) {
+    return syncFailure([{
+      code: 'asset_publish_failed',
+      severity: 'error',
+      message: 'Requested linked asset-pack registry entry was not generated.',
+      path: path.resolve(options.packDirectory),
+    }]);
+  }
+
   const generationRoot = mkdtempSync(
     path.join(options.workspace.stateRoot, 'staging', 'sync-'),
   );
@@ -888,7 +948,7 @@ export async function syncLinkedAssetPack(options: {
     generatedDigests.set('CREDITS.csv', sha256Buffer(creditsBytes));
     writeSortedJson(fileOps, stagedRegistryPath, {
       schema: ASSET_WORKSPACE_REGISTRY_SCHEMA,
-      workspaceId: marker.workspaceId,
+      workspaceId,
       entries: registryEntries,
       generatedDigests: sortRecord(Object.fromEntries(generatedDigests)),
     });
