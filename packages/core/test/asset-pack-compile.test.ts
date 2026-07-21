@@ -358,6 +358,10 @@ describe('asset-pack compile', () => {
         destinationPath: 'packages/acme.shared-pack/shared-item/top/male-female/walk.png',
       }),
     ]));
+    expect(plan.definitions).toEqual([]);
+    expect(plan.sprites).toEqual([]);
+    expect(plan.credits).toEqual([]);
+    expect(plan.ownership).toEqual([]);
   });
 
   it('reports duplicate generated ownership instead of silently coalescing identical outputs', () => {
@@ -390,6 +394,10 @@ describe('asset-pack compile', () => {
         destinationPath: 'packages/acme.shared-pack/shared-item/top/male-female/walk.png',
       }),
     ]));
+    expect(plan.definitions).toEqual([]);
+    expect(plan.sprites).toEqual([]);
+    expect(plan.credits).toEqual([]);
+    expect(plan.ownership).toEqual([]);
   });
 
   it('reports conflicting generated credit ownership for the same compiled file', () => {
@@ -419,5 +427,6 @@ describe('asset-pack compile', () => {
         destinationPath: 'packages/acme.shared-pack/shared-item/top/male-female/walk.png',
       }),
     ]));
+    expect(plan.credits).toEqual([]);
   });
 });

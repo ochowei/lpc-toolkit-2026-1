@@ -66,11 +66,13 @@ export interface AssetPackCompilePlan {
 
 interface CompileState {
   readonly baselineDefinitions: Map<string, readonly ItemId[]>;
+  readonly conflictedDefinitions: Set<string>;
   readonly definitions: Map<string, CompiledDefinitionRecord>;
+  readonly conflictedSprites: Set<string>;
   readonly sprites: Map<string, MutableCompiledSprite>;
   readonly baselineCredits: Map<string, readonly ItemId[]>;
+  readonly conflictedCredits: Set<string>;
   readonly credits: Map<string, CompiledCreditRecord>;
-  readonly ownership: Map<string, Set<string>>;
   readonly diagnostics: AssetPackDiagnostic[];
 }
 
@@ -142,11 +144,13 @@ function createCompileState(baseline: AssetPackBaseline): CompileState {
 
   return {
     baselineDefinitions,
+    conflictedDefinitions: new Set(),
     definitions: new Map(),
+    conflictedSprites: new Set(),
     sprites: new Map(),
     baselineCredits,
+    conflictedCredits: new Set(),
     credits: new Map(),
-    ownership: new Map(),
     diagnostics: [],
   };
 }
@@ -221,7 +225,6 @@ function compileNewItem(
         commitSpriteRegistration(state, compiledSprite, spriteStatus);
         commitCreditRegistration(state, credit, creditStatus);
         draft.creditFiles.add(credit.credit.file);
-        addOwnedPath(state, pack.id, destinationPath);
       }
     }
   }
@@ -245,7 +248,6 @@ function compileNewItem(
     basename: draft.basename,
     definition,
   });
-  addOwnedPath(state, pack.id, draft.logicalPath);
 }
 
 function createDefinitionDraft(
@@ -385,6 +387,18 @@ function registerDefinition(state: CompileState, definition: CompiledDefinitionR
     return false;
   }
 
+  if (state.conflictedDefinitions.has(definition.logicalPath)) {
+    state.diagnostics.push({
+      code: 'asset_path_conflict',
+      severity: 'error',
+      message: `Two generated definitions target ${definition.logicalPath}.`,
+      packId: definition.packId,
+      assetId: definition.assetId,
+      destinationPath: definition.logicalPath,
+    });
+    return false;
+  }
+
   const existing = state.definitions.get(definition.logicalPath);
   if (!existing) {
     state.definitions.set(definition.logicalPath, definition);
@@ -395,6 +409,8 @@ function registerDefinition(state: CompileState, definition: CompiledDefinitionR
     return true;
   }
 
+  state.definitions.delete(definition.logicalPath);
+  state.conflictedDefinitions.add(definition.logicalPath);
   state.diagnostics.push({
     code: 'asset_path_conflict',
     severity: 'error',
@@ -412,6 +428,19 @@ function inspectSpriteRegistration(
   state: CompileState,
   sprite: MutableCompiledSprite,
 ): RegistrationStatus {
+  if (state.conflictedSprites.has(sprite.destinationPath)) {
+    state.diagnostics.push({
+      code: 'asset_path_conflict',
+      severity: 'error',
+      message: `Two sprite sources target ${sprite.destinationPath}.`,
+      packId: sprite.packId,
+      assetId: sprite.assetId,
+      sourcePath: sprite.sourcePath,
+      destinationPath: sprite.destinationPath,
+    });
+    return 'conflict';
+  }
+
   const existing = state.sprites.get(sprite.destinationPath);
   if (!existing) {
     return 'insert';
@@ -421,6 +450,8 @@ function inspectSpriteRegistration(
     return 'merge';
   }
 
+  state.sprites.delete(sprite.destinationPath);
+  state.conflictedSprites.add(sprite.destinationPath);
   state.diagnostics.push({
     code: 'asset_path_conflict',
     severity: 'error',
@@ -464,6 +495,18 @@ function inspectCreditRegistration(
     return 'conflict';
   }
 
+  if (state.conflictedCredits.has(credit.credit.file)) {
+    state.diagnostics.push({
+      code: 'asset_path_conflict',
+      severity: 'error',
+      message: `Two generated credit records target ${credit.credit.file}.`,
+      packId: credit.packId,
+      assetId: credit.assetId,
+      destinationPath: credit.credit.file,
+    });
+    return 'conflict';
+  }
+
   const existing = state.credits.get(credit.credit.file);
   if (!existing) {
     return 'insert';
@@ -473,6 +516,8 @@ function inspectCreditRegistration(
     return 'merge';
   }
 
+  state.credits.delete(credit.credit.file);
+  state.conflictedCredits.add(credit.credit.file);
   state.diagnostics.push({
     code: 'asset_path_conflict',
     severity: 'error',
@@ -494,13 +539,19 @@ function commitCreditRegistration(
   }
 }
 
-function addOwnedPath(state: CompileState, packId: string, logicalPath: string): void {
-  const paths = state.ownership.get(packId) ?? new Set<string>();
-  paths.add(logicalPath);
-  state.ownership.set(packId, paths);
-}
-
 function finalizeCompileState(state: CompileState): AssetPackCompilePlan {
+  const ownership = new Map<string, Set<string>>();
+  for (const definition of state.definitions.values()) {
+    const paths = ownership.get(definition.packId) ?? new Set<string>();
+    paths.add(definition.logicalPath);
+    ownership.set(definition.packId, paths);
+  }
+  for (const sprite of state.sprites.values()) {
+    const paths = ownership.get(sprite.packId) ?? new Set<string>();
+    paths.add(sprite.destinationPath);
+    ownership.set(sprite.packId, paths);
+  }
+
   return {
     definitions: [...state.definitions.values()]
       .map(({ ownerKey: _ownerKey, ...definition }) => definition)
@@ -519,7 +570,7 @@ function finalizeCompileState(state: CompileState): AssetPackCompilePlan {
         ),
       ),
     credits: sortCredits([...state.credits.values()].map((entry) => entry.credit)),
-    ownership: [...state.ownership.entries()]
+    ownership: [...ownership.entries()]
       .map(([packId, logicalPaths]) => ({
         packId,
         logicalPaths: [...logicalPaths].sort((left, right) => left.localeCompare(right)),
