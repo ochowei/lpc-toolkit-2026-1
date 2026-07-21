@@ -104,6 +104,13 @@ export {
   normalizeAssetPack,
   warningAcknowledged,
 } from './asset-pack-model.js';
+export type {
+  AssetPackBaseline,
+  AssetPackSourceInspection,
+  AssetPackValidationResult,
+  ValidateAssetPackOptions,
+} from './asset-pack-validation.js';
+export { validateAssetPack } from './asset-pack-validation.js';
 
 // ==========================================
 // 5. Palette and Color Metadata Catalog
@@ -282,4 +289,7 @@ export type {
   UnsupportedAnimationFinding,
   UnsupportedAnimationRequirement,
 } from './asset-animation-audit.js';
-export { planAssetAnimationAudit } from './asset-animation-audit.js';
+export {
+  planAssetAnimationAudit,
+  standardAnimationGeometry,
+} from './asset-animation-audit.js';

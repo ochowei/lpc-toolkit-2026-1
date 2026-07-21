@@ -115,7 +115,7 @@ function planTargets(targets: readonly AnimationName[]): readonly AnimationName[
   return ANIMATIONS.map(({ value }) => value).filter((name) => requested.has(name));
 }
 
-function standardGeometry(target: AnimationName): AnimationAuditGeometry {
+export function standardAnimationGeometry(target: AnimationName): AnimationAuditGeometry {
   const config = ANIMATION_CONFIGS[target];
   if (!config) throw new Error(`Unknown standard animation: ${target}`);
 
@@ -379,7 +379,9 @@ export function planAssetAnimationAudit(
       ]) {
         const sourceAnimation = compatibleSource
           ?? (VIRTUAL_ANIMATION_MAP[target as keyof typeof VIRTUAL_ANIMATION_MAP] ?? target);
-        const geometry = compatibleSource ? customGeometry(compatibleSource) : standardGeometry(target);
+        const geometry = compatibleSource
+          ? customGeometry(compatibleSource)
+          : standardAnimationGeometry(target);
         const applicableGroups = compatibleSource
           ? groups.filter((group) => group.customAnimation === compatibleSource)
           : groups.filter((group) => !group.customAnimation);
