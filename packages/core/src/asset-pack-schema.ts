@@ -318,13 +318,15 @@ function parseCompatibility(
     `${path}.requiredCapabilities`,
     diagnostics,
   );
-  const validMinimumCliVersion = !minimumCliVersion || SEMVER_PATTERN.test(minimumCliVersion);
-  if (!validMinimumCliVersion) {
+  const rawMinimumCliVersion = record.minimumCliVersion;
+  const validMinimumCliVersion = rawMinimumCliVersion === undefined
+    || (typeof rawMinimumCliVersion === 'string' && SEMVER_PATTERN.test(rawMinimumCliVersion));
+  if (!validMinimumCliVersion && typeof rawMinimumCliVersion === 'string') {
     pushDiagnostic(diagnostics, {
       code: 'asset_pack_schema_invalid',
       severity: 'error',
       message: `Invalid minimum CLI semantic version at ${path}.minimumCliVersion.`,
-      details: { path: `${path}.minimumCliVersion`, value: minimumCliVersion },
+      details: { path: `${path}.minimumCliVersion`, value: rawMinimumCliVersion },
     });
   }
 

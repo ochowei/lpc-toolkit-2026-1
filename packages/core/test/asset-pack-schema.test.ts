@@ -180,6 +180,7 @@ describe('asset pack schema', () => {
 
   it.each([
     [{ minimumCliVersion: '2.1' }],
+    [{ minimumCliVersion: '' }],
     [{ requiredCapabilities: ['lpc-toolkit.asset-pack.v1', 'lpc-toolkit.asset-pack.v1'] }],
     [{ requiredCapabilities: [''] }],
     [{ unsupported: true }],
@@ -746,6 +747,42 @@ describe('asset pack schema', () => {
       subject: { animation: 'climb', assetId: 'hair_messy', bodyTypes: ['child'] },
     }]);
     expect(normalizeAssetPack(reconstructed)).toEqual(normalized);
+  });
+
+  it('reconstructs new-item layers by declaration order instead of z-order', () => {
+    const newItem = requireNewItemFixture();
+    const foreground = newItem.layers[0];
+    if (!foreground) throw new Error('Expected a foreground layer.');
+    const background = {
+      ...foreground,
+      id: 'background',
+      zPos: 80,
+      sprites: [{
+        animation: 'walk' as const,
+        source: 'sprites/moon-braid/background/walk.png',
+      }],
+    };
+    const parsed = parseAssetPackSource({
+      ...validPack,
+      assets: [{ ...newItem, layers: [foreground, background] }],
+    });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) throw new Error('Expected a valid layer-order source.');
+
+    const normalized = normalizeAssetPack(parsed.source);
+    const reconstructed = assetPackSourceFromNormalized(normalized);
+    const reconstructedNewItem = reconstructed.assets[0];
+    if (!reconstructedNewItem || reconstructedNewItem.kind !== 'new-item') {
+      throw new Error('Expected a reconstructed new item.');
+    }
+
+    expect(reconstructedNewItem.layers.map((layer) => layer.id)).toEqual([
+      'foreground',
+      'background',
+    ]);
+    expect(normalizeAssetPack(reconstructed)).toEqual(normalized);
+    expect(assetPackContentProjection(normalizeAssetPack(reconstructed)))
+      .toEqual(assetPackContentProjection(normalized));
   });
 
   it('preserves absent compatibility as absent', () => {

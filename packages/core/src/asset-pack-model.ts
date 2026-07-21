@@ -461,17 +461,19 @@ function assetPackAssetSourceFromNormalized(
       typeName: asset.typeName,
       bodyTypes: [...asset.bodyTypes],
       animations: [...asset.animations],
-      layers: asset.layers.map((layer) => ({
-        id: layer.id,
-        zPos: layer.zPos,
-        bodyTypes: [...layer.bodyTypes],
-        sprites: layer.sprites.map((sprite) => ({
-          animation: sprite.animation,
-          source: sprite.source,
-          bodyTypes: [...sprite.bodyTypes],
-          ...(sprite.variant ? { variant: sprite.variant } : {}),
+      layers: [...asset.layers]
+        .sort((left, right) => left.sourceIndex - right.sourceIndex)
+        .map((layer) => ({
+          id: layer.id,
+          zPos: layer.zPos,
+          bodyTypes: [...layer.bodyTypes],
+          sprites: layer.sprites.map((sprite) => ({
+            animation: sprite.animation,
+            source: sprite.source,
+            bodyTypes: [...sprite.bodyTypes],
+            ...(sprite.variant ? { variant: sprite.variant } : {}),
+          })),
         })),
-      })),
       ...(asset.variants ? { variants: [...asset.variants] } : {}),
       ...(asset.recolor ? { recolor: asset.recolor } : {}),
     };
