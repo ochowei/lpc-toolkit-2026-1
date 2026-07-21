@@ -31,6 +31,7 @@ export interface AssetPackFilesSuccess {
   readonly manifestMtimeMs: number;
   readonly pack: NormalizedAssetPack;
   readonly inspections: readonly AssetPackSourceInspection[];
+  readonly sourceBytes: ReadonlyMap<string, Buffer>;
   readonly sourceDigests: ReadonlyMap<string, string>;
   readonly contentDigest: string;
 }
@@ -203,10 +204,12 @@ function inspectSources(
 ): {
   readonly diagnostics: readonly AssetPackFileDiagnostic[];
   readonly inspections: readonly AssetPackSourceInspection[];
+  readonly sourceBytes: ReadonlyMap<string, Buffer>;
   readonly sourceDigests: ReadonlyMap<string, string>;
 } {
   const diagnostics: AssetPackFileDiagnostic[] = [];
   const inspections: AssetPackSourceInspection[] = [];
+  const sourceBytes = new Map<string, Buffer>();
   const sourceDigests = new Map<string, string>();
   const canonicalOwners = new Map<string, string>();
 
@@ -242,7 +245,9 @@ function inspectSources(
     }
     canonicalOwners.set(canonicalPath, sourcePath);
 
-    const digest = `sha256:${sha256Buffer(readFileSync(canonicalPath))}`;
+    const bytes = readFileSync(canonicalPath);
+    const digest = `sha256:${sha256Buffer(bytes)}`;
+    sourceBytes.set(sourcePath, bytes);
     sourceDigests.set(sourcePath, digest);
     inspections.push({
       sourcePath,
@@ -251,7 +256,7 @@ function inspectSources(
     });
   });
 
-  return { diagnostics, inspections, sourceDigests };
+  return { diagnostics, inspections, sourceBytes, sourceDigests };
 }
 
 export function loadAssetPackFiles(root: string): AssetPackFilesResult {
@@ -300,6 +305,7 @@ export function loadAssetPackFiles(root: string): AssetPackFilesResult {
     manifestMtimeMs,
     pack,
     inspections: inspected.inspections,
+    sourceBytes: inspected.sourceBytes,
     sourceDigests: inspected.sourceDigests,
     contentDigest,
   };

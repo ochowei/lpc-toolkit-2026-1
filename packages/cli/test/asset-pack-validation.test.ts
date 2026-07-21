@@ -379,7 +379,7 @@ describe('inspectAssetPackSources', () => {
 });
 
 describe('loadActiveAssetPackBaseline', () => {
-  it('ignores an unowned custom root, loads palettes, and excludes owned managed output digests', () => {
+  it('ignores unowned custom input and excludes manager-owned output from catalog and digests', () => {
     const unmanaged = createRuntimeFixture({
       customDefinition: baseDefinition({ animations: ['run'], credits: [] }),
     });
@@ -413,7 +413,7 @@ describe('loadActiveAssetPackBaseline', () => {
 
     expect(managedBaseline.definitionDigests.get('braid')).toBe(expectedDefinitionDigest(braid));
     expect(managedBaseline.creditDigests.get('braid')).toBe(expectedCreditDigest(braid));
-    expect(managedBaseline.catalog.byItemId.has('acme.wind-braid--wind-braid')).toBe(true);
+    expect(managedBaseline.catalog.byItemId.has('acme.wind-braid--wind-braid')).toBe(false);
     expect(managedBaseline.definitionDigests.has('acme.wind-braid--wind-braid')).toBe(false);
     expect(managedBaseline.creditDigests.has('acme.wind-braid--wind-braid')).toBe(false);
   });

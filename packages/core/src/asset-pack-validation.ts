@@ -11,6 +11,7 @@ import {
   type NormalizedNewItemLayer,
   type NormalizedNewItemSprite,
 } from './asset-pack-model.js';
+import { extensionDestinationBasePath } from './asset-pack-paths.js';
 import type {
   AssetPackAcknowledgement,
   AssetPackDiagnostic,
@@ -227,6 +228,17 @@ function validateNewItem(
   diagnostics: AssetPackDiagnostic[],
   sourceUses: Map<string, SourceUse>,
 ): void {
+  if (options.baseline.catalog.byItemId.has(asset.itemId)) {
+    diagnostics.push({
+      code: 'asset_path_conflict',
+      severity: 'error',
+      message: `New-item identity "${asset.itemId}" already exists in the baseline catalog.`,
+      assetId: asset.itemId,
+      destinationPath: `sheet_definitions/${asset.typeName}/${asset.itemId}.json`,
+      details: { path: `$.assets[${assetIndex}].localId`, itemId: asset.itemId },
+    });
+  }
+
   if (!options.baseline.catalog.typeNames.includes(asset.typeName)) {
     diagnostics.push(schemaDiagnostic(
       `$.assets[${assetIndex}].typeName`,
@@ -521,6 +533,18 @@ function validateExtendLayer(
       sourcePath: layer.source,
       destinationPath: layer.destination.path,
       details: { path: `${layerPath}.destination.accepted` },
+    });
+  }
+
+  if (extensionDestinationBasePath(layer.destination.path, animation, layer.variant) === undefined) {
+    diagnostics.push({
+      code: 'asset_pack_schema_invalid',
+      severity: 'error',
+      message: `Extension destination does not match animation "${animation}" for "${asset.itemId}".`,
+      assetId: asset.itemId,
+      sourcePath: layer.source,
+      destinationPath: layer.destination.path,
+      details: { path: `${layerPath}.destination.path` },
     });
   }
 

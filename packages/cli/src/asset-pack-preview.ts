@@ -1,6 +1,5 @@
 import {
   mkdirSync,
-  readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -160,21 +159,21 @@ function materializeDesiredState(
     writeFileSync(destination, `${JSON.stringify(definition.definition, null, 2)}\n`);
   }
 
-  const packRoots = new Map(
-    state.packs.map((pack) => [pack.loaded.pack.id, pack.sourceDirectory] as const),
+  const packSnapshots = new Map(
+    state.packs.map((pack) => [pack.loaded.pack.id, pack.loaded.sourceBytes] as const),
   );
   for (const sprite of state.compilePlan.sprites) {
-    const packRoot = packRoots.get(sprite.packId);
-    if (!packRoot) {
+    const sourceBytes = packSnapshots.get(sprite.packId)?.get(sprite.sourcePath);
+    if (!sourceBytes) {
       throw previewFailure(
         'asset_publish_failed',
-        `No linked source directory found for compiled sprite owner ${sprite.packId}.`,
+        `No validated source snapshot found for compiled sprite owner ${sprite.packId}.`,
         sprite.destinationPath,
       );
     }
     const destination = path.join(overlayRoot, sprite.destinationPath);
     mkdirSync(path.dirname(destination), { recursive: true });
-    writeFileSync(destination, readFileSync(path.join(packRoot, sprite.sourcePath)));
+    writeFileSync(destination, sourceBytes);
   }
 
   const manifest: CreditsManifest = {

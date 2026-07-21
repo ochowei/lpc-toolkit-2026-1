@@ -9,6 +9,7 @@ import type {
   NormalizedNewItemSprite,
 } from './asset-pack-model.js';
 import type { AssetPackDiagnostic } from './asset-pack-schema.js';
+import { extensionDestinationBasePath } from './asset-pack-paths.js';
 import type { AssetPackBaseline } from './asset-pack-validation.js';
 import type {
   AnimationName,
@@ -261,6 +262,17 @@ function compileNewItem(
 ): void {
   const ownerKey = compiledOwnerKey(pack, asset);
   const definitionPath = definitionLogicalPath(asset.typeName, asset.itemId);
+  if (state.baselineItems.has(asset.itemId)) {
+    state.diagnostics.push({
+      code: 'asset_path_conflict',
+      severity: 'error',
+      message: `New-item identity "${asset.itemId}" already exists in the baseline catalog.`,
+      packId: pack.id,
+      assetId: asset.itemId,
+      destinationPath: definitionPath,
+    });
+    return;
+  }
   const draft = createDefinitionDraft(asset, definitionPath);
   const layerStates = asset.layers.map((layer, layerIndex) =>
     compileLayerGroups(pack.id, asset.localId, layer, layerIndex),
@@ -385,11 +397,23 @@ function compileExtendItem(
         continue;
       }
 
-      const basePath = destinationBasePath(
+      const basePath = extensionDestinationBasePath(
         layer.destination.path,
         animationEntry.animation,
         layer.variant,
       );
+      if (basePath === undefined) {
+        state.diagnostics.push({
+          code: 'asset_pack_schema_invalid',
+          severity: 'error',
+          message: `Extension destination does not match animation "${animationEntry.animation}" for "${asset.itemId}".`,
+          packId: pack.id,
+          assetId: asset.itemId,
+          sourcePath: layer.source,
+          destinationPath: layer.destination.path,
+        });
+        return;
+      }
 
       if (
         baseline.managedOwner
@@ -847,22 +871,6 @@ function layerEntries(
     .filter(([key, value]) => key.startsWith('layer_') && value !== undefined)
     .map(([key, value]) => [key as `layer_${number}`, value as RawLayer]);
   return entries.sort((left, right) => left[0].localeCompare(right[0]));
-}
-
-function destinationBasePath(
-  destinationPath: string,
-  animation: AnimationName,
-  variant: string | undefined,
-): string {
-  const relative = destinationPath.replace(/^spritesheets\//, '');
-  const variantFile = variant ? variantToFilename(variant) : undefined;
-  const suffix = variantFile
-    ? `${animationFolder(animation)}/${variantFile}.png`
-    : `${animationFolder(animation)}.png`;
-  if (relative.endsWith(suffix)) {
-    return relative.slice(0, -suffix.length);
-  }
-  return `${relative.slice(0, relative.lastIndexOf('/') + 1)}`;
 }
 
 function registerDefinition(state: CompileState, definition: CompiledDefinitionRecord): boolean {

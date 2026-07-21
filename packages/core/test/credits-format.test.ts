@@ -75,6 +75,25 @@ describe('creditsToCsv', () => {
     expect(out).toContain('"head/faces/walk.png"');
   });
 
+  it('escapes embedded quotes and preserves embedded newlines as RFC 4180 fields', () => {
+    const out = creditsToCsv({
+      entries: [{
+        file: 'hair/quoted',
+        notes: 'First "quoted" line\nSecond line',
+        authors: ['Alice "Ace"', 'Bob\nBuilder'],
+        licenses: ['CC-BY-SA 4.0'],
+        urls: ['https://example.com/?q="hair"'],
+      }],
+      resolvedPaths: ['hair/quoted/walk.png'],
+      licenses: ['CC-BY-SA 4.0'],
+    }, 'walk');
+
+    expect(out).toBe(
+      'filename,notes,authors,licenses,urls\n' +
+      '"hair/quoted/walk.png","First ""quoted"" line\nSecond line","Alice ""Ace"", Bob\nBuilder","CC-BY-SA 4.0","https://example.com/?q=""hair"""\n',
+    );
+  });
+
   it('returns header-only for empty manifest', () => {
     const out = creditsToCsv(
       { entries: [], resolvedPaths: [], licenses: [] },

@@ -1,4 +1,5 @@
 import type { AnimationAuditConsumer } from './asset-animation-audit.js';
+import { extensionDestinationBasePath } from './asset-pack-paths.js';
 import { BODY_TYPES, LICENSE_GROUP_OF } from './constants.js';
 import type {
   AnimationName,
@@ -644,7 +645,12 @@ function parseExtendAnimations(
 
     exactKeys(record, entryPath, ['animation', 'layers'], diagnostics);
     const animation = readString(record, 'animation', `${entryPath}.animation`, diagnostics);
-    const layers = parseExtendLayers(record.layers, `${entryPath}.layers`, diagnostics);
+    const layers = parseExtendLayers(
+      record.layers,
+      `${entryPath}.layers`,
+      animation,
+      diagnostics,
+    );
     if (!animation || !layers) return;
     parsed.push({ animation, layers });
   });
@@ -655,6 +661,7 @@ function parseExtendAnimations(
 function parseExtendLayers(
   input: unknown,
   path: string,
+  animation: string | undefined,
   diagnostics: AssetPackDiagnostic[],
 ): readonly ExtendItemLayerSource[] | undefined {
   const layers = asArray(input, path, diagnostics);
@@ -698,6 +705,20 @@ function parseExtendLayers(
       `${entryPath}.consumers`,
       diagnostics,
     );
+
+    if (
+      animation
+      && destination
+      && extensionDestinationBasePath(destination.path, animation, variant) === undefined
+    ) {
+      pushDiagnostic(diagnostics, {
+        code: 'asset_pack_schema_invalid',
+        severity: 'error',
+        message: `Extension destination does not match animation "${animation}" at ${entryPath}.destination.path.`,
+        destinationPath: destination.path,
+        details: { path: `${entryPath}.destination.path`, value: destination.path },
+      });
+    }
 
     if (layer && !EXTEND_LAYER_PATTERN.test(layer)) {
       pushDiagnostic(diagnostics, {

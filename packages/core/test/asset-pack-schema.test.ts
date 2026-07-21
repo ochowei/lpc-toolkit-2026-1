@@ -175,6 +175,48 @@ describe('asset pack schema', () => {
     });
   });
 
+  it('rejects an extension destination that does not encode its animation and variant exactly', () => {
+    const extension = validPack.assets[1];
+    if (!extension || extension.kind !== 'extend-item') {
+      throw new Error('Expected the second fixture asset to be an extension.');
+    }
+    const animation = extension.addAnimations[0];
+    const layer = animation?.layers[0];
+    if (!animation || !layer) {
+      throw new Error('Expected the extension fixture to define a layer.');
+    }
+
+    const result = parseAssetPackSource({
+      ...validPack,
+      assets: [{
+        ...extension,
+        addAnimations: [{
+          ...animation,
+          layers: [{
+            ...layer,
+            variant: 'dark brown',
+            destination: {
+              ...layer.destination,
+              path: 'spritesheets/hair/messy/child/climb/custom.png',
+            },
+          }],
+        }],
+      }],
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      diagnostics: [expect.objectContaining({
+        code: 'asset_pack_schema_invalid',
+        severity: 'error',
+        destinationPath: 'spritesheets/hair/messy/child/climb/custom.png',
+        details: expect.objectContaining({
+          path: '$.assets[0].addAnimations[0].layers[0].destination.path',
+        }),
+      })],
+    });
+  });
+
   it('rejects unknown major schema versions', () => {
     const result = parseAssetPackSource({
       ...validPack,

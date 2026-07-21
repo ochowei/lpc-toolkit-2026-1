@@ -523,6 +523,41 @@ describe('syncLinkedAssetPack', () => {
     expect(snapshotTree(fixture.cacheSentinelRoot)).toEqual(cacheSnapshot);
   });
 
+  it('escapes artist-controlled quotes and newlines in generated overlay credits', async () => {
+    const fixture = createWorkspaceFixture();
+    const packRoot = path.join(fixture.workspace.packsRoot, 'acme.quoted-credit');
+    const source = newItemSource({
+      packId: 'acme.quoted-credit',
+      displayName: 'Quoted Credit',
+      localId: 'quoted-credit',
+    });
+    writePack(packRoot, {
+      ...source,
+      credits: {
+        authors: ['Alice "Ace"', 'Bob\nBuilder'],
+        licenses: ['CC-BY-SA 4.0'],
+        urls: ['https://example.com/?q="hair"'],
+        notes: 'First "quoted" line\nSecond line',
+      },
+    }, {});
+    writeSheetPng(
+      path.join(packRoot, 'sprites/quoted-credit/foreground/walk.png'),
+      'walk',
+      '#aa5500',
+    );
+
+    expectSuccess(await syncLinkedAssetPack({
+      packDirectory: packRoot,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+    }));
+
+    const csv = readFileSync(path.join(fixture.workspace.outputRoot, 'CREDITS.csv'), 'utf8');
+    expect(csv).toContain('"First ""quoted"" line\nSecond line"');
+    expect(csv).toContain('"Alice ""Ace"", Bob\nBuilder"');
+    expect(csv).toContain('"https://example.com/?q=""hair"""');
+  });
+
   it('preserves the first linked pack when syncing a second linked pack', async () => {
     const fixture = createWorkspaceFixture();
     const firstRoot = path.join(fixture.workspace.packsRoot, 'acme.wind-braid');
@@ -597,6 +632,49 @@ describe('syncLinkedAssetPack', () => {
     expect(second.linked.version).toBe('1.1.0');
     expect(second.linked.contentDigest).not.toBe(first.linked.contentDigest);
     expect(snapshotTree(fixture.workspace.outputRoot)).not.toEqual(firstOutput);
+  });
+
+  it('publishes the immutable source bytes that were validated even if the source changes during staging', async () => {
+    const fixture = createWorkspaceFixture();
+    const packRoot = path.join(fixture.workspace.packsRoot, 'acme.snapshot-braid');
+    writeNewItemPack(packRoot, {
+      packId: 'acme.snapshot-braid',
+      displayName: 'Snapshot Braid',
+      localId: 'snapshot-braid',
+      color: '#aa5500',
+    });
+    const sourcePath = path.join(packRoot, 'sprites/snapshot-braid/foreground/walk.png');
+    const validatedBytes = readFileSync(sourcePath);
+    const mutationPath = path.join(fixture.cwd, 'mutated-walk.png');
+    writeSheetPng(mutationPath, 'walk', '#3355aa');
+    const mutatedBytes = readFileSync(mutationPath);
+    let sourceMutated = false;
+    const recorder = createFileOpsRecorder();
+    const fileOps: AssetPublicationFileOps = {
+      ...recorder.fileOps,
+      writeFileSync(target, data, optionsArg) {
+        recorder.fileOps.writeFileSync(target, data, optionsArg);
+        if (!sourceMutated && path.basename(String(target)) === '.lpc-toolkit-managed.json') {
+          writeFileSync(sourcePath, mutatedBytes);
+          sourceMutated = true;
+        }
+      },
+    };
+
+    expectSuccess(await syncLinkedAssetPack({
+      packDirectory: packRoot,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+      fileOps,
+    }));
+
+    const outputPath = path.join(
+      fixture.workspace.outputRoot,
+      'spritesheets/packages/acme.snapshot-braid/snapshot-braid/foreground/male-female/walk.png',
+    );
+    expect(sourceMutated).toBe(true);
+    expect(readFileSync(sourcePath)).toEqual(mutatedBytes);
+    expect(readFileSync(outputPath)).toEqual(validatedBytes);
   });
 
   it('refuses source-change re-sync when an existing managed generated file was tampered', async () => {
@@ -925,7 +1003,7 @@ describe('syncLinkedAssetPack', () => {
       creditDigest: digests.credit,
       layer: 'layer_1',
       bodyTypes: ['teen'],
-      destinationPath: 'spritesheets/hair/braid/front/climb.png',
+      destinationPath: 'spritesheets/hair/braid/front/climb/dark_brown.png',
       sourcePath: 'sprites/braid/front-climb-teen.png',
     });
     const adult = extendItemSource({
@@ -935,7 +1013,7 @@ describe('syncLinkedAssetPack', () => {
       creditDigest: digests.credit,
       layer: 'layer_1',
       bodyTypes: ['female'],
-      destinationPath: 'spritesheets/hair/braid/front-female/climb.png',
+      destinationPath: 'spritesheets/hair/braid/front-female/climb/dark_brown.png',
       sourcePath: 'sprites/braid/trim-climb-female.png',
     });
     writePack(childRoot, child, {});
@@ -966,6 +1044,51 @@ describe('syncLinkedAssetPack', () => {
     });
   });
 
+  it('validates and re-syncs an extension against the base snapshot after generated output exists', async () => {
+    const fixture = createWorkspaceFixture();
+    const digests = baselineDigests(fixture);
+    const packRoot = path.join(fixture.workspace.packsRoot, 'acme.base-snapshot-climb');
+    const source = extendItemSource({
+      packId: 'acme.base-snapshot-climb',
+      displayName: 'Base Snapshot Climb',
+      definitionDigest: digests.definition,
+      creditDigest: digests.credit,
+      layer: 'layer_1',
+      bodyTypes: ['teen'],
+      destinationPath: 'spritesheets/hair/braid/front/climb/dark_brown.png',
+      sourcePath: 'sprites/braid/front-climb-teen.png',
+    });
+    writePack(packRoot, source, {});
+    const sourcePath = path.join(packRoot, 'sprites/braid/front-climb-teen.png');
+    writeSheetPng(sourcePath, 'climb', '#aa5500');
+
+    const first = expectSuccess(await syncLinkedAssetPack({
+      packDirectory: packRoot,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+    }));
+    const activeBaseline = loadActiveAssetPackBaseline({
+      runtime: fixture.runtime,
+      workspace: fixture.workspace,
+    });
+    expect(activeBaseline.catalog.byItemId.get('braid')?.layer_1?.teen).toBe('hair/braid/');
+    expect(activeBaseline.definitionDigests.get('braid')).toBe(digests.definition);
+    expect(activeBaseline.creditDigests.get('braid')).toBe(digests.credit);
+
+    writeSheetPng(sourcePath, 'climb', '#3355aa');
+    const second = expectSuccess(await syncLinkedAssetPack({
+      packDirectory: packRoot,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+    }));
+
+    expect(second.linked.contentDigest).not.toBe(first.linked.contentDigest);
+    expect(readFileSync(path.join(
+      fixture.workspace.outputRoot,
+      'spritesheets/hair/braid/front/climb/dark_brown.png',
+    ))).toEqual(readFileSync(sourcePath));
+  });
+
   it('rejects true conflicts across linked packs without changing the published state', async () => {
     const fixture = createWorkspaceFixture();
     const digests = baselineDigests(fixture);
@@ -978,7 +1101,7 @@ describe('syncLinkedAssetPack', () => {
       creditDigest: digests.credit,
       layer: 'layer_1',
       bodyTypes: ['teen'],
-      destinationPath: 'spritesheets/hair/braid/front/climb.png',
+      destinationPath: 'spritesheets/hair/braid/front/climb/dark_brown.png',
       sourcePath: 'sprites/braid/front-climb-teen.png',
     });
     const conflict = extendItemSource({
@@ -988,7 +1111,7 @@ describe('syncLinkedAssetPack', () => {
       creditDigest: digests.credit,
       layer: 'layer_1',
       bodyTypes: ['teen'],
-      destinationPath: 'spritesheets/hair/braid/front-alt/climb.png',
+      destinationPath: 'spritesheets/hair/braid/front-alt/climb/dark_brown.png',
       sourcePath: 'sprites/braid/alternate-teen.png',
     });
     writePack(childRoot, child, {});
@@ -1026,7 +1149,7 @@ describe('syncLinkedAssetPack', () => {
       creditDigest: digests.credit,
       layer: 'layer_1',
       bodyTypes: ['female'],
-      destinationPath: 'spritesheets/hair/braid/front/climb.png',
+      destinationPath: 'spritesheets/hair/braid/front/climb/dark_brown.png',
       evidence: 'audit-inferred',
       sourcePath: 'sprites/braid/climb-female.png',
     });

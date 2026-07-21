@@ -206,13 +206,14 @@ function writeNewItemPack(options: {
   readonly version?: string;
   readonly assets: readonly ReturnType<typeof newItem>[];
   readonly colors?: Readonly<Record<string, string>>;
+  readonly credits?: AssetPackSource['credits'];
 }): void {
   const manifest: AssetPackSource = {
     schema: ASSET_PACK_SCHEMA,
     id: 'acme.preview-hair',
     version: options.version ?? '1.0.0',
     displayName: 'Preview Hair',
-    credits: PACK_CREDITS,
+    credits: options.credits ?? PACK_CREDITS,
     assets: options.assets,
   };
   writeJson(path.join(options.root, 'asset-pack.json'), manifest);
@@ -330,6 +331,32 @@ describe('previewAssetPack', () => {
     expect(snapshotTree(fixture.workspace.outputRoot)).toEqual(outputBefore);
     expect(readFileSync(fixture.workspace.registryPath)).toEqual(registryBefore);
     expect(validationEntries(fixture.workspace)).toEqual([]);
+  }, 30000);
+
+  it('writes preview credit CSV with escaped artist-controlled quotes and newlines', async () => {
+    const fixture = createPreviewFixture();
+    const packRoot = path.join(fixture.workspace.packsRoot, 'acme.preview-hair');
+    writeNewItemPack({
+      root: packRoot,
+      assets: [newItem('quoted')],
+      credits: {
+        authors: ['Pack "Artist"', 'Line\nArtist'],
+        licenses: ['CC-BY-SA 4.0'],
+        urls: ['https://example.com/?q="preview"'],
+        notes: 'Quoted "note"\nNext line',
+      },
+    });
+
+    const result = await previewAssetPack({
+      packDirectory: packRoot,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+    });
+
+    const csv = readFileSync(path.join(result.outDir, 'quoted.credits.csv'), 'utf8');
+    expect(csv).toContain('"Quoted ""note""\nNext line"');
+    expect(csv).toContain('"Pack ""Artist"", Line\nArtist"');
+    expect(csv).toContain('"https://example.com/?q=""preview"""');
   }, 30000);
 
   it('keeps supplied slots except the target type and honors requested asset, body, and animation', async () => {

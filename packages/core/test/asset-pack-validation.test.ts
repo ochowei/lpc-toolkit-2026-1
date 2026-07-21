@@ -284,6 +284,41 @@ describe('asset-pack validation', () => {
     ]));
   });
 
+  it('rejects a new-item identity that already exists in the baseline catalog', () => {
+    const collidingBaseline: AssetPackBaseline = {
+      ...baseline,
+      catalog: createCatalog({
+        'hair/braid.json': baselineCatalog.byItemId.get('braid')!,
+        'hair/acme.wind-braid--wind-braid.json': {
+          name: 'Unmanaged Existing Item',
+          type_name: 'hair',
+          animations: ['walk'],
+          credits: [],
+          layer_1: { zPos: 70, male: 'hair/existing/', female: 'hair/existing/' },
+        },
+      }).catalog,
+    };
+    const source = newItemSource();
+    const result = validateAssetPack({
+      pack: normalizeAssetPack(source),
+      baseline: collidingBaseline,
+      palettes,
+      inspections: [
+        inspectionFor('sprites/wind-braid/foreground/walk.png', 'walk'),
+        inspectionFor('sprites/wind-braid/foreground/climb.png', 'climb'),
+      ],
+      contentDigest: sha('d'),
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({
+      code: 'asset_path_conflict',
+      severity: 'error',
+      assetId: 'acme.wind-braid--wind-braid',
+      details: expect.objectContaining({ path: '$.assets[0].localId' }),
+    }));
+  });
+
   it('rejects unregistered extension animation, body, and variant references', () => {
     const invalid = extendItemSource({
       assets: [{
@@ -318,6 +353,46 @@ describe('asset-pack validation', () => {
       '$.assets[0].addAnimations[0].layers[0].bodyTypes[0]',
       '$.assets[0].addAnimations[0].layers[0].variant',
     ]));
+  });
+
+  it('rejects an extension destination whose filename does not match its animation and variant', () => {
+    const invalid = extendItemSource({
+      assets: [{
+        kind: 'extend-item',
+        itemId: 'braid',
+        baseDefinitionDigest: sha('a'),
+        baseCreditDigest: sha('b'),
+        addAnimations: [{
+          animation: 'climb',
+          layers: [{
+            layer: 'layer_1',
+            bodyTypes: ['female'],
+            source: 'sprites/braid/climb-female.png',
+            variant: 'dark brown',
+            destination: {
+              path: 'spritesheets/hair/braid/climb/custom.png',
+              evidence: 'artist-specified',
+              accepted: true,
+            },
+          }],
+        }],
+      }],
+    });
+
+    const result = validateSource(invalid, [
+      inspectionFor('sprites/braid/climb-female.png', 'climb'),
+    ]);
+
+    expect(result.ok).toBe(false);
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({
+      code: 'asset_pack_schema_invalid',
+      severity: 'error',
+      assetId: 'braid',
+      destinationPath: 'spritesheets/hair/braid/climb/custom.png',
+      details: {
+        path: '$.assets[0].addAnimations[0].layers[0].destination.path',
+      },
+    }));
   });
 
   it('maps missing and decode-failed inspections to source diagnostics', () => {

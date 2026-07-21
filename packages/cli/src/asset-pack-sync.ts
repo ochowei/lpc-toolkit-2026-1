@@ -554,9 +554,22 @@ async function validateLinkedPack(
     packDirectory,
     runtime,
     workspace,
+    snapshot: loaded,
   });
   if (!report.valid) {
     return syncFailure(report.diagnostics.map((diagnostic) => toSyncDiagnostic(diagnostic)));
+  }
+  if (report.contentDigest !== loaded.contentDigest) {
+    return syncFailure([{
+      code: 'asset_digest_mismatch',
+      severity: 'error',
+      message: `Linked asset-pack source changed while it was being validated: ${path.resolve(packDirectory)}`,
+      path: path.resolve(packDirectory),
+      details: {
+        validatedContentDigest: report.contentDigest,
+        capturedContentDigest: loaded.contentDigest,
+      },
+    }]);
   }
 
   return {
@@ -918,25 +931,23 @@ export async function syncLinkedAssetPack(options: {
       generatedDigests.set(definition.logicalPath, sha256Buffer(definitionBytes));
     }
 
-    const packRoots = new Map(
-      validatedPacks.map((pack) => [pack.loaded.pack.id, pack.sourceDirectory] as const),
+    const packSnapshots = new Map(
+      validatedPacks.map((pack) => [pack.loaded.pack.id, pack.loaded.sourceBytes] as const),
     );
     for (const sprite of compilePlan.sprites) {
-      const sourceDirectory = packRoots.get(sprite.packId);
-      if (!sourceDirectory) {
+      const sourceBytes = packSnapshots.get(sprite.packId)?.get(sprite.sourcePath);
+      if (!sourceBytes) {
         return syncFailure([{
           code: 'asset_publish_failed',
           severity: 'error',
-          message: `No linked source directory found for compiled sprite owner ${sprite.packId}.`,
+          message: `No validated source snapshot found for compiled sprite owner ${sprite.packId}.`,
           path: path.resolve(options.packDirectory),
         }]);
       }
-      const sourcePath = path.join(sourceDirectory, sprite.sourcePath);
       const destinationPath = path.join(stagedOutputRoot, sprite.destinationPath);
-      const spriteBytes = readFileSync(sourcePath);
       fileOps.mkdirSync(path.dirname(destinationPath), { recursive: true });
-      fileOps.writeFileSync(destinationPath, spriteBytes);
-      generatedDigests.set(sprite.destinationPath, sha256Buffer(spriteBytes));
+      fileOps.writeFileSync(destinationPath, sourceBytes);
+      generatedDigests.set(sprite.destinationPath, sha256Buffer(sourceBytes));
     }
 
     const creditsBytes = Buffer.from(creditsToCsv(creditsManifest(compilePlan.credits), 'walk'));

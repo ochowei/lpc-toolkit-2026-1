@@ -5,6 +5,7 @@ import {
   realpathSync,
 } from 'node:fs';
 import path from 'node:path';
+import { loadImage as loadCanvasImage } from '@napi-rs/canvas';
 import {
   assetPackContentProjection,
   createCatalog,
@@ -25,6 +26,7 @@ import {
   type PaletteMetadata,
 } from '@lpc-toolkit/core';
 import type { AssetWorkspace } from './asset-workspace.js';
+import type { AssetPackFilesSuccess } from './asset-pack-files.js';
 import { loadJsonRecords } from './loaders.js';
 import { createNodeCanvasAdapter } from './node-canvas-adapter.js';
 import type { RuntimeAssets } from './runtime-assets.js';
@@ -403,6 +405,45 @@ async function inspectSingleSource(
   }
 }
 
+async function inspectCapturedSource(
+  sourcePath: string,
+  bytes: Buffer,
+  digest: string,
+  uses: readonly SourceUse[],
+): Promise<AssetPackSourceInspection> {
+  try {
+    const image = await loadCanvasImage(bytes);
+    const matchedGeometry = geometryForDimensions(uses, image.width, image.height);
+    if (!matchedGeometry) {
+      return {
+        sourcePath,
+        digest,
+        regularFile: true,
+        decoded: {
+          width: image.width,
+          height: image.height,
+          nonTransparentCells: [],
+          paletteColors: [],
+        },
+      };
+    }
+
+    return {
+      sourcePath,
+      digest,
+      regularFile: true,
+      decoded: decodeImageCells(image, matchedGeometry),
+    };
+  } catch {
+    return {
+      sourcePath,
+      digest,
+      regularFile: true,
+      error: 'decode-failed',
+    };
+  }
+}
+
 async function inspectWithConcurrency(
   root: string,
   sourcePaths: readonly string[],
@@ -430,14 +471,6 @@ async function inspectWithConcurrency(
   return results;
 }
 
-function includeCustomDefinitions(
-  runtime: RuntimeAssets,
-  workspace: AssetWorkspace | undefined,
-): boolean {
-  if (!workspace) return false;
-  return path.resolve(runtime.context.customAssetsRoot) === path.resolve(workspace.outputRoot);
-}
-
 export function loadActiveAssetPackBaseline(options: {
   readonly runtime: RuntimeAssets;
   readonly workspace?: AssetWorkspace;
@@ -445,14 +478,7 @@ export function loadActiveAssetPackBaseline(options: {
   const baseRecords = asItemDefinitions(loadJsonRecords(
     options.runtime.context.sheetDefinitionsRoot,
   ).records);
-  const customRecords = includeCustomDefinitions(options.runtime, options.workspace)
-    ? asItemDefinitions(loadJsonRecords(options.runtime.context.customSheetDefinitionsRoot).records)
-    : {};
-
-  const catalog = createCatalog({
-    ...baseRecords,
-    ...customRecords,
-  }).catalog;
+  const catalog = createCatalog(baseRecords).catalog;
   const palettes = createPaletteCatalog(
     Object.fromEntries(
       Object.entries(loadJsonRecords(options.runtime.context.paletteDefinitionsRoot).records)
@@ -461,15 +487,10 @@ export function loadActiveAssetPackBaseline(options: {
     ),
   ).palettes;
 
-  const customRecordPaths = new Set(Object.keys(customRecords));
   const definitionDigests = new Map<ItemId, string>();
   const creditDigests = new Map<ItemId, string>();
 
   for (const [itemId, item] of catalog.byItemId) {
-    const fromManagedCustomOutput = customRecordPaths.has(item.sourcePath ?? '');
-    if (fromManagedCustomOutput) {
-      continue;
-    }
     definitionDigests.set(itemId, definitionDigest(item));
     creditDigests.set(itemId, creditDigest(item));
   }
@@ -490,6 +511,37 @@ export async function inspectAssetPackSources(
   const sourcePaths = collectUniqueSourcePaths(pack);
   const uses = collectSourceUses(pack);
   return inspectWithConcurrency(absoluteRoot, sourcePaths, uses);
+}
+
+async function inspectCapturedAssetPackSources(
+  loaded: AssetPackFilesSuccess,
+): Promise<readonly AssetPackSourceInspection[]> {
+  const sourcePaths = collectUniqueSourcePaths(loaded.pack);
+  const uses = collectSourceUses(loaded.pack);
+  const results: AssetPackSourceInspection[] = new Array(sourcePaths.length);
+  let nextIndex = 0;
+
+  async function worker(): Promise<void> {
+    while (nextIndex < sourcePaths.length) {
+      const sourceIndex = nextIndex;
+      nextIndex += 1;
+      const sourcePath = sourcePaths[sourceIndex];
+      if (!sourcePath) continue;
+      const bytes = loaded.sourceBytes.get(sourcePath);
+      const digest = loaded.sourceDigests.get(sourcePath);
+      results[sourceIndex] = bytes && digest
+        ? await inspectCapturedSource(sourcePath, bytes, digest, uses.get(sourcePath) ?? [])
+        : {
+            sourcePath,
+            regularFile: false,
+            error: 'missing',
+          };
+    }
+  }
+
+  const workerCount = Math.min(INSPECTION_CONCURRENCY, sourcePaths.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  return results;
 }
 
 function contentDigest(
@@ -528,34 +580,48 @@ export async function validateAssetPackDirectory(options: {
   readonly packDirectory: string;
   readonly runtime: RuntimeAssets;
   readonly workspace?: AssetWorkspace;
+  readonly snapshot?: AssetPackFilesSuccess;
 }): Promise<AssetPackValidationReport> {
   const absoluteRoot = path.resolve(options.packDirectory);
-  const manifestBytes = readFileSync(path.join(absoluteRoot, MANIFEST_FILE));
+  let inspectedPack: NormalizedAssetPack;
+  let inspections: readonly AssetPackSourceInspection[];
+  let currentDigest: string;
 
-  let manifestJson: unknown;
-  try {
-    manifestJson = JSON.parse(manifestBytes.toString('utf8')) as unknown;
-  } catch (error) {
-    return invalidManifestReport(
-      absoluteRoot,
-      error instanceof Error ? error.message : 'Invalid asset-pack JSON.',
-    );
+  if (options.snapshot) {
+    if (options.snapshot.root !== absoluteRoot) {
+      return invalidManifestReport(absoluteRoot, 'Asset-pack snapshot root does not match validation root.');
+    }
+    inspectedPack = options.snapshot.pack;
+    inspections = await inspectCapturedAssetPackSources(options.snapshot);
+    currentDigest = options.snapshot.contentDigest;
+  } else {
+    const manifestBytes = readFileSync(path.join(absoluteRoot, MANIFEST_FILE));
+
+    let manifestJson: unknown;
+    try {
+      manifestJson = JSON.parse(manifestBytes.toString('utf8')) as unknown;
+    } catch (error) {
+      return invalidManifestReport(
+        absoluteRoot,
+        error instanceof Error ? error.message : 'Invalid asset-pack JSON.',
+      );
+    }
+
+    const parsed = parseAssetPackSource(manifestJson);
+    if (!parsed.ok) {
+      return {
+        schema: VALIDATION_SCHEMA,
+        packDirectory: absoluteRoot,
+        valid: false,
+        diagnostics: parsed.diagnostics,
+        acknowledgementRecords: [],
+      };
+    }
+
+    inspectedPack = normalizeAssetPack(parsed.source);
+    inspections = await inspectAssetPackSources(absoluteRoot, inspectedPack);
+    currentDigest = contentDigest(inspectedPack, inspections);
   }
-
-  const parsed = parseAssetPackSource(manifestJson);
-  if (!parsed.ok) {
-    return {
-      schema: VALIDATION_SCHEMA,
-      packDirectory: absoluteRoot,
-      valid: false,
-      diagnostics: parsed.diagnostics,
-      acknowledgementRecords: [],
-    };
-  }
-
-  const inspectedPack = normalizeAssetPack(parsed.source);
-  const inspections = await inspectAssetPackSources(absoluteRoot, inspectedPack);
-  const currentDigest = contentDigest(inspectedPack, inspections);
   const baseline = loadActiveAssetPackBaseline({
     runtime: options.runtime,
     ...(options.workspace ? { workspace: options.workspace } : {}),

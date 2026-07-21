@@ -506,23 +506,62 @@ describe('asset-pack compile', () => {
     ]);
   });
 
-  it('ignores manager-generated baseline paths when compiling fresh managed outputs', () => {
+  it('rejects a new-item identity already present in an unmanaged baseline catalog', () => {
     const plan = compileAssetPacks({
       baseline: baselineWithExistingSharedItem(),
       packs: [normalizeAssetPack(duplicateOwnerPack())],
     });
 
-    expect(plan.diagnostics).toEqual([]);
-    expect(plan.definitions).toHaveLength(1);
-    expect(plan.sprites).toHaveLength(1);
-    expect(plan.credits).toHaveLength(1);
-    expect(plan.ownership).toEqual([{
-      packId: 'acme.shared-pack',
-      logicalPaths: [
-        'sheet_definitions/hair/acme.shared-pack--shared-item.json',
-        'spritesheets/packages/acme.shared-pack/shared-item/top/male-female/walk.png',
-      ],
-    }]);
+    expect(plan.diagnostics).toContainEqual(expect.objectContaining({
+      code: 'asset_path_conflict',
+      severity: 'error',
+      assetId: 'acme.shared-pack--shared-item',
+      destinationPath: 'sheet_definitions/hair/acme.shared-pack--shared-item.json',
+    }));
+    expect(plan.definitions).toEqual([]);
+    expect(plan.sprites).toEqual([]);
+    expect(plan.credits).toEqual([]);
+    expect(plan.ownership).toEqual([]);
+  });
+
+  it('rejects an extension destination that cannot resolve to the declared variant path', () => {
+    const invalid = extensionPack({
+      assets: [{
+        kind: 'extend-item',
+        itemId: 'braid',
+        baseDefinitionDigest: sha('e'),
+        baseCreditDigest: sha('f'),
+        addAnimations: [{
+          animation: 'climb',
+          layers: [{
+            layer: 'layer_1',
+            bodyTypes: ['female'],
+            source: 'sprites/braid/front-climb-female.png',
+            variant: 'dark brown',
+            destination: {
+              path: 'spritesheets/hair/braid/front/climb/custom.png',
+              evidence: 'artist-specified',
+              accepted: true,
+            },
+          }],
+        }],
+      }],
+    });
+
+    const plan = compileAssetPacks({
+      baseline: extensionBaseline(),
+      packs: [normalizeAssetPack(invalid)],
+    });
+
+    expect(plan.diagnostics).toContainEqual(expect.objectContaining({
+      code: 'asset_pack_schema_invalid',
+      severity: 'error',
+      assetId: 'braid',
+      destinationPath: 'spritesheets/hair/braid/front/climb/custom.png',
+    }));
+    expect(plan.definitions).toEqual([]);
+    expect(plan.sprites).toEqual([]);
+    expect(plan.credits).toEqual([]);
   });
 
   it('reports duplicate generated ownership instead of silently coalescing identical outputs', () => {
