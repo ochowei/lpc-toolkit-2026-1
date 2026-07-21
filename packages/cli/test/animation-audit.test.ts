@@ -110,6 +110,7 @@ function storeFor(present: ReadonlySet<string>): AssetStore {
     kind: 'directory',
     baseUrl: '/fixture-assets/',
     description: 'fixture',
+    logicalPath: (sourcePath) => sourcePath.replace(/^\/fixture-assets\/?/u, ''),
     has: (logicalPath) => present.has(logicalPath),
     load: async (sourcePath) => sourcePath,
   };
@@ -365,6 +366,7 @@ describe('inspectAssetAnimationPlan', () => {
       kind: 'directory',
       baseUrl: '/fixture-assets',
       description: 'fixture',
+      logicalPath: (sourcePath) => sourcePath.replace(/^\/fixture-assets\/?/u, ''),
       has: () => { throw deniedAtPreflight; },
       load: async (sourcePath) => sourcePath,
     };

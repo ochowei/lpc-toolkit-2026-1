@@ -26,9 +26,10 @@ function systemErrorCode(error: unknown): string | undefined {
 }
 
 export interface AssetStore {
-  readonly kind: 'directory' | 'zip';
+  readonly kind: 'directory' | 'zip' | 'overlay';
   readonly baseUrl: string;
   readonly description: string;
+  logicalPath(sourcePath: string): string | undefined;
   has(logicalPath: string): boolean;
   load(sourcePath: string): Promise<AssetImageSource>;
 }
@@ -76,6 +77,33 @@ function isRegularFileInsideRoot(root: string, candidate: string): boolean {
   }
 }
 
+function toLogicalPath(root: string, candidate: string): string | undefined {
+  const relative = path.relative(root, candidate);
+  if (
+    relative === '' ||
+    relative === '..' ||
+    relative.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relative)
+  ) {
+    return undefined;
+  }
+  const logicalPath = relative.split(path.sep).join('/');
+  return isSafeLogicalPath(logicalPath) ? logicalPath : undefined;
+}
+
+function directoryLogicalPath(root: string, sourcePath: string): string | undefined {
+  if (
+    sourcePath.includes('\0') ||
+    hasUrlScheme(sourcePath) ||
+    !path.isAbsolute(sourcePath)
+  ) {
+    return undefined;
+  }
+  const candidate = path.resolve(sourcePath);
+  if (!isInsideRoot(root, candidate)) return undefined;
+  return toLogicalPath(root, candidate);
+}
+
 export function createDirectoryAssetStore(assetsRoot: string): AssetStore {
   const resolvedRoot = path.resolve(assetsRoot);
   const canonicalRoot = realpathSync.native(resolvedRoot);
@@ -84,6 +112,9 @@ export function createDirectoryAssetStore(assetsRoot: string): AssetStore {
     kind: 'directory',
     baseUrl: resolvedRoot,
     description: `Directory assets at ${resolvedRoot}`,
+    logicalPath(sourcePath) {
+      return directoryLogicalPath(resolvedRoot, sourcePath);
+    },
     has(logicalPath) {
       if (!isSafeLogicalPath(logicalPath)) return false;
       const candidate = path.resolve(resolvedRoot, logicalPath);
@@ -148,6 +179,14 @@ function zipLogicalPath(sourcePath: string): string {
   return logicalPath;
 }
 
+function zipSourceLogicalPath(sourcePath: string): string | undefined {
+  const prefixes = ['lpc-zip:/', 'lpc-asset:/'] as const;
+  const prefix = prefixes.find((candidate) => sourcePath.startsWith(candidate));
+  if (prefix === undefined) return undefined;
+  const logicalPath = sourcePath.slice(prefix.length);
+  return isSafeLogicalPath(logicalPath) ? logicalPath : undefined;
+}
+
 function splitZipLogicalPath(logicalPath: string): {
   readonly category: string;
   readonly entryPath: string;
@@ -177,6 +216,9 @@ export function createZipAssetStore(layout: AssetCacheLayout): AssetStore {
     kind: 'zip',
     baseUrl: 'lpc-zip:',
     description: `Cached ZIP assets at ${layout.zipsRoot}`,
+    logicalPath(sourcePath) {
+      return zipSourceLogicalPath(sourcePath);
+    },
     has(logicalPath) {
       return isSafeLogicalPath(logicalPath) && spriteIndex.has(logicalPath);
     },

@@ -16,6 +16,7 @@ import {
   createZipAssetStore,
   type AssetStore,
 } from './asset-store.js';
+import { createOverlayAssetStore } from './asset-overlay-store.js';
 import { createRuntimeContext, type RuntimeContext } from './context.js';
 
 export interface RuntimeAssets {
@@ -34,6 +35,13 @@ export interface PrepareRuntimeAssetsOptions {
   readonly ensureCache?: typeof ensureAssetCache;
   readonly onProgress?: (progress: AssetCacheProgress) => void;
   readonly managedCacheOnly?: boolean;
+}
+
+export interface OverlayRuntimeAssetsOptions {
+  readonly runtime: RuntimeAssets;
+  readonly customSheetDefinitionsRoot: string;
+  readonly overlayRoot: string;
+  readonly logicalPaths: readonly string[];
 }
 
 function isDirectory(pathName: string): boolean {
@@ -113,4 +121,24 @@ export async function prepareRuntimeAssets(
   } catch (error) {
     throw contextualizeAssetCacheError(error, config.tag, cacheRoot);
   }
+}
+
+export function createOverlayRuntimeAssets(
+  options: OverlayRuntimeAssetsOptions,
+): RuntimeAssets {
+  const overlayRoot = path.resolve(options.overlayRoot);
+  const customSheetDefinitionsRoot = path.resolve(options.customSheetDefinitionsRoot);
+  return {
+    ...options.runtime,
+    context: {
+      ...options.runtime.context,
+      customAssetsRoot: overlayRoot,
+      customSheetDefinitionsRoot,
+    },
+    store: createOverlayAssetStore({
+      base: options.runtime.store,
+      overlayRoot,
+      logicalPaths: options.logicalPaths,
+    }),
+  };
 }

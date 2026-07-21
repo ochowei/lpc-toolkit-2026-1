@@ -76,9 +76,12 @@ describe('directory asset store', () => {
     expect(store.kind).toBe('directory');
     expect(store.baseUrl).toBe(path.resolve(assetsRoot));
     expect(store.has(logicalSpritePath)).toBe(true);
+    expect(store.logicalPath(spritePath)).toBe(logicalSpritePath);
     expect(store.has('spritesheets/body/bodies/male/missing.png')).toBe(false);
     expect(store.has('../outside.png')).toBe(false);
     expect(store.has('https://example.test/sprite.png')).toBe(false);
+    expect(store.logicalPath(path.join(assetsRoot, '..', 'outside.png'))).toBeUndefined();
+    expect(store.logicalPath('lpc-zip:/spritesheets/body/bodies/male/walk.png')).toBeUndefined();
   });
 
   it('returns absolute core-composed source paths and rejects paths outside the root', async () => {
@@ -167,6 +170,10 @@ describe('ZIP asset store', () => {
 
     const store = createZipAssetStore(layout);
     expect(store.has('spritesheets/body/bodies/male/walk.png')).toBe(true);
+    expect(store.logicalPath('lpc-zip:/spritesheets/body/bodies/male/walk.png'))
+      .toBe('spritesheets/body/bodies/male/walk.png');
+    expect(store.logicalPath('lpc-asset:/spritesheets/body/bodies/male/walk.png'))
+      .toBe('spritesheets/body/bodies/male/walk.png');
     const source = await store.load('lpc-zip:/spritesheets/body/bodies/male/walk.png');
     expect(Buffer.isBuffer(source)).toBe(true);
     const adapter = createNodeCanvasAdapter({ assetStore: store });
@@ -182,6 +189,9 @@ describe('ZIP asset store', () => {
     expect(store.has('../body/walk.png')).toBe(false);
     expect(store.has('https://example.test/walk.png')).toBe(false);
     expect(store.has('spritesheets/body/bodies/male/not-indexed.png')).toBe(false);
+    expect(store.logicalPath('https://example.test/walk.png')).toBeUndefined();
+    expect(store.logicalPath('lpc-zip:/spritesheets/body/../body/bodies/male/walk.png'))
+      .toBeUndefined();
     await expect(store.load('https://example.test/walk.png')).rejects.toThrow();
     await expect(
       store.load('lpc-zip:/spritesheets/body/../body/bodies/male/walk.png'),
