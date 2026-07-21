@@ -658,7 +658,7 @@ Task 3 record:
 - Modify: `packages/core/src/asset-pack-compile.ts`
 - Modify: `packages/core/test/asset-pack-compile.test.ts`
 
-- [ ] **Step 1: Add failing extension and conflict tests**
+- [x] **Step 1: Add failing extension and conflict tests**
 
 Cover baseline definition/credit digest success and drift, exact/inferred/manual-review destinations, added animation name, body/layer patch, deterministic union of baseline and contribution credits, a contribution override that cannot erase inherited credit, two disjoint patches, same semantic field conflict, same destination conflict, exact authorized cross-pack replacement, and unauthorized base replacement.
 
@@ -676,7 +676,7 @@ it('merges disjoint patches but rejects two owners of one destination', () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-compile.test.ts
@@ -684,17 +684,17 @@ rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-compile.test.ts
 
 Expected: FAIL on extension assertions.
 
-- [ ] **Step 3: Implement deterministic patch merge and credit union**
+- [x] **Step 3: Implement deterministic patch merge and credit union**
 
 Exclude manager-generated definitions from the supplied baseline. Verify both digests before applying a delta. Merge extensions by semantic target `(itemId, layer, bodyType, animation, variant)` and physical destination. Write one final definition at the baseline item ID and retain the baseline `name`/selection identity.
 
 Credit union order is baseline record order followed by pack-ID order; arrays deduplicate exact strings while notes concatenate non-empty unique paragraphs. A file override substitutes only the pack contribution before union.
 
-- [ ] **Step 4: Implement exact replacement checks**
+- [x] **Step 4: Implement exact replacement checks**
 
 Support only the source schema's comparator grammar (`<`, `<=`, `=`, `>=`, `>` joined by spaces) and exact pack/asset ownership. Reject malformed ranges in schema parsing and all replacement scope mismatches with `asset_replacement_unauthorized`.
 
-- [ ] **Step 5: Verify full Core asset-pack suite**
+- [x] **Step 5: Verify full Core asset-pack suite**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-schema.test.ts asset-pack-validation.test.ts asset-pack-compile.test.ts
@@ -704,7 +704,7 @@ rtk pnpm check:boundaries
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit product code**
+- [x] **Step 6: Commit product code**
 
 ```sh
 rtk git add packages/core/src/asset-pack-compile.ts packages/core/test/asset-pack-compile.test.ts packages/core/src/asset-pack-schema.ts packages/core/test/asset-pack-schema.test.ts
@@ -712,6 +712,12 @@ rtk git commit -m "feat(core): merge attributed asset extensions"
 ```
 
 Then update this task's plan record and commit it separately.
+
+Task 4 record:
+
+- Implementation: Added existing-item digest drift checks, deterministic patch merge and semantic/destination conflict handling, inherited baseline-credit plus contribution union/override semantics, and exact replacement comparator/ownership/destination authorization.
+- Product commits: `1f1f597599dd8c188f565b0fc938ba944771ea9a`, `0d57a15ec8840bd5640b402ecc9da0f91c677326`.
+- Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-schema.test.ts asset-pack-validation.test.ts asset-pack-compile.test.ts` PASS (47 tests); `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS; `rtk pnpm check:boundaries` PASS; reviewer re-review APPROVED.
 
 ---
 
