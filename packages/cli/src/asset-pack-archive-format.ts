@@ -2,13 +2,13 @@ import { createHash } from 'node:crypto';
 import {
   closeSync,
   constants as fsConstants,
+  fstatSync,
   lstatSync,
   mkdirSync,
   openSync,
-  readFileSync,
+  readSync,
   realpathSync,
   rmSync,
-  statSync,
   writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
@@ -216,7 +216,7 @@ function validateArchivePath(entryPath: string): Checked<string> {
     || segment === '..'
     || /[<>:"|?*]/u.test(segment)
     || /[. ]$/u.test(segment)
-    || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/iu.test(segment)
+    || /^(con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])(?:\..*)?$/iu.test(segment)
   ))) {
     return rejected('asset_archive_unsafe', `Unsafe archive entry path: ${entryPath}.`, entryPath);
   }
@@ -716,15 +716,48 @@ export function readAssetPackArchive(options: {
   let archiveBytes: Buffer;
   try {
     if (options.archiveBytes === undefined) {
-      const archiveSize = statSync(options.archivePath).size;
-      if (archiveSize > ASSET_PACK_ARCHIVE_LIMITS.archiveBytes) {
-        return rejected(
-          'asset_archive_limit_exceeded',
-          `Archive exceeds the ${String(ASSET_PACK_ARCHIVE_LIMITS.archiveBytes)}-byte encoded limit.`,
-          options.archivePath,
-        );
+      const descriptor = openSync(
+        options.archivePath,
+        fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW,
+      );
+      try {
+        const metadata = fstatSync(descriptor);
+        if (!metadata.isFile()) {
+          return rejected(
+            'asset_archive_invalid',
+            'Asset-pack archive path must refer to a regular file.',
+            options.archivePath,
+          );
+        }
+        const chunks: Buffer[] = [];
+        let totalBytes = 0;
+        while (totalBytes <= ASSET_PACK_ARCHIVE_LIMITS.archiveBytes) {
+          const remaining = ASSET_PACK_ARCHIVE_LIMITS.archiveBytes + 1 - totalBytes;
+          const chunk = Buffer.alloc(Math.min(64 * 1_024, remaining));
+          const bytesRead = readSync(descriptor, chunk, 0, chunk.byteLength, null);
+          if (bytesRead === 0) break;
+          chunks.push(chunk.subarray(0, bytesRead));
+          totalBytes += bytesRead;
+          if (totalBytes > ASSET_PACK_ARCHIVE_LIMITS.archiveBytes) {
+            return rejected(
+              'asset_archive_limit_exceeded',
+              `Archive exceeds the ${String(ASSET_PACK_ARCHIVE_LIMITS.archiveBytes)}-byte encoded limit.`,
+              options.archivePath,
+            );
+          }
+        }
+        const finalMetadata = fstatSync(descriptor);
+        if (finalMetadata.size > ASSET_PACK_ARCHIVE_LIMITS.archiveBytes) {
+          return rejected(
+            'asset_archive_limit_exceeded',
+            `Archive exceeds the ${String(ASSET_PACK_ARCHIVE_LIMITS.archiveBytes)}-byte encoded limit.`,
+            options.archivePath,
+          );
+        }
+        archiveBytes = Buffer.concat(chunks, totalBytes);
+      } finally {
+        closeSync(descriptor);
       }
-      archiveBytes = readFileSync(options.archivePath);
     } else {
       if (options.archiveBytes.byteLength > ASSET_PACK_ARCHIVE_LIMITS.archiveBytes) {
         return rejected(
@@ -891,12 +924,23 @@ function assertSafeExtractionParent(targetDirectory: string): string {
       throw new Error(`Extraction parent is not a directory: ${current}`);
     }
   }
+  assertPrivateStagingRoot(current);
   const canonicalParent = realpathSync(current);
   const resolvedTarget = path.join(canonicalParent, path.basename(requestedTarget));
   if (lstatSync(resolvedTarget, { throwIfNoEntry: false }) !== undefined) {
     throw new Error(`Extraction target already exists: ${resolvedTarget}`);
   }
   return resolvedTarget;
+}
+
+function assertPrivateStagingRoot(directory: string): void {
+  const status = lstatSync(directory, { throwIfNoEntry: false });
+  if (!status || status.isSymbolicLink() || !status.isDirectory()) {
+    throw new Error(`Extraction parent is not a private staging root: ${directory}`);
+  }
+  if ((status.mode & 0o077) !== 0) {
+    throw new Error(`Extraction parent is writable or accessible outside the private staging root: ${directory}`);
+  }
 }
 
 function assertPinnedExtractionDirectory(directory: string): void {
@@ -943,6 +987,7 @@ export function extractVerifiedAssetPackPayload(options: {
     for (const [entryPath, contents] of [...verifiedFiles].sort(
       ([left], [right]) => comparePaths(left, right),
     )) {
+      assertPinnedExtractionDirectory(targetDirectory);
       const segments = entryPath.split('/');
       let directory = targetDirectory;
       for (const segment of segments.slice(0, -1)) {
@@ -955,6 +1000,7 @@ export function extractVerifiedAssetPackPayload(options: {
       }
       const fileName = segments.at(-1);
       if (!fileName) throw new Error(`Invalid verified archive path: ${entryPath}`);
+      assertPinnedExtractionDirectory(directory);
       writeNewFileNoFollow(path.join(directory, fileName), Buffer.from(contents));
     }
   } catch (error) {

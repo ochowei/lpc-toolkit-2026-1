@@ -1,18 +1,24 @@
 import { createHash } from 'node:crypto';
 import {
+  chmodSync,
+  fstatSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   realpathSync,
+  renameSync,
   rmSync,
   statSync,
   symlinkSync,
+  truncateSync,
+  writeFileSync,
 } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { deflateRawSync } from 'node:zlib';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ASSET_PACK_SCHEMA, type AssetPackSource } from '@lpc-toolkit/core';
 import {
   ASSET_PACK_ARCHIVE_LIMITS,
@@ -23,6 +29,56 @@ import {
   type AssetPackArchiveDiagnostic,
   type AssetPackArchiveReadResult,
 } from '../src/asset-pack-archive-format.js';
+
+const fileSystemInterception = vi.hoisted(() => ({
+  archivePath: undefined as string | undefined,
+  archiveDescriptor: undefined as number | undefined,
+  rejectPathRead: false,
+  afterDescriptorWrite: undefined as (() => void) | undefined,
+}));
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    openSync(
+      filePath: Parameters<typeof actual.openSync>[0],
+      flags: Parameters<typeof actual.openSync>[1],
+      mode?: Parameters<typeof actual.openSync>[2],
+    ) {
+      const descriptor = actual.openSync(filePath, flags, mode);
+      if (String(filePath) === fileSystemInterception.archivePath) {
+        fileSystemInterception.archiveDescriptor = descriptor;
+      }
+      return descriptor;
+    },
+    readFileSync(
+      file: Parameters<typeof actual.readFileSync>[0],
+      options?: Parameters<typeof actual.readFileSync>[1],
+    ) {
+      if (
+        fileSystemInterception.rejectPathRead
+        && typeof file !== 'number'
+        && String(file) === fileSystemInterception.archivePath
+      ) {
+        throw new Error('Archive path was read after opening.');
+      }
+      return actual.readFileSync(file, options);
+    },
+    writeFileSync(
+      file: Parameters<typeof actual.writeFileSync>[0],
+      data: Parameters<typeof actual.writeFileSync>[1],
+      options?: Parameters<typeof actual.writeFileSync>[2],
+    ) {
+      actual.writeFileSync(file, data, options);
+      const afterDescriptorWrite = fileSystemInterception.afterDescriptorWrite;
+      if (afterDescriptorWrite !== undefined && typeof file === 'number') {
+        fileSystemInterception.afterDescriptorWrite = undefined;
+        afterDescriptorWrite();
+      }
+    },
+  };
+});
 
 const UTF8_FLAG = 0x0800;
 const SOURCE_PATH = 'sprites/wind-braid/foreground/walk.png';
@@ -326,9 +382,72 @@ function createDirectory(prefix: string): string {
 }
 
 afterEach(() => {
+  fileSystemInterception.archivePath = undefined;
+  fileSystemInterception.archiveDescriptor = undefined;
+  fileSystemInterception.rejectPathRead = false;
+  fileSystemInterception.afterDescriptorWrite = undefined;
   for (const directory of temporaryDirectories.splice(0)) {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+describe('readAssetPackArchive descriptor bounds', () => {
+  it('reads a path-backed archive through one descriptor and closes it', async () => {
+    const archive = await createDeterministicAssetPackArchive({
+      manifestBytes: manifestBytesOfLength(),
+      sourceBytes: new Map([[SOURCE_PATH, Buffer.from('walk-pixels')]]),
+    });
+    const root = createDirectory('lpc-asset-pack-read-');
+    const archivePath = path.join(root, 'pack.lpc-assets.zip');
+    writeFileSync(archivePath, archive);
+    fileSystemInterception.archivePath = archivePath;
+    fileSystemInterception.rejectPathRead = true;
+
+    const result = readAssetPackArchive({ archivePath });
+
+    expect(result.ok).toBe(true);
+    const descriptor = fileSystemInterception.archiveDescriptor;
+    expect(descriptor).toBeTypeOf('number');
+    if (descriptor === undefined) throw new Error('Expected the archive descriptor to be observed.');
+    expect(() => fstatSync(descriptor)).toThrow();
+  });
+
+  it('rejects a non-regular path and closes its descriptor', () => {
+    const archivePath = createDirectory('lpc-asset-pack-non-file-');
+    fileSystemInterception.archivePath = archivePath;
+
+    const result = readAssetPackArchive({ archivePath });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('Expected a directory archive path to be rejected.');
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ message: expect.stringMatching(/regular file/iu) }),
+    ]));
+    const descriptor = fileSystemInterception.archiveDescriptor;
+    expect(descriptor).toBeTypeOf('number');
+    if (descriptor === undefined) throw new Error('Expected the archive descriptor to be observed.');
+    expect(() => fstatSync(descriptor)).toThrow();
+  });
+
+  it('rejects an oversized sparse file and closes its descriptor', () => {
+    const root = createDirectory('lpc-asset-pack-oversized-');
+    const archivePath = path.join(root, 'oversized.lpc-assets.zip');
+    writeFileSync(archivePath, Buffer.alloc(0));
+    truncateSync(archivePath, ASSET_PACK_ARCHIVE_LIMITS.archiveBytes + 1);
+    fileSystemInterception.archivePath = archivePath;
+
+    const result = readAssetPackArchive({ archivePath });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('Expected an oversized archive path to be rejected.');
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'asset_archive_limit_exceeded' }),
+    ]));
+    const descriptor = fileSystemInterception.archiveDescriptor;
+    expect(descriptor).toBeTypeOf('number');
+    if (descriptor === undefined) throw new Error('Expected the archive descriptor to be observed.');
+    expect(() => fstatSync(descriptor)).toThrow();
+  });
 });
 
 describe('readAssetPackArchive path and central-directory safety', () => {
@@ -339,6 +458,12 @@ describe('readAssetPackArchive path and central-directory safety', () => {
     ['backslash', 'sprites\\a.png'],
     ['Windows ADS', 'sprites/a:alternate-stream.png'],
     ['Windows reserved device', 'sprites/aux.png'],
+    ['Windows superscript COM1 device', 'sprites/COM¹.png'],
+    ['Windows superscript COM2 device', 'sprites/com².asset.png'],
+    ['Windows superscript COM3 device', 'sprites/COM³'],
+    ['Windows superscript LPT1 device', 'sprites/LPT¹.png'],
+    ['Windows superscript LPT2 device', 'sprites/lpt².asset.png'],
+    ['Windows superscript LPT3 device', 'sprites/LPT³'],
     ['Windows forbidden character', 'sprites/a?.png'],
     ['Windows trailing dot', 'sprites/a.png.'],
     ['Windows trailing space', 'sprites/a.png '],
@@ -870,5 +995,49 @@ describe('extractVerifiedAssetPackPayload', () => {
       snapshot: { ...read.snapshot },
       targetDirectory: path.join(root, 'forged'),
     })).toThrow(/verified/iu);
+  });
+
+  it('requires the extraction parent to be a private staging root', async () => {
+    const archive = await createDeterministicAssetPackArchive({
+      manifestBytes: manifestBytesOfLength(),
+      sourceBytes: new Map([[SOURCE_PATH, Buffer.from('walk-pixels')]]),
+    });
+    const read = readAssetPackArchive({ archivePath: '/fixtures/verified.zip', archiveBytes: archive });
+    expect(read.ok).toBe(true);
+    if (!read.ok) throw new Error('Expected archive to verify.');
+    const stagingRoot = createDirectory('lpc-asset-pack-public-staging-');
+    chmodSync(stagingRoot, 0o777);
+
+    expect(() => extractVerifiedAssetPackPayload({
+      snapshot: read.snapshot,
+      targetDirectory: path.join(stagingRoot, 'payload'),
+    })).toThrow(/private staging root|writable/iu);
+  });
+
+  it('fails closed on a pinned target change without touching or removing the replacement', async () => {
+    const archive = await createDeterministicAssetPackArchive({
+      manifestBytes: manifestBytesOfLength(),
+      sourceBytes: new Map([[SOURCE_PATH, Buffer.from('walk-pixels')]]),
+    });
+    const read = readAssetPackArchive({ archivePath: '/fixtures/verified.zip', archiveBytes: archive });
+    expect(read.ok).toBe(true);
+    if (!read.ok) throw new Error('Expected archive to verify.');
+    const stagingRoot = createDirectory('lpc-asset-pack-pinned-staging-');
+    const target = path.join(stagingRoot, 'payload');
+    const displacedTarget = path.join(stagingRoot, 'displaced-payload');
+    const replacement = createDirectory('lpc-asset-pack-replacement-');
+    fileSystemInterception.afterDescriptorWrite = () => {
+      renameSync(target, displacedTarget);
+      symlinkSync(replacement, target, 'dir');
+    };
+
+    expect(() => extractVerifiedAssetPackPayload({
+      snapshot: read.snapshot,
+      targetDirectory: target,
+    })).toThrow(/canonical|pinned|changed/iu);
+
+    expect(lstatSync(target).isSymbolicLink()).toBe(true);
+    expect(lstatSync(displacedTarget).isDirectory()).toBe(true);
+    expect(readdirSync(replacement)).toEqual([]);
   });
 });
