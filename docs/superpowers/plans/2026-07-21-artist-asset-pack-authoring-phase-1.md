@@ -799,11 +799,11 @@ Task 5 record:
 - Create: `packages/cli/test/asset-pack-files.test.ts`
 - Create: `packages/cli/test/asset-pack-scaffold.test.ts`
 
-- [ ] **Step 1: Write failing safe-read and digest tests**
+- [x] **Step 1: Write failing safe-read and digest tests**
 
 Cover manifest JSON errors, Core schema errors, missing source files, symlink escape, non-regular files, duplicate canonical source paths, stable SHA-256 despite source manifest property order, digest change after substantive manifest or PNG change, and digest stability after acknowledgement-only changes. Assert that validate-style loads do not change manifest bytes or mtime.
 
-- [ ] **Step 2: Write failing scaffold tests**
+- [x] **Step 2: Write failing scaffold tests**
 
 Define exact CLI-independent request types and test:
 
@@ -848,7 +848,7 @@ Assert:
 
 If any selected finding is `manual-review`, `blankFrames`, or otherwise non-scaffoldable, abort before publication and return all `finding_not_scaffoldable_v1` diagnostics; never publish a partial pack beside unresolved selected work.
 
-- [ ] **Step 3: Run focused tests and verify RED**
+- [x] **Step 3: Run focused tests and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-files.test.ts asset-pack-scaffold.test.ts
@@ -856,7 +856,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-files.test.ts asset-pack-s
 
 Expected: FAIL because both modules do not exist.
 
-- [ ] **Step 4: Implement safe source reading and hashing**
+- [x] **Step 4: Implement safe source reading and hashing**
 
 Use `node:crypto` SHA-256 and the Core content projection. Resolve and canonicalize every source inside the pack root; accept only regular files. Hash sources in normalized source-path order, then hash one canonical value containing the content projection plus `{ sourcePath, digest }` pairs.
 
@@ -867,11 +867,11 @@ const contentDigest = sha256Json({
 });
 ```
 
-- [ ] **Step 5: Implement atomic scaffold publication**
+- [x] **Step 5: Implement atomic scaffold publication**
 
 Build the complete new pack in a sibling temporary directory, then rename into a path that must not already exist. Create referenced sprite parent directories but no blank PNGs. Default output is `<workspace>/artist-packs/<pack-id>`; explicit `--out` remains inside the workspace `packsRoot` in Phase 1.
 
-- [ ] **Step 6: Verify GREEN**
+- [x] **Step 6: Verify GREEN**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-files.test.ts asset-pack-scaffold.test.ts
@@ -879,6 +879,12 @@ rtk pnpm --filter @lpc-toolkit/cli run typecheck
 ```
 
 Expected: PASS.
+
+Task 6 record:
+
+- Implementation: Added safe pack loading with regular-file/containment/symlink checks and canonical SHA-256 content/source digests; added simple/advanced new-item and bounded audit-derived scaffold generation with strict finding validation, exact/inferred/manual-review semantics, consumer preservation, baseline digests, and atomic no-partial publication.
+- Product commits: `9bd367099bab9e3fcb0cb618c5cec1e695d3d686`, `dc2ece375f8dc2a52c8a8a11c577e766576277bb`, `d0c6a42775807847064e3427824debebd519c0f5`, `89ec220709454cdc178df91117e150d98892c6a7`.
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-files.test.ts asset-pack-scaffold.test.ts` PASS (16/16 after final fix); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS; reviewer final re-review APPROVED. PNG decode/frame validation remains Task 7.
 
 - [ ] **Step 7: Commit product code**
 
