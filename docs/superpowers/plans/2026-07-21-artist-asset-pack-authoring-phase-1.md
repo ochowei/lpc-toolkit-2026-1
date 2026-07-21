@@ -1207,7 +1207,7 @@ Task 10 record:
 - Modify: `packages/cli/test/main-json.test.ts`
 - Modify: `packages/cli/test/main-human.test.ts`
 
-- [ ] **Step 1: Write failing three-token parser and help tests**
+- [x] **Step 1: Write failing three-token parser and help tests**
 
 Make only `asset workspace init` consume three command tokens; keep all existing two-token commands and positionals unchanged. Add `new` and `advanced` to boolean flags. Define root `asset`, group `asset workspace`, and all six leaf specs with exact options/examples.
 
@@ -1229,11 +1229,11 @@ Required scaffold options:
 
 Preview options are `--workspace`, `--asset`, `--animation`, `--body-type`, and `--character`. Validate/sync accept `--workspace`. Every leaf accepts `--json` and `--help`.
 
-- [ ] **Step 2: Write failing asset-preparation tests**
+- [x] **Step 2: Write failing asset-preparation tests**
 
 Assert root/group/leaf help and `asset workspace init` do not call `prepareRuntimeAssets`; successful workspace init also needs no cache. Assert init-from-audit/new, validate, preview, and sync discover the workspace before preparation and call prepare with `{ cwd: workspace.root, managedCacheOnly: true }`. Invalid command input must fail before preparing assets.
 
-- [ ] **Step 3: Write failing JSON and human response tests**
+- [x] **Step 3: Write failing JSON and human response tests**
 
 JSON uses existing `CliResponse` envelopes and exactly these command names:
 
@@ -1247,7 +1247,7 @@ asset sync
 
 Validation findings remain a completed command response with `data.valid: false`; `runCli` still exits `1` for `asset validate` when `valid` is false so shell automation fails correctly. Fatal input/runtime failures use `ok: false`. Human validation prints grouped Errors, Warnings, and exact acknowledgement JSON. Preview prints artifact paths and credit paths. Sync prints pack ID, content digest, generated-file count, and workspace output path. Machine JSON stays on stdout; progress and non-JSON human diagnostics use stderr consistently with existing main behavior.
 
-- [ ] **Step 4: Run focused tests and verify RED**
+- [x] **Step 4: Run focused tests and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- args.test.ts command-spec.test.ts main-assets.test.ts main-json.test.ts main-human.test.ts
@@ -1255,7 +1255,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- args.test.ts command-spec.test.ts mai
 
 Expected: FAIL because the asset commands and parser depth do not exist.
 
-- [ ] **Step 5: Implement parser and preflight without introducing a command-spec cycle**
+- [x] **Step 5: Implement parser and preflight without introducing a command-spec cycle**
 
 Use a local depth rule in `args.ts`:
 
@@ -1268,11 +1268,11 @@ function acceptsAnotherCommandToken(command: readonly string[]): boolean {
 
 In `asset-commands.ts`, convert flag values into the request types from Tasks 6–10, validate mutually exclusive modes and required flags, and return structured `CliIssue` values rather than throwing for user input.
 
-- [ ] **Step 6: Implement workspace-aware main dispatch**
+- [x] **Step 6: Implement workspace-aware main dispatch**
 
 Handle asset root/group help and workspace initialization before runtime preparation. For remaining valid asset leaves, resolve workspace, prepare base runtime at workspace root, then dispatch with both. Do not alter asset behavior of non-asset commands.
 
-- [ ] **Step 7: Implement human formatters and verify GREEN**
+- [x] **Step 7: Implement human formatters and verify GREEN**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- args.test.ts command-spec.test.ts main-assets.test.ts main-json.test.ts main-human.test.ts
@@ -1282,7 +1282,7 @@ rtk pnpm --filter @lpc-toolkit/cli build
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit product code**
+- [x] **Step 8: Commit product code**
 
 ```sh
 rtk git add packages/cli/src/asset-commands.ts packages/cli/src/args.ts packages/cli/src/command-spec.ts packages/cli/src/main.ts packages/cli/src/response.ts packages/cli/test/args.test.ts packages/cli/test/command-spec.test.ts packages/cli/test/main-assets.test.ts packages/cli/test/main-json.test.ts packages/cli/test/main-human.test.ts
@@ -1290,6 +1290,24 @@ rtk git commit -m "feat(cli): expose local artist asset workflow"
 ```
 
 Then update this task's plan record and commit it separately.
+
+---
+
+Task 11 record:
+
+- Implementation: Added the Phase 1 `asset` command tree with three-token workspace initialization, six workspace/pack leaf invocations, exact options/help specs, workspace-aware preflight, structured JSON/human response envelopes, validation exit semantics, warning acknowledgement routing, and typed preview error preservation.
+- Product commits: `89b72b6d5a2a1a2f63aa5e4e197d4394f8ba0667`, `4a8ed82eb484dc3b81772a07758c87c0059a869e`, `3ab5c91f2b9fdef2ed1b724493d36292e6b964dc`.
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- args.test.ts command-spec.test.ts main-assets.test.ts main-json.test.ts main-human.test.ts` PASS (172/172); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS; `rtk pnpm --filter @lpc-toolkit/cli build` PASS; `rtk pnpm check:boundaries` PASS; `rtk git diff --check` PASS.
+- Review: fresh Task 11 reviewers found and fixed warning classification and typed PreviewError response findings; final re-review APPROVED with no findings.
+- CLI documentation impact:
+  - help: update — command tree/options/help contract added in Task 11; final public help verification remains Task 12
+  - cli-readme: update — document the Phase 1 commands and response behavior in Task 12
+  - root-readme: update — document the concise public CLI workflow in Task 12
+  - landing: update — document the concise public CLI workflow in Task 12
+  - architecture: update — document command/ownership/response boundaries in Task 12
+  - engineering: update — document focused CLI checks and verification mapping in Task 12
+  - releasing: N/A — no publication or pinned-asset release changes
+  - plugin: N/A — animation-audit skill remains read-only and deferred
 
 ---
 
