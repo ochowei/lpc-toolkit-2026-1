@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, existsSync, statSync } from 'node:fs';
 import {
   mkdirSync,
@@ -9,30 +8,29 @@ import {
 import path from 'node:path';
 import {
   compileAssetPacks,
-  creditsToCsv,
   type AssetPackCompilePlan,
   type AssetPackDiagnostic,
   type CreditEntry,
-  type CreditsManifest,
   type NormalizedAssetPack,
 } from '@lpc-toolkit/core';
 import {
   ASSET_OUTPUT_MARKER_SCHEMA,
-  ASSET_WORKSPACE_REGISTRY_SCHEMA,
   assertManagedAssetOutput,
   type AssetWorkspace,
 } from './asset-workspace.js';
 import {
-  assetPackCompileDigest,
   assetPackCompileProjectionFromPlan,
   assetPackRegistryBytes,
   auditPublishedManagedOutput,
   readAssetPackRegistry,
   resolveLinkedAssetPackDirectory,
-  type AssetPackRegistryDocument,
   type AssetPackCompileProjection,
   type LinkedAssetPackRegistryEntry,
 } from './asset-pack-registry.js';
+import {
+  loadLinkedAssetPackCandidate,
+  prepareAssetPackDesiredState,
+} from './asset-pack-state.js';
 import {
   loadAssetPackFiles,
   type AssetPackFileDiagnostic,
@@ -170,14 +168,6 @@ function canonicalize(value: unknown): unknown {
     );
   }
   return value;
-}
-
-function sha256Buffer(buffer: Buffer): string {
-  return `sha256:${createHash('sha256').update(buffer).digest('hex')}`;
-}
-
-function sortedJsonBytes(value: unknown): Buffer {
-  return Buffer.from(`${JSON.stringify(canonicalize(value), null, 2)}\n`);
 }
 
 function toSyncDiagnostic(
@@ -349,28 +339,6 @@ async function validateLinkedPack(
       loaded,
       diagnostics: report.diagnostics.map((diagnostic) => toSyncDiagnostic(diagnostic)),
     },
-  };
-}
-
-function uniqueLicenses(credits: readonly CreditEntry[]): CreditsManifest['licenses'] {
-  const seen = new Set<string>();
-  const licenses: string[] = [];
-  credits.forEach((credit) => {
-    credit.licenses.forEach((license) => {
-      if (!seen.has(license)) {
-        seen.add(license);
-        licenses.push(license);
-      }
-    });
-  });
-  return licenses.sort((left, right) => left.localeCompare(right)) as CreditsManifest['licenses'];
-}
-
-function creditsManifest(credits: readonly CreditEntry[]): CreditsManifest {
-  return {
-    entries: credits,
-    resolvedPaths: credits.map((credit) => `spritesheets/${credit.file}`),
-    licenses: uniqueLicenses(credits),
   };
 }
 
@@ -724,19 +692,19 @@ export async function syncLinkedAssetPack(options: {
   readonly fileOps?: AssetPublicationFileOps;
 }): Promise<AssetPackSyncResult> {
   const fileOps = options.fileOps ?? DEFAULT_FILE_OPS;
-  const desiredState = await prepareLinkedAssetPackDesiredState(options);
-  if (!desiredState.ok) return desiredState;
-  const {
-    compilePlan,
-    compileProjection,
-    markerBytes,
-    packs: validatedPacks,
-    registry: registryEntries,
-    requested,
-    workspaceId,
-  } = desiredState;
-  const linked = registryEntries.find((entry) => entry.packId === requested.loaded.pack.id);
-  if (!linked) {
+  const requested = await loadLinkedAssetPackCandidate(options);
+  if (!requested.ok) return syncFailure(requested.diagnostics);
+  const desiredState = await prepareAssetPackDesiredState({
+    workspace: options.workspace,
+    runtime: options.runtime,
+    mutation: { kind: 'upsert', candidate: requested.candidate },
+  });
+  if (!desiredState.ok) return syncFailure(desiredState.diagnostics);
+
+  const linked = desiredState.registry.entries.find((entry) =>
+    entry.packId === requested.candidate.loaded.pack.id && entry.kind === 'linked',
+  );
+  if (!linked || linked.kind !== 'linked') {
     return syncFailure([{
       code: 'asset_publish_failed',
       severity: 'error',
@@ -754,47 +722,12 @@ export async function syncLinkedAssetPack(options: {
 
   try {
     fileOps.mkdirSync(stagedOutputRoot, { recursive: true });
-    fileOps.writeFileSync(path.join(stagedOutputRoot, OUTPUT_MARKER_FILE), markerBytes);
-    const generatedDigests = new Map<string, string>();
-
-    for (const definition of compilePlan.definitions) {
-      const definitionBytes = sortedJsonBytes(definition.definition);
-      const definitionPath = path.join(stagedOutputRoot, definition.logicalPath);
-      fileOps.mkdirSync(path.dirname(definitionPath), { recursive: true });
-      fileOps.writeFileSync(definitionPath, definitionBytes);
-      generatedDigests.set(definition.logicalPath, sha256Buffer(definitionBytes));
-    }
-
-    const packSnapshots = new Map(
-      validatedPacks.map((pack) => [pack.loaded.pack.id, pack.loaded.sourceBytes] as const),
-    );
-    for (const sprite of compilePlan.sprites) {
-      const sourceBytes = packSnapshots.get(sprite.packId)?.get(sprite.sourcePath);
-      if (!sourceBytes) {
-        return syncFailure([{
-          code: 'asset_publish_failed',
-          severity: 'error',
-          message: `No validated source snapshot found for compiled sprite owner ${sprite.packId}.`,
-          path: path.resolve(options.packDirectory),
-        }]);
-      }
-      const destinationPath = path.join(stagedOutputRoot, sprite.destinationPath);
+    for (const [logicalPath, bytes] of desiredState.outputFiles) {
+      const destinationPath = path.join(stagedOutputRoot, logicalPath);
       fileOps.mkdirSync(path.dirname(destinationPath), { recursive: true });
-      fileOps.writeFileSync(destinationPath, sourceBytes);
-      generatedDigests.set(sprite.destinationPath, sha256Buffer(sourceBytes));
+      fileOps.writeFileSync(destinationPath, bytes);
     }
-
-    const creditsBytes = Buffer.from(creditsToCsv(creditsManifest(compilePlan.credits), 'walk'));
-    fileOps.writeFileSync(path.join(stagedOutputRoot, 'CREDITS.csv'), creditsBytes);
-    generatedDigests.set('CREDITS.csv', sha256Buffer(creditsBytes));
-    const registryDocument: AssetPackRegistryDocument = {
-      schema: ASSET_WORKSPACE_REGISTRY_SCHEMA,
-      workspaceId,
-      entries: registryEntries,
-      generatedDigests: sortRecord(Object.fromEntries(generatedDigests)),
-      compileDigest: assetPackCompileDigest(compileProjection),
-    };
-    fileOps.writeFileSync(stagedRegistryPath, assetPackRegistryBytes(registryDocument));
+    fileOps.writeFileSync(stagedRegistryPath, assetPackRegistryBytes(desiredState.registry));
 
     const publishResult = publishStagedGeneration({
       fileOps,
@@ -809,7 +742,9 @@ export async function syncLinkedAssetPack(options: {
     return {
       ok: true,
       linked,
-      registry: registryEntries,
+      registry: desiredState.registry.entries.filter(
+        (entry): entry is LinkedAssetPackRegistryEntry => entry.kind === 'linked',
+      ),
     };
   } catch (error) {
     return syncFailure([{

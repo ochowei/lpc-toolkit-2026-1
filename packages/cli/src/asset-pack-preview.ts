@@ -6,21 +6,20 @@ import {
 import path from 'node:path';
 import {
   BODY_TYPES,
-  creditsToCsv,
   standardAnimationGeometry,
   type AnimationName,
   type BodyType,
-  type CreditEntry,
-  type CreditsManifest,
+  type NormalizedAssetPack,
   type NormalizedAssetPackAsset,
   type SelectionJson,
 } from '@lpc-toolkit/core';
 import type { AssetWorkspace } from './asset-workspace.js';
 import {
-  prepareLinkedAssetPackDesiredState,
-  type AssetPackSyncDiagnostic,
-  type LinkedAssetPackDesiredState,
-} from './asset-pack-sync.js';
+  loadLinkedAssetPackCandidate,
+  prepareAssetPackDesiredState,
+  type AssetPackDesiredState,
+} from './asset-pack-state.js';
+import type { AssetPackSyncDiagnostic } from './asset-pack-sync.js';
 import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
 import { materializePreset } from './preset-commands.js';
 import {
@@ -106,10 +105,10 @@ function targetIdentity(asset: NormalizedAssetPackAsset): PreviewTarget {
 }
 
 function selectTarget(
-  state: LinkedAssetPackDesiredState,
+  pack: NormalizedAssetPack,
   requestedAssetId: string | undefined,
 ): PreviewTarget {
-  const targets = state.requested.loaded.pack.assets
+  const targets = pack.assets
     .map(targetIdentity)
     .sort((left, right) => left.assetId.localeCompare(right.assetId));
   const target = requestedAssetId === undefined
@@ -143,48 +142,19 @@ function resolveBodyType(requested: string | undefined, fallback: string): BodyT
   return bodyType as BodyType;
 }
 
-function uniqueLicenses(credits: readonly CreditEntry[]): CreditsManifest['licenses'] {
-  return [...new Set(credits.flatMap((credit) => credit.licenses))]
-    .sort((left, right) => left.localeCompare(right)) as CreditsManifest['licenses'];
-}
-
 function materializeDesiredState(
-  state: LinkedAssetPackDesiredState,
+  state: AssetPackDesiredState,
   overlayRoot: string,
 ): void {
   mkdirSync(overlayRoot, { recursive: true });
-  for (const definition of state.compilePlan.definitions) {
-    const destination = path.join(overlayRoot, definition.logicalPath);
+  for (const [logicalPath, bytes] of state.outputFiles) {
+    const destination = path.join(overlayRoot, logicalPath);
     mkdirSync(path.dirname(destination), { recursive: true });
-    writeFileSync(destination, `${JSON.stringify(definition.definition, null, 2)}\n`);
+    writeFileSync(destination, bytes);
   }
-
-  const packSnapshots = new Map(
-    state.packs.map((pack) => [pack.loaded.pack.id, pack.loaded.sourceBytes] as const),
-  );
-  for (const sprite of state.compilePlan.sprites) {
-    const sourceBytes = packSnapshots.get(sprite.packId)?.get(sprite.sourcePath);
-    if (!sourceBytes) {
-      throw previewFailure(
-        'asset_publish_failed',
-        `No validated source snapshot found for compiled sprite owner ${sprite.packId}.`,
-        sprite.destinationPath,
-      );
-    }
-    const destination = path.join(overlayRoot, sprite.destinationPath);
-    mkdirSync(path.dirname(destination), { recursive: true });
-    writeFileSync(destination, sourceBytes);
-  }
-
-  const manifest: CreditsManifest = {
-    entries: state.compilePlan.credits,
-    resolvedPaths: state.compilePlan.credits.map((credit) => `spritesheets/${credit.file}`),
-    licenses: uniqueLicenses(state.compilePlan.credits),
-  };
-  writeFileSync(path.join(overlayRoot, 'CREDITS.csv'), creditsToCsv(manifest, 'walk'));
 }
 
-function targetDefinition(state: LinkedAssetPackDesiredState, target: PreviewTarget) {
+function targetDefinition(state: AssetPackDesiredState, target: PreviewTarget) {
   const compiled = state.compilePlan.definitions.find(
     (definition) => definition.assetId === target.itemId,
   );
@@ -234,19 +204,25 @@ export async function previewAssetPack(options: {
   readonly bodyType?: string;
   readonly characterPath?: string;
 }): Promise<AssetPackPreviewResult> {
-  const desiredState = await prepareLinkedAssetPackDesiredState(options);
+  const requested = await loadLinkedAssetPackCandidate(options);
+  if (!requested.ok) throw desiredStateFailure(requested.diagnostics);
+  const desiredState = await prepareAssetPackDesiredState({
+    workspace: options.workspace,
+    runtime: options.runtime,
+    mutation: { kind: 'upsert', candidate: requested.candidate },
+  });
   if (!desiredState.ok) throw desiredStateFailure(desiredState.diagnostics);
 
-  const packRoot = desiredState.requested.sourceDirectory;
+  const packRoot = requested.candidate.sourceDirectory;
   const overlayRoot = path.join(
     options.workspace.stateRoot,
     'validation',
-    previewValidationDirectoryName(desiredState.requested.loaded.contentDigest),
+    previewValidationDirectoryName(requested.candidate.loaded.contentDigest),
   );
 
   rmSync(overlayRoot, { recursive: true, force: true });
   try {
-    const target = selectTarget(desiredState, options.assetId);
+    const target = selectTarget(requested.candidate.loaded.pack, options.assetId);
     const definition = targetDefinition(desiredState, target);
     const animation = selectAnimation(options.animation, definition.animations);
     materializeDesiredState(desiredState, overlayRoot);
@@ -307,7 +283,7 @@ export async function previewAssetPack(options: {
     });
 
     return {
-      packId: desiredState.requested.loaded.pack.id,
+      packId: requested.candidate.loaded.pack.id,
       assetId: target.assetId,
       artifacts: rendered.artifacts,
       warnings: [...desiredState.warnings, ...rendered.warnings],

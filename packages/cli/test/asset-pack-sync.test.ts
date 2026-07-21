@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
@@ -28,7 +29,13 @@ import {
   initializeAssetWorkspace,
   type AssetWorkspace,
 } from '../src/asset-workspace.js';
-import { ASSET_WORKSPACE_REGISTRY_V1_SCHEMA } from '../src/asset-pack-registry.js';
+import {
+  ASSET_WORKSPACE_REGISTRY_V1_SCHEMA,
+  assetPackRegistryBytes,
+  type AssetPackRegistryDocument,
+  type AssetPackRegistryEntry,
+  type InstalledAssetPackRegistryEntry,
+} from '../src/asset-pack-registry.js';
 import { loadActiveAssetPackBaseline } from '../src/asset-pack-validation.js';
 import { createDirectoryAssetStore } from '../src/asset-store.js';
 import { createRuntimeContext } from '../src/context.js';
@@ -346,6 +353,71 @@ function readRegistry(workspace: AssetWorkspace): RegistryDocument {
   return readJson<RegistryDocument>(workspace.registryPath);
 }
 
+function sha256(bytes: Buffer | string): string {
+  return `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+}
+
+function convertLinkedEntryToInstalled(
+  workspace: AssetWorkspace,
+  packId: string,
+): InstalledAssetPackRegistryEntry {
+  const document = readJson<AssetPackRegistryDocument>(workspace.registryPath);
+  const entry = document.entries.find(
+    (candidate): candidate is LinkedAssetPackRegistryEntry =>
+      candidate.kind === 'linked' && candidate.packId === packId,
+  );
+  if (!entry) throw new Error(`Missing linked registry fixture entry: ${packId}`);
+  const archiveDigest = sha256(`archive:${entry.packId}:${entry.version}`);
+  const installedDirectory = path.join(
+    workspace.stateRoot,
+    'installed',
+    entry.packId,
+    entry.version,
+    archiveDigest.slice('sha256:'.length),
+  );
+  const manifestBytes = readFileSync(path.join(entry.sourceDirectory, 'asset-pack.json'));
+  const writeInstalledFile = (relativePath: string, bytes: Buffer): void => {
+    const target = path.join(installedDirectory, ...relativePath.split('/'));
+    mkdirSync(path.dirname(target), { recursive: true });
+    writeFileSync(target, bytes);
+  };
+  writeInstalledFile('asset-pack.json', manifestBytes);
+  for (const sourcePath of Object.keys(entry.sourceDigests)) {
+    writeInstalledFile(
+      sourcePath,
+      readFileSync(path.join(entry.sourceDirectory, ...sourcePath.split('/'))),
+    );
+  }
+  const payloadDigests = Object.fromEntries(
+    [
+      ['asset-pack.json', sha256(manifestBytes)] as const,
+      ...Object.entries(entry.sourceDigests),
+    ].sort(([left], [right]) => left.localeCompare(right)),
+  );
+  writeJson(path.join(installedDirectory, 'install-receipt.json'), {
+    schema: 'lpc-toolkit.asset-pack-install-receipt.v1',
+    workspaceId: document.workspaceId,
+    packId: entry.packId,
+    version: entry.version,
+    archiveDigest,
+    contentDigest: entry.contentDigest,
+    installedAt: '2026-07-22T00:00:00.000Z',
+    payloadDigests,
+  });
+  const { sourceDirectory: _sourceDirectory, ...base } = entry;
+  const installed: InstalledAssetPackRegistryEntry = {
+    ...base,
+    kind: 'installed',
+    installedDirectory,
+    archiveDigest,
+  };
+  const entries = document.entries
+    .map((candidate): AssetPackRegistryEntry => candidate.packId === packId ? installed : candidate)
+    .sort((left, right) => left.packId.localeCompare(right.packId));
+  writeFileSync(workspace.registryPath, assetPackRegistryBytes({ ...document, entries }));
+  return installed;
+}
+
 function v1RegistryFromV2(registry: RegistryDocument): {
   schema: typeof ASSET_WORKSPACE_REGISTRY_V1_SCHEMA;
   workspaceId: string;
@@ -639,6 +711,48 @@ describe('syncLinkedAssetPack', () => {
       'sheet_definitions/hair/bravo.ribbon-braid--ribbon-braid.json': expect.any(String),
       'spritesheets/packages/acme.wind-braid/wind-braid/foreground/male-female/walk.png': expect.any(String),
       'spritesheets/packages/bravo.ribbon-braid/ribbon-braid/foreground/male-female/walk.png': expect.any(String),
+    });
+  });
+
+  it('preserves an installed active pack while syncing a linked candidate through generalized state', async () => {
+    const fixture = createWorkspaceFixture();
+    const installedRoot = path.join(fixture.workspace.packsRoot, 'acme-installed-braid');
+    const linkedRoot = path.join(fixture.workspace.packsRoot, 'bravo-linked-braid');
+    writeNewItemPack(installedRoot, {
+      packId: 'acme.installed-braid',
+      displayName: 'Installed Braid',
+      localId: 'installed-braid',
+      color: '#aa5500',
+    });
+    writeNewItemPack(linkedRoot, {
+      packId: 'bravo.linked-braid',
+      displayName: 'Linked Braid',
+      localId: 'linked-braid',
+      color: '#00aa55',
+    });
+    expectSuccess(await syncLinkedAssetPack({
+      packDirectory: installedRoot,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+    }));
+    convertLinkedEntryToInstalled(fixture.workspace, 'acme.installed-braid');
+    rmSync(installedRoot, { recursive: true, force: true });
+
+    const synced = expectSuccess(await syncLinkedAssetPack({
+      packDirectory: linkedRoot,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+    }));
+    const registry = readJson<AssetPackRegistryDocument>(fixture.workspace.registryPath);
+
+    expect(synced.registry.map((entry) => entry.packId)).toEqual(['bravo.linked-braid']);
+    expect(registry.entries.map((entry) => [entry.packId, entry.kind])).toEqual([
+      ['acme.installed-braid', 'installed'],
+      ['bravo.linked-braid', 'linked'],
+    ]);
+    expect(snapshotTree(fixture.workspace.outputRoot)).toMatchObject({
+      'sheet_definitions/hair/acme.installed-braid--installed-braid.json': expect.any(String),
+      'sheet_definitions/hair/bravo.linked-braid--linked-braid.json': expect.any(String),
     });
   });
 

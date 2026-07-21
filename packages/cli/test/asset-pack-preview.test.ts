@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
@@ -19,6 +20,13 @@ import {
   type SelectionJson,
 } from '@lpc-toolkit/core';
 import { afterEach, describe, expect, it } from 'vitest';
+import {
+  assetPackRegistryBytes,
+  type AssetPackRegistryDocument,
+  type AssetPackRegistryEntry,
+  type InstalledAssetPackRegistryEntry,
+  type LinkedAssetPackRegistryEntry,
+} from '../src/asset-pack-registry.js';
 import {
   previewAssetPack,
   previewValidationDirectoryName,
@@ -203,6 +211,7 @@ function newItem(
 
 function writeNewItemPack(options: {
   readonly root: string;
+  readonly packId?: string;
   readonly version?: string;
   readonly assets: readonly ReturnType<typeof newItem>[];
   readonly colors?: Readonly<Record<string, string>>;
@@ -210,7 +219,7 @@ function writeNewItemPack(options: {
 }): void {
   const manifest: AssetPackSource = {
     schema: ASSET_PACK_SCHEMA,
-    id: 'acme.preview-hair',
+    id: options.packId ?? 'acme.preview-hair',
     version: options.version ?? '1.0.0',
     displayName: 'Preview Hair',
     credits: options.credits ?? PACK_CREDITS,
@@ -228,6 +237,73 @@ function writeNewItemPack(options: {
       }
     }
   }
+}
+
+function sha256(bytes: Buffer | string): string {
+  return `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+}
+
+function convertLinkedEntryToInstalled(
+  workspace: AssetWorkspace,
+  packId: string,
+): InstalledAssetPackRegistryEntry {
+  const document = JSON.parse(
+    readFileSync(workspace.registryPath, 'utf8'),
+  ) as AssetPackRegistryDocument;
+  const entry = document.entries.find(
+    (candidate): candidate is LinkedAssetPackRegistryEntry =>
+      candidate.kind === 'linked' && candidate.packId === packId,
+  );
+  if (!entry) throw new Error(`Missing linked registry fixture entry: ${packId}`);
+  const archiveDigest = sha256(`archive:${entry.packId}:${entry.version}`);
+  const installedDirectory = path.join(
+    workspace.stateRoot,
+    'installed',
+    entry.packId,
+    entry.version,
+    archiveDigest.slice('sha256:'.length),
+  );
+  const manifestBytes = readFileSync(path.join(entry.sourceDirectory, 'asset-pack.json'));
+  const writeInstalledFile = (relativePath: string, bytes: Buffer): void => {
+    const target = path.join(installedDirectory, ...relativePath.split('/'));
+    mkdirSync(path.dirname(target), { recursive: true });
+    writeFileSync(target, bytes);
+  };
+  writeInstalledFile('asset-pack.json', manifestBytes);
+  for (const sourcePath of Object.keys(entry.sourceDigests)) {
+    writeInstalledFile(
+      sourcePath,
+      readFileSync(path.join(entry.sourceDirectory, ...sourcePath.split('/'))),
+    );
+  }
+  const payloadDigests = Object.fromEntries(
+    [
+      ['asset-pack.json', sha256(manifestBytes)] as const,
+      ...Object.entries(entry.sourceDigests),
+    ].sort(([left], [right]) => left.localeCompare(right)),
+  );
+  writeJson(path.join(installedDirectory, 'install-receipt.json'), {
+    schema: 'lpc-toolkit.asset-pack-install-receipt.v1',
+    workspaceId: document.workspaceId,
+    packId: entry.packId,
+    version: entry.version,
+    archiveDigest,
+    contentDigest: entry.contentDigest,
+    installedAt: '2026-07-22T00:00:00.000Z',
+    payloadDigests,
+  });
+  const { sourceDirectory: _sourceDirectory, ...base } = entry;
+  const installed: InstalledAssetPackRegistryEntry = {
+    ...base,
+    kind: 'installed',
+    installedDirectory,
+    archiveDigest,
+  };
+  const entries = document.entries
+    .map((candidate): AssetPackRegistryEntry => candidate.packId === packId ? installed : candidate)
+    .sort((left, right) => left.packId.localeCompare(right.packId));
+  writeFileSync(workspace.registryPath, assetPackRegistryBytes({ ...document, entries }));
+  return installed;
 }
 
 function snapshotTree(root: string): Readonly<Record<string, string>> {
@@ -328,6 +404,46 @@ describe('previewAssetPack', () => {
       },
     });
     expect(await pixelAt(path.join(outDir, 'alpha.preview.png'))).toEqual([0, 170, 68, 255]);
+    expect(snapshotTree(fixture.workspace.outputRoot)).toEqual(outputBefore);
+    expect(readFileSync(fixture.workspace.registryPath)).toEqual(registryBefore);
+    expect(validationEntries(fixture.workspace)).toEqual([]);
+  }, 30000);
+
+  it('transiently upserts the preview target over installed active state without publication', async () => {
+    const fixture = createPreviewFixture();
+    const installedRoot = path.join(fixture.workspace.packsRoot, 'acme-installed-hair');
+    writeNewItemPack({
+      root: installedRoot,
+      packId: 'acme.installed-hair',
+      assets: [newItem('installed')],
+    });
+    const synced = await syncLinkedAssetPack({
+      packDirectory: installedRoot,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+    });
+    expect(synced.ok).toBe(true);
+    convertLinkedEntryToInstalled(fixture.workspace, 'acme.installed-hair');
+    rmSync(installedRoot, { recursive: true, force: true });
+
+    const previewRoot = path.join(fixture.workspace.packsRoot, 'acme-preview-hair');
+    writeNewItemPack({
+      root: previewRoot,
+      assets: [newItem('preview')],
+      colors: { 'preview:male:walk': '#3355aa' },
+    });
+    const outputBefore = snapshotTree(fixture.workspace.outputRoot);
+    const registryBefore = readFileSync(fixture.workspace.registryPath);
+
+    const result = await previewAssetPack({
+      packDirectory: previewRoot,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+    });
+
+    expect(result).toMatchObject({ packId: 'acme.preview-hair', assetId: 'preview' });
+    expect(readFileSync(path.join(result.outDir, 'preview.credits.txt'), 'utf8'))
+      .toContain('Pack Artist');
     expect(snapshotTree(fixture.workspace.outputRoot)).toEqual(outputBefore);
     expect(readFileSync(fixture.workspace.registryPath)).toEqual(registryBefore);
     expect(validationEntries(fixture.workspace)).toEqual([]);
