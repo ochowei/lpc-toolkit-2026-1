@@ -257,6 +257,42 @@ describe('loadAssetPackFiles', () => {
     ]);
   });
 
+  it('rejects source paths that pass through symlinked parent directories inside the pack', () => {
+    const root = createDirectory('lpc-asset-pack-files-parent-symlink-');
+    writePack(root, packFixture({
+      assets: [{
+        kind: 'new-item',
+        localId: 'wind-braid',
+        displayName: 'Wind Braid',
+        typeName: 'hair',
+        bodyTypes: ['female'],
+        animations: ['walk'],
+        layers: [{
+          id: 'foreground',
+          zPos: 120,
+          sprites: [
+            { animation: 'walk', source: 'sprites/wind-braid/foreground/walk.png' },
+          ],
+        }],
+      }],
+    }), {
+      'sprites-real/wind-braid/foreground/walk.png': 'walk',
+    });
+    rmSync(path.join(root, 'sprites'), { recursive: true, force: true });
+    symlinkSync(
+      path.join(root, 'sprites-real'),
+      path.join(root, 'sprites'),
+      'dir',
+    );
+
+    expect(requireFailure(root)).toEqual([
+      expect.objectContaining({
+        code: 'asset_source_symlink',
+        sourcePath: 'sprites/wind-braid/foreground/walk.png',
+      }),
+    ]);
+  });
+
   it('keeps the content digest stable across manifest property order changes and acknowledgement-only edits', () => {
     const firstRoot = createDirectory('lpc-asset-pack-files-digest-a-');
     const secondRoot = createDirectory('lpc-asset-pack-files-digest-b-');

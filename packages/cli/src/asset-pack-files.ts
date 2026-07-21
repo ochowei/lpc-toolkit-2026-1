@@ -113,6 +113,90 @@ function sourceDiagnostic(
   };
 }
 
+function inspectSourceEntryPath(
+  root: string,
+  sourcePath: string,
+): {
+  readonly ok: true;
+  readonly canonicalPath: string;
+} | {
+  readonly ok: false;
+  readonly diagnostic: AssetPackFileDiagnostic;
+  readonly inspection: AssetPackSourceInspection;
+} {
+  const resolvedRoot = canonicalRoot(root);
+  const resolvedPath = path.resolve(root, sourcePath);
+  if (!isInsideRoot(root, resolvedPath)) {
+    return {
+      ok: false,
+      diagnostic: sourceDiagnostic('asset_source_outside_pack', root, sourcePath),
+      inspection: {
+        sourcePath,
+        regularFile: false,
+        error: 'outside-pack',
+      },
+    };
+  }
+
+  const relativePath = path.relative(root, resolvedPath);
+  const segments = relativePath.split(path.sep).filter((segment) => segment.length > 0);
+  let currentPath = root;
+  for (const segment of segments) {
+    currentPath = path.join(currentPath, segment);
+
+    let currentStats: ReturnType<typeof lstatSync>;
+    try {
+      currentStats = lstatSync(currentPath);
+    } catch (error) {
+      const code = error && typeof error === 'object' && 'code' in error
+        ? (error as { readonly code?: unknown }).code
+        : undefined;
+      if (code === 'ENOENT') {
+        return {
+          ok: false,
+          diagnostic: sourceDiagnostic('asset_source_missing', root, sourcePath),
+          inspection: {
+            sourcePath,
+            regularFile: false,
+            error: 'missing',
+          },
+        };
+      }
+      throw error;
+    }
+
+    if (currentStats.isSymbolicLink()) {
+      return {
+        ok: false,
+        diagnostic: sourceDiagnostic('asset_source_symlink', root, sourcePath),
+        inspection: {
+          sourcePath,
+          regularFile: false,
+          error: 'not-regular',
+        },
+      };
+    }
+
+    const canonicalPath = realpathSync.native(currentPath);
+    if (!isInsideRoot(resolvedRoot, canonicalPath)) {
+      return {
+        ok: false,
+        diagnostic: sourceDiagnostic('asset_source_outside_pack', root, sourcePath),
+        inspection: {
+          sourcePath,
+          regularFile: false,
+          error: 'outside-pack',
+        },
+      };
+    }
+  }
+
+  return {
+    ok: true,
+    canonicalPath: realpathSync.native(resolvedPath),
+  };
+}
+
 function inspectSources(
   root: string,
   pack: NormalizedAssetPack,
@@ -127,79 +211,13 @@ function inspectSources(
   const canonicalOwners = new Map<string, string>();
 
   uniqueSourcePaths(pack).forEach((sourcePath) => {
-    const resolvedPath = path.resolve(root, sourcePath);
-    const resolvedRoot = canonicalRoot(root);
-    if (!isInsideRoot(root, resolvedPath)) {
-      diagnostics.push(sourceDiagnostic(
-        'asset_source_outside_pack',
-        root,
-        sourcePath,
-      ));
-      inspections.push({
-        sourcePath,
-        regularFile: false,
-        error: 'outside-pack',
-      });
+    const inspectedPath = inspectSourceEntryPath(root, sourcePath);
+    if (!inspectedPath.ok) {
+      diagnostics.push(inspectedPath.diagnostic);
+      inspections.push(inspectedPath.inspection);
       return;
     }
-
-    try {
-      lstatSync(resolvedPath);
-    } catch (error) {
-      const code = error && typeof error === 'object' && 'code' in error
-        ? (error as { readonly code?: unknown }).code
-        : undefined;
-      if (code === 'ENOENT') {
-        diagnostics.push(sourceDiagnostic('asset_source_missing', root, sourcePath));
-        inspections.push({
-          sourcePath,
-          regularFile: false,
-          error: 'missing',
-        });
-        return;
-      }
-      throw error;
-    }
-
-    const resolvedStats = lstatSync(resolvedPath);
-    if (resolvedStats.isSymbolicLink()) {
-      diagnostics.push(sourceDiagnostic('asset_source_symlink', root, sourcePath));
-      inspections.push({
-        sourcePath,
-        regularFile: false,
-        error: 'not-regular',
-      });
-      return;
-    }
-
-    let canonicalPath: string;
-    try {
-      canonicalPath = realpathSync.native(resolvedPath);
-    } catch (error) {
-      const code = error && typeof error === 'object' && 'code' in error
-        ? (error as { readonly code?: unknown }).code
-        : undefined;
-      if (code === 'ENOENT') {
-        diagnostics.push(sourceDiagnostic('asset_source_missing', root, sourcePath));
-        inspections.push({
-          sourcePath,
-          regularFile: false,
-          error: 'missing',
-        });
-        return;
-      }
-      throw error;
-    }
-
-    if (!isInsideRoot(resolvedRoot, canonicalPath)) {
-      diagnostics.push(sourceDiagnostic('asset_source_outside_pack', root, sourcePath));
-      inspections.push({
-        sourcePath,
-        regularFile: false,
-        error: 'outside-pack',
-      });
-      return;
-    }
+    const canonicalPath = inspectedPath.canonicalPath;
 
     const canonicalStats = lstatSync(canonicalPath);
     if (!canonicalStats.isFile()) {

@@ -585,4 +585,70 @@ describe('scaffoldAuditAssetPack', () => {
     });
     expect(existsSync(path.join(target, 'acme.audit-braid'))).toBe(false);
   });
+
+  it('rejects unsupported findings whose requirement identity does not exactly match the finding identity', () => {
+    const target = createDirectory('lpc-asset-pack-scaffold-audit-identity-');
+    const reportPath = path.join(target, 'audit.json');
+    writeAuditReport(reportPath, auditEnvelope({
+      summary: {
+        itemsScanned: 1,
+        incompleteItems: 1,
+        unsupported: 1,
+        missingFiles: 0,
+        blankFrames: 0,
+        errors: 0,
+      },
+      unsupported: [{
+        itemId: 'hair_messy',
+        typeName: 'hair',
+        animation: 'climb',
+        nativeAnimations: ['walk'],
+        compatibleAnimations: ['walk'],
+        requirements: [{
+          itemId: 'armor_chain',
+          typeName: 'armor',
+          layer: 'layer_1',
+          bodyTypes: ['female'],
+          recolors: [],
+          expectedPath: 'spritesheets/hair/messy/climb/front.png',
+          pathConfidence: 'inferred',
+        }],
+      }],
+    }));
+
+    const result = scaffoldAuditAssetPack({
+      reportPath,
+      itemIds: ['hair_messy'],
+      typeNames: [],
+      animations: ['climb'],
+      bodyTypes: ['female'],
+      pack: {
+        packId: 'acme.audit-braid',
+        version: '1.0.0',
+        displayName: 'ACME Audit Braid',
+        credits: PACK_CREDITS,
+        outputDirectory: path.join(target, 'acme.audit-braid'),
+      },
+    }, {
+      definitionDigests: new Map([['hair_messy', 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa']]),
+      creditDigests: new Map([['hair_messy', 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb']]),
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      diagnostics: [
+        expect.objectContaining({
+          code: 'audit_report_invalid_v1',
+          path: '$.data.unsupported[0].requirements[0].itemId',
+          message: expect.stringContaining('must match'),
+        }),
+        expect.objectContaining({
+          code: 'audit_report_invalid_v1',
+          path: '$.data.unsupported[0].requirements[0].typeName',
+          message: expect.stringContaining('must match'),
+        }),
+      ],
+    });
+    expect(existsSync(path.join(target, 'acme.audit-braid'))).toBe(false);
+  });
 });

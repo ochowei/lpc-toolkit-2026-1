@@ -105,6 +105,10 @@ interface ExtendAssetDraft {
 }
 
 type JsonRecord = Readonly<Record<string, unknown>>;
+type AssetIdentity = Readonly<{
+  itemId: string;
+  typeName: string;
+}>;
 
 const ANIMATION_NAMES: ReadonlySet<string> = new Set(ANIMATIONS.map(({ value }) => value));
 const BODY_TYPE_NAMES: ReadonlySet<string> = new Set<string>(BODY_TYPES);
@@ -351,8 +355,27 @@ function validateUnsupportedRequirement(
   value: unknown,
   pathValue: string,
   diagnostics: AssetPackScaffoldDiagnostic[],
+  findingIdentity?: AssetIdentity,
 ): boolean {
   if (!validateConsumer(value, pathValue, diagnostics) || !isRecord(value)) return false;
+
+  let valid = true;
+  const requirementItemId = readString(value.itemId, `${pathValue}.itemId`, diagnostics);
+  const requirementTypeName = readString(value.typeName, `${pathValue}.typeName`, diagnostics);
+  if (findingIdentity && requirementItemId !== undefined && requirementItemId !== findingIdentity.itemId) {
+    diagnostics.push(invalidReportField(
+      `${pathValue}.itemId`,
+      `Audit report field ${pathValue}.itemId must match the unsupported finding itemId.`,
+    ));
+    valid = false;
+  }
+  if (findingIdentity && requirementTypeName !== undefined && requirementTypeName !== findingIdentity.typeName) {
+    diagnostics.push(invalidReportField(
+      `${pathValue}.typeName`,
+      `Audit report field ${pathValue}.typeName must match the unsupported finding typeName.`,
+    ));
+    valid = false;
+  }
 
   const pathConfidence = readString(value.pathConfidence, `${pathValue}.pathConfidence`, diagnostics);
   if (pathConfidence === undefined || !PATH_CONFIDENCE_VALUES.has(pathConfidence)) {
@@ -387,7 +410,7 @@ function validateUnsupportedRequirement(
       ));
       return false;
     }
-    return true;
+    return valid;
   }
 
   if (expectedPath !== undefined) {
@@ -404,7 +427,7 @@ function validateUnsupportedRequirement(
     ));
     return false;
   }
-  return true;
+  return valid;
 }
 
 function validateUnsupportedFinding(
@@ -418,8 +441,10 @@ function validateUnsupportedFinding(
   }
 
   let valid = true;
-  valid = readString(value.itemId, `${pathValue}.itemId`, diagnostics) !== undefined && valid;
-  valid = readString(value.typeName, `${pathValue}.typeName`, diagnostics) !== undefined && valid;
+  const findingItemId = readString(value.itemId, `${pathValue}.itemId`, diagnostics);
+  const findingTypeName = readString(value.typeName, `${pathValue}.typeName`, diagnostics);
+  valid = findingItemId !== undefined && valid;
+  valid = findingTypeName !== undefined && valid;
   valid = readAnimationName(value.animation, `${pathValue}.animation`, diagnostics) !== undefined && valid;
   valid = readStringArray(
     value.nativeAnimations,
@@ -446,6 +471,9 @@ function validateUnsupportedFinding(
       requirement,
       `${pathValue}.requirements[${index}]`,
       diagnostics,
+      findingItemId && findingTypeName
+        ? { itemId: findingItemId, typeName: findingTypeName }
+        : undefined,
     ) && valid;
   });
   return valid;
@@ -884,6 +912,23 @@ function buildDrafts(
 
   report.unsupported.forEach((finding) => {
     finding.requirements.forEach((requirement) => {
+      if (requirement.itemId !== finding.itemId || requirement.typeName !== finding.typeName) {
+        diagnostics.push({
+          code: 'audit_report_invalid_v1',
+          message: 'Unsupported finding requirements must match the parent finding identity before scaffolding.',
+          findingType: 'unsupported',
+          itemId: finding.itemId,
+          details: {
+            animation: finding.animation,
+            findingItemId: finding.itemId,
+            findingTypeName: finding.typeName,
+            requirementItemId: requirement.itemId,
+            requirementTypeName: requirement.typeName,
+            layer: requirement.layer,
+          },
+        });
+        return;
+      }
       if (!matchesSelection(request, requirement, finding.animation)) return;
       if (requirement.pathConfidence === 'manual-review' || !requirement.expectedPath) {
         diagnostics.push({

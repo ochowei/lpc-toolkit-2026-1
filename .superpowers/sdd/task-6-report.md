@@ -192,3 +192,70 @@ Self-review:
 - Confirmed the earlier mixed safety regression still covers missing files and non-regular directories, while symlink cases now intentionally resolve to the new symlink diagnostic instead of escape/duplicate follow-on errors.
 - Confirmed malformed nested audit findings fail in `readAuditEnvelope` before `buildDrafts`, so a report that mixes valid and invalid selected findings still publishes nothing.
 - Confirmed valid supported behavior remains intact for exact missing-file scaffolds, inferred unsupported scaffolds, manual-review blockers, blank-frame blockers, grouped consumers, and recolor metadata passthrough.
+
+---
+
+## Remaining Important Task 6 reviewer fixes — 2026-07-21
+
+Status: complete
+
+Fix commit:
+
+- `fix(cli): close task 6 review gaps` — final repository commit for this report section; use `git rev-parse HEAD` after checkout to read the exact hash.
+
+Files:
+
+- `packages/cli/src/asset-pack-files.ts`
+- `packages/cli/src/asset-pack-scaffold.ts`
+- `packages/cli/test/asset-pack-files.test.ts`
+- `packages/cli/test/asset-pack-scaffold.test.ts`
+
+RED:
+
+1. Added a symlinked-parent regression in `packages/cli/test/asset-pack-files.test.ts`.
+   - Command: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-files.test.ts asset-pack-scaffold.test.ts`
+   - Result: FAIL
+   - Output:
+     - `× loadAssetPackFiles > rejects source paths that pass through symlinked parent directories inside the pack`
+     - `expected true to be false`
+
+2. Added a mismatched unsupported finding/requirement identity regression in `packages/cli/test/asset-pack-scaffold.test.ts`.
+   - Command: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-files.test.ts asset-pack-scaffold.test.ts`
+   - Result: FAIL
+   - Output:
+     - `× scaffoldAuditAssetPack > rejects unsupported findings whose requirement identity does not exactly match the finding identity`
+     - `message: "Selected findings did not match any scaffoldable work."`
+
+Implementation:
+
+- `loadAssetPackFiles` now validates every path component under the pack root before accepting a source:
+  - checks each source-path ancestor and final entry with `lstatSync`
+  - rejects any symlinked parent directory or final symlink entry as `asset_source_symlink`
+  - confirms each resolved component stays contained under the canonical pack root before the source can be read
+- unsupported audit findings now enforce exact identity consistency before scaffolding:
+  - every requirement `itemId` must match the parent unsupported finding `itemId`
+  - every requirement `typeName` must match the parent unsupported finding `typeName`
+  - malformed successful reports now fail validation with `audit_report_invalid_v1` path diagnostics
+  - `buildDrafts` also rejects inconsistent typed findings defensively, so draft publication still aborts even if malformed data bypassed envelope validation
+
+GREEN:
+
+1. Focused CLI regressions:
+   - Command: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-files.test.ts asset-pack-scaffold.test.ts`
+   - Result: PASS
+   - Output:
+     - `✓ test/asset-pack-scaffold.test.ts (8 tests)`
+     - `✓ test/asset-pack-files.test.ts (8 tests)`
+     - `Tests 16 passed (16)`
+
+2. CLI typecheck:
+   - Command: `rtk pnpm --filter @lpc-toolkit/cli run typecheck`
+   - Result: PASS
+   - Output:
+     - `tsc -p tsconfig.json --noEmit`
+
+Self-review:
+
+- Confirmed a manifest path that traverses a symlinked in-pack parent directory now fails before canonical-file inspection or hashing, while existing missing/non-regular/duplicate handling remains unchanged.
+- Confirmed identity mismatches now fail at validation time with JSON-path diagnostics and still fail in `buildDrafts` as a second barrier against inconsistent scaffold publication.
+- Confirmed valid unsupported exact/inferred/manual-review behavior, blank-frame blockers, grouped consumers, recolor metadata passthrough, and atomic no-partial publication remain unchanged.
