@@ -34,7 +34,7 @@ import type { RuntimeAssets } from './runtime-assets.js';
 
 const OUTPUT_MARKER_FILE = '.lpc-toolkit-managed.json';
 const OUTPUT_MARKER_KEYS = ['schema', 'workspaceId'] as const;
-const REGISTRY_KEYS = ['schema', 'workspaceId', 'entries'] as const;
+const REGISTRY_KEYS = ['schema', 'workspaceId', 'entries', 'generatedDigests'] as const;
 const REGISTRY_ENTRY_KEYS = [
   'kind',
   'packId',
@@ -102,6 +102,7 @@ interface RegistryDocument {
   readonly schema: typeof ASSET_WORKSPACE_REGISTRY_SCHEMA;
   readonly workspaceId: string;
   readonly entries: readonly LinkedAssetPackRegistryEntry[];
+  readonly generatedDigests: Readonly<Record<string, string>>;
 }
 
 interface ValidatedLinkedPack {
@@ -207,13 +208,17 @@ function sha256Buffer(buffer: Buffer): string {
   return `sha256:${createHash('sha256').update(buffer).digest('hex')}`;
 }
 
+function sortedJsonBytes(value: unknown): Buffer {
+  return Buffer.from(`${JSON.stringify(canonicalize(value), null, 2)}\n`);
+}
+
 function writeSortedJson(
   fileOps: AssetPublicationFileOps,
   filePath: string,
   value: unknown,
 ): void {
   fileOps.mkdirSync(path.dirname(filePath), { recursive: true });
-  fileOps.writeFileSync(filePath, `${JSON.stringify(canonicalize(value), null, 2)}\n`);
+  fileOps.writeFileSync(filePath, sortedJsonBytes(value));
 }
 
 function toSyncDiagnostic(
@@ -325,6 +330,7 @@ function readRegistryDocument(
         schema: ASSET_WORKSPACE_REGISTRY_SCHEMA,
         workspaceId: markerWorkspaceId,
         entries: [],
+        generatedDigests: {},
       },
     };
   }
@@ -412,6 +418,33 @@ function readRegistryDocument(
         )),
       };
     });
+    const generatedDigests = sortRecord(requireStringRecord(
+      parsed,
+      'generatedDigests',
+      'Asset workspace registry must include a generatedDigests object.',
+    ));
+    const malformedDigestPath = Object.entries(generatedDigests)
+      .find(([, digest]) => !/^sha256:[0-9a-f]{64}$/.test(digest))?.[0];
+    if (malformedDigestPath) {
+      throw new Error(
+        `Asset workspace registry contains an invalid generated digest: ${malformedDigestPath}`,
+      );
+    }
+    const expectedGeneratedPaths = new Set<string>();
+    entries.forEach((entry) => {
+      entry.generatedPaths.forEach((generatedPath) => {
+        expectedGeneratedPaths.add(generatedPath);
+      });
+    });
+    if (entries.length > 0) {
+      expectedGeneratedPaths.add('CREDITS.csv');
+    }
+    const expectedDigestPaths = [...expectedGeneratedPaths]
+      .sort((left, right) => left.localeCompare(right));
+    const actualDigestPaths = Object.keys(generatedDigests);
+    if (JSON.stringify(actualDigestPaths) !== JSON.stringify(expectedDigestPaths)) {
+      throw new Error('Asset workspace registry generatedDigests must exactly cover generated output paths.');
+    }
 
     return {
       ok: true,
@@ -419,6 +452,7 @@ function readRegistryDocument(
         schema: ASSET_WORKSPACE_REGISTRY_SCHEMA,
         workspaceId,
         entries: [...entries].sort((left, right) => left.packId.localeCompare(right.packId)),
+        generatedDigests,
       },
     };
   } catch (error) {
@@ -539,38 +573,16 @@ function creditsManifest(credits: readonly CreditEntry[]): CreditsManifest {
   };
 }
 
-function packMatchesRegistryEntry(
-  pack: ValidatedLinkedPack,
-  entry: LinkedAssetPackRegistryEntry,
-): boolean {
-  return (
-    pack.loaded.contentDigest === entry.contentDigest &&
-    JSON.stringify(sortRecord(Object.fromEntries([...pack.loaded.sourceDigests.entries()]))) ===
-      JSON.stringify(entry.sourceDigests) &&
-    JSON.stringify(collectBaselineDefinitionDigests(pack.loaded.pack)) ===
-      JSON.stringify(entry.baselineDefinitionDigests) &&
-    JSON.stringify(collectBaselineCreditDigests(pack.loaded.pack)) ===
-      JSON.stringify(entry.baselineCreditDigests)
-  );
-}
-
 function auditPublishedManagedOutput(options: {
   readonly workspace: AssetWorkspace;
-  readonly runtime: RuntimeAssets;
   readonly markerBytes: Buffer;
-  readonly registryEntries: readonly LinkedAssetPackRegistryEntry[];
-  readonly validatedRegistryPacks: readonly ValidatedLinkedPack[];
+  readonly generatedDigests: Readonly<Record<string, string>>;
 }): AssetPackSyncFailure | undefined {
   const actualFiles = snapshotManagedOutputFiles(options.workspace.outputRoot);
   const expectedPathSet = new Set<string>([OUTPUT_MARKER_FILE]);
-  options.registryEntries.forEach((entry) => {
-    entry.generatedPaths.forEach((generatedPath) => {
-      expectedPathSet.add(generatedPath);
-    });
+  Object.keys(options.generatedDigests).forEach((generatedPath) => {
+    expectedPathSet.add(generatedPath);
   });
-  if (options.registryEntries.length > 0) {
-    expectedPathSet.add('CREDITS.csv');
-  }
 
   const strayPath = [...actualFiles.keys()]
     .sort((left, right) => left.localeCompare(right))
@@ -596,131 +608,20 @@ function auditPublishedManagedOutput(options: {
     }]);
   }
 
-  const packRoots = new Map(
-    options.validatedRegistryPacks.map((pack) => [pack.loaded.pack.id, pack.sourceDirectory] as const),
-  );
-  const expectedFiles = new Map<string, Buffer>();
-  expectedFiles.set(OUTPUT_MARKER_FILE, options.markerBytes);
-  if (options.registryEntries.length === 0) {
-    return undefined;
-  }
-
-  const validatedByPackId = new Map(
-    options.validatedRegistryPacks.map((pack) => [pack.loaded.pack.id, pack] as const),
-  );
-  const stableRegistryPackIds = new Set(
-    options.registryEntries
-      .filter((entry) => {
-        const pack = validatedByPackId.get(entry.packId);
-        return pack !== undefined && packMatchesRegistryEntry(pack, entry);
-      })
-      .map((entry) => entry.packId),
-  );
-
-  const compilePlan = compileAssetPacks({
-    baseline: loadActiveAssetPackBaseline({
-      runtime: options.runtime,
-      workspace: options.workspace,
-    }),
-    packs: options.validatedRegistryPacks.map((pack) => pack.loaded.pack),
-  });
-  const currentGeneratedFiles = new Map<string, Buffer>();
-  const currentSpritesByPath = new Map<
-    string,
-    {
-      readonly packId: string;
-      readonly sourcePath: string;
-    }
-  >();
-  for (const definition of compilePlan.definitions) {
-    currentGeneratedFiles.set(
-      definition.logicalPath,
-      Buffer.from(`${JSON.stringify(canonicalize(definition.definition), null, 2)}\n`),
-    );
-  }
-  for (const sprite of compilePlan.sprites) {
-    const sourceDirectory = packRoots.get(sprite.packId);
-    if (!sourceDirectory) {
-      return syncFailure([{
-        code: 'asset_publish_failed',
-        severity: 'error',
-        message: `No linked source directory found for published sprite owner ${sprite.packId}.`,
-        path: options.workspace.outputRoot,
-        }]);
-    }
-    const expectedBytes = readFileSync(path.join(sourceDirectory, sprite.sourcePath));
-    currentGeneratedFiles.set(sprite.destinationPath, expectedBytes);
-    currentSpritesByPath.set(sprite.destinationPath, {
-      packId: sprite.packId,
-      sourcePath: sprite.sourcePath,
-    });
-  }
-  currentGeneratedFiles.set(
-    'CREDITS.csv',
-    Buffer.from(creditsToCsv(creditsManifest(compilePlan.credits), 'walk')),
-  );
-
-  options.registryEntries
-    .filter((entry) => stableRegistryPackIds.has(entry.packId))
-    .forEach((entry) => {
-      entry.generatedPaths.forEach((generatedPath) => {
-        const expectedBytes = currentGeneratedFiles.get(generatedPath);
-        if (expectedBytes !== undefined) {
-          expectedFiles.set(generatedPath, expectedBytes);
-        }
-      });
-    });
-  if (stableRegistryPackIds.size === options.registryEntries.length) {
-    const expectedCredits = currentGeneratedFiles.get('CREDITS.csv');
-    if (expectedCredits !== undefined) {
-      expectedFiles.set('CREDITS.csv', expectedCredits);
-    }
-  }
-
-  const mismatchedPath = [...expectedFiles.entries()]
-    .sort(([left], [right]) => left.localeCompare(right))
-    .find(([filePath, expectedBytes]) => {
-      const actual = actualFiles.get(filePath);
-      return actual === undefined || !actual.equals(expectedBytes);
-    });
+  const markerBytes = actualFiles.get(OUTPUT_MARKER_FILE);
+  const mismatchedPath = markerBytes === undefined || !markerBytes.equals(options.markerBytes)
+    ? OUTPUT_MARKER_FILE
+    : Object.entries(options.generatedDigests)
+      .find(([filePath, digest]) => {
+        const actual = actualFiles.get(filePath);
+        return actual === undefined || sha256Buffer(actual) !== digest;
+      })?.[0];
   if (mismatchedPath) {
     return syncFailure([{
       code: 'asset_digest_mismatch',
       severity: 'error',
-      message: `Managed asset output differs from the registry-owned generated file: ${mismatchedPath[0]}`,
-      path: path.join(options.workspace.outputRoot, mismatchedPath[0]),
-    }]);
-  }
-
-  const unstableSpriteMismatch = options.registryEntries
-    .filter((entry) => !stableRegistryPackIds.has(entry.packId))
-    .sort((left, right) => left.packId.localeCompare(right.packId))
-    .flatMap((entry) => entry.generatedPaths
-      .map((generatedPath) => {
-        const sprite = currentSpritesByPath.get(generatedPath);
-        if (!sprite || sprite.packId !== entry.packId) return undefined;
-        const currentPack = validatedByPackId.get(entry.packId);
-        const currentSourceDigest = currentPack?.loaded.sourceDigests.get(sprite.sourcePath);
-        const previousSourceDigest = entry.sourceDigests[sprite.sourcePath];
-        if (currentSourceDigest === undefined || previousSourceDigest === undefined) {
-          return undefined;
-        }
-        const actual = actualFiles.get(generatedPath);
-        if (actual === undefined) return undefined;
-        const actualDigest = sha256Buffer(actual);
-        if (actualDigest === currentSourceDigest || actualDigest === previousSourceDigest) {
-          return undefined;
-        }
-        return generatedPath;
-      })
-      .filter((generatedPath): generatedPath is string => generatedPath !== undefined))
-    .at(0);
-  if (unstableSpriteMismatch) {
-    return syncFailure([{
-      code: 'asset_digest_mismatch',
-      severity: 'error',
-      message: `Managed asset output differs from the registry-owned generated file: ${unstableSpriteMismatch}`,
-      path: path.join(options.workspace.outputRoot, unstableSpriteMismatch),
+      message: `Managed asset output differs from the registry-owned generated file: ${mismatchedPath}`,
+      path: path.join(options.workspace.outputRoot, mismatchedPath),
     }]);
   }
 
@@ -874,10 +775,8 @@ export async function syncLinkedAssetPack(options: {
 
   const publishedOutputFailure = auditPublishedManagedOutput({
     workspace: options.workspace,
-    runtime: options.runtime,
     markerBytes,
-    registryEntries: registryResult.document.entries,
-    validatedRegistryPacks: currentValidated,
+    generatedDigests: registryResult.document.generatedDigests,
   });
   if (publishedOutputFailure) return publishedOutputFailure;
 
@@ -953,13 +852,14 @@ export async function syncLinkedAssetPack(options: {
   try {
     fileOps.mkdirSync(stagedOutputRoot, { recursive: true });
     fileOps.writeFileSync(path.join(stagedOutputRoot, OUTPUT_MARKER_FILE), markerBytes);
+    const generatedDigests = new Map<string, string>();
 
     for (const definition of compilePlan.definitions) {
-      writeSortedJson(
-        fileOps,
-        path.join(stagedOutputRoot, definition.logicalPath),
-        definition.definition,
-      );
+      const definitionBytes = sortedJsonBytes(definition.definition);
+      const definitionPath = path.join(stagedOutputRoot, definition.logicalPath);
+      fileOps.mkdirSync(path.dirname(definitionPath), { recursive: true });
+      fileOps.writeFileSync(definitionPath, definitionBytes);
+      generatedDigests.set(definition.logicalPath, sha256Buffer(definitionBytes));
     }
 
     const packRoots = new Map(
@@ -977,18 +877,20 @@ export async function syncLinkedAssetPack(options: {
       }
       const sourcePath = path.join(sourceDirectory, sprite.sourcePath);
       const destinationPath = path.join(stagedOutputRoot, sprite.destinationPath);
+      const spriteBytes = readFileSync(sourcePath);
       fileOps.mkdirSync(path.dirname(destinationPath), { recursive: true });
-      fileOps.writeFileSync(destinationPath, readFileSync(sourcePath));
+      fileOps.writeFileSync(destinationPath, spriteBytes);
+      generatedDigests.set(sprite.destinationPath, sha256Buffer(spriteBytes));
     }
 
-    fileOps.writeFileSync(
-      path.join(stagedOutputRoot, 'CREDITS.csv'),
-      creditsToCsv(creditsManifest(compilePlan.credits), 'walk'),
-    );
+    const creditsBytes = Buffer.from(creditsToCsv(creditsManifest(compilePlan.credits), 'walk'));
+    fileOps.writeFileSync(path.join(stagedOutputRoot, 'CREDITS.csv'), creditsBytes);
+    generatedDigests.set('CREDITS.csv', sha256Buffer(creditsBytes));
     writeSortedJson(fileOps, stagedRegistryPath, {
       schema: ASSET_WORKSPACE_REGISTRY_SCHEMA,
       workspaceId: marker.workspaceId,
       entries: registryEntries,
+      generatedDigests: sortRecord(Object.fromEntries(generatedDigests)),
     });
 
     const publishResult = publishStagedGeneration({
