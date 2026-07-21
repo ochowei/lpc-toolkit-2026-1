@@ -111,6 +111,15 @@ export type {
   ValidateAssetPackOptions,
 } from './asset-pack-validation.js';
 export { validateAssetPack } from './asset-pack-validation.js';
+export type {
+  AssetPackCompilePlan,
+  CompileAssetPacksOptions,
+  CompiledAssetDefinition,
+  CompiledAssetOwnership,
+  CompiledAssetSprite,
+  CompiledAssetSpriteConsumer,
+} from './asset-pack-compile.js';
+export { compileAssetPacks } from './asset-pack-compile.js';
 
 // ==========================================
 // 5. Palette and Color Metadata Catalog
