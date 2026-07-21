@@ -978,7 +978,7 @@ Task 7 record:
 - Modify: `packages/cli/src/runtime-assets.ts`
 - Modify: `packages/cli/test/asset-store.test.ts`
 
-- [ ] **Step 1: Write failing logical-path and overlay tests**
+- [x] **Step 1: Write failing logical-path and overlay tests**
 
 Add a source-to-logical-path contract to both current stores and test absolute directory sources, `lpc-asset:` ZIP sources, malformed sources, authorized overlay hit, unauthorized file ignored, base fallback, overlay missing despite authorized mapping, symlink escape, and overlay paths that cannot shadow base unless present in the compiler's authorized list.
 
@@ -992,7 +992,7 @@ expect(await overlay.load(`${base.baseUrl}/spritesheets/packages/acme/hair/foreg
   .toEqual(path.join(overlayRoot, 'spritesheets/packages/acme/hair/foreground/male/climb.png'));
 ```
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-store.test.ts asset-overlay-store.test.ts
@@ -1000,15 +1000,15 @@ rtk pnpm --filter @lpc-toolkit/cli test -- asset-store.test.ts asset-overlay-sto
 
 Expected: FAIL because the store cannot expose logical sources or overlay resolution.
 
-- [ ] **Step 3: Extend the internal AssetStore contract**
+- [x] **Step 3: Extend the internal AssetStore contract**
 
 Add `kind: 'directory' | 'zip' | 'overlay'` and `logicalPath(sourcePath): string | undefined`. Preserve `baseUrl` exactly from the wrapped base store so Core composition continues to generate source URLs the same way. Overlay `has` and `load` consult only the explicit logical-path set, then delegate to base.
 
-- [ ] **Step 4: Add runtime wrapping without changing base preparation**
+- [x] **Step 4: Add runtime wrapping without changing base preparation**
 
 Add a pure constructor that takes already prepared `RuntimeAssets`, a custom sheet-definition root, and overlay mapping; it returns a new runtime context/store without mutating the original. Do not make ordinary CLI commands discover artist workspaces.
 
-- [ ] **Step 5: Verify GREEN and existing render paths**
+- [x] **Step 5: Verify GREEN and existing render paths**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-store.test.ts asset-overlay-store.test.ts preview.test.ts
@@ -1017,7 +1017,7 @@ rtk pnpm --filter @lpc-toolkit/cli run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit product code**
+- [x] **Step 6: Commit product code**
 
 ```sh
 rtk git add packages/cli/src/asset-overlay-store.ts packages/cli/src/asset-store.ts packages/cli/src/runtime-assets.ts packages/cli/test/asset-overlay-store.test.ts packages/cli/test/asset-store.test.ts
@@ -1025,6 +1025,12 @@ rtk git commit -m "feat(cli): load compiled artist asset overlays"
 ```
 
 Then update this task's plan record and commit it separately.
+
+Task 8 record:
+
+- Implementation: Added logicalPath support for directory/ZIP stores, compiler-authorized overlay-first resolution with guarded has/load parity and base fallback, and non-mutating runtime wrapping over prepared assets while preserving baseUrl and existing audit/render behavior.
+- Product commits: `af58b7ffd7dcf2c5a3f6726707ef92044d9331b4`, `4194751c917eda9dfeed688a789310842015f830`.
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-store.test.ts asset-overlay-store.test.ts preview.test.ts` PASS (29 passed, 1 skipped); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS; reviewer final re-review APPROVED.
 
 ---
 
