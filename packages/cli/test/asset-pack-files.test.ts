@@ -388,4 +388,18 @@ describe('loadAssetPackFiles', () => {
     expect(readFileSync(manifestPath)).toEqual(beforeBytes);
     expect(lstatSync(manifestPath).mtimeMs).toBe(expectedMtimeMs);
   });
+
+  it('retains captured source bytes after the on-disk source changes', () => {
+    const root = createDirectory('lpc-asset-pack-files-snapshot-');
+    writePack(root, packFixture(), {
+      'sprites/wind-braid/foreground/walk.png': 'walk',
+      'sprites/wind-braid/foreground/climb.png': 'climb',
+    });
+
+    const loaded = requireSuccess(root);
+    writeFileSync(path.join(root, 'sprites/wind-braid/foreground/walk.png'), 'changed');
+
+    expect(loaded.sourceBytes.get('sprites/wind-braid/foreground/walk.png')?.toString())
+      .toBe('walk');
+  });
 });

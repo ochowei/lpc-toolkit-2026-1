@@ -27,6 +27,7 @@ import {
 } from '@lpc-toolkit/core';
 import type { AssetWorkspace } from './asset-workspace.js';
 import type { AssetPackFilesSuccess } from './asset-pack-files.js';
+import type { AssetPackPayloadSuccess } from './asset-pack-payload.js';
 import { loadJsonRecords } from './loaders.js';
 import { createNodeCanvasAdapter } from './node-canvas-adapter.js';
 import type { RuntimeAssets } from './runtime-assets.js';
@@ -514,7 +515,7 @@ export async function inspectAssetPackSources(
 }
 
 async function inspectCapturedAssetPackSources(
-  loaded: AssetPackFilesSuccess,
+  loaded: AssetPackPayloadSuccess,
 ): Promise<readonly AssetPackSourceInspection[]> {
   const sourcePaths = collectUniqueSourcePaths(loaded.pack);
   const uses = collectSourceUses(loaded.pack);
@@ -576,6 +577,36 @@ function invalidManifestReport(
   };
 }
 
+export async function validateAssetPackPayload(options: {
+  readonly payload: AssetPackPayloadSuccess;
+  readonly runtime: RuntimeAssets;
+  readonly workspace?: AssetWorkspace;
+  readonly origin: string;
+}): Promise<AssetPackValidationReport> {
+  const inspections = await inspectCapturedAssetPackSources(options.payload);
+  const baseline = loadActiveAssetPackBaseline({
+    runtime: options.runtime,
+    ...(options.workspace ? { workspace: options.workspace } : {}),
+  });
+  const result = validateCoreAssetPack({
+    pack: options.payload.pack,
+    baseline,
+    palettes: baseline.palettes,
+    inspections,
+    contentDigest: options.payload.contentDigest,
+  });
+
+  return {
+    schema: VALIDATION_SCHEMA,
+    packId: options.payload.pack.id,
+    packDirectory: options.origin,
+    contentDigest: options.payload.contentDigest,
+    valid: result.ok,
+    diagnostics: result.diagnostics,
+    acknowledgementRecords: result.acknowledgementRecords,
+  };
+}
+
 export async function validateAssetPackDirectory(options: {
   readonly packDirectory: string;
   readonly runtime: RuntimeAssets;
@@ -591,9 +622,12 @@ export async function validateAssetPackDirectory(options: {
     if (options.snapshot.root !== absoluteRoot) {
       return invalidManifestReport(absoluteRoot, 'Asset-pack snapshot root does not match validation root.');
     }
-    inspectedPack = options.snapshot.pack;
-    inspections = await inspectCapturedAssetPackSources(options.snapshot);
-    currentDigest = options.snapshot.contentDigest;
+    return validateAssetPackPayload({
+      payload: options.snapshot,
+      runtime: options.runtime,
+      ...(options.workspace ? { workspace: options.workspace } : {}),
+      origin: absoluteRoot,
+    });
   } else {
     const manifestBytes = readFileSync(path.join(absoluteRoot, MANIFEST_FILE));
 

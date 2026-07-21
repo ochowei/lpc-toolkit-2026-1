@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import {
   lstatSync,
   readFileSync,
@@ -6,34 +5,25 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 import {
-  assetPackContentProjection,
   normalizeAssetPack,
   parseAssetPackSource,
   type AssetPackSourceInspection,
   type NormalizedAssetPack,
 } from '@lpc-toolkit/core';
+import {
+  parseAssetPackPayload,
+  type AssetPackFileDiagnostic,
+  type AssetPackPayloadSuccess,
+} from './asset-pack-payload.js';
 
 const MANIFEST_FILE = 'asset-pack.json';
 
-export interface AssetPackFileDiagnostic {
-  readonly code: string;
-  readonly message: string;
-  readonly path?: string;
-  readonly sourcePath?: string;
-  readonly details?: Readonly<Record<string, unknown>>;
-}
+export type { AssetPackFileDiagnostic } from './asset-pack-payload.js';
 
-export interface AssetPackFilesSuccess {
-  readonly ok: true;
+export interface AssetPackFilesSuccess extends AssetPackPayloadSuccess {
   readonly root: string;
   readonly manifestPath: string;
-  readonly manifestBytes: Buffer;
   readonly manifestMtimeMs: number;
-  readonly pack: NormalizedAssetPack;
-  readonly inspections: readonly AssetPackSourceInspection[];
-  readonly sourceBytes: ReadonlyMap<string, Buffer>;
-  readonly sourceDigests: ReadonlyMap<string, string>;
-  readonly contentDigest: string;
 }
 
 export interface AssetPackFilesFailure {
@@ -59,14 +49,6 @@ function canonicalRoot(root: string): string {
   } catch {
     return root;
   }
-}
-
-function sha256Buffer(buffer: Buffer): string {
-  return createHash('sha256').update(buffer).digest('hex');
-}
-
-function sha256Json(value: unknown): string {
-  return `sha256:${createHash('sha256').update(JSON.stringify(value)).digest('hex')}`;
 }
 
 function uniqueSourcePaths(pack: NormalizedAssetPack): readonly string[] {
@@ -203,21 +185,16 @@ function inspectSources(
   pack: NormalizedAssetPack,
 ): {
   readonly diagnostics: readonly AssetPackFileDiagnostic[];
-  readonly inspections: readonly AssetPackSourceInspection[];
   readonly sourceBytes: ReadonlyMap<string, Buffer>;
-  readonly sourceDigests: ReadonlyMap<string, string>;
 } {
   const diagnostics: AssetPackFileDiagnostic[] = [];
-  const inspections: AssetPackSourceInspection[] = [];
   const sourceBytes = new Map<string, Buffer>();
-  const sourceDigests = new Map<string, string>();
   const canonicalOwners = new Map<string, string>();
 
   uniqueSourcePaths(pack).forEach((sourcePath) => {
     const inspectedPath = inspectSourceEntryPath(root, sourcePath);
     if (!inspectedPath.ok) {
       diagnostics.push(inspectedPath.diagnostic);
-      inspections.push(inspectedPath.inspection);
       return;
     }
     const canonicalPath = inspectedPath.canonicalPath;
@@ -225,11 +202,6 @@ function inspectSources(
     const canonicalStats = lstatSync(canonicalPath);
     if (!canonicalStats.isFile()) {
       diagnostics.push(sourceDiagnostic('asset_source_not_regular', root, sourcePath));
-      inspections.push({
-        sourcePath,
-        regularFile: false,
-        error: 'not-regular',
-      });
       return;
     }
 
@@ -246,17 +218,10 @@ function inspectSources(
     canonicalOwners.set(canonicalPath, sourcePath);
 
     const bytes = readFileSync(canonicalPath);
-    const digest = `sha256:${sha256Buffer(bytes)}`;
     sourceBytes.set(sourcePath, bytes);
-    sourceDigests.set(sourcePath, digest);
-    inspections.push({
-      sourcePath,
-      digest,
-      regularFile: true,
-    });
   });
 
-  return { diagnostics, inspections, sourceBytes, sourceDigests };
+  return { diagnostics, sourceBytes };
 }
 
 export function loadAssetPackFiles(root: string): AssetPackFilesResult {
@@ -290,23 +255,13 @@ export function loadAssetPackFiles(root: string): AssetPackFilesResult {
     return { ok: false, diagnostics: inspected.diagnostics };
   }
 
-  const contentDigest = sha256Json({
-    manifest: assetPackContentProjection(pack),
-    sources: [...inspected.sourceDigests.entries()]
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([sourcePath, digest]) => ({ sourcePath, digest })),
-  });
+  const payload = parseAssetPackPayload({ manifestBytes, sourceBytes: inspected.sourceBytes });
+  if (!payload.ok) return payload;
 
   return {
-    ok: true,
     root: absoluteRoot,
     manifestPath,
-    manifestBytes,
     manifestMtimeMs,
-    pack,
-    inspections: inspected.inspections,
-    sourceBytes: inspected.sourceBytes,
-    sourceDigests: inspected.sourceDigests,
-    contentDigest,
+    ...payload,
   };
 }

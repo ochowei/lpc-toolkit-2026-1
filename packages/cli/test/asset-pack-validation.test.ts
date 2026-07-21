@@ -29,8 +29,10 @@ import { createDirectoryAssetStore } from '../src/asset-store.js';
 import {
   inspectAssetPackSources,
   loadActiveAssetPackBaseline,
+  validateAssetPackPayload,
   validateAssetPackDirectory,
 } from '../src/asset-pack-validation.js';
+import { parseAssetPackPayload } from '../src/asset-pack-payload.js';
 import type { RuntimeAssets } from '../src/runtime-assets.js';
 
 const temporaryDirectories: string[] = [];
@@ -132,6 +134,24 @@ function writeSheetPng(
 
   mkdirSync(path.dirname(filePath), { recursive: true });
   writeFileSync(filePath, canvas.toBuffer('image/png'));
+}
+
+function sheetPng(
+  animation: AnimationName,
+  filledCells: Readonly<Record<string, string>>,
+): Buffer {
+  const bounds = geometryBounds(animation);
+  const canvas = createCanvas(bounds.width, bounds.height);
+  const context = canvas.getContext('2d');
+  const frameSize = standardAnimationGeometry(animation).frameSize;
+
+  for (const [cell, color] of Object.entries(filledCells)) {
+    const [rowText, columnText] = cell.split(':');
+    context.fillStyle = color;
+    context.fillRect(Number(columnText) * frameSize, Number(rowText) * frameSize, frameSize, frameSize);
+  }
+
+  return canvas.toBuffer('image/png');
 }
 
 function baseDefinition(overrides: Partial<ItemDefinition> = {}): ItemDefinition {
@@ -420,6 +440,34 @@ describe('loadActiveAssetPackBaseline', () => {
 });
 
 describe('validateAssetPackDirectory', () => {
+  it('validates captured payload PNG bytes without a pack directory', async () => {
+    const sourcePath = 'sprites/wind-braid/climb.png';
+    const source = newItemSource([{ animation: 'climb', source: sourcePath }]);
+    const payload = parseAssetPackPayload({
+      manifestBytes: Buffer.from(JSON.stringify(source)),
+      sourceBytes: new Map([[
+        sourcePath,
+        sheetPng('climb', Object.fromEntries(
+          requiredCells('climb').map((cell) => [cell, '#111111']),
+        )),
+      ]]),
+    });
+    expect(payload.ok).toBe(true);
+    if (!payload.ok) throw new Error('Expected captured payload parsing to succeed.');
+
+    const report = await validateAssetPackPayload({
+      payload,
+      runtime: createRuntimeFixture().runtime,
+      origin: 'memory://acme.wind-braid',
+    });
+
+    expect(report).toMatchObject({
+      valid: true,
+      contentDigest: payload.contentDigest,
+      packDirectory: 'memory://acme.wind-braid',
+    });
+  });
+
   it('reports geometry, blank-cell, decode, missing, and incompatible-geometry diagnostics from inspected PNGs', async () => {
     const runtime = createRuntimeFixture().runtime;
     const packRoot = createDirectory('lpc-asset-pack-validation-pack-');
