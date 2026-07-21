@@ -1129,17 +1129,17 @@ Task 9 record:
 - Create: `packages/cli/test/asset-pack-preview.test.ts`
 - Modify: `packages/cli/src/preview.ts` only if a narrow output option must be shared
 
-- [ ] **Step 1: Write failing default preview tests**
+- [x] **Step 1: Write failing default preview tests**
 
 Use a valid small attributed pack plus baseline fixture. Assert preview validates fresh, compiles the current linked desired state with the target pack transiently replacing its registered version, selects the requested or first stable local asset, materializes the existing `farmer` preset against the compiled catalog, replaces that asset's type slot, uses requested/default body and animation, and writes PNG/TXT/CSV/metadata under `<pack>/previews/<asset-id>/`.
 
 Assert metadata and both credit files contain the pack contribution; an existing-item extension also contains inherited base attribution.
 
-- [ ] **Step 2: Write failing supplied-character and non-mutation tests**
+- [x] **Step 2: Write failing supplied-character and non-mutation tests**
 
 Test `--character <selection.json>` keeps every supplied slot except the previewed asset's type, reports an incompatible body/animation, leaves active `assets_custom/` and registry byte-identical, and deletes the temporary validation overlay after success or failure.
 
-- [ ] **Step 3: Run the focused test and verify RED**
+- [x] **Step 3: Run the focused test and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-preview.test.ts
@@ -1147,15 +1147,15 @@ rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-preview.test.ts
 
 Expected: FAIL because asset-pack preview does not exist.
 
-- [ ] **Step 4: Implement transient compile and selection construction**
+- [x] **Step 4: Implement transient compile and selection construction**
 
 Reuse sync's desired-state read/validate/compile helper but materialize under `.lpc-toolkit/asset-packs/validation/<content-digest>/` and never publish it. Wrap runtime with `createOverlayAssetStore`, load compiled catalog/palettes, call `materializePreset('farmer', { catalog, palettes })` when no character is supplied, then set the target item by internal namespaced or preserved baseline `name`.
 
-- [ ] **Step 5: Reuse existing attributed preview publication**
+- [x] **Step 5: Reuse existing attributed preview publication**
 
 Call `renderCharacterPreview`; do not write a second renderer or credits formatter. Add only the minimum option to `preview.ts` needed for an explicit authoring output path. Return its artifact list and warnings in `AssetPackPreviewResult`.
 
-- [ ] **Step 6: Verify GREEN and preview regression**
+- [x] **Step 6: Verify GREEN and preview regression**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-preview.test.ts preview.test.ts
@@ -1164,7 +1164,7 @@ rtk pnpm --filter @lpc-toolkit/cli run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit product code**
+- [x] **Step 7: Commit product code**
 
 ```sh
 rtk git add packages/cli/src/asset-pack-preview.ts packages/cli/test/asset-pack-preview.test.ts packages/cli/src/preview.ts
@@ -1172,6 +1172,24 @@ rtk git commit -m "feat(cli): preview attributed artist assets"
 ```
 
 Omit `preview.ts` from `git add` if unchanged. Then update this task's plan record and commit it separately.
+
+---
+
+Task 10 record:
+
+- Implementation: Added transient attributed preview compilation and publication using the current linked desired state, complete credit metadata (including authors, URLs, licenses, and notes), supplied-character/non-mutation cleanup, same-ID transient replacement that ignores stale links, and Windows-safe validation staging paths.
+- Product commits: `2e8d8ef4ec88d408d5152f7568ea80d81d166330`, `578fa4af4b51861a6bc292106101058da3de2805`.
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-preview.test.ts preview.test.ts asset-pack-sync.test.ts` PASS (41/41); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS; `rtk pnpm check:boundaries` PASS; `rtk git diff --check` PASS; `rtk pnpm verify` PASS (Core 299; Presets 3; CLI 542 passed, 1 skipped; Web 697 passed).
+- Review: fresh Task 10 reviewer found and fixed three Important findings; final re-review APPROVED with no findings.
+- CLI documentation impact:
+  - help: N/A — no command or help contract changed
+  - cli-readme: N/A — no public workflow changed
+  - root-readme: N/A — no public workflow changed
+  - landing: N/A — no public workflow changed
+  - architecture: N/A — approved ownership contract is unchanged
+  - engineering: N/A — verification commands are unchanged
+  - releasing: N/A — no release behavior changed
+  - plugin: N/A — no plugin contract changed
 
 ---
 
