@@ -132,6 +132,64 @@ function sunRibbonPack(): AssetPackSource {
   };
 }
 
+function duplicateOwnerPack(options?: {
+  readonly version?: string;
+  readonly credits?: typeof PACK_CREDITS;
+  readonly creditOverrides?: Readonly<Record<string, typeof PACK_CREDITS>>;
+}): AssetPackSource {
+  return {
+    schema: 'lpc-toolkit.asset-pack.v1',
+    id: 'acme.shared-pack',
+    version: options?.version ?? '1.0.0',
+    displayName: 'ACME Shared Pack',
+    credits: options?.credits ?? PACK_CREDITS,
+    ...(options?.creditOverrides ? { creditOverrides: options.creditOverrides } : {}),
+    assets: [{
+      kind: 'new-item',
+      localId: 'shared-item',
+      displayName: 'Shared Item',
+      typeName: 'hair',
+      bodyTypes: ['male', 'female'],
+      animations: ['walk'],
+      layers: [{
+        id: 'top',
+        zPos: 90,
+        sprites: [{
+          animation: 'walk',
+          source: 'sprites/shared-item/top/walk.png',
+        }],
+      }],
+    }],
+  };
+}
+
+function baselineWithExistingSharedItem(): AssetPackBaseline {
+  return {
+    catalog: createCatalog({
+      'sheet_definitions/hair/acme.shared-pack--shared-item.json': {
+        name: 'acme.shared-pack--shared-item',
+        display_name: 'Baseline Shared Item',
+        type_name: 'hair',
+        animations: ['walk'],
+        credits: [{
+          file: 'packages/acme.shared-pack/shared-item/top/male-female/walk.png',
+          authors: ['Baseline Artist'],
+          licenses: ['CC-BY 4.0'],
+          urls: ['https://example.com/baseline-artist'],
+          notes: 'Baseline compiled credit.',
+        }],
+        layer_1: {
+          zPos: 90,
+          male: 'packages/acme.shared-pack/shared-item/top/male-female/',
+          female: 'packages/acme.shared-pack/shared-item/top/male-female/',
+        },
+      },
+    }).catalog,
+    definitionDigests: new Map([['acme.shared-pack--shared-item', sha('c')]]),
+    creditDigests: new Map([['acme.shared-pack--shared-item', sha('d')]]),
+  };
+}
+
 function projectPlan(plan: ReturnType<typeof compileAssetPacks>) {
   return {
     definitions: plan.definitions.map((definition) => ({
@@ -278,5 +336,88 @@ describe('asset-pack compile', () => {
       'sheet_definitions/hair/acme.fantasy-hair--moon-braid.json',
       'sheet_definitions/hair/bravo.ribbons--sun-ribbon.json',
     ]);
+  });
+
+  it('reports conflicts against baseline-seeded definition and credit paths', () => {
+    const plan = compileAssetPacks({
+      baseline: baselineWithExistingSharedItem(),
+      packs: [normalizeAssetPack(duplicateOwnerPack())],
+    });
+
+    expect(plan.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'asset_path_conflict',
+        severity: 'error',
+        assetId: 'acme.shared-pack--shared-item',
+        destinationPath: 'sheet_definitions/hair/acme.shared-pack--shared-item.json',
+      }),
+      expect.objectContaining({
+        code: 'asset_path_conflict',
+        severity: 'error',
+        assetId: 'acme.shared-pack--shared-item',
+        destinationPath: 'packages/acme.shared-pack/shared-item/top/male-female/walk.png',
+      }),
+    ]));
+  });
+
+  it('reports duplicate generated ownership instead of silently coalescing identical outputs', () => {
+    const plan = compileAssetPacks({
+      baseline,
+      packs: [
+        normalizeAssetPack(duplicateOwnerPack({ version: '1.0.0' })),
+        normalizeAssetPack(duplicateOwnerPack({ version: '2.0.0' })),
+      ],
+    });
+
+    expect(plan.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'asset_path_conflict',
+        severity: 'error',
+        assetId: 'acme.shared-pack--shared-item',
+        destinationPath: 'sheet_definitions/hair/acme.shared-pack--shared-item.json',
+      }),
+      expect.objectContaining({
+        code: 'asset_path_conflict',
+        severity: 'error',
+        assetId: 'acme.shared-pack--shared-item',
+        sourcePath: 'sprites/shared-item/top/walk.png',
+        destinationPath: 'spritesheets/packages/acme.shared-pack/shared-item/top/male-female/walk.png',
+      }),
+      expect.objectContaining({
+        code: 'asset_path_conflict',
+        severity: 'error',
+        assetId: 'acme.shared-pack--shared-item',
+        destinationPath: 'packages/acme.shared-pack/shared-item/top/male-female/walk.png',
+      }),
+    ]));
+  });
+
+  it('reports conflicting generated credit ownership for the same compiled file', () => {
+    const plan = compileAssetPacks({
+      baseline,
+      packs: [
+        normalizeAssetPack(duplicateOwnerPack({
+          version: '1.0.0',
+          creditOverrides: {
+            'sprites/shared-item/top/walk.png': PACK_CREDITS,
+          },
+        })),
+        normalizeAssetPack(duplicateOwnerPack({
+          version: '2.0.0',
+          creditOverrides: {
+            'sprites/shared-item/top/walk.png': CLIMB_OVERRIDE,
+          },
+        })),
+      ],
+    });
+
+    expect(plan.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'asset_path_conflict',
+        severity: 'error',
+        assetId: 'acme.shared-pack--shared-item',
+        destinationPath: 'packages/acme.shared-pack/shared-item/top/male-female/walk.png',
+      }),
+    ]));
   });
 });

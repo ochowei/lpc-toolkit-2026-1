@@ -65,20 +65,34 @@ export interface AssetPackCompilePlan {
 }
 
 interface CompileState {
-  readonly definitions: Map<string, CompiledAssetDefinition>;
+  readonly baselineDefinitions: Map<string, readonly ItemId[]>;
+  readonly definitions: Map<string, CompiledDefinitionRecord>;
   readonly sprites: Map<string, MutableCompiledSprite>;
-  readonly credits: Map<string, CreditEntry>;
+  readonly baselineCredits: Map<string, readonly ItemId[]>;
+  readonly credits: Map<string, CompiledCreditRecord>;
   readonly ownership: Map<string, Set<string>>;
   readonly diagnostics: AssetPackDiagnostic[];
 }
 
+interface CompiledDefinitionRecord extends CompiledAssetDefinition {
+  readonly ownerKey: string;
+}
+
 interface MutableCompiledSprite {
+  readonly ownerKey: string;
   readonly packId: string;
   readonly assetId: ItemId;
   readonly sourcePath: string;
   readonly destinationPath: string;
   readonly animation: AnimationName;
   readonly consumers: CompiledAssetSpriteConsumer[];
+}
+
+interface CompiledCreditRecord {
+  readonly ownerKey: string;
+  readonly packId: string;
+  readonly assetId: ItemId;
+  readonly credit: CreditEntry;
 }
 
 interface CompiledBodyGroup {
@@ -101,7 +115,7 @@ interface DefinitionDraft {
 }
 
 export function compileAssetPacks(options: CompileAssetPacksOptions): AssetPackCompilePlan {
-  const state = createCompileState();
+  const state = createCompileState(options.baseline);
   for (const pack of [...options.packs].sort(comparePackIdentity)) {
     for (const asset of [...pack.assets].sort(compareAssetIdentity)) {
       compileAsset(state, pack, asset);
@@ -110,10 +124,27 @@ export function compileAssetPacks(options: CompileAssetPacksOptions): AssetPackC
   return finalizeCompileState(state);
 }
 
-function createCompileState(): CompileState {
+function createCompileState(baseline: AssetPackBaseline): CompileState {
+  const baselineDefinitions = new Map<string, ItemId[]>();
+  const baselineCredits = new Map<string, ItemId[]>();
+  for (const [itemId, definition] of baseline.catalog.byItemId) {
+    const existingDefinitions = baselineDefinitions.get(definitionLogicalPath(definition.type_name, itemId)) ?? [];
+    baselineDefinitions.set(
+      definitionLogicalPath(definition.type_name, itemId),
+      [...existingDefinitions, itemId],
+    );
+
+    for (const credit of definition.credits) {
+      const existingCredits = baselineCredits.get(credit.file) ?? [];
+      baselineCredits.set(credit.file, [...existingCredits, itemId]);
+    }
+  }
+
   return {
+    baselineDefinitions,
     definitions: new Map(),
     sprites: new Map(),
+    baselineCredits,
     credits: new Map(),
     ownership: new Map(),
     diagnostics: [],
@@ -136,6 +167,7 @@ function compileNewItem(
   pack: NormalizedAssetPack,
   asset: NormalizedNewItemAsset,
 ): void {
+  const ownerKey = compiledOwnerKey(pack, asset);
   const definitionPath = definitionLogicalPath(asset.typeName, asset.itemId);
   const draft = createDefinitionDraft(asset, definitionPath);
   const layerStates = asset.layers.map((layer, layerIndex) =>
@@ -163,21 +195,32 @@ function compileNewItem(
           bodyTypes: group.bodyTypes,
           ...(sprite.variant ? { variant: sprite.variant } : {}),
         };
-        registerSprite(state, {
+        const compiledSprite: MutableCompiledSprite = {
+          ownerKey,
           packId: pack.id,
           assetId: asset.itemId,
           sourcePath: sprite.source,
           destinationPath,
           animation: sprite.animation,
           consumers: [consumer],
-        });
+        };
 
         const credit = compiledCreditEntry(
+          ownerKey,
+          pack.id,
+          asset.itemId,
           pack.creditOverrides.get(sprite.source) ?? pack.credits,
           destinationPath,
         );
-        registerCredit(state, credit);
-        draft.creditFiles.add(credit.file);
+        const spriteStatus = inspectSpriteRegistration(state, compiledSprite);
+        const creditStatus = inspectCreditRegistration(state, credit);
+        if (spriteStatus === 'conflict' || creditStatus === 'conflict') {
+          continue;
+        }
+
+        commitSpriteRegistration(state, compiledSprite, spriteStatus);
+        commitCreditRegistration(state, credit, creditStatus);
+        draft.creditFiles.add(credit.credit.file);
         addOwnedPath(state, pack.id, destinationPath);
       }
     }
@@ -185,6 +228,7 @@ function compileNewItem(
 
   const definitionCredits = [...draft.creditFiles]
     .map((file) => state.credits.get(file))
+    .map((credit) => credit?.credit)
     .filter((credit): credit is CreditEntry => credit !== undefined);
 
   const definition: ItemDefinition = {
@@ -194,6 +238,7 @@ function compileNewItem(
   };
 
   registerDefinition(state, {
+    ownerKey,
     packId: pack.id,
     assetId: asset.itemId,
     logicalPath: draft.logicalPath,
@@ -307,27 +352,47 @@ function definitionLogicalPath(typeName: TypeName, itemId: ItemId): string {
 }
 
 function compiledCreditEntry(
+  ownerKey: string,
+  packId: string,
+  assetId: ItemId,
   credit: AssetPackCreditRecord,
   destinationPath: string,
-): CreditEntry {
+): CompiledCreditRecord {
   return {
-    file: destinationPath.replace(/^spritesheets\//, ''),
-    authors: [...credit.authors],
-    licenses: [...credit.licenses],
-    urls: [...credit.urls],
-    notes: credit.notes,
+    ownerKey,
+    packId,
+    assetId,
+    credit: {
+      file: destinationPath.replace(/^spritesheets\//, ''),
+      authors: [...credit.authors],
+      licenses: [...credit.licenses],
+      urls: [...credit.urls],
+      notes: credit.notes,
+    },
   };
 }
 
-function registerDefinition(state: CompileState, definition: CompiledAssetDefinition): void {
+function registerDefinition(state: CompileState, definition: CompiledDefinitionRecord): boolean {
+  if (state.baselineDefinitions.has(definition.logicalPath)) {
+    state.diagnostics.push({
+      code: 'asset_path_conflict',
+      severity: 'error',
+      message: `Generated definition targets existing baseline path ${definition.logicalPath}.`,
+      packId: definition.packId,
+      assetId: definition.assetId,
+      destinationPath: definition.logicalPath,
+    });
+    return false;
+  }
+
   const existing = state.definitions.get(definition.logicalPath);
   if (!existing) {
     state.definitions.set(definition.logicalPath, definition);
-    return;
+    return true;
   }
 
-  if (sameDefinition(existing, definition)) {
-    return;
+  if (existing.ownerKey === definition.ownerKey && sameDefinition(existing, definition)) {
+    return true;
   }
 
   state.diagnostics.push({
@@ -338,40 +403,94 @@ function registerDefinition(state: CompileState, definition: CompiledAssetDefini
     assetId: definition.assetId,
     destinationPath: definition.logicalPath,
   });
+  return false;
 }
 
-function registerSprite(state: CompileState, sprite: MutableCompiledSprite): void {
+type RegistrationStatus = 'insert' | 'merge' | 'conflict';
+
+function inspectSpriteRegistration(
+  state: CompileState,
+  sprite: MutableCompiledSprite,
+): RegistrationStatus {
   const existing = state.sprites.get(sprite.destinationPath);
   if (!existing) {
+    return 'insert';
+  }
+
+  if (existing.ownerKey === sprite.ownerKey && existing.sourcePath === sprite.sourcePath) {
+    return 'merge';
+  }
+
+  state.diagnostics.push({
+    code: 'asset_path_conflict',
+    severity: 'error',
+    message: `Two sprite sources target ${sprite.destinationPath}.`,
+    packId: sprite.packId,
+    assetId: sprite.assetId,
+    sourcePath: sprite.sourcePath,
+    destinationPath: sprite.destinationPath,
+  });
+  return 'conflict';
+}
+
+function commitSpriteRegistration(
+  state: CompileState,
+  sprite: MutableCompiledSprite,
+  status: Exclude<RegistrationStatus, 'conflict'>,
+): void {
+  if (status === 'insert') {
     state.sprites.set(sprite.destinationPath, sprite);
     return;
   }
 
-  if (existing.sourcePath !== sprite.sourcePath) {
-    state.diagnostics.push({
-      code: 'asset_path_conflict',
-      severity: 'error',
-      message: `Two sprite sources target ${sprite.destinationPath}.`,
-      packId: sprite.packId,
-      assetId: sprite.assetId,
-      sourcePath: sprite.sourcePath,
-      destinationPath: sprite.destinationPath,
-    });
-    return;
-  }
-
+  const existing = state.sprites.get(sprite.destinationPath);
+  if (!existing) return;
   existing.consumers.push(...sprite.consumers);
 }
 
-function registerCredit(state: CompileState, credit: CreditEntry): void {
-  const existing = state.credits.get(credit.file);
-  if (!existing) {
-    state.credits.set(credit.file, credit);
-    return;
+function inspectCreditRegistration(
+  state: CompileState,
+  credit: CompiledCreditRecord,
+): RegistrationStatus {
+  if (state.baselineCredits.has(credit.credit.file)) {
+    state.diagnostics.push({
+      code: 'asset_path_conflict',
+      severity: 'error',
+      message: `Generated credit targets existing baseline path ${credit.credit.file}.`,
+      packId: credit.packId,
+      assetId: credit.assetId,
+      destinationPath: credit.credit.file,
+    });
+    return 'conflict';
   }
 
-  if (sameCredit(existing, credit)) {
-    return;
+  const existing = state.credits.get(credit.credit.file);
+  if (!existing) {
+    return 'insert';
+  }
+
+  if (existing.ownerKey === credit.ownerKey && sameCredit(existing.credit, credit.credit)) {
+    return 'merge';
+  }
+
+  state.diagnostics.push({
+    code: 'asset_path_conflict',
+    severity: 'error',
+    message: `Two generated credit records target ${credit.credit.file}.`,
+    packId: credit.packId,
+    assetId: credit.assetId,
+    destinationPath: credit.credit.file,
+  });
+  return 'conflict';
+}
+
+function commitCreditRegistration(
+  state: CompileState,
+  credit: CompiledCreditRecord,
+  status: Exclude<RegistrationStatus, 'conflict'>,
+): void {
+  if (status === 'insert') {
+    state.credits.set(credit.credit.file, credit);
   }
 }
 
@@ -383,11 +502,13 @@ function addOwnedPath(state: CompileState, packId: string, logicalPath: string):
 
 function finalizeCompileState(state: CompileState): AssetPackCompilePlan {
   return {
-    definitions: [...state.definitions.values()].sort((left, right) =>
+    definitions: [...state.definitions.values()]
+      .map(({ ownerKey: _ownerKey, ...definition }) => definition)
+      .sort((left, right) =>
       left.logicalPath.localeCompare(right.logicalPath),
-    ),
+      ),
     sprites: [...state.sprites.values()]
-      .map((sprite) => ({
+      .map(({ ownerKey: _ownerKey, ...sprite }) => ({
         ...sprite,
         consumers: sortConsumers(dedupeConsumers(sprite.consumers)),
       }))
@@ -397,7 +518,7 @@ function finalizeCompileState(state: CompileState): AssetPackCompilePlan {
           [right.destinationPath, right.sourcePath],
         ),
       ),
-    credits: sortCredits([...state.credits.values()]),
+    credits: sortCredits([...state.credits.values()].map((entry) => entry.credit)),
     ownership: [...state.ownership.entries()]
       .map(([packId, logicalPaths]) => ({
         packId,
@@ -525,4 +646,8 @@ function groupName(bodyTypes: readonly BodyType[]): string {
 
 function variantToFilename(variant: string): string {
   return variant.replaceAll(' ', '_');
+}
+
+function compiledOwnerKey(pack: NormalizedAssetPack, asset: NormalizedNewItemAsset): string {
+  return `${pack.id}@${pack.version}\u0000${asset.itemId}`;
 }
