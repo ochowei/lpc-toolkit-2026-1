@@ -33,6 +33,7 @@ import {
 const fileSystemInterception = vi.hoisted(() => ({
   archivePath: undefined as string | undefined,
   archiveDescriptor: undefined as number | undefined,
+  archiveReadCalls: 0,
   rejectPathRead: false,
   afterDescriptorWrite: undefined as (() => void) | undefined,
 }));
@@ -64,6 +65,12 @@ vi.mock('node:fs', async (importOriginal) => {
         throw new Error('Archive path was read after opening.');
       }
       return actual.readFileSync(file, options);
+    },
+    readSync(...args: Parameters<typeof actual.readSync>) {
+      if (args[0] === fileSystemInterception.archiveDescriptor) {
+        fileSystemInterception.archiveReadCalls += 1;
+      }
+      return actual.readSync(...args);
     },
     writeFileSync(
       file: Parameters<typeof actual.writeFileSync>[0],
@@ -384,6 +391,7 @@ function createDirectory(prefix: string): string {
 afterEach(() => {
   fileSystemInterception.archivePath = undefined;
   fileSystemInterception.archiveDescriptor = undefined;
+  fileSystemInterception.archiveReadCalls = 0;
   fileSystemInterception.rejectPathRead = false;
   fileSystemInterception.afterDescriptorWrite = undefined;
   for (const directory of temporaryDirectories.splice(0)) {
@@ -443,6 +451,7 @@ describe('readAssetPackArchive descriptor bounds', () => {
     expect(result.diagnostics).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'asset_archive_limit_exceeded' }),
     ]));
+    expect(fileSystemInterception.archiveReadCalls).toBe(0);
     const descriptor = fileSystemInterception.archiveDescriptor;
     expect(descriptor).toBeTypeOf('number');
     if (descriptor === undefined) throw new Error('Expected the archive descriptor to be observed.');
@@ -1039,5 +1048,32 @@ describe('extractVerifiedAssetPackPayload', () => {
     expect(lstatSync(target).isSymbolicLink()).toBe(true);
     expect(lstatSync(displacedTarget).isDirectory()).toBe(true);
     expect(readdirSync(replacement)).toEqual([]);
+  });
+
+  it('rejects a different directory rebound at the pinned canonical target path', async () => {
+    const archive = await createDeterministicAssetPackArchive({
+      manifestBytes: manifestBytesOfLength(),
+      sourceBytes: new Map([[SOURCE_PATH, Buffer.from('walk-pixels')]]),
+    });
+    const read = readAssetPackArchive({ archivePath: '/fixtures/verified.zip', archiveBytes: archive });
+    expect(read.ok).toBe(true);
+    if (!read.ok) throw new Error('Expected archive to verify.');
+    const stagingRoot = createDirectory('lpc-asset-pack-rebound-staging-');
+    const target = path.join(stagingRoot, 'payload');
+    const displacedTarget = path.join(stagingRoot, 'displaced-payload');
+    fileSystemInterception.afterDescriptorWrite = () => {
+      renameSync(target, displacedTarget);
+      mkdirSync(target, { mode: 0o700 });
+    };
+
+    expect(() => extractVerifiedAssetPackPayload({
+      snapshot: read.snapshot,
+      targetDirectory: target,
+    })).toThrow(/identity|pinned|changed/iu);
+
+    expect(lstatSync(target).isDirectory()).toBe(true);
+    expect(readdirSync(target)).toEqual([]);
+    expect(readFileSync(path.join(displacedTarget, 'asset-pack.json')))
+      .toEqual(read.snapshot.manifestBytes);
   });
 });

@@ -729,6 +729,13 @@ export function readAssetPackArchive(options: {
             options.archivePath,
           );
         }
+        if (metadata.size > ASSET_PACK_ARCHIVE_LIMITS.archiveBytes) {
+          return rejected(
+            'asset_archive_limit_exceeded',
+            `Archive exceeds the ${String(ASSET_PACK_ARCHIVE_LIMITS.archiveBytes)}-byte encoded limit.`,
+            options.archivePath,
+          );
+        }
         const chunks: Buffer[] = [];
         let totalBytes = 0;
         while (totalBytes <= ASSET_PACK_ARCHIVE_LIMITS.archiveBytes) {
@@ -907,11 +914,87 @@ export async function createDeterministicAssetPackArchive(options: {
   return archive;
 }
 
-function assertSafeExtractionParent(targetDirectory: string): string {
+interface PinnedExtractionDirectory {
+  readonly canonicalPath: string;
+  readonly device: number;
+  readonly inode: number;
+}
+
+function extractionDirectoryStatus(directory: string) {
+  const status = lstatSync(directory, { throwIfNoEntry: false });
+  if (!status || status.isSymbolicLink() || !status.isDirectory()) {
+    throw new Error(`Extraction directory is not a pinned directory: ${directory}`);
+  }
+  return status;
+}
+
+function hasPinnedIdentity(
+  status: ReturnType<typeof extractionDirectoryStatus>,
+  pinned: PinnedExtractionDirectory,
+): boolean {
+  return status.dev === pinned.device && status.ino === pinned.inode;
+}
+
+function pinCanonicalExtractionDirectory(directory: string): PinnedExtractionDirectory {
+  const before = extractionDirectoryStatus(directory);
+  const canonicalPath = realpathSync(directory);
+  const after = extractionDirectoryStatus(directory);
+  const confirmedCanonicalPath = realpathSync(directory);
+  if (canonicalPath !== directory) {
+    throw new Error(`Extraction directory resolves through an alias: ${directory}`);
+  }
+  if (
+    confirmedCanonicalPath !== canonicalPath
+    || before.dev !== after.dev
+    || before.ino !== after.ino
+  ) {
+    throw new Error(`Extraction directory canonical path or identity changed: ${directory}`);
+  }
+  return {
+    canonicalPath,
+    device: after.dev,
+    inode: after.ino,
+  };
+}
+
+function assertPinnedExtractionDirectory(
+  pinned: PinnedExtractionDirectory,
+): ReturnType<typeof extractionDirectoryStatus> {
+  const before = extractionDirectoryStatus(pinned.canonicalPath);
+  if (!hasPinnedIdentity(before, pinned)) {
+    throw new Error(`Pinned extraction directory identity changed: ${pinned.canonicalPath}`);
+  }
+  const canonicalPath = realpathSync(pinned.canonicalPath);
+  const after = extractionDirectoryStatus(pinned.canonicalPath);
+  const confirmedCanonicalPath = realpathSync(pinned.canonicalPath);
+  if (
+    !hasPinnedIdentity(after, pinned)
+    || canonicalPath !== pinned.canonicalPath
+    || confirmedCanonicalPath !== pinned.canonicalPath
+  ) {
+    throw new Error(`Pinned extraction directory canonical path changed: ${pinned.canonicalPath}`);
+  }
+  return after;
+}
+
+function assertPrivateStagingRoot(pinned: PinnedExtractionDirectory): void {
+  const status = assertPinnedExtractionDirectory(pinned);
+  if ((status.mode & 0o077) !== 0) {
+    throw new Error(
+      `Extraction parent is writable or accessible outside the private staging root: ${pinned.canonicalPath}`,
+    );
+  }
+}
+
+function pinSafeExtractionParent(targetDirectory: string): {
+  readonly stagingRoot: PinnedExtractionDirectory;
+  readonly targetPath: string;
+} {
   const requestedTarget = path.resolve(targetDirectory);
   const parent = path.dirname(requestedTarget);
   const root = path.parse(parent).root;
   let current = root;
+  let stagingRoot = pinCanonicalExtractionDirectory(root);
   for (const segment of path.relative(root, parent).split(path.sep)) {
     if (segment.length === 0) continue;
     current = path.join(current, segment);
@@ -923,44 +1006,50 @@ function assertSafeExtractionParent(targetDirectory: string): string {
     if (!status.isDirectory()) {
       throw new Error(`Extraction parent is not a directory: ${current}`);
     }
+    stagingRoot = pinCanonicalExtractionDirectory(current);
   }
-  assertPrivateStagingRoot(current);
-  const canonicalParent = realpathSync(current);
-  const resolvedTarget = path.join(canonicalParent, path.basename(requestedTarget));
-  if (lstatSync(resolvedTarget, { throwIfNoEntry: false }) !== undefined) {
-    throw new Error(`Extraction target already exists: ${resolvedTarget}`);
+  assertPrivateStagingRoot(stagingRoot);
+  const targetPath = path.join(stagingRoot.canonicalPath, path.basename(requestedTarget));
+  assertPinnedExtractionDirectory(stagingRoot);
+  if (lstatSync(targetPath, { throwIfNoEntry: false }) !== undefined) {
+    throw new Error(`Extraction target already exists: ${targetPath}`);
   }
-  return resolvedTarget;
+  return { stagingRoot, targetPath };
 }
 
-function assertPrivateStagingRoot(directory: string): void {
-  const status = lstatSync(directory, { throwIfNoEntry: false });
-  if (!status || status.isSymbolicLink() || !status.isDirectory()) {
-    throw new Error(`Extraction parent is not a private staging root: ${directory}`);
-  }
-  if ((status.mode & 0o077) !== 0) {
-    throw new Error(`Extraction parent is writable or accessible outside the private staging root: ${directory}`);
-  }
+function createPinnedExtractionDirectory(
+  parent: PinnedExtractionDirectory,
+  name: string,
+): PinnedExtractionDirectory {
+  assertPinnedExtractionDirectory(parent);
+  const directory = path.join(parent.canonicalPath, name);
+  mkdirSync(directory, { mode: 0o700 });
+  const pinned = pinCanonicalExtractionDirectory(directory);
+  assertPinnedExtractionDirectory(parent);
+  assertPinnedExtractionDirectory(pinned);
+  return pinned;
 }
 
-function assertPinnedExtractionDirectory(directory: string): void {
-  const status = lstatSync(directory, { throwIfNoEntry: false });
-  if (!status || status.isSymbolicLink() || !status.isDirectory()) {
-    throw new Error(`Extraction directory is not a pinned directory: ${directory}`);
+function cleanupPinnedExtractionDirectory(
+  stagingRoot: PinnedExtractionDirectory,
+  target: PinnedExtractionDirectory,
+): void {
+  try {
+    assertPrivateStagingRoot(stagingRoot);
+    assertPinnedExtractionDirectory(target);
+  } catch {
+    return;
   }
-  if (realpathSync(directory) !== directory) {
-    throw new Error(`Extraction directory resolves through an alias: ${directory}`);
-  }
+  rmSync(target.canonicalPath, { recursive: true, force: true });
 }
 
-function cleanupPinnedExtractionDirectory(directory: string): void {
-  const status = lstatSync(directory, { throwIfNoEntry: false });
-  if (!status || status.isSymbolicLink() || !status.isDirectory()) return;
-  if (realpathSync(directory) !== directory) return;
-  rmSync(directory, { recursive: true, force: true });
-}
-
-function writeNewFileNoFollow(filePath: string, contents: Buffer): void {
+function writeNewFileNoFollow(
+  directory: PinnedExtractionDirectory,
+  fileName: string,
+  contents: Buffer,
+): void {
+  assertPinnedExtractionDirectory(directory);
+  const filePath = path.join(directory.canonicalPath, fileName);
   const descriptor = openSync(
     filePath,
     fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL | fsConstants.O_NOFOLLOW,
@@ -971,40 +1060,56 @@ function writeNewFileNoFollow(filePath: string, contents: Buffer): void {
   } finally {
     closeSync(descriptor);
   }
+  assertPinnedExtractionDirectory(directory);
 }
 
+/**
+ * The target must be a new direct child of a caller-created, canonical, private staging root.
+ * Portable Node does not expose openat-style relative operations, so extraction excludes an
+ * attacker that can concurrently write that staging root and fails closed if a pinned canonical
+ * path or directory identity changes while it is being used.
+ */
 export function extractVerifiedAssetPackPayload(options: {
   readonly snapshot: AssetPackArchiveSnapshot;
   readonly targetDirectory: string;
 }): void {
   const verifiedFiles = verifiedExtractionFiles.get(options.snapshot);
   if (!verifiedFiles) throw new Error('Extraction requires a verified archive snapshot.');
-  const targetDirectory = assertSafeExtractionParent(options.targetDirectory);
-  mkdirSync(targetDirectory, { mode: 0o700 });
+  const { stagingRoot, targetPath } = pinSafeExtractionParent(options.targetDirectory);
+  let target: PinnedExtractionDirectory | undefined;
   try {
-    assertPinnedExtractionDirectory(targetDirectory);
-    const createdDirectories = new Set<string>([targetDirectory]);
+    target = createPinnedExtractionDirectory(stagingRoot, path.basename(targetPath));
+    const createdDirectories = new Map<string, PinnedExtractionDirectory>([
+      [target.canonicalPath, target],
+    ]);
     for (const [entryPath, contents] of [...verifiedFiles].sort(
       ([left], [right]) => comparePaths(left, right),
     )) {
-      assertPinnedExtractionDirectory(targetDirectory);
+      assertPrivateStagingRoot(stagingRoot);
+      assertPinnedExtractionDirectory(target);
       const segments = entryPath.split('/');
-      let directory = targetDirectory;
+      let directory = target;
       for (const segment of segments.slice(0, -1)) {
-        directory = path.join(directory, segment);
-        if (!createdDirectories.has(directory)) {
-          mkdirSync(directory, { mode: 0o700 });
-          createdDirectories.add(directory);
-        }
         assertPinnedExtractionDirectory(directory);
+        const childPath = path.join(directory.canonicalPath, segment);
+        const existing = createdDirectories.get(childPath);
+        if (existing) {
+          assertPinnedExtractionDirectory(existing);
+          directory = existing;
+        } else {
+          const created = createPinnedExtractionDirectory(directory, segment);
+          createdDirectories.set(created.canonicalPath, created);
+          directory = created;
+        }
       }
       const fileName = segments.at(-1);
       if (!fileName) throw new Error(`Invalid verified archive path: ${entryPath}`);
-      assertPinnedExtractionDirectory(directory);
-      writeNewFileNoFollow(path.join(directory, fileName), Buffer.from(contents));
+      writeNewFileNoFollow(directory, fileName, Buffer.from(contents));
     }
+    assertPrivateStagingRoot(stagingRoot);
+    assertPinnedExtractionDirectory(target);
   } catch (error) {
-    cleanupPinnedExtractionDirectory(targetDirectory);
+    if (target) cleanupPinnedExtractionDirectory(stagingRoot, target);
     throw error;
   }
 }
