@@ -1,26 +1,35 @@
 import type { NormalizedAssetPack } from './asset-pack-model.js';
 
 export interface AssetPackSemver {
-  readonly major: string;
-  readonly minor: string;
-  readonly patch: string;
+  readonly major: number;
+  readonly minor: number;
+  readonly patch: number;
+  readonly prerelease: readonly (string | number)[];
+}
+
+interface RawAssetPackSemver {
+  readonly core: readonly [string, string, string];
   readonly prerelease: readonly string[];
 }
 
 const SEMVER_PATTERN = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 const VERSION_COMPARATOR_PATTERN = /^(<=|>=|=|<|>)(.+)$/;
+const RAW_SEMVERS = new WeakMap<AssetPackSemver, RawAssetPackSemver>();
 
 export function parseAssetPackSemver(value: string): AssetPackSemver | undefined {
   const match = SEMVER_PATTERN.exec(value);
   if (!match) return undefined;
-  return {
-    major: match[1]!,
-    minor: match[2]!,
-    patch: match[3]!,
-    prerelease: match[4]
-      ? match[4].split('.')
-      : [],
+  const core = [match[1]!, match[2]!, match[3]!] as const;
+  const prerelease = match[4] ? match[4].split('.') : [];
+  const parsed: AssetPackSemver = {
+    major: Number(core[0]),
+    minor: Number(core[1]),
+    patch: Number(core[2]),
+    prerelease: prerelease.map((identifier) =>
+      /^\d+$/.test(identifier) ? Number(identifier) : identifier),
   };
+  RAW_SEMVERS.set(parsed, { core, prerelease });
+  return parsed;
 }
 
 export function compareAssetPackVersions(left: string, right: string): number {
@@ -29,16 +38,21 @@ export function compareAssetPackVersions(left: string, right: string): number {
   if (!leftVersion || !rightVersion) {
     throw new RangeError('Asset-pack version comparison requires valid SemVer values.');
   }
-  for (const key of ['major', 'minor', 'patch'] as const) {
-    const comparison = compareDecimal(leftVersion[key], rightVersion[key]);
+  const leftRaw = RAW_SEMVERS.get(leftVersion);
+  const rightRaw = RAW_SEMVERS.get(rightVersion);
+  if (!leftRaw || !rightRaw) {
+    throw new RangeError('Asset-pack version comparison requires parsed SemVer values.');
+  }
+  for (let index = 0; index < leftRaw.core.length; index += 1) {
+    const comparison = compareDecimal(leftRaw.core[index]!, rightRaw.core[index]!);
     if (comparison !== 0) return comparison;
   }
-  if (leftVersion.prerelease.length === 0 && rightVersion.prerelease.length === 0) return 0;
-  if (leftVersion.prerelease.length === 0) return 1;
-  if (rightVersion.prerelease.length === 0) return -1;
-  for (let index = 0; index < Math.max(leftVersion.prerelease.length, rightVersion.prerelease.length); index += 1) {
-    const leftIdentifier = leftVersion.prerelease[index];
-    const rightIdentifier = rightVersion.prerelease[index];
+  if (leftRaw.prerelease.length === 0 && rightRaw.prerelease.length === 0) return 0;
+  if (leftRaw.prerelease.length === 0) return 1;
+  if (rightRaw.prerelease.length === 0) return -1;
+  for (let index = 0; index < Math.max(leftRaw.prerelease.length, rightRaw.prerelease.length); index += 1) {
+    const leftIdentifier = leftRaw.prerelease[index];
+    const rightIdentifier = rightRaw.prerelease[index];
     if (leftIdentifier === undefined) return -1;
     if (rightIdentifier === undefined) return 1;
     const leftNumeric = /^\d+$/.test(leftIdentifier);

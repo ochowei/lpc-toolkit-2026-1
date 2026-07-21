@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   assetPackAssetKeys,
   assetPackLifecycleReplacementAllows,
@@ -6,6 +6,7 @@ import {
   compareAssetPackVersions,
   normalizeAssetPack,
   parseAssetPackSemver,
+  type AssetPackSemver,
   type AssetPackSource,
 } from '../src/index.js';
 
@@ -59,11 +60,30 @@ describe('asset pack versions', () => {
     const longLower = '12345678901234567890123456789012345678901234567890';
     const longHigher = '12345678901234567890123456789012345678901234567891';
 
-    expect(parseAssetPackSemver(`${higher}.0.0`)?.major).toBe(higher);
     expect(compareAssetPackVersions(`${lower}.0.0`, `${higher}.0.0`)).toBeLessThan(0);
+    expect(compareAssetPackVersions(`${longLower}.0.0`, `${longHigher}.0.0`)).toBeLessThan(0);
     expect(compareAssetPackVersions(`1.0.0-${longLower}`, `1.0.0-${longHigher}`))
       .toBeLessThan(0);
     expect(assetPackVersionRangeMatches(`=${longHigher}.0.0`, `${longHigher}.0.0`)).toBe(true);
+  });
+
+  it('keeps the approved public SemVer shape while comparing huge versions precisely', () => {
+    expectTypeOf<AssetPackSemver>().toEqualTypeOf<{
+      readonly major: number;
+      readonly minor: number;
+      readonly patch: number;
+      readonly prerelease: readonly (string | number)[];
+    }>();
+    expect(parseAssetPackSemver('1.2.3-4.rc')).toEqual({
+      major: 1,
+      minor: 2,
+      patch: 3,
+      prerelease: [4, 'rc'],
+    });
+    expect(compareAssetPackVersions(
+      '99999999999999999999999999999999999999999999999999.0.0',
+      '100000000000000000000000000000000000000000000000000.0.0',
+    )).toBeLessThan(0);
   });
 
   it('rejects malformed versions instead of falling back to lexical ordering', () => {
