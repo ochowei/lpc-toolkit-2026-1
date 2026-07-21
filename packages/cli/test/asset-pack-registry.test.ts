@@ -1,10 +1,13 @@
+import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { BODY_TYPES, type ItemDefinition } from '@lpc-toolkit/core';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   ASSET_WORKSPACE_REGISTRY_V1_SCHEMA,
   assetPackCompileDigest,
+  type AssetPackCompileProjection,
   readAssetPackRegistry,
 } from '../src/asset-pack-registry.js';
 import {
@@ -22,6 +25,105 @@ function workspaceFixture(): ReturnType<typeof initializeAssetWorkspace> {
 
 const digest = `sha256:${'a'.repeat(64)}`;
 
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, item]) => [key, canonical(item)]),
+    );
+  }
+  return value;
+}
+
+function independentCompileDigest(projection: AssetPackCompileProjection): string {
+  const normalized = {
+    definitions: [...projection.definitions]
+      .sort((left, right) => left.logicalPath.localeCompare(right.logicalPath)),
+    sprites: [...projection.sprites]
+      .sort((left, right) => left.destinationPath.localeCompare(right.destinationPath)
+        || left.sourcePath.localeCompare(right.sourcePath))
+      .map((sprite) => ({
+        ...sprite,
+        consumers: [...sprite.consumers]
+          .sort((left, right) => JSON.stringify(canonical(left)).localeCompare(JSON.stringify(canonical(right))))
+          .map((consumer) => ({
+            ...consumer,
+            bodyTypes: BODY_TYPES.filter((bodyType) => consumer.bodyTypes.includes(bodyType)),
+          })),
+      })),
+    credits: [...projection.credits]
+      .sort((left, right) => left.file.localeCompare(right.file)),
+    ownership: [...projection.ownership]
+      .sort((left, right) => left.packId.localeCompare(right.packId))
+      .map((ownership) => ({ ...ownership, logicalPaths: [...ownership.logicalPaths].sort() })),
+  };
+  return `sha256:${createHash('sha256').update(JSON.stringify(canonical(normalized))).digest('hex')}`;
+}
+
+function compileDefinition(name: string): ItemDefinition {
+  return {
+    name,
+    type_name: 'hair',
+    animations: ['walk'],
+    credits: [],
+    variants: ['orange'],
+    recolors: { material: 'hair', palettes: ['ulpc'] },
+    layer_1: { zPos: 10, male: 'hair/example/' },
+  };
+}
+
+function compileProjectionFixture(): AssetPackCompileProjection {
+  return {
+    definitions: [
+      { logicalPath: 'sheet_definitions/hair/bravo.json', definition: compileDefinition('Bravo') },
+      { logicalPath: 'sheet_definitions/hair/acme.json', definition: compileDefinition('Acme') },
+    ],
+    sprites: [
+      {
+        packId: 'bravo.braid',
+        assetId: 'bravo.braid--braid',
+        sourcePath: 'sprites/bravo.png',
+        sourceDigest: `sha256:${'b'.repeat(64)}`,
+        destinationPath: 'spritesheets/packages/bravo.braid/braid/walk.png',
+        destinationDigest: `sha256:${'c'.repeat(64)}`,
+        animation: 'walk',
+        consumers: [{
+          itemId: 'bravo.braid--braid',
+          typeName: 'hair',
+          layer: 'layer_1',
+          bodyTypes: ['female', 'male'],
+          variant: 'orange',
+        }],
+      },
+      {
+        packId: 'acme.braid',
+        assetId: 'acme.braid--braid',
+        sourcePath: 'sprites/acme.png',
+        sourceDigest: `sha256:${'d'.repeat(64)}`,
+        destinationPath: 'spritesheets/packages/acme.braid/braid/walk.png',
+        destinationDigest: `sha256:${'e'.repeat(64)}`,
+        animation: 'walk',
+        consumers: [{
+          itemId: 'acme.braid--braid',
+          typeName: 'hair',
+          layer: 'layer_1',
+          bodyTypes: ['male'],
+        }],
+      },
+    ],
+    credits: [
+      { file: 'packages/bravo.braid/braid/walk.png', notes: 'Bravo', authors: ['Bravo'], licenses: ['CC-BY-SA 4.0'], urls: ['https://example.com/bravo'] },
+      { file: 'packages/acme.braid/braid/walk.png', notes: 'Acme', authors: ['Acme'], licenses: ['CC-BY-SA 4.0'], urls: ['https://example.com/acme'] },
+    ],
+    ownership: [
+      { packId: 'bravo.braid', logicalPaths: ['spritesheets/packages/bravo.braid/braid/walk.png', 'sheet_definitions/hair/bravo.json'] },
+      { packId: 'acme.braid', logicalPaths: ['spritesheets/packages/acme.braid/braid/walk.png', 'sheet_definitions/hair/acme.json'] },
+    ],
+  };
+}
+
 function workspaceId(workspace: ReturnType<typeof initializeAssetWorkspace>): string {
   return (JSON.parse(readFileSync(
     path.join(workspace.outputRoot, '.lpc-toolkit-managed.json'),
@@ -29,11 +131,33 @@ function workspaceId(workspace: ReturnType<typeof initializeAssetWorkspace>): st
   )) as { workspaceId: string }).workspaceId;
 }
 
+interface RegistryFixtureEntry {
+  readonly kind: 'linked' | 'installed';
+  readonly packId: string;
+  readonly version: string;
+  readonly displayName: string;
+  readonly contentDigest: string;
+  readonly acknowledgements: readonly unknown[];
+  readonly sourceDigests: Readonly<Record<string, string>>;
+  readonly generatedPaths: readonly string[];
+  readonly logicalDestinations: readonly string[];
+  readonly generatedSprites: readonly Omit<AssetPackCompileProjection['sprites'][number], 'packId'>[];
+  readonly replacements: readonly unknown[];
+  readonly baselineDefinitionDigests: Readonly<Record<string, string>>;
+  readonly baselineCreditDigests: Readonly<Record<string, string>>;
+  readonly generatedCredits: AssetPackCompileProjection['credits'];
+  readonly sourceDirectory?: string;
+  readonly installedDirectory?: string;
+  readonly archiveDigest?: string;
+}
+
 function linkedEntry(
   workspace: ReturnType<typeof initializeAssetWorkspace>,
   packId = 'acme.braid',
-): Record<string, unknown> {
+): RegistryFixtureEntry {
   const sourceDirectory = path.join(workspace.packsRoot, packId);
+  const destinationPath = `spritesheets/packages/${packId}/walk.png`;
+  const sourcePath = `sprites/${packId}/walk.png`;
   mkdirSync(sourceDirectory, { recursive: true });
   return {
     kind: 'linked',
@@ -43,27 +167,76 @@ function linkedEntry(
     sourceDirectory,
     contentDigest: digest,
     acknowledgements: [],
-    sourceDigests: {},
-    generatedPaths: [],
-    logicalDestinations: [`spritesheets/packages/${packId}/walk.png`],
+    sourceDigests: { [sourcePath]: digest },
+    generatedPaths: [destinationPath],
+    logicalDestinations: [destinationPath],
+    generatedSprites: [{
+      assetId: `${packId}--walk`,
+      sourcePath,
+      sourceDigest: digest,
+      destinationPath,
+      destinationDigest: digest,
+      animation: 'walk',
+      consumers: [{
+        itemId: `${packId}--walk`,
+        typeName: 'hair',
+        layer: 'layer_1',
+        bodyTypes: ['male'],
+      }],
+    }],
     replacements: [],
     baselineDefinitionDigests: {},
     baselineCreditDigests: {},
-    generatedCredits: [],
+    generatedCredits: [{
+      file: `packages/${packId}/walk.png`,
+      notes: '',
+      authors: [],
+      licenses: [],
+      urls: [],
+    }],
+  };
+}
+
+function registryCompileProjection(
+  entries: readonly RegistryFixtureEntry[],
+): AssetPackCompileProjection {
+  const creditsByFile = new Map<string, AssetPackCompileProjection['credits'][number]>();
+  entries.forEach((entry) => {
+    entry.generatedCredits.forEach((credit) => {
+      if (!creditsByFile.has(credit.file)) creditsByFile.set(credit.file, credit);
+    });
+  });
+  return {
+    definitions: [],
+    sprites: entries.flatMap((entry) => entry.generatedSprites.map((sprite) => ({
+      ...sprite,
+      packId: entry.packId,
+    }))),
+    credits: [...creditsByFile.values()],
+    ownership: entries.map((entry) => ({
+      packId: entry.packId,
+      logicalPaths: entry.generatedPaths,
+    })),
   };
 }
 
 function v2Document(
   workspace: ReturnType<typeof initializeAssetWorkspace>,
-  entries: readonly Record<string, unknown>[],
+  entries: readonly unknown[],
 ): Record<string, unknown> {
-  const generatedDigests = entries.length === 0 ? {} : { 'CREDITS.csv': digest };
+  const fixtureEntries = entries as readonly RegistryFixtureEntry[];
+  const generatedDigests = fixtureEntries.length === 0
+    ? {}
+    : Object.fromEntries([
+      ['CREDITS.csv', digest],
+      ...fixtureEntries.flatMap((entry) => entry.generatedPaths.map((generatedPath) => [generatedPath, digest] as const)),
+    ].sort(([left], [right]) => left.localeCompare(right)));
   return {
     schema: ASSET_WORKSPACE_REGISTRY_SCHEMA,
     workspaceId: workspaceId(workspace),
     entries,
     generatedDigests,
-    compileDigest: assetPackCompileDigest({ entries, generatedDigests }),
+    compileDigest: assetPackCompileDigest(registryCompileProjection(fixtureEntries)),
   };
 }
 
@@ -93,6 +266,55 @@ afterEach(() => {
 });
 
 describe('readAssetPackRegistry', () => {
+  it('hashes one typed canonical compile projection with field sensitivity and order independence', () => {
+    const projection = compileProjectionFixture();
+    const expected = independentCompileDigest(projection);
+
+    expect(assetPackCompileDigest(projection)).toBe(expected);
+    expect(assetPackCompileDigest({
+      ...projection,
+      definitions: [...projection.definitions].reverse(),
+      sprites: [...projection.sprites].reverse(),
+      credits: [...projection.credits].reverse(),
+      ownership: [...projection.ownership].reverse(),
+    })).toBe(expected);
+    expect(assetPackCompileDigest({
+      ...projection,
+      definitions: [{ ...projection.definitions[0]!, definition: compileDefinition('Changed') }, projection.definitions[1]!],
+    })).not.toBe(expected);
+    expect(assetPackCompileDigest({
+      ...projection,
+      sprites: [{ ...projection.sprites[0]!, sourcePath: 'sprites/changed.png' }, projection.sprites[1]!],
+    })).not.toBe(expected);
+    expect(assetPackCompileDigest({
+      ...projection,
+      sprites: [{ ...projection.sprites[0]!, destinationPath: 'spritesheets/changed.png' }, projection.sprites[1]!],
+    })).not.toBe(expected);
+    expect(assetPackCompileDigest({
+      ...projection,
+      sprites: [{ ...projection.sprites[0]!, sourceDigest: `sha256:${'f'.repeat(64)}` }, projection.sprites[1]!],
+    })).not.toBe(expected);
+    expect(assetPackCompileDigest({
+      ...projection,
+      sprites: [{ ...projection.sprites[0]!, destinationDigest: `sha256:${'0'.repeat(64)}` }, projection.sprites[1]!],
+    })).not.toBe(expected);
+    expect(assetPackCompileDigest({
+      ...projection,
+      credits: [{ ...projection.credits[0]!, notes: 'Changed' }, projection.credits[1]!],
+    })).not.toBe(expected);
+    expect(assetPackCompileDigest({
+      ...projection,
+      ownership: [{ ...projection.ownership[0]!, logicalPaths: ['sheet_definitions/hair/changed.json'] }, projection.ownership[1]!],
+    })).not.toBe(expected);
+    expect(assetPackCompileDigest({
+      ...projection,
+      sprites: [{
+        ...projection.sprites[0]!,
+        consumers: [{ ...projection.sprites[0]!.consumers[0]!, variant: 'blue' }],
+      }, projection.sprites[1]!],
+    })).not.toBe(expected);
+  });
+
   it('reads a strict v1 registry without mutating it and marks migration as needed', () => {
     const workspace = workspaceFixture();
     const v1 = {
@@ -115,6 +337,44 @@ describe('readAssetPackRegistry', () => {
       document: v1,
     });
     expect(readFileSync(workspace.registryPath)).toEqual(before);
+  });
+
+  it('preserves a populated v1 registry exactly and rejects generated digest coverage drift', () => {
+    const workspace = workspaceFixture();
+    const entry = linkedEntry(workspace);
+    const v1 = {
+      schema: ASSET_WORKSPACE_REGISTRY_V1_SCHEMA,
+      workspaceId: workspaceId(workspace),
+      entries: [{
+        kind: 'linked',
+        packId: entry.packId,
+        version: entry.version,
+        displayName: entry.displayName,
+        sourceDirectory: entry.sourceDirectory,
+        contentDigest: entry.contentDigest,
+        sourceDigests: entry.sourceDigests,
+        generatedPaths: entry.generatedPaths,
+        baselineDefinitionDigests: entry.baselineDefinitionDigests,
+        baselineCreditDigests: entry.baselineCreditDigests,
+      }],
+      generatedDigests: {
+        'CREDITS.csv': digest,
+        [entry.generatedPaths[0]!]: digest,
+      },
+    };
+    writeRegistry(workspace, v1);
+    const before = readFileSync(workspace.registryPath);
+
+    expect(readAssetPackRegistry({ workspace, markerWorkspaceId: workspaceId(workspace) })).toEqual({
+      ok: true,
+      needsMigration: true,
+      document: v1,
+    });
+    expect(readFileSync(workspace.registryPath)).toEqual(before);
+    expectInvalid(workspace, {
+      ...v1,
+      generatedDigests: { [entry.generatedPaths[0]!]: digest },
+    });
   });
 
   it('exports the v2 registry schema from the workspace module', () => {
@@ -186,6 +446,94 @@ describe('readAssetPackRegistry', () => {
     })}\n`);
     expectInvalid(workspace, v2Document(workspace, [installed]));
     expectInvalid(workspace, v2Document(workspace, [{ ...base, installedDirectory, archiveDigest: digest }]));
+  });
+
+  it('binds each entry generated destinations, sprite digests, and credits to its owned paths', () => {
+    const workspace = workspaceFixture();
+    const entry = linkedEntry(workspace);
+    writeRegistry(workspace, v2Document(workspace, [entry]));
+    expect(readAssetPackRegistry({ workspace, markerWorkspaceId: workspaceId(workspace) })).toMatchObject({
+      ok: true,
+      needsMigration: false,
+    });
+
+    expectInvalid(workspace, v2Document(workspace, [{
+      ...entry,
+      generatedPaths: [],
+    }]));
+    expectInvalid(workspace, v2Document(workspace, [{
+      ...entry,
+      generatedCredits: [],
+    }]));
+    expectInvalid(workspace, v2Document(workspace, [{
+      ...entry,
+      generatedCredits: [{
+        file: 'packages/acme.braid/unowned.png',
+        notes: '',
+        authors: [],
+        licenses: [],
+        urls: [],
+      }],
+    }]));
+    expectInvalid(workspace, v2Document(workspace, [{
+      ...entry,
+      generatedSprites: [{
+        ...entry.generatedSprites[0]!,
+        sourceDigest: `sha256:${'b'.repeat(64)}`,
+      }],
+    }]));
+  });
+
+  it('rejects cross-pack reassigned generated destination ownership', () => {
+    const workspace = workspaceFixture();
+    const first = linkedEntry(workspace, 'acme.braid');
+    const second = linkedEntry(workspace, 'bravo.braid');
+
+    expectInvalid(workspace, v2Document(workspace, [{
+      ...first,
+      generatedPaths: [],
+    }, second]));
+  });
+
+  it('rejects unsorted or duplicate acknowledgements and replacements', () => {
+    const workspace = workspaceFixture();
+    const entry = linkedEntry(workspace);
+    const acknowledgement = {
+      code: 'asset_path_inferred',
+      subject: { destination: 'spritesheets/packages/acme.braid/walk.png' },
+      contentDigest: digest,
+      reason: 'Reviewed manually.',
+    };
+    const laterAcknowledgement = {
+      ...acknowledgement,
+      code: 'asset_baseline_changed',
+    };
+    const replacement = {
+      packId: 'acme.base',
+      versions: '>=1.0.0',
+      assets: ['hair/braid'],
+    };
+    const laterReplacement = {
+      ...replacement,
+      packId: 'bravo.base',
+    };
+
+    expectInvalid(workspace, v2Document(workspace, [{
+      ...entry,
+      acknowledgements: [acknowledgement, laterAcknowledgement],
+    }]));
+    expectInvalid(workspace, v2Document(workspace, [{
+      ...entry,
+      acknowledgements: [acknowledgement, acknowledgement],
+    }]));
+    expectInvalid(workspace, v2Document(workspace, [{
+      ...entry,
+      replacements: [laterReplacement, replacement],
+    }]));
+    expectInvalid(workspace, v2Document(workspace, [{
+      ...entry,
+      replacements: [replacement, replacement],
+    }]));
   });
 
   it('rejects logical destination conflicts and unsorted generated credits', () => {

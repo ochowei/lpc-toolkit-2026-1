@@ -6,6 +6,7 @@ import {
   readdirSync,
   renameSync,
   rmSync,
+  symlinkSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -343,6 +344,42 @@ function outputMarkerPath(workspace: AssetWorkspace): string {
 
 function readRegistry(workspace: AssetWorkspace): RegistryDocument {
   return readJson<RegistryDocument>(workspace.registryPath);
+}
+
+function v1RegistryFromV2(registry: RegistryDocument): {
+  schema: typeof ASSET_WORKSPACE_REGISTRY_V1_SCHEMA;
+  workspaceId: string;
+  entries: Array<{
+    kind: 'linked';
+    packId: string;
+    version: string;
+    displayName: string;
+    sourceDirectory: string;
+    contentDigest: string;
+    sourceDigests: Readonly<Record<string, string>>;
+    generatedPaths: readonly string[];
+    baselineDefinitionDigests: Readonly<Record<string, string>>;
+    baselineCreditDigests: Readonly<Record<string, string>>;
+  }>;
+  generatedDigests: Readonly<Record<string, string>>;
+} {
+  return {
+    schema: ASSET_WORKSPACE_REGISTRY_V1_SCHEMA,
+    workspaceId: registry.workspaceId,
+    entries: registry.entries.map((entry) => ({
+      kind: entry.kind,
+      packId: entry.packId,
+      version: entry.version,
+      displayName: entry.displayName,
+      sourceDirectory: entry.sourceDirectory,
+      contentDigest: entry.contentDigest,
+      sourceDigests: entry.sourceDigests,
+      generatedPaths: entry.generatedPaths,
+      baselineDefinitionDigests: entry.baselineDefinitionDigests,
+      baselineCreditDigests: entry.baselineCreditDigests,
+    })),
+    generatedDigests: registry.generatedDigests,
+  };
 }
 
 function expectSuccess(result: AssetPackSyncResult): AssetPackSyncSuccess {
@@ -687,6 +724,55 @@ describe('syncLinkedAssetPack', () => {
     expect(diagnosticCodes(failed.diagnostics)).toContain('asset_digest_mismatch');
     expect(readJson<{ schema: string }>(fixture.workspace.registryPath).schema)
       .toBe(ASSET_WORKSPACE_REGISTRY_V1_SCHEMA);
+  });
+
+  it('rejects retained v1 identity, metadata, and baseline drift without publication', async () => {
+    const mutations: readonly {
+      readonly name: string;
+      readonly apply: (entry: {
+        version: string;
+        displayName: string;
+        sourceDigests: Readonly<Record<string, string>>;
+        generatedPaths: readonly string[];
+        baselineDefinitionDigests: Readonly<Record<string, string>>;
+        baselineCreditDigests: Readonly<Record<string, string>>;
+      }) => void;
+    }[] = [
+      { name: 'version', apply: (entry) => { entry.version = '2.0.0'; } },
+      { name: 'display name', apply: (entry) => { entry.displayName = 'Tampered Braid'; } },
+      { name: 'source digest', apply: (entry) => { entry.sourceDigests = {}; } },
+      { name: 'generated ownership', apply: (entry) => { entry.generatedPaths = []; } },
+      { name: 'definition baseline', apply: (entry) => { entry.baselineDefinitionDigests = { braid: `sha256:${'a'.repeat(64)}` }; } },
+      { name: 'credit baseline', apply: (entry) => { entry.baselineCreditDigests = { braid: `sha256:${'b'.repeat(64)}` }; } },
+    ];
+
+    for (const mutation of mutations) {
+      const fixture = createWorkspaceFixture();
+      const firstRoot = path.join(fixture.workspace.packsRoot, 'acme.wind-braid');
+      const secondRoot = path.join(fixture.workspace.packsRoot, 'bravo.ribbon-braid');
+      writeNewItemPack(firstRoot, {
+        packId: 'acme.wind-braid', displayName: 'Wind Braid', localId: 'wind-braid', color: '#aa5500',
+      });
+      writeNewItemPack(secondRoot, {
+        packId: 'bravo.ribbon-braid', displayName: 'Ribbon Braid', localId: 'ribbon-braid', color: '#00aa55',
+      });
+      expectSuccess(await syncLinkedAssetPack({ packDirectory: firstRoot, workspace: fixture.workspace, runtime: fixture.runtime }));
+      const v1 = v1RegistryFromV2(readRegistry(fixture.workspace));
+      mutation.apply(v1.entries[0]!);
+      writeJson(fixture.workspace.registryPath, v1);
+      const beforeOutput = snapshotTree(fixture.workspace.outputRoot);
+      const beforeRegistry = snapshotFile(fixture.workspace.registryPath);
+
+      const failed = expectFailure(await syncLinkedAssetPack({
+        packDirectory: secondRoot,
+        workspace: fixture.workspace,
+        runtime: fixture.runtime,
+      }));
+
+      expect(diagnosticCodes(failed.diagnostics), mutation.name).toContain('asset_digest_mismatch');
+      expect(snapshotTree(fixture.workspace.outputRoot), mutation.name).toEqual(beforeOutput);
+      expect(snapshotFile(fixture.workspace.registryPath), mutation.name).toEqual(beforeRegistry);
+    }
   });
 
   it('re-syncs after source changes and publishes the new bytes', async () => {
@@ -1257,6 +1343,56 @@ describe('syncLinkedAssetPack', () => {
     expect(diagnosticCodes(failed.diagnostics)).toContain('asset_path_inferred');
     expect(snapshotTree(fixture.workspace.outputRoot)).toEqual(beforeOutput);
     expect(existsSync(fixture.workspace.registryPath)).toBe(false);
+  });
+
+  it('rejects requested linked packs outside packsRoot without mutating managed output', async () => {
+    const fixture = createWorkspaceFixture();
+    const outsideRoot = createDirectory('lpc-asset-pack-sync-outside-');
+    const packRoot = path.join(outsideRoot, 'acme.wind-braid');
+    writeNewItemPack(packRoot, {
+      packId: 'acme.wind-braid',
+      displayName: 'Wind Braid',
+      localId: 'wind-braid',
+      color: '#aa5500',
+    });
+    const beforeOutput = snapshotTree(fixture.workspace.outputRoot);
+    const beforeRegistry = snapshotFile(fixture.workspace.registryPath);
+
+    const failed = expectFailure(await syncLinkedAssetPack({
+      packDirectory: packRoot,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+    }));
+
+    expect(failed.diagnostics[0]?.message).toContain('must be contained');
+    expect(snapshotTree(fixture.workspace.outputRoot)).toEqual(beforeOutput);
+    expect(snapshotFile(fixture.workspace.registryPath)).toEqual(beforeRegistry);
+  });
+
+  it('rejects requested linked packs through a symlink ancestor without mutating managed output', async () => {
+    const fixture = createWorkspaceFixture();
+    const outsideRoot = createDirectory('lpc-asset-pack-sync-symlink-');
+    const outsidePack = path.join(outsideRoot, 'acme.wind-braid');
+    writeNewItemPack(outsidePack, {
+      packId: 'acme.wind-braid',
+      displayName: 'Wind Braid',
+      localId: 'wind-braid',
+      color: '#aa5500',
+    });
+    const linkedRoot = path.join(fixture.workspace.packsRoot, 'linked-pack');
+    symlinkSync(outsidePack, linkedRoot, process.platform === 'win32' ? 'junction' : 'dir');
+    const beforeOutput = snapshotTree(fixture.workspace.outputRoot);
+    const beforeRegistry = snapshotFile(fixture.workspace.registryPath);
+
+    const failed = expectFailure(await syncLinkedAssetPack({
+      packDirectory: linkedRoot,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+    }));
+
+    expect(failed.diagnostics[0]?.message).toContain('symbolic link');
+    expect(snapshotTree(fixture.workspace.outputRoot)).toEqual(beforeOutput);
+    expect(snapshotFile(fixture.workspace.registryPath)).toEqual(beforeRegistry);
   });
 
   it('refuses to sync into an unowned output root', async () => {

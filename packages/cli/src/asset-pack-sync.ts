@@ -24,10 +24,13 @@ import {
 } from './asset-workspace.js';
 import {
   assetPackCompileDigest,
+  assetPackCompileProjectionFromPlan,
   assetPackRegistryBytes,
   auditPublishedManagedOutput,
   readAssetPackRegistry,
+  resolveLinkedAssetPackDirectory,
   type AssetPackRegistryDocument,
+  type AssetPackCompileProjection,
   type LinkedAssetPackRegistryEntry,
 } from './asset-pack-registry.js';
 import {
@@ -94,6 +97,7 @@ export interface LinkedAssetPackDesiredState {
   readonly requested: ValidatedLinkedAssetPack;
   readonly packs: readonly ValidatedLinkedAssetPack[];
   readonly compilePlan: AssetPackCompilePlan;
+  readonly compileProjection: AssetPackCompileProjection;
   readonly registry: readonly LinkedAssetPackRegistryEntry[];
   readonly warnings: readonly AssetPackSyncDiagnostic[];
   readonly workspaceId: string;
@@ -273,18 +277,30 @@ async function validateLinkedPack(
   readonly ok: true;
   readonly validated: ValidatedLinkedAssetPack;
 }> {
+  let sourceDirectory: string;
+  try {
+    sourceDirectory = resolveLinkedAssetPackDirectory(workspace, packDirectory);
+  } catch (error) {
+    return syncFailure([{
+      code: 'asset_digest_mismatch',
+      severity: 'error',
+      message: errorMessage(error),
+      path: path.resolve(packDirectory),
+    }]);
+  }
+
   let loaded: ReturnType<typeof loadAssetPackFiles>;
   try {
-    loaded = loadAssetPackFiles(packDirectory);
+    loaded = loadAssetPackFiles(sourceDirectory);
   } catch (error) {
     const missing = isNodeError(error) && ['ENOENT', 'ENOTDIR'].includes(error.code ?? '');
     return syncFailure([{
       code: missing ? 'asset_source_missing' : 'asset_publish_failed',
       severity: 'error',
       message: missing
-        ? `Linked asset-pack source is missing: ${path.resolve(packDirectory)}`
+        ? `Linked asset-pack source is missing: ${sourceDirectory}`
         : errorMessage(error),
-      path: path.resolve(packDirectory),
+      path: sourceDirectory,
     }]);
   }
 
@@ -296,7 +312,7 @@ async function validateLinkedPack(
       code: 'asset_digest_mismatch',
       severity: 'error',
       message: `Linked asset-pack source changed pack ID from ${expectedPackId} to ${loaded.pack.id}.`,
-      path: path.resolve(packDirectory),
+      path: sourceDirectory,
       details: {
         expectedPackId,
         actualPackId: loaded.pack.id,
@@ -305,7 +321,7 @@ async function validateLinkedPack(
   }
 
   const report = await validateAssetPackDirectory({
-    packDirectory,
+    packDirectory: sourceDirectory,
     runtime,
     workspace,
     snapshot: loaded,
@@ -318,7 +334,7 @@ async function validateLinkedPack(
       code: 'asset_digest_mismatch',
       severity: 'error',
       message: `Linked asset-pack source changed while it was being validated: ${path.resolve(packDirectory)}`,
-      path: path.resolve(packDirectory),
+      path: sourceDirectory,
       details: {
         validatedContentDigest: report.contentDigest,
         capturedContentDigest: loaded.contentDigest,
@@ -329,7 +345,7 @@ async function validateLinkedPack(
   return {
     ok: true,
     validated: {
-      sourceDirectory: path.resolve(packDirectory),
+      sourceDirectory,
       loaded,
       diagnostics: report.diagnostics.map((diagnostic) => toSyncDiagnostic(diagnostic)),
     },
@@ -486,12 +502,6 @@ export async function prepareLinkedAssetPackDesiredState(options: {
     }]);
   }
 
-  const registryResult = readAssetPackRegistry({
-    workspace: options.workspace,
-    markerWorkspaceId: marker.workspaceId,
-  });
-  if (!registryResult.ok) return syncFailure(registryResult.diagnostics);
-
   const requestedResult = await validateLinkedPack(
     options.packDirectory,
     options.runtime,
@@ -499,6 +509,12 @@ export async function prepareLinkedAssetPackDesiredState(options: {
   );
   if (!requestedResult.ok) return requestedResult;
   const requested = requestedResult.validated;
+
+  const registryResult = readAssetPackRegistry({
+    workspace: options.workspace,
+    markerWorkspaceId: marker.workspaceId,
+  });
+  if (!registryResult.ok) return syncFailure(registryResult.diagnostics);
   const retainedEntries = registryResult.document.entries
     .filter((entry) => entry.packId !== requested.loaded.pack.id)
     .sort((left, right) => left.packId.localeCompare(right.packId));
@@ -562,8 +578,33 @@ export async function prepareLinkedAssetPackDesiredState(options: {
     return syncFailure(compileErrors.map((diagnostic) => toSyncDiagnostic(diagnostic)));
   }
 
+  let compileProjection: AssetPackCompileProjection;
+  try {
+    compileProjection = assetPackCompileProjectionFromPlan({
+      compilePlan,
+      sourceDigestsByPackId: new Map(
+        validatedPacks.map((pack) => [pack.loaded.pack.id, pack.loaded.sourceDigests] as const),
+      ),
+    });
+  } catch (error) {
+    return syncFailure([{
+      code: 'asset_digest_mismatch',
+      severity: 'error',
+      message: errorMessage(error),
+      path: path.resolve(options.packDirectory),
+    }]);
+  }
+
   const generatedPathsByPackId = new Map(
     compilePlan.ownership.map((ownership) => [ownership.packId, ownership.logicalPaths] as const),
+  );
+  const generatedSpritesByPackId = new Map(
+    validatedPacks.map((pack) => [
+      pack.loaded.pack.id,
+      compileProjection.sprites
+        .filter((sprite) => sprite.packId === pack.loaded.pack.id)
+        .map(({ packId: _packId, ...sprite }) => sprite),
+    ] as const),
   );
   const logicalDestinationsByPackId = new Map(
     validatedPacks.map((pack) => [
@@ -587,6 +628,7 @@ export async function prepareLinkedAssetPackDesiredState(options: {
     generatedPaths: [...(generatedPathsByPackId.get(pack.loaded.pack.id) ?? [])]
       .sort((left, right) => left.localeCompare(right)),
     logicalDestinations: logicalDestinationsByPackId.get(pack.loaded.pack.id) ?? [],
+    generatedSprites: generatedSpritesByPackId.get(pack.loaded.pack.id) ?? [],
     replacements: pack.loaded.pack.replacements,
     acknowledgements: pack.loaded.pack.acknowledgements,
     baselineDefinitionDigests: collectBaselineDefinitionDigests(pack.loaded.pack),
@@ -607,11 +649,41 @@ export async function prepareLinkedAssetPackDesiredState(options: {
     }]);
   }
 
+  if (registryResult.document.schema === 'lpc-toolkit.asset-workspace-registry.v1') {
+    for (const retained of retainedEntries) {
+      const compiled = registryEntries.find((entry) => entry.packId === retained.packId);
+      if (
+        compiled === undefined
+        || retained.kind !== 'linked'
+        || retained.packId !== compiled.packId
+        || retained.version !== compiled.version
+        || retained.displayName !== compiled.displayName
+        || path.resolve(retained.sourceDirectory) !== compiled.sourceDirectory
+        || retained.contentDigest !== compiled.contentDigest
+        || JSON.stringify(retained.sourceDigests) !== JSON.stringify(compiled.sourceDigests)
+        || JSON.stringify(retained.generatedPaths) !== JSON.stringify(compiled.generatedPaths)
+        || JSON.stringify(retained.baselineDefinitionDigests)
+          !== JSON.stringify(compiled.baselineDefinitionDigests)
+        || JSON.stringify(retained.baselineCreditDigests)
+          !== JSON.stringify(compiled.baselineCreditDigests)
+      ) {
+        return syncFailure([{
+          code: 'asset_digest_mismatch',
+          severity: 'error',
+          message: `Retained v1 linked asset-pack registry entry does not match the validated compile state: ${retained.packId}.`,
+          path: options.workspace.registryPath,
+          packId: retained.packId,
+        }]);
+      }
+    }
+  }
+
   return {
     ok: true,
     requested,
     packs: validatedPacks,
     compilePlan,
+    compileProjection,
     registry: registryEntries,
     warnings: [
       ...validatedPacks.flatMap((pack) => pack.diagnostics),
@@ -635,6 +707,7 @@ export async function syncLinkedAssetPack(options: {
   if (!desiredState.ok) return desiredState;
   const {
     compilePlan,
+    compileProjection,
     markerBytes,
     packs: validatedPacks,
     registry: registryEntries,
@@ -698,10 +771,7 @@ export async function syncLinkedAssetPack(options: {
       workspaceId,
       entries: registryEntries,
       generatedDigests: sortRecord(Object.fromEntries(generatedDigests)),
-      compileDigest: assetPackCompileDigest({
-        entries: registryEntries,
-        generatedDigests: sortRecord(Object.fromEntries(generatedDigests)),
-      }),
+      compileDigest: assetPackCompileDigest(compileProjection),
     };
     fileOps.writeFileSync(stagedRegistryPath, assetPackRegistryBytes(registryDocument));
 

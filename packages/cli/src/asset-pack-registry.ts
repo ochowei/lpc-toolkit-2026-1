@@ -1,9 +1,13 @@
 import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
+import { BODY_TYPES } from '@lpc-toolkit/core';
 import type {
   AssetPackAcknowledgement,
+  AssetPackCompilePlan,
+  CompiledAssetSpriteConsumer,
   CreditEntry,
+  ItemDefinition,
   NormalizedAssetPackReplacement,
 } from '@lpc-toolkit/core';
 import type { AssetWorkspace } from './asset-workspace.js';
@@ -22,6 +26,7 @@ export interface AssetPackRegistryEntryBase {
   readonly sourceDigests: Readonly<Record<string, string>>;
   readonly generatedPaths: readonly string[];
   readonly logicalDestinations: readonly string[];
+  readonly generatedSprites: readonly Omit<AssetPackCompileProjectionSprite, 'packId'>[];
   readonly replacements: readonly NormalizedAssetPackReplacement[];
   readonly baselineDefinitionDigests: Readonly<Record<string, string>>;
   readonly baselineCreditDigests: Readonly<Record<string, string>>;
@@ -49,6 +54,34 @@ export interface AssetPackRegistryDocument {
   readonly entries: readonly AssetPackRegistryEntry[];
   readonly generatedDigests: Readonly<Record<string, string>>;
   readonly compileDigest: string;
+}
+
+export interface AssetPackCompileProjectionDefinition {
+  readonly logicalPath: string;
+  readonly definition: ItemDefinition;
+}
+
+export interface AssetPackCompileProjectionSprite {
+  readonly packId: string;
+  readonly assetId: string;
+  readonly sourcePath: string;
+  readonly sourceDigest: string;
+  readonly destinationPath: string;
+  readonly destinationDigest: string;
+  readonly animation: string;
+  readonly consumers: readonly CompiledAssetSpriteConsumer[];
+}
+
+export interface AssetPackCompileProjectionOwnership {
+  readonly packId: string;
+  readonly logicalPaths: readonly string[];
+}
+
+export interface AssetPackCompileProjection {
+  readonly definitions: readonly AssetPackCompileProjectionDefinition[];
+  readonly sprites: readonly AssetPackCompileProjectionSprite[];
+  readonly credits: readonly CreditEntry[];
+  readonly ownership: readonly AssetPackCompileProjectionOwnership[];
 }
 
 export interface LinkedAssetPackRegistryEntryV1 {
@@ -88,10 +121,12 @@ const DIGEST = /^sha256:[0-9a-f]{64}$/;
 const V1_DOCUMENT_KEYS = ['schema', 'workspaceId', 'entries', 'generatedDigests'] as const;
 const V1_ENTRY_KEYS = ['kind', 'packId', 'version', 'displayName', 'sourceDirectory', 'contentDigest', 'sourceDigests', 'generatedPaths', 'baselineDefinitionDigests', 'baselineCreditDigests'] as const;
 const V2_DOCUMENT_KEYS = ['schema', 'workspaceId', 'entries', 'generatedDigests', 'compileDigest'] as const;
-const BASE_ENTRY_KEYS = ['kind', 'packId', 'version', 'displayName', 'contentDigest', 'acknowledgements', 'sourceDigests', 'generatedPaths', 'logicalDestinations', 'replacements', 'baselineDefinitionDigests', 'baselineCreditDigests', 'generatedCredits'] as const;
+const BASE_ENTRY_KEYS = ['kind', 'packId', 'version', 'displayName', 'contentDigest', 'acknowledgements', 'sourceDigests', 'generatedPaths', 'logicalDestinations', 'generatedSprites', 'replacements', 'baselineDefinitionDigests', 'baselineCreditDigests', 'generatedCredits'] as const;
 const ACKNOWLEDGEMENT_KEYS = ['code', 'subject', 'contentDigest', 'reason'] as const;
 const REPLACEMENT_KEYS = ['packId', 'versions', 'assets'] as const;
 const CREDIT_KEYS = ['file', 'notes', 'authors', 'licenses', 'urls'] as const;
+const GENERATED_SPRITE_KEYS = ['assetId', 'sourcePath', 'sourceDigest', 'destinationPath', 'destinationDigest', 'animation', 'consumers'] as const;
+const GENERATED_SPRITE_CONSUMER_KEYS = ['itemId', 'typeName', 'layer', 'bodyTypes', 'variant'] as const;
 const RECEIPT_SCHEMA = 'lpc-toolkit.asset-pack-install-receipt.v1';
 const RECEIPT_KEYS = ['schema', 'workspaceId', 'packId', 'version', 'archiveDigest', 'contentDigest', 'installedAt', 'payloadDigests'] as const;
 
@@ -137,6 +172,19 @@ function sortedUniqueStrings(value: unknown, label: string): readonly string[] {
   return entries;
 }
 
+function sortedUniqueBy<T>(
+  entries: readonly T[],
+  key: (entry: T) => string,
+  label: string,
+): readonly T[] {
+  const keys = entries.map(key);
+  const sorted = [...keys].sort((left, right) => left.localeCompare(right));
+  if (JSON.stringify(keys) !== JSON.stringify(sorted) || new Set(keys).size !== keys.length) {
+    throw new Error(`${label} must be sorted and unique.`);
+  }
+  return entries;
+}
+
 function sortedDigestRecord(value: unknown, label: string): Readonly<Record<string, string>> {
   const record = requireRecord(value, label);
   const entries = Object.entries(record);
@@ -167,9 +215,20 @@ function containedPath(root: string, candidate: string, label: string): string {
   return resolved;
 }
 
+export function resolveLinkedAssetPackDirectory(
+  workspace: AssetWorkspace,
+  sourceDirectory: string,
+): string {
+  return containedPath(
+    workspace.packsRoot,
+    sourceDirectory,
+    'Linked asset-pack sourceDirectory',
+  );
+}
+
 function readAcknowledgements(value: unknown, label: string): readonly AssetPackAcknowledgement[] {
   if (!Array.isArray(value)) throw new Error(`${label} must be an array.`);
-  return value.map((entry, index) => {
+  const acknowledgements = value.map((entry, index) => {
     const record = requireRecord(entry, `${label}[${index}]`);
     exactKeys(record, ACKNOWLEDGEMENT_KEYS, `${label}[${index}]`);
     const subject = requireRecord(record.subject, `${label}[${index}].subject`);
@@ -185,11 +244,21 @@ function readAcknowledgements(value: unknown, label: string): readonly AssetPack
       reason: stringAt(record, 'reason', `${label}[${index}]`),
     };
   });
+  return sortedUniqueBy(
+    acknowledgements,
+    (acknowledgement) => [
+      acknowledgement.code,
+      acknowledgement.contentDigest,
+      acknowledgement.reason,
+      JSON.stringify(canonical(acknowledgement.subject)),
+    ].join('\u0000'),
+    label,
+  );
 }
 
 function readReplacements(value: unknown, label: string): readonly NormalizedAssetPackReplacement[] {
   if (!Array.isArray(value)) throw new Error(`${label} must be an array.`);
-  return value.map((entry, index) => {
+  const replacements = value.map((entry, index) => {
     const record = requireRecord(entry, `${label}[${index}]`);
     exactKeys(record, REPLACEMENT_KEYS, `${label}[${index}]`);
     return {
@@ -198,6 +267,86 @@ function readReplacements(value: unknown, label: string): readonly NormalizedAss
       assets: sortedUniqueStrings(record.assets, `${label}[${index}].assets`),
     };
   });
+  return sortedUniqueBy(
+    replacements,
+    (replacement) => [
+      replacement.packId,
+      replacement.versions,
+      replacement.assets.join('\u0000'),
+    ].join('\u0000'),
+    label,
+  );
+}
+
+function readGeneratedSpriteConsumers(
+  value: unknown,
+  label: string,
+): readonly CompiledAssetSpriteConsumer[] {
+  if (!Array.isArray(value)) throw new Error(`${label} must be an array.`);
+  const consumers = value.map((entry, index) => {
+    const record = requireRecord(entry, `${label}[${index}]`);
+    const keys = record.variant === undefined
+      ? GENERATED_SPRITE_CONSUMER_KEYS.filter((key) => key !== 'variant')
+      : GENERATED_SPRITE_CONSUMER_KEYS;
+    exactKeys(record, keys, `${label}[${index}]`);
+    return {
+      itemId: stringAt(record, 'itemId', `${label}[${index}]`),
+      typeName: stringAt(record, 'typeName', `${label}[${index}]`),
+      layer: stringAt(record, 'layer', `${label}[${index}]`) as `layer_${number}`,
+      bodyTypes: sortedBodyTypes(record.bodyTypes, `${label}[${index}].bodyTypes`),
+      ...(record.variant === undefined
+        ? {}
+        : { variant: stringAt(record, 'variant', `${label}[${index}]`) }),
+    };
+  });
+  return sortedUniqueBy(
+    consumers,
+    (consumer) => JSON.stringify(canonical(consumer)),
+    label,
+  );
+}
+
+function sortedBodyTypes(
+  value: unknown,
+  label: string,
+): CompiledAssetSpriteConsumer['bodyTypes'] {
+  if (!Array.isArray(value) || value.some((bodyType) => typeof bodyType !== 'string' || bodyType.length === 0)) {
+    throw new Error(`${label} must be an array of non-empty strings.`);
+  }
+  const bodyTypes = [...value] as string[];
+  if (new Set(bodyTypes).size !== bodyTypes.length) {
+    throw new Error(`${label} must be unique.`);
+  }
+  const normalized = BODY_TYPES.filter((bodyType) => bodyTypes.includes(bodyType));
+  if (!pathsEqual(bodyTypes, normalized)) {
+    throw new Error(`${label} must use canonical body type order.`);
+  }
+  return normalized;
+}
+
+function readGeneratedSprites(
+  value: unknown,
+  label: string,
+): readonly Omit<AssetPackCompileProjectionSprite, 'packId'>[] {
+  if (!Array.isArray(value)) throw new Error(`${label} must be an array.`);
+  const sprites = value.map((entry, index) => {
+    const record = requireRecord(entry, `${label}[${index}]`);
+    exactKeys(record, GENERATED_SPRITE_KEYS, `${label}[${index}]`);
+    return {
+      assetId: stringAt(record, 'assetId', `${label}[${index}]`),
+      sourcePath: stringAt(record, 'sourcePath', `${label}[${index}]`),
+      sourceDigest: digestAt(record, 'sourceDigest', `${label}[${index}]`),
+      destinationPath: stringAt(record, 'destinationPath', `${label}[${index}]`),
+      destinationDigest: digestAt(record, 'destinationDigest', `${label}[${index}]`),
+      animation: stringAt(record, 'animation', `${label}[${index}]`),
+      consumers: readGeneratedSpriteConsumers(record.consumers, `${label}[${index}].consumers`),
+    };
+  });
+  return sortedUniqueBy(
+    sprites,
+    (sprite) => [sprite.destinationPath, sprite.sourcePath].join('\u0000'),
+    label,
+  );
 }
 
 function readCredits(value: unknown, label: string): readonly CreditEntry[] {
@@ -227,7 +376,7 @@ function readV1Entry(value: unknown): LinkedAssetPackRegistryEntryV1 {
   return {
     kind: 'linked', packId: stringAt(record, 'packId', 'Linked asset-pack registry entry'),
     version: stringAt(record, 'version', 'Linked asset-pack registry entry'), displayName: stringAt(record, 'displayName', 'Linked asset-pack registry entry'),
-    sourceDirectory: path.resolve(stringAt(record, 'sourceDirectory', 'Linked asset-pack registry entry')),
+    sourceDirectory: stringAt(record, 'sourceDirectory', 'Linked asset-pack registry entry'),
     contentDigest: stringAt(record, 'contentDigest', 'Linked asset-pack registry entry'),
     sourceDigests: sortedDigestRecord(record.sourceDigests, 'Linked asset-pack registry entry.sourceDigests'),
     generatedPaths: sortedUniqueStrings(record.generatedPaths, 'Linked asset-pack registry entry.generatedPaths'),
@@ -249,13 +398,21 @@ function readV2Entry(value: unknown, workspace: AssetWorkspace, workspaceId: str
     sourceDigests: sortedDigestRecord(record.sourceDigests, 'Asset-pack registry entry.sourceDigests'),
     generatedPaths: sortedUniqueStrings(record.generatedPaths, 'Asset-pack registry entry.generatedPaths'),
     logicalDestinations: sortedUniqueStrings(record.logicalDestinations, 'Asset-pack registry entry.logicalDestinations'),
+    generatedSprites: readGeneratedSprites(record.generatedSprites, 'Asset-pack registry entry.generatedSprites'),
     replacements: readReplacements(record.replacements, 'Asset-pack registry entry.replacements'),
     baselineDefinitionDigests: sortedDigestRecord(record.baselineDefinitionDigests, 'Asset-pack registry entry.baselineDefinitionDigests'),
     baselineCreditDigests: sortedDigestRecord(record.baselineCreditDigests, 'Asset-pack registry entry.baselineCreditDigests'),
     generatedCredits: readCredits(record.generatedCredits, 'Asset-pack registry entry.generatedCredits'),
   };
   if (kind === 'linked') {
-    return { ...base, kind, sourceDirectory: containedPath(workspace.packsRoot, stringAt(record, 'sourceDirectory', 'Asset-pack registry entry'), 'Linked asset-pack sourceDirectory') };
+    return {
+      ...base,
+      kind,
+      sourceDirectory: resolveLinkedAssetPackDirectory(
+        workspace,
+        stringAt(record, 'sourceDirectory', 'Asset-pack registry entry'),
+      ),
+    };
   }
   const installedDirectory = containedPath(path.join(workspace.stateRoot, 'installed'), stringAt(record, 'installedDirectory', 'Asset-pack registry entry'), 'Installed asset-pack installedDirectory');
   verifyInstallReceipt(installedDirectory, workspaceId, base, digestAt(record, 'archiveDigest', 'Asset-pack registry entry'));
@@ -274,8 +431,47 @@ function verifyInstallReceipt(directory: string, workspaceId: string, entry: Ass
   sortedDigestRecord(receipt.payloadDigests, 'Installed asset-pack receipt.payloadDigests');
 }
 
+function emptyCompileProjection(): AssetPackCompileProjection {
+  return { definitions: [], sprites: [], credits: [], ownership: [] };
+}
+
+function canonicalCompileProjection(
+  projection: AssetPackCompileProjection,
+): AssetPackCompileProjection {
+  return {
+    definitions: [...projection.definitions]
+      .sort((left, right) => left.logicalPath.localeCompare(right.logicalPath)),
+    sprites: [...projection.sprites]
+      .sort((left, right) => left.destinationPath.localeCompare(right.destinationPath)
+        || left.sourcePath.localeCompare(right.sourcePath))
+      .map((sprite) => ({
+        ...sprite,
+        consumers: [...sprite.consumers]
+          .sort((left, right) => JSON.stringify(canonical(left)).localeCompare(JSON.stringify(canonical(right))))
+          .map((consumer) => ({
+            ...consumer,
+            bodyTypes: BODY_TYPES.filter((bodyType) => consumer.bodyTypes.includes(bodyType)),
+          })),
+      })),
+    credits: [...projection.credits]
+      .sort((left, right) => left.file.localeCompare(right.file)),
+    ownership: [...projection.ownership]
+      .sort((left, right) => left.packId.localeCompare(right.packId))
+      .map((ownership) => ({
+        ...ownership,
+        logicalPaths: [...ownership.logicalPaths].sort((left, right) => left.localeCompare(right)),
+      })),
+  };
+}
+
 function emptyDocument(workspaceId: string): AssetPackRegistryDocument {
-  return { schema: ASSET_WORKSPACE_REGISTRY_SCHEMA, workspaceId, entries: [], generatedDigests: {}, compileDigest: sha256({ definitions: [], sprites: [], credits: [], ownership: [] }) };
+  return {
+    schema: ASSET_WORKSPACE_REGISTRY_SCHEMA,
+    workspaceId,
+    entries: [],
+    generatedDigests: {},
+    compileDigest: assetPackCompileDigest(emptyCompileProjection()),
+  };
 }
 
 function canonical(value: unknown): unknown {
@@ -286,6 +482,137 @@ function canonical(value: unknown): unknown {
 
 function sha256(value: unknown): string {
   return `sha256:${createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex')}`;
+}
+
+function pathsEqual(left: readonly string[], right: readonly string[]): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function creditOwnsDestination(credit: CreditEntry, destinationPath: string): boolean {
+  const creditPath = `spritesheets/${credit.file}`;
+  return destinationPath === creditPath || destinationPath.startsWith(`${creditPath}/`);
+}
+
+function validateGeneratedEntryRelationships(
+  entries: readonly AssetPackRegistryEntry[],
+  generatedDigests: Readonly<Record<string, string>>,
+): void {
+  for (const entry of entries) {
+    const spriteDestinations = entry.generatedSprites.map((sprite) => sprite.destinationPath);
+    if (!pathsEqual(entry.logicalDestinations, spriteDestinations)) {
+      throw new Error(`Asset-pack registry logical destinations must exactly match generated sprites for ${entry.packId}.`);
+    }
+    const ownedPaths = new Set(entry.generatedPaths);
+    for (const sprite of entry.generatedSprites) {
+      if (!ownedPaths.has(sprite.destinationPath)) {
+        throw new Error(`Asset-pack registry generated sprite destination is not owned by ${entry.packId}: ${sprite.destinationPath}.`);
+      }
+      if (entry.sourceDigests[sprite.sourcePath] !== sprite.sourceDigest) {
+        throw new Error(`Asset-pack registry generated sprite source digest does not match ${entry.packId}: ${sprite.sourcePath}.`);
+      }
+      if (generatedDigests[sprite.destinationPath] !== sprite.destinationDigest) {
+        throw new Error(`Asset-pack registry generated sprite destination digest does not match ${entry.packId}: ${sprite.destinationPath}.`);
+      }
+    }
+    for (const generatedPath of entry.generatedPaths) {
+      if (!ownedPaths.has(generatedPath)) continue;
+      if (!spriteDestinations.includes(generatedPath) && !generatedPath.startsWith('sheet_definitions/')) {
+        throw new Error(`Asset-pack registry generated path is neither a definition nor a logical destination for ${entry.packId}: ${generatedPath}.`);
+      }
+    }
+    for (const credit of entry.generatedCredits) {
+      if (!entry.logicalDestinations.some((destination) => creditOwnsDestination(credit, destination))) {
+        throw new Error(`Asset-pack registry generated credit is not associated with an owned destination for ${entry.packId}: ${credit.file}.`);
+      }
+    }
+    for (const destination of entry.logicalDestinations) {
+      if (!entry.generatedCredits.some((credit) => creditOwnsDestination(credit, destination))) {
+        throw new Error(`Asset-pack registry logical destination is missing generated credit coverage for ${entry.packId}: ${destination}.`);
+      }
+    }
+  }
+}
+
+function readCompileDefinitions(
+  workspace: AssetWorkspace,
+  entries: readonly AssetPackRegistryEntry[],
+): readonly AssetPackCompileProjectionDefinition[] {
+  const logicalPaths = [...new Set(entries.flatMap((entry) => entry.generatedPaths)
+    .filter((generatedPath) => generatedPath.startsWith('sheet_definitions/')))]
+    .sort((left, right) => left.localeCompare(right));
+  return logicalPaths.map((logicalPath) => {
+    const filePath = path.join(workspace.outputRoot, logicalPath);
+    const definition = requireRecord(
+      JSON.parse(readFileSync(filePath, 'utf8')) as unknown,
+      `Generated definition ${logicalPath}`,
+    ) as unknown as ItemDefinition;
+    return { logicalPath, definition };
+  });
+}
+
+function uniqueGeneratedCredits(
+  entries: readonly AssetPackRegistryEntry[],
+): readonly CreditEntry[] {
+  const credits = new Map<string, CreditEntry>();
+  for (const credit of entries.flatMap((entry) => entry.generatedCredits)) {
+    const existing = credits.get(credit.file);
+    if (existing !== undefined && JSON.stringify(canonical(existing)) !== JSON.stringify(canonical(credit))) {
+      throw new Error(`Asset-pack registry generated credits disagree for ${credit.file}.`);
+    }
+    credits.set(credit.file, credit);
+  }
+  return [...credits.values()].sort((left, right) => left.file.localeCompare(right.file));
+}
+
+export function assetPackCompileProjectionFromRegistry(options: {
+  readonly workspace: AssetWorkspace;
+  readonly entries: readonly AssetPackRegistryEntry[];
+}): AssetPackCompileProjection {
+  return {
+    definitions: readCompileDefinitions(options.workspace, options.entries),
+    sprites: options.entries.flatMap((entry) => entry.generatedSprites.map((sprite) => ({
+      ...sprite,
+      packId: entry.packId,
+    }))),
+    credits: uniqueGeneratedCredits(options.entries),
+    ownership: options.entries.map((entry) => ({
+      packId: entry.packId,
+      logicalPaths: entry.generatedPaths,
+    })),
+  };
+}
+
+export function assetPackCompileProjectionFromPlan(options: {
+  readonly compilePlan: AssetPackCompilePlan;
+  readonly sourceDigestsByPackId: ReadonlyMap<string, ReadonlyMap<string, string>>;
+}): AssetPackCompileProjection {
+  return {
+    definitions: options.compilePlan.definitions.map((definition) => ({
+      logicalPath: definition.logicalPath,
+      definition: definition.definition,
+    })),
+    sprites: options.compilePlan.sprites.map((sprite) => {
+      const sourceDigest = options.sourceDigestsByPackId.get(sprite.packId)?.get(sprite.sourcePath);
+      if (sourceDigest === undefined) {
+        throw new Error(`No captured source digest for compiled sprite ${sprite.packId}:${sprite.sourcePath}.`);
+      }
+      return {
+        packId: sprite.packId,
+        assetId: sprite.assetId,
+        sourcePath: sprite.sourcePath,
+        sourceDigest,
+        destinationPath: sprite.destinationPath,
+        destinationDigest: sourceDigest,
+        animation: sprite.animation,
+        consumers: sprite.consumers,
+      };
+    }),
+    credits: options.compilePlan.credits,
+    ownership: options.compilePlan.ownership.map((ownership) => ({
+      packId: ownership.packId,
+      logicalPaths: ownership.logicalPaths,
+    })),
+  };
 }
 
 export function readAssetPackRegistry(options: { readonly workspace: AssetWorkspace; readonly markerWorkspaceId: string }): AssetPackRegistryReadResult {
@@ -306,7 +633,22 @@ export function readAssetPackRegistry(options: { readonly workspace: AssetWorksp
       const entries = record.entries.map(readV1Entry);
       const ids = entries.map((entry) => entry.packId);
       if (new Set(ids).size !== ids.length || JSON.stringify(ids) !== JSON.stringify([...ids].sort((left, right) => left.localeCompare(right)))) throw new Error('Asset workspace registry entries must have sorted unique pack IDs.');
-      return { ok: true, needsMigration: true, document: { schema: ASSET_WORKSPACE_REGISTRY_V1_SCHEMA, workspaceId, entries, generatedDigests: sortedDigestRecord(record.generatedDigests, 'Asset workspace registry.generatedDigests') } };
+      const generatedDigests = sortedDigestRecord(record.generatedDigests, 'Asset workspace registry.generatedDigests');
+      const owned = new Set(entries.flatMap((entry) => entry.generatedPaths));
+      if (entries.length > 0) owned.add('CREDITS.csv');
+      if (!pathsEqual(Object.keys(generatedDigests), [...owned].sort((left, right) => left.localeCompare(right)))) {
+        throw new Error('Asset workspace registry generatedDigests must exactly cover generated output paths.');
+      }
+      return {
+        ok: true,
+        needsMigration: true,
+        document: {
+          schema: ASSET_WORKSPACE_REGISTRY_V1_SCHEMA,
+          workspaceId,
+          entries,
+          generatedDigests,
+        },
+      };
     }
     if (schema !== ASSET_WORKSPACE_REGISTRY_SCHEMA) throw new Error(`Unknown asset workspace registry schema: ${schema}.`);
     exactKeys(record, V2_DOCUMENT_KEYS, 'Asset workspace registry');
@@ -322,8 +664,12 @@ export function readAssetPackRegistry(options: { readonly workspace: AssetWorksp
     const owned = new Set(entries.flatMap((entry) => entry.generatedPaths));
     if (entries.length > 0) owned.add('CREDITS.csv');
     if (JSON.stringify(Object.keys(generatedDigests)) !== JSON.stringify([...owned].sort((left, right) => left.localeCompare(right)))) throw new Error('Asset workspace registry generatedDigests must exactly cover generated output paths.');
+    validateGeneratedEntryRelationships(entries, generatedDigests);
     const compileDigest = digestAt(record, 'compileDigest', 'Asset workspace registry');
-    if (compileDigest !== assetPackCompileDigest({ entries, generatedDigests })) {
+    if (compileDigest !== assetPackCompileDigest(assetPackCompileProjectionFromRegistry({
+      workspace: options.workspace,
+      entries,
+    }))) {
       throw new Error('Asset workspace registry compileDigest does not match the compiled registry state.');
     }
     const document: AssetPackRegistryDocument = { schema: ASSET_WORKSPACE_REGISTRY_SCHEMA, workspaceId, entries, generatedDigests, compileDigest };
@@ -348,8 +694,8 @@ export function assetPackRegistryBytes(document: AssetPackRegistryDocument): Buf
   return Buffer.from(`${JSON.stringify(canonical(document), null, 2)}\n`);
 }
 
-export function assetPackCompileDigest(value: unknown): string {
-  return sha256(value);
+export function assetPackCompileDigest(projection: AssetPackCompileProjection): string {
+  return sha256(canonicalCompileProjection(projection));
 }
 
 export function snapshotManagedOutputFiles(root: string): Map<string, Buffer> {
