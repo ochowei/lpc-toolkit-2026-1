@@ -206,6 +206,32 @@ describe('human-readable CLI output', () => {
     expect(acknowledged.stderr).toContain('Available: braid');
   });
 
+  it('prints unavailable asset preview animation details', async () => {
+    const fixture = createWarningAssetCommandFixture();
+    await acknowledgeWarning(fixture);
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+
+    const code = await runCli([
+      'asset', 'preview', fixture.packRoot,
+      '--animation', 'run',
+      '--workspace', fixture.workspace.root,
+    ], {
+      cwd: fixture.workspace.root,
+      stdout: (text) => stdout.push(text),
+      stderr: (text) => stderr.push(text),
+    }, {
+      prepareRuntimeAssets: async () => fixture.runtime,
+    });
+
+    expect(code).toBe(1);
+    expect(stdout).toEqual([]);
+    expect(stderr.join('')).toBe(
+      'preview_animation_unavailable: The requested preview animation is unavailable. (run)\n'
+      + 'Available: walk, climb\n',
+    );
+  });
+
   it('prints workspace and scaffold paths', () => {
     expect(formatHumanResponse({
       ok: true,

@@ -25,6 +25,7 @@ import {
   validateAssetPackDirectory,
 } from './asset-pack-validation.js';
 import type { AssetWorkspace } from './asset-workspace.js';
+import { PreviewError } from './preview.js';
 import {
   commandError,
   commandOk,
@@ -407,6 +408,14 @@ function previewErrorResponse(error: unknown): CliResponse<null> {
       error.message,
       error.path,
       compatibleIssueDetails(error.details),
+    ));
+  }
+  if (error instanceof PreviewError) {
+    return commandError('asset preview', issue(
+      error.code,
+      error.message,
+      error.path,
+      error.details,
     ));
   }
   return commandError('asset preview', issue(

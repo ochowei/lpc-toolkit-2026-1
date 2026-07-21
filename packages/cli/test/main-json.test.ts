@@ -141,6 +141,41 @@ describe('main json behavior', () => {
     });
   });
 
+  it('preserves unavailable asset preview animation errors in the JSON envelope', async () => {
+    const fixture = createWarningAssetCommandFixture();
+    await acknowledgeWarning(fixture);
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+
+    const code = await runCli([
+      'asset', 'preview', fixture.packRoot,
+      '--animation', 'run',
+      '--workspace', fixture.workspace.root,
+      '--json',
+    ], {
+      cwd: fixture.workspace.root,
+      stdout: (text) => stdout.push(text),
+      stderr: (text) => stderr.push(text),
+    }, {
+      prepareRuntimeAssets: async () => fixture.runtime,
+    });
+
+    expect(code).toBe(1);
+    expect(stderr).toEqual([]);
+    expect(JSON.parse(stdout.join(''))).toEqual({
+      ok: false,
+      command: 'asset preview',
+      data: null,
+      warnings: [],
+      errors: [{
+        code: 'preview_animation_unavailable',
+        message: 'The requested preview animation is unavailable.',
+        path: 'run',
+        details: { available: ['walk', 'climb'] },
+      }],
+    });
+  });
+
   it('returns the standard workspace-init JSON envelope without runtime assets', async () => {
     const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-main-json-workspace-'));
     const stdout: string[] = [];
