@@ -1468,7 +1468,8 @@ Evidence captured on 2026-07-21 after the whole-branch reviewer fixes:
 - Branch: `codex/artist-asset-pack-authoring-design`.
 - Verified product HEAD: `6915b14a1c3e1c052c1fc1554989e890066a0807`.
 - Phase 1 whole-branch review base (approved design spec): `c712f459eb9bfd3e1d99b2f641be804e9da97c5`.
-- Current handoff HEAD: `cf6802381d6bfe05e67c4bd28b1c7ebbd6bdc9bc` (plan/report evidence commit after verified product HEAD).
+- Prior handoff evidence commit: `cf6802381d6bfe05e67c4bd28b1c7ebbd6bdc9bc` (plan/report evidence after verified product HEAD).
+- Current handoff HEAD: `9d6d1b5fd04946376f9b2a5336e6f980fcfda8dc` (final bookkeeping correction after whole-branch re-review).
 - This handoff record is intentionally committed after the verified product HEAD; its commit hash is reported by the live handoff because a commit cannot embed its own hash.
 
 Full product commit hashes, grouped in implementation order:
