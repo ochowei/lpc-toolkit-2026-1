@@ -904,15 +904,15 @@ Then update this task's plan record and commit it separately.
 - Create: `packages/cli/test/asset-pack-validation.test.ts`
 - Modify: `packages/cli/src/node-canvas-adapter.ts` only if a small existing decode helper must be exported
 
-- [ ] **Step 1: Write failing PNG inspection tests**
+- [x] **Step 1: Write failing PNG inspection tests**
 
 Generate small canvases with the existing test canvas helper; do not check in large binary fixtures. Cover exact `climb` dimensions, a wrong dimension, one required transparent cell, optional transparent padding, corrupt bytes, missing files, recolor ramp presence/absence, and two layers with incompatible geometry.
 
-- [ ] **Step 2: Write failing baseline integration tests**
+- [x] **Step 2: Write failing baseline integration tests**
 
 Use a tiny attributed base fixture with catalog/palette records to assert normalized definition and credit digests, existing-item drift, registered references, missing acknowledgement, accepted acknowledgement, and JSON-safe diagnostic details. Also assert no write occurs below `runtime.context.assetsRoot` or the runtime store/cache.
 
-- [ ] **Step 3: Run the focused test and verify RED**
+- [x] **Step 3: Run the focused test and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-validation.test.ts
@@ -920,11 +920,11 @@ rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-validation.test.ts
 
 Expected: FAIL because CLI validation orchestration does not exist.
 
-- [ ] **Step 4: Implement bounded pixel inspection**
+- [x] **Step 4: Implement bounded pixel inspection**
 
 Decode through the existing Node canvas adapter. Reject unexpected dimensions before allocating any additional full-sheet buffer. Scan only geometry cells; represent nontransparent cells by `<row>:<column>` and unique opaque RGB colors by lowercase hex. Inspect at fixed concurrency `4` with deterministic result ordering and no public concurrency flag.
 
-- [ ] **Step 5: Implement baseline and Core orchestration**
+- [x] **Step 5: Implement baseline and Core orchestration**
 
 Load catalog and palettes from the active base while excluding this workspace's manager-owned generated output from baseline digest input. Phase 1 does not adopt an unowned custom root. Canonicalize definitions and item credits with the same CLI SHA helper. Return:
 
@@ -942,7 +942,7 @@ export interface AssetPackValidationReport {
 
 Core parse failures use the same report rather than throwing unstructured errors. Fatal filesystem/runtime failures become the existing failed CLI response envelope in Task 11.
 
-- [ ] **Step 6: Verify GREEN**
+- [x] **Step 6: Verify GREEN**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-validation.test.ts
@@ -952,7 +952,7 @@ rtk pnpm check:boundaries
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit product code**
+- [x] **Step 7: Commit product code**
 
 ```sh
 rtk git add packages/cli/src/asset-pack-validation.ts packages/cli/test/asset-pack-validation.test.ts packages/cli/src/node-canvas-adapter.ts
@@ -960,6 +960,12 @@ rtk git commit -m "feat(cli): validate artist sprite sources"
 ```
 
 Omit `node-canvas-adapter.ts` from `git add` if no change was needed. Then update this task's plan record and commit it separately.
+
+Task 7 record:
+
+- Implementation: Added bounded existing-canvas PNG inspection with fixed concurrency and deterministic results, geometry/cell/color extraction, active baseline catalog/palette orchestration excluding manager output, and report-shaped Core validation integration with read-only runtime safety.
+- Product commit: `3f3e54e5008fccee4dec0f996cc18ee8afccbbe0`.
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-validation.test.ts` PASS; `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS; `rtk pnpm check:boundaries` PASS; reviewer APPROVED.
 
 ---
 
