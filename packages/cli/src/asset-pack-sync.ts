@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdtempSync, readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { mkdtempSync, readFileSync, existsSync, statSync } from 'node:fs';
 import {
   mkdirSync,
   renameSync,
@@ -23,6 +23,14 @@ import {
   type AssetWorkspace,
 } from './asset-workspace.js';
 import {
+  assetPackCompileDigest,
+  assetPackRegistryBytes,
+  auditPublishedManagedOutput,
+  readAssetPackRegistry,
+  type AssetPackRegistryDocument,
+  type LinkedAssetPackRegistryEntry,
+} from './asset-pack-registry.js';
+import {
   loadAssetPackFiles,
   type AssetPackFileDiagnostic,
   type AssetPackFilesSuccess,
@@ -35,32 +43,8 @@ import type { RuntimeAssets } from './runtime-assets.js';
 
 const OUTPUT_MARKER_FILE = '.lpc-toolkit-managed.json';
 const OUTPUT_MARKER_KEYS = ['schema', 'workspaceId'] as const;
-const REGISTRY_KEYS = ['schema', 'workspaceId', 'entries', 'generatedDigests'] as const;
-const REGISTRY_ENTRY_KEYS = [
-  'kind',
-  'packId',
-  'version',
-  'displayName',
-  'sourceDirectory',
-  'contentDigest',
-  'sourceDigests',
-  'generatedPaths',
-  'baselineDefinitionDigests',
-  'baselineCreditDigests',
-] as const;
 
-export interface LinkedAssetPackRegistryEntry {
-  readonly kind: 'linked';
-  readonly packId: string;
-  readonly version: string;
-  readonly displayName: string;
-  readonly sourceDirectory: string;
-  readonly contentDigest: string;
-  readonly sourceDigests: Readonly<Record<string, string>>;
-  readonly generatedPaths: readonly string[];
-  readonly baselineDefinitionDigests: Readonly<Record<string, string>>;
-  readonly baselineCreditDigests: Readonly<Record<string, string>>;
-}
+export type { LinkedAssetPackRegistryEntry } from './asset-pack-registry.js';
 
 export interface AssetPackSyncDiagnostic {
   readonly code: string;
@@ -97,13 +81,6 @@ export interface AssetPublicationFileOps {
 interface ManagedOutputMarker {
   readonly schema: typeof ASSET_OUTPUT_MARKER_SCHEMA;
   readonly workspaceId: string;
-}
-
-interface RegistryDocument {
-  readonly schema: typeof ASSET_WORKSPACE_REGISTRY_SCHEMA;
-  readonly workspaceId: string;
-  readonly entries: readonly LinkedAssetPackRegistryEntry[];
-  readonly generatedDigests: Readonly<Record<string, string>>;
 }
 
 export interface ValidatedLinkedAssetPack {
@@ -170,36 +147,6 @@ function requireString(
   return value;
 }
 
-function requireStringRecord(
-  record: Record<string, unknown>,
-  key: string,
-  message: string,
-): Readonly<Record<string, string>> {
-  const value = record[key];
-  if (!isRecord(value)) {
-    throw new Error(message);
-  }
-  const entries = Object.entries(value);
-  if (entries.some(([, entry]) => typeof entry !== 'string')) {
-    throw new Error(message);
-  }
-  return Object.fromEntries(
-    entries.sort(([left], [right]) => left.localeCompare(right)),
-  ) as Readonly<Record<string, string>>;
-}
-
-function requireStringArray(
-  record: Record<string, unknown>,
-  key: string,
-  message: string,
-): readonly string[] {
-  const value = record[key];
-  if (!Array.isArray(value) || value.some((entry) => typeof entry !== 'string')) {
-    throw new Error(message);
-  }
-  return [...value];
-}
-
 function sortRecord(record: Readonly<Record<string, string>>): Readonly<Record<string, string>> {
   return Object.fromEntries(
     Object.entries(record).sort(([left], [right]) => left.localeCompare(right)),
@@ -229,15 +176,6 @@ function sortedJsonBytes(value: unknown): Buffer {
   return Buffer.from(`${JSON.stringify(canonicalize(value), null, 2)}\n`);
 }
 
-function writeSortedJson(
-  fileOps: AssetPublicationFileOps,
-  filePath: string,
-  value: unknown,
-): void {
-  fileOps.mkdirSync(path.dirname(filePath), { recursive: true });
-  fileOps.writeFileSync(filePath, sortedJsonBytes(value));
-}
-
 function toSyncDiagnostic(
   diagnostic: AssetPackDiagnostic | AssetPackFileDiagnostic,
 ): AssetPackSyncDiagnostic {
@@ -264,31 +202,6 @@ function syncFailure(
 
 function outputMarkerPath(workspace: AssetWorkspace): string {
   return path.join(workspace.outputRoot, OUTPUT_MARKER_FILE);
-}
-
-function relativeOutputPath(root: string, filePath: string): string {
-  return path.relative(root, filePath).split(path.sep).join('/');
-}
-
-function snapshotManagedOutputFiles(root: string): Map<string, Buffer> {
-  const files = new Map<string, Buffer>();
-
-  function visit(current: string): void {
-    for (const entry of readdirSync(current, { withFileTypes: true })) {
-      const absolutePath = path.join(current, entry.name);
-      if (entry.isDirectory()) {
-        visit(absolutePath);
-        continue;
-      }
-      files.set(relativeOutputPath(root, absolutePath), readFileSync(absolutePath));
-    }
-  }
-
-  if (existsSync(root)) {
-    visit(root);
-  }
-
-  return files;
 }
 
 function readManagedOutputMarker(workspace: AssetWorkspace): {
@@ -321,165 +234,6 @@ function readManagedOutputMarker(workspace: AssetWorkspace): {
     },
     bytes,
   };
-}
-
-function readRegistryDocument(
-  workspace: AssetWorkspace,
-  markerWorkspaceId: string,
-): AssetPackSyncFailure | {
-  readonly ok: true;
-  readonly document: RegistryDocument;
-} {
-  if (!existsSync(workspace.registryPath)) {
-    const managedFiles = snapshotManagedOutputFiles(workspace.outputRoot);
-    managedFiles.delete(OUTPUT_MARKER_FILE);
-    if (managedFiles.size > 0) {
-      return syncFailure([{
-        code: 'asset_output_root_unowned',
-        severity: 'error',
-        message: 'Managed asset output contains files but the linked-pack registry is missing.',
-        path: workspace.outputRoot,
-      }]);
-    }
-    return {
-      ok: true,
-      document: {
-        schema: ASSET_WORKSPACE_REGISTRY_SCHEMA,
-        workspaceId: markerWorkspaceId,
-        entries: [],
-        generatedDigests: {},
-      },
-    };
-  }
-
-  try {
-    const parsed = JSON.parse(readFileSync(workspace.registryPath, 'utf8')) as unknown;
-    if (!isRecord(parsed)) {
-      throw new Error('Asset workspace registry must be a JSON object.');
-    }
-    exactKeys(parsed, REGISTRY_KEYS, 'Asset workspace registry');
-    const schema = requireString(
-      parsed,
-      'schema',
-      'Asset workspace registry must include a string schema.',
-    );
-    if (schema !== ASSET_WORKSPACE_REGISTRY_SCHEMA) {
-      throw new Error(`Unknown asset workspace registry schema: ${schema}`);
-    }
-    const workspaceId = requireString(
-      parsed,
-      'workspaceId',
-      'Asset workspace registry must include a string workspaceId.',
-    );
-    if (workspaceId !== markerWorkspaceId) {
-      return syncFailure([{
-        code: 'asset_output_root_unowned',
-        severity: 'error',
-        message: 'Managed asset output marker does not match the linked-pack registry.',
-        path: workspace.registryPath,
-      }]);
-    }
-    const rawEntries = parsed['entries'];
-    if (!Array.isArray(rawEntries)) {
-      throw new Error('Asset workspace registry must include an entries array.');
-    }
-    const entries = rawEntries.map((entry): LinkedAssetPackRegistryEntry => {
-      if (!isRecord(entry)) {
-        throw new Error('Linked asset-pack registry entry must be a JSON object.');
-      }
-      exactKeys(entry, REGISTRY_ENTRY_KEYS, 'Linked asset-pack registry entry');
-      const kind = requireString(entry, 'kind', 'Linked asset-pack registry entry must include a kind.');
-      if (kind !== 'linked') {
-        throw new Error(`Unknown linked asset-pack registry entry kind: ${kind}`);
-      }
-      return {
-        kind: 'linked',
-        packId: requireString(entry, 'packId', 'Linked asset-pack registry entry must include a packId.'),
-        version: requireString(entry, 'version', 'Linked asset-pack registry entry must include a version.'),
-        displayName: requireString(
-          entry,
-          'displayName',
-          'Linked asset-pack registry entry must include a displayName.',
-        ),
-        sourceDirectory: path.resolve(
-          requireString(
-            entry,
-            'sourceDirectory',
-            'Linked asset-pack registry entry must include a sourceDirectory.',
-          ),
-        ),
-        contentDigest: requireString(
-          entry,
-          'contentDigest',
-          'Linked asset-pack registry entry must include a contentDigest.',
-        ),
-        sourceDigests: sortRecord(requireStringRecord(
-          entry,
-          'sourceDigests',
-          'Linked asset-pack registry entry must include a sourceDigests object.',
-        )),
-        generatedPaths: [...requireStringArray(
-          entry,
-          'generatedPaths',
-          'Linked asset-pack registry entry must include a generatedPaths array.',
-        )].sort((left: string, right: string) => left.localeCompare(right)),
-        baselineDefinitionDigests: sortRecord(requireStringRecord(
-          entry,
-          'baselineDefinitionDigests',
-          'Linked asset-pack registry entry must include a baselineDefinitionDigests object.',
-        )),
-        baselineCreditDigests: sortRecord(requireStringRecord(
-          entry,
-          'baselineCreditDigests',
-          'Linked asset-pack registry entry must include a baselineCreditDigests object.',
-        )),
-      };
-    });
-    const generatedDigests = sortRecord(requireStringRecord(
-      parsed,
-      'generatedDigests',
-      'Asset workspace registry must include a generatedDigests object.',
-    ));
-    const malformedDigestPath = Object.entries(generatedDigests)
-      .find(([, digest]) => !/^sha256:[0-9a-f]{64}$/.test(digest))?.[0];
-    if (malformedDigestPath) {
-      throw new Error(
-        `Asset workspace registry contains an invalid generated digest: ${malformedDigestPath}`,
-      );
-    }
-    const expectedGeneratedPaths = new Set<string>();
-    entries.forEach((entry) => {
-      entry.generatedPaths.forEach((generatedPath) => {
-        expectedGeneratedPaths.add(generatedPath);
-      });
-    });
-    if (entries.length > 0) {
-      expectedGeneratedPaths.add('CREDITS.csv');
-    }
-    const expectedDigestPaths = [...expectedGeneratedPaths]
-      .sort((left, right) => left.localeCompare(right));
-    const actualDigestPaths = Object.keys(generatedDigests);
-    if (JSON.stringify(actualDigestPaths) !== JSON.stringify(expectedDigestPaths)) {
-      throw new Error('Asset workspace registry generatedDigests must exactly cover generated output paths.');
-    }
-
-    return {
-      ok: true,
-      document: {
-        schema: ASSET_WORKSPACE_REGISTRY_SCHEMA,
-        workspaceId,
-        entries: [...entries].sort((left, right) => left.packId.localeCompare(right.packId)),
-        generatedDigests,
-      },
-    };
-  } catch (error) {
-    return syncFailure([{
-      code: 'asset_digest_mismatch',
-      severity: 'error',
-      message: errorMessage(error),
-      path: workspace.registryPath,
-    }]);
-  }
 }
 
 function collectBaselineDefinitionDigests(
@@ -602,61 +356,6 @@ function creditsManifest(credits: readonly CreditEntry[]): CreditsManifest {
     resolvedPaths: credits.map((credit) => `spritesheets/${credit.file}`),
     licenses: uniqueLicenses(credits),
   };
-}
-
-function auditPublishedManagedOutput(options: {
-  readonly workspace: AssetWorkspace;
-  readonly markerBytes: Buffer;
-  readonly generatedDigests: Readonly<Record<string, string>>;
-}): AssetPackSyncFailure | undefined {
-  const actualFiles = snapshotManagedOutputFiles(options.workspace.outputRoot);
-  const expectedPathSet = new Set<string>([OUTPUT_MARKER_FILE]);
-  Object.keys(options.generatedDigests).forEach((generatedPath) => {
-    expectedPathSet.add(generatedPath);
-  });
-
-  const strayPath = [...actualFiles.keys()]
-    .sort((left, right) => left.localeCompare(right))
-    .find((filePath) => !expectedPathSet.has(filePath));
-  if (strayPath) {
-    return syncFailure([{
-      code: 'asset_output_root_unowned',
-      severity: 'error',
-      message: `Managed asset output contains an unowned file: ${strayPath}`,
-      path: path.join(options.workspace.outputRoot, strayPath),
-    }]);
-  }
-
-  const missingPath = [...expectedPathSet]
-    .sort((left, right) => left.localeCompare(right))
-    .find((filePath) => !actualFiles.has(filePath));
-  if (missingPath) {
-    return syncFailure([{
-      code: 'asset_digest_mismatch',
-      severity: 'error',
-      message: `Managed asset output is missing a registry-owned file: ${missingPath}`,
-      path: path.join(options.workspace.outputRoot, missingPath),
-    }]);
-  }
-
-  const markerBytes = actualFiles.get(OUTPUT_MARKER_FILE);
-  const mismatchedPath = markerBytes === undefined || !markerBytes.equals(options.markerBytes)
-    ? OUTPUT_MARKER_FILE
-    : Object.entries(options.generatedDigests)
-      .find(([filePath, digest]) => {
-        const actual = actualFiles.get(filePath);
-        return actual === undefined || sha256Buffer(actual) !== digest;
-      })?.[0];
-  if (mismatchedPath) {
-    return syncFailure([{
-      code: 'asset_digest_mismatch',
-      severity: 'error',
-      message: `Managed asset output differs from the registry-owned generated file: ${mismatchedPath}`,
-      path: path.join(options.workspace.outputRoot, mismatchedPath),
-    }]);
-  }
-
-  return undefined;
 }
 
 function preflightPublish(workspace: AssetWorkspace): AssetPackSyncFailure | undefined {
@@ -787,8 +486,11 @@ export async function prepareLinkedAssetPackDesiredState(options: {
     }]);
   }
 
-  const registryResult = readRegistryDocument(options.workspace, marker.workspaceId);
-  if (!registryResult.ok) return registryResult;
+  const registryResult = readAssetPackRegistry({
+    workspace: options.workspace,
+    markerWorkspaceId: marker.workspaceId,
+  });
+  if (!registryResult.ok) return syncFailure(registryResult.diagnostics);
 
   const requestedResult = await validateLinkedPack(
     options.packDirectory,
@@ -803,6 +505,15 @@ export async function prepareLinkedAssetPackDesiredState(options: {
 
   const retainedValidated: ValidatedLinkedAssetPack[] = [];
   for (const entry of retainedEntries) {
+    if (entry.kind !== 'linked') {
+      return syncFailure([{
+        code: 'asset_publish_failed',
+        severity: 'error',
+        message: `Phase 1 sync cannot publish an installed registry entry: ${entry.packId}.`,
+        path: options.workspace.registryPath,
+        packId: entry.packId,
+      }]);
+    }
     const validated = await validateLinkedPack(
       entry.sourceDirectory,
       options.runtime,
@@ -810,6 +521,19 @@ export async function prepareLinkedAssetPackDesiredState(options: {
       entry.packId,
     );
     if (!validated.ok) return validated;
+    if (
+      validated.validated.loaded.contentDigest !== entry.contentDigest ||
+      JSON.stringify(sortRecord(Object.fromEntries(validated.validated.loaded.sourceDigests))) !==
+        JSON.stringify(entry.sourceDigests)
+    ) {
+      return syncFailure([{
+        code: 'asset_digest_mismatch',
+        severity: 'error',
+        message: `Linked asset-pack source differs from the registry snapshot: ${entry.packId}.`,
+        path: entry.sourceDirectory,
+        packId: entry.packId,
+      }]);
+    }
     retainedValidated.push(validated.validated);
   }
 
@@ -818,7 +542,7 @@ export async function prepareLinkedAssetPackDesiredState(options: {
     markerBytes,
     generatedDigests: registryResult.document.generatedDigests,
   });
-  if (publishedOutputFailure) return publishedOutputFailure;
+  if (publishedOutputFailure) return syncFailure([publishedOutputFailure]);
 
   const validatedPacks = [
     ...retainedValidated,
@@ -841,6 +565,15 @@ export async function prepareLinkedAssetPackDesiredState(options: {
   const generatedPathsByPackId = new Map(
     compilePlan.ownership.map((ownership) => [ownership.packId, ownership.logicalPaths] as const),
   );
+  const logicalDestinationsByPackId = new Map(
+    validatedPacks.map((pack) => [
+      pack.loaded.pack.id,
+      compilePlan.sprites
+        .filter((sprite) => sprite.packId === pack.loaded.pack.id)
+        .map((sprite) => sprite.destinationPath)
+        .sort((left, right) => left.localeCompare(right)),
+    ] as const),
+  );
   const registryEntries = validatedPacks.map((pack): LinkedAssetPackRegistryEntry => ({
     kind: 'linked',
     packId: pack.loaded.pack.id,
@@ -853,8 +586,15 @@ export async function prepareLinkedAssetPackDesiredState(options: {
     )),
     generatedPaths: [...(generatedPathsByPackId.get(pack.loaded.pack.id) ?? [])]
       .sort((left, right) => left.localeCompare(right)),
+    logicalDestinations: logicalDestinationsByPackId.get(pack.loaded.pack.id) ?? [],
+    replacements: pack.loaded.pack.replacements,
+    acknowledgements: pack.loaded.pack.acknowledgements,
     baselineDefinitionDigests: collectBaselineDefinitionDigests(pack.loaded.pack),
     baselineCreditDigests: collectBaselineCreditDigests(pack.loaded.pack),
+    generatedCredits: compilePlan.credits
+      .filter((credit) => (logicalDestinationsByPackId.get(pack.loaded.pack.id) ?? [])
+        .some((destination) => destination === `spritesheets/${credit.file}` || destination.startsWith(`spritesheets/${credit.file}/`)))
+      .sort((left, right) => left.file.localeCompare(right.file)),
   })).sort((left, right) => left.packId.localeCompare(right.packId));
 
   const linked = registryEntries.find((entry) => entry.packId === requested.loaded.pack.id);
@@ -953,12 +693,17 @@ export async function syncLinkedAssetPack(options: {
     const creditsBytes = Buffer.from(creditsToCsv(creditsManifest(compilePlan.credits), 'walk'));
     fileOps.writeFileSync(path.join(stagedOutputRoot, 'CREDITS.csv'), creditsBytes);
     generatedDigests.set('CREDITS.csv', sha256Buffer(creditsBytes));
-    writeSortedJson(fileOps, stagedRegistryPath, {
+    const registryDocument: AssetPackRegistryDocument = {
       schema: ASSET_WORKSPACE_REGISTRY_SCHEMA,
       workspaceId,
       entries: registryEntries,
       generatedDigests: sortRecord(Object.fromEntries(generatedDigests)),
-    });
+      compileDigest: assetPackCompileDigest({
+        entries: registryEntries,
+        generatedDigests: sortRecord(Object.fromEntries(generatedDigests)),
+      }),
+    };
+    fileOps.writeFileSync(stagedRegistryPath, assetPackRegistryBytes(registryDocument));
 
     const publishResult = publishStagedGeneration({
       fileOps,

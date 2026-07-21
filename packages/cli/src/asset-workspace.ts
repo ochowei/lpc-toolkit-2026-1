@@ -12,7 +12,7 @@ import { randomUUID } from 'node:crypto';
 
 export const ASSET_WORKSPACE_SCHEMA = 'lpc-toolkit.asset-workspace.v1' as const;
 export const ASSET_WORKSPACE_REGISTRY_SCHEMA =
-  'lpc-toolkit.asset-workspace-registry.v1' as const;
+  'lpc-toolkit.asset-workspace-registry.v2' as const;
 export const ASSET_OUTPUT_MARKER_SCHEMA = 'lpc-toolkit.asset-output.v1' as const;
 
 const WORKSPACE_CONFIG_FILE = 'lpc-asset-workspace.json';

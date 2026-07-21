@@ -27,6 +27,7 @@ import {
   initializeAssetWorkspace,
   type AssetWorkspace,
 } from '../src/asset-workspace.js';
+import { ASSET_WORKSPACE_REGISTRY_V1_SCHEMA } from '../src/asset-pack-registry.js';
 import { loadActiveAssetPackBaseline } from '../src/asset-pack-validation.js';
 import { createDirectoryAssetStore } from '../src/asset-store.js';
 import { createRuntimeContext } from '../src/context.js';
@@ -72,6 +73,7 @@ interface RegistryDocument {
   readonly workspaceId: string;
   readonly entries: readonly LinkedAssetPackRegistryEntry[];
   readonly generatedDigests: Readonly<Record<string, string>>;
+  readonly compileDigest: string;
 }
 
 function createDirectory(prefix: string): string {
@@ -110,6 +112,10 @@ function writeSheetPng(
   const context = canvas.getContext('2d');
   context.fillStyle = color;
   context.fillRect(0, 0, bounds.width, bounds.height);
+  context.fillStyle = '#111111';
+  context.fillRect(0, 0, 1, 1);
+  context.fillStyle = '#222222';
+  context.fillRect(1, 0, 1, 1);
 
   mkdirSync(path.dirname(filePath), { recursive: true });
   writeFileSync(filePath, canvas.toBuffer('image/png'));
@@ -506,6 +512,7 @@ describe('syncLinkedAssetPack', () => {
         'spritesheets/packages/acme.wind-braid/wind-braid/foreground/male-female/walk.png':
           expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
       },
+      compileDigest: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
     });
 
     expect(snapshotTree(fixture.workspace.outputRoot)).toMatchObject({
@@ -596,6 +603,90 @@ describe('syncLinkedAssetPack', () => {
       'spritesheets/packages/acme.wind-braid/wind-braid/foreground/male-female/walk.png': expect.any(String),
       'spritesheets/packages/bravo.ribbon-braid/ribbon-braid/foreground/male-female/walk.png': expect.any(String),
     });
+  });
+
+  it('migrates a populated v1 linked registry to v2 during the next sync', async () => {
+    const fixture = createWorkspaceFixture();
+    const firstRoot = path.join(fixture.workspace.packsRoot, 'acme.wind-braid');
+    const secondRoot = path.join(fixture.workspace.packsRoot, 'bravo.ribbon-braid');
+    writeNewItemPack(firstRoot, {
+      packId: 'acme.wind-braid', displayName: 'Wind Braid', localId: 'wind-braid', color: '#aa5500',
+    });
+    writeNewItemPack(secondRoot, {
+      packId: 'bravo.ribbon-braid', displayName: 'Ribbon Braid', localId: 'ribbon-braid', color: '#00aa55',
+    });
+    expectSuccess(await syncLinkedAssetPack({ packDirectory: firstRoot, workspace: fixture.workspace, runtime: fixture.runtime }));
+    const v2 = readRegistry(fixture.workspace);
+    writeJson(fixture.workspace.registryPath, {
+      schema: ASSET_WORKSPACE_REGISTRY_V1_SCHEMA,
+      workspaceId: v2.workspaceId,
+      entries: v2.entries.map((entry) => ({
+        kind: entry.kind,
+        packId: entry.packId,
+        version: entry.version,
+        displayName: entry.displayName,
+        sourceDirectory: entry.sourceDirectory,
+        contentDigest: entry.contentDigest,
+        sourceDigests: entry.sourceDigests,
+        generatedPaths: entry.generatedPaths,
+        baselineDefinitionDigests: entry.baselineDefinitionDigests,
+        baselineCreditDigests: entry.baselineCreditDigests,
+      })),
+      generatedDigests: v2.generatedDigests,
+    });
+
+    const migrated = expectSuccess(await syncLinkedAssetPack({
+      packDirectory: secondRoot,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+    }));
+
+    expect(readRegistry(fixture.workspace)).toMatchObject({
+      schema: ASSET_WORKSPACE_REGISTRY_SCHEMA,
+      entries: migrated.registry,
+      compileDigest: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
+    });
+  });
+
+  it('rejects a retained v1 linked source whose content digest no longer matches', async () => {
+    const fixture = createWorkspaceFixture();
+    const firstRoot = path.join(fixture.workspace.packsRoot, 'acme.wind-braid');
+    const secondRoot = path.join(fixture.workspace.packsRoot, 'bravo.ribbon-braid');
+    writeNewItemPack(firstRoot, {
+      packId: 'acme.wind-braid', displayName: 'Wind Braid', localId: 'wind-braid', color: '#aa5500',
+    });
+    writeNewItemPack(secondRoot, {
+      packId: 'bravo.ribbon-braid', displayName: 'Ribbon Braid', localId: 'ribbon-braid', color: '#00aa55',
+    });
+    expectSuccess(await syncLinkedAssetPack({ packDirectory: firstRoot, workspace: fixture.workspace, runtime: fixture.runtime }));
+    const v2 = readRegistry(fixture.workspace);
+    writeJson(fixture.workspace.registryPath, {
+      schema: ASSET_WORKSPACE_REGISTRY_V1_SCHEMA,
+      workspaceId: v2.workspaceId,
+      entries: v2.entries.map((entry) => ({
+        kind: entry.kind,
+        packId: entry.packId,
+        version: entry.version,
+        displayName: entry.displayName,
+        sourceDirectory: entry.sourceDirectory,
+        contentDigest: 'sha256:incorrect',
+        sourceDigests: entry.sourceDigests,
+        generatedPaths: entry.generatedPaths,
+        baselineDefinitionDigests: entry.baselineDefinitionDigests,
+        baselineCreditDigests: entry.baselineCreditDigests,
+      })),
+      generatedDigests: v2.generatedDigests,
+    });
+
+    const failed = expectFailure(await syncLinkedAssetPack({
+      packDirectory: secondRoot,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+    }));
+
+    expect(diagnosticCodes(failed.diagnostics)).toContain('asset_digest_mismatch');
+    expect(readJson<{ schema: string }>(fixture.workspace.registryPath).schema)
+      .toBe(ASSET_WORKSPACE_REGISTRY_V1_SCHEMA);
   });
 
   it('re-syncs after source changes and publishes the new bytes', async () => {
