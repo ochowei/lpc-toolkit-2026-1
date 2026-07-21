@@ -633,6 +633,14 @@ rtk git add packages/core/src/asset-pack-version.ts packages/core/src/asset-pack
 rtk git commit -m "feat(core): define asset pack lifecycle compatibility"
 ```
 
+Task 1 record:
+
+- Implementation: Added strict compatibility parsing, precision-safe ASCII SemVer/range matching, lifecycle replacement authorization, normalized-source reconstruction, and compiler range-helper reuse while preserving Phase 1 animation declaration order and content-digest semantics.
+- Product/fix commits: `9b7ccc74c4339f7643368827869fce662a2a7ab5`, `92042d97b743a2b232b13dc47d615aa132bb3e99`, `d6501f960015b68703199408bf05597f974ff779`, `3c7b9ba3a82f8888ad18fc0e07bb1211015fbd4f`, `bc6f03fa3f9fcfce372ec219aabfd1c9587c7c03`.
+- Plan-record commit: `c1056c6208fe52ce01fd931fba99efeb3818d1fd`.
+- Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-version.test.ts asset-pack-schema.test.ts asset-pack-compile.test.ts` PASS (66 tests); `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS; `rtk pnpm check:boundaries` PASS.
+- Review: Task reviewer APPROVED with no Critical, Important, or Minor findings after the final fix wave.
+
 Then update this task's plan record and commit it separately.
 
 ---
