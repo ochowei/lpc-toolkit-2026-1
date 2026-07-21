@@ -50,12 +50,36 @@ function issue(
   code: string,
   message: string,
   issuePath?: string,
+  details?: CliIssue['details'],
 ): CliIssue {
   return {
     code,
     message,
     ...(issuePath === undefined ? {} : { path: issuePath }),
+    ...(details === undefined ? {} : { details }),
   };
+}
+
+function compatibleIssueDetails(
+  details: Readonly<Record<string, unknown>> | undefined,
+): CliIssue['details'] | undefined {
+  if (details === undefined) return undefined;
+  const suggestions = details.suggestions;
+  const available = details.available;
+  const compatibleSuggestions = Array.isArray(suggestions)
+    && suggestions.every((value): value is string => typeof value === 'string')
+    ? suggestions
+    : undefined;
+  const compatibleAvailable = Array.isArray(available)
+    && available.every((value): value is string => typeof value === 'string')
+    ? available
+    : undefined;
+  return compatibleSuggestions === undefined && compatibleAvailable === undefined
+    ? undefined
+    : {
+      ...(compatibleSuggestions === undefined ? {} : { suggestions: compatibleSuggestions }),
+      ...(compatibleAvailable === undefined ? {} : { available: compatibleAvailable }),
+    };
 }
 
 function missingFlag(name: string): CliIssue {
@@ -69,13 +93,18 @@ function commandFailure(
     readonly message: string;
     readonly path?: string;
     readonly severity?: 'error' | 'warning';
+    readonly details?: Readonly<Record<string, unknown>>;
   }[],
 ): CliResponse<null> {
-  const toIssue = (diagnostic: (typeof diagnostics)[number]): CliIssue => ({
-    code: diagnostic.code,
-    message: diagnostic.message,
-    ...(diagnostic.path === undefined ? {} : { path: diagnostic.path }),
-  });
+  const toIssue = (diagnostic: (typeof diagnostics)[number]): CliIssue => {
+    const details = compatibleIssueDetails(diagnostic.details);
+    return {
+      code: diagnostic.code,
+      message: diagnostic.message,
+      ...(diagnostic.path === undefined ? {} : { path: diagnostic.path }),
+      ...(details === undefined ? {} : { details }),
+    };
+  };
   const warnings = diagnostics
     .filter((diagnostic) => diagnostic.severity === 'warning')
     .map(toIssue);
@@ -370,7 +399,15 @@ async function runInitCommand(
 
 function previewErrorResponse(error: unknown): CliResponse<null> {
   if (error instanceof AssetPackPreviewError) {
-    return commandError('asset preview', issue(error.code, error.message, error.path));
+    if (error.diagnostics.length > 0) {
+      return commandFailure('asset preview', error.diagnostics);
+    }
+    return commandError('asset preview', issue(
+      error.code,
+      error.message,
+      error.path,
+      compatibleIssueDetails(error.details),
+    ));
   }
   return commandError('asset preview', issue(
     'asset_preview_failed',

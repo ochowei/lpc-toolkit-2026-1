@@ -5,6 +5,10 @@ import { createCanvas } from '@napi-rs/canvas';
 import { describe, expect, it } from 'vitest';
 import { runCli } from '../src/main.js';
 import { formatHumanResponse } from '../src/response.js';
+import {
+  acknowledgeWarning,
+  createWarningAssetCommandFixture,
+} from './asset-command-warning-fixture.js';
 
 function makeCatalogCwd(): string {
   const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-human-'));
@@ -169,6 +173,39 @@ async function runHumanError(argv: readonly string[], cwd: string): Promise<stri
 }
 
 describe('human-readable CLI output', () => {
+  it('prints warning-only preview blocks and typed available values after acknowledgement', async () => {
+    const fixture = createWarningAssetCommandFixture();
+    const runPreview = async () => {
+      const stdout: string[] = [];
+      const stderr: string[] = [];
+      const code = await runCli([
+        'asset', 'preview', fixture.packRoot,
+        '--asset', 'missing',
+        '--workspace', fixture.workspace.root,
+      ], {
+        cwd: fixture.workspace.root,
+        stdout: (text) => stdout.push(text),
+        stderr: (text) => stderr.push(text),
+      }, {
+        prepareRuntimeAssets: async () => fixture.runtime,
+      });
+      return { code, stdout, stderr: stderr.join('') };
+    };
+
+    const blocked = await runPreview();
+    expect(blocked.code).toBe(1);
+    expect(blocked.stdout).toEqual([]);
+    expect(blocked.stderr).toContain('Warnings (1):');
+    expect(blocked.stderr).toContain('asset_path_inferred');
+
+    await acknowledgeWarning(fixture);
+    const acknowledged = await runPreview();
+    expect(acknowledged.code).toBe(1);
+    expect(acknowledged.stdout).toEqual([]);
+    expect(acknowledged.stderr).toContain('asset_preview_asset_not_found');
+    expect(acknowledged.stderr).toContain('Available: braid');
+  });
+
   it('prints workspace and scaffold paths', () => {
     expect(formatHumanResponse({
       ok: true,

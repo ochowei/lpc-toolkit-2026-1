@@ -13,6 +13,10 @@ import { initializeAssetWorkspace } from '../src/asset-workspace.js';
 import { createRuntimeContext } from '../src/context.js';
 import { runCli } from '../src/main.js';
 import type { RuntimeAssets } from '../src/runtime-assets.js';
+import {
+  acknowledgeWarning,
+  createWarningAssetCommandFixture,
+} from './asset-command-warning-fixture.js';
 
 function createRuntime(): RuntimeAssets {
   const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-main-json-'));
@@ -80,6 +84,63 @@ function auditDefinition(animations: readonly string[]): Record<string, unknown>
 }
 
 describe('main json behavior', () => {
+  it('keeps preview warning blocks in warnings and preserves typed details after acknowledgement', async () => {
+    const fixture = createWarningAssetCommandFixture();
+    const runAssetJson = async (command: 'preview' | 'sync') => {
+      const stdout: string[] = [];
+      const stderr: string[] = [];
+      const code = await runCli([
+        'asset', command, fixture.packRoot,
+        ...(command === 'preview' ? ['--asset', 'missing'] : []),
+        '--workspace', fixture.workspace.root,
+        '--json',
+      ], {
+        cwd: fixture.workspace.root,
+        stdout: (text) => stdout.push(text),
+        stderr: (text) => stderr.push(text),
+      }, {
+        prepareRuntimeAssets: async () => fixture.runtime,
+      });
+      return { code, response: JSON.parse(stdout.join('')), stderr };
+    };
+
+    const previewBlocked = await runAssetJson('preview');
+    const syncBlocked = await runAssetJson('sync');
+
+    expect(previewBlocked.code).toBe(1);
+    expect(previewBlocked.stderr).toEqual([]);
+    expect(previewBlocked.response).toMatchObject({
+      ok: false,
+      command: 'asset preview',
+      data: null,
+      warnings: [expect.objectContaining({ code: 'asset_path_inferred' })],
+      errors: [],
+    });
+    expect(syncBlocked.code).toBe(1);
+    expect(syncBlocked.response).toMatchObject({
+      ok: false,
+      command: 'asset sync',
+      data: null,
+      warnings: [expect.objectContaining({ code: 'asset_path_inferred' })],
+      errors: [],
+    });
+
+    await acknowledgeWarning(fixture);
+    const acknowledgedPreview = await runAssetJson('preview');
+
+    expect(acknowledgedPreview.code).toBe(1);
+    expect(acknowledgedPreview.response).toMatchObject({
+      ok: false,
+      command: 'asset preview',
+      warnings: [],
+      errors: [{
+        code: 'asset_preview_asset_not_found',
+        path: 'missing',
+        details: { available: ['braid'] },
+      }],
+    });
+  });
+
   it('returns the standard workspace-init JSON envelope without runtime assets', async () => {
     const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-main-json-workspace-'));
     const stdout: string[] = [];
