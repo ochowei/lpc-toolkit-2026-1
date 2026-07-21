@@ -31,6 +31,11 @@ import type { AssetPackPayloadSuccess } from './asset-pack-payload.js';
 import { loadJsonRecords } from './loaders.js';
 import { createNodeCanvasAdapter } from './node-canvas-adapter.js';
 import type { RuntimeAssets } from './runtime-assets.js';
+import {
+  checkAssetPackCompatibility,
+  type AssetPackLifecycleDiagnostic,
+} from './asset-pack-compatibility.js';
+import { CLI_VERSION } from './package-info.js';
 
 export interface ActiveAssetPackBaseline extends AssetPackBaseline {
   readonly palettes: PaletteMetadata;
@@ -42,7 +47,7 @@ export interface AssetPackValidationReport {
   readonly packDirectory: string;
   readonly contentDigest?: string;
   readonly valid: boolean;
-  readonly diagnostics: readonly AssetPackDiagnostic[];
+  readonly diagnostics: readonly (AssetPackDiagnostic | AssetPackLifecycleDiagnostic)[];
   readonly acknowledgementRecords: readonly AssetPackAcknowledgement[];
 }
 
@@ -595,14 +600,18 @@ export async function validateAssetPackPayload(options: {
     inspections,
     contentDigest: options.payload.contentDigest,
   });
+  const compatibilityDiagnostics = checkAssetPackCompatibility(
+    options.payload.pack,
+    CLI_VERSION,
+  );
 
   return {
     schema: VALIDATION_SCHEMA,
     packId: options.payload.pack.id,
     packDirectory: options.origin,
     contentDigest: options.payload.contentDigest,
-    valid: result.ok,
-    diagnostics: result.diagnostics,
+    valid: result.ok && compatibilityDiagnostics.length === 0,
+    diagnostics: [...compatibilityDiagnostics, ...result.diagnostics],
     acknowledgementRecords: result.acknowledgementRecords,
   };
 }
@@ -667,14 +676,15 @@ export async function validateAssetPackDirectory(options: {
     inspections,
     contentDigest: currentDigest,
   });
+  const compatibilityDiagnostics = checkAssetPackCompatibility(inspectedPack, CLI_VERSION);
 
   return {
     schema: VALIDATION_SCHEMA,
     packId: inspectedPack.id,
     packDirectory: absoluteRoot,
     contentDigest: currentDigest,
-    valid: result.ok,
-    diagnostics: result.diagnostics,
+    valid: result.ok && compatibilityDiagnostics.length === 0,
+    diagnostics: [...compatibilityDiagnostics, ...result.diagnostics],
     acknowledgementRecords: result.acknowledgementRecords,
   };
 }

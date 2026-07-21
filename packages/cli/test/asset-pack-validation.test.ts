@@ -33,6 +33,7 @@ import {
   validateAssetPackDirectory,
 } from '../src/asset-pack-validation.js';
 import { parseAssetPackPayload } from '../src/asset-pack-payload.js';
+import { loadAssetPackFiles } from '../src/asset-pack-files.js';
 import type { RuntimeAssets } from '../src/runtime-assets.js';
 
 const temporaryDirectories: string[] = [];
@@ -623,5 +624,40 @@ describe('validateAssetPackDirectory', () => {
       expect.objectContaining({ code: 'asset_base_definition_changed' }),
       expect.objectContaining({ code: 'asset_base_credit_changed' }),
     ]));
+  });
+
+  it('applies the same CLI compatibility gate to directory and captured-payload validation', async () => {
+    const runtime = createRuntimeFixture().runtime;
+    const packRoot = createDirectory('lpc-asset-pack-validation-compatibility-');
+    const source = newItemSource([
+      { animation: 'walk', source: 'sprites/wind-braid/walk.png' },
+    ], {
+      compatibility: {
+        minimumCliVersion: '0.3.0',
+        requiredCapabilities: ['lpc-toolkit.asset-pack.future.v1'],
+      },
+    });
+    writePack(packRoot, source, {});
+    writeSheetPng(path.join(packRoot, 'sprites/wind-braid/walk.png'), 'walk', {
+      filledCells: Object.fromEntries(requiredCells('walk').map((cell) => [cell, '#111111'])),
+    });
+
+    const directoryReport = await validateAssetPackDirectory({ packDirectory: packRoot, runtime });
+    const loaded = loadAssetPackFiles(packRoot);
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) throw new Error('Expected asset-pack files to load.');
+    const payloadReport = await validateAssetPackPayload({
+      payload: loaded,
+      runtime,
+      origin: packRoot,
+    });
+
+    for (const report of [directoryReport, payloadReport]) {
+      expect(report.valid).toBe(false);
+      expect(report.diagnostics).toEqual(expect.arrayContaining([
+        expect.objectContaining({ code: 'asset_cli_version_incompatible', severity: 'error' }),
+        expect.objectContaining({ code: 'asset_capability_unsupported', severity: 'error' }),
+      ]));
+    }
   });
 });
