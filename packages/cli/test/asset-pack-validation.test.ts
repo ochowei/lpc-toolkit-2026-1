@@ -9,7 +9,7 @@ import {
 } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createCanvas } from '@napi-rs/canvas';
+import { createCanvas, loadImage as loadCanvasImage } from '@napi-rs/canvas';
 import {
   ASSET_PACK_SCHEMA,
   normalizeAssetPack,
@@ -19,7 +19,7 @@ import {
   type AssetPackSource,
   type ItemDefinition,
 } from '@lpc-toolkit/core';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRuntimeContext } from '../src/context.js';
 import {
   initializeAssetWorkspace,
@@ -37,6 +37,24 @@ import { loadAssetPackFiles } from '../src/asset-pack-files.js';
 import type { RuntimeAssets } from '../src/runtime-assets.js';
 
 const temporaryDirectories: string[] = [];
+const canvasLoadImage = vi.mocked(loadCanvasImage);
+
+vi.mock('@napi-rs/canvas', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@napi-rs/canvas')>();
+  return {
+    ...actual,
+    loadImage: vi.fn(async (source: Parameters<typeof actual.loadImage>[0]) => {
+      if (
+        Buffer.isBuffer(source)
+        && source.byteLength >= 24
+        && (source.readUInt32BE(16) > 8_192 || source.readUInt32BE(20) > 8_192)
+      ) {
+        throw new Error('Test decoder guard rejected oversized PNG geometry.');
+      }
+      return actual.loadImage(source);
+    }),
+  };
+});
 
 const PACK_CREDITS = {
   authors: ['Alice'],
@@ -153,6 +171,20 @@ function sheetPng(
   }
 
   return canvas.toBuffer('image/png');
+}
+
+function pngWithDeclaredDimensions(
+  animation: AnimationName,
+  width: number,
+  height: number,
+): Buffer {
+  const bytes = Buffer.from(sheetPng(
+    animation,
+    Object.fromEntries(requiredCells(animation).map((cell) => [cell, '#111111'])),
+  ));
+  bytes.writeUInt32BE(width, 16);
+  bytes.writeUInt32BE(height, 20);
+  return bytes;
 }
 
 function baseDefinition(overrides: Partial<ItemDefinition> = {}): ItemDefinition {
@@ -327,6 +359,10 @@ afterEach(() => {
   }
 });
 
+beforeEach(() => {
+  canvasLoadImage.mockClear();
+});
+
 describe('inspectAssetPackSources', () => {
   it('decodes bounded climb cells and records lowercase opaque palette colors when present or absent', async () => {
     const packRoot = createDirectory('lpc-asset-pack-validation-pack-');
@@ -441,6 +477,104 @@ describe('loadActiveAssetPackBaseline', () => {
 });
 
 describe('validateAssetPackDirectory', () => {
+  it.each([
+    { label: 'wrong', width: 512, height: 256 },
+    { label: 'huge', width: 0xffff_ffff, height: 0xffff_ffff },
+  ])('rejects $label captured IHDR geometry before canvas decode', async ({ width, height }) => {
+    const sourcePath = 'sprites/wind-braid/climb.png';
+    const payload = parseAssetPackPayload({
+      manifestBytes: Buffer.from(JSON.stringify(newItemSource([
+        { animation: 'climb', source: sourcePath },
+      ]))),
+      sourceBytes: new Map([[
+        sourcePath,
+        pngWithDeclaredDimensions('climb', width, height),
+      ]]),
+    });
+    expect(payload.ok).toBe(true);
+    if (!payload.ok) throw new Error('Expected captured payload parsing to succeed.');
+
+    const report = await validateAssetPackPayload({
+      payload,
+      runtime: createRuntimeFixture().runtime,
+      origin: 'memory://acme.wind-braid',
+    });
+
+    expect(report.valid).toBe(false);
+    expect(report.diagnostics).toContainEqual(expect.objectContaining({
+      code: 'asset_geometry_mismatch',
+      sourcePath,
+      details: expect.objectContaining({ actualWidth: width, actualHeight: height }),
+    }));
+    expect(canvasLoadImage).not.toHaveBeenCalled();
+  });
+
+  it('rejects a truncated captured IHDR before canvas decode', async () => {
+    const sourcePath = 'sprites/wind-braid/climb.png';
+    const truncated = sheetPng('climb', {}).subarray(0, 24);
+    const payload = parseAssetPackPayload({
+      manifestBytes: Buffer.from(JSON.stringify(newItemSource([
+        { animation: 'climb', source: sourcePath },
+      ]))),
+      sourceBytes: new Map([[sourcePath, truncated]]),
+    });
+    expect(payload.ok).toBe(true);
+    if (!payload.ok) throw new Error('Expected captured payload parsing to succeed.');
+
+    const report = await validateAssetPackPayload({
+      payload,
+      runtime: createRuntimeFixture().runtime,
+      origin: 'memory://acme.wind-braid',
+    });
+
+    expect(report.valid).toBe(false);
+    expect(report.diagnostics).toContainEqual(expect.objectContaining({
+      code: 'asset_png_decode_failed',
+      sourcePath,
+    }));
+    expect(canvasLoadImage).not.toHaveBeenCalled();
+  });
+
+  it('decodes exact captured IHDR geometry and delegates corrupt CRC detection to canvas', async () => {
+    const sourcePath = 'sprites/wind-braid/climb.png';
+    const exact = sheetPng(
+      'climb',
+      Object.fromEntries(requiredCells('climb').map((cell) => [cell, '#111111'])),
+    );
+    const corruptCrc = Buffer.from(exact);
+    corruptCrc[29] = (corruptCrc[29] ?? 0) ^ 0xff;
+
+    for (const [bytes, expectedValid] of [[exact, true], [corruptCrc, false]] as const) {
+      canvasLoadImage.mockClear();
+      if (!expectedValid) {
+        canvasLoadImage.mockRejectedValueOnce(new Error('Corrupt PNG CRC.'));
+      }
+      const payload = parseAssetPackPayload({
+        manifestBytes: Buffer.from(JSON.stringify(newItemSource([
+          { animation: 'climb', source: sourcePath },
+        ]))),
+        sourceBytes: new Map([[sourcePath, bytes]]),
+      });
+      expect(payload.ok).toBe(true);
+      if (!payload.ok) throw new Error('Expected captured payload parsing to succeed.');
+
+      const report = await validateAssetPackPayload({
+        payload,
+        runtime: createRuntimeFixture().runtime,
+        origin: 'memory://acme.wind-braid',
+      });
+
+      expect(report.valid).toBe(expectedValid);
+      expect(canvasLoadImage).toHaveBeenCalledTimes(1);
+      if (!expectedValid) {
+        expect(report.diagnostics).toContainEqual(expect.objectContaining({
+          code: 'asset_png_decode_failed',
+          sourcePath,
+        }));
+      }
+    }
+  });
+
   it('validates captured payload PNG bytes without a pack directory', async () => {
     const sourcePath = 'sprites/wind-braid/climb.png';
     const source = newItemSource([{ animation: 'climb', source: sourcePath }]);

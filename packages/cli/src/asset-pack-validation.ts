@@ -66,6 +66,9 @@ interface DecodedImageData {
 const VALIDATION_SCHEMA = 'lpc-toolkit.asset-pack-validation.v1' as const;
 const MANIFEST_FILE = 'asset-pack.json';
 const INSPECTION_CONCURRENCY = 4;
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const PNG_IHDR_LENGTH = 13;
+const PNG_IHDR_END = 33;
 
 function sha256Buffer(buffer: Buffer): string {
   return createHash('sha256').update(buffer).digest('hex');
@@ -298,6 +301,38 @@ function geometryForDimensions(
   return uses.find((use) => geometryKey(use.geometry) === key)?.geometry;
 }
 
+function geometryForEveryDeclaredUse(
+  uses: readonly SourceUse[],
+  width: number,
+  height: number,
+): AnimationAuditGeometry | undefined {
+  const first = uses[0]?.geometry;
+  if (!first) return undefined;
+  const key = `${width}x${height}`;
+  return uses.every((use) => geometryKey(use.geometry) === key)
+    ? first
+    : undefined;
+}
+
+function readPngIhdrGeometry(bytes: Buffer): {
+  readonly width: number;
+  readonly height: number;
+} | undefined {
+  if (
+    bytes.byteLength < PNG_IHDR_END
+    || !bytes.subarray(0, PNG_SIGNATURE.byteLength).equals(PNG_SIGNATURE)
+    || bytes.readUInt32BE(8) !== PNG_IHDR_LENGTH
+    || bytes.toString('ascii', 12, 16) !== 'IHDR'
+  ) {
+    return undefined;
+  }
+
+  const width = bytes.readUInt32BE(16);
+  const height = bytes.readUInt32BE(20);
+  if (width === 0 || height === 0) return undefined;
+  return { width, height };
+}
+
 function decodeImageCells(
   image: Awaited<ReturnType<ReturnType<typeof createNodeCanvasAdapter>['loadImage']>>,
   geometry: AnimationAuditGeometry,
@@ -417,23 +452,33 @@ async function inspectCapturedSource(
   digest: string,
   uses: readonly SourceUse[],
 ): Promise<AssetPackSourceInspection> {
+  const ihdr = readPngIhdrGeometry(bytes);
+  if (!ihdr) {
+    return {
+      sourcePath,
+      digest,
+      regularFile: true,
+      error: 'decode-failed',
+    };
+  }
+
+  const matchedGeometry = geometryForEveryDeclaredUse(uses, ihdr.width, ihdr.height);
+  if (!matchedGeometry) {
+    return {
+      sourcePath,
+      digest,
+      regularFile: true,
+      decoded: {
+        width: ihdr.width,
+        height: ihdr.height,
+        nonTransparentCells: [],
+        paletteColors: [],
+      },
+    };
+  }
+
   try {
     const image = await loadCanvasImage(bytes);
-    const matchedGeometry = geometryForDimensions(uses, image.width, image.height);
-    if (!matchedGeometry) {
-      return {
-        sourcePath,
-        digest,
-        regularFile: true,
-        decoded: {
-          width: image.width,
-          height: image.height,
-          nonTransparentCells: [],
-          paletteColors: [],
-        },
-      };
-    }
-
     return {
       sourcePath,
       digest,
