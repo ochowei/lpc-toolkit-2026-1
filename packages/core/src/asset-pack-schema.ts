@@ -839,8 +839,10 @@ function parseCreditOverrideRecord(
   const record = asRecord(input, path, diagnostics);
   if (!record) return undefined;
 
+  const entries = Object.entries(record);
+  const parsedEntries = new Map<string, AssetPackCreditSource>();
   const overrides: Record<string, AssetPackCreditSource> = {};
-  for (const [key, value] of Object.entries(record)) {
+  for (const [key, value] of sortedRecordEntries(record, path)) {
     if (!isManagedPath(key, 'sprites/')) {
       pushDiagnostic(diagnostics, {
         code: 'asset_pack_schema_invalid',
@@ -853,6 +855,11 @@ function parseCreditOverrideRecord(
     }
 
     const parsed = parseCreditSource(value, `${path}.${key}`, diagnostics);
+    if (parsed) parsedEntries.set(key, parsed);
+  }
+
+  for (const [key] of entries) {
+    const parsed = parsedEntries.get(key);
     if (parsed) overrides[key] = parsed;
   }
 
@@ -983,14 +990,16 @@ function parseSubject(
   const record = asRecord(input, path, diagnostics);
   if (!record) return undefined;
 
+  const entries = Object.entries(record);
+  const parsedEntries = new Map<string, string | readonly string[]>();
   const subject: Record<string, string | readonly string[]> = {};
-  for (const [key, value] of Object.entries(record)) {
+  for (const [key, value] of sortedRecordEntries(record, path)) {
     if (typeof value === 'string') {
-      subject[key] = value;
+      parsedEntries.set(key, value);
       continue;
     }
     if (Array.isArray(value) && value.every((entry) => typeof entry === 'string')) {
-      subject[key] = [...value];
+      parsedEntries.set(key, [...value]);
       continue;
     }
     pushDiagnostic(diagnostics, {
@@ -999,6 +1008,11 @@ function parseSubject(
       message: `Invalid acknowledgement subject field at ${path}.${key}.`,
       details: { path: `${path}.${key}`, value },
     });
+  }
+
+  for (const [key] of entries) {
+    const value = parsedEntries.get(key);
+    if (value) subject[key] = value;
   }
 
   return subject;
@@ -1159,8 +1173,11 @@ function parseRawRecolors(
     return undefined;
   }
 
-  const multi: Record<`color_${number}`, ReturnType<typeof parseRecolorConfig>> = {};
-  entries.forEach(([key, value]) => {
+  const parsedEntries = new Map<
+    `color_${number}`,
+    NonNullable<ReturnType<typeof parseRecolorConfig>>
+  >();
+  sortedRecordEntries(record, path).forEach(([key, value]) => {
     if (!RECOLOR_KEY_PATTERN.test(key)) {
       pushDiagnostic(diagnostics, {
         code: 'asset_pack_schema_invalid',
@@ -1172,8 +1189,14 @@ function parseRawRecolors(
     }
     const parsed = parseRecolorConfig(value, `${path}.${key}`, diagnostics);
     if (parsed) {
-      multi[key as `color_${number}`] = parsed;
+      parsedEntries.set(key as `color_${number}`, parsed);
     }
+  });
+
+  const multi: Record<`color_${number}`, ReturnType<typeof parseRecolorConfig>> = {};
+  entries.forEach(([key]) => {
+    const parsed = parsedEntries.get(key as `color_${number}`);
+    if (parsed) multi[key as `color_${number}`] = parsed;
   });
 
   return multi as RawRecolors;
@@ -1214,9 +1237,7 @@ function exactKeys(
   diagnostics: AssetPackDiagnostic[],
 ) {
   const allowed = new Set(allowedKeys);
-  Object.keys(record)
-    .sort((left, right) => left.localeCompare(right))
-    .forEach((key) => {
+  sortedRecordEntries(record, path).forEach(([key]) => {
     if (allowed.has(key)) return;
     pushDiagnostic(diagnostics, {
       code: 'asset_pack_schema_invalid',
@@ -1224,7 +1245,15 @@ function exactKeys(
       message: `Unknown field at ${path}.${key}.`,
       details: { path: `${path}.${key}` },
     });
-    });
+  });
+}
+
+function sortedRecordEntries(
+  record: UnknownRecord,
+  path: string,
+): [string, unknown][] {
+  return Object.entries(record).sort(([left], [right]) =>
+    `${path}.${left}`.localeCompare(`${path}.${right}`));
 }
 
 function asRecord(

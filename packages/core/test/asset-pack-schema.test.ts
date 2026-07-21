@@ -128,6 +128,15 @@ function requireDiagnosticPaths(
   });
 }
 
+function expectEquivalentDiagnosticPaths(
+  inputs: readonly unknown[],
+  expectedPaths: readonly string[],
+) {
+  inputs.forEach((input) => {
+    expect(requireDiagnosticPaths(parseAssetPackSource(input))).toEqual(expectedPaths);
+  });
+}
+
 describe('asset pack schema', () => {
   it('parses the approved v1 examples for new and extended items', () => {
     const result = parseAssetPackSource(validPack);
@@ -292,6 +301,104 @@ describe('asset pack schema', () => {
       '$.middle',
       '$.zulu',
     ]);
+  });
+
+  it('reports credit override diagnostics in sorted path order regardless of source key order', () => {
+    expectEquivalentDiagnosticPaths(
+      [
+        {
+          ...validPack,
+          creditOverrides: {
+            'sprites/zeta/credits.png': 'bad-credit',
+            'images/middle/credits.png': PACK_CREDITS,
+            'sprites/alpha/credits.png': false,
+          },
+        },
+        {
+          ...validPack,
+          creditOverrides: {
+            'sprites/alpha/credits.png': false,
+            'sprites/zeta/credits.png': 'bad-credit',
+            'images/middle/credits.png': PACK_CREDITS,
+          },
+        },
+      ],
+      [
+        '$.creditOverrides.images/middle/credits.png',
+        '$.creditOverrides.sprites/alpha/credits.png',
+        '$.creditOverrides.sprites/zeta/credits.png',
+      ],
+    );
+  });
+
+  it('reports acknowledgement subject diagnostics in sorted path order regardless of source key order', () => {
+    expectEquivalentDiagnosticPaths(
+      [
+        {
+          ...validPack,
+          acknowledgements: [{
+            ...ACKNOWLEDGEMENT,
+            subject: {
+              zulu: 1,
+              alpha: false,
+              middle: [1],
+            },
+          }],
+        },
+        {
+          ...validPack,
+          acknowledgements: [{
+            ...ACKNOWLEDGEMENT,
+            subject: {
+              middle: [1],
+              zulu: 1,
+              alpha: false,
+            },
+          }],
+        },
+      ],
+      [
+        '$.acknowledgements[0].subject.alpha',
+        '$.acknowledgements[0].subject.middle',
+        '$.acknowledgements[0].subject.zulu',
+      ],
+    );
+  });
+
+  it('reports multi-recolor diagnostics in sorted path order regardless of source key order', () => {
+    const firstAsset = requireNewItemFixture();
+
+    expectEquivalentDiagnosticPaths(
+      [
+        {
+          ...validPack,
+          assets: [{
+            ...firstAsset,
+            recolor: {
+              color_2: false,
+              zulu: { material: 'hair', palettes: ['ulpc'] },
+              color_1: 'bad-recolor',
+            },
+          }],
+        },
+        {
+          ...validPack,
+          assets: [{
+            ...firstAsset,
+            recolor: {
+              color_1: 'bad-recolor',
+              color_2: false,
+              zulu: { material: 'hair', palettes: ['ulpc'] },
+            },
+          }],
+        },
+      ],
+      [
+        '$.assets[0].recolor.color_1',
+        '$.assets[0].recolor.color_2',
+        '$.assets[0].recolor.zulu',
+      ],
+    );
   });
 
   it.each([
