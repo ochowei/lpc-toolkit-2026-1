@@ -1,10 +1,10 @@
 import type { NormalizedAssetPack } from './asset-pack-model.js';
 
 export interface AssetPackSemver {
-  readonly major: number;
-  readonly minor: number;
-  readonly patch: number;
-  readonly prerelease: readonly (string | number)[];
+  readonly major: string;
+  readonly minor: string;
+  readonly patch: string;
+  readonly prerelease: readonly string[];
 }
 
 const SEMVER_PATTERN = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
@@ -14,12 +14,11 @@ export function parseAssetPackSemver(value: string): AssetPackSemver | undefined
   const match = SEMVER_PATTERN.exec(value);
   if (!match) return undefined;
   return {
-    major: Number(match[1]),
-    minor: Number(match[2]),
-    patch: Number(match[3]),
+    major: match[1]!,
+    minor: match[2]!,
+    patch: match[3]!,
     prerelease: match[4]
-      ? match[4].split('.').map((identifier) =>
-        /^\d+$/.test(identifier) ? Number(identifier) : identifier)
+      ? match[4].split('.')
       : [],
   };
 }
@@ -31,7 +30,7 @@ export function compareAssetPackVersions(left: string, right: string): number {
     throw new RangeError('Asset-pack version comparison requires valid SemVer values.');
   }
   for (const key of ['major', 'minor', 'patch'] as const) {
-    const comparison = leftVersion[key] - rightVersion[key];
+    const comparison = compareDecimal(leftVersion[key], rightVersion[key]);
     if (comparison !== 0) return comparison;
   }
   if (leftVersion.prerelease.length === 0 && rightVersion.prerelease.length === 0) return 0;
@@ -42,17 +41,26 @@ export function compareAssetPackVersions(left: string, right: string): number {
     const rightIdentifier = rightVersion.prerelease[index];
     if (leftIdentifier === undefined) return -1;
     if (rightIdentifier === undefined) return 1;
-    if (typeof leftIdentifier === 'number' && typeof rightIdentifier === 'number') {
-      const comparison = leftIdentifier - rightIdentifier;
+    const leftNumeric = /^\d+$/.test(leftIdentifier);
+    const rightNumeric = /^\d+$/.test(rightIdentifier);
+    if (leftNumeric && rightNumeric) {
+      const comparison = compareDecimal(leftIdentifier, rightIdentifier);
       if (comparison !== 0) return comparison;
       continue;
     }
-    if (typeof leftIdentifier === 'number') return -1;
-    if (typeof rightIdentifier === 'number') return 1;
+    if (leftNumeric) return -1;
+    if (rightNumeric) return 1;
     const comparison = leftIdentifier.localeCompare(rightIdentifier);
     if (comparison !== 0) return comparison;
   }
   return 0;
+}
+
+function compareDecimal(left: string, right: string): number {
+  const normalizedLeft = left.replace(/^0+(?=\d)/, '');
+  const normalizedRight = right.replace(/^0+(?=\d)/, '');
+  return normalizedLeft.length - normalizedRight.length
+    || normalizedLeft.localeCompare(normalizedRight);
 }
 
 export function assetPackVersionRangeMatches(range: string, version: string): boolean {

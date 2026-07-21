@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createCatalog } from '../src/catalog.js';
 import {
+  assetPackSourceFromNormalized,
   compileAssetPacks,
   normalizeAssetPack,
   type AssetPackSource,
@@ -55,7 +56,7 @@ function moonBraidPack(): AssetPackSource {
       displayName: 'Moon Braid',
       typeName: 'hair',
       bodyTypes: ['teen', 'male', 'female'],
-      animations: ['climb', 'walk'],
+      animations: ['walk', 'climb'],
       recolor: { material: 'hair', palettes: ['ulpc'] },
       layers: [
         {
@@ -400,6 +401,21 @@ function projectPlan(plan: ReturnType<typeof compileAssetPacks>) {
 }
 
 describe('asset-pack compile', () => {
+  it('preserves new-item animation declaration order through normalization and compilation', () => {
+    const normalized = normalizeAssetPack(moonBraidPack());
+    const reconstructed = assetPackSourceFromNormalized(normalized);
+    const newItem = normalized.assets.find((asset) => asset.kind === 'new-item');
+    const reconstructedNewItem = reconstructed.assets.find((asset) => asset.kind === 'new-item');
+    if (!newItem || newItem.kind !== 'new-item' || !reconstructedNewItem || reconstructedNewItem.kind !== 'new-item') {
+      throw new Error('Expected a normalized and reconstructed new item.');
+    }
+
+    expect(newItem.animations).toEqual(['walk', 'climb']);
+    expect(reconstructedNewItem.animations).toEqual(['walk', 'climb']);
+    expect(compileAssetPacks({ baseline, packs: [normalized] }).definitions[0]?.definition.animations)
+      .toEqual(['walk', 'climb']);
+  });
+
   it('compiles deterministic namespaced definitions, sprites, credits, and ownership for new items', () => {
     const plan = compileAssetPacks({
       baseline,
@@ -415,7 +431,7 @@ describe('asset-pack compile', () => {
         name: 'acme.fantasy-hair--moon-braid',
         display_name: 'Moon Braid',
         type_name: 'hair',
-        animations: ['climb', 'walk'],
+        animations: ['walk', 'climb'],
         recolors: { material: 'hair', palettes: ['ulpc'] },
         layer_1: {
           zPos: 80,

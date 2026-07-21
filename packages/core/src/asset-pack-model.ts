@@ -207,7 +207,7 @@ function normalizeNewItem(
     displayName: asset.displayName,
     typeName: asset.typeName,
     bodyTypes: assetBodyTypes,
-    animations: sortStrings(asset.animations),
+    animations: [...asset.animations],
     layers,
     ...(asset.variants ? { variants: sortStrings(asset.variants) } : {}),
     ...(asset.recolor ? { recolor: asset.recolor } : {}),
@@ -250,9 +250,7 @@ function normalizeExtendItem(asset: ExtendItemAssetSource): NormalizedExtendItem
     itemId: asset.itemId,
     baseDefinitionDigest: asset.baseDefinitionDigest,
     baseCreditDigest: asset.baseCreditDigest,
-    addAnimations: asset.addAnimations
-      .map(normalizeExtendAnimation)
-      .sort((left, right) => left.animation.localeCompare(right.animation)),
+    addAnimations: asset.addAnimations.map(normalizeExtendAnimation),
   };
 }
 

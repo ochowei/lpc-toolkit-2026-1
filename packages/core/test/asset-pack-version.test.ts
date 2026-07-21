@@ -53,6 +53,19 @@ describe('asset pack versions', () => {
     expect(compareAssetPackVersions('1.0.0+build.2', '1.0.0+build.1')).toBe(0);
   });
 
+  it('compares unbounded decimal identifiers without numeric precision loss', () => {
+    const lower = '9007199254740992';
+    const higher = '9007199254740993';
+    const longLower = '12345678901234567890123456789012345678901234567890';
+    const longHigher = '12345678901234567890123456789012345678901234567891';
+
+    expect(parseAssetPackSemver(`${higher}.0.0`)?.major).toBe(higher);
+    expect(compareAssetPackVersions(`${lower}.0.0`, `${higher}.0.0`)).toBeLessThan(0);
+    expect(compareAssetPackVersions(`1.0.0-${longLower}`, `1.0.0-${longHigher}`))
+      .toBeLessThan(0);
+    expect(assetPackVersionRangeMatches(`=${longHigher}.0.0`, `${longHigher}.0.0`)).toBe(true);
+  });
+
   it('rejects malformed versions instead of falling back to lexical ordering', () => {
     expect(parseAssetPackSemver('1.0')).toBeUndefined();
     expect(() => compareAssetPackVersions('1.0.0', 'not-a-version')).toThrow(RangeError);
