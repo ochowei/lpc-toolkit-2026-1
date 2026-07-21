@@ -659,7 +659,9 @@ Then update this task's plan record and commit it separately.
 - Consumes: `assetPackSourceFromNormalized`, current directory containment checks, and captured-byte pixel inspection.
 - Produces: `parseAssetPackPayload`, `AssetPackPayloadSuccess`, and payload validation used by Tasks 3–11.
 
-- [ ] **Step 1: Write failing payload parity tests**
+- [x] **Step 1: Write failing payload parity tests**
+
+  - Implementation: Added immutable directory/archive payload parity and digest-stability coverage.
 
 Use one manifest and source byte map through both directory loading and direct payload parsing. Assert equal normalized pack, source digests, content digest, source order, immutable copied buffers, schema diagnostics, missing/extra referenced source behavior, and acknowledgement-only content-digest stability.
 
@@ -670,7 +672,9 @@ expect(direct.contentDigest).toBe(directory.contentDigest);
 expect([...direct.sourceDigests]).toEqual([...directory.sourceDigests]);
 ```
 
-- [ ] **Step 2: Write failing payload-validation tests**
+- [x] **Step 2: Write failing payload-validation tests**
+
+  - Implementation: Added payload-snapshot validation coverage with captured PNG bytes and unchanged validation semantics.
 
 Call a new snapshot entry point with captured PNG bytes and assert the same report as directory validation without requiring a synthetic filesystem root:
 
@@ -679,7 +683,9 @@ const report = await validateAssetPackPayload({ payload, runtime });
 expect(report).toMatchObject({ valid: true, contentDigest: payload.contentDigest });
 ```
 
-- [ ] **Step 3: Run focused tests and verify RED**
+- [x] **Step 3: Run focused tests and verify RED**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-payload.test.ts asset-pack-files.test.ts asset-pack-validation.test.ts` RED as expected before implementation.
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-payload.test.ts asset-pack-files.test.ts asset-pack-validation.test.ts
@@ -687,11 +693,15 @@ rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-payload.test.ts asset-pack
 
 Expected: FAIL because payload parsing/validation is not exported.
 
-- [ ] **Step 4: Extract byte parsing without weakening filesystem safety**
+- [x] **Step 4: Extract byte parsing without weakening filesystem safety**
+
+  - Implementation: Reused existing directory containment/symlink/regular-file gates and delegated only trusted captured bytes to the shared payload parser.
 
 `asset-pack-files.ts` must still reject source traversal, missing entries, non-regular files, every symlink, and duplicate canonical files before reading bytes. It passes only the exact referenced byte map to `parseAssetPackPayload`; direct payload parsing rejects missing referenced paths and ignores no extra map keys—extras are diagnostics so archive checksum coverage cannot hide payload files.
 
-- [ ] **Step 5: Expose payload validation**
+- [x] **Step 5: Expose payload validation**
+
+  - Implementation: Added `parseAssetPackPayload` and `validateAssetPackPayload`; directory validation delegates through the immutable payload snapshot.
 
 Refactor `inspectCapturedAssetPackSources` to accept `AssetPackPayloadSuccess`. Add:
 
@@ -706,7 +716,9 @@ export async function validateAssetPackPayload(options: {
 
 Keep `validateAssetPackDirectory` public and make its snapshot branch delegate to the new function.
 
-- [ ] **Step 6: Verify GREEN and Phase 1 regressions**
+- [x] **Step 6: Verify GREEN and Phase 1 regressions**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-payload.test.ts asset-pack-files.test.ts asset-pack-validation.test.ts asset-pack-sync.test.ts asset-pack-preview.test.ts` PASS; `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-payload.test.ts asset-pack-files.test.ts asset-pack-validation.test.ts asset-pack-sync.test.ts asset-pack-preview.test.ts
@@ -715,12 +727,21 @@ rtk pnpm --filter @lpc-toolkit/cli run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit product code**
+- [x] **Step 7: Commit product code**
+
+  - Commit: `4a24fe6cc6fbcabed9cb20760baf7f7ffd6e64b4`
 
 ```sh
 rtk git add packages/cli/src/asset-pack-payload.ts packages/cli/src/asset-pack-files.ts packages/cli/src/asset-pack-validation.ts packages/cli/test/asset-pack-payload.test.ts packages/cli/test/asset-pack-files.test.ts packages/cli/test/asset-pack-validation.test.ts
 rtk git commit -m "refactor(cli): share immutable asset pack payloads"
 ```
+
+Task 2 record:
+
+- Implementation: Shared immutable manifest/source byte payload parsing between directory and archive workflows, preserved directory safety checks, and exposed payload-snapshot validation without changing Phase 1 attribution or acknowledgement semantics.
+- Product commit: `4a24fe6cc6fbcabed9cb20760baf7f7ffd6e64b4`.
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-payload.test.ts asset-pack-files.test.ts asset-pack-validation.test.ts` PASS (18 tests); `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-payload.test.ts asset-pack-files.test.ts asset-pack-validation.test.ts asset-pack-sync.test.ts asset-pack-preview.test.ts` PASS; `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+- Review: Task reviewer APPROVED with no Critical, Important, or Minor findings.
 
 Then update this task's plan record and commit it separately.
 
