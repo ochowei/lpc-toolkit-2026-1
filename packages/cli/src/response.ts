@@ -316,6 +316,107 @@ function formatRender(data: JsonRecord, label = 'Render'): string | undefined {
   return `${label} complete. Artifacts (${artifacts.length})\n${lines.join('\n')}\nMetadata: ${metadataPath}\n`;
 }
 
+function formatAssetWorkspaceInit(data: JsonRecord): string | undefined {
+  const root = stringValue(data, 'root');
+  const configPath = stringValue(data, 'configPath');
+  if (!root || !configPath) return undefined;
+  return `Asset workspace initialized: ${root}\nConfig: ${configPath}\n`;
+}
+
+function formatAssetInit(data: JsonRecord): string | undefined {
+  const packRoot = stringValue(data, 'packRoot');
+  const manifestPath = stringValue(data, 'manifestPath');
+  if (!packRoot || !manifestPath) return undefined;
+  return `Asset pack scaffolded: ${packRoot}\nManifest: ${manifestPath}\n`;
+}
+
+function assetDiagnosticPath(diagnostic: JsonRecord): string | undefined {
+  return stringValue(diagnostic, 'path')
+    ?? stringValue(diagnostic, 'sourcePath')
+    ?? stringValue(diagnostic, 'destinationPath');
+}
+
+function formatAssetDiagnostic(diagnostic: JsonRecord): string {
+  const code = stringValue(diagnostic, 'code') ?? 'asset_pack_diagnostic';
+  const message = stringValue(diagnostic, 'message') ?? 'Asset-pack diagnostic.';
+  const diagnosticPath = assetDiagnosticPath(diagnostic);
+  return `- ${code}: ${message}${diagnosticPath ? ` (${diagnosticPath})` : ''}`;
+}
+
+function formatAssetValidation(data: JsonRecord): string | undefined {
+  const valid = data['valid'];
+  const diagnostics = recordArrayValue(data, 'diagnostics');
+  const acknowledgements = recordArrayValue(data, 'acknowledgementRecords');
+  if (typeof valid !== 'boolean' || !diagnostics || !acknowledgements) return undefined;
+  const errors = diagnostics.filter((diagnostic) => diagnostic['severity'] === 'error');
+  const warnings = diagnostics.filter((diagnostic) => diagnostic['severity'] === 'warning');
+  const lines = [`Asset pack validation: ${valid ? 'valid' : 'invalid'}`];
+  const packDirectory = stringValue(data, 'packDirectory');
+  const contentDigest = stringValue(data, 'contentDigest');
+  if (packDirectory) lines.push(`Pack: ${packDirectory}`);
+  if (contentDigest) lines.push(`Content digest: ${contentDigest}`);
+  if (errors.length > 0) {
+    lines.push(`Errors (${errors.length}):`, ...errors.map(formatAssetDiagnostic));
+  }
+  if (warnings.length > 0) {
+    lines.push(`Warnings (${warnings.length}):`, ...warnings.map(formatAssetDiagnostic));
+  }
+  if (acknowledgements.length > 0) {
+    lines.push(
+      'Acknowledgements (copy exact JSON and add a non-empty reason):',
+      JSON.stringify(acknowledgements, null, 2),
+    );
+  }
+  return `${lines.join('\n')}\n`;
+}
+
+function previewArtifactLabel(type: string): string {
+  switch (type) {
+    case 'preview':
+      return 'Preview';
+    case 'credits_txt':
+      return 'Credits TXT';
+    case 'credits_csv':
+      return 'Credits CSV';
+    case 'metadata':
+      return 'Metadata';
+    default:
+      return type;
+  }
+}
+
+function formatAssetPreview(data: JsonRecord): string | undefined {
+  const packId = stringValue(data, 'packId');
+  const assetId = stringValue(data, 'assetId');
+  const artifacts = recordArrayValue(data, 'artifacts');
+  if (!packId || !assetId || !artifacts) return undefined;
+  const lines = artifacts.flatMap((artifact) => {
+    const type = stringValue(artifact, 'type');
+    const artifactPath = stringValue(artifact, 'path');
+    return type && artifactPath
+      ? [`${previewArtifactLabel(type)}: ${artifactPath}`]
+      : [];
+  });
+  return `Asset preview: ${packId} / ${assetId}\n${lines.join('\n')}\n`;
+}
+
+function formatAssetSync(data: JsonRecord): string | undefined {
+  const packId = stringValue(data, 'packId');
+  const contentDigest = stringValue(data, 'contentDigest');
+  const generatedFileCount = numberValue(data, 'generatedFileCount');
+  const outputPath = stringValue(data, 'outputPath');
+  if (!packId || !contentDigest || generatedFileCount === undefined || !outputPath) {
+    return undefined;
+  }
+  return [
+    `Asset pack synced: ${packId}`,
+    `Content digest: ${contentDigest}`,
+    `Generated files: ${generatedFileCount}`,
+    `Workspace output: ${outputPath}`,
+    '',
+  ].join('\n');
+}
+
 function formatAnimationAuditConsumer(consumer: JsonRecord, indent: string): readonly string[] {
   const itemId = stringValue(consumer, 'itemId');
   const typeName = stringValue(consumer, 'typeName');
@@ -469,6 +570,16 @@ function formatHumanData(response: CliResponse<unknown>): string | undefined {
   if (!isRecord(data)) return undefined;
 
   switch (response.command) {
+    case 'asset workspace init':
+      return formatAssetWorkspaceInit(data);
+    case 'asset init':
+      return formatAssetInit(data);
+    case 'asset validate':
+      return formatAssetValidation(data);
+    case 'asset preview':
+      return formatAssetPreview(data);
+    case 'asset sync':
+      return formatAssetSync(data);
     case 'catalog types':
       return formatCatalogTypes(data);
     case 'catalog items':
@@ -518,7 +629,11 @@ export function formatHumanResponse(
   fallbackSuccess: string,
 ): string {
   if (!response.ok) {
-    return `${response.errors.map(humanIssue).join('\n')}\n`;
+    const errors = response.errors.map(humanIssue).join('\n');
+    const warnings = formatWarnings(response.warnings);
+    if (errors && warnings) return `${errors}\n${warnings.slice(1)}`;
+    if (warnings) return warnings.slice(1);
+    return `${errors}\n`;
   }
 
   return `${formatHumanData(response) ?? fallbackSuccess}${formatWarnings(response.warnings)}`;

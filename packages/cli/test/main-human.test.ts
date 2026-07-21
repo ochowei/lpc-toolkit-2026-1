@@ -169,6 +169,157 @@ async function runHumanError(argv: readonly string[], cwd: string): Promise<stri
 }
 
 describe('human-readable CLI output', () => {
+  it('prints workspace and scaffold paths', () => {
+    expect(formatHumanResponse({
+      ok: true,
+      command: 'asset workspace init',
+      data: {
+        root: '/workspace',
+        configPath: '/workspace/lpc-asset-workspace.json',
+        packsRoot: '/workspace/artist-packs',
+        outputRoot: '/workspace/assets_custom',
+        stateRoot: '/workspace/.lpc-toolkit/asset-packs',
+        registryPath: '/workspace/.lpc-toolkit/asset-packs/registry.json',
+      },
+      warnings: [],
+      errors: [],
+    }, 'fallback\n')).toContain('Asset workspace initialized: /workspace');
+
+    const scaffold = formatHumanResponse({
+      ok: true,
+      command: 'asset init',
+      data: {
+        packRoot: '/workspace/artist-packs/acme.hair',
+        manifestPath: '/workspace/artist-packs/acme.hair/asset-pack.json',
+      },
+      warnings: [],
+      errors: [],
+    }, 'fallback\n');
+    expect(scaffold).toContain('Asset pack scaffolded: /workspace/artist-packs/acme.hair');
+    expect(scaffold).toContain(
+      'Manifest: /workspace/artist-packs/acme.hair/asset-pack.json',
+    );
+  });
+
+  it('groups asset validation errors and warnings with exact acknowledgement JSON', () => {
+    const acknowledgement = {
+      code: 'asset_path_inferred',
+      subject: {
+        assetId: 'hair_braid',
+        animation: 'climb',
+        bodyTypes: ['male'],
+      },
+      contentDigest: `sha256:${'a'.repeat(64)}`,
+      reason: '',
+    };
+    const output = formatHumanResponse({
+      ok: true,
+      command: 'asset validate',
+      data: {
+        schema: 'lpc-toolkit.asset-pack-validation.v1',
+        packId: 'acme.hair',
+        packDirectory: '/workspace/artist-packs/acme.hair',
+        contentDigest: `sha256:${'a'.repeat(64)}`,
+        valid: false,
+        diagnostics: [
+          {
+            code: 'asset_source_missing',
+            severity: 'error',
+            message: 'Source PNG is missing.',
+            sourcePath: 'sprites/hair/walk.png',
+          },
+          {
+            code: 'asset_path_inferred',
+            severity: 'warning',
+            message: 'Confirm the inferred destination.',
+            destinationPath: 'spritesheets/hair/braid/climb.png',
+          },
+        ],
+        acknowledgementRecords: [acknowledgement],
+      },
+      warnings: [],
+      errors: [],
+    }, 'fallback\n');
+
+    expect(output).toContain('Asset pack validation: invalid');
+    expect(output).toContain('Errors (1):');
+    expect(output).toContain(
+      '- asset_source_missing: Source PNG is missing. (sprites/hair/walk.png)',
+    );
+    expect(output).toContain('Warnings (1):');
+    expect(output).toContain(
+      '- asset_path_inferred: Confirm the inferred destination. (spritesheets/hair/braid/climb.png)',
+    );
+    expect(output).toContain('Acknowledgements (copy exact JSON and add a non-empty reason):');
+    expect(output).toContain(JSON.stringify([acknowledgement], null, 2));
+  });
+
+  it('prints attributed asset preview artifact and credit paths', () => {
+    const output = formatHumanResponse({
+      ok: true,
+      command: 'asset preview',
+      data: {
+        packId: 'acme.hair',
+        assetId: 'moon-braid',
+        artifacts: [
+          { type: 'preview', path: '/pack/previews/moon-braid.preview.png' },
+          { type: 'credits_txt', path: '/pack/previews/moon-braid.credits.txt' },
+          { type: 'credits_csv', path: '/pack/previews/moon-braid.credits.csv' },
+          { type: 'metadata', path: '/pack/previews/moon-braid.metadata.json' },
+        ],
+        warnings: [],
+        metadataPath: '/pack/previews/moon-braid.metadata.json',
+        outDir: '/pack/previews',
+      },
+      warnings: [],
+      errors: [],
+    }, 'fallback\n');
+
+    expect(output).toContain('Asset preview: acme.hair / moon-braid');
+    expect(output).toContain('Preview: /pack/previews/moon-braid.preview.png');
+    expect(output).toContain('Credits TXT: /pack/previews/moon-braid.credits.txt');
+    expect(output).toContain('Credits CSV: /pack/previews/moon-braid.credits.csv');
+    expect(output).toContain('Metadata: /pack/previews/moon-braid.metadata.json');
+  });
+
+  it('prints the linked pack digest, generated-file count, and workspace output', () => {
+    const output = formatHumanResponse({
+      ok: true,
+      command: 'asset sync',
+      data: {
+        packId: 'acme.hair',
+        contentDigest: `sha256:${'b'.repeat(64)}`,
+        generatedFileCount: 7,
+        outputPath: '/workspace/assets_custom',
+      },
+      warnings: [],
+      errors: [],
+    }, 'fallback\n');
+
+    expect(output).toContain('Asset pack synced: acme.hair');
+    expect(output).toContain(`Content digest: sha256:${'b'.repeat(64)}`);
+    expect(output).toContain('Generated files: 7');
+    expect(output).toContain('Workspace output: /workspace/assets_custom');
+  });
+
+  it('prints warnings when they are the only reason an asset sync is blocked', () => {
+    const output = formatHumanResponse({
+      ok: false,
+      command: 'asset sync',
+      data: null,
+      warnings: [{
+        code: 'asset_path_inferred',
+        message: 'Persist the exact acknowledgement before synchronizing.',
+        path: 'spritesheets/hair/braid/climb.png',
+      }],
+      errors: [],
+    }, 'fallback\n');
+
+    expect(output).toContain('Warnings (1):');
+    expect(output).toContain('asset_path_inferred');
+    expect(output).toContain('Persist the exact acknowledgement before synchronizing.');
+  });
+
   it('uses singular item summary labels for a one-item animation audit', () => {
     const output = formatHumanResponse({
       ok: true,

@@ -8,8 +8,17 @@ import {
   parseArgs,
   type ParsedArgs,
 } from './args.js';
+import {
+  preflightAssetCommand,
+  preflightAssetWorkspaceCommand,
+  runAssetCommand,
+} from './asset-commands.js';
 import { assetCacheErrorIssue } from './asset-cache.js';
 import { AssetStoreError } from './asset-store.js';
+import {
+  findAssetWorkspace,
+  initializeAssetWorkspace,
+} from './asset-workspace.js';
 import { runAnimationAuditCommand } from './animation-audit.js';
 import { SelectionOutputError } from './compose-selection.js';
 import { runCatalogCommand } from './catalog-commands.js';
@@ -53,9 +62,16 @@ export interface CliIo {
 export interface CliDependencies {
   readonly prepareRuntimeAssets: typeof prepareRuntimeAssets;
   readonly startWebServer: typeof startWebServer;
+  readonly findAssetWorkspace: typeof findAssetWorkspace;
+  readonly initializeAssetWorkspace: typeof initializeAssetWorkspace;
 }
 
-const DEFAULT_DEPENDENCIES: CliDependencies = { prepareRuntimeAssets, startWebServer };
+const DEFAULT_DEPENDENCIES: CliDependencies = {
+  findAssetWorkspace,
+  initializeAssetWorkspace,
+  prepareRuntimeAssets,
+  startWebServer,
+};
 
 export function resolveWebRoot(moduleUrl: string): string {
   return fileURLToPath(new URL('./web', moduleUrl));
@@ -96,18 +112,29 @@ function writeResponse(
   io: CliIo,
   humanSuccess: string,
 ): number {
+  const validationFailed = response.ok
+    && response.command === 'asset validate'
+    && typeof response.data === 'object'
+    && response.data !== null
+    && 'valid' in response.data
+    && response.data.valid === false;
+  const exitCode = response.ok && !validationFailed ? 0 : 1;
   if (flagBoolean(parsed.flags, 'json')) {
     io.stdout(formatJsonResponse(response));
-  } else if (response.ok) {
+  } else if (exitCode === 0) {
     io.stdout(formatHumanResponse(response, humanSuccess));
   } else {
     io.stderr(formatHumanResponse(response, humanSuccess));
   }
-  return response.ok ? 0 : 1;
+  return exitCode;
 }
 
 export function commandNeedsAssets(parsed: ParsedArgs): boolean {
   if (parsed.flags.has('help')) return false;
+  if (parsed.command[0] === 'asset') {
+    return parsed.command[1] !== undefined
+      && parsed.command[1] !== 'workspace';
+  }
   if (parsed.command[0] === 'catalog') return true;
   if (parsed.command[0] === 'selection') return true;
   if (parsed.command[0] === 'render') return true;
@@ -134,7 +161,7 @@ function isLoopbackHost(host: string): boolean {
   return host === 'localhost' || host === '::1' || /^127(?:\.\d{1,3}){3}$/.test(host);
 }
 
-function preflightAssetCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
+function preflightCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
   const command = parsed.command[0];
   const subcommand = parsed.command[1];
 
@@ -289,6 +316,20 @@ export async function runCli(
   }
 
   const parsed = parseArgs(argv);
+  if (
+    parsed.flags.size === 0
+    && (
+      (parsed.command.length === 1 && parsed.command[0] === 'asset')
+      || (
+        parsed.command.length === 2
+        && parsed.command[0] === 'asset'
+        && parsed.command[1] === 'workspace'
+      )
+    )
+  ) {
+    io.stdout(helpForCommand(parsed.command));
+    return 0;
+  }
   if (parsed.flags.has('help')) {
     io.stdout(helpForCommand(parsed.command));
     return 0;
@@ -304,9 +345,95 @@ export async function runCli(
     );
   }
 
-  const preflightResponse = preflightAssetCommand(parsed);
+  const preflightResponse = preflightCommand(parsed) ?? preflightAssetCommand(parsed);
   if (preflightResponse !== undefined) {
     return writeResponse(preflightResponse, parsed, io, '');
+  }
+
+  if (
+    parsed.command[0] === 'asset'
+    && parsed.command[1] === 'workspace'
+    && parsed.command[2] === 'init'
+  ) {
+    try {
+      const workspace = resolvedDependencies.initializeAssetWorkspace(
+        path.resolve(io.cwd, parsed.positionals[0]!),
+      );
+      return writeResponse(
+        commandOk('asset workspace init', workspace),
+        parsed,
+        io,
+        'Asset workspace initialized.\n',
+      );
+    } catch (error) {
+      return writeResponse(
+        commandError('asset workspace init', {
+          code: 'asset_workspace_init_failed',
+          message: error instanceof Error
+            ? error.message
+            : 'Asset workspace initialization failed.',
+          path: path.resolve(io.cwd, parsed.positionals[0]!),
+        }),
+        parsed,
+        io,
+        '',
+      );
+    }
+  }
+
+  if (parsed.command[0] === 'asset') {
+    let workspace;
+    try {
+      workspace = resolvedDependencies.findAssetWorkspace(
+        io.cwd,
+        flagString(parsed.flags, 'workspace'),
+      );
+    } catch (error) {
+      return writeResponse(
+        commandError(parsed.command.join(' '), {
+          code: 'asset_workspace_not_found',
+          message: error instanceof Error ? error.message : 'Asset workspace not found.',
+          path: flagString(parsed.flags, 'workspace') ?? io.cwd,
+        }),
+        parsed,
+        io,
+        '',
+      );
+    }
+
+    const workspacePreflightResponse = preflightAssetWorkspaceCommand(
+      parsed,
+      io.cwd,
+      workspace,
+    );
+    if (workspacePreflightResponse !== undefined) {
+      return writeResponse(workspacePreflightResponse, parsed, io, '');
+    }
+
+    let assetRuntime: RuntimeAssets;
+    try {
+      assetRuntime = await resolvedDependencies.prepareRuntimeAssets({
+        cwd: workspace.root,
+        managedCacheOnly: true,
+        onProgress: (progress) =>
+          io.stderr(formatProgress(progress.phase, progress.message)),
+      });
+    } catch (error) {
+      return writeResponse(
+        commandError(parsed.command.join(' '), assetCacheErrorIssue(error)),
+        parsed,
+        io,
+        '',
+      );
+    }
+
+    const response = await runAssetCommand({
+      parsed,
+      cwd: io.cwd,
+      workspace,
+      runtime: assetRuntime,
+    });
+    return writeResponse(response, parsed, io, 'Asset command completed.\n');
   }
 
   let runtime: RuntimeAssets | undefined;

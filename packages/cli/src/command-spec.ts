@@ -66,6 +66,48 @@ const DISCOVERY_OPTIONS: readonly CommandOptionSpec[] = [
   { name: 'all', kind: 'boolean', description: 'Return all matching items.' },
 ];
 
+const ASSET_WORKSPACE_OPTION: CommandOptionSpec = {
+  name: 'workspace',
+  kind: 'value',
+  valueLabel: 'directory',
+  description: 'Use this asset workspace instead of discovering one.',
+};
+
+const ASSET_SCAFFOLD_OPTIONS: readonly CommandOptionSpec[] = [
+  ASSET_WORKSPACE_OPTION,
+  {
+    name: 'out',
+    kind: 'value',
+    valueLabel: 'directory',
+    description: 'Create the pack in this directory inside artist-packs.',
+  },
+  { name: 'pack-id', kind: 'value', valueLabel: 'id', description: 'Set the asset-pack id.' },
+  {
+    name: 'version',
+    kind: 'value',
+    valueLabel: 'semver',
+    description: 'Set the asset-pack version. Default: 0.1.0.',
+  },
+  {
+    name: 'display-name',
+    kind: 'value',
+    valueLabel: 'label',
+    description: 'Set the artist-facing pack name.',
+  },
+  { name: 'author', kind: 'repeatable', valueLabel: 'name', description: 'Credit an author; may be repeated.' },
+  { name: 'license', kind: 'repeatable', valueLabel: 'license', description: 'Declare a license; may be repeated.' },
+  { name: 'url', kind: 'repeatable', valueLabel: 'url', description: 'Record a credit URL; may be repeated.' },
+  { name: 'notes', kind: 'value', valueLabel: 'text', description: 'Record pack credit notes.' },
+  { name: 'new', kind: 'boolean', description: 'Scaffold a new catalog item.' },
+  { name: 'asset-id', kind: 'value', valueLabel: 'id', description: 'Set the new item local id.' },
+  { name: 'type', kind: 'repeatable', valueLabel: 'type', description: 'Set or select an item type; may be repeated for audit selection.' },
+  { name: 'body-type', kind: 'repeatable', valueLabel: 'type', description: 'Set or narrow body types; may be repeated.' },
+  { name: 'animation', kind: 'repeatable', valueLabel: 'name', description: 'Set or narrow animations; may be repeated.' },
+  { name: 'advanced', kind: 'boolean', description: 'Include advanced new-item guidance.' },
+  { name: 'from-audit', kind: 'value', valueLabel: 'report', description: 'Scaffold from a complete animation audit JSON report.' },
+  { name: 'item', kind: 'repeatable', valueLabel: 'item-id', description: 'Select an audited item; may be repeated.' },
+];
+
 const COMMAND_SPECS: readonly CommandSpec[] = [
   {
     command: [],
@@ -80,6 +122,71 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
       'lpc-toolkit character search hero --type hair --query braid --limit 20 --json',
       'lpc-toolkit catalog item hair_braid --json',
     ],
+  },
+  {
+    command: ['asset'],
+    usage: 'lpc-toolkit asset <command>',
+    description: 'Create, validate, preview, and synchronize local artist asset packs.',
+    options: [HELP_OPTION],
+    examples: [
+      'lpc-toolkit asset workspace init ./my-lpc-art',
+      'lpc-toolkit asset validate ./artist-packs/acme.hair',
+    ],
+  },
+  {
+    command: ['asset', 'workspace'],
+    usage: 'lpc-toolkit asset workspace <command>',
+    description: 'Create and inspect standalone artist workspaces.',
+    options: [HELP_OPTION],
+    examples: ['lpc-toolkit asset workspace init ./my-lpc-art'],
+  },
+  {
+    command: ['asset', 'workspace', 'init'],
+    usage: 'lpc-toolkit asset workspace init <directory>',
+    description: 'Initialize a standalone artist asset workspace without preparing base assets.',
+    options: [HELP_OPTION, JSON_OPTION],
+    examples: ['lpc-toolkit asset workspace init ./my-lpc-art'],
+  },
+  {
+    command: ['asset', 'init'],
+    usage: 'lpc-toolkit asset init (--new | --from-audit <report>) [options]',
+    description: 'Scaffold a new or audit-derived artist asset pack.',
+    options: [HELP_OPTION, JSON_OPTION, ...ASSET_SCAFFOLD_OPTIONS],
+    examples: [
+      'lpc-toolkit asset init --new --pack-id acme.hair --asset-id moon-braid --display-name "ACME Hair" --type hair --body-type male --animation walk --author Alice --license "CC-BY-SA 4.0" --url https://example.com/acme/hair',
+      'lpc-toolkit asset init --from-audit audit.json --item hair_braid --pack-id acme.audit --display-name "ACME Audit" --author Alice --license "CC-BY-SA 4.0" --url https://example.com/acme/audit',
+    ],
+  },
+  {
+    command: ['asset', 'validate'],
+    usage: 'lpc-toolkit asset validate <pack-directory>',
+    description: 'Validate an artist asset pack, its PNGs, and its attribution.',
+    options: [HELP_OPTION, JSON_OPTION, ASSET_WORKSPACE_OPTION],
+    examples: ['lpc-toolkit asset validate ./artist-packs/acme.hair --json'],
+  },
+  {
+    command: ['asset', 'preview'],
+    usage: 'lpc-toolkit asset preview <pack-directory> [options]',
+    description: 'Render an attributed preview without changing active workspace output.',
+    options: [
+      HELP_OPTION,
+      JSON_OPTION,
+      ASSET_WORKSPACE_OPTION,
+      { name: 'asset', kind: 'value', valueLabel: 'local-id', description: 'Preview this pack asset.' },
+      { name: 'animation', kind: 'value', valueLabel: 'name', description: 'Preview this animation.' },
+      { name: 'body-type', kind: 'value', valueLabel: 'type', description: 'Preview this body type.' },
+      { name: 'character', kind: 'value', valueLabel: 'selection.json', description: 'Use this character selection for overlap testing.' },
+    ],
+    examples: [
+      'lpc-toolkit asset preview ./artist-packs/acme.hair --asset moon-braid --animation walk',
+    ],
+  },
+  {
+    command: ['asset', 'sync'],
+    usage: 'lpc-toolkit asset sync <pack-directory>',
+    description: 'Link an artist pack and rebuild the managed workspace overlay.',
+    options: [HELP_OPTION, JSON_OPTION, ASSET_WORKSPACE_OPTION],
+    examples: ['lpc-toolkit asset sync ./artist-packs/acme.hair --json'],
   },
   {
     command: ['catalog'],

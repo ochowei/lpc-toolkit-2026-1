@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createDirectoryAssetStore } from '../src/asset-store.js';
+import { initializeAssetWorkspace } from '../src/asset-workspace.js';
 import { createRuntimeContext } from '../src/context.js';
 import { runCli } from '../src/main.js';
 import type { RuntimeAssets } from '../src/runtime-assets.js';
@@ -79,6 +80,155 @@ function auditDefinition(animations: readonly string[]): Record<string, unknown>
 }
 
 describe('main json behavior', () => {
+  it('returns the standard workspace-init JSON envelope without runtime assets', async () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-main-json-workspace-'));
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+
+    const code = await runCli([
+      'asset', 'workspace', 'init', 'artist-workspace', '--json',
+    ], {
+      cwd,
+      stdout: (text) => stdout.push(text),
+      stderr: (text) => stderr.push(text),
+    }, {
+      prepareRuntimeAssets: async () => {
+        throw new Error('workspace init must not prepare runtime assets');
+      },
+    });
+
+    expect(code).toBe(0);
+    expect(stderr).toEqual([]);
+    expect(JSON.parse(stdout.join(''))).toEqual({
+      ok: true,
+      command: 'asset workspace init',
+      data: expect.objectContaining({
+        root: path.join(cwd, 'artist-workspace'),
+        packsRoot: path.join(cwd, 'artist-workspace', 'artist-packs'),
+        outputRoot: path.join(cwd, 'artist-workspace', 'assets_custom'),
+      }),
+      warnings: [],
+      errors: [],
+    });
+  });
+
+  it('returns the standard scaffold JSON envelope with the default version', async () => {
+    const workspaceRoot = mkdtempSync(path.join(tmpdir(), 'lpc-main-json-scaffold-'));
+    initializeAssetWorkspace(workspaceRoot);
+    const runtime = createRuntime();
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+
+    const code = await runCli([
+      'asset', 'init', '--new', '--pack-id', 'acme.hair',
+      '--display-name', 'ACME Hair', '--asset-id', 'moon-braid', '--type', 'hair',
+      '--body-type', 'male', '--animation', 'walk', '--author', 'Alice',
+      '--license', 'CC-BY-SA 4.0', '--url', 'https://example.test/acme-hair',
+      '--workspace', workspaceRoot, '--json',
+    ], {
+      cwd: workspaceRoot,
+      stdout: (text) => stdout.push(text),
+      stderr: (text) => stderr.push(text),
+    }, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+
+    expect(code).toBe(0);
+    expect(stderr).toEqual([]);
+    expect(JSON.parse(stdout.join(''))).toEqual({
+      ok: true,
+      command: 'asset init',
+      data: {
+        packRoot: path.join(workspaceRoot, 'artist-packs', 'acme.hair'),
+        manifestPath: path.join(
+          workspaceRoot,
+          'artist-packs',
+          'acme.hair',
+          'asset-pack.json',
+        ),
+      },
+      warnings: [],
+      errors: [],
+    });
+    expect(JSON.parse(readFileSync(path.join(
+      workspaceRoot,
+      'artist-packs',
+      'acme.hair',
+      'asset-pack.json',
+    ), 'utf8'))).toMatchObject({ version: '0.1.0' });
+  });
+
+  it('keeps validation findings in a completed response while exiting one', async () => {
+    const workspaceRoot = mkdtempSync(path.join(tmpdir(), 'lpc-main-json-validate-'));
+    initializeAssetWorkspace(workspaceRoot);
+    const packRoot = path.join(workspaceRoot, 'artist-packs', 'invalid');
+    mkdirSync(packRoot, { recursive: true });
+    writeFileSync(path.join(packRoot, 'asset-pack.json'), '{}');
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const runtime = createRuntime();
+
+    const code = await runCli([
+      'asset', 'validate', packRoot, '--workspace', workspaceRoot, '--json',
+    ], {
+      cwd: workspaceRoot,
+      stdout: (text) => stdout.push(text),
+      stderr: (text) => stderr.push(text),
+    }, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+
+    expect(code).toBe(1);
+    expect(stderr).toEqual([]);
+    expect(JSON.parse(stdout.join(''))).toMatchObject({
+      ok: true,
+      command: 'asset validate',
+      data: {
+        packDirectory: packRoot,
+        valid: false,
+        diagnostics: expect.arrayContaining([
+          expect.objectContaining({ severity: 'error' }),
+        ]),
+        acknowledgementRecords: [],
+      },
+      warnings: [],
+      errors: [],
+    });
+  });
+
+  it.each(['preview', 'sync'])('uses a fatal envelope for asset %s failures', async (command) => {
+    const workspaceRoot = mkdtempSync(path.join(tmpdir(), `lpc-main-json-${command}-`));
+    initializeAssetWorkspace(workspaceRoot);
+    const packRoot = path.join(workspaceRoot, 'artist-packs', 'invalid');
+    mkdirSync(packRoot, { recursive: true });
+    writeFileSync(path.join(packRoot, 'asset-pack.json'), '{}');
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const runtime = createRuntime();
+
+    const code = await runCli([
+      'asset', command, packRoot, '--workspace', workspaceRoot, '--json',
+    ], {
+      cwd: workspaceRoot,
+      stdout: (text) => stdout.push(text),
+      stderr: (text) => stderr.push(text),
+    }, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+
+    expect(code).toBe(1);
+    expect(stderr).toEqual([]);
+    expect(JSON.parse(stdout.join(''))).toMatchObject({
+      ok: false,
+      command: `asset ${command}`,
+      data: null,
+      warnings: [],
+      errors: expect.arrayContaining([
+        expect.objectContaining({ code: expect.any(String) }),
+      ]),
+    });
+  });
+
   it('reports normalization in the JSON envelope after an upstream character mutation', async () => {
     const runtime = createRuntime();
     const selectionPath = path.join(runtime.context.repoRoot, 'upstream.json');
