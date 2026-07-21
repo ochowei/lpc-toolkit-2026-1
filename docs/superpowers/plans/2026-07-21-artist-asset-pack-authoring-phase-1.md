@@ -1040,7 +1040,7 @@ Task 8 record:
 - Create: `packages/cli/src/asset-pack-sync.ts`
 - Create: `packages/cli/test/asset-pack-sync.test.ts`
 
-- [ ] **Step 1: Write failing desired-state registry tests**
+- [x] **Step 1: Write failing desired-state registry tests**
 
 Define the Phase 1 registry record:
 
@@ -1061,11 +1061,11 @@ export interface LinkedAssetPackRegistryEntry {
 
 Test first sync, second linked pack preserving the first, re-sync after source change, same pack ID changing its link target, removed source failure without deletion, deterministic registry/output, disjoint extension merge, true conflict, unacknowledged warning, unowned output refusal, marker mismatch, and no writes to base/cache/upstream sentinels.
 
-- [ ] **Step 2: Write failing publication rollback tests**
+- [x] **Step 2: Write failing publication rollback tests**
 
 Inject `AssetPublicationFileOps` and fail each publish rename/write point. Assert the previous `assets_custom/` bytes and `registry.json` bytes are restored exactly, staging/backup cleanup is confined to manager state, and artist source remains untouched.
 
-- [ ] **Step 3: Run focused tests and verify RED**
+- [x] **Step 3: Run focused tests and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-sync.test.ts
@@ -1073,17 +1073,17 @@ rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-sync.test.ts
 
 Expected: FAIL because linked sync does not exist.
 
-- [ ] **Step 4: Implement complete desired-state compilation**
+- [x] **Step 4: Implement complete desired-state compilation**
 
 Read every current linked registry entry plus the requested pack, validate each source fresh, replace the same pack ID entry with the requested link, sort by pack ID, compile once against the active baseline, and stop before staging on any error or unacknowledged warning.
 
 Materialize compiler output only below a newly created staging generation. Copy source PNG bytes to their planned logical destinations, write recursively key-sorted definitions, write deterministic `CREDITS.csv`, and include the workspace marker in the staged root.
 
-- [ ] **Step 5: Implement rollback-safe publication**
+- [x] **Step 5: Implement rollback-safe publication**
 
 Preflight all paths. Rename current output and registry to manager-state backups, rename staged output and staged registry into place, then remove backups. On any caught error, remove only newly published manager-owned paths and rename backups back. If rollback itself fails, return `asset_publish_failed` with both errors and retain all recovery paths; do not guess or delete further. Persistent crash recovery remains Phase 2.
 
-- [ ] **Step 6: Verify GREEN**
+- [x] **Step 6: Verify GREEN**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-sync.test.ts asset-workspace.test.ts asset-pack-validation.test.ts asset-overlay-store.test.ts
@@ -1093,7 +1093,7 @@ rtk pnpm check:boundaries
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit product code**
+- [x] **Step 7: Commit product code**
 
 ```sh
 rtk git add packages/cli/src/asset-pack-sync.ts packages/cli/test/asset-pack-sync.test.ts
@@ -1101,6 +1101,24 @@ rtk git commit -m "feat(cli): sync linked artist asset packs"
 ```
 
 Then update this task's plan record and commit it separately.
+
+Task 9 record:
+
+- Implementation: Added deterministic linked-pack desired-state synchronization with exact registry validation, fresh source validation, generated overlay/credit publication, persisted generated-output ownership digests, refusal of unowned or tampered output (including source-change definition, credit, and removed-path cases), and in-process rollback with retained recovery paths on rollback failure.
+- Product commits: `c202c5c17925d94651e7527e67261366c8825aec`, `b6bae9d2d037ab749ae5c28a5a0e3357399e8b22`, `1e6f17a455c8bc98d3296c12ae23670862f79430`, `787055d911e7838d60796d794aea512ef8f73b61`.
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-sync.test.ts` PASS (20/20); `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-sync.test.ts asset-workspace.test.ts asset-pack-validation.test.ts asset-overlay-store.test.ts` PASS (53/53); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS; `rtk pnpm check:boundaries` PASS; `rtk pnpm verify` PASS (Core 299 passed; Presets 3 passed; CLI 536 passed, 1 skipped; Web 697 passed).
+- Review: fresh Task 9 reviewers found and fixed Critical/Important ownership findings; final re-review APPROVED with no Minor findings.
+- CLI documentation impact:
+  - help: N/A — no command or help contract changed
+  - cli-readme: N/A — no public workflow changed
+  - root-readme: N/A — no public workflow changed
+  - landing: N/A — no public workflow changed
+  - architecture: N/A — approved ownership contract is unchanged
+  - engineering: N/A — verification commands are unchanged
+  - releasing: N/A — no release behavior changed
+  - plugin: N/A — no plugin contract changed
+
+---
 
 ---
 
