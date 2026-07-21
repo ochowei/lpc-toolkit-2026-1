@@ -251,6 +251,31 @@ describe('asset pack schema', () => {
     });
   });
 
+  it.each([
+    '^1.0.0',
+    '>= 1.0.0',
+    '1.0.0',
+    '>=1.0',
+    '>=1.0.0 || <2.0.0',
+  ])('rejects malformed replacement version ranges: %s', (versions) => {
+    const result = parseAssetPackSource({
+      ...validPack,
+      replaces: [{
+        packId: 'acme.fantasy-hair',
+        versions,
+        assets: ['moon-braid'],
+      }],
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      diagnostics: [expect.objectContaining({
+        code: 'asset_pack_schema_invalid',
+        severity: 'error',
+      })],
+    });
+  });
+
   it('reports diagnostics in global JSON-path order', () => {
     const firstAsset = requireNewItemFixture();
     const firstLayer = firstAsset.layers[0];

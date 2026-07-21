@@ -176,6 +176,9 @@ const SHA256_PATTERN = /^sha256:[0-9a-f]{64}$/;
 const SOURCE_LAYER_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const EXTEND_LAYER_PATTERN = /^layer_[1-9]\d*$/;
 const RECOLOR_KEY_PATTERN = /^color_\d+$/;
+const REPLACEMENT_VERSION_TOKEN_PATTERN = new RegExp(
+  `^(?:<=|>=|=|<|>)${SEMVER_PATTERN.source.slice(1, -1)}$`,
+);
 
 export function parseAssetPackSource(input: unknown): AssetPackParseResult {
   const diagnostics: AssetPackDiagnostic[] = [];
@@ -910,11 +913,27 @@ function parseReplacementList(
       });
     }
 
+    const validVersions = versions ? isValidReplacementVersionRange(versions) : false;
+    if (versions && !validVersions) {
+      pushDiagnostic(diagnostics, {
+        code: 'asset_pack_schema_invalid',
+        severity: 'error',
+        message: `Invalid replacement version range at ${entryPath}.versions.`,
+        details: { path: `${entryPath}.versions`, value: versions },
+      });
+    }
+
     if (!packId || !versions || !assets) return;
+    if (!validVersions) return;
     replacements.push({ packId, versions, assets });
   });
 
   return replacements;
+}
+
+function isValidReplacementVersionRange(versions: string): boolean {
+  const tokens = versions.trim().split(/\s+/).filter((token) => token.length > 0);
+  return tokens.length > 0 && tokens.every((token) => REPLACEMENT_VERSION_TOKEN_PATTERN.test(token));
 }
 
 function parseAcknowledgements(

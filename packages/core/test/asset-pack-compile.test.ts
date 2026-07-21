@@ -190,6 +190,123 @@ function baselineWithExistingSharedItem(): AssetPackBaseline {
   };
 }
 
+function extensionBaseline(): AssetPackBaseline {
+  return {
+    catalog: createCatalog({
+      'hair/braid.json': {
+        name: 'braid',
+        display_name: 'Braid',
+        type_name: 'hair',
+        animations: ['walk'],
+        variants: ['dark brown'],
+        credits: [
+          {
+            file: 'hair/braid/front/walk/dark_brown.png',
+            authors: ['Baseline Artist'],
+            licenses: ['CC-BY-SA 4.0'],
+            urls: ['https://example.com/baseline'],
+            notes: 'Baseline walk credit.',
+          },
+          {
+            file: 'hair/braid/front/climb/dark_brown.png',
+            authors: ['Baseline Artist'],
+            licenses: ['CC-BY-SA 4.0'],
+            urls: ['https://example.com/baseline'],
+            notes: 'Inherited climb credit.',
+          },
+        ],
+        layer_1: {
+          zPos: 50,
+          male: 'hair/braid/front/',
+          female: 'hair/braid/front/',
+          teen: 'hair/braid/front/',
+        },
+        layer_2: {
+          zPos: 80,
+          male: 'hair/braid/trim/',
+        },
+      },
+    }).catalog,
+    definitionDigests: new Map([['braid', sha('e')]]),
+    creditDigests: new Map([['braid', sha('f')]]),
+  };
+}
+
+function extensionPack(overrides?: {
+  readonly id?: string;
+  readonly version?: string;
+  readonly credits?: typeof PACK_CREDITS;
+  readonly creditOverrides?: Readonly<Record<string, typeof PACK_CREDITS | typeof CLIMB_OVERRIDE>>;
+  readonly replaces?: readonly {
+    readonly packId: string;
+    readonly versions: string;
+    readonly assets: readonly string[];
+  }[];
+  readonly assets?: AssetPackSource['assets'];
+}): AssetPackSource {
+  return {
+    schema: 'lpc-toolkit.asset-pack.v1',
+    id: overrides?.id ?? 'acme.braid-extensions',
+    version: overrides?.version ?? '1.0.0',
+    displayName: 'ACME Braid Extensions',
+    credits: overrides?.credits ?? PACK_CREDITS,
+    ...(overrides?.creditOverrides ? { creditOverrides: overrides.creditOverrides } : {}),
+    ...(overrides?.replaces ? { replaces: overrides.replaces } : {}),
+    assets: overrides?.assets ?? [{
+      kind: 'extend-item',
+      itemId: 'braid',
+      baseDefinitionDigest: sha('e'),
+      baseCreditDigest: sha('f'),
+      addAnimations: [{
+        animation: 'climb',
+        layers: [
+          {
+            layer: 'layer_1',
+            bodyTypes: ['female'],
+            source: 'sprites/braid/front-climb-female.png',
+            variant: 'dark brown',
+            destination: {
+              path: 'spritesheets/hair/braid/front/climb/dark_brown.png',
+              evidence: 'audit-exact',
+              accepted: true,
+            },
+          },
+          {
+            layer: 'layer_1',
+            bodyTypes: ['teen'],
+            source: 'sprites/braid/front-climb-teen.png',
+            destination: {
+              path: 'spritesheets/hair/braid/front/climb.png',
+              evidence: 'audit-inferred',
+              accepted: true,
+            },
+          },
+          {
+            layer: 'layer_2',
+            bodyTypes: ['female'],
+            source: 'sprites/braid/trim-climb-female.png',
+            destination: {
+              path: 'spritesheets/hair/braid/trim-female/climb.png',
+              evidence: 'artist-specified',
+              accepted: true,
+            },
+          },
+          {
+            layer: 'layer_1',
+            bodyTypes: ['male'],
+            source: 'sprites/braid/front-climb-manual.png',
+            destination: {
+              path: 'spritesheets/hair/braid/manual-review/climb.png',
+              evidence: 'manual-review',
+              accepted: false,
+            },
+          },
+        ],
+      }],
+    }],
+  };
+}
+
 function projectPlan(plan: ReturnType<typeof compileAssetPacks>) {
   return {
     definitions: plan.definitions.map((definition) => ({
@@ -338,30 +455,23 @@ describe('asset-pack compile', () => {
     ]);
   });
 
-  it('reports conflicts against baseline-seeded definition and credit paths', () => {
+  it('ignores manager-generated baseline paths when compiling fresh managed outputs', () => {
     const plan = compileAssetPacks({
       baseline: baselineWithExistingSharedItem(),
       packs: [normalizeAssetPack(duplicateOwnerPack())],
     });
 
-    expect(plan.diagnostics).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        code: 'asset_path_conflict',
-        severity: 'error',
-        assetId: 'acme.shared-pack--shared-item',
-        destinationPath: 'sheet_definitions/hair/acme.shared-pack--shared-item.json',
-      }),
-      expect.objectContaining({
-        code: 'asset_path_conflict',
-        severity: 'error',
-        assetId: 'acme.shared-pack--shared-item',
-        destinationPath: 'packages/acme.shared-pack/shared-item/top/male-female/walk.png',
-      }),
-    ]));
-    expect(plan.definitions).toEqual([]);
-    expect(plan.sprites).toEqual([]);
-    expect(plan.credits).toEqual([]);
-    expect(plan.ownership).toEqual([]);
+    expect(plan.diagnostics).toEqual([]);
+    expect(plan.definitions).toHaveLength(1);
+    expect(plan.sprites).toHaveLength(1);
+    expect(plan.credits).toHaveLength(1);
+    expect(plan.ownership).toEqual([{
+      packId: 'acme.shared-pack',
+      logicalPaths: [
+        'sheet_definitions/hair/acme.shared-pack--shared-item.json',
+        'spritesheets/packages/acme.shared-pack/shared-item/top/male-female/walk.png',
+      ],
+    }]);
   });
 
   it('reports duplicate generated ownership instead of silently coalescing identical outputs', () => {
@@ -427,6 +537,370 @@ describe('asset-pack compile', () => {
         destinationPath: 'packages/acme.shared-pack/shared-item/top/male-female/walk.png',
       }),
     ]));
+    expect(plan.credits).toEqual([]);
+  });
+
+  it('compiles accepted existing-item patches, unions inherited credits, and skips manual-review destinations', () => {
+    const plan = compileAssetPacks({
+      baseline: extensionBaseline(),
+      packs: [normalizeAssetPack(extensionPack({
+        creditOverrides: {
+          'sprites/braid/front-climb-female.png': CLIMB_OVERRIDE,
+        },
+      }))],
+    });
+
+    expect(plan.diagnostics).toEqual([]);
+    expect(plan.definitions).toHaveLength(1);
+    expect(plan.definitions[0]).toMatchObject({
+      logicalPath: 'sheet_definitions/hair/braid.json',
+      basename: 'braid.json',
+      definition: {
+        name: 'braid',
+        display_name: 'Braid',
+        type_name: 'hair',
+        animations: ['walk', 'climb'],
+        layer_1: {
+          zPos: 50,
+          male: 'hair/braid/front/',
+          female: 'hair/braid/front/',
+          teen: 'hair/braid/front/',
+        },
+        layer_2: {
+          zPos: 80,
+          male: 'hair/braid/trim/',
+          female: 'hair/braid/trim-female/',
+        },
+      },
+    });
+
+    expect(plan.sprites.map((sprite) => sprite.destinationPath)).toEqual([
+      'spritesheets/hair/braid/front/climb.png',
+      'spritesheets/hair/braid/front/climb/dark_brown.png',
+      'spritesheets/hair/braid/trim-female/climb.png',
+    ]);
+
+    expect(plan.sprites).not.toContainEqual(expect.objectContaining({
+      destinationPath: 'spritesheets/hair/braid/manual-review/climb.png',
+    }));
+
+    expect(plan.credits).toContainEqual({
+      file: 'hair/braid/front/climb/dark_brown.png',
+      authors: ['Baseline Artist', 'Beatrice'],
+      licenses: ['CC-BY-SA 4.0', 'CC-BY 4.0'],
+      urls: ['https://example.com/baseline', 'https://example.com/beatrice'],
+      notes: 'Inherited climb credit.\n\nForeground climb override.',
+    });
+
+    expect(plan.definitions[0]?.definition.credits).toContainEqual({
+      file: 'hair/braid/front/climb/dark_brown.png',
+      authors: ['Baseline Artist', 'Beatrice'],
+      licenses: ['CC-BY-SA 4.0', 'CC-BY 4.0'],
+      urls: ['https://example.com/baseline', 'https://example.com/beatrice'],
+      notes: 'Inherited climb credit.\n\nForeground climb override.',
+    });
+  });
+
+  it('reports baseline definition and credit drift before applying an existing-item delta', () => {
+    const definitionDrift = compileAssetPacks({
+      baseline: extensionBaseline(),
+      packs: [normalizeAssetPack(extensionPack({
+        assets: [{
+          kind: 'extend-item',
+          itemId: 'braid',
+          baseDefinitionDigest: sha('a'),
+          baseCreditDigest: sha('f'),
+          addAnimations: [{
+            animation: 'climb',
+            layers: [{
+              layer: 'layer_1',
+              bodyTypes: ['female'],
+              source: 'sprites/braid/front-climb-female.png',
+              variant: 'dark brown',
+              destination: {
+                path: 'spritesheets/hair/braid/front/climb/dark_brown.png',
+                evidence: 'audit-exact',
+                accepted: true,
+              },
+            }],
+          }],
+        }],
+      }))],
+    });
+
+    expect(definitionDrift.diagnostics).toContainEqual(expect.objectContaining({
+      code: 'asset_base_definition_changed',
+      severity: 'error',
+      assetId: 'braid',
+    }));
+    expect(definitionDrift.definitions).toEqual([]);
+    expect(definitionDrift.sprites).toEqual([]);
+    expect(definitionDrift.credits).toEqual([]);
+
+    const creditDrift = compileAssetPacks({
+      baseline: extensionBaseline(),
+      packs: [normalizeAssetPack(extensionPack({
+        assets: [{
+          kind: 'extend-item',
+          itemId: 'braid',
+          baseDefinitionDigest: sha('e'),
+          baseCreditDigest: sha('a'),
+          addAnimations: [{
+            animation: 'climb',
+            layers: [{
+              layer: 'layer_1',
+              bodyTypes: ['female'],
+              source: 'sprites/braid/front-climb-female.png',
+              variant: 'dark brown',
+              destination: {
+                path: 'spritesheets/hair/braid/front/climb/dark_brown.png',
+                evidence: 'audit-exact',
+                accepted: true,
+              },
+            }],
+          }],
+        }],
+      }))],
+    });
+
+    expect(creditDrift.diagnostics).toContainEqual(expect.objectContaining({
+      code: 'asset_base_credit_changed',
+      severity: 'error',
+      assetId: 'braid',
+    }));
+    expect(creditDrift.definitions).toEqual([]);
+    expect(creditDrift.sprites).toEqual([]);
+    expect(creditDrift.credits).toEqual([]);
+  });
+
+  it('merges disjoint patches but rejects same semantic field conflicts', () => {
+    const baseline = extensionBaseline();
+    const childClimb = normalizeAssetPack(extensionPack({
+      id: 'acme.child-climb',
+      assets: [{
+        kind: 'extend-item',
+        itemId: 'braid',
+        baseDefinitionDigest: sha('e'),
+        baseCreditDigest: sha('f'),
+        addAnimations: [{
+          animation: 'climb',
+          layers: [{
+            layer: 'layer_1',
+            bodyTypes: ['teen'],
+            source: 'sprites/braid/front-climb-teen.png',
+            destination: {
+              path: 'spritesheets/hair/braid/front/climb.png',
+              evidence: 'audit-inferred',
+              accepted: true,
+            },
+          }],
+        }],
+      }],
+    }));
+    const adultClimb = normalizeAssetPack(extensionPack({
+      id: 'bravo.adult-climb',
+      assets: [{
+        kind: 'extend-item',
+        itemId: 'braid',
+        baseDefinitionDigest: sha('e'),
+        baseCreditDigest: sha('f'),
+        addAnimations: [{
+          animation: 'climb',
+          layers: [{
+            layer: 'layer_2',
+            bodyTypes: ['female'],
+            source: 'sprites/braid/trim-climb-female.png',
+            destination: {
+              path: 'spritesheets/hair/braid/trim-female/climb.png',
+              evidence: 'artist-specified',
+              accepted: true,
+            },
+          }],
+        }],
+      }],
+    }));
+
+    const merged = compileAssetPacks({ baseline, packs: [childClimb, adultClimb] });
+    expect(merged.diagnostics).not.toContainEqual(
+      expect.objectContaining({ code: 'asset_path_conflict' }),
+    );
+    expect(merged.definitions[0]?.definition.layer_2).toMatchObject({
+      female: 'hair/braid/trim-female/',
+    });
+
+    const otherChildClimb = normalizeAssetPack(extensionPack({
+      id: 'charlie.child-climb',
+      assets: [{
+        kind: 'extend-item',
+        itemId: 'braid',
+        baseDefinitionDigest: sha('e'),
+        baseCreditDigest: sha('f'),
+        addAnimations: [{
+          animation: 'climb',
+          layers: [{
+            layer: 'layer_1',
+            bodyTypes: ['teen'],
+            source: 'sprites/braid/alternate-teen.png',
+            destination: {
+              path: 'spritesheets/hair/braid/front-alt/climb.png',
+              evidence: 'artist-specified',
+              accepted: true,
+            },
+          }],
+        }],
+      }],
+    }));
+
+    const conflicted = compileAssetPacks({ baseline, packs: [childClimb, otherChildClimb] });
+    expect(conflicted.diagnostics).toContainEqual(
+      expect.objectContaining({ code: 'asset_path_conflict', severity: 'error' }),
+    );
+  });
+
+  it('rejects two owners of one destination even when their semantic targets differ', () => {
+    const conflicted = compileAssetPacks({
+      baseline: extensionBaseline(),
+      packs: [
+        normalizeAssetPack(extensionPack({
+          id: 'acme.child-climb',
+          assets: [{
+            kind: 'extend-item',
+            itemId: 'braid',
+            baseDefinitionDigest: sha('e'),
+            baseCreditDigest: sha('f'),
+            addAnimations: [{
+              animation: 'climb',
+              layers: [{
+                layer: 'layer_1',
+                bodyTypes: ['teen'],
+                source: 'sprites/braid/front-climb-teen.png',
+                destination: {
+                  path: 'spritesheets/hair/braid/shared/climb.png',
+                  evidence: 'audit-inferred',
+                  accepted: true,
+                },
+              }],
+            }],
+          }],
+        })),
+        normalizeAssetPack(extensionPack({
+          id: 'bravo.adult-climb',
+          assets: [{
+            kind: 'extend-item',
+            itemId: 'braid',
+            baseDefinitionDigest: sha('e'),
+            baseCreditDigest: sha('f'),
+            addAnimations: [{
+              animation: 'climb',
+              layers: [{
+                layer: 'layer_2',
+                bodyTypes: ['female'],
+                source: 'sprites/braid/trim-climb-female.png',
+                destination: {
+                  path: 'spritesheets/hair/braid/shared/climb.png',
+                  evidence: 'artist-specified',
+                  accepted: true,
+                },
+              }],
+            }],
+          }],
+        })),
+      ],
+    });
+
+    expect(conflicted.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: 'asset_path_conflict',
+        severity: 'error',
+        destinationPath: 'spritesheets/hair/braid/shared/climb.png',
+      }),
+    );
+  });
+
+  it('allows exact authorized cross-pack replacement of manager-owned outputs', () => {
+    const plan = compileAssetPacks({
+      baseline: baselineWithExistingSharedItem(),
+      packs: [normalizeAssetPack(extensionPack({
+        id: 'omega.shared-replacer',
+        replaces: [{
+          packId: 'acme.shared-pack',
+          versions: '=1.0.0',
+          assets: ['shared-item'],
+        }],
+        assets: [{
+          kind: 'extend-item',
+          itemId: 'acme.shared-pack--shared-item',
+          baseDefinitionDigest: sha('c'),
+          baseCreditDigest: sha('d'),
+          addAnimations: [{
+            animation: 'climb',
+            layers: [{
+              layer: 'layer_1',
+              bodyTypes: ['male', 'female'],
+              source: 'sprites/shared-item/top/climb.png',
+              destination: {
+                path: 'spritesheets/packages/acme.shared-pack/shared-item/top/male-female/climb.png',
+                evidence: 'audit-exact',
+                accepted: true,
+              },
+            }],
+          }],
+        }],
+      }))],
+    });
+
+    expect(plan.diagnostics).not.toContainEqual(
+      expect.objectContaining({ code: 'asset_replacement_unauthorized' }),
+    );
+    expect(plan.definitions[0]).toMatchObject({
+      logicalPath: 'sheet_definitions/hair/acme.shared-pack--shared-item.json',
+      definition: expect.objectContaining({
+        name: 'acme.shared-pack--shared-item',
+        animations: ['walk', 'climb'],
+      }),
+    });
+    expect(plan.sprites).toContainEqual(expect.objectContaining({
+      destinationPath: 'spritesheets/packages/acme.shared-pack/shared-item/top/male-female/climb.png',
+    }));
+  });
+
+  it('rejects unauthorized replacement into manager-owned base paths', () => {
+    const plan = compileAssetPacks({
+      baseline: baselineWithExistingSharedItem(),
+      packs: [normalizeAssetPack(extensionPack({
+        id: 'zeta.unauthorized-replacer',
+        assets: [{
+          kind: 'extend-item',
+          itemId: 'acme.shared-pack--shared-item',
+          baseDefinitionDigest: sha('c'),
+          baseCreditDigest: sha('d'),
+          addAnimations: [{
+            animation: 'climb',
+            layers: [{
+              layer: 'layer_1',
+              bodyTypes: ['male', 'female'],
+              source: 'sprites/shared-item/top/climb.png',
+              destination: {
+                path: 'spritesheets/packages/acme.shared-pack/shared-item/top/male-female/climb.png',
+                evidence: 'audit-exact',
+                accepted: true,
+              },
+            }],
+          }],
+        }],
+      }))],
+    });
+
+    expect(plan.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: 'asset_replacement_unauthorized',
+        severity: 'error',
+        assetId: 'acme.shared-pack--shared-item',
+        destinationPath: 'spritesheets/packages/acme.shared-pack/shared-item/top/male-female/climb.png',
+      }),
+    );
+    expect(plan.definitions).toEqual([]);
+    expect(plan.sprites).toEqual([]);
     expect(plan.credits).toEqual([]);
   });
 });
