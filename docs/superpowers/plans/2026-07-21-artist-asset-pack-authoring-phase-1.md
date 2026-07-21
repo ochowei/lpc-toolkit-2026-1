@@ -886,7 +886,7 @@ Task 6 record:
 - Product commits: `9bd367099bab9e3fcb0cb618c5cec1e695d3d686`, `dc2ece375f8dc2a52c8a8a11c577e766576277bb`, `d0c6a42775807847064e3427824debebd519c0f5`, `89ec220709454cdc178df91117e150d98892c6a7`.
 - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-files.test.ts asset-pack-scaffold.test.ts` PASS (16/16 after final fix); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS; reviewer final re-review APPROVED. PNG decode/frame validation remains Task 7.
 
-- [ ] **Step 7: Commit product code**
+- [x] **Step 7: Commit product code**
 
 ```sh
 rtk git add packages/cli/src/asset-pack-files.ts packages/cli/src/asset-pack-scaffold.ts packages/cli/test/asset-pack-files.test.ts packages/cli/test/asset-pack-scaffold.test.ts
@@ -894,6 +894,8 @@ rtk git commit -m "feat(cli): scaffold artist asset pack sources"
 ```
 
 Then update this task's plan record and commit it separately.
+
+Step 7 record: satisfied by `9bd367099bab9e3fcb0cb618c5cec1e695d3d686` (`feat(cli): scaffold artist asset pack sources`) plus the recorded review fixes `dc2ece375f8dc2a52c8a8a11c577e766576277bb` and `89ec220709454cdc178df91117e150d98892c6a7`; the checkbox was corrected during final whole-branch handoff without rewriting the existing Task 6 history above.
 
 ---
 
@@ -1460,14 +1462,100 @@ Task 12 record:
 
 ## Final Handoff Evidence
 
-Before claiming Phase 1 complete, the implementation handoff must include:
+Evidence captured on 2026-07-21 after the whole-branch reviewer fixes:
 
-- branch name and full product commit hashes;
-- the final CLI documentation matrix and PR declaration;
-- exact PASS output summaries for every Task 12 Step 8 command;
-- an explicit statement that no dependency, `any`, `upstream/`, base asset, or managed-cache mutation was introduced;
-- the packed-CLI no-repository workspace-init evidence;
-- the end-to-end new-item plus `hair_messy` climb extension evidence;
-- preview artifact paths and proof that both base and pack credits are present;
-- linked sync/re-sync, conflict, unowned output, and rollback test evidence;
-- deferred Phase 2/3 scope restated so distribution commands are not implied complete.
+- Branch: `codex/artist-asset-pack-authoring-design`.
+- Verified product HEAD: `6915b14a1c3e1c052c1fc1554989e890066a0807`.
+- Merge-base with `origin/main`: `5855c3ea5e24cc497d46bc4aef16b4b074c8e5dc`.
+- This handoff record is intentionally committed after the verified product HEAD; its commit hash is reported by the live handoff because a commit cannot embed its own hash.
+
+Full product commit hashes, grouped in implementation order:
+
+```text
+04e65abd3b7c0e101cff807f4cd67cd39dae91b3
+7e68f48f1b4ac55debd61b8eaed731ec233e53ce
+af2ee58eb2c010470895bd9cfbce8589896c7b21
+fcb75b52cd9b1ecdcf87ea03c1342455ae811938
+7cb1aacf5ca5a77184b618291597f51079951c3b
+eb109e9223e8d88a9c6769bde83bca31315d8062
+e6f6bea5f37cdf40fe461e4ca10f5d34da293124
+481900c2f1f6daad6f7e5f857f287dcb450a86d4
+1f1f597599dd8c188f565b0fc938ba944771ea9a
+0d57a15ec8840bd5640b402ecc9da0f91c677326
+fd4b669907ec3a6248aa4e986202c4fb975de97d
+39a38a3141688c501ef38683f57ce14bb4fe15cd
+533842bb64cfc7dcfaa8e39fe82687abde0c057b
+9bd367099bab9e3fcb0cb618c5cec1e695d3d686
+dc2ece375f8dc2a52c8a8a11c577e766576277bb
+89ec220709454cdc178df91117e150d98892c6a7
+3f3e54e5008fccee4dec0f996cc18ee8afccbbe0
+af58b7ffd7dcf2c5a3f6726707ef92044d9331b4
+4194751c917eda9dfeed688a789310842015f830
+c202c5c17925d94651e7527e67261366c8825aec
+b6bae9d2d037ab749ae5c28a5a0e3357399e8b22
+1e6f17a455c8bc98d3296c12ae23670862f79430
+787055d911e7838d60796d794aea512ef8f73b61
+2e8d8ef4ec88d408d5152f7568ea80d81d166330
+578fa4af4b51861a6bc292106101058da3de2805
+89b72b6d5a2a1a2f63aa5e4e197d4394f8ba0667
+4a8ed82eb484dc3b81772a07758c87c0059a869e
+3ab5c91f2b9fdef2ed1b724493d36292e6b964dc
+c712eaa7ccc110415cb998d23b5f8cc618571744
+c6709bd1cc293cd30254e6926af043169b572396
+6915b14a1c3e1c052c1fc1554989e890066a0807
+```
+
+Whole-branch reviewer regression evidence:
+
+- Core RED: `rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-schema.test.ts asset-pack-validation.test.ts asset-pack-compile.test.ts credits-format.test.ts` failed as intended with 6 failures and 52 passing controls: extension destination schema/validation/compile, new-item identity validation/compile, and CSV escaping.
+- CLI RED: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-validation.test.ts asset-pack-sync.test.ts asset-pack-preview.test.ts` failed as intended with 5 failures and 33 passing controls: manager baseline catalog contamination, changed source bytes during staging, extension resync baseline contamination, generated CSV escaping, and preview CSV escaping.
+- Core GREEN: the same focused Core command passed 58/58.
+- CLI GREEN: the same focused CLI command passed 38/38.
+- Authoring GREEN: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-workspace.test.ts asset-pack-files.test.ts asset-pack-scaffold.test.ts asset-pack-validation.test.ts asset-overlay-store.test.ts asset-pack-sync.test.ts asset-pack-preview.test.ts asset-authoring-e2e.test.ts preview.test.ts` passed 95/95.
+
+Task 12 Step 8 verification, freshly repeated after the reviewer fixes:
+
+- `rtk pnpm check:boundaries` — PASS, architecture boundary check passed.
+- `rtk pnpm --filter @lpc-toolkit/core run typecheck` — PASS.
+- `rtk pnpm --filter @lpc-toolkit/core test` — PASS, 23 files / 304 tests.
+- `rtk pnpm --filter @lpc-toolkit/cli run typecheck` — PASS.
+- `rtk pnpm --filter @lpc-toolkit/cli test` — PASS, 42 files / 598 passed / 1 skipped. The sandbox-only `listen EPERM` attempt was rerun unchanged with local-socket permission.
+- `rtk pnpm --filter @lpc-toolkit/cli build` — PASS.
+- `rtk pnpm --filter @lpc-toolkit/cli test:package` — PASS; built `lpc-toolkit-cli-0.2.0.tgz`, installed it in a temporary consumer, and completed the no-repository workspace-init smoke.
+- `rtk pnpm --filter @lpc-toolkit/web test` — PASS, 78 files / 698 tests. The sandbox-only tsx IPC denial was rerun unchanged with local-socket permission.
+- `rtk pnpm verify` — PASS after the same required socket-permitted rerun: Core 304, Presets 3, CLI 598 passed / 1 skipped, Web 698, plus asset pin, CLI docs policy, plugin, boundaries, and all workspace typechecks.
+- `rtk git diff --check` — PASS.
+
+Concrete no-repository and artifact evidence:
+
+- `packages/cli/scripts/smoke-packed-cli.mjs` installs the packed CLI into a fresh temporary consumer and asserts `asset workspace init` creates `lpc-asset-workspace.json`, `artist-packs/`, manager-owned `assets_custom/`, and `.lpc-toolkit/asset-packs/` without a repository checkout or cache/network preparation.
+- `packages/cli/test/asset-authoring-e2e.test.ts` executes workspace init, new `acme.fantasy-hair` scaffolding, audit-derived `acme.messy-climb` / `hair_messy` climb scaffolding, PNG placement, validation, both preview modes, two-pack sync, overlay render, attribution, and audit closure through `runCli` in a fresh temporary workspace.
+- Default preview artifacts are asserted under `<workspace>/artist-packs/acme.fantasy-hair/previews/moon-braid/`, including `moon-braid.preview.png`, `moon-braid.credits.txt`, `moon-braid.credits.csv`, and `moon-braid.metadata.json`; the credits include `New Hair Artist`.
+- Character preview artifacts are asserted under `<workspace>/artist-packs/acme.messy-climb/previews/hair_messy/`, including `artist-character.preview.png`, `artist-character.credits.txt`, `artist-character.credits.csv`, and `artist-character.metadata.json`; the credits include both inherited `Base Hair Artist` and contributed `Extension Artist`.
+- Render output is asserted below `<workspace>/rendered/`; its credit artifact includes `Base Body Artist`, `Base Hair Artist`, and `Extension Artist`.
+- Generated linked output is asserted under `<workspace>/assets_custom/`, including both pack definitions/sprites and `CREDITS.csv`; second-pack sync preserves first-pack bytes and credit rows.
+
+Sync and rollback evidence:
+
+- `packages/cli/test/asset-pack-sync.test.ts` passed 23/23, covering source-change re-sync, immutable validated-source publication during an injected staging mutation, extension re-sync after manager output exists, disjoint merge, true conflict with unchanged published state, unowned output, marker/registry mismatch, stray/missing/tampered generated output, and rollback.
+- The rollback test discovers every publication write/rename point, injects failure at each point in turn, and verifies byte-identical restoration of `assets_custom/` and `registry.json` plus unchanged artist source.
+
+Final CLI documentation impact:
+
+```text
+help: update
+cli-readme: update
+root-readme: update
+landing: update
+architecture: update
+engineering: update
+releasing: N/A — no npm publication or pinned base-asset publication procedure changes
+plugin: N/A — the current audit skill is read-only and authoring-skill design is deferred
+```
+
+```text
+CLI docs impact: updated
+CLI docs surfaces: help, cli-readme, root-readme, landing, architecture, engineering
+```
+
+Scope statement: no dependency or lockfile change, no `any`, no `upstream/` initialization/read requirement/modification, no checked-in `assets/` or base-asset mutation, no managed-cache mutation, and no unrelated scope change was introduced. Phase 1 remains limited to workspace/scaffold/validate/preview/linked-sync/overlay behavior. Phase 2 pack/install/upgrade/downgrade/remove/list/doctor/archive/crash-journal work and Phase 3 Web authoring remain deferred and are not implied complete.

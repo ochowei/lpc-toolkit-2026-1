@@ -159,7 +159,7 @@ Files changed:
 
 Fix commit summary:
 
-- `2f22c67e93cbf82ae761b2ce0ee35f5696895257` — `fix(cli): reject symlinked-ancestor workspace reopen and discovery`
+- `533842bb64cfc7dcfaa8e39fe82687abde0c057b` — `fix(cli): reject symlinked-ancestor workspace reopen and discovery`
 
 What changed:
 
