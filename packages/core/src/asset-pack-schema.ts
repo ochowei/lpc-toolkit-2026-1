@@ -54,6 +54,11 @@ export interface AssetPackReplacementSource {
   readonly assets: readonly string[];
 }
 
+export interface AssetPackCompatibilitySource {
+  readonly minimumCliVersion?: string;
+  readonly requiredCapabilities?: readonly string[];
+}
+
 export interface NewItemSpriteSource {
   readonly animation: AnimationName;
   readonly source: string;
@@ -123,6 +128,7 @@ export interface AssetPackSource {
   readonly creditOverrides?: Readonly<Record<string, AssetPackCreditSource>>;
   readonly replaces?: readonly AssetPackReplacementSource[];
   readonly acknowledgements?: readonly AssetPackAcknowledgement[];
+  readonly compatibility?: AssetPackCompatibilitySource;
   readonly assets: readonly AssetPackAssetSource[];
 }
 
@@ -171,6 +177,7 @@ const LICENSES = new Set<License>(Object.keys(LICENSE_GROUP_OF) as License[]);
 const BODY_TYPE_SET = new Set<BodyType>(BODY_TYPES);
 const PACK_ID_PATTERN = /^[a-z0-9]+(?:[.-][a-z0-9]+)*$/;
 const LOCAL_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const REPLACEMENT_ASSET_KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.-]*$/;
 const SEMVER_PATTERN =
   /^\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 const SHA256_PATTERN = /^sha256:[0-9a-f]{64}$/;
@@ -206,6 +213,7 @@ function parsePackRecord(
     'creditOverrides',
     'replaces',
     'acknowledgements',
+    'compatibility',
     'assets',
   ], diagnostics);
 
@@ -264,6 +272,11 @@ function parsePackRecord(
     `${path}.acknowledgements`,
     diagnostics,
   );
+  const compatibility = parseCompatibility(
+    record.compatibility,
+    `${path}.compatibility`,
+    diagnostics,
+  );
   const assets = parseAssets(record.assets, `${path}.assets`, diagnostics);
 
   if (!schema || !id || !version || !displayName || !credits || !assets) {
@@ -279,7 +292,62 @@ function parsePackRecord(
     ...(creditOverrides ? { creditOverrides } : {}),
     ...(replacements ? { replaces: replacements } : {}),
     ...(acknowledgements ? { acknowledgements } : {}),
+    ...(compatibility ? { compatibility } : {}),
     assets,
+  };
+}
+
+function parseCompatibility(
+  input: unknown,
+  path: string,
+  diagnostics: AssetPackDiagnostic[],
+): AssetPackCompatibilitySource | undefined {
+  if (input === undefined) return undefined;
+  const record = asRecord(input, path, diagnostics);
+  if (!record) return undefined;
+  exactKeys(record, path, ['minimumCliVersion', 'requiredCapabilities'], diagnostics);
+
+  const minimumCliVersion = readOptionalString(
+    record,
+    'minimumCliVersion',
+    `${path}.minimumCliVersion`,
+    diagnostics,
+  );
+  const requiredCapabilities = parseOptionalStringArray(
+    record.requiredCapabilities,
+    `${path}.requiredCapabilities`,
+    diagnostics,
+  );
+  const validMinimumCliVersion = !minimumCliVersion || SEMVER_PATTERN.test(minimumCliVersion);
+  if (!validMinimumCliVersion) {
+    pushDiagnostic(diagnostics, {
+      code: 'asset_pack_schema_invalid',
+      severity: 'error',
+      message: `Invalid minimum CLI semantic version at ${path}.minimumCliVersion.`,
+      details: { path: `${path}.minimumCliVersion`, value: minimumCliVersion },
+    });
+  }
+
+  const validCapabilities = requiredCapabilities?.every((capability, index) => {
+    const valid = capability.trim().length > 0 && requiredCapabilities.indexOf(capability) === index;
+    if (!valid) {
+      pushDiagnostic(diagnostics, {
+        code: 'asset_pack_schema_invalid',
+        severity: 'error',
+        message: `Compatibility capabilities at ${path}.requiredCapabilities must be unique and non-empty.`,
+        details: { path: `${path}.requiredCapabilities[${index}]`, value: capability },
+      });
+    }
+    return valid;
+  }) ?? true;
+
+  if (!validMinimumCliVersion || !validCapabilities) return undefined;
+  if (!minimumCliVersion && (!requiredCapabilities || requiredCapabilities.length === 0)) {
+    return undefined;
+  }
+  return {
+    ...(minimumCliVersion ? { minimumCliVersion } : {}),
+    ...(requiredCapabilities && requiredCapabilities.length > 0 ? { requiredCapabilities } : {}),
   };
 }
 
@@ -922,11 +990,11 @@ function parseReplacementList(
 
     if (assets) {
       assets.forEach((assetId, assetIndex) => {
-        if (!LOCAL_ID_PATTERN.test(assetId)) {
+        if (!REPLACEMENT_ASSET_KEY_PATTERN.test(assetId)) {
           pushDiagnostic(diagnostics, {
             code: 'asset_pack_id_invalid',
             severity: 'error',
-            message: `Invalid replacement local id at ${entryPath}.assets[${assetIndex}].`,
+            message: `Invalid replacement asset key at ${entryPath}.assets[${assetIndex}].`,
             assetId,
             details: { path: `${entryPath}.assets[${assetIndex}]`, value: assetId },
           });

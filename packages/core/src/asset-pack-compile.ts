@@ -10,6 +10,7 @@ import type {
 } from './asset-pack-model.js';
 import type { AssetPackDiagnostic } from './asset-pack-schema.js';
 import { extensionDestinationBasePath } from './asset-pack-paths.js';
+import { assetPackVersionRangeMatches } from './asset-pack-version.js';
 import type { AssetPackBaseline } from './asset-pack-validation.js';
 import type {
   AnimationName,
@@ -730,7 +731,7 @@ function replacementAuthorizedForPath(
   return pack.replacements.some((replacement) =>
     replacement.packId === owner.packId
     && replacement.assets.includes(owner.localId)
-    && (owner.version === undefined || versionRangeMatches(replacement.versions, owner.version)),
+    && (owner.version === undefined || assetPackVersionRangeMatches(replacement.versions, owner.version)),
   );
 }
 
@@ -1256,87 +1257,6 @@ function unionNotes(
   append(inherited);
   additions.forEach(append);
   return ordered.join('\n\n');
-}
-
-function versionRangeMatches(range: string, version: string): boolean {
-  return range.split(/\s+/).every((token) => versionComparatorMatches(token, version));
-}
-
-function versionComparatorMatches(token: string, version: string): boolean {
-  const match = /^(<=|>=|=|<|>)(.+)$/.exec(token);
-  if (!match) return false;
-  const operator = match[1];
-  const candidate = match[2];
-  if (!candidate) return false;
-  const comparison = compareSemver(version, candidate);
-  switch (operator) {
-    case '<':
-      return comparison < 0;
-    case '<=':
-      return comparison <= 0;
-    case '=':
-      return comparison === 0;
-    case '>=':
-      return comparison >= 0;
-    case '>':
-      return comparison > 0;
-    default:
-      return false;
-  }
-}
-
-function compareSemver(left: string, right: string): number {
-  const leftParts = parseSemver(left);
-  const rightParts = parseSemver(right);
-  if (!leftParts || !rightParts) {
-    return left.localeCompare(right);
-  }
-
-  const [leftMajor, leftMinor, leftPatch] = leftParts.core;
-  const [rightMajor, rightMinor, rightPatch] = rightParts.core;
-  const coreComparisons = [
-    leftMajor - rightMajor,
-    leftMinor - rightMinor,
-    leftPatch - rightPatch,
-  ];
-  for (const comparison of coreComparisons) {
-    if (comparison !== 0) return comparison;
-  }
-
-  if (leftParts.prerelease.length === 0 && rightParts.prerelease.length === 0) return 0;
-  if (leftParts.prerelease.length === 0) return 1;
-  if (rightParts.prerelease.length === 0) return -1;
-
-  for (let index = 0; index < Math.max(leftParts.prerelease.length, rightParts.prerelease.length); index += 1) {
-    const leftIdentifier = leftParts.prerelease[index];
-    const rightIdentifier = rightParts.prerelease[index];
-    if (leftIdentifier === undefined) return -1;
-    if (rightIdentifier === undefined) return 1;
-    const leftNumeric = /^\d+$/.test(leftIdentifier);
-    const rightNumeric = /^\d+$/.test(rightIdentifier);
-    if (leftNumeric && rightNumeric) {
-      const comparison = Number(leftIdentifier) - Number(rightIdentifier);
-      if (comparison !== 0) return comparison;
-      continue;
-    }
-    if (leftNumeric) return -1;
-    if (rightNumeric) return 1;
-    const comparison = leftIdentifier.localeCompare(rightIdentifier);
-    if (comparison !== 0) return comparison;
-  }
-
-  return 0;
-}
-
-function parseSemver(
-  value: string,
-): { readonly core: readonly [number, number, number]; readonly prerelease: readonly string[] } | undefined {
-  const match = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+.*)?$/.exec(value);
-  if (!match) return undefined;
-  return {
-    core: [Number(match[1]), Number(match[2]), Number(match[3])],
-    prerelease: match[4] ? match[4].split('.') : [],
-  };
 }
 
 function comparePackIdentity(left: NormalizedAssetPack, right: NormalizedAssetPack): number {

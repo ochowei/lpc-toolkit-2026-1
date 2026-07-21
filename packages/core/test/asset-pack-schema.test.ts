@@ -7,6 +7,7 @@ import {
 import {
   assetPackContentProjection,
   assetPackItemId,
+  assetPackSourceFromNormalized,
   normalizeAssetPack,
 } from '../src/asset-pack-model.js';
 
@@ -148,6 +149,48 @@ describe('asset pack schema', () => {
     expect(result).toMatchObject({
       ok: false,
       diagnostics: [{ code: 'asset_pack_schema_invalid', severity: 'error' }],
+    });
+  });
+
+  it('parses strict compatibility declarations', () => {
+    const result = parseAssetPackSource({
+      ...validPack,
+      compatibility: {
+        minimumCliVersion: '2.1.0-rc.1',
+        requiredCapabilities: [
+          'lpc-toolkit.asset-pack.lifecycle.v1',
+          'lpc-toolkit.asset-pack.v1',
+        ],
+      },
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: true,
+      source: expect.objectContaining({
+        compatibility: {
+          minimumCliVersion: '2.1.0-rc.1',
+          requiredCapabilities: [
+            'lpc-toolkit.asset-pack.lifecycle.v1',
+            'lpc-toolkit.asset-pack.v1',
+          ],
+        },
+      }),
+    }));
+  });
+
+  it.each([
+    [{ minimumCliVersion: '2.1' }],
+    [{ requiredCapabilities: ['lpc-toolkit.asset-pack.v1', 'lpc-toolkit.asset-pack.v1'] }],
+    [{ requiredCapabilities: [''] }],
+    [{ unsupported: true }],
+  ])('rejects invalid compatibility declarations: %o', (compatibility) => {
+    const result = parseAssetPackSource({ ...validPack, compatibility });
+    expect(result).toMatchObject({
+      ok: false,
+      diagnostics: [expect.objectContaining({
+        code: 'asset_pack_schema_invalid',
+        severity: 'error',
+      })],
     });
   });
 
@@ -668,5 +711,46 @@ describe('asset pack schema', () => {
       'sprites/moon-braid/background/walk.png',
       'sprites/moon-braid/foreground/climb.png',
     ]);
+  });
+
+  it('round-trips normalized compatibility and acknowledgements in deterministic source order', () => {
+    const parsed = parseAssetPackSource({
+      ...validPack,
+      compatibility: {
+        requiredCapabilities: [
+          'lpc-toolkit.asset-pack.v1',
+          'lpc-toolkit.asset-pack.lifecycle.v1',
+        ],
+        minimumCliVersion: '2.0.0',
+      },
+      acknowledgements: [{
+        ...ACKNOWLEDGEMENT,
+        subject: { animation: 'climb', assetId: 'hair_messy', bodyTypes: ['child'] },
+      }],
+    });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) throw new Error('Expected a valid compatibility source.');
+
+    const normalized = normalizeAssetPack(parsed.source);
+    const reconstructed = assetPackSourceFromNormalized(normalized);
+
+    expect(reconstructed.compatibility).toEqual({
+      minimumCliVersion: '2.0.0',
+      requiredCapabilities: [
+        'lpc-toolkit.asset-pack.lifecycle.v1',
+        'lpc-toolkit.asset-pack.v1',
+      ],
+    });
+    expect(reconstructed.acknowledgements).toEqual([{
+      ...ACKNOWLEDGEMENT,
+      subject: { animation: 'climb', assetId: 'hair_messy', bodyTypes: ['child'] },
+    }]);
+    expect(normalizeAssetPack(reconstructed)).toEqual(normalized);
+  });
+
+  it('preserves absent compatibility as absent', () => {
+    const normalized = normalizeAssetPack(validPack);
+    expect(normalized).not.toHaveProperty('compatibility');
+    expect(assetPackSourceFromNormalized(normalized)).not.toHaveProperty('compatibility');
   });
 });

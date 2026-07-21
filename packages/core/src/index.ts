@@ -67,6 +67,7 @@ export { createCatalog } from './catalog.js';
 export type {
   AssetPackAcknowledgement,
   AssetPackAssetSource,
+  AssetPackCompatibilitySource,
   AssetPackCreditSource,
   AssetPackDiagnostic,
   AssetPackDiagnosticCode,
@@ -89,6 +90,7 @@ export type {
   AssetPackCreditRecord,
   NormalizedAssetPack,
   NormalizedAssetPackAsset,
+  NormalizedAssetPackCompatibility,
   NormalizedAssetPackReplacement,
   NormalizedExtendItemAnimation,
   NormalizedExtendItemAsset,
@@ -101,9 +103,18 @@ export type {
 export {
   assetPackContentProjection,
   assetPackItemId,
+  assetPackSourceFromNormalized,
   normalizeAssetPack,
   warningAcknowledged,
 } from './asset-pack-model.js';
+export type { AssetPackSemver } from './asset-pack-version.js';
+export {
+  assetPackAssetKeys,
+  assetPackLifecycleReplacementAllows,
+  assetPackVersionRangeMatches,
+  compareAssetPackVersions,
+  parseAssetPackSemver,
+} from './asset-pack-version.js';
 export type {
   AssetPackBaseline,
   AssetPackSourceInspection,

@@ -1,0 +1,124 @@
+import { describe, expect, it } from 'vitest';
+import {
+  assetPackAssetKeys,
+  assetPackLifecycleReplacementAllows,
+  assetPackVersionRangeMatches,
+  compareAssetPackVersions,
+  normalizeAssetPack,
+  parseAssetPackSemver,
+  type AssetPackSource,
+} from '../src/index.js';
+
+const credits = {
+  authors: ['Artist'],
+  licenses: ['CC-BY-SA 4.0'],
+  urls: ['https://example.com/artist'],
+  notes: '',
+} as const;
+
+function pack(options?: {
+  readonly id?: string;
+  readonly version?: string;
+  readonly replaces?: AssetPackSource['replaces'];
+  readonly assets?: AssetPackSource['assets'];
+}) {
+  return normalizeAssetPack({
+    schema: 'lpc-toolkit.asset-pack.v1',
+    id: options?.id ?? 'acme.hair',
+    version: options?.version ?? '1.0.0',
+    displayName: 'ACME Hair',
+    credits,
+    ...(options?.replaces ? { replaces: options.replaces } : {}),
+    assets: options?.assets ?? [{
+      kind: 'new-item',
+      localId: 'moon-braid',
+      displayName: 'Moon Braid',
+      typeName: 'hair',
+      bodyTypes: ['male'],
+      animations: ['walk'],
+      layers: [{
+        id: 'top',
+        zPos: 1,
+        sprites: [{ animation: 'walk', source: 'sprites/moon-braid/top/walk.png' }],
+      }],
+    }],
+  });
+}
+
+describe('asset pack versions', () => {
+  it('implements SemVer core and prerelease precedence without build metadata', () => {
+    expect(compareAssetPackVersions('1.0.0', '1.0.0-rc.1')).toBeGreaterThan(0);
+    expect(compareAssetPackVersions('1.0.0-alpha.2', '1.0.0-alpha.beta')).toBeLessThan(0);
+    expect(compareAssetPackVersions('1.0.0-alpha.10', '1.0.0-alpha.2')).toBeGreaterThan(0);
+    expect(compareAssetPackVersions('1.0.0+build.2', '1.0.0+build.1')).toBe(0);
+  });
+
+  it('rejects malformed versions instead of falling back to lexical ordering', () => {
+    expect(parseAssetPackSemver('1.0')).toBeUndefined();
+    expect(() => compareAssetPackVersions('1.0.0', 'not-a-version')).toThrow(RangeError);
+  });
+
+  it.each([
+    ['<1.0.0', '0.9.9', true],
+    ['<=1.0.0', '1.0.0', true],
+    ['=1.0.0', '1.0.0+build.3', true],
+    ['>=1.0.0', '1.0.0', true],
+    ['>1.0.0', '1.0.1', true],
+    ['>=1.0.0 <2.0.0', '1.5.0', true],
+    ['>=1.0.0 <2.0.0', '2.0.0', false],
+    ['>=1.0.0', 'invalid', false],
+    ['^1.0.0', '1.0.0', false],
+  ])('matches strict replacement range %s against %s', (range, version, expected) => {
+    expect(assetPackVersionRangeMatches(range, version)).toBe(expected);
+  });
+
+  it('returns stable, deduplicated keys for new and extended assets', () => {
+    const packWithNewAndExtend = pack({
+      assets: [
+        {
+          kind: 'new-item',
+          localId: 'moon-braid',
+          displayName: 'Moon Braid',
+          typeName: 'hair',
+          bodyTypes: ['male'],
+          animations: ['walk'],
+          layers: [{
+            id: 'top',
+            zPos: 1,
+            sprites: [{ animation: 'walk', source: 'sprites/moon-braid/top/walk.png' }],
+          }],
+        },
+        {
+          kind: 'extend-item',
+          itemId: 'hair_messy',
+          baseDefinitionDigest: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          baseCreditDigest: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+          addAnimations: [],
+        },
+      ],
+    });
+
+    expect(assetPackAssetKeys(packWithNewAndExtend)).toEqual(['hair_messy', 'moon-braid']);
+  });
+
+  it('allows only a complete, self-authorized downgrade replacement', () => {
+    const installed = pack({ version: '2.0.0' });
+    const downgrade = pack({
+      version: '1.0.0',
+      replaces: [{ packId: 'acme.hair', versions: '=2.0.0', assets: ['moon-braid'] }],
+    });
+
+    expect(compareAssetPackVersions('3.0.0', installed.version)).toBeGreaterThan(0);
+    expect(compareAssetPackVersions(installed.version, installed.version)).toBe(0);
+    expect(assetPackLifecycleReplacementAllows(downgrade, installed)).toBe(true);
+    expect(assetPackLifecycleReplacementAllows(pack({
+      replaces: [{ packId: 'acme.hair', versions: '=2.0.0', assets: [] }],
+    }), installed)).toBe(false);
+    expect(assetPackLifecycleReplacementAllows(pack({
+      replaces: [{ packId: 'other.hair', versions: '=2.0.0', assets: ['moon-braid'] }],
+    }), installed)).toBe(false);
+    expect(assetPackLifecycleReplacementAllows(pack({
+      replaces: [{ packId: 'acme.hair', versions: '=1.0.0', assets: ['moon-braid'] }],
+    }), installed)).toBe(false);
+  });
+});

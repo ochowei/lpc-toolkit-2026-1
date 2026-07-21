@@ -1,6 +1,6 @@
 import { BODY_TYPES } from './constants.js';
-import type { CreditEntry, ItemId, RawRecolors } from './types.js';
-import { ASSET_PACK_SCHEMA, type AssetPackAcknowledgement, type AssetPackAssetSource, type AssetPackDiagnostic, type AssetPackReplacementSource, type AssetPackSource, type ExtendItemAnimationSource, type ExtendItemDestinationSource, type ExtendItemLayerSource, type ExtendItemAssetSource, type NewItemAssetSource, type NewItemLayerSource, type NewItemSpriteSource } from './asset-pack-schema.js';
+import type { AnimationName, BodyType, CreditEntry, ItemId, RawRecolors, TypeName } from './types.js';
+import { ASSET_PACK_SCHEMA, type AssetPackAcknowledgement, type AssetPackAssetSource, type AssetPackCompatibilitySource, type AssetPackDiagnostic, type AssetPackReplacementSource, type AssetPackSource, type ExtendItemAnimationSource, type ExtendItemDestinationSource, type ExtendItemLayerSource, type ExtendItemAssetSource, type NewItemAssetSource, type NewItemLayerSource, type NewItemSpriteSource } from './asset-pack-schema.js';
 
 export type AssetPackCreditRecord = Omit<CreditEntry, 'file'>;
 
@@ -10,10 +10,15 @@ export interface NormalizedAssetPackReplacement {
   readonly assets: readonly string[];
 }
 
+export interface NormalizedAssetPackCompatibility {
+  readonly minimumCliVersion?: string;
+  readonly requiredCapabilities: readonly string[];
+}
+
 export interface NormalizedNewItemSprite {
-  readonly animation: string;
+  readonly animation: AnimationName;
   readonly source: string;
-  readonly bodyTypes: readonly string[];
+  readonly bodyTypes: readonly BodyType[];
   readonly variant?: string;
 }
 
@@ -21,7 +26,7 @@ export interface NormalizedNewItemLayer {
   readonly id: string;
   readonly zPos: number;
   readonly sourceIndex: number;
-  readonly bodyTypes: readonly string[];
+  readonly bodyTypes: readonly BodyType[];
   readonly sprites: readonly NormalizedNewItemSprite[];
 }
 
@@ -30,9 +35,9 @@ export interface NormalizedNewItemAsset {
   readonly localId: string;
   readonly itemId: ItemId;
   readonly displayName: string;
-  readonly typeName: string;
-  readonly bodyTypes: readonly string[];
-  readonly animations: readonly string[];
+  readonly typeName: TypeName;
+  readonly bodyTypes: readonly BodyType[];
+  readonly animations: readonly AnimationName[];
   readonly layers: readonly NormalizedNewItemLayer[];
   readonly variants?: readonly string[];
   readonly recolor?: RawRecolors;
@@ -46,7 +51,7 @@ export interface NormalizedExtendItemDestination {
 
 export interface NormalizedExtendItemLayer {
   readonly layer: ExtendItemLayerSource['layer'];
-  readonly bodyTypes: readonly string[];
+  readonly bodyTypes: readonly BodyType[];
   readonly source: string;
   readonly destination: NormalizedExtendItemDestination;
   readonly variant?: string;
@@ -79,6 +84,7 @@ export interface NormalizedAssetPack {
   readonly creditOverrides: ReadonlyMap<string, AssetPackCreditRecord>;
   readonly replacements: readonly NormalizedAssetPackReplacement[];
   readonly acknowledgements: readonly AssetPackAcknowledgement[];
+  readonly compatibility?: NormalizedAssetPackCompatibility;
   readonly assets: readonly NormalizedAssetPackAsset[];
 }
 
@@ -103,7 +109,8 @@ export function normalizeAssetPack(source: AssetPackSource): NormalizedAssetPack
     credits: normalizeCredit(source.credits),
     creditOverrides: new Map(overrides),
     replacements: normalizeReplacements(source.replaces ?? []),
-    acknowledgements: [...(source.acknowledgements ?? [])],
+    acknowledgements: normalizeAcknowledgements(source.acknowledgements ?? []),
+    ...(source.compatibility ? { compatibility: normalizeCompatibility(source.compatibility) } : {}),
     assets,
   };
 }
@@ -116,6 +123,7 @@ export function assetPackContentProjection(pack: NormalizedAssetPack): unknown {
     displayName: pack.displayName,
     credits: projectCredit(pack.credits),
     creditOverrides: Object.fromEntries(pack.creditOverrides),
+    ...(pack.compatibility ? { compatibility: projectCompatibility(pack.compatibility) } : {}),
     replacements: pack.replacements.map((replacement) => ({
       packId: replacement.packId,
       versions: replacement.versions,
@@ -123,6 +131,39 @@ export function assetPackContentProjection(pack: NormalizedAssetPack): unknown {
     })),
     assets: pack.assets.map(projectAsset),
   });
+}
+
+export function assetPackSourceFromNormalized(pack: NormalizedAssetPack): AssetPackSource {
+  const creditOverrides = Object.fromEntries(
+    [...pack.creditOverrides.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([path, credit]) => [path, normalizeCredit(credit)]),
+  );
+  return {
+    schema: pack.schema,
+    id: pack.id,
+    version: pack.version,
+    displayName: pack.displayName,
+    credits: normalizeCredit(pack.credits),
+    ...(pack.compatibility ? { compatibility: sourceCompatibility(pack.compatibility) } : {}),
+    ...(Object.keys(creditOverrides).length > 0 ? { creditOverrides } : {}),
+    ...(pack.replacements.length > 0 ? {
+      replaces: pack.replacements.map((replacement) => ({
+        packId: replacement.packId,
+        versions: replacement.versions,
+        assets: [...replacement.assets],
+      })),
+    } : {}),
+    ...(pack.acknowledgements.length > 0 ? {
+      acknowledgements: pack.acknowledgements.map((acknowledgement) => ({
+        code: acknowledgement.code,
+        subject: normalizeSubject(acknowledgement.subject),
+        contentDigest: acknowledgement.contentDigest,
+        reason: acknowledgement.reason,
+      })),
+    } : {}),
+    assets: pack.assets.map(assetPackAssetSourceFromNormalized),
+  };
 }
 
 export function warningAcknowledged(
@@ -166,9 +207,9 @@ function normalizeNewItem(
     displayName: asset.displayName,
     typeName: asset.typeName,
     bodyTypes: assetBodyTypes,
-    animations: [...asset.animations],
+    animations: sortStrings(asset.animations),
     layers,
-    ...(asset.variants ? { variants: [...asset.variants] } : {}),
+    ...(asset.variants ? { variants: sortStrings(asset.variants) } : {}),
     ...(asset.recolor ? { recolor: asset.recolor } : {}),
   };
 }
@@ -176,7 +217,7 @@ function normalizeNewItem(
 function normalizeNewItemLayer(
   layer: NewItemLayerSource,
   sourceIndex: number,
-  parentBodyTypes: readonly string[],
+  parentBodyTypes: readonly BodyType[],
 ): NormalizedNewItemLayer {
   const layerBodyTypes = normalizeBodyTypes(layer.bodyTypes ?? parentBodyTypes);
   return {
@@ -184,13 +225,15 @@ function normalizeNewItemLayer(
     zPos: layer.zPos,
     sourceIndex,
     bodyTypes: layerBodyTypes,
-    sprites: layer.sprites.map((sprite) => normalizeNewItemSprite(sprite, layerBodyTypes)),
+    sprites: layer.sprites
+      .map((sprite) => normalizeNewItemSprite(sprite, layerBodyTypes))
+      .sort(compareSprites),
   };
 }
 
 function normalizeNewItemSprite(
   sprite: NewItemSpriteSource,
-  parentBodyTypes: readonly string[],
+  parentBodyTypes: readonly BodyType[],
 ): NormalizedNewItemSprite {
   const bodyTypes = normalizeBodyTypes(sprite.bodyTypes ?? parentBodyTypes);
   return {
@@ -207,7 +250,9 @@ function normalizeExtendItem(asset: ExtendItemAssetSource): NormalizedExtendItem
     itemId: asset.itemId,
     baseDefinitionDigest: asset.baseDefinitionDigest,
     baseCreditDigest: asset.baseCreditDigest,
-    addAnimations: asset.addAnimations.map(normalizeExtendAnimation),
+    addAnimations: asset.addAnimations
+      .map(normalizeExtendAnimation)
+      .sort((left, right) => left.animation.localeCompare(right.animation)),
   };
 }
 
@@ -216,7 +261,12 @@ function normalizeExtendAnimation(
 ): NormalizedExtendItemAnimation {
   return {
     animation: animation.animation,
-    layers: animation.layers.map(normalizeExtendLayer),
+    layers: animation.layers
+      .map(normalizeExtendLayer)
+      .sort((left, right) =>
+        left.layer.localeCompare(right.layer)
+        || (left.variant ?? '').localeCompare(right.variant ?? '')
+        || left.source.localeCompare(right.source)),
   };
 }
 
@@ -268,9 +318,47 @@ function normalizeCredit(credit: AssetPackCreditRecord): AssetPackCreditRecord {
   };
 }
 
-function normalizeBodyTypes(bodyTypes: readonly string[]): readonly string[] {
+function normalizeBodyTypes(bodyTypes: readonly BodyType[]): readonly BodyType[] {
   const requested = new Set(bodyTypes);
   return BODY_TYPES.filter((bodyType) => requested.has(bodyType));
+}
+
+function normalizeCompatibility(
+  compatibility: AssetPackCompatibilitySource,
+): NormalizedAssetPackCompatibility {
+  return {
+    ...(compatibility.minimumCliVersion ? { minimumCliVersion: compatibility.minimumCliVersion } : {}),
+    requiredCapabilities: sortStrings(compatibility.requiredCapabilities ?? []),
+  };
+}
+
+function normalizeAcknowledgements(
+  acknowledgements: readonly AssetPackAcknowledgement[],
+): readonly AssetPackAcknowledgement[] {
+  return acknowledgements
+    .map((acknowledgement) => ({
+      code: acknowledgement.code,
+      subject: normalizeSubject(acknowledgement.subject),
+      contentDigest: acknowledgement.contentDigest,
+      reason: acknowledgement.reason,
+    }))
+    .sort((left, right) =>
+      left.code.localeCompare(right.code)
+      || left.contentDigest.localeCompare(right.contentDigest)
+      || left.reason.localeCompare(right.reason)
+      || JSON.stringify(left.subject).localeCompare(JSON.stringify(right.subject)));
+}
+
+function normalizeSubject(
+  subject: Readonly<Record<string, string | readonly string[]>>,
+): Readonly<Record<string, string | readonly string[]>> {
+  return Object.fromEntries(Object.entries(subject)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, value]) => [key, Array.isArray(value) ? [...value] : value]));
+}
+
+function sortStrings<T extends string>(values: readonly T[]): readonly T[] {
+  return [...values].sort((left, right) => left.localeCompare(right));
 }
 
 function compareAssets(
@@ -282,6 +370,13 @@ function compareAssets(
 
 function assetIdentity(asset: NormalizedAssetPackAsset): string {
   return asset.kind === 'new-item' ? asset.itemId : asset.itemId;
+}
+
+function compareSprites(left: NormalizedNewItemSprite, right: NormalizedNewItemSprite): number {
+  return left.animation.localeCompare(right.animation)
+    || (left.variant ?? '').localeCompare(right.variant ?? '')
+    || left.source.localeCompare(right.source)
+    || left.bodyTypes.join('\0').localeCompare(right.bodyTypes.join('\0'));
 }
 
 function projectAsset(asset: NormalizedAssetPackAsset): unknown {
@@ -336,6 +431,67 @@ function projectCredit(credit: AssetPackCreditRecord) {
     licenses: [...credit.licenses],
     notes: credit.notes,
     urls: [...credit.urls],
+  };
+}
+
+function projectCompatibility(compatibility: NormalizedAssetPackCompatibility) {
+  return {
+    ...(compatibility.minimumCliVersion ? { minimumCliVersion: compatibility.minimumCliVersion } : {}),
+    requiredCapabilities: [...compatibility.requiredCapabilities],
+  };
+}
+
+function sourceCompatibility(compatibility: NormalizedAssetPackCompatibility): AssetPackCompatibilitySource {
+  return {
+    ...(compatibility.minimumCliVersion ? { minimumCliVersion: compatibility.minimumCliVersion } : {}),
+    ...(compatibility.requiredCapabilities.length > 0
+      ? { requiredCapabilities: [...compatibility.requiredCapabilities] }
+      : {}),
+  };
+}
+
+function assetPackAssetSourceFromNormalized(
+  asset: NormalizedAssetPackAsset,
+): AssetPackAssetSource {
+  if (asset.kind === 'new-item') {
+    return {
+      kind: asset.kind,
+      localId: asset.localId,
+      displayName: asset.displayName,
+      typeName: asset.typeName,
+      bodyTypes: [...asset.bodyTypes],
+      animations: [...asset.animations],
+      layers: asset.layers.map((layer) => ({
+        id: layer.id,
+        zPos: layer.zPos,
+        bodyTypes: [...layer.bodyTypes],
+        sprites: layer.sprites.map((sprite) => ({
+          animation: sprite.animation,
+          source: sprite.source,
+          bodyTypes: [...sprite.bodyTypes],
+          ...(sprite.variant ? { variant: sprite.variant } : {}),
+        })),
+      })),
+      ...(asset.variants ? { variants: [...asset.variants] } : {}),
+      ...(asset.recolor ? { recolor: asset.recolor } : {}),
+    };
+  }
+  return {
+    kind: asset.kind,
+    itemId: asset.itemId,
+    baseDefinitionDigest: asset.baseDefinitionDigest,
+    baseCreditDigest: asset.baseCreditDigest,
+    addAnimations: asset.addAnimations.map((animation) => ({
+      animation: animation.animation,
+      layers: animation.layers.map((layer) => ({
+        layer: layer.layer,
+        bodyTypes: [...layer.bodyTypes],
+        source: layer.source,
+        destination: { ...layer.destination },
+        ...(layer.variant ? { variant: layer.variant } : {}),
+        ...(layer.consumers ? { consumers: [...layer.consumers] } : {}),
+      })),
+    })),
   };
 }
 
