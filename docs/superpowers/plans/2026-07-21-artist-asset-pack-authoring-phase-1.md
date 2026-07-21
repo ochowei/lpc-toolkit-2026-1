@@ -727,7 +727,7 @@ Task 4 record:
 - Create: `packages/cli/src/asset-workspace.ts`
 - Create: `packages/cli/test/asset-workspace.test.ts`
 
-- [ ] **Step 1: Write failing workspace tests**
+- [x] **Step 1: Write failing workspace tests**
 
 Use fresh temporary directories to cover explicit initialization, upward discovery, `--workspace` resolution, idempotent re-open of an unchanged workspace, refusal when the target marker already contains an unknown schema, refusal of a non-empty unowned `assets_custom/`, creation of an empty owned output root, and no writes outside the requested target.
 
@@ -742,7 +742,7 @@ expect(JSON.parse(readFileSync(path.join(target, 'lpc-asset-workspace.json'), 'u
   .toMatchObject({ schema: 'lpc-toolkit.asset-workspace.v1' });
 ```
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-workspace.test.ts
@@ -750,7 +750,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- asset-workspace.test.ts
 
 Expected: FAIL because `asset-workspace.ts` does not exist.
 
-- [ ] **Step 3: Implement config, marker, and discovery**
+- [x] **Step 3: Implement config, marker, and discovery**
 
 Write this normalized config and no optional fields in v1:
 
@@ -765,7 +765,7 @@ Write this normalized config and no optional fields in v1:
 
 Write an output marker named `.lpc-toolkit-managed.json` with schema and a generated workspace ID. Resolve relative configured paths inside the workspace only. Walk parents only for implicit discovery; an explicit path must resolve directly to a valid config and must not fall back.
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-workspace.test.ts
@@ -774,7 +774,7 @@ rtk pnpm --filter @lpc-toolkit/cli run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit product code**
+- [x] **Step 5: Commit product code**
 
 ```sh
 rtk git add packages/cli/src/asset-workspace.ts packages/cli/test/asset-workspace.test.ts
@@ -782,6 +782,12 @@ rtk git commit -m "feat(cli): initialize artist asset workspaces"
 ```
 
 Then update this task's plan record and commit it separately.
+
+Task 5 record:
+
+- Implementation: Added standalone workspace initialization/discovery with exact v1 config and manager marker schemas, upward/explicit resolution, idempotent reopen, owned output refusal, and realpath containment for fresh, reopen, and discovery paths without cache preparation or registry lifecycle.
+- Product commits: `fd4b669907ec3a6248aa4e986202c4fb975de97d`, `39a38a3141688c501ef38683f57ce14bb4fe15cd`, `533842bb64cfc7dcfaa8e39fe82687abde0c057b`.
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-workspace.test.ts` PASS (18/18 after final fix); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS; reviewer re-review APPROVED.
 
 ---
 
