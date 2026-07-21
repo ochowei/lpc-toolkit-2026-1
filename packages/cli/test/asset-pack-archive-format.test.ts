@@ -4,6 +4,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   statSync,
   symlinkSync,
@@ -319,7 +320,7 @@ function inspectCentralEntries(archive: Buffer): readonly CentralEntryInspection
 }
 
 function createDirectory(prefix: string): string {
-  const directory = mkdtempSync(path.join(os.tmpdir(), prefix));
+  const directory = mkdtempSync(path.join(realpathSync(os.tmpdir()), prefix));
   temporaryDirectories.push(directory);
   return directory;
 }
@@ -336,6 +337,11 @@ describe('readAssetPackArchive path and central-directory safety', () => {
     ['Windows drive', 'C:/sprites/a.png'],
     ['UNC', '//server/share/a.png'],
     ['backslash', 'sprites\\a.png'],
+    ['Windows ADS', 'sprites/a:alternate-stream.png'],
+    ['Windows reserved device', 'sprites/aux.png'],
+    ['Windows forbidden character', 'sprites/a?.png'],
+    ['Windows trailing dot', 'sprites/a.png.'],
+    ['Windows trailing space', 'sprites/a.png '],
     ['empty segment', 'sprites//a.png'],
     ['dot segment', 'sprites/./a.png'],
     ['parent segment', 'sprites/../a.png'],
@@ -417,6 +423,17 @@ describe('readAssetPackArchive path and central-directory safety', () => {
       data: Buffer.from('a'),
       flags: UTF8_FLAG | 0x0008,
       localFlags: UTF8_FLAG | 0x0008,
+    }]), 'asset_archive_unsafe');
+  });
+
+  it('rejects DEFLATE-specific flags on stored entries', () => {
+    expectFailure(buildRawZip([{
+      name: 'sprites/a.png',
+      data: Buffer.from('a'),
+      method: 0,
+      localMethod: 0,
+      flags: UTF8_FLAG | 0x0002,
+      localFlags: UTF8_FLAG | 0x0002,
     }]), 'asset_archive_unsafe');
   });
 
@@ -602,6 +619,25 @@ describe('readAssetPackArchive bounds and checksums', () => {
     }]), 'asset_archive_invalid');
   });
 
+  it('rejects oversized encoded entries before inflation and DEFLATE trailing bytes', () => {
+    const encodedTooLarge = buildRawZip([{
+      name: 'sprites/encoded-too-large.png',
+      compressedData: Buffer.alloc(0),
+      compressedSize: ASSET_PACK_ARCHIVE_LIMITS.entryBytes + 1,
+      localCompressedSize: ASSET_PACK_ARCHIVE_LIMITS.entryBytes + 1,
+      uncompressedSize: 0,
+      localUncompressedSize: 0,
+    }]);
+    expectFailure(encodedTooLarge, 'asset_archive_limit_exceeded');
+
+    const data = Buffer.from('verified bytes');
+    expectFailure(buildRawZip([{
+      name: 'sprites/trailing-deflate.png',
+      data,
+      compressedData: Buffer.concat([deflateRawSync(data), Buffer.from([0xde, 0xad])]),
+    }]), 'asset_archive_invalid');
+  });
+
   it.each([
     ['invalid JSON', Buffer.from('{')],
     ['wrong schema', Buffer.from(JSON.stringify({ schema: 'wrong', files: [] }))],
@@ -717,6 +753,18 @@ describe('readAssetPackArchive bounds and checksums', () => {
 });
 
 describe('createDeterministicAssetPackArchive', () => {
+  it('enforces archive safety limits before creating ZIP entries', async () => {
+    await expect(createDeterministicAssetPackArchive({
+      manifestBytes: manifestBytesOfLength(ASSET_PACK_ARCHIVE_LIMITS.manifestBytes + 1),
+      sourceBytes: new Map([[SOURCE_PATH, Buffer.from('walk-pixels')]]),
+    })).rejects.toThrow(/manifest|limit/i);
+
+    await expect(createDeterministicAssetPackArchive({
+      manifestBytes: manifestBytesWithSources(['sprites/aux.png']),
+      sourceBytes: new Map([['sprites/aux.png', Buffer.from('walk-pixels')]]),
+    })).rejects.toThrow(/unsafe|path/i);
+  });
+
   it('writes byte-identical sorted UNIX archives across map order and process timezone', async () => {
     const manifest = manifestBytesWithSources([SOURCE_PATH, SECOND_SOURCE_PATH]);
     const firstSources = new Map<string, Buffer>([

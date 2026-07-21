@@ -8,6 +8,7 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
@@ -26,6 +27,8 @@ export const ASSET_PACK_ARCHIVE_LIMITS = {
   manifestBytes: 1 * 1_024 * 1_024,
   entryBytes: 64 * 1_024 * 1_024,
   totalBytes: 512 * 1_024 * 1_024,
+  pathBytes: 1 * 1_024,
+  archiveBytes: (512 * 1_024 * 1_024) + (4_096 * ((2 * 65_535) + 76)) + 65_557,
 } as const;
 
 export interface AssetPackChecksumEntry {
@@ -89,7 +92,8 @@ const LOCAL_SIGNATURE = 0x0403_4b50;
 const UTF8_FLAG = 0x0800;
 const DATA_DESCRIPTOR_FLAG = 0x0008;
 const ENCRYPTED_FLAGS = 0x0041;
-const ALLOWED_FLAGS = UTF8_FLAG | 0x0006;
+const DEFLATE_FLAGS = 0x0006;
+const ALLOWED_FLAGS = UTF8_FLAG | DEFLATE_FLAGS;
 const ZIP64_EXTRA_ID = 0x0001;
 const UNIX_CREATOR_PLATFORM = 3;
 const UNIX_FILE_TYPE_MASK = 0o170000;
@@ -206,8 +210,22 @@ function validateArchivePath(entryPath: string): Checked<string> {
     return rejected('asset_archive_unsafe', `Unsafe archive entry path: ${entryPath}.`, entryPath);
   }
   const segments = entryPath.split('/');
-  if (segments.some((segment) => segment.length === 0 || segment === '.' || segment === '..')) {
+  if (segments.some((segment) => (
+    segment.length === 0
+    || segment === '.'
+    || segment === '..'
+    || /[<>:"|?*]/u.test(segment)
+    || /[. ]$/u.test(segment)
+    || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/iu.test(segment)
+  ))) {
     return rejected('asset_archive_unsafe', `Unsafe archive entry path: ${entryPath}.`, entryPath);
+  }
+  if (Buffer.byteLength(entryPath) > ASSET_PACK_ARCHIVE_LIMITS.pathBytes) {
+    return rejected(
+      'asset_archive_limit_exceeded',
+      `Archive entry path exceeds the ${String(ASSET_PACK_ARCHIVE_LIMITS.pathBytes)}-byte limit.`,
+      entryPath,
+    );
   }
   if (
     entryPath !== 'asset-pack.json'
@@ -221,6 +239,55 @@ function validateArchivePath(entryPath: string): Checked<string> {
     );
   }
   return { ok: true, value: entryPath };
+}
+
+function validateArchiveFiles(files: ReadonlyMap<string, Buffer>): Checked<true> {
+  if (files.size > ASSET_PACK_ARCHIVE_LIMITS.entries) {
+    return rejected(
+      'asset_archive_limit_exceeded',
+      `Archive contains more than ${String(ASSET_PACK_ARCHIVE_LIMITS.entries)} entries.`,
+    );
+  }
+  const collisionPaths = new Set<string>();
+  let totalBytes = 0;
+  for (const [entryPath, contents] of files) {
+    const validatedPath = validateArchivePath(entryPath);
+    if (!validatedPath.ok) return validatedPath;
+    const collisionPath = validatedPath.value.normalize('NFC').toLowerCase();
+    if (collisionPaths.has(collisionPath)) {
+      return rejected(
+        'asset_archive_unsafe',
+        `Archive entry path collides with another entry: ${entryPath}.`,
+        entryPath,
+      );
+    }
+    collisionPaths.add(collisionPath);
+    if (contents.byteLength > ASSET_PACK_ARCHIVE_LIMITS.entryBytes) {
+      return rejected(
+        'asset_archive_limit_exceeded',
+        `Archive entry exceeds the ${String(ASSET_PACK_ARCHIVE_LIMITS.entryBytes)}-byte limit.`,
+        entryPath,
+      );
+    }
+    if (
+      entryPath === 'asset-pack.json'
+      && contents.byteLength > ASSET_PACK_ARCHIVE_LIMITS.manifestBytes
+    ) {
+      return rejected(
+        'asset_archive_limit_exceeded',
+        `asset-pack.json exceeds the ${String(ASSET_PACK_ARCHIVE_LIMITS.manifestBytes)}-byte limit.`,
+        entryPath,
+      );
+    }
+    totalBytes += contents.byteLength;
+    if (totalBytes > ASSET_PACK_ARCHIVE_LIMITS.totalBytes) {
+      return rejected(
+        'asset_archive_limit_exceeded',
+        `Archive exceeds the ${String(ASSET_PACK_ARCHIVE_LIMITS.totalBytes)}-byte total limit.`,
+      );
+    }
+  }
+  return { ok: true, value: true };
 }
 
 function validateEntryKind(
@@ -283,6 +350,7 @@ function parseArchiveMetadata(bytes: Buffer): Checked<readonly ZipCentralEntry[]
   const entries: ZipCentralEntry[] = [];
   const collisionPaths = new Set<string>();
   let declaredTotal = 0;
+  let declaredEncodedTotal = 0;
   let offset = centralOffset;
   for (let index = 0; index < entryCount; index += 1) {
     if (offset + 46 > eocdOffset || bytes.readUInt32LE(offset) !== CENTRAL_SIGNATURE) {
@@ -336,6 +404,12 @@ function parseArchiveMetadata(bytes: Buffer): Checked<readonly ZipCentralEntry[]
         `ZIP compression method ${String(compressionMethod)} is not supported.`,
       );
     }
+    if (compressionMethod === 0 && (flags & DEFLATE_FLAGS) !== 0) {
+      return rejected(
+        'asset_archive_unsafe',
+        'Stored ZIP entries must not use DEFLATE-specific general-purpose flags.',
+      );
+    }
     const rawName = Buffer.from(bytes.subarray(nameStart, nameStart + nameLength));
     const decoded = decodeEntryName(rawName, flags);
     if (!decoded.ok) return decoded;
@@ -353,6 +427,20 @@ function parseArchiveMetadata(bytes: Buffer): Checked<readonly ZipCentralEntry[]
     collisionPaths.add(collisionPath);
     const kind = validateEntryKind(entryPath, creatorPlatform, externalAttributes);
     if (!kind.ok) return kind;
+    if (compressedSize > ASSET_PACK_ARCHIVE_LIMITS.entryBytes) {
+      return rejected(
+        'asset_archive_limit_exceeded',
+        `Archive encoded entry exceeds the ${String(ASSET_PACK_ARCHIVE_LIMITS.entryBytes)}-byte limit.`,
+        entryPath,
+      );
+    }
+    declaredEncodedTotal += compressedSize;
+    if (declaredEncodedTotal > ASSET_PACK_ARCHIVE_LIMITS.totalBytes) {
+      return rejected(
+        'asset_archive_limit_exceeded',
+        `Archive encoded data exceeds the ${String(ASSET_PACK_ARCHIVE_LIMITS.totalBytes)}-byte total limit.`,
+      );
+    }
     if (uncompressedSize > ASSET_PACK_ARCHIVE_LIMITS.entryBytes) {
       return rejected(
         'asset_archive_limit_exceeded',
@@ -464,12 +552,26 @@ function readEntryBytes(bytes: Buffer, entry: ZipCentralEntry): Checked<Buffer> 
   const compressed = bytes.subarray(entry.dataStart, entry.dataEnd);
   let contents: Buffer;
   try {
-    contents = entry.compressionMethod === 0
-      ? Buffer.from(compressed)
-      : inflateRawSync(compressed, {
+    if (entry.compressionMethod === 0) {
+      contents = Buffer.from(compressed);
+    } else {
+      const inflated = inflateRawSync(compressed, {
         // Node requires a positive maxOutputLength; one byte still strictly bounds a declared zero.
         maxOutputLength: Math.max(entry.uncompressedSize, 1),
-      });
+        info: true,
+      }) as unknown as {
+        readonly buffer: Buffer;
+        readonly engine: { readonly bytesWritten: number };
+      };
+      if (inflated.engine.bytesWritten !== compressed.byteLength) {
+        return rejected(
+          'asset_archive_invalid',
+          `Archive entry contains trailing DEFLATE bytes: ${entry.path}.`,
+          entry.path,
+        );
+      }
+      contents = inflated.buffer;
+    }
   } catch (error) {
     return rejected(
       'asset_archive_invalid',
@@ -613,15 +715,39 @@ export function readAssetPackArchive(options: {
 }): AssetPackArchiveReadResult {
   let archiveBytes: Buffer;
   try {
-    archiveBytes = options.archiveBytes === undefined
-      ? readFileSync(options.archivePath)
-      : Buffer.from(options.archiveBytes);
+    if (options.archiveBytes === undefined) {
+      const archiveSize = statSync(options.archivePath).size;
+      if (archiveSize > ASSET_PACK_ARCHIVE_LIMITS.archiveBytes) {
+        return rejected(
+          'asset_archive_limit_exceeded',
+          `Archive exceeds the ${String(ASSET_PACK_ARCHIVE_LIMITS.archiveBytes)}-byte encoded limit.`,
+          options.archivePath,
+        );
+      }
+      archiveBytes = readFileSync(options.archivePath);
+    } else {
+      if (options.archiveBytes.byteLength > ASSET_PACK_ARCHIVE_LIMITS.archiveBytes) {
+        return rejected(
+          'asset_archive_limit_exceeded',
+          `Archive exceeds the ${String(ASSET_PACK_ARCHIVE_LIMITS.archiveBytes)}-byte encoded limit.`,
+          options.archivePath,
+        );
+      }
+      archiveBytes = Buffer.from(options.archiveBytes);
+    }
   } catch (error) {
     return rejected(
       'asset_archive_invalid',
       `Could not read asset-pack archive: ${options.archivePath}.`,
       options.archivePath,
       { error: error instanceof Error ? error.message : String(error) },
+    );
+  }
+  if (archiveBytes.byteLength > ASSET_PACK_ARCHIVE_LIMITS.archiveBytes) {
+    return rejected(
+      'asset_archive_limit_exceeded',
+      `Archive exceeds the ${String(ASSET_PACK_ARCHIVE_LIMITS.archiveBytes)}-byte encoded limit.`,
+      options.archivePath,
     );
   }
   const metadata = parseArchiveMetadata(archiveBytes);
@@ -715,6 +841,10 @@ export async function createDeterministicAssetPackArchive(options: {
   ]);
   const archiveFiles = new Map<string, Buffer>(payloadFiles);
   archiveFiles.set('checksums.json', checksumsBytesFor(payloadFiles));
+  const archiveFilesStatus = validateArchiveFiles(archiveFiles);
+  if (!archiveFilesStatus.ok) {
+    throw new Error(`Cannot archive unsafe asset-pack files: ${JSON.stringify(archiveFilesStatus.diagnostics)}`);
+  }
 
   const zip = new JSZip();
   for (const [entryPath, contents] of [...archiveFiles].sort(
@@ -727,13 +857,21 @@ export async function createDeterministicAssetPackArchive(options: {
       unixPermissions: 0o100644,
     });
   }
-  return zip.generateAsync({
+  const archive = await zip.generateAsync({
     type: 'nodebuffer',
     platform: 'UNIX',
     compression: 'DEFLATE',
     compressionOptions: { level: 9 },
     streamFiles: false,
   });
+  const readBack = readAssetPackArchive({
+    archivePath: '<generated asset-pack archive>',
+    archiveBytes: archive,
+  });
+  if (!readBack.ok) {
+    throw new Error(`Generated asset-pack archive failed validation: ${JSON.stringify(readBack.diagnostics)}`);
+  }
+  return archive;
 }
 
 function assertSafeExtractionParent(targetDirectory: string): string {
@@ -747,25 +885,35 @@ function assertSafeExtractionParent(targetDirectory: string): string {
     const status = lstatSync(current, { throwIfNoEntry: false });
     if (!status) throw new Error(`Extraction parent does not exist: ${current}`);
     if (status.isSymbolicLink()) {
-      if (path.dirname(current) !== root) {
-        throw new Error(`Refusing to extract through symlinked parent: ${current}`);
-      }
-      current = realpathSync(current);
-      const resolvedStatus = lstatSync(current);
-      if (!resolvedStatus.isDirectory()) {
-        throw new Error(`Extraction parent is not a directory: ${current}`);
-      }
-      continue;
+      throw new Error(`Refusing to extract through symlinked parent: ${current}`);
     }
     if (!status.isDirectory()) {
       throw new Error(`Extraction parent is not a directory: ${current}`);
     }
   }
-  const resolvedTarget = path.join(current, path.basename(requestedTarget));
+  const canonicalParent = realpathSync(current);
+  const resolvedTarget = path.join(canonicalParent, path.basename(requestedTarget));
   if (lstatSync(resolvedTarget, { throwIfNoEntry: false }) !== undefined) {
     throw new Error(`Extraction target already exists: ${resolvedTarget}`);
   }
   return resolvedTarget;
+}
+
+function assertPinnedExtractionDirectory(directory: string): void {
+  const status = lstatSync(directory, { throwIfNoEntry: false });
+  if (!status || status.isSymbolicLink() || !status.isDirectory()) {
+    throw new Error(`Extraction directory is not a pinned directory: ${directory}`);
+  }
+  if (realpathSync(directory) !== directory) {
+    throw new Error(`Extraction directory resolves through an alias: ${directory}`);
+  }
+}
+
+function cleanupPinnedExtractionDirectory(directory: string): void {
+  const status = lstatSync(directory, { throwIfNoEntry: false });
+  if (!status || status.isSymbolicLink() || !status.isDirectory()) return;
+  if (realpathSync(directory) !== directory) return;
+  rmSync(directory, { recursive: true, force: true });
 }
 
 function writeNewFileNoFollow(filePath: string, contents: Buffer): void {
@@ -790,6 +938,7 @@ export function extractVerifiedAssetPackPayload(options: {
   const targetDirectory = assertSafeExtractionParent(options.targetDirectory);
   mkdirSync(targetDirectory, { mode: 0o700 });
   try {
+    assertPinnedExtractionDirectory(targetDirectory);
     const createdDirectories = new Set<string>([targetDirectory]);
     for (const [entryPath, contents] of [...verifiedFiles].sort(
       ([left], [right]) => comparePaths(left, right),
@@ -798,16 +947,18 @@ export function extractVerifiedAssetPackPayload(options: {
       let directory = targetDirectory;
       for (const segment of segments.slice(0, -1)) {
         directory = path.join(directory, segment);
-        if (createdDirectories.has(directory)) continue;
-        mkdirSync(directory, { mode: 0o700 });
-        createdDirectories.add(directory);
+        if (!createdDirectories.has(directory)) {
+          mkdirSync(directory, { mode: 0o700 });
+          createdDirectories.add(directory);
+        }
+        assertPinnedExtractionDirectory(directory);
       }
       const fileName = segments.at(-1);
       if (!fileName) throw new Error(`Invalid verified archive path: ${entryPath}`);
       writeNewFileNoFollow(path.join(directory, fileName), Buffer.from(contents));
     }
   } catch (error) {
-    rmSync(targetDirectory, { recursive: true, force: true });
+    cleanupPinnedExtractionDirectory(targetDirectory);
     throw error;
   }
 }
