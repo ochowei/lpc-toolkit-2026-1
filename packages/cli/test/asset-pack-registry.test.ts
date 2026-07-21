@@ -1,5 +1,14 @@
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { BODY_TYPES, type ItemDefinition } from '@lpc-toolkit/core';
@@ -7,6 +16,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   ASSET_WORKSPACE_REGISTRY_V1_SCHEMA,
   assetPackCompileDigest,
+  auditPublishedManagedOutput,
   type AssetPackCompileProjection,
   readAssetPackRegistry,
 } from '../src/asset-pack-registry.js';
@@ -158,7 +168,20 @@ function linkedEntry(
   const sourceDirectory = path.join(workspace.packsRoot, packId);
   const destinationPath = `spritesheets/packages/${packId}/walk.png`;
   const sourcePath = `sprites/${packId}/walk.png`;
+  const definitionPath = `sheet_definitions/hair/${packId}--walk.json`;
+  const generatedCredit = {
+    file: `packages/${packId}/walk.png`,
+    notes: '',
+    authors: [],
+    licenses: [],
+    urls: [],
+  };
   mkdirSync(sourceDirectory, { recursive: true });
+  mkdirSync(path.dirname(path.join(workspace.outputRoot, definitionPath)), { recursive: true });
+  writeFileSync(
+    path.join(workspace.outputRoot, definitionPath),
+    `${JSON.stringify({ ...compileDefinition(packId), credits: [generatedCredit] }, null, 2)}\n`,
+  );
   return {
     kind: 'linked',
     packId,
@@ -168,7 +191,7 @@ function linkedEntry(
     contentDigest: digest,
     acknowledgements: [],
     sourceDigests: { [sourcePath]: digest },
-    generatedPaths: [destinationPath],
+    generatedPaths: [definitionPath, destinationPath],
     logicalDestinations: [destinationPath],
     generatedSprites: [{
       assetId: `${packId}--walk`,
@@ -187,17 +210,12 @@ function linkedEntry(
     replacements: [],
     baselineDefinitionDigests: {},
     baselineCreditDigests: {},
-    generatedCredits: [{
-      file: `packages/${packId}/walk.png`,
-      notes: '',
-      authors: [],
-      licenses: [],
-      urls: [],
-    }],
+    generatedCredits: [generatedCredit],
   };
 }
 
 function registryCompileProjection(
+  workspace: ReturnType<typeof initializeAssetWorkspace>,
   entries: readonly RegistryFixtureEntry[],
 ): AssetPackCompileProjection {
   const creditsByFile = new Map<string, AssetPackCompileProjection['credits'][number]>();
@@ -207,7 +225,12 @@ function registryCompileProjection(
     });
   });
   return {
-    definitions: [],
+    definitions: entries.flatMap((entry) => entry.generatedPaths
+      .filter((generatedPath) => generatedPath.startsWith('sheet_definitions/'))
+      .map((logicalPath) => ({
+        logicalPath,
+        definition: JSON.parse(readFileSync(path.join(workspace.outputRoot, logicalPath), 'utf8')) as ItemDefinition,
+      }))),
     sprites: entries.flatMap((entry) => entry.generatedSprites.map((sprite) => ({
       ...sprite,
       packId: entry.packId,
@@ -236,7 +259,7 @@ function v2Document(
     workspaceId: workspaceId(workspace),
     entries,
     generatedDigests,
-    compileDigest: assetPackCompileDigest(registryCompileProjection(fixtureEntries)),
+    compileDigest: assetPackCompileDigest(registryCompileProjection(workspace, fixtureEntries)),
   };
 }
 
@@ -257,6 +280,65 @@ function expectInvalid(
     ok: false,
     diagnostics: [{ code }],
   });
+}
+
+function expectInvalidMessage(
+  workspace: ReturnType<typeof initializeAssetWorkspace>,
+  document: Record<string, unknown>,
+  message: string,
+): void {
+  writeRegistry(workspace, document);
+  expect(readAssetPackRegistry({ workspace, markerWorkspaceId: workspaceId(workspace) })).toMatchObject({
+    ok: false,
+    diagnostics: [{ message: expect.stringContaining(message) }],
+  });
+}
+
+function sha256(value: Buffer | string): string {
+  return `sha256:${createHash('sha256').update(value).digest('hex')}`;
+}
+
+function installedEntryFixture(workspace: ReturnType<typeof initializeAssetWorkspace>): {
+  readonly entry: RegistryFixtureEntry;
+  readonly sourcePath: string;
+  readonly sourceBytes: Buffer;
+  readonly receiptPath: string;
+} {
+  const linked = linkedEntry(workspace);
+  const sourcePath = Object.keys(linked.sourceDigests)[0]!;
+  const sourceBytes = Buffer.from('installed sprite payload');
+  const sourceDigest = sha256(sourceBytes);
+  const installedDirectory = path.join(
+    workspace.stateRoot,
+    'installed',
+    linked.packId,
+    linked.version,
+    'digest',
+  );
+  const sourceFile = path.join(installedDirectory, sourcePath);
+  mkdirSync(path.dirname(sourceFile), { recursive: true });
+  writeFileSync(sourceFile, sourceBytes);
+  const { sourceDirectory: _sourceDirectory, ...base } = linked;
+  const entry: RegistryFixtureEntry = {
+    ...base,
+    kind: 'installed',
+    sourceDigests: { [sourcePath]: sourceDigest },
+    generatedSprites: [{ ...linked.generatedSprites[0]!, sourceDigest }],
+    installedDirectory,
+    archiveDigest: digest,
+  };
+  const receiptPath = path.join(installedDirectory, 'install-receipt.json');
+  writeFileSync(receiptPath, `${JSON.stringify({
+    schema: 'lpc-toolkit.asset-pack-install-receipt.v1',
+    workspaceId: workspaceId(workspace),
+    packId: entry.packId,
+    version: entry.version,
+    archiveDigest: entry.archiveDigest,
+    contentDigest: entry.contentDigest,
+    installedAt: '2026-07-22T00:00:00.000Z',
+    payloadDigests: entry.sourceDigests,
+  }, null, 2)}\n`);
+  return { entry, sourcePath, sourceBytes, receiptPath };
 }
 
 afterEach(() => {
@@ -357,10 +439,10 @@ describe('readAssetPackRegistry', () => {
         baselineDefinitionDigests: entry.baselineDefinitionDigests,
         baselineCreditDigests: entry.baselineCreditDigests,
       }],
-      generatedDigests: {
-        'CREDITS.csv': digest,
-        [entry.generatedPaths[0]!]: digest,
-      },
+      generatedDigests: Object.fromEntries([
+        ['CREDITS.csv', digest],
+        ...entry.generatedPaths.map((generatedPath) => [generatedPath, digest] as const),
+      ].sort(([left], [right]) => left.localeCompare(right))),
     };
     writeRegistry(workspace, v1);
     const before = readFileSync(workspace.registryPath);
@@ -482,6 +564,204 @@ describe('readAssetPackRegistry', () => {
         sourceDigest: `sha256:${'b'.repeat(64)}`,
       }],
     }]));
+  });
+
+  it('requires exact compiler-derived generated credit rows after a digest recomputation', () => {
+    const workspace = workspaceFixture();
+    const entry = linkedEntry(workspace);
+
+    expectInvalid(workspace, v2Document(workspace, [{
+      ...entry,
+      generatedCredits: [{
+        ...entry.generatedCredits[0]!,
+        file: 'packages',
+      }],
+    }]));
+    expectInvalid(workspace, v2Document(workspace, [{
+      ...entry,
+      generatedCredits: [{
+        ...entry.generatedCredits[0]!,
+        authors: ['Tampered author'],
+      }],
+    }]));
+  });
+
+  it('rejects acknowledgement and replacement values Core would not normalize', () => {
+    const workspace = workspaceFixture();
+    const entry = linkedEntry(workspace);
+    const acknowledgement = {
+      code: 'asset_path_inferred',
+      subject: { destination: 'spritesheets/packages/acme.braid/walk.png' },
+      contentDigest: digest,
+      reason: 'Reviewed manually.',
+    };
+    const replacement = {
+      packId: 'acme.base',
+      versions: '>=1.0.0',
+      assets: ['hair.braid'],
+    };
+
+    expectInvalid(workspace, v2Document(workspace, [{
+      ...entry,
+      acknowledgements: [{ ...acknowledgement, code: 'not-a-core-code' }],
+    }]));
+    expectInvalid(workspace, v2Document(workspace, [{
+      ...entry,
+      acknowledgements: [{ ...acknowledgement, reason: '   ' }],
+    }]));
+    expectInvalid(workspace, v2Document(workspace, [{
+      ...entry,
+      acknowledgements: [{ ...acknowledgement, subject: { destination: [1] } }],
+    }]));
+    expectInvalid(workspace, v2Document(workspace, [{
+      ...entry,
+      replacements: [{ ...replacement, packId: 'Acme base' }],
+    }]));
+    expectInvalid(workspace, v2Document(workspace, [{
+      ...entry,
+      replacements: [{ ...replacement, versions: 'roughly 1.0.0' }],
+    }]));
+    expectInvalid(workspace, v2Document(workspace, [{
+      ...entry,
+      replacements: [{ ...replacement, assets: ['hair/braid'] }],
+    }]));
+  });
+
+  it('rejects non-canonical persisted paths before output reads or digest comparisons', () => {
+    const workspace = workspaceFixture();
+    const entry = linkedEntry(workspace);
+    const sourcePath = entry.generatedSprites[0]!.sourcePath;
+    const nonCanonicalSources = [
+      '/tmp/asset.png',
+      'sprites\\asset.png',
+      'sprites/./asset.png',
+      'sprites/../asset.png',
+      'sprites/cafe\u0301.png',
+    ];
+
+    for (const replacement of nonCanonicalSources) {
+      expectInvalid(workspace, v2Document(workspace, [{
+        ...entry,
+        sourceDigests: { [replacement]: digest },
+        generatedSprites: [{ ...entry.generatedSprites[0]!, sourcePath: replacement }],
+      }]));
+    }
+
+    expectInvalid(workspace, v2Document(workspace, [{
+      ...entry,
+      sourceDigests: {
+        'sprites/A.png': digest,
+        'sprites/a.png': digest,
+      },
+      generatedSprites: [{ ...entry.generatedSprites[0]!, sourcePath: 'sprites/A.png' }],
+    }]));
+
+    const outside = path.join(workspace.root, 'outside-definition.json');
+    writeFileSync(outside, '{ this is not valid json');
+    const document = v2Document(workspace, [entry]);
+    const escapedDefinition = 'sheet_definitions/../../outside-definition.json';
+    document.entries = [{
+      ...entry,
+      generatedPaths: [escapedDefinition, ...entry.generatedPaths]
+        .sort((left, right) => left.localeCompare(right)),
+    }];
+    document.generatedDigests = Object.fromEntries([
+      ['CREDITS.csv', digest],
+      [escapedDefinition, digest],
+      ...entry.generatedPaths.map((generatedPath) => [generatedPath, digest] as const),
+    ].sort(([left], [right]) => left.localeCompare(right)));
+    expectInvalidMessage(workspace, document, 'canonical managed-relative path');
+    expect(sourcePath).toBe('sprites/acme.braid/walk.png');
+  });
+
+  it('verifies installed receipt payload coverage, bytes, and regular paths', () => {
+    const workspace = workspaceFixture();
+    const fixture = installedEntryFixture(workspace);
+    const document = v2Document(workspace, [fixture.entry]);
+
+    writeRegistry(workspace, document);
+    expect(readAssetPackRegistry({ workspace, markerWorkspaceId: workspaceId(workspace) })).toMatchObject({ ok: true });
+
+    const writeReceipt = (payloadDigests: Readonly<Record<string, string>>): void => {
+      writeFileSync(fixture.receiptPath, `${JSON.stringify({
+        schema: 'lpc-toolkit.asset-pack-install-receipt.v1',
+        workspaceId: workspaceId(workspace),
+        packId: fixture.entry.packId,
+        version: fixture.entry.version,
+        archiveDigest: fixture.entry.archiveDigest,
+        contentDigest: fixture.entry.contentDigest,
+        installedAt: '2026-07-22T00:00:00.000Z',
+        payloadDigests,
+      }, null, 2)}\n`);
+    };
+
+    writeReceipt({});
+    expect(readAssetPackRegistry({ workspace, markerWorkspaceId: workspaceId(workspace) })).toMatchObject({ ok: false });
+    writeReceipt({
+      ...fixture.entry.sourceDigests,
+      'sprites/extra.png': digest,
+    });
+    expect(readAssetPackRegistry({ workspace, markerWorkspaceId: workspaceId(workspace) })).toMatchObject({ ok: false });
+    writeReceipt({ [fixture.sourcePath]: digest });
+    expect(readAssetPackRegistry({ workspace, markerWorkspaceId: workspaceId(workspace) })).toMatchObject({ ok: false });
+    writeReceipt(fixture.entry.sourceDigests);
+    writeFileSync(path.join(fixture.entry.installedDirectory!, fixture.sourcePath), 'tampered');
+    expect(readAssetPackRegistry({ workspace, markerWorkspaceId: workspaceId(workspace) })).toMatchObject({ ok: false });
+    writeFileSync(path.join(fixture.entry.installedDirectory!, fixture.sourcePath), fixture.sourceBytes);
+
+    const outside = mkdtempSync(path.join(os.tmpdir(), 'lpc-asset-pack-registry-receipt-outside-'));
+    temporaryDirectories.push(outside);
+    unlinkSync(fixture.receiptPath);
+    symlinkSync(path.join(outside, 'receipt.json'), fixture.receiptPath, 'file');
+    expect(readAssetPackRegistry({ workspace, markerWorkspaceId: workspaceId(workspace) })).toMatchObject({ ok: false });
+    unlinkSync(fixture.receiptPath);
+    writeReceipt(fixture.entry.sourceDigests);
+    const sourceFile = path.join(fixture.entry.installedDirectory!, fixture.sourcePath);
+    unlinkSync(sourceFile);
+    symlinkSync(path.join(outside, 'payload.png'), sourceFile, 'file');
+    expect(readAssetPackRegistry({ workspace, markerWorkspaceId: workspaceId(workspace) })).toMatchObject({ ok: false });
+  });
+
+  it('reports non-regular managed output entries without following symlinks or special files', () => {
+    const workspace = workspaceFixture();
+    const markerBytes = readFileSync(path.join(workspace.outputRoot, '.lpc-toolkit-managed.json'));
+    const ownedPath = path.join(workspace.outputRoot, 'owned.txt');
+    const digestForOwnedPath = sha256('owned bytes');
+    const audit = () => auditPublishedManagedOutput({
+      workspace,
+      markerBytes,
+      generatedDigests: { 'owned.txt': digestForOwnedPath },
+    });
+
+    writeFileSync(ownedPath, 'owned bytes');
+    expect(audit()).toBeUndefined();
+
+    const outside = mkdtempSync(path.join(os.tmpdir(), 'lpc-asset-pack-registry-output-outside-'));
+    temporaryDirectories.push(outside);
+    writeFileSync(path.join(outside, 'owned.txt'), 'owned bytes');
+    unlinkSync(ownedPath);
+    symlinkSync(path.join(outside, 'owned.txt'), ownedPath, 'file');
+    expect(audit()).toMatchObject({
+      code: 'asset_output_root_unowned',
+      message: expect.stringContaining('non-regular'),
+    });
+
+    unlinkSync(ownedPath);
+    symlinkSync(outside, path.join(workspace.outputRoot, 'linked-directory'), 'dir');
+    expect(audit()).toMatchObject({
+      code: 'asset_output_root_unowned',
+      message: expect.stringContaining('non-regular'),
+    });
+    unlinkSync(path.join(workspace.outputRoot, 'linked-directory'));
+
+    if (process.platform !== 'win32') {
+      const fifo = path.join(workspace.outputRoot, 'managed.fifo');
+      execFileSync('mkfifo', [fifo]);
+      expect(audit()).toMatchObject({
+        code: 'asset_output_root_unowned',
+        message: expect.stringContaining('non-regular'),
+      });
+    }
   });
 
   it('rejects cross-pack reassigned generated destination ownership', () => {

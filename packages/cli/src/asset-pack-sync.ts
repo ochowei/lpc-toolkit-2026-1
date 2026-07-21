@@ -615,6 +615,30 @@ export async function prepareLinkedAssetPackDesiredState(options: {
         .sort((left, right) => left.localeCompare(right)),
     ] as const),
   );
+  const generatedCreditsByPackId = new Map(
+    compilePlan.ownership.map((ownership) => {
+      const ownedDefinitions = new Set(ownership.logicalPaths.filter((logicalPath) =>
+        logicalPath.startsWith('sheet_definitions/')));
+      const credits = new Map<string, CreditEntry>();
+      for (const definition of compilePlan.definitions) {
+        if (!ownedDefinitions.has(definition.logicalPath)) continue;
+        for (const credit of definition.definition.credits) {
+          const existing = credits.get(credit.file);
+          if (
+            existing !== undefined
+            && JSON.stringify(canonicalize(existing)) !== JSON.stringify(canonicalize(credit))
+          ) {
+            throw new Error(`Compiler definitions disagree on generated credit data: ${credit.file}.`);
+          }
+          credits.set(credit.file, credit);
+        }
+      }
+      return [
+        ownership.packId,
+        [...credits.values()].sort((left, right) => left.file.localeCompare(right.file)),
+      ] as const;
+    }),
+  );
   const registryEntries = validatedPacks.map((pack): LinkedAssetPackRegistryEntry => ({
     kind: 'linked',
     packId: pack.loaded.pack.id,
@@ -633,10 +657,7 @@ export async function prepareLinkedAssetPackDesiredState(options: {
     acknowledgements: pack.loaded.pack.acknowledgements,
     baselineDefinitionDigests: collectBaselineDefinitionDigests(pack.loaded.pack),
     baselineCreditDigests: collectBaselineCreditDigests(pack.loaded.pack),
-    generatedCredits: compilePlan.credits
-      .filter((credit) => (logicalDestinationsByPackId.get(pack.loaded.pack.id) ?? [])
-        .some((destination) => destination === `spritesheets/${credit.file}` || destination.startsWith(`spritesheets/${credit.file}/`)))
-      .sort((left, right) => left.file.localeCompare(right.file)),
+    generatedCredits: generatedCreditsByPackId.get(pack.loaded.pack.id) ?? [],
   })).sort((left, right) => left.packId.localeCompare(right.packId));
 
   const linked = registryEntries.find((entry) => entry.packId === requested.loaded.pack.id);

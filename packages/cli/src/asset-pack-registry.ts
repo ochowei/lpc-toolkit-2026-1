@@ -1,7 +1,12 @@
 import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
-import { BODY_TYPES } from '@lpc-toolkit/core';
+import {
+  ASSET_PACK_SCHEMA,
+  BODY_TYPES,
+  normalizeAssetPack,
+  parseAssetPackSource,
+} from '@lpc-toolkit/core';
 import type {
   AssetPackAcknowledgement,
   AssetPackCompilePlan,
@@ -122,13 +127,14 @@ const V1_DOCUMENT_KEYS = ['schema', 'workspaceId', 'entries', 'generatedDigests'
 const V1_ENTRY_KEYS = ['kind', 'packId', 'version', 'displayName', 'sourceDirectory', 'contentDigest', 'sourceDigests', 'generatedPaths', 'baselineDefinitionDigests', 'baselineCreditDigests'] as const;
 const V2_DOCUMENT_KEYS = ['schema', 'workspaceId', 'entries', 'generatedDigests', 'compileDigest'] as const;
 const BASE_ENTRY_KEYS = ['kind', 'packId', 'version', 'displayName', 'contentDigest', 'acknowledgements', 'sourceDigests', 'generatedPaths', 'logicalDestinations', 'generatedSprites', 'replacements', 'baselineDefinitionDigests', 'baselineCreditDigests', 'generatedCredits'] as const;
-const ACKNOWLEDGEMENT_KEYS = ['code', 'subject', 'contentDigest', 'reason'] as const;
-const REPLACEMENT_KEYS = ['packId', 'versions', 'assets'] as const;
 const CREDIT_KEYS = ['file', 'notes', 'authors', 'licenses', 'urls'] as const;
 const GENERATED_SPRITE_KEYS = ['assetId', 'sourcePath', 'sourceDigest', 'destinationPath', 'destinationDigest', 'animation', 'consumers'] as const;
 const GENERATED_SPRITE_CONSUMER_KEYS = ['itemId', 'typeName', 'layer', 'bodyTypes', 'variant'] as const;
 const RECEIPT_SCHEMA = 'lpc-toolkit.asset-pack-install-receipt.v1';
 const RECEIPT_KEYS = ['schema', 'workspaceId', 'packId', 'version', 'archiveDigest', 'contentDigest', 'installedAt', 'payloadDigests'] as const;
+const WINDOWS_RESERVED_NAME = /^(con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])(?:\..*)?$/iu;
+
+type ManagedPathKind = 'generic' | 'source' | 'output' | 'destination' | 'credit' | 'outputDigest';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -172,6 +178,74 @@ function sortedUniqueStrings(value: unknown, label: string): readonly string[] {
   return entries;
 }
 
+function requireCanonicalManagedRelativePath(
+  value: string,
+  label: string,
+  kind: ManagedPathKind,
+): string {
+  if (
+    value.length === 0
+    || value !== value.normalize('NFC')
+    || path.posix.isAbsolute(value)
+    || path.win32.isAbsolute(value)
+    || value.includes('\\')
+    || /[\u0000-\u001f\u007f]/u.test(value)
+  ) {
+    throw new Error(`${label} must be a canonical managed-relative path.`);
+  }
+  const segments = value.split('/');
+  if (
+    path.posix.normalize(value) !== value
+    || segments.some((segment) => (
+      segment.length === 0
+      || segment === '.'
+      || segment === '..'
+      || /[<>:"|?*]/u.test(segment)
+      || /[. ]$/u.test(segment)
+      || WINDOWS_RESERVED_NAME.test(segment)
+    ))
+  ) {
+    throw new Error(`${label} must be a canonical managed-relative path.`);
+  }
+  const allowed = kind === 'generic'
+    || (kind === 'source' && value.startsWith('sprites/'))
+    || (kind === 'output' && (
+      value.startsWith('sheet_definitions/') || value.startsWith('spritesheets/')
+    ))
+    || (kind === 'destination' && value.startsWith('spritesheets/'))
+    || kind === 'credit'
+    || (kind === 'outputDigest' && (
+      value === 'CREDITS.csv'
+      || value.startsWith('sheet_definitions/')
+      || value.startsWith('spritesheets/')
+    ));
+  if (!allowed) throw new Error(`${label} must use an allowed managed output path.`);
+  return value;
+}
+
+function assertNoManagedPathCollisions(paths: readonly string[], label: string): void {
+  const seen = new Map<string, string>();
+  for (const candidate of paths) {
+    const collisionKey = candidate.normalize('NFC').toLowerCase();
+    const existing = seen.get(collisionKey);
+    if (existing !== undefined && existing !== candidate) {
+      throw new Error(`${label} must not contain case- or Unicode-colliding paths.`);
+    }
+    seen.set(collisionKey, candidate);
+  }
+}
+
+function sortedUniqueManagedPaths(
+  value: unknown,
+  label: string,
+  kind: ManagedPathKind,
+): readonly string[] {
+  const paths = sortedUniqueStrings(value, label)
+    .map((entry) => requireCanonicalManagedRelativePath(entry, label, kind));
+  assertNoManagedPathCollisions(paths, label);
+  return paths;
+}
+
 function sortedUniqueBy<T>(
   entries: readonly T[],
   key: (entry: T) => string,
@@ -185,12 +259,20 @@ function sortedUniqueBy<T>(
   return entries;
 }
 
-function sortedDigestRecord(value: unknown, label: string): Readonly<Record<string, string>> {
+function sortedDigestRecord(
+  value: unknown,
+  label: string,
+  pathKind: ManagedPathKind = 'generic',
+): Readonly<Record<string, string>> {
   const record = requireRecord(value, label);
   const entries = Object.entries(record);
-  if (entries.some(([key, digest]) => key.length === 0 || !DIGEST.test(String(digest)))) {
-    throw new Error(`${label} must map non-empty paths to sha256 digests.`);
+  for (const [key, digest] of entries) {
+    if (typeof digest !== 'string' || !DIGEST.test(digest)) {
+      throw new Error(`${label} must map non-empty paths to sha256 digests.`);
+    }
+    requireCanonicalManagedRelativePath(key, label, pathKind);
   }
+  assertNoManagedPathCollisions(entries.map(([key]) => key), label);
   const sorted = [...entries].sort(([left], [right]) => left.localeCompare(right));
   if (JSON.stringify(entries.map(([key]) => key)) !== JSON.stringify(sorted.map(([key]) => key))) {
     throw new Error(`${label} keys must be sorted.`);
@@ -215,6 +297,29 @@ function containedPath(root: string, candidate: string, label: string): string {
   return resolved;
 }
 
+function readRegularManagedFile(root: string, logicalPath: string, label: string): Buffer {
+  const safePath = requireCanonicalManagedRelativePath(logicalPath, label, 'generic');
+  const rootStats = lstatSync(root);
+  if (rootStats.isSymbolicLink() || !rootStats.isDirectory()) {
+    throw new Error(`${label} has an invalid managed root: ${root}.`);
+  }
+  let current = root;
+  const segments = safePath.split('/');
+  for (const [index, segment] of segments.entries()) {
+    current = path.join(current, segment);
+    const stats = lstatSync(current);
+    if (stats.isSymbolicLink()) {
+      throw new Error(`${label} must not traverse a symbolic link: ${current}.`);
+    }
+    if (index < segments.length - 1) {
+      if (!stats.isDirectory()) throw new Error(`${label} has a non-directory path component: ${current}.`);
+      continue;
+    }
+    if (!stats.isFile()) throw new Error(`${label} must be a regular file: ${current}.`);
+  }
+  return readFileSync(current);
+}
+
 export function resolveLinkedAssetPackDirectory(
   workspace: AssetWorkspace,
   sourceDirectory: string,
@@ -226,56 +331,65 @@ export function resolveLinkedAssetPackDirectory(
   );
 }
 
-function readAcknowledgements(value: unknown, label: string): readonly AssetPackAcknowledgement[] {
-  if (!Array.isArray(value)) throw new Error(`${label} must be an array.`);
-  const acknowledgements = value.map((entry, index) => {
-    const record = requireRecord(entry, `${label}[${index}]`);
-    exactKeys(record, ACKNOWLEDGEMENT_KEYS, `${label}[${index}]`);
-    const subject = requireRecord(record.subject, `${label}[${index}].subject`);
-    for (const subjectValue of Object.values(subject)) {
-      if (typeof subjectValue !== 'string' && (!Array.isArray(subjectValue) || subjectValue.some((item) => typeof item !== 'string'))) {
-        throw new Error(`${label}[${index}].subject must contain strings or string arrays.`);
-      }
-    }
-    return {
-      code: stringAt(record, 'code', `${label}[${index}]`) as AssetPackAcknowledgement['code'],
-      subject: Object.fromEntries(Object.entries(subject).sort(([left], [right]) => left.localeCompare(right))) as AssetPackAcknowledgement['subject'],
-      contentDigest: digestAt(record, 'contentDigest', `${label}[${index}]`),
-      reason: stringAt(record, 'reason', `${label}[${index}]`),
-    };
+function normalizedEntryFieldsFromCore(options: {
+  readonly packId: string;
+  readonly version: string;
+  readonly acknowledgements: unknown;
+  readonly replacements: unknown;
+}): {
+  readonly acknowledgements: readonly AssetPackAcknowledgement[];
+  readonly replacements: readonly NormalizedAssetPackReplacement[];
+} {
+  const parsed = parseAssetPackSource({
+    schema: ASSET_PACK_SCHEMA,
+    id: options.packId,
+    version: options.version,
+    displayName: 'Asset workspace registry semantic validation',
+    credits: {
+      authors: ['lpc-toolkit'],
+      licenses: ['CC0'],
+      urls: ['https://example.com/lpc-toolkit'],
+      notes: '',
+    },
+    acknowledgements: options.acknowledgements,
+    replaces: options.replacements,
+    assets: [],
   });
-  return sortedUniqueBy(
-    acknowledgements,
+  if (!parsed.ok) {
+    throw new Error(`Asset-pack registry acknowledgement or replacement is invalid: ${parsed.diagnostics[0]?.message ?? 'Core rejected the value.'}`);
+  }
+  const normalized = normalizeAssetPack(parsed.source);
+  if (
+    JSON.stringify(canonical(options.acknowledgements))
+      !== JSON.stringify(canonical(normalized.acknowledgements))
+    || JSON.stringify(canonical(options.replacements))
+      !== JSON.stringify(canonical(normalized.replacements))
+  ) {
+    throw new Error('Asset-pack registry acknowledgements and replacements must use Core canonical normalization.');
+  }
+  const acknowledgements = sortedUniqueBy(
+    normalized.acknowledgements,
     (acknowledgement) => [
       acknowledgement.code,
       acknowledgement.contentDigest,
       acknowledgement.reason,
       JSON.stringify(canonical(acknowledgement.subject)),
     ].join('\u0000'),
-    label,
+    'Asset-pack registry entry.acknowledgements',
   );
-}
-
-function readReplacements(value: unknown, label: string): readonly NormalizedAssetPackReplacement[] {
-  if (!Array.isArray(value)) throw new Error(`${label} must be an array.`);
-  const replacements = value.map((entry, index) => {
-    const record = requireRecord(entry, `${label}[${index}]`);
-    exactKeys(record, REPLACEMENT_KEYS, `${label}[${index}]`);
-    return {
-      packId: stringAt(record, 'packId', `${label}[${index}]`),
-      versions: stringAt(record, 'versions', `${label}[${index}]`),
-      assets: sortedUniqueStrings(record.assets, `${label}[${index}].assets`),
-    };
-  });
-  return sortedUniqueBy(
-    replacements,
+  const replacements = sortedUniqueBy(
+    normalized.replacements.map((replacement) => ({
+      ...replacement,
+      assets: sortedUniqueStrings(replacement.assets, 'Asset-pack registry entry.replacements.assets'),
+    })),
     (replacement) => [
       replacement.packId,
       replacement.versions,
       replacement.assets.join('\u0000'),
     ].join('\u0000'),
-    label,
+    'Asset-pack registry entry.replacements',
   );
+  return { acknowledgements, replacements };
 }
 
 function readGeneratedSpriteConsumers(
@@ -334,9 +448,17 @@ function readGeneratedSprites(
     exactKeys(record, GENERATED_SPRITE_KEYS, `${label}[${index}]`);
     return {
       assetId: stringAt(record, 'assetId', `${label}[${index}]`),
-      sourcePath: stringAt(record, 'sourcePath', `${label}[${index}]`),
+      sourcePath: requireCanonicalManagedRelativePath(
+        stringAt(record, 'sourcePath', `${label}[${index}]`),
+        `${label}[${index}].sourcePath`,
+        'source',
+      ),
       sourceDigest: digestAt(record, 'sourceDigest', `${label}[${index}]`),
-      destinationPath: stringAt(record, 'destinationPath', `${label}[${index}]`),
+      destinationPath: requireCanonicalManagedRelativePath(
+        stringAt(record, 'destinationPath', `${label}[${index}]`),
+        `${label}[${index}].destinationPath`,
+        'destination',
+      ),
       destinationDigest: digestAt(record, 'destinationDigest', `${label}[${index}]`),
       animation: stringAt(record, 'animation', `${label}[${index}]`),
       consumers: readGeneratedSpriteConsumers(record.consumers, `${label}[${index}].consumers`),
@@ -355,18 +477,30 @@ function readCredits(value: unknown, label: string): readonly CreditEntry[] {
     const record = requireRecord(entry, `${label}[${index}]`);
     exactKeys(record, CREDIT_KEYS, `${label}[${index}]`);
     return {
-      file: stringAt(record, 'file', `${label}[${index}]`),
+      file: requireCanonicalManagedRelativePath(
+        stringAt(record, 'file', `${label}[${index}]`),
+        `${label}[${index}].file`,
+        'credit',
+      ),
       notes: typeof record.notes === 'string' ? record.notes : (() => { throw new Error(`${label}[${index}].notes must be a string.`); })(),
-      authors: sortedUniqueStrings(record.authors, `${label}[${index}].authors`),
-      licenses: sortedUniqueStrings(record.licenses, `${label}[${index}].licenses`) as CreditEntry['licenses'],
-      urls: sortedUniqueStrings(record.urls, `${label}[${index}].urls`),
+      authors: readCreditStrings(record.authors, `${label}[${index}].authors`),
+      licenses: readCreditStrings(record.licenses, `${label}[${index}].licenses`) as CreditEntry['licenses'],
+      urls: readCreditStrings(record.urls, `${label}[${index}].urls`),
     };
   });
   const files = credits.map((credit) => credit.file);
   if (JSON.stringify(files) !== JSON.stringify([...files].sort((left, right) => left.localeCompare(right))) || new Set(files).size !== files.length) {
     throw new Error(`${label} must be sorted by unique credit file.`);
   }
+  assertNoManagedPathCollisions(files, label);
   return credits;
+}
+
+function readCreditStrings(value: unknown, label: string): readonly string[] {
+  if (!Array.isArray(value) || value.some((entry) => typeof entry !== 'string')) {
+    throw new Error(`${label} must be an array of strings.`);
+  }
+  return [...value] as readonly string[];
 }
 
 function readV1Entry(value: unknown): LinkedAssetPackRegistryEntryV1 {
@@ -378,8 +512,8 @@ function readV1Entry(value: unknown): LinkedAssetPackRegistryEntryV1 {
     version: stringAt(record, 'version', 'Linked asset-pack registry entry'), displayName: stringAt(record, 'displayName', 'Linked asset-pack registry entry'),
     sourceDirectory: stringAt(record, 'sourceDirectory', 'Linked asset-pack registry entry'),
     contentDigest: stringAt(record, 'contentDigest', 'Linked asset-pack registry entry'),
-    sourceDigests: sortedDigestRecord(record.sourceDigests, 'Linked asset-pack registry entry.sourceDigests'),
-    generatedPaths: sortedUniqueStrings(record.generatedPaths, 'Linked asset-pack registry entry.generatedPaths'),
+    sourceDigests: sortedDigestRecord(record.sourceDigests, 'Linked asset-pack registry entry.sourceDigests', 'source'),
+    generatedPaths: sortedUniqueManagedPaths(record.generatedPaths, 'Linked asset-pack registry entry.generatedPaths', 'output'),
     baselineDefinitionDigests: sortedDigestRecord(record.baselineDefinitionDigests, 'Linked asset-pack registry entry.baselineDefinitionDigests'),
     baselineCreditDigests: sortedDigestRecord(record.baselineCreditDigests, 'Linked asset-pack registry entry.baselineCreditDigests'),
   };
@@ -391,15 +525,23 @@ function readV2Entry(value: unknown, workspace: AssetWorkspace, workspaceId: str
   const entryKeys = [...BASE_ENTRY_KEYS, ...(kind === 'linked' ? ['sourceDirectory'] : kind === 'installed' ? ['installedDirectory', 'archiveDigest'] : [])];
   exactKeys(record, entryKeys, 'Asset-pack registry entry');
   if (kind !== 'linked' && kind !== 'installed') throw new Error(`Unknown asset-pack registry entry kind: ${kind}.`);
+  const packId = stringAt(record, 'packId', 'Asset-pack registry entry');
+  const version = stringAt(record, 'version', 'Asset-pack registry entry');
+  const normalizedFields = normalizedEntryFieldsFromCore({
+    packId,
+    version,
+    acknowledgements: record.acknowledgements,
+    replacements: record.replacements,
+  });
   const base: AssetPackRegistryEntryBase = {
-    packId: stringAt(record, 'packId', 'Asset-pack registry entry'), version: stringAt(record, 'version', 'Asset-pack registry entry'),
+    packId, version,
     displayName: stringAt(record, 'displayName', 'Asset-pack registry entry'), contentDigest: digestAt(record, 'contentDigest', 'Asset-pack registry entry'),
-    acknowledgements: readAcknowledgements(record.acknowledgements, 'Asset-pack registry entry.acknowledgements'),
-    sourceDigests: sortedDigestRecord(record.sourceDigests, 'Asset-pack registry entry.sourceDigests'),
-    generatedPaths: sortedUniqueStrings(record.generatedPaths, 'Asset-pack registry entry.generatedPaths'),
-    logicalDestinations: sortedUniqueStrings(record.logicalDestinations, 'Asset-pack registry entry.logicalDestinations'),
+    acknowledgements: normalizedFields.acknowledgements,
+    sourceDigests: sortedDigestRecord(record.sourceDigests, 'Asset-pack registry entry.sourceDigests', 'source'),
+    generatedPaths: sortedUniqueManagedPaths(record.generatedPaths, 'Asset-pack registry entry.generatedPaths', 'output'),
+    logicalDestinations: sortedUniqueManagedPaths(record.logicalDestinations, 'Asset-pack registry entry.logicalDestinations', 'destination'),
     generatedSprites: readGeneratedSprites(record.generatedSprites, 'Asset-pack registry entry.generatedSprites'),
-    replacements: readReplacements(record.replacements, 'Asset-pack registry entry.replacements'),
+    replacements: normalizedFields.replacements,
     baselineDefinitionDigests: sortedDigestRecord(record.baselineDefinitionDigests, 'Asset-pack registry entry.baselineDefinitionDigests'),
     baselineCreditDigests: sortedDigestRecord(record.baselineCreditDigests, 'Asset-pack registry entry.baselineCreditDigests'),
     generatedCredits: readCredits(record.generatedCredits, 'Asset-pack registry entry.generatedCredits'),
@@ -422,13 +564,33 @@ function readV2Entry(value: unknown, workspace: AssetWorkspace, workspaceId: str
 function verifyInstallReceipt(directory: string, workspaceId: string, entry: AssetPackRegistryEntryBase, archiveDigest: string): void {
   const receiptPath = path.join(directory, 'install-receipt.json');
   if (!existsSync(receiptPath)) throw new Error(`Installed asset-pack receipt is missing: ${receiptPath}.`);
-  const receipt = requireRecord(JSON.parse(readFileSync(receiptPath, 'utf8')) as unknown, 'Installed asset-pack receipt');
+  const receipt = requireRecord(
+    JSON.parse(readRegularManagedFile(directory, 'install-receipt.json', 'Installed asset-pack receipt').toString('utf8')) as unknown,
+    'Installed asset-pack receipt',
+  );
   exactKeys(receipt, RECEIPT_KEYS, 'Installed asset-pack receipt');
   if (stringAt(receipt, 'schema', 'Installed asset-pack receipt') !== RECEIPT_SCHEMA || stringAt(receipt, 'workspaceId', 'Installed asset-pack receipt') !== workspaceId || stringAt(receipt, 'packId', 'Installed asset-pack receipt') !== entry.packId || stringAt(receipt, 'version', 'Installed asset-pack receipt') !== entry.version || digestAt(receipt, 'archiveDigest', 'Installed asset-pack receipt') !== archiveDigest || digestAt(receipt, 'contentDigest', 'Installed asset-pack receipt') !== entry.contentDigest) {
     throw new Error(`Installed asset-pack receipt does not match registry entry: ${receiptPath}.`);
   }
   stringAt(receipt, 'installedAt', 'Installed asset-pack receipt');
-  sortedDigestRecord(receipt.payloadDigests, 'Installed asset-pack receipt.payloadDigests');
+  const payloadDigests = sortedDigestRecord(
+    receipt.payloadDigests,
+    'Installed asset-pack receipt.payloadDigests',
+    'source',
+  );
+  if (!pathsEqual(Object.keys(payloadDigests), Object.keys(entry.sourceDigests))) {
+    throw new Error(`Installed asset-pack receipt payload coverage does not match registry source payload: ${receiptPath}.`);
+  }
+  for (const [sourcePath, digest] of Object.entries(entry.sourceDigests)) {
+    if (payloadDigests[sourcePath] !== digest) {
+      throw new Error(`Installed asset-pack receipt payload digest does not match registry source payload: ${sourcePath}.`);
+    }
+    const bytes = readRegularManagedFile(directory, sourcePath, 'Installed asset-pack payload');
+    const actual = `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+    if (actual !== digest) {
+      throw new Error(`Installed asset-pack payload digest does not match its receipt: ${sourcePath}.`);
+    }
+  }
 }
 
 function emptyCompileProjection(): AssetPackCompileProjection {
@@ -488,14 +650,10 @@ function pathsEqual(left: readonly string[], right: readonly string[]): boolean 
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-function creditOwnsDestination(credit: CreditEntry, destinationPath: string): boolean {
-  const creditPath = `spritesheets/${credit.file}`;
-  return destinationPath === creditPath || destinationPath.startsWith(`${creditPath}/`);
-}
-
 function validateGeneratedEntryRelationships(
   entries: readonly AssetPackRegistryEntry[],
   generatedDigests: Readonly<Record<string, string>>,
+  definitions: readonly AssetPackCompileProjectionDefinition[],
 ): void {
   for (const entry of entries) {
     const spriteDestinations = entry.generatedSprites.map((sprite) => sprite.destinationPath);
@@ -520,15 +678,18 @@ function validateGeneratedEntryRelationships(
         throw new Error(`Asset-pack registry generated path is neither a definition nor a logical destination for ${entry.packId}: ${generatedPath}.`);
       }
     }
-    for (const credit of entry.generatedCredits) {
-      if (!entry.logicalDestinations.some((destination) => creditOwnsDestination(credit, destination))) {
-        throw new Error(`Asset-pack registry generated credit is not associated with an owned destination for ${entry.packId}: ${credit.file}.`);
+    const expectedCredits = compilerCreditsForOwnedDefinitions(entry, definitions);
+    for (const destination of entry.logicalDestinations) {
+      const file = destination.slice('spritesheets/'.length);
+      if (!expectedCredits.some((credit) => credit.file === file)) {
+        throw new Error(`Asset-pack registry logical destination is missing compiler-derived credit data for ${entry.packId}: ${destination}.`);
       }
     }
-    for (const destination of entry.logicalDestinations) {
-      if (!entry.generatedCredits.some((credit) => creditOwnsDestination(credit, destination))) {
-        throw new Error(`Asset-pack registry logical destination is missing generated credit coverage for ${entry.packId}: ${destination}.`);
-      }
+    if (
+      JSON.stringify(canonical(entry.generatedCredits))
+        !== JSON.stringify(canonical(expectedCredits))
+    ) {
+      throw new Error(`Asset-pack registry generated credits must exactly match compiler-derived rows for ${entry.packId}.`);
     }
   }
 }
@@ -541,13 +702,40 @@ function readCompileDefinitions(
     .filter((generatedPath) => generatedPath.startsWith('sheet_definitions/')))]
     .sort((left, right) => left.localeCompare(right));
   return logicalPaths.map((logicalPath) => {
-    const filePath = path.join(workspace.outputRoot, logicalPath);
     const definition = requireRecord(
-      JSON.parse(readFileSync(filePath, 'utf8')) as unknown,
+      JSON.parse(readRegularManagedFile(
+        workspace.outputRoot,
+        logicalPath,
+        `Generated definition ${logicalPath}`,
+      ).toString('utf8')) as unknown,
       `Generated definition ${logicalPath}`,
     ) as unknown as ItemDefinition;
     return { logicalPath, definition };
   });
+}
+
+function compilerCreditsForOwnedDefinitions(
+  entry: AssetPackRegistryEntry,
+  definitions: readonly AssetPackCompileProjectionDefinition[],
+): readonly CreditEntry[] {
+  const credits = new Map<string, CreditEntry>();
+  for (const definition of definitions) {
+    if (!entry.generatedPaths.includes(definition.logicalPath)) continue;
+    for (const credit of readCredits(
+      definition.definition.credits,
+      `Generated definition ${definition.logicalPath}.credits`,
+    )) {
+      const existing = credits.get(credit.file);
+      if (
+        existing !== undefined
+        && JSON.stringify(canonical(existing)) !== JSON.stringify(canonical(credit))
+      ) {
+        throw new Error(`Generated definitions disagree on compiler-derived credit data: ${credit.file}.`);
+      }
+      credits.set(credit.file, credit);
+    }
+  }
+  return [...credits.values()].sort((left, right) => left.file.localeCompare(right.file));
 }
 
 function uniqueGeneratedCredits(
@@ -561,15 +749,17 @@ function uniqueGeneratedCredits(
     }
     credits.set(credit.file, credit);
   }
+  assertNoManagedPathCollisions([...credits.keys()], 'Asset-pack registry generated credits');
   return [...credits.values()].sort((left, right) => left.file.localeCompare(right.file));
 }
 
 export function assetPackCompileProjectionFromRegistry(options: {
   readonly workspace: AssetWorkspace;
   readonly entries: readonly AssetPackRegistryEntry[];
+  readonly definitions?: readonly AssetPackCompileProjectionDefinition[];
 }): AssetPackCompileProjection {
   return {
-    definitions: readCompileDefinitions(options.workspace, options.entries),
+    definitions: options.definitions ?? readCompileDefinitions(options.workspace, options.entries),
     sprites: options.entries.flatMap((entry) => entry.generatedSprites.map((sprite) => ({
       ...sprite,
       packId: entry.packId,
@@ -633,7 +823,11 @@ export function readAssetPackRegistry(options: { readonly workspace: AssetWorksp
       const entries = record.entries.map(readV1Entry);
       const ids = entries.map((entry) => entry.packId);
       if (new Set(ids).size !== ids.length || JSON.stringify(ids) !== JSON.stringify([...ids].sort((left, right) => left.localeCompare(right)))) throw new Error('Asset workspace registry entries must have sorted unique pack IDs.');
-      const generatedDigests = sortedDigestRecord(record.generatedDigests, 'Asset workspace registry.generatedDigests');
+      const generatedDigests = sortedDigestRecord(
+        record.generatedDigests,
+        'Asset workspace registry.generatedDigests',
+        'outputDigest',
+      );
       const owned = new Set(entries.flatMap((entry) => entry.generatedPaths));
       if (entries.length > 0) owned.add('CREDITS.csv');
       if (!pathsEqual(Object.keys(generatedDigests), [...owned].sort((left, right) => left.localeCompare(right)))) {
@@ -660,15 +854,21 @@ export function readAssetPackRegistry(options: { readonly workspace: AssetWorksp
     if (new Set(ids).size !== ids.length || JSON.stringify(ids) !== JSON.stringify([...ids].sort((left, right) => left.localeCompare(right)))) throw new Error('Asset workspace registry entries must have sorted unique pack IDs.');
     const destinations = entries.flatMap((entry) => entry.logicalDestinations);
     if (new Set(destinations).size !== destinations.length) throw new Error('Asset workspace registry logical destinations must not conflict.');
-    const generatedDigests = sortedDigestRecord(record.generatedDigests, 'Asset workspace registry.generatedDigests');
+    const generatedDigests = sortedDigestRecord(
+      record.generatedDigests,
+      'Asset workspace registry.generatedDigests',
+      'outputDigest',
+    );
     const owned = new Set(entries.flatMap((entry) => entry.generatedPaths));
     if (entries.length > 0) owned.add('CREDITS.csv');
     if (JSON.stringify(Object.keys(generatedDigests)) !== JSON.stringify([...owned].sort((left, right) => left.localeCompare(right)))) throw new Error('Asset workspace registry generatedDigests must exactly cover generated output paths.');
-    validateGeneratedEntryRelationships(entries, generatedDigests);
+    const definitions = readCompileDefinitions(options.workspace, entries);
+    validateGeneratedEntryRelationships(entries, generatedDigests, definitions);
     const compileDigest = digestAt(record, 'compileDigest', 'Asset workspace registry');
     if (compileDigest !== assetPackCompileDigest(assetPackCompileProjectionFromRegistry({
       workspace: options.workspace,
       entries,
+      definitions,
     }))) {
       throw new Error('Asset workspace registry compileDigest does not match the compiled registry state.');
     }
@@ -700,24 +900,64 @@ export function assetPackCompileDigest(projection: AssetPackCompileProjection): 
 
 export function snapshotManagedOutputFiles(root: string): Map<string, Buffer> {
   const files = new Map<string, Buffer>();
-  const visit = (current: string): void => {
+  if (!existsSync(root)) return files;
+  const rootStats = lstatSync(root);
+  if (rootStats.isSymbolicLink() || !rootStats.isDirectory()) {
+    throw new Error(`Managed asset output root is not a directory: ${root}.`);
+  }
+  const visit = (current: string, relative: string): void => {
+    const currentStats = lstatSync(current);
+    if (currentStats.isSymbolicLink() || !currentStats.isDirectory()) {
+      throw new Error(`Managed asset output contains a non-regular path: ${relative || '.'}.`);
+    }
     for (const entry of readdirSync(current, { withFileTypes: true })) {
       const target = path.join(current, entry.name);
-      if (entry.isDirectory()) visit(target);
-      else files.set(path.relative(root, target).split(path.sep).join('/'), readFileSync(target));
+      const logicalPath = relative.length === 0 ? entry.name : `${relative}/${entry.name}`;
+      const stats = lstatSync(target);
+      if (stats.isSymbolicLink() || (!stats.isDirectory() && !stats.isFile())) {
+        throw new Error(`Managed asset output contains a non-regular path: ${logicalPath}.`);
+      }
+      if (stats.isDirectory()) {
+        visit(target, logicalPath);
+      } else {
+        files.set(logicalPath, readFileSync(target));
+      }
     }
   };
-  if (existsSync(root)) visit(root);
+  visit(root, '');
   return files;
 }
 
 export function auditPublishedManagedOutput(options: { readonly workspace: AssetWorkspace; readonly markerBytes: Buffer; readonly generatedDigests: Readonly<Record<string, string>> }): AssetPackLifecycleDiagnostic | undefined {
-  const files = snapshotManagedOutputFiles(options.workspace.outputRoot);
+  let files: Map<string, Buffer>;
+  try {
+    files = snapshotManagedOutputFiles(options.workspace.outputRoot);
+  } catch (error) {
+    return {
+      code: 'asset_output_root_unowned',
+      severity: 'error',
+      message: error instanceof Error ? error.message : String(error),
+      path: options.workspace.outputRoot,
+    };
+  }
   const expected = new Set(['.lpc-toolkit-managed.json', ...Object.keys(options.generatedDigests)]);
   const stray = [...files.keys()].sort().find((file) => !expected.has(file));
   if (stray) return { code: 'asset_output_root_unowned', severity: 'error', message: `Managed asset output contains an unowned file: ${stray}`, path: path.join(options.workspace.outputRoot, stray) };
-  const missing = [...expected].sort().find((file) => !files.has(file));
-  if (missing) return { code: 'asset_digest_mismatch', severity: 'error', message: `Managed asset output is missing a registry-owned file: ${missing}`, path: path.join(options.workspace.outputRoot, missing) };
+  for (const file of [...expected].sort()) {
+    try {
+      readRegularManagedFile(options.workspace.outputRoot, file, 'Managed asset output');
+    } catch (error) {
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+        return { code: 'asset_digest_mismatch', severity: 'error', message: `Managed asset output is missing a registry-owned file: ${file}`, path: path.join(options.workspace.outputRoot, file) };
+      }
+      return {
+        code: 'asset_output_root_unowned',
+        severity: 'error',
+        message: error instanceof Error ? error.message : String(error),
+        path: path.join(options.workspace.outputRoot, file),
+      };
+    }
+  }
   for (const [file, digest] of Object.entries(options.generatedDigests)) {
     const bytes = files.get(file);
     const actual = bytes ? `sha256:${createHash('sha256').update(bytes).digest('hex')}` : undefined;
