@@ -583,7 +583,7 @@ Task 2 record:
 - Create: `packages/core/test/asset-pack-compile.test.ts`
 - Modify: `packages/core/src/index.ts`
 
-- [ ] **Step 1: Write failing new-item compile tests**
+- [x] **Step 1: Write failing new-item compile tests**
 
 Assert namespaced definition path/basename/name, `display_name`, type, animations, `layer_N` assignment, effective body groups, generated sprite destinations, recolor preservation, full-file credit override, shared-source consumer aggregation, and deterministic ordering independent of input pack order.
 
@@ -601,7 +601,7 @@ expect(plan.sprites[0].destinationPath).toBe(
 );
 ```
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-compile.test.ts
@@ -609,7 +609,7 @@ rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-compile.test.ts
 
 Expected: FAIL because the compiler does not exist.
 
-- [ ] **Step 3: Implement new-item compile planning**
+- [x] **Step 3: Implement new-item compile planning**
 
 Build immutable JSON definitions and copy operations only; Core must not read or write files. Sort packs/assets/layers/sprites, aggregate one physical source/destination with all consumers, and emit `asset_path_conflict` rather than choosing a winner.
 
@@ -625,7 +625,7 @@ export function compileAssetPacks(options: CompileAssetPacksOptions): AssetPackC
 }
 ```
 
-- [ ] **Step 4: Verify GREEN and boundaries**
+- [x] **Step 4: Verify GREEN and boundaries**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-compile.test.ts
@@ -635,7 +635,7 @@ rtk pnpm check:boundaries
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit product code**
+- [x] **Step 5: Commit product code**
 
 ```sh
 rtk git add packages/core/src/asset-pack-compile.ts packages/core/src/index.ts packages/core/test/asset-pack-compile.test.ts
@@ -643,6 +643,12 @@ rtk git commit -m "feat(core): compile namespaced artist assets"
 ```
 
 Then update this task's plan record and commit it separately.
+
+Task 3 record:
+
+- Implementation: Added deterministic pure compilation for namespaced new-item definitions, generated sprite paths, recolor metadata, credits, ownership, shared physical-source consumers, baseline reservations, and no-winner conflict suppression for duplicate generated outputs.
+- Product commits: `eb109e9223e8d88a9c6769bde83bca31315d8062`, `e6f6bea5f37cdf40fe461e4ca10f5d34da293124`, `481900c2f1f6daad6f7e5f857f287dcb450a86d4`.
+- Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-compile.test.ts` PASS; `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS; `rtk pnpm check:boundaries` PASS; reviewer re-review APPROVED. Task 4 extension/replacement behavior remains deferred.
 
 ---
 
