@@ -757,21 +757,29 @@ Then update this task's plan record and commit it separately.
 - Consumes: `parseAssetPackPayload` and the exact Phase 2 archive constants.
 - Produces: archive reader/writer/extractor under Stable Interfaces for Tasks 4, 5, 9, and 13.
 
-- [ ] **Step 1: Write failing safe-path and central-directory tests**
+- [x] **Step 1: Write failing safe-path and central-directory tests**
+
+  - Implementation: Added raw ZIP fixtures for traversal, Windows portability/device names (including superscript COM/LPT forms), collisions, special entries, metadata mismatches, overlap, ZIP64, and entry-count bounds.
 
 Create raw ZIP fixtures for absolute POSIX, Windows drive, UNC, backslash, NUL, empty segment, dot, parent, directory, duplicate exact path, ASCII-case collision, Unicode NFC collision, symlink UNIX mode, FIFO/special mode, encrypted flag, unsupported compression, central/local filename mismatch, invalid offsets/lengths, overlapping local data, ZIP64 markers, and more than `4_096` entries.
 
 The canonical collision key is `validatedPath.normalize('NFC').toLowerCase()` after all path-shape checks; this conservative rule keeps archives portable across supported filesystems. UTF-8-flagged names use fatal UTF-8 decoding; unflagged names must be printable ASCII so ambiguous legacy encodings cannot create a second spelling.
 
-- [ ] **Step 2: Write failing bounds and checksum tests**
+- [x] **Step 2: Write failing bounds and checksum tests**
+
+  - Implementation: Added manifest/entry/aggregate/encoded archive bounds, bounded inflation and trailing DEFLATE, strict checksum schema/order/coverage, digest, root, and required-entry tests.
 
 Cover manifest `1 MiB` pass and `1 MiB + 1` fail, entry `64 MiB` pass and `+1` fail without inflation, declared total `512 MiB + 1`, inflater output exceeding declared/bounded length, checksum JSON syntax/schema/unknown fields/order, missing/extra rows, size mismatch, digest mismatch, unexpected roots, unreferenced sprite, missing manifest/checksums, and `checksums.json` attempting to cover itself.
 
-- [ ] **Step 3: Write failing deterministic-writer tests**
+- [x] **Step 3: Write failing deterministic-writer tests**
+
+  - Implementation: Added byte-identical sorted UNIX archive, fixed timestamp/permission, compression, and checksum coverage assertions.
 
 Create the same archive twice with reversed input-map order and different process timezone. Assert identical SHA-256 and bytes; inspect central entries for sorted paths, fixed timestamp, UNIX `0o100644`, no directory entries, method `8`, and checksum coverage.
 
-- [ ] **Step 4: Run the focused test and verify RED**
+- [x] **Step 4: Run the focused test and verify RED**
+
+  - Verification: Initial focused archive test was RED before the module implementation, as expected.
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-archive-format.test.ts
@@ -779,11 +787,15 @@ rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-archive-format.test.ts
 
 Expected: FAIL because the archive trust-boundary module does not exist.
 
-- [ ] **Step 5: Implement metadata-first bounded reading**
+- [x] **Step 5: Implement metadata-first bounded reading**
+
+  - Implementation: Added strict EOCD/central/local metadata parsing, archive/entry/encoded/decoded limits, single-descriptor regular-file reads capped at archiveBytes + 1, bounded DEFLATE consumption, CRC and checksum verification, and immutable verified snapshots.
 
 Parse EOCD and central records before calling `inflateRawSync`. Capture general-purpose flags, compression, compressed/uncompressed sizes, creator platform, external attributes, local-header offset, and raw filename bytes. Reject the complete archive on any diagnostic. For method `8`, call `inflateRawSync(compressed, { maxOutputLength: declaredSize })`; require exact output length. Parse and verify checksums before constructing `AssetPackPayloadSuccess`.
 
-- [ ] **Step 6: Implement deterministic writing and verified extraction**
+- [x] **Step 6: Implement deterministic writing and verified extraction**
+
+  - Implementation: Added deterministic JSZip writing with read-back validation and verified extraction under a private staging-root contract with canonical device/inode pinning, no-follow file creation, symlink/race fail-closed checks, and safe cleanup.
 
 Use `JSZip` only after payload bytes are trusted:
 
@@ -805,7 +817,9 @@ return zip.generateAsync({
 
 Extraction accepts only a successful snapshot, requires a newly created empty target below the caller-validated staging root, writes exact verified bytes with mode `0o600`, and never follows symlinks.
 
-- [ ] **Step 7: Verify GREEN**
+- [x] **Step 7: Verify GREEN**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-archive-format.test.ts` PASS (62 tests); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-archive-format.test.ts
@@ -814,12 +828,21 @@ rtk pnpm --filter @lpc-toolkit/cli run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit product code**
+- [x] **Step 8: Commit product code**
+
+  - Commit: `993bcf52622dbb5605bf1ebb0201dd5ff48254a3`
 
 ```sh
 rtk git add packages/cli/src/asset-pack-archive-format.ts packages/cli/test/asset-pack-archive-format.test.ts
 rtk git commit -m "feat(cli): enforce asset pack archive safety"
 ```
+
+Task 3 record:
+
+- Implementation: Added the bounded archive/checksum trust boundary, deterministic writer, verified extraction, descriptor-capped archive reads, Windows device-name portability checks, and canonical extraction identity hardening.
+- Product/fix commits: `993bcf52622dbb5605bf1ebb0201dd5ff48254a3`, `f18722e8f1c5228405e95d34c7fdbdf48cea2c76`, `f84d500a32b6a9ebe96b05490235e105f271497a`, `b0657ab669860448073305803c6084f6d2dcfa1d`.
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-archive-format.test.ts` PASS (62 tests); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+- Review: Task reviewer APPROVED with no Critical or Important findings after the final security fix waves.
 
 Then update this task's plan record and commit it separately.
 
