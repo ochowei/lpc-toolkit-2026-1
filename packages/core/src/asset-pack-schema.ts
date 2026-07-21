@@ -214,23 +214,6 @@ function parsePackRecord(
     `${path}.displayName`,
     diagnostics,
   );
-  const credits = parseCreditSource(record.credits, `${path}.credits`, diagnostics);
-  const creditOverrides = parseCreditOverrideRecord(
-    record.creditOverrides,
-    `${path}.creditOverrides`,
-    diagnostics,
-  );
-  const replacements = parseReplacementList(
-    record.replaces,
-    `${path}.replaces`,
-    diagnostics,
-  );
-  const acknowledgements = parseAcknowledgements(
-    record.acknowledgements,
-    `${path}.acknowledgements`,
-    diagnostics,
-  );
-  const assets = parseAssets(record.assets, `${path}.assets`, diagnostics);
 
   if (schema !== ASSET_PACK_SCHEMA) {
     pushDiagnostic(diagnostics, {
@@ -260,6 +243,24 @@ function parsePackRecord(
       details: { path: `${path}.version`, value: version },
     });
   }
+
+  const credits = parseCreditSource(record.credits, `${path}.credits`, diagnostics);
+  const creditOverrides = parseCreditOverrideRecord(
+    record.creditOverrides,
+    `${path}.creditOverrides`,
+    diagnostics,
+  );
+  const replacements = parseReplacementList(
+    record.replaces,
+    `${path}.replaces`,
+    diagnostics,
+  );
+  const acknowledgements = parseAcknowledgements(
+    record.acknowledgements,
+    `${path}.acknowledgements`,
+    diagnostics,
+  );
+  const assets = parseAssets(record.assets, `${path}.assets`, diagnostics);
 
   if (!schema || !id || !version || !displayName || !credits || !assets) {
     return undefined;
@@ -1213,7 +1214,9 @@ function exactKeys(
   diagnostics: AssetPackDiagnostic[],
 ) {
   const allowed = new Set(allowedKeys);
-  Object.keys(record).forEach((key) => {
+  Object.keys(record)
+    .sort((left, right) => left.localeCompare(right))
+    .forEach((key) => {
     if (allowed.has(key)) return;
     pushDiagnostic(diagnostics, {
       code: 'asset_pack_schema_invalid',
@@ -1221,7 +1224,7 @@ function exactKeys(
       message: `Unknown field at ${path}.${key}.`,
       details: { path: `${path}.${key}` },
     });
-  });
+    });
 }
 
 function asRecord(

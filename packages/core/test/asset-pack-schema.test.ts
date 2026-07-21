@@ -114,6 +114,20 @@ function requireNewItemFixture() {
   return firstAsset;
 }
 
+function requireDiagnosticPaths(
+  result: ReturnType<typeof parseAssetPackSource>,
+): string[] {
+  expect(result.ok).toBe(false);
+  if (result.ok) {
+    throw new Error('Expected parsing to fail.');
+  }
+
+  return result.diagnostics.map((diagnostic) => {
+    const path = diagnostic.details?.path;
+    return typeof path === 'string' ? path : '<missing-path>';
+  });
+}
+
 describe('asset pack schema', () => {
   it('parses the approved v1 examples for new and extended items', () => {
     const result = parseAssetPackSource(validPack);
@@ -226,6 +240,58 @@ describe('asset pack schema', () => {
       ok: false,
       diagnostics: [{ code: 'asset_pack_schema_invalid', severity: 'error' }],
     });
+  });
+
+  it('reports root validation diagnostics before later nested paths', () => {
+    const firstAsset = requireNewItemFixture();
+    const firstLayer = firstAsset.layers[0];
+    if (!firstLayer) {
+      throw new Error('Expected the new-item fixture to define a first layer.');
+    }
+
+    const result = parseAssetPackSource({
+      ...validPack,
+      schema: 'lpc-toolkit.asset-pack.v2',
+      id: 'Acme.Fantasy-Hair',
+      version: '1.0',
+      credits: {
+        ...PACK_CREDITS,
+        licenses: ['MIT'],
+      },
+      assets: [{
+        ...firstAsset,
+        layers: [{
+          ...firstLayer,
+          sprites: [{
+            ...firstLayer.sprites[0]!,
+            source: 'images/moon-braid/foreground/walk.png',
+          }],
+        }],
+      }],
+    });
+
+    expect(requireDiagnosticPaths(result)).toEqual([
+      '$.schema',
+      '$.id',
+      '$.version',
+      '$.credits.licenses[0]',
+      '$.assets[0].layers[0].sprites[0].source',
+    ]);
+  });
+
+  it('reports unknown fields in sorted path order', () => {
+    const result = parseAssetPackSource({
+      ...validPack,
+      zulu: true,
+      alpha: true,
+      middle: true,
+    });
+
+    expect(requireDiagnosticPaths(result)).toEqual([
+      '$.alpha',
+      '$.middle',
+      '$.zulu',
+    ]);
   });
 
   it.each([
