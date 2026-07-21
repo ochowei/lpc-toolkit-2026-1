@@ -438,12 +438,6 @@ function includeCustomDefinitions(
   return path.resolve(runtime.context.customAssetsRoot) === path.resolve(workspace.outputRoot);
 }
 
-function isManagedOutputItem(itemId: string | undefined): boolean {
-  if (!itemId) return false;
-  const separator = itemId.indexOf('--');
-  return separator > 0 && separator < itemId.length - 2;
-}
-
 export function loadActiveAssetPackBaseline(options: {
   readonly runtime: RuntimeAssets;
   readonly workspace?: AssetWorkspace;
@@ -472,8 +466,7 @@ export function loadActiveAssetPackBaseline(options: {
   const creditDigests = new Map<ItemId, string>();
 
   for (const [itemId, item] of catalog.byItemId) {
-    const fromManagedCustomOutput = customRecordPaths.has(item.sourcePath ?? '')
-      && isManagedOutputItem(itemId);
+    const fromManagedCustomOutput = customRecordPaths.has(item.sourcePath ?? '');
     if (fromManagedCustomOutput) {
       continue;
     }
