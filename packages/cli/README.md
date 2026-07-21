@@ -38,6 +38,125 @@ The character selection is saved under `./characters/`. Preview and render
 commands write the sprite together with metadata and both TXT and CSV credit
 files; keep those attribution artifacts with the generated image.
 
+## Artist asset-pack authoring (Phase 1)
+
+An artist can create and test local LPC asset packs using only the published
+CLI. Cloning this repository, initializing `upstream/`, and creating a local
+`assets/` directory are unnecessary.
+
+```sh
+npm install -g @lpc-toolkit/cli
+lpc-toolkit asset workspace init ./my-lpc-art
+cd ./my-lpc-art
+lpc-toolkit asset init --new --pack-id acme.fantasy-hair --asset-id moon-braid --display-name "Moon Braid" --type hair --body-type male --body-type female --animation walk --animation climb --author Alice --license "CC-BY-SA 4.0" --url https://example.com/acme/fantasy-hair
+lpc-toolkit asset validate ./artist-packs/<pack-id>
+lpc-toolkit asset preview ./artist-packs/<pack-id>
+lpc-toolkit asset sync ./artist-packs/<pack-id>
+```
+
+Place every authored PNG below
+`artist-packs/<pack-id>/sprites/`. Phase 1 accepts one complete PNG for each
+declared animation, layer, effective body-type group, and optional variant. It
+does not assemble separate frame images, extract base pixels, or generate
+runtime-recolor PNGs.
+
+### Workspace and generated output
+
+`asset workspace init <directory>` creates this standalone layout without
+preparing the managed asset cache or making a network request:
+
+```text
+my-lpc-art/
+├── lpc-asset-workspace.json
+├── artist-packs/
+│   └── <pack-id>/
+│       ├── asset-pack.json
+│       ├── sprites/
+│       └── previews/                  created by asset preview
+├── assets_custom/
+│   └── .lpc-toolkit-managed.json
+└── .lpc-toolkit/
+    └── asset-packs/
+        ├── registry.json              created by the first successful sync
+        ├── installed/                 reserved for Phase 2
+        ├── validation/
+        └── staging/
+```
+
+The workspace config uses schema `lpc-toolkit.asset-workspace.v1` and records
+the source, generated-output, and manager-state directories. Asset commands
+find it by walking upward from the current directory. Use
+`--workspace <directory>` to resolve exactly that workspace instead, which is
+useful for automation.
+
+Workspace initialization refuses a non-empty `assets_custom/` directory that
+does not have the CLI-created management marker. Sync likewise refuses missing,
+mismatched, or tampered ownership data; it never adopts unknown output. The
+artist source in `artist-packs/` remains authoritative. `assets_custom/` and
+`.lpc-toolkit/asset-packs/` are reproducible manager-owned state.
+
+Workspace creation needs no base assets. The first later command that needs
+catalog data or pixels prepares or reuses the existing pinned, verified managed
+cache with the workspace root as its working context. A valid cache is reused
+offline. Artist commands never write the pack into that cache, checked-in
+assets, or `upstream/`.
+
+### Phase 1 asset commands and options
+
+Every leaf command accepts `--help`; every command below also accepts `--json`.
+
+| Command | Options and behavior |
+| --- | --- |
+| `asset workspace init <directory>` | Create or reopen the exact standalone workspace. It does not accept `--workspace` and does not prepare runtime assets. |
+| `asset init --new` | Requires `--pack-id`, `--display-name`, `--asset-id`, `--type`, one or more `--body-type`, one or more `--animation`, one or more `--author`, and one or more `--license`. Optional: `--version` (default `0.1.0`), repeatable `--url`, `--notes`, `--advanced`, `--out`, and `--workspace`. |
+| `asset init --from-audit <report.json>` | Requires the common pack/credit options plus at least one repeatable `--item` or `--type`. Repeatable `--animation` and `--body-type` narrow the report selection. Optional: `--version`, repeatable `--url`, `--notes`, `--out`, and `--workspace`. It is mutually exclusive with `--new`. |
+| `asset validate <pack-directory>` | Validate the strict manifest, active catalog, complete PNG geometry/pixels, credits, ownership, conflicts, and acknowledgements. Optional: `--workspace`. |
+| `asset preview <pack-directory>` | Build a temporary overlay and write attributed PNG, metadata, TXT credits, and CSV credits below `<pack>/previews/<asset-id>/` without changing active sync state. Optional: `--asset`, `--animation`, `--body-type`, `--character <selection.json>`, and `--workspace`. The default preview uses a standard farmer body. |
+| `asset sync <pack-directory>` | Validate all active linked packs, rebuild the complete desired overlay, and link this source pack in the workspace registry. Optional: `--workspace`. |
+
+Common scaffold credit flags are repeatable `--author <name>`,
+`--license <license>`, and `--url <url>`; `--notes <text>` supplies credit
+context. `--out <directory>` must remain below this workspace's
+`artist-packs/`. The advanced new-item mode adds a sibling authoring README but
+keeps `asset-pack.json` strict JSON.
+
+Audit scaffolding accepts only a complete successful
+`catalog audit-animations --json` response. `unsupported` findings preserve
+their inferred or manual-review evidence; inferred destinations remain warnings
+until accepted and acknowledged. `missingFiles` uses the report's exact path.
+`blankFrames` cannot be scaffolded in Phase 1, and audit `errors` never become
+drawing tasks. Recolors remain consumer metadata rather than extra source PNGs.
+If any selected finding is not scaffoldable, no partial pack is published.
+
+Validation errors always block preview and sync. Warnings also block until the
+manifest contains the exact acknowledgement record returned by validation,
+bound to its diagnostic code, structured subject, and current content digest,
+with a non-empty human reason. Changing substantive manifest data or a source
+PNG invalidates the acknowledgement; changing only the acknowledgement array
+does not change the content digest. There is no broad force or ignore-warnings
+flag.
+
+Sync compiles every active linked pack in deterministic order and rejects path,
+semantic-field, baseline-digest, credit, or ownership conflicts instead of
+using last-write-wins. It stages the complete overlay and registry before
+publication. If an in-process publication step fails, it rolls the previous
+manager-owned output and registry back byte-for-byte; persistent crash journals
+and recovery are not part of Phase 1.
+
+Human-readable successes go to stdout. Human diagnostics and cache progress go
+to stderr. With `--json`, the response envelope is written to stdout and
+progress remains on stderr. Successful commands exit `0`; fatal input/runtime
+failures exit `1`. `asset validate` returns a completed response with
+`data.valid: false` and exits `1` when findings block the pack.
+
+Phase 1 ends at local validation, attributed preview, and linked sync. The
+distribution/lifecycle commands `asset pack`, `asset inspect`, `asset install`,
+`asset list`, upgrade/downgrade, `asset remove`, and `asset doctor`, along with
+archive security and crash-journal recovery, are deferred to Phase 2. Browser
+upload, Web validation/editing, acknowledgement UI, and corrected-pack download
+are deferred to Phase 3; the current Web editor is not an asset-pack authoring
+surface.
+
 ### Codex Plugin
 
 1. Install or upgrade the CLI to the range supported by plugin `0.2.0`:

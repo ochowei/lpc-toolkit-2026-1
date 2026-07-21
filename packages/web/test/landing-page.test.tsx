@@ -57,4 +57,30 @@ describe('LandingPage', () => {
     expect(html).not.toContain('lpc-toolkit selection validate');
     expect(html).not.toContain('lpc-toolkit token encode');
   });
+
+  it('documents the public CLI artist workflow without requiring a repository clone', () => {
+    const html = renderToStaticMarkup(<LandingPage onNavigate={() => {}} />)
+      .replaceAll('&quot;', '"')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>');
+    const commands = [
+      'npm install -g @lpc-toolkit/cli',
+      'lpc-toolkit asset workspace init ./my-lpc-art',
+      'cd ./my-lpc-art',
+      'lpc-toolkit asset init --new --pack-id acme.fantasy-hair --asset-id moon-braid --display-name "Moon Braid" --type hair --body-type male --body-type female --animation walk --animation climb --author Alice --license "CC-BY-SA 4.0" --url https://example.com/acme/fantasy-hair',
+      'lpc-toolkit asset validate ./artist-packs/<pack-id>',
+      'lpc-toolkit asset preview ./artist-packs/<pack-id>',
+      'lpc-toolkit asset sync ./artist-packs/<pack-id>',
+    ];
+    const positions = commands.map((command) => {
+      expect(html).toContain(command);
+      return html.indexOf(command);
+    });
+
+    expect(positions).toEqual([...positions].sort((left, right) => left - right));
+    expect(html).toContain('artist-packs/<pack-id>/sprites/');
+    expect(html).toContain('You do not need to clone this repository');
+    expect(html).toContain('Phase 2');
+    expect(html).toContain('Phase 3');
+  });
 });

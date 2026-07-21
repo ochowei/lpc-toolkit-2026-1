@@ -123,6 +123,32 @@ troubleshooting.
 
 Final render output includes a standalone `<name>.viewer.html` offline animation viewer.
 
+### Artist asset-pack quick start
+
+Artists can create, validate, preview, and locally sync a Phase 1 asset pack
+using only the public CLI. You do not need to clone this repository or
+initialize `upstream/`.
+
+```sh
+npm install -g @lpc-toolkit/cli
+lpc-toolkit asset workspace init ./my-lpc-art
+cd ./my-lpc-art
+lpc-toolkit asset init --new --pack-id acme.fantasy-hair --asset-id moon-braid --display-name "Moon Braid" --type hair --body-type male --body-type female --animation walk --animation climb --author Alice --license "CC-BY-SA 4.0" --url https://example.com/acme/fantasy-hair
+lpc-toolkit asset validate ./artist-packs/<pack-id>
+lpc-toolkit asset preview ./artist-packs/<pack-id>
+lpc-toolkit asset sync ./artist-packs/<pack-id>
+```
+
+Put complete animation PNGs under
+`artist-packs/<pack-id>/sprites/`. The detailed
+[CLI asset-authoring guide](packages/cli/README.md#artist-asset-pack-authoring-phase-1)
+documents audit-derived scaffolds, acknowledgements, workspace ownership,
+cache behavior, output, and exit semantics.
+
+Phase 1 is local authoring only. Pack/install/upgrade/remove/doctor lifecycle
+commands remain deferred to Phase 2, and Web asset-pack authoring remains
+deferred to Phase 3.
+
 Catalog and character searches return 20 items by default. Use `--limit 20`
 to set a bounded page size, `--offset 20` (or the returned `page.nextOffset`)
 to continue the same result set, and `--all` only when an explicit unbounded

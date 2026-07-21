@@ -25,6 +25,8 @@ LPC behavior:
 - animation extraction and frame slicing
 - pure playback descriptions for composed standard and custom animations
 - credits and attribution manifests
+- strict artist asset-pack schema, normalized models, validation decisions,
+  warning acknowledgements, and deterministic compile plans
 - hash/token serialization and parsing
 - the canonical character document and pure upstream compatibility adapter
 - static asset validation
@@ -139,6 +141,9 @@ not modify `upstream/`.
 - metadata, credits, animation, frame, and ZIP artifact writing
 - self-contained offline animation viewer generation
 - token and preset commands for automation
+- standalone artist-workspace discovery and ownership
+- artist pack scaffolding, PNG inspection, attributed preview, linked-pack
+  registry orchestration, and rollback-safe generated-overlay publication
 
 CLI code may use Node APIs, `@napi-rs/canvas` (MIT), and `jszip` (MIT) because
 it is a Node runtime package. Those dependencies must not move into
@@ -374,6 +379,69 @@ The `AssetStore` port isolates logical sprite lookup from storage. A complete
 local tree uses `createDirectoryAssetStore`; the managed compressed cache uses
 `createZipAssetStore`, its sprite index, and lazy category ZIP reads. Both stay
 inside `packages/cli/` and supply core through its injected image-loading port.
+
+### Phase 1 artist asset-pack flow
+
+Core owns the strict `lpc-toolkit.asset-pack.v1` source schema, normalized pack
+identity and body/layer inheritance, catalog and geometry validation,
+acknowledgement matching, deterministic patch/credit/conflict decisions, and
+the compile plan. These are pure values: Core receives catalog, palette,
+source-digest, and pixel-inspection inputs and never reads an artist workspace
+or imports Node filesystem/canvas implementations.
+
+The CLI owns the `lpc-toolkit.asset-workspace.v1` marker/config contract and
+the filesystem flow:
+
+```text
+artist-packs/<pack-id>/asset-pack.json + sprites/
+  -> safe read and complete-PNG inspection
+  -> Core validation and compile plan
+  -> temporary attributed preview, or complete linked desired state
+  -> manager-owned assets_custom/ plus registry.json
+```
+
+The compile baseline is the active base catalog plus any explicitly supplied
+unmanaged baseline, with this workspace's manager-generated output excluded.
+That exclusion prevents the generated overlay from changing its own baseline
+definition and credit digests. Artist source remains below `artist-packs/`;
+manager output never becomes source input.
+
+The Phase 1 registry records linked source directories, content/source digests,
+baseline definition and credit digests, and every generated logical path. The
+CLI alone owns that registry and the output marker. It refuses unowned,
+mismatched, or tampered output and rebuilds all active linked packs as one
+desired state, so no pack wins implicitly by write order.
+
+Runtime composition receives an injected overlay `AssetStore`. It resolves
+only compiler-authorized generated logical paths before delegating to the
+unchanged directory or ZIP base store; arbitrary files in `assets_custom/`
+cannot shadow the base. The wrapped runtime points catalog loading at generated
+sheet definitions without mutating the prepared base runtime.
+
+New-item selection identity is stable: definition basename,
+`ItemDefinition.name`, and persisted catalog identity are all
+`<pack-id>--<local-id>`, while `display_name` remains the artist-facing label.
+Existing-item extensions retain the baseline name and identity.
+
+Attribution follows the same compile path as pixels. Each physical source has
+one complete pack credit record; extension output unions inherited baseline
+credits with the pack contribution, and an override replaces only that
+contribution. The compiler emits generated credits, overlay composition freezes
+them into `ComposedSheet.credits`, and preview/render publication writes the
+PNG plus metadata and TXT/CSV credit artifacts from that frozen manifest.
+
+Linked sync stages the complete generated overlay and registry, validates all
+paths and credits, and only then publishes. Any caught in-process publication
+failure restores the previous manager-owned output and registry byte-for-byte.
+Persistent crash journaling and recovery are outside that rollback boundary.
+
+Phase 1 includes workspace initialization, new and audit-derived scaffolding,
+validation, attributed preview, linked sync, and overlay rendering only.
+Packing, archive inspection/security, install, upgrade/downgrade, list, remove,
+doctor, and crash-journal recovery are deferred to Phase 2. Browser upload,
+validation/editing, acknowledgement UI, temporary browser overlays, and pack
+download are deferred to Phase 3; the Web must later reuse the Core schema and
+must not introduce an alternate manifest format.
 
 Production asset resolution uses the local tree or pinned managed cache.
 `upstream/` is an optional read-only provenance dormant gitlink that preserves source

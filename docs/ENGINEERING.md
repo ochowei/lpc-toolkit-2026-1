@@ -104,6 +104,71 @@ rtk pnpm --filter @lpc-toolkit/cli build
 rtk pnpm --filter @lpc-toolkit/cli test:package
 ```
 
+#### Phase 1 artist asset-pack authoring
+
+Run the three focused Core modules whenever the source schema, validation, or
+compile decisions change:
+
+```sh
+rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-schema.test.ts asset-pack-validation.test.ts asset-pack-compile.test.ts
+```
+
+The seven focused CLI authoring modules cover workspace ownership, safe source
+reads, scaffolding, PNG/baseline validation, authorized overlay loading, linked
+sync/publication, and attributed preview:
+
+```sh
+rtk pnpm --filter @lpc-toolkit/cli test -- asset-workspace.test.ts asset-pack-files.test.ts asset-pack-scaffold.test.ts asset-pack-validation.test.ts asset-overlay-store.test.ts asset-pack-sync.test.ts asset-pack-preview.test.ts
+```
+
+The no-repository acceptance runs the Phase 1 workflow through `runCli` with an
+injected prepared base runtime. It covers a new item plus the `hair_messy`
+climb extension, default and supplied-character previews, two-pack sync,
+compiled-overlay rendering with base/custom credits, and the same-scope audit
+closure:
+
+```sh
+rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-e2e.test.ts
+```
+
+Landing documentation and its checked-in attributed artifacts are verified
+together:
+
+```sh
+rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifacts.test.ts
+```
+
+Run `rtk pnpm check:boundaries` for every asset-pack architecture change. Run
+the packed CLI smoke conditionally whenever CLI package metadata, build output,
+or `packages/cli/scripts/` changes; it installs the produced tarball in a clean
+consumer directory and proves `asset workspace init` needs neither a repository
+checkout nor cache/network preparation:
+
+```sh
+rtk pnpm --filter @lpc-toolkit/cli test:package
+```
+
+Before handoff, run the complete Task 12 mapping below. `rtk pnpm verify`
+repeats the shared asset-pin, boundary, CLI documentation policy, plugin,
+workspace typecheck, and workspace Vitest stages; it does not replace the
+explicit CLI build/package smoke.
+
+```sh
+rtk pnpm check:boundaries
+rtk pnpm --filter @lpc-toolkit/core run typecheck
+rtk pnpm --filter @lpc-toolkit/core test
+rtk pnpm --filter @lpc-toolkit/cli run typecheck
+rtk pnpm --filter @lpc-toolkit/cli test
+rtk pnpm --filter @lpc-toolkit/cli build
+rtk pnpm --filter @lpc-toolkit/cli test:package
+rtk pnpm --filter @lpc-toolkit/web test
+rtk pnpm verify
+```
+
+These checks require no initialized `upstream/`. The package smoke may require
+network access for a clean npm dependency install and first pinned-cache
+preparation; valid existing caches are reusable offline.
+
 ### Codex plugin
 
 ```sh

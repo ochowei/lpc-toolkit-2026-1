@@ -205,6 +205,86 @@ try {
   const decodeOutput = JSON.parse(decodeResult.stdout);
   assert.equal(decodeOutput.data?.selection?.items?.hair?.name, 'Braid');
 
+  const workspaceRoot = path.join(emptyCwd, 'my-lpc-art');
+  const workspaceCacheRoot = path.join(emptyCwd, '.workspace-cache');
+  const workspaceInvocation = installedCliInvocation({
+    platform: process.platform,
+    nodePath: process.execPath,
+    shimPath: installedBinPath,
+    targetPath: installedBinTargetPath,
+    args: ['asset', 'workspace', 'init', workspaceRoot, '--json'],
+  });
+  const workspaceResult = spawnSync(
+    workspaceInvocation.command,
+    workspaceInvocation.args,
+    {
+      cwd: emptyCwd,
+      encoding: 'utf8',
+      env: { ...process.env, LPC_TOOLKIT_CACHE_DIR: workspaceCacheRoot },
+    },
+  );
+  assert.equal(workspaceResult.status, 0, workspaceResult.stderr);
+  assert.equal(
+    workspaceResult.stderr,
+    '',
+    'asset workspace init must not prepare or download runtime assets',
+  );
+  assert.equal(
+    existsSync(workspaceCacheRoot),
+    false,
+    'asset workspace init must not create the managed cache root',
+  );
+  assert.equal(existsSync(path.join(emptyCwd, '.git')), false);
+  assert.equal(existsSync(path.join(emptyCwd, 'assets')), false);
+  assert.equal(existsSync(path.join(workspaceRoot, '.git')), false);
+  assert.equal(existsSync(path.join(workspaceRoot, 'assets')), false);
+
+  const workspaceOutput = JSON.parse(workspaceResult.stdout);
+  assert.equal(workspaceOutput.ok, true);
+  assert.equal(workspaceOutput.command, 'asset workspace init');
+  assert.equal(workspaceOutput.data?.root, workspaceRoot);
+  assert.equal(
+    workspaceOutput.data?.configPath,
+    path.join(workspaceRoot, 'lpc-asset-workspace.json'),
+  );
+  assert.equal(workspaceOutput.data?.packsRoot, path.join(workspaceRoot, 'artist-packs'));
+  assert.equal(workspaceOutput.data?.outputRoot, path.join(workspaceRoot, 'assets_custom'));
+  assert.equal(
+    workspaceOutput.data?.stateRoot,
+    path.join(workspaceRoot, '.lpc-toolkit', 'asset-packs'),
+  );
+  assert.equal(
+    workspaceOutput.data?.registryPath,
+    path.join(workspaceRoot, '.lpc-toolkit', 'asset-packs', 'registry.json'),
+  );
+  assert.deepEqual(
+    JSON.parse(readFileSync(path.join(workspaceRoot, 'lpc-asset-workspace.json'), 'utf8')),
+    {
+      schema: 'lpc-toolkit.asset-workspace.v1',
+      packsDirectory: 'artist-packs',
+      outputDirectory: 'assets_custom',
+      stateDirectory: '.lpc-toolkit/asset-packs',
+    },
+  );
+  assert.deepEqual(readdirSync(path.join(workspaceRoot, 'artist-packs')), []);
+  const outputMarker = JSON.parse(
+    readFileSync(
+      path.join(workspaceRoot, 'assets_custom', '.lpc-toolkit-managed.json'),
+      'utf8',
+    ),
+  );
+  assert.equal(outputMarker.schema, 'lpc-toolkit.asset-output.v1');
+  assert.equal(typeof outputMarker.workspaceId, 'string');
+  assert.ok(outputMarker.workspaceId.length > 0);
+  assert.deepEqual(
+    readdirSync(path.join(workspaceRoot, 'assets_custom')),
+    ['.lpc-toolkit-managed.json'],
+  );
+  assert.deepEqual(
+    readdirSync(path.join(workspaceRoot, '.lpc-toolkit', 'asset-packs')).sort(),
+    ['installed', 'staging', 'validation'],
+  );
+
   cacheRoot = mkdtempSync(path.join(os.tmpdir(), 'lpc-toolkit-cache-'));
   const webInvocation = installedCliInvocation({
     platform: process.platform,
