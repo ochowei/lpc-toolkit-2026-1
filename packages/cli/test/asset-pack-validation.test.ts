@@ -44,12 +44,37 @@ vi.mock('@napi-rs/canvas', async (importOriginal) => {
   return {
     ...actual,
     loadImage: vi.fn(async (source: Parameters<typeof actual.loadImage>[0]) => {
-      if (
-        Buffer.isBuffer(source)
-        && source.byteLength >= 24
-        && (source.readUInt32BE(16) > 8_192 || source.readUInt32BE(20) > 8_192)
-      ) {
-        throw new Error('Test decoder guard rejected oversized PNG geometry.');
+      if (Buffer.isBuffer(source) && source.byteLength >= 33) {
+        const bitDepth = source[24];
+        const colorType = source[25];
+        const validBitDepths = new Map<number, readonly number[]>([
+          [0, [1, 2, 4, 8, 16]],
+          [2, [8, 16]],
+          [3, [1, 2, 4, 8]],
+          [4, [8, 16]],
+          [6, [8, 16]],
+        ]);
+        let crc = 0xffff_ffff;
+        for (const byte of source.subarray(12, 29)) {
+          crc ^= byte;
+          for (let bit = 0; bit < 8; bit += 1) {
+            crc = (crc >>> 1) ^ (crc & 1 ? 0xedb8_8320 : 0);
+          }
+        }
+        const ihdrCrc = (crc ^ 0xffff_ffff) >>> 0;
+        if (
+          source.readUInt32BE(16) > 8_192
+          || source.readUInt32BE(20) > 8_192
+          || bitDepth === undefined
+          || colorType === undefined
+          || !validBitDepths.get(colorType)?.includes(bitDepth)
+          || source[26] !== 0
+          || source[27] !== 0
+          || (source[28] !== 0 && source[28] !== 1)
+          || source.readUInt32BE(29) !== ihdrCrc
+        ) {
+          throw new Error('Test decoder guard rejected unsafe PNG IHDR data.');
+        }
       }
       return actual.loadImage(source);
     }),
@@ -126,6 +151,13 @@ function requiredCells(animation: AnimationName): readonly string[] {
   );
 }
 
+function filledRequiredCells(animation: AnimationName): Readonly<Record<string, string>> {
+  return Object.fromEntries(requiredCells(animation).map((cell, index) => [
+    cell,
+    index % 2 === 0 ? '#111111' : '#222222',
+  ]));
+}
+
 function writeSheetPng(
   filePath: string,
   animation: AnimationName,
@@ -173,6 +205,21 @@ function sheetPng(
   return canvas.toBuffer('image/png');
 }
 
+function pngCrc32(bytes: Buffer): number {
+  let crc = 0xffff_ffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb8_8320 : 0);
+    }
+  }
+  return (crc ^ 0xffff_ffff) >>> 0;
+}
+
+function rewriteIhdrCrc(bytes: Buffer): void {
+  bytes.writeUInt32BE(pngCrc32(bytes.subarray(12, 29)), 29);
+}
+
 function pngWithDeclaredDimensions(
   animation: AnimationName,
   width: number,
@@ -184,6 +231,7 @@ function pngWithDeclaredDimensions(
   ));
   bytes.writeUInt32BE(width, 16);
   bytes.writeUInt32BE(height, 20);
+  rewriteIhdrCrc(bytes);
   return bytes;
 }
 
@@ -479,7 +527,7 @@ describe('loadActiveAssetPackBaseline', () => {
 describe('validateAssetPackDirectory', () => {
   it.each([
     { label: 'wrong', width: 512, height: 256 },
-    { label: 'huge', width: 0xffff_ffff, height: 0xffff_ffff },
+    { label: 'huge', width: 0x7fff_ffff, height: 0x7fff_ffff },
   ])('rejects $label captured IHDR geometry before canvas decode', async ({ width, height }) => {
     const sourcePath = 'sprites/wind-braid/climb.png';
     const payload = parseAssetPackPayload({
@@ -511,7 +559,7 @@ describe('validateAssetPackDirectory', () => {
 
   it('rejects a truncated captured IHDR before canvas decode', async () => {
     const sourcePath = 'sprites/wind-braid/climb.png';
-    const truncated = sheetPng('climb', {}).subarray(0, 24);
+    const truncated = sheetPng('climb', {}).subarray(0, 32);
     const payload = parseAssetPackPayload({
       manifestBytes: Buffer.from(JSON.stringify(newItemSource([
         { animation: 'climb', source: sourcePath },
@@ -535,20 +583,57 @@ describe('validateAssetPackDirectory', () => {
     expect(canvasLoadImage).not.toHaveBeenCalled();
   });
 
-  it('decodes exact captured IHDR geometry and delegates corrupt CRC detection to canvas', async () => {
+  it.each([
+    { label: 'invalid bit-depth/color-type pairing', offset: 24, value: 4 },
+    { label: 'invalid color type', offset: 25, value: 1 },
+    { label: 'invalid compression method', offset: 26, value: 1 },
+    { label: 'invalid filter method', offset: 27, value: 1 },
+    { label: 'invalid interlace method', offset: 28, value: 2 },
+  ])('rejects exact-dimension captured IHDR with $label before canvas decode', async ({
+    offset,
+    value,
+  }) => {
+    const sourcePath = 'sprites/wind-braid/climb.png';
+    const malformed = Buffer.from(sheetPng(
+      'climb',
+      Object.fromEntries(requiredCells('climb').map((cell) => [cell, '#111111'])),
+    ));
+    malformed[offset] = value;
+    rewriteIhdrCrc(malformed);
+    const payload = parseAssetPackPayload({
+      manifestBytes: Buffer.from(JSON.stringify(newItemSource([
+        { animation: 'climb', source: sourcePath },
+      ]))),
+      sourceBytes: new Map([[sourcePath, malformed]]),
+    });
+    expect(payload.ok).toBe(true);
+    if (!payload.ok) throw new Error('Expected captured payload parsing to succeed.');
+
+    const report = await validateAssetPackPayload({
+      payload,
+      runtime: createRuntimeFixture().runtime,
+      origin: 'memory://acme.wind-braid',
+    });
+
+    expect(report.valid).toBe(false);
+    expect(report.diagnostics).toContainEqual(expect.objectContaining({
+      code: 'asset_png_decode_failed',
+      sourcePath,
+    }));
+    expect(canvasLoadImage).not.toHaveBeenCalled();
+  });
+
+  it('decodes exact captured IHDR geometry but rejects a corrupt IHDR CRC before canvas decode', async () => {
     const sourcePath = 'sprites/wind-braid/climb.png';
     const exact = sheetPng(
       'climb',
-      Object.fromEntries(requiredCells('climb').map((cell) => [cell, '#111111'])),
+      filledRequiredCells('climb'),
     );
     const corruptCrc = Buffer.from(exact);
     corruptCrc[29] = (corruptCrc[29] ?? 0) ^ 0xff;
 
     for (const [bytes, expectedValid] of [[exact, true], [corruptCrc, false]] as const) {
       canvasLoadImage.mockClear();
-      if (!expectedValid) {
-        canvasLoadImage.mockRejectedValueOnce(new Error('Corrupt PNG CRC.'));
-      }
       const payload = parseAssetPackPayload({
         manifestBytes: Buffer.from(JSON.stringify(newItemSource([
           { animation: 'climb', source: sourcePath },
@@ -565,7 +650,7 @@ describe('validateAssetPackDirectory', () => {
       });
 
       expect(report.valid).toBe(expectedValid);
-      expect(canvasLoadImage).toHaveBeenCalledTimes(1);
+      expect(canvasLoadImage).toHaveBeenCalledTimes(expectedValid ? 1 : 0);
       if (!expectedValid) {
         expect(report.diagnostics).toContainEqual(expect.objectContaining({
           code: 'asset_png_decode_failed',
@@ -575,6 +660,42 @@ describe('validateAssetPackDirectory', () => {
     }
   });
 
+  it('enforces configured recolor source ramps identically for directory and captured payloads', async () => {
+    const sourcePath = 'sprites/wind-braid/climb.png';
+    const source = newItemSource([{ animation: 'climb', source: sourcePath }]);
+    const sourceBytes = sheetPng(
+      'climb',
+      Object.fromEntries(requiredCells('climb').map((cell) => [cell, '#333333'])),
+    );
+    const runtime = createRuntimeFixture().runtime;
+    const packRoot = createDirectory('lpc-asset-pack-validation-recolor-');
+    writePack(packRoot, source, { [sourcePath]: sourceBytes });
+    const loaded = loadAssetPackFiles(packRoot);
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) throw new Error('Expected asset-pack files to load.');
+
+    const directoryReport = await validateAssetPackDirectory({ packDirectory: packRoot, runtime });
+    const payloadReport = await validateAssetPackPayload({
+      payload: loaded,
+      runtime,
+      origin: packRoot,
+    });
+
+    expect(directoryReport.valid).toBe(false);
+    expect(payloadReport.valid).toBe(false);
+    expect(payloadReport.diagnostics).toEqual(directoryReport.diagnostics);
+    expect(directoryReport.diagnostics).toContainEqual(expect.objectContaining({
+      code: 'asset_pack_schema_invalid',
+      sourcePath,
+      message: `Configured recolor source ramp is not present in ${sourcePath}.`,
+      details: expect.objectContaining({
+        path: '$.assets[0].recolor',
+        requiredColors: ['#111111', '#222222'],
+        missingColors: ['#111111', '#222222'],
+      }),
+    }));
+  });
+
   it('validates captured payload PNG bytes without a pack directory', async () => {
     const sourcePath = 'sprites/wind-braid/climb.png';
     const source = newItemSource([{ animation: 'climb', source: sourcePath }]);
@@ -582,9 +703,7 @@ describe('validateAssetPackDirectory', () => {
       manifestBytes: Buffer.from(JSON.stringify(source)),
       sourceBytes: new Map([[
         sourcePath,
-        sheetPng('climb', Object.fromEntries(
-          requiredCells('climb').map((cell) => [cell, '#111111']),
-        )),
+        sheetPng('climb', filledRequiredCells('climb')),
       ]]),
     });
     expect(payload.ok).toBe(true);

@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import {
   mkdirSync,
   mkdtempSync,
@@ -7,6 +8,7 @@ import {
 } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createCanvas } from '@napi-rs/canvas';
 import {
   ASSET_PACK_SCHEMA,
@@ -34,6 +36,7 @@ import type { RuntimeAssets } from '../src/runtime-assets.js';
 const temporaryDirectories: string[] = [];
 const SOURCE_PATH = 'sprites/wind-braid/climb.png';
 const ARCHIVE_PATH = '/fixtures/acme.wind-braid.lpc-assets.zip';
+const CLI_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const PACK_CREDITS = {
   authors: ['Alice'],
@@ -261,6 +264,57 @@ async function uncheckedArchive(
   });
 }
 
+function inspectArchiveInIsolatedProcess(
+  archivePath: string,
+  assetsRoot: string,
+): ReturnType<typeof spawnSync> {
+  const inspectionUrl = new URL('../src/asset-pack-inspection.ts', import.meta.url).href;
+  const assetStoreUrl = new URL('../src/asset-store.ts', import.meta.url).href;
+  const contextUrl = new URL('../src/context.ts', import.meta.url).href;
+  const probe = `
+    import { readFileSync } from 'node:fs';
+    import path from 'node:path';
+    import { inspectAssetPackArchive } from ${JSON.stringify(inspectionUrl)};
+    import { createDirectoryAssetStore } from ${JSON.stringify(assetStoreUrl)};
+    import { createRuntimeContext } from ${JSON.stringify(contextUrl)};
+
+    const [archivePath, assetsRoot] = process.argv.slice(1);
+    if (!archivePath || !assetsRoot) throw new Error('Missing probe paths.');
+    const store = createDirectoryAssetStore(assetsRoot);
+    const result = await inspectAssetPackArchive({
+      archivePath,
+      archiveBytes: readFileSync(archivePath),
+      runtime: {
+        context: createRuntimeContext({
+          cwd: path.dirname(assetsRoot),
+          assetsRoot,
+          spritesheetsBaseUrl: store.baseUrl,
+        }),
+        store,
+        source: 'working-directory',
+      },
+    });
+    process.stdout.write(JSON.stringify({
+      report: result.report,
+      hasSnapshot: result.snapshot !== undefined,
+    }));
+  `;
+
+  return spawnSync(process.execPath, [
+    '--import',
+    'tsx',
+    '--input-type=module',
+    '--eval',
+    probe,
+    archivePath,
+    assetsRoot,
+  ], {
+    cwd: CLI_ROOT,
+    encoding: 'utf8',
+    timeout: 15_000,
+  });
+}
+
 afterEach(() => {
   for (const directory of temporaryDirectories.splice(0)) {
     rmSync(directory, { recursive: true, force: true });
@@ -404,6 +458,81 @@ describe('inspectAssetPackArchive report and captured-byte validation', () => {
     expect(serialized).not.toContain('archiveBytes');
     expect(serialized).not.toContain('manifestBytes');
     expect(JSON.parse(serialized)).toEqual(result.report);
+  });
+
+  it('rejects a corrupt IHDR CRC without entering the native decoder process', async () => {
+    const runtime = createRuntimeFixture();
+    const corruptIhdr = Buffer.from(sheetPng('climb', filledRequiredCells('climb')));
+    corruptIhdr[29] = (corruptIhdr[29] ?? 0) ^ 0xff;
+    const archiveBytes = await archiveFor(
+      newItemSource(),
+      new Map([[SOURCE_PATH, corruptIhdr]]),
+    );
+    const archivePath = path.join(
+      createDirectory('lpc-asset-pack-corrupt-ihdr-'),
+      'corrupt-ihdr.lpc-assets.zip',
+    );
+    writeFileSync(archivePath, archiveBytes);
+
+    const probe = inspectArchiveInIsolatedProcess(
+      archivePath,
+      runtime.context.assetsRoot,
+    );
+
+    const stderr = probe.stderr?.toString() ?? '';
+    expect(probe.signal, stderr).toBeNull();
+    expect(probe.status, stderr).toBe(0);
+    const result = JSON.parse(probe.stdout?.toString() ?? '') as {
+      readonly report: { readonly valid: boolean; readonly diagnostics: readonly { readonly code: string }[] };
+      readonly hasSnapshot: boolean;
+    };
+    expect(result.report.valid).toBe(false);
+    expect(result.report.diagnostics).toContainEqual(expect.objectContaining({
+      code: 'asset_png_decode_failed',
+    }));
+    expect(result.hasSnapshot).toBe(false);
+  });
+
+  it('requires the configured runtime recolor source ramp in captured PNG colors', async () => {
+    const matching = await inspectAssetPackArchive({
+      archivePath: ARCHIVE_PATH,
+      archiveBytes: await archiveFor(newItemSource()),
+      runtime: createRuntimeFixture(),
+    });
+    expect(matching.report.valid).toBe(true);
+    expect(matching.snapshot).toBeDefined();
+
+    const missingRampArchive = await archiveFor(
+      newItemSource(),
+      new Map([[SOURCE_PATH, sheetPng(
+        'climb',
+        Object.fromEntries(requiredCells('climb').map((cell) => [cell, '#333333'])),
+      )]]),
+    );
+    const missing = await inspectAssetPackArchive({
+      archivePath: ARCHIVE_PATH,
+      archiveBytes: missingRampArchive,
+      runtime: createRuntimeFixture(),
+    });
+    const repeated = await inspectAssetPackArchive({
+      archivePath: ARCHIVE_PATH,
+      archiveBytes: missingRampArchive,
+      runtime: createRuntimeFixture(),
+    });
+
+    expect(missing.report.valid).toBe(false);
+    expect(missing.report.diagnostics).toContainEqual(expect.objectContaining({
+      code: 'asset_pack_schema_invalid',
+      sourcePath: SOURCE_PATH,
+      message: `Configured recolor source ramp is not present in ${SOURCE_PATH}.`,
+      details: expect.objectContaining({
+        path: '$.assets[0].recolor',
+        requiredColors: ['#111111', '#222222'],
+        missingColors: ['#111111', '#222222'],
+      }),
+    }));
+    expect(repeated.report.diagnostics).toEqual(missing.report.diagnostics);
+    expect(missing).not.toHaveProperty('snapshot');
   });
 
   it('validates required cells and runtime recolor palettes from captured PNG bytes', async () => {

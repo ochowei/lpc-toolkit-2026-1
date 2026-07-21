@@ -24,6 +24,8 @@ import {
   type ItemId,
   type NormalizedAssetPack,
   type PaletteMetadata,
+  type RawRecolors,
+  type RecolorConfig,
 } from '@lpc-toolkit/core';
 import type { AssetWorkspace } from './asset-workspace.js';
 import type { AssetPackFilesSuccess } from './asset-pack-files.js';
@@ -69,6 +71,14 @@ const INSPECTION_CONCURRENCY = 4;
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const PNG_IHDR_LENGTH = 13;
 const PNG_IHDR_END = 33;
+const PNG_MAX_DIMENSION = 0x7fff_ffff;
+const PNG_BIT_DEPTHS_BY_COLOR_TYPE: Readonly<Record<number, readonly number[]>> = {
+  0: [1, 2, 4, 8, 16],
+  2: [8, 16],
+  3: [1, 2, 4, 8],
+  4: [8, 16],
+  6: [8, 16],
+};
 
 function sha256Buffer(buffer: Buffer): string {
   return createHash('sha256').update(buffer).digest('hex');
@@ -314,6 +324,17 @@ function geometryForEveryDeclaredUse(
     : undefined;
 }
 
+function pngCrc32(bytes: Buffer): number {
+  let crc = 0xffff_ffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb8_8320 : 0);
+    }
+  }
+  return (crc ^ 0xffff_ffff) >>> 0;
+}
+
 function readPngIhdrGeometry(bytes: Buffer): {
   readonly width: number;
   readonly height: number;
@@ -329,7 +350,23 @@ function readPngIhdrGeometry(bytes: Buffer): {
 
   const width = bytes.readUInt32BE(16);
   const height = bytes.readUInt32BE(20);
-  if (width === 0 || height === 0) return undefined;
+  const bitDepth = bytes[24];
+  const colorType = bytes[25];
+  if (
+    width === 0
+    || height === 0
+    || width > PNG_MAX_DIMENSION
+    || height > PNG_MAX_DIMENSION
+    || bitDepth === undefined
+    || colorType === undefined
+    || !PNG_BIT_DEPTHS_BY_COLOR_TYPE[colorType]?.includes(bitDepth)
+    || bytes[26] !== 0
+    || bytes[27] !== 0
+    || (bytes[28] !== 0 && bytes[28] !== 1)
+    || bytes.readUInt32BE(29) !== pngCrc32(bytes.subarray(12, 29))
+  ) {
+    return undefined;
+  }
   return { width, height };
 }
 
@@ -410,26 +447,35 @@ async function inspectSingleSource(
     };
   }
 
-  const digest = `sha256:${sha256Buffer(readFileSync(inspected.canonicalPath))}`;
-  const adapter = createNodeCanvasAdapter();
+  const bytes = readFileSync(inspected.canonicalPath);
+  const digest = `sha256:${sha256Buffer(bytes)}`;
+  const ihdr = readPngIhdrGeometry(bytes);
+  if (!ihdr) {
+    return {
+      sourcePath,
+      digest,
+      regularFile: true,
+      error: 'decode-failed',
+    };
+  }
+
+  const matchedGeometry = geometryForDimensions(uses, ihdr.width, ihdr.height);
+  if (!matchedGeometry) {
+    return {
+      sourcePath,
+      digest,
+      regularFile: true,
+      decoded: {
+        width: ihdr.width,
+        height: ihdr.height,
+        nonTransparentCells: [],
+        paletteColors: [],
+      },
+    };
+  }
 
   try {
-    const image = await adapter.loadImage(inspected.canonicalPath);
-    const matchedGeometry = geometryForDimensions(uses, image.width, image.height);
-    if (!matchedGeometry) {
-      return {
-        sourcePath,
-        digest,
-        regularFile: true,
-        decoded: {
-          width: image.width,
-          height: image.height,
-          nonTransparentCells: [],
-          paletteColors: [],
-        },
-      };
-    }
-
+    const image = await loadCanvasImage(new Uint8Array(bytes));
     return {
       sourcePath,
       digest,
@@ -444,6 +490,137 @@ async function inspectSingleSource(
       error: 'decode-failed',
     };
   }
+}
+
+interface RecolorEntry {
+  readonly config: RecolorConfig;
+  readonly path: string;
+}
+
+function collectRecolorEntries(
+  recolor: RawRecolors | undefined,
+  pathValue: string,
+): readonly RecolorEntry[] {
+  if (!recolor) return [];
+  const entries: RecolorEntry[] = [];
+  const multi = recolor as {
+    readonly [key: `color_${number}`]: RecolorConfig | undefined;
+  };
+  for (let index = 1; index < 10; index += 1) {
+    const config = multi[`color_${index}`];
+    if (!config) break;
+    entries.push({ config, path: `${pathValue}.color_${index}` });
+  }
+  return entries.length > 0
+    ? entries
+    : [{ config: recolor as RecolorConfig, path: pathValue }];
+}
+
+function normalizedColorRamp(colors: readonly string[]): readonly string[] | undefined {
+  if (colors.length === 0) return undefined;
+  const normalized: string[] = [];
+  for (const color of colors) {
+    const match = /^#?([0-9a-f]{6})$/i.exec(color);
+    if (!match?.[1]) return undefined;
+    normalized.push(`#${match[1].toLowerCase()}`);
+  }
+  return normalized;
+}
+
+function configuredSourceRamp(
+  config: RecolorConfig,
+  palettes: PaletteMetadata,
+): readonly string[] | undefined {
+  if (config.source) return normalizedColorRamp(config.source);
+
+  const material = palettes.materials[config.material];
+  if (!material) return undefined;
+  let base = config.base;
+  if (!base) {
+    if (!material.default || !material.base) return undefined;
+    base = `${material.default}.${material.base}`;
+  } else if (!base.includes('.')) {
+    if (!material.default) return undefined;
+    base = `${material.default}.${base}`;
+  }
+
+  const [version, recolor] = base.split('.');
+  if (!version || !recolor) return undefined;
+  const ramp = material.palettes[version]?.[recolor];
+  return ramp ? normalizedColorRamp(ramp) : undefined;
+}
+
+function requiredCells(geometry: AnimationAuditGeometry): readonly string[] {
+  return geometry.rows.flatMap((row) =>
+    row.cells.map((cell) => `${row.sourceRow}:${cell.sourceColumn}`),
+  );
+}
+
+function validateRecolorSourceRamps(
+  pack: NormalizedAssetPack,
+  palettes: PaletteMetadata,
+  inspections: readonly AssetPackSourceInspection[],
+): readonly AssetPackDiagnostic[] {
+  const diagnostics: AssetPackDiagnostic[] = [];
+  const inspectionMap = new Map(inspections.map((inspection) => [
+    inspection.sourcePath,
+    inspection,
+  ]));
+  const uses = collectSourceUses(pack);
+
+  pack.assets.forEach((asset, assetIndex) => {
+    if (asset.kind !== 'new-item' || !asset.recolor) return;
+    const entries = collectRecolorEntries(
+      asset.recolor,
+      `$.assets[${assetIndex}].recolor`,
+    );
+    const sourcePaths = [...new Set(asset.layers.flatMap((layer) =>
+      layer.sprites.map((sprite) => sprite.source),
+    ))].sort((left, right) => left.localeCompare(right));
+
+    for (const sourcePath of sourcePaths) {
+      const inspection = inspectionMap.get(sourcePath);
+      const sourceUses = uses.get(sourcePath) ?? [];
+      if (!inspection?.decoded || inspection.error) continue;
+      const geometry = geometryForEveryDeclaredUse(
+        sourceUses,
+        inspection.decoded.width,
+        inspection.decoded.height,
+      );
+      if (!geometry) continue;
+      const presentCells = new Set(inspection.decoded.nonTransparentCells);
+      if (requiredCells(geometry).some((cell) => !presentCells.has(cell))) continue;
+      const presentColors = new Set(inspection.decoded.paletteColors);
+
+      for (const entry of entries) {
+        const requiredColors = configuredSourceRamp(entry.config, palettes);
+        if (!requiredColors) continue;
+        const missingColors = requiredColors.filter((color) => !presentColors.has(color));
+        if (missingColors.length === 0) continue;
+        diagnostics.push({
+          code: 'asset_pack_schema_invalid',
+          severity: 'error',
+          message: `Configured recolor source ramp is not present in ${sourcePath}.`,
+          assetId: asset.itemId,
+          sourcePath,
+          details: {
+            path: entry.path,
+            material: entry.config.material,
+            requiredColors,
+            missingColors,
+          },
+        });
+      }
+    }
+  });
+
+  return diagnostics.sort((left, right) => {
+    const leftPath = typeof left.details?.path === 'string' ? left.details.path : '';
+    const rightPath = typeof right.details?.path === 'string' ? right.details.path : '';
+    return [leftPath, left.sourcePath ?? '', left.message]
+      .join('\u0000')
+      .localeCompare([rightPath, right.sourcePath ?? '', right.message].join('\u0000'));
+  });
 }
 
 async function inspectCapturedSource(
@@ -645,6 +822,11 @@ export async function validateAssetPackPayload(options: {
     inspections,
     contentDigest: options.payload.contentDigest,
   });
+  const recolorDiagnostics = validateRecolorSourceRamps(
+    options.payload.pack,
+    baseline.palettes,
+    inspections,
+  );
   const compatibilityDiagnostics = checkAssetPackCompatibility(
     options.payload.pack,
     CLI_VERSION,
@@ -655,8 +837,8 @@ export async function validateAssetPackPayload(options: {
     packId: options.payload.pack.id,
     packDirectory: options.origin,
     contentDigest: options.payload.contentDigest,
-    valid: result.ok && compatibilityDiagnostics.length === 0,
-    diagnostics: [...compatibilityDiagnostics, ...result.diagnostics],
+    valid: result.ok && recolorDiagnostics.length === 0 && compatibilityDiagnostics.length === 0,
+    diagnostics: [...compatibilityDiagnostics, ...result.diagnostics, ...recolorDiagnostics],
     acknowledgementRecords: result.acknowledgementRecords,
   };
 }
@@ -721,6 +903,11 @@ export async function validateAssetPackDirectory(options: {
     inspections,
     contentDigest: currentDigest,
   });
+  const recolorDiagnostics = validateRecolorSourceRamps(
+    inspectedPack,
+    baseline.palettes,
+    inspections,
+  );
   const compatibilityDiagnostics = checkAssetPackCompatibility(inspectedPack, CLI_VERSION);
 
   return {
@@ -728,8 +915,8 @@ export async function validateAssetPackDirectory(options: {
     packId: inspectedPack.id,
     packDirectory: absoluteRoot,
     contentDigest: currentDigest,
-    valid: result.ok && compatibilityDiagnostics.length === 0,
-    diagnostics: [...compatibilityDiagnostics, ...result.diagnostics],
+    valid: result.ok && recolorDiagnostics.length === 0 && compatibilityDiagnostics.length === 0,
+    diagnostics: [...compatibilityDiagnostics, ...result.diagnostics, ...recolorDiagnostics],
     acknowledgementRecords: result.acknowledgementRecords,
   };
 }
