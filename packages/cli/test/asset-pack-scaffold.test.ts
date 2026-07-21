@@ -514,4 +514,75 @@ describe('scaffoldAuditAssetPack', () => {
       ],
     });
   });
+
+  it('rejects malformed successful audit findings with invalid pathConfidence and publishes no partial pack', () => {
+    const target = createDirectory('lpc-asset-pack-scaffold-audit-malformed-');
+    const reportPath = path.join(target, 'audit.json');
+    writeAuditReport(reportPath, auditEnvelope({
+      summary: {
+        itemsScanned: 2,
+        incompleteItems: 2,
+        unsupported: 1,
+        missingFiles: 1,
+        blankFrames: 0,
+        errors: 0,
+      },
+      unsupported: [{
+        itemId: 'hair_messy',
+        typeName: 'hair',
+        animation: 'climb',
+        nativeAnimations: ['walk'],
+        compatibleAnimations: ['walk'],
+        requirements: [{
+          itemId: 'hair_messy',
+          typeName: 'hair',
+          layer: 'layer_1',
+          bodyTypes: ['female'],
+          recolors: [],
+          expectedPath: 'spritesheets/hair/messy/climb/front.png',
+          pathConfidence: 'ok' as unknown as 'inferred',
+        }],
+      }],
+      missingFiles: [missingFinding(
+        'spritesheets/hair/messy/climb/back.png',
+        [{
+          itemId: 'hair_messy',
+          typeName: 'hair',
+          layer: 'layer_2',
+          bodyTypes: ['female'],
+          recolors: [],
+        }],
+      )],
+    }));
+
+    const result = scaffoldAuditAssetPack({
+      reportPath,
+      itemIds: ['hair_messy'],
+      typeNames: [],
+      animations: ['climb'],
+      bodyTypes: ['female'],
+      pack: {
+        packId: 'acme.audit-braid',
+        version: '1.0.0',
+        displayName: 'ACME Audit Braid',
+        credits: PACK_CREDITS,
+        outputDirectory: path.join(target, 'acme.audit-braid'),
+      },
+    }, {
+      definitionDigests: new Map([['hair_messy', 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa']]),
+      creditDigests: new Map([['hair_messy', 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb']]),
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      diagnostics: [
+        expect.objectContaining({
+          code: 'audit_report_invalid_v1',
+          path: '$.data.unsupported[0].requirements[0].pathConfidence',
+          message: expect.stringContaining('pathConfidence'),
+        }),
+      ],
+    });
+    expect(existsSync(path.join(target, 'acme.audit-braid'))).toBe(false);
+  });
 });

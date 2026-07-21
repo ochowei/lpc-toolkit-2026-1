@@ -161,6 +161,17 @@ function inspectSources(
       throw error;
     }
 
+    const resolvedStats = lstatSync(resolvedPath);
+    if (resolvedStats.isSymbolicLink()) {
+      diagnostics.push(sourceDiagnostic('asset_source_symlink', root, sourcePath));
+      inspections.push({
+        sourcePath,
+        regularFile: false,
+        error: 'not-regular',
+      });
+      return;
+    }
+
     let canonicalPath: string;
     try {
       canonicalPath = realpathSync.native(resolvedPath);

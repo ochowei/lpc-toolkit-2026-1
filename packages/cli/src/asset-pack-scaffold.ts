@@ -9,7 +9,10 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 import {
+  ANIMATIONS,
   ASSET_PACK_SCHEMA,
+  BODY_TYPES,
+  DIRECTIONS,
   type AssetPackCreditSource,
   type AnimationAuditConsumer,
 } from '@lpc-toolkit/core';
@@ -101,6 +104,19 @@ interface ExtendAssetDraft {
   readonly addAnimations: readonly ExtendAnimationDraft[];
 }
 
+type JsonRecord = Readonly<Record<string, unknown>>;
+
+const ANIMATION_NAMES: ReadonlySet<string> = new Set(ANIMATIONS.map(({ value }) => value));
+const BODY_TYPE_NAMES: ReadonlySet<string> = new Set<string>(BODY_TYPES);
+const DIRECTION_NAMES: ReadonlySet<string> = new Set<string>(DIRECTIONS);
+const INSPECTION_ERROR_KINDS = new Set([
+  'asset_read_failed',
+  'image_decode_failed',
+  'path_resolution_requires_selection',
+]);
+const PATH_CONFIDENCE_VALUES = new Set(['inferred', 'manual-review']);
+const LAYER_NAME = /^layer_[1-9][0-9]*$/u;
+
 function writeJson(filePath: string, value: unknown): void {
   mkdirSync(path.dirname(filePath), { recursive: true });
   writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
@@ -186,6 +202,509 @@ function scaffoldSourceDirectories(
   });
 }
 
+function invalidReportField(
+  pathValue: string,
+  message: string,
+): AssetPackScaffoldDiagnostic {
+  return {
+    code: 'audit_report_invalid_v1',
+    message,
+    path: pathValue,
+  };
+}
+
+function isRecord(value: unknown): value is JsonRecord {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readString(
+  value: unknown,
+  pathValue: string,
+  diagnostics: AssetPackScaffoldDiagnostic[],
+): string | undefined {
+  if (typeof value !== 'string' || value.length === 0) {
+    diagnostics.push(invalidReportField(pathValue, `Audit report field ${pathValue} must be a non-empty string.`));
+    return undefined;
+  }
+  return value;
+}
+
+function readOptionalString(
+  value: unknown,
+  pathValue: string,
+  diagnostics: AssetPackScaffoldDiagnostic[],
+): string | undefined {
+  if (value === undefined) return undefined;
+  return readString(value, pathValue, diagnostics);
+}
+
+function readNonNegativeInteger(
+  value: unknown,
+  pathValue: string,
+  diagnostics: AssetPackScaffoldDiagnostic[],
+): number | undefined {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+    diagnostics.push(invalidReportField(pathValue, `Audit report field ${pathValue} must be a non-negative integer.`));
+    return undefined;
+  }
+  return value;
+}
+
+function readAnimationName(
+  value: unknown,
+  pathValue: string,
+  diagnostics: AssetPackScaffoldDiagnostic[],
+): string | undefined {
+  const animation = readString(value, pathValue, diagnostics);
+  if (animation === undefined) return undefined;
+  if (!ANIMATION_NAMES.has(animation)) {
+    diagnostics.push(invalidReportField(pathValue, `Audit report field ${pathValue} must be a valid animation name.`));
+    return undefined;
+  }
+  return animation;
+}
+
+function readBodyTypeArray(
+  value: unknown,
+  pathValue: string,
+  diagnostics: AssetPackScaffoldDiagnostic[],
+): readonly string[] | undefined {
+  if (!Array.isArray(value) || value.length === 0) {
+    diagnostics.push(invalidReportField(pathValue, `Audit report field ${pathValue} must be a non-empty body type array.`));
+    return undefined;
+  }
+  const bodyTypes: string[] = [];
+  value.forEach((entry, index) => {
+    const itemPath = `${pathValue}[${index}]`;
+    const bodyType = readString(entry, itemPath, diagnostics);
+    if (bodyType === undefined) return;
+    if (!BODY_TYPE_NAMES.has(bodyType)) {
+      diagnostics.push(invalidReportField(itemPath, `Audit report field ${itemPath} must be a valid body type.`));
+      return;
+    }
+    bodyTypes.push(bodyType);
+  });
+  return bodyTypes;
+}
+
+function readStringArray(
+  value: unknown,
+  pathValue: string,
+  diagnostics: AssetPackScaffoldDiagnostic[],
+  options?: {
+    readonly allowEmpty?: boolean;
+    readonly allowedValues?: ReadonlySet<string>;
+  },
+): readonly string[] | undefined {
+  if (!Array.isArray(value) || (!(options?.allowEmpty ?? true) && value.length === 0)) {
+    diagnostics.push(invalidReportField(
+      pathValue,
+      `Audit report field ${pathValue} must be ${options?.allowEmpty ?? true ? 'an array' : 'a non-empty array'} of strings.`,
+    ));
+    return undefined;
+  }
+  const strings: string[] = [];
+  value.forEach((entry, index) => {
+    const itemPath = `${pathValue}[${index}]`;
+    const stringValue = readString(entry, itemPath, diagnostics);
+    if (stringValue === undefined) return;
+    if (options?.allowedValues && !options.allowedValues.has(stringValue)) {
+      diagnostics.push(invalidReportField(itemPath, `Audit report field ${itemPath} has an unsupported value.`));
+      return;
+    }
+    strings.push(stringValue);
+  });
+  return strings;
+}
+
+function validateConsumer(
+  value: unknown,
+  pathValue: string,
+  diagnostics: AssetPackScaffoldDiagnostic[],
+): value is AnimationAuditConsumer {
+  if (!isRecord(value)) {
+    diagnostics.push(invalidReportField(pathValue, `Audit report field ${pathValue} must be an object.`));
+    return false;
+  }
+
+  let valid = true;
+  valid = readString(value.itemId, `${pathValue}.itemId`, diagnostics) !== undefined && valid;
+  valid = readString(value.typeName, `${pathValue}.typeName`, diagnostics) !== undefined && valid;
+
+  const layer = readString(value.layer, `${pathValue}.layer`, diagnostics);
+  if (layer === undefined || !LAYER_NAME.test(layer)) {
+    if (layer !== undefined) {
+      diagnostics.push(invalidReportField(`${pathValue}.layer`, `Audit report field ${pathValue}.layer must match layer_<number>.`));
+    }
+    valid = false;
+  }
+
+  valid = readBodyTypeArray(value.bodyTypes, `${pathValue}.bodyTypes`, diagnostics) !== undefined && valid;
+  valid = readStringArray(value.recolors, `${pathValue}.recolors`, diagnostics, { allowEmpty: true }) !== undefined && valid;
+  valid = readOptionalString(value.variant, `${pathValue}.variant`, diagnostics) !== undefined || value.variant === undefined
+    ? valid
+    : false;
+  return valid;
+}
+
+function validateUnsupportedRequirement(
+  value: unknown,
+  pathValue: string,
+  diagnostics: AssetPackScaffoldDiagnostic[],
+): boolean {
+  if (!validateConsumer(value, pathValue, diagnostics) || !isRecord(value)) return false;
+
+  const pathConfidence = readString(value.pathConfidence, `${pathValue}.pathConfidence`, diagnostics);
+  if (pathConfidence === undefined || !PATH_CONFIDENCE_VALUES.has(pathConfidence)) {
+    if (pathConfidence !== undefined) {
+      diagnostics.push(invalidReportField(
+        `${pathValue}.pathConfidence`,
+        `Audit report field ${pathValue}.pathConfidence must be "inferred" or "manual-review".`,
+      ));
+    }
+    return false;
+  }
+
+  const expectedPath = readOptionalString(value.expectedPath, `${pathValue}.expectedPath`, diagnostics);
+  const manualReviewReason = readOptionalString(
+    value.manualReviewReason,
+    `${pathValue}.manualReviewReason`,
+    diagnostics,
+  );
+
+  if (pathConfidence === 'inferred') {
+    if (expectedPath === undefined) {
+      diagnostics.push(invalidReportField(
+        `${pathValue}.expectedPath`,
+        `Audit report field ${pathValue}.expectedPath is required when pathConfidence is inferred.`,
+      ));
+      return false;
+    }
+    if (manualReviewReason !== undefined) {
+      diagnostics.push(invalidReportField(
+        `${pathValue}.manualReviewReason`,
+        `Audit report field ${pathValue}.manualReviewReason must be omitted when pathConfidence is inferred.`,
+      ));
+      return false;
+    }
+    return true;
+  }
+
+  if (expectedPath !== undefined) {
+    diagnostics.push(invalidReportField(
+      `${pathValue}.expectedPath`,
+      `Audit report field ${pathValue}.expectedPath must be omitted when pathConfidence is manual-review.`,
+    ));
+    return false;
+  }
+  if (manualReviewReason === undefined) {
+    diagnostics.push(invalidReportField(
+      `${pathValue}.manualReviewReason`,
+      `Audit report field ${pathValue}.manualReviewReason is required when pathConfidence is manual-review.`,
+    ));
+    return false;
+  }
+  return true;
+}
+
+function validateUnsupportedFinding(
+  value: unknown,
+  pathValue: string,
+  diagnostics: AssetPackScaffoldDiagnostic[],
+): boolean {
+  if (!isRecord(value)) {
+    diagnostics.push(invalidReportField(pathValue, `Audit report field ${pathValue} must be an object.`));
+    return false;
+  }
+
+  let valid = true;
+  valid = readString(value.itemId, `${pathValue}.itemId`, diagnostics) !== undefined && valid;
+  valid = readString(value.typeName, `${pathValue}.typeName`, diagnostics) !== undefined && valid;
+  valid = readAnimationName(value.animation, `${pathValue}.animation`, diagnostics) !== undefined && valid;
+  valid = readStringArray(
+    value.nativeAnimations,
+    `${pathValue}.nativeAnimations`,
+    diagnostics,
+    { allowEmpty: true, allowedValues: ANIMATION_NAMES },
+  ) !== undefined && valid;
+  valid = readStringArray(
+    value.compatibleAnimations,
+    `${pathValue}.compatibleAnimations`,
+    diagnostics,
+    { allowEmpty: true, allowedValues: ANIMATION_NAMES },
+  ) !== undefined && valid;
+
+  if (!Array.isArray(value.requirements) || value.requirements.length === 0) {
+    diagnostics.push(invalidReportField(
+      `${pathValue}.requirements`,
+      `Audit report field ${pathValue}.requirements must be a non-empty array.`,
+    ));
+    return false;
+  }
+  value.requirements.forEach((requirement, index) => {
+    valid = validateUnsupportedRequirement(
+      requirement,
+      `${pathValue}.requirements[${index}]`,
+      diagnostics,
+    ) && valid;
+  });
+  return valid;
+}
+
+function validateMissingFileFinding(
+  value: unknown,
+  pathValue: string,
+  diagnostics: AssetPackScaffoldDiagnostic[],
+): boolean {
+  if (!isRecord(value)) {
+    diagnostics.push(invalidReportField(pathValue, `Audit report field ${pathValue} must be an object.`));
+    return false;
+  }
+
+  let valid = true;
+  valid = readString(value.path, `${pathValue}.path`, diagnostics) !== undefined && valid;
+  valid = readAnimationName(value.animation, `${pathValue}.animation`, diagnostics) !== undefined && valid;
+  valid = readAnimationName(value.sourceAnimation, `${pathValue}.sourceAnimation`, diagnostics) !== undefined && valid;
+
+  if (!Array.isArray(value.consumers) || value.consumers.length === 0) {
+    diagnostics.push(invalidReportField(
+      `${pathValue}.consumers`,
+      `Audit report field ${pathValue}.consumers must be a non-empty array.`,
+    ));
+    return false;
+  }
+  value.consumers.forEach((consumer, index) => {
+    valid = validateConsumer(consumer, `${pathValue}.consumers[${index}]`, diagnostics) && valid;
+  });
+  return valid;
+}
+
+function validateBlankFrame(
+  value: unknown,
+  pathValue: string,
+  diagnostics: AssetPackScaffoldDiagnostic[],
+): boolean {
+  if (!isRecord(value)) {
+    diagnostics.push(invalidReportField(pathValue, `Audit report field ${pathValue} must be an object.`));
+    return false;
+  }
+
+  let valid = true;
+  valid = readNonNegativeInteger(value.sourceColumn, `${pathValue}.sourceColumn`, diagnostics) !== undefined && valid;
+  const logicalFrameIndices = value.logicalFrameIndices;
+  if (!Array.isArray(logicalFrameIndices) || logicalFrameIndices.length === 0) {
+    diagnostics.push(invalidReportField(
+      `${pathValue}.logicalFrameIndices`,
+      `Audit report field ${pathValue}.logicalFrameIndices must be a non-empty array.`,
+    ));
+    return false;
+  }
+  logicalFrameIndices.forEach((frameIndex, index) => {
+    valid = readNonNegativeInteger(
+      frameIndex,
+      `${pathValue}.logicalFrameIndices[${index}]`,
+      diagnostics,
+    ) !== undefined && valid;
+  });
+  return valid;
+}
+
+function validateBlankFramesFinding(
+  value: unknown,
+  pathValue: string,
+  diagnostics: AssetPackScaffoldDiagnostic[],
+): boolean {
+  if (!isRecord(value)) {
+    diagnostics.push(invalidReportField(pathValue, `Audit report field ${pathValue} must be an object.`));
+    return false;
+  }
+
+  let valid = true;
+  valid = readString(value.path, `${pathValue}.path`, diagnostics) !== undefined && valid;
+  valid = readAnimationName(value.animation, `${pathValue}.animation`, diagnostics) !== undefined && valid;
+  valid = readAnimationName(value.sourceAnimation, `${pathValue}.sourceAnimation`, diagnostics) !== undefined && valid;
+  valid = readNonNegativeInteger(value.sourceRow, `${pathValue}.sourceRow`, diagnostics) !== undefined && valid;
+
+  if (value.direction !== undefined) {
+    const direction = readString(value.direction, `${pathValue}.direction`, diagnostics);
+    if (direction === undefined || !DIRECTION_NAMES.has(direction)) {
+      if (direction !== undefined) {
+        diagnostics.push(invalidReportField(`${pathValue}.direction`, `Audit report field ${pathValue}.direction must be a valid direction.`));
+      }
+      valid = false;
+    }
+  }
+
+  if (!Array.isArray(value.frames) || value.frames.length === 0) {
+    diagnostics.push(invalidReportField(
+      `${pathValue}.frames`,
+      `Audit report field ${pathValue}.frames must be a non-empty array.`,
+    ));
+    return false;
+  }
+  value.frames.forEach((frame, index) => {
+    valid = validateBlankFrame(frame, `${pathValue}.frames[${index}]`, diagnostics) && valid;
+  });
+
+  if (!Array.isArray(value.consumers) || value.consumers.length === 0) {
+    diagnostics.push(invalidReportField(
+      `${pathValue}.consumers`,
+      `Audit report field ${pathValue}.consumers must be a non-empty array.`,
+    ));
+    return false;
+  }
+  value.consumers.forEach((consumer, index) => {
+    valid = validateConsumer(consumer, `${pathValue}.consumers[${index}]`, diagnostics) && valid;
+  });
+  return valid;
+}
+
+function validateInspectionError(
+  value: unknown,
+  pathValue: string,
+  diagnostics: AssetPackScaffoldDiagnostic[],
+): boolean {
+  if (!isRecord(value)) {
+    diagnostics.push(invalidReportField(pathValue, `Audit report field ${pathValue} must be an object.`));
+    return false;
+  }
+
+  let valid = true;
+  const kind = readString(value.kind, `${pathValue}.kind`, diagnostics);
+  if (kind === undefined || !INSPECTION_ERROR_KINDS.has(kind)) {
+    if (kind !== undefined) {
+      diagnostics.push(invalidReportField(`${pathValue}.kind`, `Audit report field ${pathValue}.kind has an unsupported value.`));
+    }
+    valid = false;
+  }
+  valid = readString(value.message, `${pathValue}.message`, diagnostics) !== undefined && valid;
+  valid = readOptionalString(value.path, `${pathValue}.path`, diagnostics) !== undefined || value.path === undefined
+    ? valid
+    : false;
+
+  if (!Array.isArray(value.consumers) || value.consumers.length === 0) {
+    diagnostics.push(invalidReportField(
+      `${pathValue}.consumers`,
+      `Audit report field ${pathValue}.consumers must be a non-empty array.`,
+    ));
+    return false;
+  }
+  value.consumers.forEach((consumer, index) => {
+    valid = validateConsumer(consumer, `${pathValue}.consumers[${index}]`, diagnostics) && valid;
+  });
+  return valid;
+}
+
+function validateAuditReportData(
+  value: unknown,
+  diagnostics: AssetPackScaffoldDiagnostic[],
+): value is AssetAnimationAuditReport {
+  if (!isRecord(value)) {
+    diagnostics.push(invalidReportField('$.data', 'Audit report data must be an object.'));
+    return false;
+  }
+
+  let valid = true;
+  valid = readStringArray(value.targets, '$.data.targets', diagnostics, {
+    allowEmpty: false,
+    allowedValues: ANIMATION_NAMES,
+  }) !== undefined && valid;
+
+  if (!isRecord(value.scope)) {
+    diagnostics.push(invalidReportField('$.data.scope', 'Audit report field $.data.scope must be an object.'));
+    valid = false;
+  } else {
+    valid = readOptionalString(value.scope.typeName, '$.data.scope.typeName', diagnostics) !== undefined || value.scope.typeName === undefined
+      ? valid
+      : false;
+    const bodyType = readOptionalString(value.scope.bodyType, '$.data.scope.bodyType', diagnostics);
+    if (bodyType !== undefined && !BODY_TYPE_NAMES.has(bodyType)) {
+      diagnostics.push(invalidReportField('$.data.scope.bodyType', 'Audit report field $.data.scope.bodyType must be a valid body type.'));
+      valid = false;
+    } else if (bodyType === undefined && value.scope.bodyType !== undefined) {
+      valid = false;
+    }
+  }
+
+  if (!isRecord(value.summary)) {
+    diagnostics.push(invalidReportField('$.data.summary', 'Audit report field $.data.summary must be an object.'));
+    valid = false;
+  } else {
+    const summary = value.summary;
+    const summaryPath = '$.data.summary';
+    valid = readNonNegativeInteger(summary.itemsScanned, `${summaryPath}.itemsScanned`, diagnostics) !== undefined && valid;
+    valid = readNonNegativeInteger(summary.incompleteItems, `${summaryPath}.incompleteItems`, diagnostics) !== undefined && valid;
+    valid = readNonNegativeInteger(summary.unsupported, `${summaryPath}.unsupported`, diagnostics) !== undefined && valid;
+    valid = readNonNegativeInteger(summary.missingFiles, `${summaryPath}.missingFiles`, diagnostics) !== undefined && valid;
+    valid = readNonNegativeInteger(summary.blankFrames, `${summaryPath}.blankFrames`, diagnostics) !== undefined && valid;
+    valid = readNonNegativeInteger(summary.errors, `${summaryPath}.errors`, diagnostics) !== undefined && valid;
+  }
+
+  if (!Array.isArray(value.unsupported)) {
+    diagnostics.push(invalidReportField('$.data.unsupported', 'Audit report field $.data.unsupported must be an array.'));
+    valid = false;
+  } else {
+    value.unsupported.forEach((finding, index) => {
+      valid = validateUnsupportedFinding(finding, `$.data.unsupported[${index}]`, diagnostics) && valid;
+    });
+  }
+
+  if (!Array.isArray(value.missingFiles)) {
+    diagnostics.push(invalidReportField('$.data.missingFiles', 'Audit report field $.data.missingFiles must be an array.'));
+    valid = false;
+  } else {
+    value.missingFiles.forEach((finding, index) => {
+      valid = validateMissingFileFinding(finding, `$.data.missingFiles[${index}]`, diagnostics) && valid;
+    });
+  }
+
+  if (!Array.isArray(value.blankFrames)) {
+    diagnostics.push(invalidReportField('$.data.blankFrames', 'Audit report field $.data.blankFrames must be an array.'));
+    valid = false;
+  } else {
+    value.blankFrames.forEach((finding, index) => {
+      valid = validateBlankFramesFinding(finding, `$.data.blankFrames[${index}]`, diagnostics) && valid;
+    });
+  }
+
+  if (!Array.isArray(value.errors)) {
+    diagnostics.push(invalidReportField('$.data.errors', 'Audit report field $.data.errors must be an array.'));
+    valid = false;
+  } else {
+    value.errors.forEach((error, index) => {
+      valid = validateInspectionError(error, `$.data.errors[${index}]`, diagnostics) && valid;
+    });
+  }
+
+  if (
+    isRecord(value.summary)
+    && Array.isArray(value.unsupported)
+    && Array.isArray(value.missingFiles)
+    && Array.isArray(value.blankFrames)
+    && Array.isArray(value.errors)
+  ) {
+    const summary = value.summary;
+    const counts = [
+      ['unsupported', value.unsupported.length],
+      ['missingFiles', value.missingFiles.length],
+      ['blankFrames', value.blankFrames.length],
+      ['errors', value.errors.length],
+    ] as const;
+    counts.forEach(([field, expected]) => {
+      const actual = summary[field];
+      if (typeof actual === 'number' && actual !== expected) {
+        diagnostics.push(invalidReportField(
+          `$.data.summary.${field}`,
+          `Audit report field $.data.summary.${field} must match the ${field} array length.`,
+        ));
+        valid = false;
+      }
+    });
+  }
+
+  return valid;
+}
+
 export function scaffoldNewAssetPack(
   request: NewAssetPackScaffoldRequest,
 ): AssetPackScaffoldResult {
@@ -251,13 +770,7 @@ function readAuditEnvelope(reportPath: string): AuditEnvelopeSuccess | AssetPack
     };
   }
 
-  if (
-    !envelope
-    || typeof envelope !== 'object'
-    || !('ok' in envelope)
-    || !('command' in envelope)
-    || !('data' in envelope)
-  ) {
+  if (!isRecord(envelope) || !('ok' in envelope) || !('command' in envelope) || !('data' in envelope)) {
     return {
       ok: false,
       diagnostics: [{
@@ -268,20 +781,7 @@ function readAuditEnvelope(reportPath: string): AuditEnvelopeSuccess | AssetPack
     };
   }
 
-  const typed = envelope as AuditEnvelope;
-  const data = typed.data;
-  if (
-    typed.ok !== true
-    || typed.command !== 'catalog audit-animations'
-    || !data
-    || !Array.isArray(data.targets)
-    || typeof data.scope !== 'object'
-    || data.scope === null
-    || !Array.isArray(data.unsupported)
-    || !Array.isArray(data.missingFiles)
-    || !Array.isArray(data.blankFrames)
-    || !Array.isArray(data.errors)
-  ) {
+  if (envelope.ok !== true || envelope.command !== 'catalog audit-animations') {
     return {
       ok: false,
       diagnostics: [{
@@ -290,11 +790,27 @@ function readAuditEnvelope(reportPath: string): AuditEnvelopeSuccess | AssetPack
         path: reportPath,
       }],
     };
+  }
+
+  if (!Array.isArray(envelope.errors) || envelope.errors.length > 0) {
+    return {
+      ok: false,
+      diagnostics: [{
+        code: 'audit_report_invalid_v1',
+        message: 'Audit report must be a successful catalog audit-animations envelope.',
+        path: reportPath,
+      }],
+    };
+  }
+
+  const diagnostics: AssetPackScaffoldDiagnostic[] = [];
+  if (!validateAuditReportData(envelope.data, diagnostics)) {
+    return { ok: false, diagnostics };
   }
 
   return {
     ok: true,
-    envelope: typed as AuditEnvelope & { readonly data: AssetAnimationAuditReport },
+    envelope: envelope as unknown as AuditEnvelope & { readonly data: AssetAnimationAuditReport },
   };
 }
 

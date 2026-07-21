@@ -212,15 +212,49 @@ describe('loadAssetPackFiles', () => {
           sourcePath: 'sprites/wind-braid/foreground/not-a-file.png',
         }),
         expect.objectContaining({
-          code: 'asset_source_outside_pack',
+          code: 'asset_source_symlink',
           sourcePath: 'sprites/wind-braid/foreground/escape.png',
         }),
         expect.objectContaining({
-          code: 'asset_source_duplicate_canonical_path',
+          code: 'asset_source_symlink',
           sourcePath: 'sprites/wind-braid/foreground/duplicate-link.png',
         }),
       ]),
     );
+  });
+
+  it('rejects in-pack symlink source entries even when they resolve to regular files inside the pack', () => {
+    const root = createDirectory('lpc-asset-pack-files-symlink-');
+    writePack(root, packFixture({
+      assets: [{
+        kind: 'new-item',
+        localId: 'wind-braid',
+        displayName: 'Wind Braid',
+        typeName: 'hair',
+        bodyTypes: ['female'],
+        animations: ['walk'],
+        layers: [{
+          id: 'foreground',
+          zPos: 120,
+          sprites: [
+            { animation: 'walk', source: 'sprites/wind-braid/foreground/link.png' },
+          ],
+        }],
+      }],
+    }), {
+      'sprites/wind-braid/foreground/target.png': 'walk',
+    });
+    symlinkSync(
+      path.join(root, 'sprites/wind-braid/foreground/target.png'),
+      path.join(root, 'sprites/wind-braid/foreground/link.png'),
+    );
+
+    expect(requireFailure(root)).toEqual([
+      expect.objectContaining({
+        code: 'asset_source_symlink',
+        sourcePath: 'sprites/wind-braid/foreground/link.png',
+      }),
+    ]);
   });
 
   it('keeps the content digest stable across manifest property order changes and acknowledgement-only edits', () => {
