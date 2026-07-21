@@ -64,7 +64,7 @@ export function compareAssetPackVersions(left: string, right: string): number {
     }
     if (leftNumeric) return -1;
     if (rightNumeric) return 1;
-    const comparison = leftIdentifier.localeCompare(rightIdentifier);
+    const comparison = leftIdentifier < rightIdentifier ? -1 : leftIdentifier > rightIdentifier ? 1 : 0;
     if (comparison !== 0) return comparison;
   }
   return 0;

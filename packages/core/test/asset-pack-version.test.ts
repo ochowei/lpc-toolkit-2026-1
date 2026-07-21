@@ -54,6 +54,11 @@ describe('asset pack versions', () => {
     expect(compareAssetPackVersions('1.0.0+build.2', '1.0.0+build.1')).toBe(0);
   });
 
+  it('uses ASCII code-unit ordering for non-numeric prerelease identifiers', () => {
+    expect(compareAssetPackVersions('1.0.0-a', '1.0.0-B')).toBeGreaterThan(0);
+    expect(assetPackVersionRangeMatches('>1.0.0-B', '1.0.0-a')).toBe(true);
+  });
+
   it('compares unbounded decimal identifiers without numeric precision loss', () => {
     const lower = '9007199254740992';
     const higher = '9007199254740993';
