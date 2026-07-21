@@ -1323,11 +1323,11 @@ Task 11 record:
 - Modify: `docs/ENGINEERING.md`
 - Modify: this plan's CLI Documentation Impact matrix if reassessment changes it
 
-- [ ] **Step 1: Extend the packed-CLI smoke test before docs**
+- [x] **Step 1: Extend the packed-CLI smoke test before docs**
 
 From the packed tarball installed into an isolated temporary consumer directory, run `asset workspace init`, assert the complete workspace layout/marker/config, assert no repository `.git` or `assets/` directory is required, and assert no cache/network preparation hook is reached. Keep the existing package smoke cases.
 
-- [ ] **Step 2: Add a focused no-repository integration acceptance**
+- [x] **Step 2: Add a focused no-repository integration acceptance**
 
 In CLI Vitest, simulate a clean artist directory with injected prepared runtime assets and execute through `runCli`:
 
@@ -1346,7 +1346,7 @@ workspace init
 
 Add this acceptance to `packages/cli/test/asset-authoring-e2e.test.ts`. Re-run the same-scope audit planner against the compiled catalog and assert the selected unsupported/missing requirement is absent. Assert all writes stay under the artist workspace and preview destinations.
 
-- [ ] **Step 3: Run smoke/acceptance and verify RED if documentation strings are not yet present**
+- [x] **Step 3: Run smoke/acceptance and verify RED if documentation strings are not yet present**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-e2e.test.ts
@@ -1356,7 +1356,7 @@ rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx
 
 Expected before completing this task: CLI acceptance/package checks pass after the smoke additions; landing test fails on the not-yet-documented artist workflow.
 
-- [ ] **Step 4: Update help-adjacent public documentation**
+- [x] **Step 4: Update help-adjacent public documentation**
 
 In `packages/cli/README.md`, document every Phase 1 command and option, upward/explicit workspace resolution, exact source/output layout, PNG location, managed cache behavior, complete-PNG rule, audit finding behavior, acknowledgement workflow, ownership refusal, atomic in-process rollback, stdout/stderr/exit semantics, and Phase 2 exclusions.
 
@@ -1374,11 +1374,11 @@ lpc-toolkit asset sync ./artist-packs/<pack-id>
 
 State explicitly that PNGs belong under `artist-packs/<pack-id>/sprites/` and cloning this repository is unnecessary.
 
-- [ ] **Step 5: Update architecture and engineering contracts**
+- [x] **Step 5: Update architecture and engineering contracts**
 
 Architecture must document schema ownership, baseline exclusion of manager output, pack-to-compile flow, registry/overlay ownership, overlay store injection, selection identity, attribution path, rollback boundary, and Phase 2/3 deferrals. Engineering must list the three focused Core tests, seven focused CLI modules, e2e/package smoke, landing test, `check:boundaries`, conditional package test, and `rtk pnpm verify` mapping.
 
-- [ ] **Step 6: Reassess the mandatory CLI documentation matrix**
+- [x] **Step 6: Reassess the mandatory CLI documentation matrix**
 
 Record `update` or `N/A — reason` for all eight surfaces. Expected final result remains:
 
@@ -1393,7 +1393,7 @@ releasing: N/A — no npm publication or pinned base-asset publication procedure
 plugin: N/A — the current audit skill is read-only and authoring-skill design is deferred
 ```
 
-- [ ] **Step 7: Run focused documentation, acceptance, and package checks**
+- [x] **Step 7: Run focused documentation, acceptance, and package checks**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifacts.test.ts
@@ -1403,7 +1403,7 @@ rtk pnpm --filter @lpc-toolkit/cli test:package
 
 Expected: PASS.
 
-- [ ] **Step 8: Run full repository verification**
+- [x] **Step 8: Run full repository verification**
 
 ```sh
 rtk pnpm check:boundaries
@@ -1419,7 +1419,7 @@ rtk pnpm verify
 
 Expected: PASS. If a check fails, fix the implementation or explicitly amend this approved plan; do not weaken a gate.
 
-- [ ] **Step 9: Inspect the final diff and ownership boundaries**
+- [x] **Step 9: Inspect the final diff and ownership boundaries**
 
 ```sh
 rtk git status --short
@@ -1430,7 +1430,7 @@ rtk git diff -- packages/core packages/cli README.md packages/web/src/components
 
 Expected: only planned files, no `upstream/`, cache, generated artist workspace, or unrelated user changes; `git diff --check` emits no output.
 
-- [ ] **Step 10: Commit product documentation and acceptance**
+- [x] **Step 10: Commit product documentation and acceptance**
 
 ```sh
 rtk git add packages/cli/scripts/smoke-packed-cli.mjs packages/cli/test/asset-authoring-e2e.test.ts packages/cli/README.md README.md packages/web/src/components/landing-page.tsx packages/web/test/landing-page.test.tsx docs/ARCHITECTURE.md docs/ENGINEERING.md
@@ -1438,6 +1438,25 @@ rtk git commit -m "docs: publish artist asset authoring workflow"
 ```
 
 Then update this task's plan record with the full verification evidence and commit it separately.
+
+Task 12 record:
+
+- Implementation: Extended packed-CLI smoke and added no-repository authoring E2E for new items, audit-driven `hair_messy` climb extensions, validation, previews, two-pack sync, overlay rendering, attribution, and audit closure; updated CLI/root/landing/architecture/engineering documentation with explicit Phase 2 distribution/lifecycle and Phase 3 Web deferrals.
+- Product commits: `c712eaa7ccc110415cb998d23b5f8cc618571744`, `c6709bd1cc293cd30254e6926af043169b572396`.
+- Verification: `rtk pnpm check:boundaries` PASS; `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS; `rtk pnpm --filter @lpc-toolkit/core test` PASS (23 files / 299 tests); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS; `rtk pnpm --filter @lpc-toolkit/cli test` PASS (42 files / 594 passed / 1 skipped); `rtk pnpm --filter @lpc-toolkit/cli build` PASS; `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS; `rtk pnpm --filter @lpc-toolkit/web test` PASS (78 files / 698 tests); `rtk pnpm verify` PASS; `rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifacts.test.ts` PASS (3 tests); `rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-e2e.test.ts` PASS (1/1); `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-sync.test.ts` PASS (20/20); `rtk git diff --check` PASS.
+- Review: Task 12 reviewer found and fixed E2E first-pack preservation coverage and rollback/layout documentation findings; final re-review APPROVED with no findings.
+- CLI documentation impact:
+  - help: update
+  - cli-readme: update
+  - root-readme: update
+  - landing: update
+  - architecture: update
+  - engineering: update
+  - releasing: N/A — no npm publication or pinned base-asset publication procedure changes
+  - plugin: N/A — the current audit skill is read-only and authoring-skill design is deferred
+- Scope audit: no dependencies, `any`, `upstream/`, checked-in assets, managed-cache state, implementation plan, or `.superpowers/sdd/progress.md` changes.
+
+---
 
 ## Final Handoff Evidence
 
