@@ -974,7 +974,9 @@ Then update this task's plan record and commit it separately.
 - Consumes: archive snapshot, Core compatibility/version helpers, `CLI_VERSION`, runtime baseline/palettes, and payload validation.
 - Produces: `inspectAssetPackArchive`, report schemas, and verified snapshots for Task 9.
 
-- [ ] **Step 1: Write failing compatibility tests**
+- [x] **Step 1: Write failing compatibility tests**
+
+  - Implementation: Added absent/equal/higher CLI-version, capability, malformed archive, and manifest-schema inspection cases.
 
 Cover absent compatibility, equal/lower minimum CLI, higher minimum CLI, supported capabilities, unknown capability, malformed archive, and manifest schema failure. Reuse the exact exported capability list:
 
@@ -985,11 +987,15 @@ expect(SUPPORTED_ASSET_PACK_CAPABILITIES).toEqual([
 ]);
 ```
 
-- [ ] **Step 2: Write failing IHDR-before-decode tests**
+- [x] **Step 2: Write failing IHDR-before-decode tests**
+
+  - Implementation: Added IHDR geometry, truncation, exact dimensions, corrupt CRC isolation, required/optional frames, recolor ramps, and shared-source consumer coverage.
 
 Provide PNG bytes with a valid signature/IHDR declaring huge or wrong dimensions and spy on the canvas decoder. Assert `asset_geometry_mismatch` is returned and decode is never called. Cover truncated IHDR, corrupt CRC/decode, exact dimensions, required blank frames, optional blank warnings, recolor ramp, and multiple consumers of one source.
 
-- [ ] **Step 3: Write failing inspection-report tests**
+- [x] **Step 3: Write failing inspection-report tests**
+
+  - Implementation: Added JSON-safe report shape, archive identity/byte totals, deterministic diagnostics, and valid-report-only snapshot assertions.
 
 Assert deterministic diagnostics and this JSON-safe shape:
 
@@ -1016,7 +1022,9 @@ export interface AssetPackInspectionResult {
 
 Only a valid report carries `snapshot`; `asset-commands.ts` serializes `report` and never the byte-bearing result wrapper.
 
-- [ ] **Step 4: Run focused tests and verify RED**
+- [x] **Step 4: Run focused tests and verify RED**
+
+  - Verification: Initial inspection test run was RED because archive inspection did not exist.
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-inspection.test.ts asset-pack-validation.test.ts
@@ -1024,11 +1032,15 @@ rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-inspection.test.ts asset-p
 
 Expected: FAIL because archive inspection and IHDR preflight do not exist.
 
-- [ ] **Step 5: Implement predecode geometry gate and full validation**
+- [x] **Step 5: Implement predecode geometry gate and full validation**
+
+  - Implementation: Added archive inspection/reporting, strict IHDR format/CRC/dimension preflight before native decode, captured-byte validation reuse, and configured recolor source-ramp enforcement with attribution/acknowledgement preservation.
 
 Read width/height from PNG signature plus IHDR bytes using unsigned big-endian integers. Compare each source's declared uses to registered geometry before canvas decode. After the gate passes, call the existing captured-byte inspector and Core validator so required/optional cells, palettes, credits, baseline digests, and acknowledgement semantics remain identical to directory validation.
 
-- [ ] **Step 6: Verify GREEN**
+- [x] **Step 6: Verify GREEN**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-inspection.test.ts asset-pack-validation.test.ts` PASS (31 tests); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS; `rtk git diff --check` PASS.
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-inspection.test.ts asset-pack-validation.test.ts
@@ -1037,12 +1049,21 @@ rtk pnpm --filter @lpc-toolkit/cli run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit product code**
+- [x] **Step 7: Commit product code**
+
+  - Commits: `b3c85619ff172777af1f139ced7ae732d9505fad`, `3998b10a731a0aa97d9892526a1666611a1c0c6b`
 
 ```sh
 rtk git add packages/cli/src/asset-pack-inspection.ts packages/cli/src/asset-pack-validation.ts packages/cli/test/asset-pack-inspection.test.ts packages/cli/test/asset-pack-validation.test.ts
 rtk git commit -m "feat(cli): inspect attributed asset archives"
 ```
+
+Task 5 record:
+
+- Implementation: Added archive inspection reports with valid-snapshot gating, predecode PNG IHDR safety, full captured-byte validation, attribution/acknowledgement continuity, and configured recolor source-ramp enforcement.
+- Product/fix commits: `b3c85619ff172777af1f139ced7ae732d9505fad`, `3998b10a731a0aa97d9892526a1666611a1c0c6b`.
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-inspection.test.ts asset-pack-validation.test.ts` PASS (31 tests); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS; `rtk git diff --check` PASS.
+- Review: Initial review found a native-decoder crash boundary and missing source-ramp enforcement; final reviewer APPROVED with no Critical or Important findings after the fix wave.
 
 Then update this task's plan record and commit it separately.
 
