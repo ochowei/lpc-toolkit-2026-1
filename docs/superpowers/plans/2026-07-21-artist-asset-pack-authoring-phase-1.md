@@ -423,7 +423,7 @@ Reassess the matrix in Task 12. If implementation changes another owned contract
 - Create: `packages/core/test/asset-pack-schema.test.ts`
 - Modify: `packages/core/src/index.ts`
 
-- [ ] **Step 1: Write failing strict-schema tests**
+- [x] **Step 1: Write failing strict-schema tests**
 
 Cover the complete approved examples plus: unknown top-level/nested fields, unknown major schema, missing credits, unsupported license, URL-less credits without notes, invalid pack/local IDs, invalid semantic versions, absolute/backslash/dot/parent/source-outside-`sprites/` paths, duplicate local IDs, child body types broadening parents, and duplicate semantic layer IDs.
 
@@ -442,7 +442,7 @@ it('uses pack plus local id for both catalog and selection identity', () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run:
 
@@ -452,7 +452,7 @@ rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-schema.test.ts
 
 Expected: FAIL because the new modules do not exist.
 
-- [ ] **Step 3: Implement strict parsing without a schema dependency**
+- [x] **Step 3: Implement strict parsing without a schema dependency**
 
 Use small `isRecord`, `exactKeys`, string-array, optional-field, discriminated-union, and path validators. Accumulate deterministic diagnostics in JSON-path order; do not cast an unchecked record into the public source type.
 
@@ -466,11 +466,11 @@ export function parseAssetPackSource(input: unknown): AssetPackParseResult {
 }
 ```
 
-- [ ] **Step 4: Normalize identity, body inheritance, layers, and credits**
+- [x] **Step 4: Normalize identity, body inheritance, layers, and credits**
 
 Expand every effective body-type list in registry order, reject broadening during parsing, translate complete credit sources into `AssetPackCreditRecord` values, retain source declaration index for layer tie-breaking, and make `assetPackContentProjection` recursively key-sorted while omitting only the top-level acknowledgement array.
 
-- [ ] **Step 5: Export interfaces and verify GREEN**
+- [x] **Step 5: Export interfaces and verify GREEN**
 
 Run:
 
@@ -481,7 +481,7 @@ rtk pnpm --filter @lpc-toolkit/core run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit product code**
+- [x] **Step 6: Commit product code**
 
 ```sh
 rtk git add packages/core/src/asset-pack-schema.ts packages/core/src/asset-pack-model.ts packages/core/src/index.ts packages/core/test/asset-pack-schema.test.ts
@@ -489,6 +489,12 @@ rtk git commit -m "feat(core): define artist asset pack schema"
 ```
 
 Then update this task's plan record and commit it separately.
+
+Task 1 record:
+
+- Implementation: Added strict v1 source parsing, deterministic path-ordered diagnostics, normalized identity/body/layer/credit models, and acknowledgement-free canonical content projection. Reviewer-required ordering regressions were fixed in follow-up product commits.
+- Product commits: `04e65abd3b7c0e101cff807f4cd67cd39dae91b3`, `7e68f48f1b4ac55debd61b8eaed731ec233e53ce`, `af2ee58eb2c010470895bd9cfbce8589896c7b21`, `fcb75b52cd9b1ecdcf87ea03c1342455ae811938`.
+- Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-schema.test.ts` PASS (20/20 after final fix); `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS; `rtk pnpm check:boundaries` PASS; reviewer re-review APPROVED.
 
 ---
 
