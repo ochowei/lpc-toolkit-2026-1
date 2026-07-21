@@ -883,7 +883,8 @@ Expected: PASS.
 Task 6 record:
 
 - Implementation: Added safe pack loading with regular-file/containment/symlink checks and canonical SHA-256 content/source digests; added simple/advanced new-item and bounded audit-derived scaffold generation with strict finding validation, exact/inferred/manual-review semantics, consumer preservation, baseline digests, and atomic no-partial publication.
-- Product commits: `9bd367099bab9e3fcb0cb618c5cec1e695d3d686`, `dc2ece375f8dc2a52c8a8a11c577e766576277bb`, `d0c6a42775807847064e3427824debebd519c0f5`, `89ec220709454cdc178df91117e150d98892c6a7`.
+- Product commits: `9bd367099bab9e3fcb0cb618c5cec1e695d3d686`, `dc2ece375f8dc2a52c8a8a11c577e766576277bb`, `89ec220709454cdc178df91117e150d98892c6a7`.
+- Review evidence commit: `d0c6a42775807847064e3427824debebd519c0f5` (documentation-only reviewer evidence).
 - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-files.test.ts asset-pack-scaffold.test.ts` PASS (16/16 after final fix); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS; reviewer final re-review APPROVED. PNG decode/frame validation remains Task 7.
 
 - [x] **Step 7: Commit product code**
@@ -1466,7 +1467,8 @@ Evidence captured on 2026-07-21 after the whole-branch reviewer fixes:
 
 - Branch: `codex/artist-asset-pack-authoring-design`.
 - Verified product HEAD: `6915b14a1c3e1c052c1fc1554989e890066a0807`.
-- Merge-base with `origin/main`: `5855c3ea5e24cc497d46bc4aef16b4b074c8e5dc`.
+- Phase 1 whole-branch review base (approved design spec): `c712f459eb9bfd3e1d99b2f641be804e9da97c5`.
+- Current handoff HEAD: `cf6802381d6bfe05e67c4bd28b1c7ebbd6bdc9bc` (plan/report evidence commit after verified product HEAD).
 - This handoff record is intentionally committed after the verified product HEAD; its commit hash is reported by the live handoff because a commit cannot embed its own hash.
 
 Full product commit hashes, grouped in implementation order:
