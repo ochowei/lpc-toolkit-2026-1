@@ -64,6 +64,47 @@ export { ok, err, isOk, isErr, unwrapOr } from './result.js';
 export type { CatalogLoadWarning, CreateCatalogResult } from './catalog.js';
 export { createCatalog } from './catalog.js';
 
+export type {
+  AssetPackAcknowledgement,
+  AssetPackAssetSource,
+  AssetPackCreditSource,
+  AssetPackDiagnostic,
+  AssetPackDiagnosticCode,
+  AssetPackParseResult,
+  AssetPackReplacementSource,
+  AssetPackSource,
+  ExtendItemAnimationSource,
+  ExtendItemAssetSource,
+  ExtendItemDestinationSource,
+  ExtendItemLayerSource,
+  NewItemAssetSource,
+  NewItemLayerSource,
+  NewItemSpriteSource,
+} from './asset-pack-schema.js';
+export {
+  ASSET_PACK_SCHEMA,
+  parseAssetPackSource,
+} from './asset-pack-schema.js';
+export type {
+  AssetPackCreditRecord,
+  NormalizedAssetPack,
+  NormalizedAssetPackAsset,
+  NormalizedAssetPackReplacement,
+  NormalizedExtendItemAnimation,
+  NormalizedExtendItemAsset,
+  NormalizedExtendItemDestination,
+  NormalizedExtendItemLayer,
+  NormalizedNewItemAsset,
+  NormalizedNewItemLayer,
+  NormalizedNewItemSprite,
+} from './asset-pack-model.js';
+export {
+  assetPackContentProjection,
+  assetPackItemId,
+  normalizeAssetPack,
+  warningAcknowledged,
+} from './asset-pack-model.js';
+
 // ==========================================
 // 5. Palette and Color Metadata Catalog
 // ==========================================
