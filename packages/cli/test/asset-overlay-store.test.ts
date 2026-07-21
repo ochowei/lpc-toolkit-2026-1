@@ -136,6 +136,55 @@ describe('overlay asset store', () => {
     ).resolves.toBe(baseSpritePath);
   });
 
+  it('reports authorized overlay symlink escapes as missing in has()', () => {
+    const { runtime } = createDirectoryRuntime();
+    const overlayRoot = mkdtempSync(path.join(os.tmpdir(), 'lpc-overlay-root-'));
+    const outsideRoot = mkdtempSync(path.join(os.tmpdir(), 'lpc-overlay-outside-'));
+    const outsideSpritePath = path.join(outsideRoot, 'escape.png');
+    writeFileSync(outsideSpritePath, 'escape');
+    const overlaySpritePath = path.join(overlayRoot, logicalSpritePath);
+    mkdirSync(path.dirname(overlaySpritePath), { recursive: true });
+    symlinkSync(outsideSpritePath, overlaySpritePath, 'file');
+
+    const overlay = createOverlayAssetStore({
+      base: runtime.store,
+      overlayRoot,
+      logicalPaths: [logicalSpritePath],
+    });
+
+    expect(overlay.has(logicalSpritePath)).toBe(false);
+  });
+
+  it('reports authorized overlay directory placeholders as missing in has()', () => {
+    const { runtime } = createDirectoryRuntime();
+    const overlayRoot = mkdtempSync(path.join(os.tmpdir(), 'lpc-overlay-root-'));
+    const overlaySpritePath = path.join(overlayRoot, logicalSpritePath);
+    mkdirSync(overlaySpritePath, { recursive: true });
+
+    const overlay = createOverlayAssetStore({
+      base: runtime.store,
+      overlayRoot,
+      logicalPaths: [logicalSpritePath],
+    });
+
+    expect(overlay.has(logicalSpritePath)).toBe(false);
+  });
+
+  it('rejects unsafe authorized logical paths in has()', () => {
+    const { runtime } = createDirectoryRuntime();
+    const overlayRoot = mkdtempSync(path.join(os.tmpdir(), 'lpc-overlay-root-'));
+    const unsafeLogicalPath = '../escape.png';
+    writeFileSync(path.join(overlayRoot, unsafeLogicalPath), 'escape');
+
+    const overlay = createOverlayAssetStore({
+      base: runtime.store,
+      overlayRoot,
+      logicalPaths: [unsafeLogicalPath],
+    });
+
+    expect(overlay.has(unsafeLogicalPath)).toBe(false);
+  });
+
   it('does not allow unauthorized overlay-only files to shadow the base namespace', async () => {
     const { runtime } = createDirectoryRuntime();
     const overlayRoot = mkdtempSync(path.join(os.tmpdir(), 'lpc-overlay-root-'));

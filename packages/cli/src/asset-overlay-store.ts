@@ -22,6 +22,24 @@ export function createOverlayAssetStore(
   const overlayPathFor = (logicalPath: string): string =>
     path.join(overlayRoot, logicalPath);
 
+  const existingAuthorizedOverlayPathFor = (
+    logicalPath: string,
+  ): string | undefined => {
+    if (!authorizedLogicalPaths.has(logicalPath)) return undefined;
+    const overlayPath = overlayPathFor(logicalPath);
+    return existsSync(overlayPath) ? overlayPath : undefined;
+  };
+
+  const validAuthorizedOverlayPathFor = (
+    logicalPath: string,
+  ): string | undefined => {
+    const overlayPath = existingAuthorizedOverlayPathFor(logicalPath);
+    if (overlayPath === undefined || !overlayDirectory.has(logicalPath)) {
+      return undefined;
+    }
+    return overlayPath;
+  };
+
   return {
     kind: 'overlay',
     baseUrl: options.base.baseUrl,
@@ -37,21 +55,17 @@ export function createOverlayAssetStore(
       return options.base.logicalPath(sourcePath);
     },
     has(logicalPath) {
-      if (
-        authorizedLogicalPaths.has(logicalPath) &&
-        existsSync(overlayPathFor(logicalPath))
-      ) {
+      if (validAuthorizedOverlayPathFor(logicalPath) !== undefined) {
         return true;
       }
+      if (existingAuthorizedOverlayPathFor(logicalPath) !== undefined) return false;
       return options.base.has(logicalPath);
     },
     async load(sourcePath): Promise<AssetImageSource> {
       const logicalPath = options.base.logicalPath(sourcePath);
-      if (logicalPath !== undefined && authorizedLogicalPaths.has(logicalPath)) {
-        const overlayPath = overlayPathFor(logicalPath);
-        if (existsSync(overlayPath)) {
-          return overlayDirectory.load(overlayPath);
-        }
+      if (logicalPath !== undefined) {
+        const overlayPath = existingAuthorizedOverlayPathFor(logicalPath);
+        if (overlayPath !== undefined) return overlayDirectory.load(overlayPath);
       }
       return options.base.load(sourcePath);
     },
