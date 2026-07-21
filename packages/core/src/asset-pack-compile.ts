@@ -385,6 +385,33 @@ function compileExtendItem(
         continue;
       }
 
+      const basePath = destinationBasePath(
+        layer.destination.path,
+        animationEntry.animation,
+        layer.variant,
+      );
+
+      if (
+        baseline.managedOwner
+        && !destinationOwnedByManagedBaseline(
+          baseline.definition,
+          layer.layer,
+          layer.bodyTypes,
+          basePath,
+        )
+      ) {
+        state.diagnostics.push({
+          code: 'asset_replacement_unauthorized',
+          severity: 'error',
+          message: `Pack "${pack.id}" is not authorized to replace manager-owned output ${layer.destination.path}.`,
+          packId: pack.id,
+          assetId: asset.itemId,
+          sourcePath: layer.source,
+          destinationPath: layer.destination.path,
+        });
+        return;
+      }
+
       if (!replacementAuthorizedForPath(pack, baseline.managedOwner, layer.destination.path)) {
         state.diagnostics.push({
           code: 'asset_replacement_unauthorized',
@@ -415,12 +442,6 @@ function compileExtendItem(
         });
         return;
       }
-
-      const basePath = destinationBasePath(
-        layer.destination.path,
-        animationEntry.animation,
-        layer.variant,
-      );
       const consumer: CompiledAssetSpriteConsumer = {
         itemId: asset.itemId,
         typeName: baseline.definition.type_name,
@@ -695,6 +716,20 @@ function sameManagedOwner(
 ): boolean {
   if (!left || !right) return false;
   return left.packId === right.packId && left.localId === right.localId;
+}
+
+function destinationOwnedByManagedBaseline(
+  definition: ItemDefinition,
+  layerName: `layer_${number}`,
+  bodyTypes: readonly BodyType[],
+  destinationBase: string,
+): boolean {
+  const layer = definition[layerName];
+  if (!layer) {
+    return false;
+  }
+
+  return bodyTypes.every((bodyType) => layer[bodyType] === destinationBase);
 }
 
 function semanticPatchKey(patch: Pick<

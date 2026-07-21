@@ -190,6 +190,57 @@ function baselineWithExistingSharedItem(): AssetPackBaseline {
   };
 }
 
+function baselineWithMultipleManagedItems(): AssetPackBaseline {
+  return {
+    catalog: createCatalog({
+      'sheet_definitions/hair/acme.shared-pack--shared-item.json': {
+        name: 'acme.shared-pack--shared-item',
+        display_name: 'Baseline Shared Item',
+        type_name: 'hair',
+        animations: ['walk'],
+        credits: [{
+          file: 'packages/acme.shared-pack/shared-item/top/male-female/walk.png',
+          authors: ['Baseline Artist'],
+          licenses: ['CC-BY 4.0'],
+          urls: ['https://example.com/baseline-artist'],
+          notes: 'Baseline compiled credit.',
+        }],
+        layer_1: {
+          zPos: 90,
+          male: 'packages/acme.shared-pack/shared-item/top/male-female/',
+          female: 'packages/acme.shared-pack/shared-item/top/male-female/',
+        },
+      },
+      'sheet_definitions/hair/acme.shared-pack--other-item.json': {
+        name: 'acme.shared-pack--other-item',
+        display_name: 'Baseline Other Item',
+        type_name: 'hair',
+        animations: ['walk'],
+        credits: [{
+          file: 'packages/acme.shared-pack/other-item/top/male-female/walk.png',
+          authors: ['Other Baseline Artist'],
+          licenses: ['CC-BY 4.0'],
+          urls: ['https://example.com/other-baseline-artist'],
+          notes: 'Other baseline compiled credit.',
+        }],
+        layer_1: {
+          zPos: 95,
+          male: 'packages/acme.shared-pack/other-item/top/male-female/',
+          female: 'packages/acme.shared-pack/other-item/top/male-female/',
+        },
+      },
+    }).catalog,
+    definitionDigests: new Map([
+      ['acme.shared-pack--shared-item', sha('c')],
+      ['acme.shared-pack--other-item', sha('g')],
+    ]),
+    creditDigests: new Map([
+      ['acme.shared-pack--shared-item', sha('d')],
+      ['acme.shared-pack--other-item', sha('h')],
+    ]),
+  };
+}
+
 function extensionBaseline(): AssetPackBaseline {
   return {
     catalog: createCatalog({
@@ -862,6 +913,51 @@ describe('asset-pack compile', () => {
     expect(plan.sprites).toContainEqual(expect.objectContaining({
       destinationPath: 'spritesheets/packages/acme.shared-pack/shared-item/top/male-female/climb.png',
     }));
+  });
+
+  it('rejects authorized replacement attempts into another managed asset destination', () => {
+    const plan = compileAssetPacks({
+      baseline: baselineWithMultipleManagedItems(),
+      packs: [normalizeAssetPack(extensionPack({
+        id: 'omega.shared-replacer',
+        replaces: [{
+          packId: 'acme.shared-pack',
+          versions: '=1.0.0',
+          assets: ['shared-item'],
+        }],
+        assets: [{
+          kind: 'extend-item',
+          itemId: 'acme.shared-pack--shared-item',
+          baseDefinitionDigest: sha('c'),
+          baseCreditDigest: sha('d'),
+          addAnimations: [{
+            animation: 'climb',
+            layers: [{
+              layer: 'layer_1',
+              bodyTypes: ['male', 'female'],
+              source: 'sprites/shared-item/top/climb.png',
+              destination: {
+                path: 'spritesheets/packages/acme.shared-pack/other-item/top/male-female/climb.png',
+                evidence: 'audit-exact',
+                accepted: true,
+              },
+            }],
+          }],
+        }],
+      }))],
+    });
+
+    expect(plan.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: 'asset_replacement_unauthorized',
+        severity: 'error',
+        assetId: 'acme.shared-pack--shared-item',
+        destinationPath: 'spritesheets/packages/acme.shared-pack/other-item/top/male-female/climb.png',
+      }),
+    );
+    expect(plan.definitions).toEqual([]);
+    expect(plan.sprites).toEqual([]);
+    expect(plan.credits).toEqual([]);
   });
 
   it('rejects unauthorized replacement into manager-owned base paths', () => {
