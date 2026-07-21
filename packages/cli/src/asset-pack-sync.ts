@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, existsSync, statSync } from 'node:fs';
+import { mkdtempSync, readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import {
   mkdirSync,
   renameSync,
@@ -239,6 +239,31 @@ function outputMarkerPath(workspace: AssetWorkspace): string {
   return path.join(workspace.outputRoot, OUTPUT_MARKER_FILE);
 }
 
+function relativeOutputPath(root: string, filePath: string): string {
+  return path.relative(root, filePath).split(path.sep).join('/');
+}
+
+function snapshotManagedOutputFiles(root: string): Map<string, Buffer> {
+  const files = new Map<string, Buffer>();
+
+  function visit(current: string): void {
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const absolutePath = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        visit(absolutePath);
+        continue;
+      }
+      files.set(relativeOutputPath(root, absolutePath), readFileSync(absolutePath));
+    }
+  }
+
+  if (existsSync(root)) {
+    visit(root);
+  }
+
+  return files;
+}
+
 function readManagedOutputMarker(workspace: AssetWorkspace): {
   readonly marker: ManagedOutputMarker;
   readonly bytes: Buffer;
@@ -279,6 +304,16 @@ function readRegistryDocument(
   readonly document: RegistryDocument;
 } {
   if (!existsSync(workspace.registryPath)) {
+    const managedFiles = snapshotManagedOutputFiles(workspace.outputRoot);
+    managedFiles.delete(OUTPUT_MARKER_FILE);
+    if (managedFiles.size > 0) {
+      return syncFailure([{
+        code: 'asset_output_root_unowned',
+        severity: 'error',
+        message: 'Managed asset output contains files but the linked-pack registry is missing.',
+        path: workspace.outputRoot,
+      }]);
+    }
     return {
       ok: true,
       document: {
@@ -499,6 +534,131 @@ function creditsManifest(credits: readonly CreditEntry[]): CreditsManifest {
   };
 }
 
+function packMatchesRegistryEntry(
+  pack: ValidatedLinkedPack,
+  entry: LinkedAssetPackRegistryEntry,
+): boolean {
+  return (
+    pack.loaded.contentDigest === entry.contentDigest &&
+    JSON.stringify(sortRecord(Object.fromEntries([...pack.loaded.sourceDigests.entries()]))) ===
+      JSON.stringify(entry.sourceDigests) &&
+    JSON.stringify(collectBaselineDefinitionDigests(pack.loaded.pack)) ===
+      JSON.stringify(entry.baselineDefinitionDigests) &&
+    JSON.stringify(collectBaselineCreditDigests(pack.loaded.pack)) ===
+      JSON.stringify(entry.baselineCreditDigests)
+  );
+}
+
+function auditPublishedManagedOutput(options: {
+  readonly workspace: AssetWorkspace;
+  readonly runtime: RuntimeAssets;
+  readonly markerBytes: Buffer;
+  readonly registryEntries: readonly LinkedAssetPackRegistryEntry[];
+  readonly validatedRegistryPacks: readonly ValidatedLinkedPack[];
+}): AssetPackSyncFailure | undefined {
+  const actualFiles = snapshotManagedOutputFiles(options.workspace.outputRoot);
+  const expectedPathSet = new Set<string>([OUTPUT_MARKER_FILE]);
+  options.registryEntries.forEach((entry) => {
+    entry.generatedPaths.forEach((generatedPath) => {
+      expectedPathSet.add(generatedPath);
+    });
+  });
+  if (options.registryEntries.length > 0) {
+    expectedPathSet.add('CREDITS.csv');
+  }
+
+  const strayPath = [...actualFiles.keys()]
+    .sort((left, right) => left.localeCompare(right))
+    .find((filePath) => !expectedPathSet.has(filePath));
+  if (strayPath) {
+    return syncFailure([{
+      code: 'asset_output_root_unowned',
+      severity: 'error',
+      message: `Managed asset output contains an unowned file: ${strayPath}`,
+      path: path.join(options.workspace.outputRoot, strayPath),
+    }]);
+  }
+
+  const missingPath = [...expectedPathSet]
+    .sort((left, right) => left.localeCompare(right))
+    .find((filePath) => !actualFiles.has(filePath));
+  if (missingPath) {
+    return syncFailure([{
+      code: 'asset_digest_mismatch',
+      severity: 'error',
+      message: `Managed asset output is missing a registry-owned file: ${missingPath}`,
+      path: path.join(options.workspace.outputRoot, missingPath),
+    }]);
+  }
+
+  const packRoots = new Map(
+    options.validatedRegistryPacks.map((pack) => [pack.loaded.pack.id, pack.sourceDirectory] as const),
+  );
+  const expectedFiles = new Map<string, Buffer>();
+  expectedFiles.set(OUTPUT_MARKER_FILE, options.markerBytes);
+  if (options.registryEntries.length === 0) {
+    return undefined;
+  }
+
+  const validatedByPackId = new Map(
+    options.validatedRegistryPacks.map((pack) => [pack.loaded.pack.id, pack] as const),
+  );
+  const allRegistryEntriesStable = options.registryEntries.every((entry) => {
+    const pack = validatedByPackId.get(entry.packId);
+    return pack !== undefined && packMatchesRegistryEntry(pack, entry);
+  });
+  if (!allRegistryEntriesStable) {
+    return undefined;
+  }
+
+  const compilePlan = compileAssetPacks({
+    baseline: loadActiveAssetPackBaseline({
+      runtime: options.runtime,
+      workspace: options.workspace,
+    }),
+    packs: options.validatedRegistryPacks.map((pack) => pack.loaded.pack),
+  });
+  for (const definition of compilePlan.definitions) {
+    expectedFiles.set(
+      definition.logicalPath,
+      Buffer.from(`${JSON.stringify(canonicalize(definition.definition), null, 2)}\n`),
+    );
+  }
+  for (const sprite of compilePlan.sprites) {
+    const sourceDirectory = packRoots.get(sprite.packId);
+    if (!sourceDirectory) {
+      return syncFailure([{
+        code: 'asset_publish_failed',
+        severity: 'error',
+        message: `No linked source directory found for published sprite owner ${sprite.packId}.`,
+        path: options.workspace.outputRoot,
+      }]);
+    }
+    expectedFiles.set(sprite.destinationPath, readFileSync(path.join(sourceDirectory, sprite.sourcePath)));
+  }
+  expectedFiles.set(
+    'CREDITS.csv',
+    Buffer.from(creditsToCsv(creditsManifest(compilePlan.credits), 'walk')),
+  );
+
+  const mismatchedPath = [...expectedFiles.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .find(([filePath, expectedBytes]) => {
+      const actual = actualFiles.get(filePath);
+      return actual === undefined || !actual.equals(expectedBytes);
+    });
+  if (mismatchedPath) {
+    return syncFailure([{
+      code: 'asset_digest_mismatch',
+      severity: 'error',
+      message: `Managed asset output differs from the registry-owned generated file: ${mismatchedPath[0]}`,
+      path: path.join(options.workspace.outputRoot, mismatchedPath[0]),
+    }]);
+  }
+
+  return undefined;
+}
+
 function preflightPublish(workspace: AssetWorkspace): AssetPackSyncFailure | undefined {
   try {
     assertManagedAssetOutput(workspace);
@@ -632,6 +792,27 @@ export async function syncLinkedAssetPack(options: {
   const registryResult = readRegistryDocument(options.workspace, marker.workspaceId);
   if (!registryResult.ok) return registryResult;
 
+  const currentValidated: ValidatedLinkedPack[] = [];
+  for (const entry of registryResult.document.entries) {
+    const validated = await validateLinkedPack(
+      entry.sourceDirectory,
+      options.runtime,
+      options.workspace,
+      entry.packId,
+    );
+    if (!validated.ok) return validated;
+    currentValidated.push(validated.validated);
+  }
+
+  const publishedOutputFailure = auditPublishedManagedOutput({
+    workspace: options.workspace,
+    runtime: options.runtime,
+    markerBytes,
+    registryEntries: registryResult.document.entries,
+    validatedRegistryPacks: currentValidated,
+  });
+  if (publishedOutputFailure) return publishedOutputFailure;
+
   const requestedResult = await validateLinkedPack(
     options.packDirectory,
     options.runtime,
@@ -643,17 +824,9 @@ export async function syncLinkedAssetPack(options: {
     .filter((entry) => entry.packId !== requested.loaded.pack.id)
     .sort((left, right) => left.packId.localeCompare(right.packId));
 
-  const retainedValidated: ValidatedLinkedPack[] = [];
-  for (const entry of retainedEntries) {
-    const validated = await validateLinkedPack(
-      entry.sourceDirectory,
-      options.runtime,
-      options.workspace,
-      entry.packId,
-    );
-    if (!validated.ok) return validated;
-    retainedValidated.push(validated.validated);
-  }
+  const retainedValidated = currentValidated
+    .filter((pack) => pack.loaded.pack.id !== requested.loaded.pack.id)
+    .filter((pack) => retainedEntries.some((entry) => entry.packId === pack.loaded.pack.id));
 
   const validatedPacks = [
     ...retainedValidated,

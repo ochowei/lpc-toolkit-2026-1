@@ -927,6 +927,123 @@ describe('syncLinkedAssetPack', () => {
     expect(snapshotFile(fixture.workspace.registryPath)).toEqual(beforeRegistry);
   });
 
+  it('refuses to sync when managed output is non-empty but the registry is missing', async () => {
+    const fixture = createWorkspaceFixture();
+    const firstRoot = path.join(fixture.workspace.packsRoot, 'acme.wind-braid');
+    const secondRoot = path.join(fixture.workspace.packsRoot, 'bravo.ribbon-braid');
+    writeNewItemPack(firstRoot, {
+      packId: 'acme.wind-braid',
+      displayName: 'Wind Braid',
+      localId: 'wind-braid',
+      color: '#aa5500',
+    });
+    writeNewItemPack(secondRoot, {
+      packId: 'bravo.ribbon-braid',
+      displayName: 'Ribbon Braid',
+      localId: 'ribbon-braid',
+      color: '#00aa55',
+    });
+
+    expectSuccess(await syncLinkedAssetPack({
+      packDirectory: firstRoot,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+    }));
+    rmSync(fixture.workspace.registryPath, { force: true });
+    const beforeOutput = snapshotTree(fixture.workspace.outputRoot);
+    const beforeRegistry = snapshotFile(fixture.workspace.registryPath);
+
+    const failed = expectFailure(await syncLinkedAssetPack({
+      packDirectory: secondRoot,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+    }));
+
+    expect(diagnosticCodes(failed.diagnostics)).toContain('asset_output_root_unowned');
+    expect(snapshotTree(fixture.workspace.outputRoot)).toEqual(beforeOutput);
+    expect(snapshotFile(fixture.workspace.registryPath)).toEqual(beforeRegistry);
+  });
+
+  it('refuses to sync when managed output contains stray files outside the registry-owned generation', async () => {
+    const fixture = createWorkspaceFixture();
+    const firstRoot = path.join(fixture.workspace.packsRoot, 'acme.wind-braid');
+    const secondRoot = path.join(fixture.workspace.packsRoot, 'bravo.ribbon-braid');
+    writeNewItemPack(firstRoot, {
+      packId: 'acme.wind-braid',
+      displayName: 'Wind Braid',
+      localId: 'wind-braid',
+      color: '#aa5500',
+    });
+    writeNewItemPack(secondRoot, {
+      packId: 'bravo.ribbon-braid',
+      displayName: 'Ribbon Braid',
+      localId: 'ribbon-braid',
+      color: '#00aa55',
+    });
+
+    expectSuccess(await syncLinkedAssetPack({
+      packDirectory: firstRoot,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+    }));
+    writeFileSync(path.join(fixture.workspace.outputRoot, 'rogue.txt'), 'tampered\n');
+    const beforeOutput = snapshotTree(fixture.workspace.outputRoot);
+    const beforeRegistry = snapshotFile(fixture.workspace.registryPath);
+
+    const failed = expectFailure(await syncLinkedAssetPack({
+      packDirectory: secondRoot,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+    }));
+
+    expect(diagnosticCodes(failed.diagnostics)).toContain('asset_output_root_unowned');
+    expect(snapshotTree(fixture.workspace.outputRoot)).toEqual(beforeOutput);
+    expect(snapshotFile(fixture.workspace.registryPath)).toEqual(beforeRegistry);
+  });
+
+  it('refuses to sync when an existing managed generated file has been modified', async () => {
+    const fixture = createWorkspaceFixture();
+    const firstRoot = path.join(fixture.workspace.packsRoot, 'acme.wind-braid');
+    const secondRoot = path.join(fixture.workspace.packsRoot, 'bravo.ribbon-braid');
+    writeNewItemPack(firstRoot, {
+      packId: 'acme.wind-braid',
+      displayName: 'Wind Braid',
+      localId: 'wind-braid',
+      color: '#aa5500',
+    });
+    writeNewItemPack(secondRoot, {
+      packId: 'bravo.ribbon-braid',
+      displayName: 'Ribbon Braid',
+      localId: 'ribbon-braid',
+      color: '#00aa55',
+    });
+
+    expectSuccess(await syncLinkedAssetPack({
+      packDirectory: firstRoot,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+    }));
+    writeFileSync(
+      path.join(
+        fixture.workspace.outputRoot,
+        'spritesheets/packages/acme.wind-braid/wind-braid/foreground/male-female/walk.png',
+      ),
+      'not-a-real-png\n',
+    );
+    const beforeOutput = snapshotTree(fixture.workspace.outputRoot);
+    const beforeRegistry = snapshotFile(fixture.workspace.registryPath);
+
+    const failed = expectFailure(await syncLinkedAssetPack({
+      packDirectory: secondRoot,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+    }));
+
+    expect(diagnosticCodes(failed.diagnostics)).toContain('asset_digest_mismatch');
+    expect(snapshotTree(fixture.workspace.outputRoot)).toEqual(beforeOutput);
+    expect(snapshotFile(fixture.workspace.registryPath)).toEqual(beforeRegistry);
+  });
+
   it('rolls back every injected publish write or rename failure and preserves the previous bytes', async () => {
     const discoveryFixture = await createRollbackFixture();
     const discovery = createFileOpsRecorder();
