@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import {
   mkdirSync,
@@ -200,6 +201,10 @@ function canonicalize(value: unknown): unknown {
     );
   }
   return value;
+}
+
+function sha256Buffer(buffer: Buffer): string {
+  return `sha256:${createHash('sha256').update(buffer).digest('hex')}`;
 }
 
 function writeSortedJson(
@@ -603,13 +608,14 @@ function auditPublishedManagedOutput(options: {
   const validatedByPackId = new Map(
     options.validatedRegistryPacks.map((pack) => [pack.loaded.pack.id, pack] as const),
   );
-  const allRegistryEntriesStable = options.registryEntries.every((entry) => {
-    const pack = validatedByPackId.get(entry.packId);
-    return pack !== undefined && packMatchesRegistryEntry(pack, entry);
-  });
-  if (!allRegistryEntriesStable) {
-    return undefined;
-  }
+  const stableRegistryPackIds = new Set(
+    options.registryEntries
+      .filter((entry) => {
+        const pack = validatedByPackId.get(entry.packId);
+        return pack !== undefined && packMatchesRegistryEntry(pack, entry);
+      })
+      .map((entry) => entry.packId),
+  );
 
   const compilePlan = compileAssetPacks({
     baseline: loadActiveAssetPackBaseline({
@@ -618,8 +624,16 @@ function auditPublishedManagedOutput(options: {
     }),
     packs: options.validatedRegistryPacks.map((pack) => pack.loaded.pack),
   });
+  const currentGeneratedFiles = new Map<string, Buffer>();
+  const currentSpritesByPath = new Map<
+    string,
+    {
+      readonly packId: string;
+      readonly sourcePath: string;
+    }
+  >();
   for (const definition of compilePlan.definitions) {
-    expectedFiles.set(
+    currentGeneratedFiles.set(
       definition.logicalPath,
       Buffer.from(`${JSON.stringify(canonicalize(definition.definition), null, 2)}\n`),
     );
@@ -632,14 +646,36 @@ function auditPublishedManagedOutput(options: {
         severity: 'error',
         message: `No linked source directory found for published sprite owner ${sprite.packId}.`,
         path: options.workspace.outputRoot,
-      }]);
+        }]);
     }
-    expectedFiles.set(sprite.destinationPath, readFileSync(path.join(sourceDirectory, sprite.sourcePath)));
+    const expectedBytes = readFileSync(path.join(sourceDirectory, sprite.sourcePath));
+    currentGeneratedFiles.set(sprite.destinationPath, expectedBytes);
+    currentSpritesByPath.set(sprite.destinationPath, {
+      packId: sprite.packId,
+      sourcePath: sprite.sourcePath,
+    });
   }
-  expectedFiles.set(
+  currentGeneratedFiles.set(
     'CREDITS.csv',
     Buffer.from(creditsToCsv(creditsManifest(compilePlan.credits), 'walk')),
   );
+
+  options.registryEntries
+    .filter((entry) => stableRegistryPackIds.has(entry.packId))
+    .forEach((entry) => {
+      entry.generatedPaths.forEach((generatedPath) => {
+        const expectedBytes = currentGeneratedFiles.get(generatedPath);
+        if (expectedBytes !== undefined) {
+          expectedFiles.set(generatedPath, expectedBytes);
+        }
+      });
+    });
+  if (stableRegistryPackIds.size === options.registryEntries.length) {
+    const expectedCredits = currentGeneratedFiles.get('CREDITS.csv');
+    if (expectedCredits !== undefined) {
+      expectedFiles.set('CREDITS.csv', expectedCredits);
+    }
+  }
 
   const mismatchedPath = [...expectedFiles.entries()]
     .sort(([left], [right]) => left.localeCompare(right))
@@ -653,6 +689,38 @@ function auditPublishedManagedOutput(options: {
       severity: 'error',
       message: `Managed asset output differs from the registry-owned generated file: ${mismatchedPath[0]}`,
       path: path.join(options.workspace.outputRoot, mismatchedPath[0]),
+    }]);
+  }
+
+  const unstableSpriteMismatch = options.registryEntries
+    .filter((entry) => !stableRegistryPackIds.has(entry.packId))
+    .sort((left, right) => left.packId.localeCompare(right.packId))
+    .flatMap((entry) => entry.generatedPaths
+      .map((generatedPath) => {
+        const sprite = currentSpritesByPath.get(generatedPath);
+        if (!sprite || sprite.packId !== entry.packId) return undefined;
+        const currentPack = validatedByPackId.get(entry.packId);
+        const currentSourceDigest = currentPack?.loaded.sourceDigests.get(sprite.sourcePath);
+        const previousSourceDigest = entry.sourceDigests[sprite.sourcePath];
+        if (currentSourceDigest === undefined || previousSourceDigest === undefined) {
+          return undefined;
+        }
+        const actual = actualFiles.get(generatedPath);
+        if (actual === undefined) return undefined;
+        const actualDigest = sha256Buffer(actual);
+        if (actualDigest === currentSourceDigest || actualDigest === previousSourceDigest) {
+          return undefined;
+        }
+        return generatedPath;
+      })
+      .filter((generatedPath): generatedPath is string => generatedPath !== undefined))
+    .at(0);
+  if (unstableSpriteMismatch) {
+    return syncFailure([{
+      code: 'asset_digest_mismatch',
+      severity: 'error',
+      message: `Managed asset output differs from the registry-owned generated file: ${unstableSpriteMismatch}`,
+      path: path.join(options.workspace.outputRoot, unstableSpriteMismatch),
     }]);
   }
 

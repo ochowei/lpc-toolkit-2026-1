@@ -590,6 +590,50 @@ describe('syncLinkedAssetPack', () => {
     expect(snapshotTree(fixture.workspace.outputRoot)).not.toEqual(firstOutput);
   });
 
+  it('refuses source-change re-sync when an existing managed generated file was tampered', async () => {
+    const fixture = createWorkspaceFixture();
+    const packRoot = path.join(fixture.workspace.packsRoot, 'acme.wind-braid');
+    writeNewItemPack(packRoot, {
+      packId: 'acme.wind-braid',
+      displayName: 'Wind Braid',
+      localId: 'wind-braid',
+      color: '#aa5500',
+    });
+
+    expectSuccess(await syncLinkedAssetPack({
+      packDirectory: packRoot,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+    }));
+
+    writeNewItemPack(packRoot, {
+      packId: 'acme.wind-braid',
+      version: '1.1.0',
+      displayName: 'Wind Braid',
+      localId: 'wind-braid',
+      color: '#3355aa',
+    });
+    writeFileSync(
+      path.join(
+        fixture.workspace.outputRoot,
+        'spritesheets/packages/acme.wind-braid/wind-braid/foreground/male-female/walk.png',
+      ),
+      'not-a-real-png\n',
+    );
+    const beforeOutput = snapshotTree(fixture.workspace.outputRoot);
+    const beforeRegistry = snapshotFile(fixture.workspace.registryPath);
+
+    const failed = expectFailure(await syncLinkedAssetPack({
+      packDirectory: packRoot,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+    }));
+
+    expect(diagnosticCodes(failed.diagnostics)).toContain('asset_digest_mismatch');
+    expect(snapshotTree(fixture.workspace.outputRoot)).toEqual(beforeOutput);
+    expect(snapshotFile(fixture.workspace.registryPath)).toEqual(beforeRegistry);
+  });
+
   it('replaces a same-pack-id link target instead of incrementally keeping old generated files', async () => {
     const fixture = createWorkspaceFixture();
     const oldRoot = path.join(fixture.workspace.packsRoot, 'old-shared');
