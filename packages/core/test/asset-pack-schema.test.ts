@@ -251,7 +251,7 @@ describe('asset pack schema', () => {
     });
   });
 
-  it('reports root validation diagnostics before later nested paths', () => {
+  it('reports diagnostics in global JSON-path order', () => {
     const firstAsset = requireNewItemFixture();
     const firstLayer = firstAsset.layers[0];
     if (!firstLayer) {
@@ -280,11 +280,11 @@ describe('asset pack schema', () => {
     });
 
     expect(requireDiagnosticPaths(result)).toEqual([
-      '$.schema',
-      '$.id',
-      '$.version',
-      '$.credits.licenses[0]',
       '$.assets[0].layers[0].sprites[0].source',
+      '$.credits.licenses[0]',
+      '$.id',
+      '$.schema',
+      '$.version',
     ]);
   });
 
@@ -299,6 +299,19 @@ describe('asset pack schema', () => {
     expect(requireDiagnosticPaths(result)).toEqual([
       '$.alpha',
       '$.middle',
+      '$.zulu',
+    ]);
+  });
+
+  it('reports typed sibling diagnostics before later unknown sibling paths', () => {
+    const result = parseAssetPackSource({
+      ...validPack,
+      displayName: false,
+      zulu: true,
+    });
+
+    expect(requireDiagnosticPaths(result)).toEqual([
+      '$.displayName',
       '$.zulu',
     ]);
   });

@@ -182,7 +182,7 @@ export function parseAssetPackSource(input: unknown): AssetPackParseResult {
   const source = parsePackRecord(input, '$', diagnostics);
   return source && diagnostics.length === 0
     ? { ok: true, source }
-    : { ok: false, diagnostics };
+    : { ok: false, diagnostics: sortDiagnostics(diagnostics) };
 }
 
 function parsePackRecord(
@@ -1254,6 +1254,24 @@ function sortedRecordEntries(
 ): [string, unknown][] {
   return Object.entries(record).sort(([left], [right]) =>
     `${path}.${left}`.localeCompare(`${path}.${right}`));
+}
+
+function sortDiagnostics(
+  diagnostics: readonly AssetPackDiagnostic[],
+): AssetPackDiagnostic[] {
+  return diagnostics
+    .map((diagnostic, index) => ({
+      diagnostic,
+      index,
+      path: diagnosticPath(diagnostic),
+    }))
+    .sort((left, right) => left.path.localeCompare(right.path) || left.index - right.index)
+    .map(({ diagnostic }) => diagnostic);
+}
+
+function diagnosticPath(diagnostic: AssetPackDiagnostic): string {
+  const path = diagnostic.details?.path;
+  return typeof path === 'string' ? path : '\uffff';
 }
 
 function asRecord(
