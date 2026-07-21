@@ -7,7 +7,11 @@ import {
   writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
-import { assetPackSourceFromNormalized } from '@lpc-toolkit/core';
+import {
+  assetPackSourceFromNormalized,
+  type AssetPackSource,
+  type NormalizedAssetPack,
+} from '@lpc-toolkit/core';
 import {
   createDeterministicAssetPackArchive,
 } from './asset-pack-archive-format.js';
@@ -40,17 +44,104 @@ export type PackAssetPackResult =
   | PackAssetPackSuccess
   | { readonly ok: false; readonly diagnostics: readonly AssetPackLifecycleDiagnostic[] };
 
+function compareCodeUnits(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+}
+
 function sortJson(value: unknown): unknown {
   if (Array.isArray(value)) return value.map((entry) => sortJson(entry));
   if (value && typeof value === 'object') {
     return Object.fromEntries(
       Object.entries(value)
         .filter(([, entry]) => entry !== undefined)
-        .sort(([left], [right]) => left.localeCompare(right))
+        .sort(([left], [right]) => compareCodeUnits(left, right))
         .map(([key, entry]) => [key, sortJson(entry)]),
     );
   }
   return value;
+}
+
+function compareArchiveAssets(
+  packId: string,
+  left: AssetPackSource['assets'][number],
+  right: AssetPackSource['assets'][number],
+): number {
+  const leftId = left.kind === 'new-item' ? `${packId}--${left.localId}` : left.itemId;
+  const rightId = right.kind === 'new-item' ? `${packId}--${right.localId}` : right.itemId;
+  return compareCodeUnits(leftId, rightId);
+}
+
+function canonicalArchiveAsset(
+  asset: AssetPackSource['assets'][number],
+): AssetPackSource['assets'][number] {
+  if (asset.kind === 'new-item') {
+    return {
+      ...asset,
+      layers: asset.layers.map((layer) => ({
+        ...layer,
+        sprites: [...layer.sprites].sort((left, right) =>
+          compareCodeUnits(left.animation, right.animation)
+          || compareCodeUnits(left.variant ?? '', right.variant ?? '')
+          || compareCodeUnits(left.source, right.source)
+          || compareCodeUnits(left.bodyTypes?.join('\0') ?? '', right.bodyTypes?.join('\0') ?? '')),
+      })),
+      ...(asset.variants
+        ? { variants: [...asset.variants].sort(compareCodeUnits) }
+        : {}),
+    };
+  }
+
+  return {
+    ...asset,
+    addAnimations: asset.addAnimations.map((animation) => ({
+      ...animation,
+      layers: [...animation.layers].sort((left, right) =>
+        compareCodeUnits(left.layer, right.layer)
+        || compareCodeUnits(left.variant ?? '', right.variant ?? '')
+        || compareCodeUnits(left.source, right.source)),
+    })),
+  };
+}
+
+function canonicalArchiveSource(pack: NormalizedAssetPack): AssetPackSource {
+  const source = assetPackSourceFromNormalized(pack);
+  return {
+    ...source,
+    ...(source.compatibility ? {
+      compatibility: {
+        ...source.compatibility,
+        ...(source.compatibility.requiredCapabilities ? {
+          requiredCapabilities: [...source.compatibility.requiredCapabilities].sort(compareCodeUnits),
+        } : {}),
+      },
+    } : {}),
+    ...(source.replaces ? {
+      replaces: source.replaces
+        .map((replacement) => ({
+          ...replacement,
+          assets: [...replacement.assets].sort(compareCodeUnits),
+        }))
+        .sort((left, right) =>
+          compareCodeUnits(left.packId, right.packId)
+          || compareCodeUnits(left.versions, right.versions)
+          || compareCodeUnits(left.assets.join('\0'), right.assets.join('\0'))),
+    } : {}),
+    ...(source.acknowledgements ? {
+      acknowledgements: [...source.acknowledgements].sort((left, right) =>
+        compareCodeUnits(left.code, right.code)
+        || compareCodeUnits(left.contentDigest, right.contentDigest)
+        || compareCodeUnits(left.reason, right.reason)
+        || compareCodeUnits(
+          JSON.stringify(sortJson(left.subject)),
+          JSON.stringify(sortJson(right.subject)),
+        )),
+    } : {}),
+    assets: source.assets
+      .map(canonicalArchiveAsset)
+      .sort((left, right) => compareArchiveAssets(source.id, left, right)),
+  };
 }
 
 function archiveDigest(bytes: Buffer): string {
@@ -190,7 +281,7 @@ export async function packAssetPack(options: {
   }
 
   const manifestBytes = Buffer.from(`${JSON.stringify(
-    sortJson(assetPackSourceFromNormalized(snapshot.pack)),
+    sortJson(canonicalArchiveSource(snapshot.pack)),
     null,
     2,
   )}\n`);
