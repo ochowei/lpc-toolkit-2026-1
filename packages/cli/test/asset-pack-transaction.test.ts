@@ -397,6 +397,12 @@ function writeJournal(fixture: Fixture, journal: unknown): void {
   writeFileSync(transactionPath(fixture.workspace), `${JSON.stringify(journal, null, 2)}\n`);
 }
 
+function readJournal(fixture: Fixture): AssetPackTransactionJournal {
+  return JSON.parse(
+    readFileSync(transactionPath(fixture.workspace), 'utf8'),
+  ) as AssetPackTransactionJournal;
+}
+
 function seedPhase(fixture: Fixture, phase: AssetPackTransactionPhase): {
   readonly journal: AssetPackTransactionJournal;
   readonly cleanupSource: string;
@@ -1280,6 +1286,102 @@ describe('asset-pack transaction recovery', () => {
       expectUnsafe(fixture, seeded.journal);
     },
   );
+
+  it.each(['unmarked', 'substituted'] as const)(
+    'rejects a %s staged output role without deleting it',
+    (kind) => {
+      const fixture = createFixture();
+      const seeded = seedPhase(fixture, 'prepared');
+      const stagedOutput = path.resolve(fixture.workspace.root, seeded.journal.stagedOutput);
+      if (kind === 'unmarked') {
+        rmSync(path.join(stagedOutput, '.lpc-toolkit-managed.json'));
+      } else {
+        writeFileSync(path.join(stagedOutput, 'CREDITS.csv'), 'substituted\n');
+      }
+      writeTreeFile(stagedOutput, 'role-sentinel.txt', `${kind}\n`);
+
+      expectUnsafe(fixture, seeded.journal);
+      expect(readFileSync(path.join(stagedOutput, 'role-sentinel.txt'), 'utf8'))
+        .toBe(`${kind}\n`);
+    },
+  );
+
+  it('rejects an unmarked output backup role without deleting it', () => {
+    const fixture = createFixture();
+    const seeded = seedPhase(fixture, 'registry-published');
+    const outputBackup = path.resolve(
+      fixture.workspace.root,
+      seeded.journal.oldOutputBackup,
+    );
+    rmSync(path.join(outputBackup, '.lpc-toolkit-managed.json'));
+    writeTreeFile(outputBackup, 'role-sentinel.txt', 'backup\n');
+
+    expectUnsafe(fixture, seeded.journal);
+    expect(readFileSync(path.join(outputBackup, 'role-sentinel.txt'), 'utf8'))
+      .toBe('backup\n');
+  });
+
+  it.each([3, 4, 5, 6, 7, 8, 9, 10])(
+    'rejects forged rollback recovery cursor %i without mutation',
+    (cursor) => {
+      const fixture = createFixture();
+      seedPhase(fixture, 'sources-published');
+      let interrupted = false;
+      const authorizationOnly: AssetTransactionFileOps = {
+        ...REAL_FILE_OPS,
+        afterMutationValidationSync(operation, targets) {
+          if (
+            !interrupted
+            && operation === 'remove'
+            && targets.some((target) => path.resolve(target) === fixture.workspace.outputRoot)
+          ) {
+            interrupted = true;
+            throw new Error('stop after rollback authorization');
+          }
+        },
+      };
+      expect(recoverAssetPackTransaction({
+        workspace: fixture.workspace,
+        fileOps: authorizationOnly,
+      }).ok).toBe(false);
+      expect(interrupted).toBe(true);
+      const authorized = readJournal(fixture);
+      expect(authorized.recoveryMode).toBe('rollback');
+
+      expectUnsafe(fixture, { ...authorized, recoveryCursor: cursor });
+    },
+  );
+
+  it.each([1, 2, 3, 4, 5, 6, 7, 8])(
+    'rejects forged cleanup recovery cursor %i without mutation',
+    (cursor) => {
+      const fixture = createFixture();
+      const seeded = seedPhase(fixture, 'registry-published');
+      let interrupted = false;
+      const authorizationOnly: AssetTransactionFileOps = {
+        ...REAL_FILE_OPS,
+        afterMutationValidationSync(operation, targets) {
+          if (
+            !interrupted
+            && operation === 'remove'
+            && targets.some((target) => path.resolve(target) === path.resolve(seeded.cleanupSource))
+          ) {
+            interrupted = true;
+            throw new Error('stop after cleanup authorization');
+          }
+        },
+      };
+      expect(recoverAssetPackTransaction({
+        workspace: fixture.workspace,
+        fileOps: authorizationOnly,
+      }).ok).toBe(false);
+      expect(interrupted).toBe(true);
+      const authorized = readJournal(fixture);
+      expect(authorized.recoveryMode).toBe('cleanup');
+
+      expectUnsafe(fixture, { ...authorized, recoveryCursor: cursor });
+    },
+  );
 });
 
 describe('asset-pack transaction durability', () => {
@@ -1446,6 +1548,69 @@ describe('asset-pack transaction durability', () => {
       desiredState: desiredState(fixture),
       cleanupInstalledSources: [],
     })).toEqual({ ok: true });
+  });
+
+  it('surfaces direct recovery claim unlink failure instead of reporting success', () => {
+    const fixture = createFixture();
+    seedPhase(fixture, 'prepared');
+    let releaseAttempted = false;
+    const releaseFailure: AssetTransactionFileOps = {
+      ...REAL_FILE_OPS,
+      rmSync(target, options) {
+        if (path.basename(String(target)) === 'transaction.lock') {
+          releaseAttempted = true;
+          throw Object.assign(new Error('claim release unlink failed'), { code: 'EIO' });
+        }
+        return rmSync(target, options);
+      },
+    };
+
+    const result = recoverAssetPackTransaction({
+      workspace: fixture.workspace,
+      fileOps: releaseFailure,
+    });
+    expect(releaseAttempted).toBe(true);
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('Expected direct recovery release failure.');
+    expect(result.diagnostics.map((entry) => entry.code)).toEqual(['asset_publish_failed']);
+    expect(result.diagnostics[0]?.message).toContain('claim release unlink failed');
+    expect(existsSync(transactionClaimPath(fixture.workspace))).toBe(true);
+  });
+
+  it('preserves an unsafe recovery result when claim-release fsync also fails', () => {
+    const fixture = createFixture();
+    writeJournal(fixture, { unsafe: true });
+    let claimRemoved = false;
+    let releaseFsyncFailed = false;
+    const releaseFailure: AssetTransactionFileOps = {
+      ...REAL_FILE_OPS,
+      rmSync(target, options) {
+        const result = rmSync(target, options);
+        if (path.basename(String(target)) === 'transaction.lock') claimRemoved = true;
+        return result;
+      },
+      fsyncSync(descriptor) {
+        if (claimRemoved && !releaseFsyncFailed) {
+          releaseFsyncFailed = true;
+          throw Object.assign(new Error('claim release fsync failed'), { code: 'EIO' });
+        }
+        fsyncSync(descriptor);
+      },
+    };
+
+    const result = recoverAssetPackTransaction({
+      workspace: fixture.workspace,
+      fileOps: releaseFailure,
+    });
+    expect(releaseFsyncFailed).toBe(true);
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('Expected unsafe recovery and release failure.');
+    expect(result.diagnostics.map((entry) => entry.code)).toEqual([
+      'asset_transaction_unsafe',
+      'asset_publish_failed',
+    ]);
+    expect(result.diagnostics[1]?.message).toContain('claim release fsync failed');
+    expect(existsSync(transactionClaimPath(fixture.workspace))).toBe(false);
   });
 
   it('fsyncs the parent of every newly created nested output and installed directory', async () => {
@@ -1709,6 +1874,130 @@ describe('asset-pack transaction adversarial recovery', () => {
       }
     },
   );
+
+  it.each(['output', 'registry', 'installed-source'] as const)(
+    'rejects a substituted %s publication child at the mutation boundary',
+    async (boundary) => {
+      const fixture = createFixture();
+      const stagedSource = path.join(fixture.workspace.stateRoot, 'staging', 'incoming-install');
+      const finalSource = installedPath(fixture.workspace);
+      if (boundary === 'installed-source') {
+        writeInstalledSource(fixture, stagedSource, '1.0.0', ARCHIVE_DIGEST);
+      }
+      let substitutedSource: string | undefined;
+      let heldSource: string | undefined;
+      const racingOps: AssetTransactionFileOps = {
+        ...REAL_FILE_OPS,
+        afterMutationValidationSync(operation, targets) {
+          if (operation !== 'rename' || substitutedSource !== undefined) return;
+          const source = path.resolve(targets[0] ?? '');
+          const destination = path.resolve(targets[1] ?? '');
+          const matches = boundary === 'output'
+            ? source === path.resolve(fixture.workspace.outputRoot)
+            : boundary === 'registry'
+              ? source === path.resolve(fixture.workspace.registryPath)
+              : destination === path.resolve(finalSource);
+          if (!matches) return;
+          substitutedSource = source;
+          heldSource = `${source}.held-child`;
+          renameSync(source, heldSource);
+          if (boundary === 'registry') {
+            writeFileSync(source, 'substituted registry child\n');
+          } else {
+            writeTreeFile(source, 'child-sentinel.txt', `${boundary}\n`);
+          }
+        },
+      };
+
+      const result = await publishAssetPackGeneration({
+        operation: boundary === 'installed-source' ? 'install' : 'sync',
+        workspace: fixture.workspace,
+        desiredState: boundary === 'installed-source'
+          ? installedDesiredState(fixture, finalSource)
+          : desiredState(fixture),
+        ...(boundary === 'installed-source'
+          ? { stagedInstalledSource: stagedSource, finalInstalledSource: finalSource }
+          : {}),
+        cleanupInstalledSources: [],
+        fileOps: racingOps,
+      });
+
+      expect(result.ok).toBe(false);
+      expect(substitutedSource).toBeDefined();
+      expect(heldSource).toBeDefined();
+      expect(existsSync(heldSource!)).toBe(true);
+      if (boundary === 'registry') {
+        expect(readFileSync(substitutedSource!, 'utf8')).toBe('substituted registry child\n');
+      } else {
+        expect(readFileSync(path.join(substitutedSource!, 'child-sentinel.txt'), 'utf8'))
+          .toBe(`${boundary}\n`);
+      }
+    },
+  );
+
+  it('rejects a substituted rollback rename child at the mutation boundary', () => {
+    const fixture = createFixture();
+    const seeded = seedPhase(fixture, 'output-published');
+    const outputBackup = path.resolve(fixture.workspace.root, seeded.journal.oldOutputBackup);
+    const heldBackup = `${outputBackup}.held-child`;
+    let substituted = false;
+    const racingOps: AssetTransactionFileOps = {
+      ...REAL_FILE_OPS,
+      afterMutationValidationSync(operation, targets) {
+        if (
+          substituted
+          || operation !== 'rename'
+          || path.resolve(targets[0] ?? '') !== outputBackup
+          || path.resolve(targets[1] ?? '') !== path.resolve(fixture.workspace.outputRoot)
+        ) return;
+        substituted = true;
+        renameSync(outputBackup, heldBackup);
+        writeTreeFile(outputBackup, 'child-sentinel.txt', 'rollback\n');
+      },
+    };
+
+    const result = recoverAssetPackTransaction({
+      workspace: fixture.workspace,
+      fileOps: racingOps,
+    });
+    expect(result.ok).toBe(false);
+    expect(substituted).toBe(true);
+    expect(existsSync(heldBackup)).toBe(true);
+    expect(readFileSync(path.join(outputBackup, 'child-sentinel.txt'), 'utf8'))
+      .toBe('rollback\n');
+  });
+
+  it('rejects a substituted cleanup child before recursive removal', () => {
+    const fixture = createFixture();
+    const seeded = seedPhase(fixture, 'registry-published');
+    const heldCleanup = `${seeded.cleanupSource}.held-child`;
+    const sibling = path.join(path.dirname(seeded.cleanupSource), 'd'.repeat(64));
+    writeTreeFile(sibling, 'child-sentinel.txt', 'cleanup sibling\n');
+    let substituted = false;
+    const racingOps: AssetTransactionFileOps = {
+      ...REAL_FILE_OPS,
+      afterMutationValidationSync(operation, targets) {
+        if (
+          substituted
+          || operation !== 'remove'
+          || !targets.some((target) => path.resolve(target) === path.resolve(seeded.cleanupSource))
+        ) return;
+        substituted = true;
+        renameSync(seeded.cleanupSource, heldCleanup);
+        renameSync(sibling, seeded.cleanupSource);
+      },
+    };
+
+    const result = recoverAssetPackTransaction({
+      workspace: fixture.workspace,
+      fileOps: racingOps,
+    });
+    expect(result.ok).toBe(false);
+    expect(substituted).toBe(true);
+    expect(existsSync(heldCleanup)).toBe(true);
+    expect(readFileSync(path.join(seeded.cleanupSource, 'child-sentinel.txt'), 'utf8'))
+      .toBe('cleanup sibling\n');
+  });
 
   it('rejects a cleanup path for an active sibling without mutation', () => {
     const fixture = createFixture();

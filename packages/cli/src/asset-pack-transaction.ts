@@ -21,6 +21,7 @@ import {
 } from './asset-workspace.js';
 import {
   ASSET_WORKSPACE_REGISTRY_SCHEMA,
+  ASSET_WORKSPACE_REGISTRY_V1_SCHEMA,
   auditPublishedManagedOutput,
   assetPackRegistryBytes,
   readAssetPackRegistry,
@@ -141,6 +142,15 @@ interface DirectoryIdentity {
   readonly inode: string;
 }
 
+type PathEntryIdentity =
+  | { readonly present: false }
+  | {
+    readonly present: true;
+    readonly device: string;
+    readonly inode: string;
+    readonly type: 'directory' | 'file' | 'symlink' | 'other';
+  };
+
 interface MutationGuard {
   readonly workspaceRoot: string;
   readonly roots: Map<string, DirectoryIdentity>;
@@ -236,6 +246,44 @@ function sameIdentity(left: DirectoryIdentity, right: DirectoryIdentity): boolea
   return left.device === right.device && left.inode === right.inode;
 }
 
+function pathEntryIdentity(
+  target: string,
+  fileOps: AssetTransactionFileOps,
+): PathEntryIdentity {
+  try {
+    const stats = (fileOps.lstatSync ?? lstatSync)(target);
+    if (!stats) throw new Error(`Asset transaction path disappeared: ${target}`);
+    const type = stats.isDirectory()
+      ? 'directory'
+      : stats.isFile()
+        ? 'file'
+        : stats.isSymbolicLink()
+          ? 'symlink'
+          : 'other';
+    return {
+      present: true,
+      device: String(stats.dev),
+      inode: String(stats.ino),
+      type,
+    };
+  } catch (error) {
+    if (isNodeError(error) && (error.code === 'ENOENT' || error.code === 'ENOTDIR')) {
+      return { present: false };
+    }
+    throw error;
+  }
+}
+
+function samePathEntryIdentity(
+  left: PathEntryIdentity,
+  right: PathEntryIdentity,
+): boolean {
+  if (!left.present || !right.present) return left.present === right.present;
+  return left.device === right.device
+    && left.inode === right.inode
+    && left.type === right.type;
+}
+
 function rememberDirectory(guard: MutationGuard, target: string): void {
   guard.roots.set(path.resolve(target), directoryIdentity(target, guard.fileOps));
 }
@@ -279,6 +327,7 @@ function withPinnedWorkingDirectory<T>(options: {
   readonly parent: string;
   readonly operation: 'mkdir' | 'write' | 'rename' | 'remove';
   readonly paths: readonly string[];
+  readonly childPaths?: readonly string[];
   readonly action: () => T;
 }): T {
   const absoluteParent = path.resolve(options.parent);
@@ -295,10 +344,29 @@ function withPinnedWorkingDirectory<T>(options: {
     if (!sameIdentity(actual, expected)) {
       throw new Error(`Asset transaction directory identity changed: ${absoluteParent}`);
     }
+    const childIdentities = (options.childPaths ?? []).map((target) => {
+      if (path.resolve(path.dirname(target)) !== absoluteParent) {
+        throw new Error(`Asset transaction child is outside its pinned parent: ${target}`);
+      }
+      const basename = path.basename(target);
+      return {
+        target,
+        basename,
+        identity: pathEntryIdentity(basename, options.guard.fileOps),
+      };
+    });
     options.guard.fileOps.afterMutationValidationSync?.(
       options.operation,
       options.paths,
     );
+    for (const child of childIdentities) {
+      const actualChild = pathEntryIdentity(child.basename, options.guard.fileOps);
+      if (!samePathEntryIdentity(actualChild, child.identity)) {
+        throw new Error(
+          `Asset transaction child identity changed before mutation: ${child.target}`,
+        );
+      }
+    }
     return options.action();
   } finally {
     process.chdir(previousWorkingDirectory);
@@ -923,11 +991,18 @@ function resolveJournal(
   cleanupInstalledSources.forEach((entry) =>
     assertDirectoryIfPresent(entry, 'Asset transaction cleanup installed source'));
 
-  const markerIds = [workspace.outputRoot, oldOutputBackup, stagedOutput]
-    .map((root) => readOutputWorkspaceId(root, fileOps))
-    .filter((entry): entry is string => entry !== undefined);
-  if (markerIds.length === 0 || markerIds.some((entry) => entry !== journal.workspaceId)) {
-    throw new Error('Asset transaction workspaceId does not match its managed output markers.');
+  const outputRoles = [workspace.outputRoot, oldOutputBackup, stagedOutput];
+  const presentOutputRoles = outputRoles.filter((root) => pathEntryExists(root));
+  if (presentOutputRoles.length === 0) {
+    throw new Error('Asset transaction has no managed output role present.');
+  }
+  for (const root of presentOutputRoles) {
+    const markerId = readOutputWorkspaceId(root, fileOps);
+    if (markerId === undefined || markerId !== journal.workspaceId) {
+      throw new Error(
+        `Asset transaction output role is not owned by this workspace: ${root}`,
+      );
+    }
   }
 
   return {
@@ -1091,6 +1166,52 @@ function readInstalledPathsFromRegistry(
   return installed.sort();
 }
 
+function authenticatePendingOutput(
+  workspace: AssetWorkspace,
+  outputRoot: string,
+  registryPath: string,
+  workspaceId: string,
+  fileOps: AssetTransactionFileOps,
+): void {
+  assertDirectoryIfPresent(outputRoot, 'Asset transaction pending output');
+  if (!pathEntryExists(outputRoot)) {
+    throw new Error(`Asset transaction pending output is missing: ${outputRoot}`);
+  }
+  assertNoExistingSymlink(workspace.root, outputRoot, 'Asset transaction pending output');
+  assertNoExistingSymlink(workspace.stateRoot, registryPath, 'Asset transaction pending registry');
+  assertRegularFileIfPresent(registryPath, 'Asset transaction pending registry');
+  const parsed = JSON.parse(fileOps.readFileSync(registryPath).toString('utf8')) as unknown;
+  if (!isRecord(parsed)
+    || (
+      parsed.schema !== ASSET_WORKSPACE_REGISTRY_SCHEMA
+      && parsed.schema !== ASSET_WORKSPACE_REGISTRY_V1_SCHEMA
+    )
+    || parsed.workspaceId !== workspaceId
+    || !isRecord(parsed.generatedDigests)) {
+    throw new Error('Asset transaction pending registry identity is invalid.');
+  }
+  const generatedDigests: Record<string, string> = {};
+  for (const [logicalPath, digest] of Object.entries(parsed.generatedDigests)) {
+    if (typeof digest !== 'string' || !/^sha256:[0-9a-f]{64}$/.test(digest)) {
+      throw new Error(
+        `Asset transaction pending registry generated digest is invalid: ${logicalPath}`,
+      );
+    }
+    generatedDigests[logicalPath] = digest;
+  }
+  const markerPath = path.join(outputRoot, OUTPUT_MARKER_FILE);
+  const markerBytes = fileOps.readFileSync(markerPath);
+  if (readOutputWorkspaceId(outputRoot, fileOps) !== workspaceId) {
+    throw new Error('Asset transaction pending output marker is invalid.');
+  }
+  const audit = auditPublishedManagedOutput({
+    workspace: { ...workspace, outputRoot, registryPath },
+    markerBytes,
+    generatedDigests,
+  });
+  if (audit) throw new Error(audit.message);
+}
+
 function assertInstalledDelta(
   resolved: ResolvedJournal,
   oldGeneration: AuthenticatedGeneration,
@@ -1208,24 +1329,61 @@ function validateRecoveryState(
     fileOps,
     true,
   );
+  let newGeneration: AuthenticatedGeneration | undefined;
   if (hasStagedRegistry) {
-    assertInstalledPathDelta(
-      resolved.cleanupInstalledSources,
-      resolved.finalInstalledSource,
-      installedDirectories(oldGeneration),
-      readInstalledPathsFromRegistry(
-        workspace,
-        resolved.stagedRegistry,
-        resolved.journal.workspaceId,
-        fileOps,
-      ),
-    );
+    const newOutputPath = hasStagedOutput
+      ? resolved.stagedOutput
+      : hasOutputBackup && hasActiveOutput
+        ? workspace.outputRoot
+        : undefined;
+    if (newOutputPath) {
+      if (hasFinalSource) {
+        newGeneration = authenticateGeneration(
+          workspace,
+          newOutputPath,
+          resolved.stagedRegistry,
+          fileOps,
+        );
+        assertInstalledDelta(resolved, oldGeneration, newGeneration);
+      } else {
+        authenticatePendingOutput(
+          workspace,
+          newOutputPath,
+          resolved.stagedRegistry,
+          resolved.journal.workspaceId,
+          fileOps,
+        );
+        assertInstalledPathDelta(
+          resolved.cleanupInstalledSources,
+          resolved.finalInstalledSource,
+          installedDirectories(oldGeneration),
+          readInstalledPathsFromRegistry(
+            workspace,
+            resolved.stagedRegistry,
+            resolved.journal.workspaceId,
+            fileOps,
+          ),
+        );
+      }
+    } else {
+      assertInstalledPathDelta(
+        resolved.cleanupInstalledSources,
+        resolved.finalInstalledSource,
+        installedDirectories(oldGeneration),
+        readInstalledPathsFromRegistry(
+          workspace,
+          resolved.stagedRegistry,
+          resolved.journal.workspaceId,
+          fileOps,
+        ),
+      );
+    }
   }
   if (hasFinalSource) {
     if (!hasStagedRegistry || !hasActiveOutput || !hasOutputBackup) {
       throw new Error('Published source cannot be authenticated against a staged new generation.');
     }
-    const newGeneration = authenticateGeneration(
+    newGeneration ??= authenticateGeneration(
       workspace,
       workspace.outputRoot,
       resolved.stagedRegistry,
@@ -1241,6 +1399,7 @@ function validateRecoveryState(
   }
   return {
     oldGeneration,
+    ...(newGeneration ? { newGeneration } : {}),
     oldRegistryPath: workspace.registryPath,
     ...(hasStagedRegistry ? { newRegistryPath: resolved.stagedRegistry } : {}),
   };
@@ -1672,6 +1831,7 @@ function durableRename(
     parent: sourceParent,
     operation: 'rename',
     paths: [source, destination],
+    childPaths: [source, destination],
     action: () => {
       guard.fileOps.renameSync(path.basename(source), path.basename(destination));
       guard.fileOps.afterMutationSync?.('rename', [source, destination], 'mutation');
@@ -1717,6 +1877,7 @@ function removeListedPath(
     parent: path.dirname(target),
     operation: 'remove',
     paths: [target],
+    childPaths: [target],
     action: () => {
       guard.fileOps.rmSync(path.basename(target), { recursive, force: true });
       guard.fileOps.afterMutationSync?.('remove', [target], 'mutation');
@@ -1875,6 +2036,175 @@ function cleanupMutations(
   ];
 }
 
+type RecoveryPresence = ReadonlyMap<string, boolean>;
+
+function recoveryPathKey(target: string): string {
+  return path.resolve(target);
+}
+
+function setRecoveryPresence(
+  presence: Map<string, boolean>,
+  target: string | undefined,
+  present: boolean,
+): void {
+  if (target !== undefined) presence.set(recoveryPathKey(target), present);
+}
+
+function initialRecoveryPresences(
+  resolved: ResolvedJournal,
+  workspace: AssetWorkspace,
+  mutations: readonly RecoveryMutation[],
+): readonly Map<string, boolean>[] {
+  const base = new Map<string, boolean>();
+  for (const mutation of mutations) {
+    if (mutation.kind === 'remove') {
+      setRecoveryPresence(base, mutation.target, false);
+      setRecoveryPresence(base, mutation.onlyWhenPresent, false);
+    } else {
+      setRecoveryPresence(base, mutation.source, false);
+      setRecoveryPresence(base, mutation.destination, false);
+    }
+  }
+
+  if (resolved.journal.recoveryMode === 'cleanup') {
+    const presence = new Map(base);
+    setRecoveryPresence(presence, workspace.outputRoot, true);
+    setRecoveryPresence(presence, resolved.oldOutputBackup, true);
+    setRecoveryPresence(presence, resolved.stagedOutput, false);
+    setRecoveryPresence(presence, workspace.registryPath, true);
+    setRecoveryPresence(presence, resolved.oldRegistryBackup, true);
+    setRecoveryPresence(presence, resolved.stagedRegistry, false);
+    setRecoveryPresence(presence, resolved.finalInstalledSource, true);
+    setRecoveryPresence(presence, resolved.stagedInstalledSource, false);
+    setRecoveryPresence(presence, resolved.incomingInstalledSource, true);
+    for (const cleanupSource of resolved.cleanupInstalledSources) {
+      setRecoveryPresence(presence, cleanupSource, true);
+    }
+    setRecoveryPresence(presence, resolved.journalTemporaryPath, false);
+    return [presence];
+  }
+
+  setRecoveryPresence(
+    base,
+    workspace.registryPath,
+    resolved.oldRegistryBackup !== undefined,
+  );
+  setRecoveryPresence(base, resolved.oldRegistryBackup, false);
+  setRecoveryPresence(base, resolved.stagedRegistry, true);
+  setRecoveryPresence(base, resolved.journalTemporaryPath, false);
+
+  const outputLayouts = [
+    { active: true, backup: false, staged: true },
+    { active: false, backup: true, staged: true },
+    { active: true, backup: true, staged: false },
+  ] as const;
+  const installedLayouts = resolved.finalInstalledSource
+    ? [
+      { final: false, staged: true },
+      { final: true, staged: false },
+      { final: false, staged: false },
+    ] as const
+    : [{ final: false, staged: false }] as const;
+  const incomingStates = resolved.incomingInstalledSource
+    ? [true, false] as const
+    : [false] as const;
+  const variants: Map<string, boolean>[] = [];
+  for (const outputLayout of outputLayouts) {
+    for (const installedLayout of installedLayouts) {
+      for (const incomingPresent of incomingStates) {
+        const presence = new Map(base);
+        setRecoveryPresence(presence, workspace.outputRoot, outputLayout.active);
+        setRecoveryPresence(presence, resolved.oldOutputBackup, outputLayout.backup);
+        setRecoveryPresence(presence, resolved.stagedOutput, outputLayout.staged);
+        setRecoveryPresence(
+          presence,
+          resolved.finalInstalledSource,
+          installedLayout.final,
+        );
+        setRecoveryPresence(
+          presence,
+          resolved.stagedInstalledSource,
+          installedLayout.staged,
+        );
+        setRecoveryPresence(
+          presence,
+          resolved.incomingInstalledSource,
+          incomingPresent,
+        );
+        variants.push(presence);
+      }
+    }
+  }
+  return variants;
+}
+
+function applyRecoveryPresenceMutation(
+  current: RecoveryPresence,
+  mutation: RecoveryMutation,
+): Map<string, boolean> {
+  const next = new Map(current);
+  if (mutation.kind === 'remove') {
+    if (
+      mutation.onlyWhenPresent
+      && next.get(recoveryPathKey(mutation.onlyWhenPresent)) !== true
+    ) {
+      return next;
+    }
+    next.set(recoveryPathKey(mutation.target), false);
+    return next;
+  }
+  const source = recoveryPathKey(mutation.source);
+  const destination = recoveryPathKey(mutation.destination);
+  const hasSource = next.get(source) === true;
+  const hasDestination = next.get(destination) === true;
+  if (hasSource && !hasDestination) {
+    next.set(source, false);
+    next.set(destination, true);
+    return next;
+  }
+  if (!hasSource && hasDestination) return next;
+  throw new Error('Asset transaction recovery transition table is internally inconsistent.');
+}
+
+function recoveryPresenceMatches(
+  expected: RecoveryPresence,
+  resolved: ResolvedJournal,
+): boolean {
+  for (const [target, present] of expected) {
+    if (target === recoveryPathKey(resolved.journalTemporaryPath)) continue;
+    if (pathEntryExists(target) !== present) return false;
+  }
+  return true;
+}
+
+function validateRecoveryCursorState(
+  resolved: ResolvedJournal,
+  workspace: AssetWorkspace,
+  mutations: readonly RecoveryMutation[],
+): void {
+  const cursor = resolved.journal.recoveryCursor;
+  if (cursor === undefined || cursor > mutations.length) {
+    throw new Error('Asset transaction recovery cursor is outside its transition table.');
+  }
+  for (const initial of initialRecoveryPresences(resolved, workspace, mutations)) {
+    const states: Map<string, boolean>[] = [initial];
+    for (const mutation of mutations) {
+      states.push(applyRecoveryPresenceMutation(states.at(-1)!, mutation));
+    }
+    const current = states[cursor]!;
+    const afterCurrent = cursor < mutations.length ? states[cursor + 1] : undefined;
+    if (
+      recoveryPresenceMatches(current, resolved)
+      || (afterCurrent !== undefined && recoveryPresenceMatches(afterCurrent, resolved))
+    ) {
+      return;
+    }
+  }
+  throw new Error(
+    'Asset transaction recovery cursor does not match its exact filesystem state.',
+  );
+}
+
 function executeRecoveryMutation(
   mutation: RecoveryMutation,
   guard: MutationGuard,
@@ -1926,6 +2256,97 @@ function authorizeRecovery(
   return authorized;
 }
 
+function authenticateAuthorizedRecoveryOutputs(
+  resolved: ResolvedJournal,
+  workspace: AssetWorkspace,
+  fileOps: AssetTransactionFileOps,
+): void {
+  const hasActiveOutput = pathEntryExists(workspace.outputRoot);
+  const hasOutputBackup = pathEntryExists(resolved.oldOutputBackup);
+  const hasStagedOutput = pathEntryExists(resolved.stagedOutput);
+  const hasActiveRegistry = pathEntryExists(workspace.registryPath);
+  const hasOldRegistryBackup = resolved.oldRegistryBackup !== undefined
+    && pathEntryExists(resolved.oldRegistryBackup);
+  const hasStagedRegistry = pathEntryExists(resolved.stagedRegistry);
+
+  if (resolved.journal.recoveryMode === 'cleanup') {
+    if (!hasActiveOutput || !hasActiveRegistry) {
+      throw new Error('Committed recovery lost its active generation.');
+    }
+    authenticateGeneration(
+      workspace,
+      workspace.outputRoot,
+      workspace.registryPath,
+      fileOps,
+    );
+    if (hasOutputBackup) {
+      if (resolved.oldRegistryBackup && hasOldRegistryBackup) {
+        authenticatePendingOutput(
+          workspace,
+          resolved.oldOutputBackup,
+          resolved.oldRegistryBackup,
+          resolved.journal.workspaceId,
+          fileOps,
+        );
+      } else if (resolved.journal.oldRegistryDigest === 'absent') {
+        const markerPath = path.join(resolved.oldOutputBackup, OUTPUT_MARKER_FILE);
+        const markerBytes = fileOps.readFileSync(markerPath);
+        const audit = auditPublishedManagedOutput({
+          workspace: { ...workspace, outputRoot: resolved.oldOutputBackup },
+          markerBytes,
+          generatedDigests: {},
+        });
+        if (audit) throw new Error(audit.message);
+      } else {
+        throw new Error('Committed recovery output backup has no authenticated registry.');
+      }
+    }
+    if (hasStagedOutput) {
+      throw new Error('Committed recovery contains an unexpected staged output role.');
+    }
+    return;
+  }
+
+  const oldRegistryPath = hasOldRegistryBackup
+    ? resolved.oldRegistryBackup
+    : hasActiveRegistry
+      ? workspace.registryPath
+      : undefined;
+  const oldOutputPath = hasOutputBackup
+    ? resolved.oldOutputBackup
+    : hasActiveOutput
+      ? workspace.outputRoot
+      : undefined;
+  if (!oldRegistryPath || !oldOutputPath) {
+    throw new Error('Rollback recovery lost its authenticated old generation.');
+  }
+  authenticateGeneration(
+    workspace,
+    oldOutputPath,
+    oldRegistryPath,
+    fileOps,
+    true,
+  );
+
+  const newOutputPath = hasStagedOutput
+    ? resolved.stagedOutput
+    : hasOutputBackup && hasActiveOutput
+      ? workspace.outputRoot
+      : undefined;
+  if (newOutputPath) {
+    if (!hasStagedRegistry) {
+      throw new Error('Rollback recovery output role has no authenticated staged registry.');
+    }
+    authenticatePendingOutput(
+      workspace,
+      newOutputPath,
+      resolved.stagedRegistry,
+      resolved.journal.workspaceId,
+      fileOps,
+    );
+  }
+}
+
 function validateAuthorizedRecovery(
   resolved: ResolvedJournal,
   workspace: AssetWorkspace,
@@ -1943,9 +2364,7 @@ function validateAuthorizedRecovery(
   const mutations = journal.recoveryMode === 'cleanup'
     ? cleanupMutations(resolved, workspace)
     : rollbackMutations(resolved, workspace);
-  if (journal.recoveryCursor > mutations.length) {
-    throw new Error('Asset transaction recovery cursor is outside its transition table.');
-  }
+  validateRecoveryCursorState(resolved, workspace, mutations);
   if (journal.recoveryMode === 'cleanup') {
     assertDigestIfPresent(
       workspace.registryPath,
@@ -1967,6 +2386,7 @@ function validateAuthorizedRecovery(
         'Old registry backup',
       );
     }
+    authenticateAuthorizedRecoveryOutputs(resolved, workspace, fileOps);
     return;
   }
   if (resolved.oldRegistryBackup) {
@@ -1989,12 +2409,7 @@ function validateAuthorizedRecovery(
     fileOps,
     'Rollback staged registry',
   );
-  const markerIds = [workspace.outputRoot, resolved.oldOutputBackup, resolved.stagedOutput]
-    .map((root) => readOutputWorkspaceId(root, fileOps))
-    .filter((entry): entry is string => entry !== undefined);
-  if (markerIds.some((entry) => entry !== journal.workspaceId)) {
-    throw new Error('Rollback output marker changed during recovery.');
-  }
+  authenticateAuthorizedRecoveryOutputs(resolved, workspace, fileOps);
 }
 
 function runAuthorizedRecovery(
@@ -2148,19 +2563,31 @@ export function recoverAssetPackTransaction(options: {
   } catch (error) {
     return recoveryFailure('asset_publish_failed', error, options.workspace);
   }
+  let result: AssetPackRecoveryResult;
   try {
-    return recoverAssetPackTransactionUnderClaim({
+    result = recoverAssetPackTransactionUnderClaim({
       workspace: options.workspace,
       fileOps,
       claim,
     });
-  } finally {
-    try {
-      releaseTransactionClaim(claim);
-    } catch {
-      // The recovery result remains primary; a stale claim fails closed later.
-    }
+  } catch (error) {
+    result = recoveryFailure('asset_publish_failed', error, options.workspace);
   }
+  try {
+    releaseTransactionClaim(claim);
+  } catch (error) {
+    const releaseFailure = recoveryFailure(
+      'asset_publish_failed',
+      error,
+      options.workspace,
+    );
+    if (result.ok) return releaseFailure;
+    return {
+      ok: false,
+      diagnostics: [...result.diagnostics, ...releaseFailure.diagnostics],
+    };
+  }
+  return result;
 }
 
 function safeOutputDestination(stagedOutput: string, logicalPath: string): string {
