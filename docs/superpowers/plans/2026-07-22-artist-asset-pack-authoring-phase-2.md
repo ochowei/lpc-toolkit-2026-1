@@ -1800,16 +1800,20 @@ CLI documentation impact: `help` updated in this task; `cli-readme` and `root-re
 - Modify: `docs/ENGINEERING.md`
 - Modify: this plan's CLI Documentation Impact matrix if reassessment changes it
 
-**Actual expanded implementation scope:** Task 13 spans 27 tracked paths,
+**Actual expanded implementation scope:** Task 13 spans 38 tracked paths,
 including this plan record. The original acceptance/documentation paths remain,
 plus runtime activation and snapshot-aware consumer integration in
 `packages/cli/src/{animation-audit,asset-overlay-store,catalog-commands,character-commands,command-spec,compose-selection,loaders,main,preset-commands,runtime-assets,selection-document-file}.ts`,
-linked-manifest containment in `packages/cli/src/asset-pack-files.ts`, and the
-matching authoring, lifecycle, sync, command, main-assets, asset-pack-files, and
-runtime-activation tests. This expansion authenticates one runtime generation
-and closes the linked `asset-pack.json` symlink boundary; it does not add a
-dependency, lockfile change, `any`, `upstream/`, checked-in asset/cache,
-release/plugin, Phase 3, remote, push, or PR change.
+linked-manifest containment in `packages/cli/src/asset-pack-files.ts`, final
+manager-file authentication in
+`packages/cli/src/{asset-pack-doctor,asset-pack-install,asset-pack-managed-file,asset-pack-registry,asset-pack-validation}.ts`,
+and the matching authoring, lifecycle, sync, command, validation, registry,
+list, doctor, install, main JSON, asset-pack-files, and runtime-activation
+tests. This expansion authenticates one runtime generation, closes linked
+manifest and registry-file boundaries, and enforces exact installed
+content-addressed locations; it does not add a dependency, lockfile change,
+`any`, `upstream/`, checked-in asset/cache, release/plugin, Phase 3, remote,
+push, or PR change.
 
 **Interfaces:**
 - Consumes: the complete Phase 1+2 public CLI.
@@ -1912,8 +1916,12 @@ Landing shows `asset pack`, second-workspace `asset install`, and `asset doctor`
   - Result: the matrix below is final; help plus CLI/root/landing/architecture/
     engineering are updated, while release and plugin surfaces remain N/A for
     the stated reasons. The linked-manifest containment follow-up is an internal
-    enforcement of the already documented source boundary and requires no
-    additional public, architecture, engineering, release, or plugin wording.
+    enforcement of the already documented source boundary. The final immutable
+    validation, regular registry snapshot, and exact installed-directory
+    checks likewise enforce the documented manager trust boundary without
+    changing public commands, response schemas, workflows, or owned contracts;
+    they require no additional public, architecture, engineering, release, or
+    plugin wording.
   - Verification: `rtk pnpm verify` PASS, including CLI documentation-policy
     tests (19 passed).
   - Commit: `13a3b016aa8757e057823f3467a587dde14680fd`
@@ -1936,18 +1944,28 @@ plugin: N/A — the audit skill stays read-only and asset-authoring skill design
   - Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-version.test.ts asset-pack-schema.test.ts asset-pack-compile.test.ts`
     PASS (3 files, 66 tests).
   - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-payload.test.ts asset-pack-archive-format.test.ts asset-pack-packaging.test.ts asset-pack-inspection.test.ts asset-pack-registry.test.ts asset-pack-state.test.ts asset-pack-transaction.test.ts asset-pack-install.test.ts asset-pack-remove.test.ts asset-pack-doctor.test.ts asset-lifecycle-e2e.test.ts`
-    PASS (11 files, 295 tests).
+    PASS (11 files, 301 tests).
   - Verification: `rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifacts.test.ts`
     PASS (2 files, 3 tests).
   - Verification: `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS
     (`Packed CLI install smoke test passed.`).
   - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- runtime-asset-pack-activation.test.ts`
-    PASS (1 file, 7 tests), including external linked-manifest symlink rejection
-    before runtime action execution.
+    PASS (1 file, 9 tests), including external linked-manifest and registry
+    symlink rejection plus exact installed-directory enforcement before runtime
+    action execution.
   - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-files.test.ts asset-pack-state.test.ts asset-pack-sync.test.ts runtime-asset-pack-activation.test.ts`
-    PASS (4 files, 67 tests), covering pre-read manifest checks, linked path
+    PASS (4 files, 69 tests), covering pre-read manifest checks, linked path
     components, desired-state authentication, sync publication, and runtime
     activation.
+  - Final correctness RED: the focused validation/registry/list/doctor/runtime/
+    install command produced 11 expected failures and 145 passes before the
+    implementation. Failures covered an external manifest link and
+    non-regular manifest, an external registry link, registry target-only
+    mutation, receipt-valid mislocated installed sources, and the public
+    command/service paths.
+  - Final correctness GREEN: that same 7-module command PASS (156 tests); the
+    expanded command including `asset-pack-files.test.ts` PASS (8 files, 166
+    tests).
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-version.test.ts asset-pack-schema.test.ts asset-pack-compile.test.ts
@@ -1966,7 +1984,7 @@ Expected: PASS.
     330 tests).
   - Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
   - Verification: `rtk pnpm --filter @lpc-toolkit/cli test` PASS (54 files,
-    990 passed, 1 intentional skip). A sandbox-only run produced 13
+    1001 passed, 1 intentional skip). A sandbox-only run produced 13
     `listen EPERM` failures in `web-server.test.ts`; the required permitted exact
     rerun passed the complete suite.
   - Verification: `rtk pnpm --filter @lpc-toolkit/cli build` PASS.
@@ -1975,7 +1993,7 @@ Expected: PASS.
   - Verification: `rtk pnpm --filter @lpc-toolkit/web test` PASS (78 files,
     698 tests).
   - Verification: `rtk pnpm verify` PASS (exit 0; boundaries, CLI docs policy, plugin,
-    all workspace typechecks, Core 330, Presets 3, Web 698, CLI 990 passed and
+    all workspace typechecks, Core 330, Presets 3, Web 698, CLI 1001 passed and
     1 intentional skip).
 
 ```sh
@@ -1997,11 +2015,13 @@ Expected: PASS. Fix implementation failures; do not weaken archive limits, attri
   - Verification: `rtk git status --short`, `rtk git diff --check`,
     `rtk git diff --stat`, and the scoped `rtk git diff` inspection PASS.
     The implementation range
-    `3caefcb39668936c4165950850be0e0da960b2c0..b763c4c0a4e74e1077e59e01fcb0300b317f8330`
-    contains the 27 Task 13 paths summarized above. The expanded runtime and
-    security paths are traceable to authenticated generation activation and
-    linked-manifest containment. There are no dependency/lockfile, `any` type,
-    `upstream/`, checked-in asset/cache, release/plugin, generated workspace,
+    `3caefcb39668936c4165950850be0e0da960b2c0..d6f8d3c09c935c2e16f3c765fa06dd7ac044f9de`
+    contains the 38 Task 13 paths summarized above. The final correction commit
+    contains exactly 13 CLI source/test paths. The expanded runtime and security
+    paths are traceable to authenticated generation activation, immutable
+    validation, stable regular registry snapshots, and exact installed source
+    locations. There are no dependency/lockfile, `any` type, `upstream/`,
+    checked-in asset/cache, release/plugin, generated workspace,
     archive-fixture, Phase 3, remote, push, or PR changes.
 
 ```sh
@@ -2025,13 +2045,16 @@ Expected: only planned files and plan records; no `upstream/`, checked-in assets
     `4f19983b4d1fe10dd3bebbd3b45d0a3f55cd73d1`.
   - Linked-manifest containment commit:
     `b763c4c0a4e74e1077e59e01fcb0300b317f8330`.
-  - Verification: `rtk git diff --check 3caefcb39668936c4165950850be0e0da960b2c0..b763c4c0a4e74e1077e59e01fcb0300b317f8330`
-    PASS; focused manifest/runtime tests and CLI typecheck passed again after
-    the permitted exact Step 7/8 runs, and the product tree was clean before
-    this plan-record update.
-  - Review status: final fresh reviewer APPROVED with no Critical, Important,
-    or Minor findings in `.superpowers/sdd/task-13-review-final-3.md` after the
-    linked-manifest containment fix and refreshed verification record.
+  - Final whole-branch correctness commit:
+    `d6f8d3c09c935c2e16f3c765fa06dd7ac044f9de`.
+  - Verification: `rtk git diff --check 3caefcb39668936c4165950850be0e0da960b2c0..d6f8d3c09c935c2e16f3c765fa06dd7ac044f9de`
+    PASS; focused validation/registry/list/doctor/runtime/install tests, Task 13
+    Step 7, every exact Step 8 command, and the packed lifecycle smoke passed.
+    The product tree was clean before this plan-record update.
+  - Review status: the earlier Task 13 approval was superseded by the final
+    whole-branch review that identified three Important trust-boundary gaps.
+    Those findings are fixed in the product commit above; a fresh final review
+    of the updated branch is pending after this plan-record commit.
 
 ```sh
 rtk git add packages/cli/test/asset-lifecycle-e2e.test.ts packages/cli/scripts/smoke-packed-cli.mjs packages/cli/README.md README.md packages/web/src/components/landing-page.tsx packages/web/test/landing-page.test.tsx docs/ARCHITECTURE.md docs/ENGINEERING.md
