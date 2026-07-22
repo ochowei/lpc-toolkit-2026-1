@@ -951,6 +951,211 @@ describe('asset-pack transaction recovery', () => {
     },
   );
 
+  it('restores the exact old output and registry absence after an interrupted first publication', async () => {
+    const fixture = createFixture();
+    rmSync(fixture.workspace.registryPath);
+    const before = snapshotTree(fixture.root);
+    let journalWriteCount = 0;
+    const crashingOps: AssetTransactionFileOps = {
+      ...REAL_FILE_OPS,
+      writeFileSync(target, data, writeOptions) {
+        if (String(target).includes('transaction.json.')) {
+          journalWriteCount += 1;
+          if (journalWriteCount === 3) {
+            throw new Error('injected crash after absent-registry output swap');
+          }
+        }
+        writeFileSync(target, data, writeOptions);
+      },
+    };
+
+    expect((await publishAssetPackGeneration({
+      operation: 'sync',
+      workspace: fixture.workspace,
+      desiredState: desiredState(fixture),
+      cleanupInstalledSources: [],
+      fileOps: crashingOps,
+    })).ok).toBe(false);
+    expect(readJournal(fixture)).toMatchObject({
+      phase: 'prepared',
+      recoveryMode: 'rollback',
+      oldRegistryDigest: 'absent',
+    });
+    expect(readJournal(fixture).oldRegistryBackup).toBeUndefined();
+
+    expect(recoverAssetPackTransaction({ workspace: fixture.workspace })).toEqual({
+      ok: true,
+      action: 'rolled-back',
+    });
+    expect(existsSync(fixture.workspace.registryPath)).toBe(false);
+    expect(snapshotTree(fixture.root)).toEqual(before);
+    expect(recoverAssetPackTransaction({ workspace: fixture.workspace })).toEqual({
+      ok: true,
+      action: 'none',
+    });
+  });
+
+  it('rejects a registry that appears after absent-registry rollback authorization', async () => {
+    const fixture = createFixture();
+    rmSync(fixture.workspace.registryPath);
+    let journalWriteCount = 0;
+    const crashingOps: AssetTransactionFileOps = {
+      ...REAL_FILE_OPS,
+      writeFileSync(target, data, writeOptions) {
+        if (String(target).includes('transaction.json.')) {
+          journalWriteCount += 1;
+          if (journalWriteCount === 3) {
+            throw new Error('injected crash after absent-registry output swap');
+          }
+        }
+        writeFileSync(target, data, writeOptions);
+      },
+    };
+
+    expect((await publishAssetPackGeneration({
+      operation: 'sync',
+      workspace: fixture.workspace,
+      desiredState: desiredState(fixture),
+      cleanupInstalledSources: [],
+      fileOps: crashingOps,
+    })).ok).toBe(false);
+    writeFileSync(fixture.workspace.registryPath, assetPackRegistryBytes(desiredState(fixture).registry));
+    const beforeRecovery = snapshotTree(fixture.root);
+
+    const recovery = recoverAssetPackTransaction({ workspace: fixture.workspace });
+    expect(recovery.ok).toBe(false);
+    if (recovery.ok) throw new Error('Expected unsafe absent-registry recovery failure.');
+    expect(recovery.diagnostics.map((entry) => entry.code)).toEqual([
+      'asset_transaction_unsafe',
+    ]);
+    expect(snapshotTree(fixture.root)).toEqual(beforeRecovery);
+  });
+
+  it('rejects replacement of a created installed parent before rollback', async () => {
+    const fixture = createFixture();
+    const stagedSource = path.join(
+      fixture.workspace.stateRoot,
+      'staging',
+      'incoming-install',
+    );
+    const finalSource = installedPath(fixture.workspace);
+    writeInstalledSource(fixture, stagedSource, '1.0.0', ARCHIVE_DIGEST);
+    let journalWriteCount = 0;
+    const crashingOps: AssetTransactionFileOps = {
+      ...REAL_FILE_OPS,
+      writeFileSync(target, data, writeOptions) {
+        if (String(target).includes('transaction.json.')) {
+          journalWriteCount += 1;
+          if (journalWriteCount === 3) {
+            throw new Error('injected crash after created-parent authorization');
+          }
+        }
+        writeFileSync(target, data, writeOptions);
+      },
+    };
+
+    expect((await publishAssetPackGeneration({
+      operation: 'install',
+      workspace: fixture.workspace,
+      desiredState: installedDesiredState(fixture, finalSource),
+      stagedInstalledSource: stagedSource,
+      finalInstalledSource: finalSource,
+      cleanupInstalledSources: [],
+      fileOps: crashingOps,
+    })).ok).toBe(false);
+    const journal = readJournal(fixture);
+    const versionParent = path.dirname(finalSource);
+    expect(journal.createdInstalledParents).toEqual([
+      relativeToWorkspace(fixture.workspace, versionParent),
+      relativeToWorkspace(fixture.workspace, path.dirname(versionParent)),
+    ]);
+    expect(journal.recoveryRoleEvidence?.filter((entry) =>
+      entry.role === 'created-installed-parent')).toHaveLength(2);
+
+    const displacedParent = `${versionParent}.displaced`;
+    renameSync(versionParent, displacedParent);
+    mkdirSync(versionParent);
+    const beforeRecovery = snapshotTree(fixture.root);
+
+    const recovery = recoverAssetPackTransaction({ workspace: fixture.workspace });
+    expect(recovery.ok).toBe(false);
+    if (recovery.ok) throw new Error('Expected unsafe created-parent recovery failure.');
+    expect(recovery.diagnostics.map((entry) => entry.code)).toEqual([
+      'asset_transaction_unsafe',
+    ]);
+    expect(snapshotTree(fixture.root)).toEqual(beforeRecovery);
+  });
+
+  it('resumes rollback after a created installed parent is durably removed', async () => {
+    const fixture = createFixture();
+    const stagedSource = path.join(
+      fixture.workspace.stateRoot,
+      'staging',
+      'incoming-install',
+    );
+    const finalSource = installedPath(fixture.workspace);
+    const versionParent = path.dirname(finalSource);
+    const packParent = path.dirname(versionParent);
+    writeInstalledSource(fixture, stagedSource, '1.0.0', ARCHIVE_DIGEST);
+    let journalWriteCount = 0;
+    const publicationCrash: AssetTransactionFileOps = {
+      ...REAL_FILE_OPS,
+      writeFileSync(target, data, writeOptions) {
+        if (String(target).includes('transaction.json.')) {
+          journalWriteCount += 1;
+          if (journalWriteCount === 3) {
+            throw new Error('injected crash after created-parent authorization');
+          }
+        }
+        writeFileSync(target, data, writeOptions);
+      },
+    };
+
+    expect((await publishAssetPackGeneration({
+      operation: 'install',
+      workspace: fixture.workspace,
+      desiredState: installedDesiredState(fixture, finalSource),
+      stagedInstalledSource: stagedSource,
+      finalInstalledSource: finalSource,
+      cleanupInstalledSources: [],
+      fileOps: publicationCrash,
+    })).ok).toBe(false);
+
+    let interrupted = false;
+    const firstRecovery = recoverAssetPackTransaction({
+      workspace: fixture.workspace,
+      fileOps: {
+        ...REAL_FILE_OPS,
+        afterMutationSync(operation, targets, boundary) {
+          if (
+            !interrupted
+            && operation === 'remove'
+            && boundary === 'mutation'
+            && path.resolve(targets[0] ?? '') === versionParent
+          ) {
+            interrupted = true;
+            throw new Error('injected interruption after created-parent removal');
+          }
+        },
+      },
+    });
+    expect(firstRecovery.ok).toBe(false);
+    expect(interrupted).toBe(true);
+    expect(existsSync(versionParent)).toBe(false);
+    expect(existsSync(packParent)).toBe(true);
+
+    expect(recoverAssetPackTransaction({ workspace: fixture.workspace })).toEqual({
+      ok: true,
+      action: 'rolled-back',
+    });
+    expect(existsSync(versionParent)).toBe(false);
+    expect(existsSync(packParent)).toBe(false);
+    expect(recoverAssetPackTransaction({ workspace: fixture.workspace })).toEqual({
+      ok: true,
+      action: 'none',
+    });
+  });
+
   it('journals the destination-local installed stage before copying into it', async () => {
     const fixture = createFixture();
     const stagedSource = path.join(

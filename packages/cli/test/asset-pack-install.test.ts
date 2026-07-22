@@ -51,6 +51,7 @@ import {
 } from '../src/asset-pack-transaction.js';
 import {
   ASSET_OUTPUT_MARKER_SCHEMA,
+  assetPackInstalledDirectory,
   initializeAssetWorkspace,
   type AssetWorkspace,
 } from '../src/asset-workspace.js';
@@ -445,13 +446,20 @@ function transactionJournal(workspace: AssetWorkspace): {
 
 function crashingFileOps(
   workspace: AssetWorkspace,
-  crashPoint: 'before-source' | 'after-source' | 'after-registry',
+  crashPoint: 'before-journal' | 'before-source' | 'after-source' | 'after-registry',
 ): AssetTransactionFileOps {
   let journalWriteCount = 0;
   let installJournalSeen = false;
   return {
     ...REAL_FILE_OPS,
     writeFileSync(target, data, writeOptions) {
+      if (
+        crashPoint === 'before-journal'
+        && path.basename(String(target)).startsWith('.registry.json.')
+        && path.basename(String(target)).endsWith('.staged')
+      ) {
+        throw new Error('injected before-journal crash');
+      }
       if (String(target).includes('transaction.json.')) {
         const journalText = typeof data === 'string'
           ? data
@@ -705,6 +713,54 @@ function firstInstallPath(
 }
 
 describe('installAssetPack staging and receipts', () => {
+  it('restores an absent registry and the exact managed trees when receipt timestamp creation fails', async () => {
+    const fixture = createFixture();
+    const archive = await createArchive(
+      fixture,
+      newItemSource({ packId: 'acme.receipt-failure', version: '1.0.0' }),
+      'receipt-failure',
+    );
+    const outputBefore = snapshotTree(fixture.workspace.outputRoot);
+    const stateBefore = snapshotTree(fixture.workspace.stateRoot);
+
+    const diagnostics = expectFailure(await installAssetPack({
+      archivePath: archive.path,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+      now: () => {
+        throw new Error('injected receipt timestamp failure');
+      },
+    }));
+
+    expect(diagnostics[0]?.code).toBe('asset_publish_failed');
+    expect(existsSync(fixture.workspace.registryPath)).toBe(false);
+    expect(snapshotTree(fixture.workspace.outputRoot)).toEqual(outputBefore);
+    expect(snapshotTree(fixture.workspace.stateRoot)).toEqual(stateBefore);
+  });
+
+  it('restores an absent registry and the exact managed trees on pre-journal publication failure', async () => {
+    const fixture = createFixture();
+    const archive = await createArchive(
+      fixture,
+      newItemSource({ packId: 'acme.pre-journal-failure', version: '1.0.0' }),
+      'pre-journal-failure',
+    );
+    const outputBefore = snapshotTree(fixture.workspace.outputRoot);
+    const stateBefore = snapshotTree(fixture.workspace.stateRoot);
+
+    const diagnostics = expectFailure(await installAssetPack({
+      archivePath: archive.path,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+      fileOps: crashingFileOps(fixture.workspace, 'before-journal'),
+    }));
+
+    expect(diagnostics[0]?.code).toBe('asset_publish_failed');
+    expect(existsSync(fixture.workspace.registryPath)).toBe(false);
+    expect(snapshotTree(fixture.workspace.outputRoot)).toEqual(outputBefore);
+    expect(snapshotTree(fixture.workspace.stateRoot)).toEqual(stateBefore);
+  });
+
   it('installs normalized verified bytes at the full digest path with an exact receipt', async () => {
     const fixture = createFixture();
     const source = newItemSource({ packId: 'acme.receipt', version: '1.0.0' });
@@ -800,6 +856,8 @@ describe('installAssetPack staging and receipts', () => {
     const outside = createDirectory('lpc-asset-pack-install-staging-outside-');
     writeFileSync(path.join(outside, 'sentinel.txt'), 'outside sentinel\n');
     symlinkSync(outside, stagingRoot, 'dir');
+    const outputBefore = snapshotTree(fixture.workspace.outputRoot);
+    const stateBefore = snapshotTree(fixture.workspace.stateRoot);
 
     const diagnostics = expectFailure(await installAssetPack({
       archivePath: archive.path,
@@ -811,7 +869,48 @@ describe('installAssetPack staging and receipts', () => {
     expect(readFileSync(path.join(outside, 'sentinel.txt'), 'utf8')).toBe('outside sentinel\n');
     expect(readdirSync(outside)).toEqual(['sentinel.txt']);
     expect(existsSync(fixture.workspace.registryPath)).toBe(false);
+    expect(snapshotTree(fixture.workspace.outputRoot)).toEqual(outputBefore);
+    expect(snapshotTree(fixture.workspace.stateRoot)).toEqual(stateBefore);
   });
+
+  it.each([
+    'CON',
+    'prn.txt',
+    'aux.',
+    'nul ',
+    'COM1.json',
+    'lpt9...',
+  ])('rejects the portable Windows device-name segment %s on every host', (packId) => {
+    expect(() => assetPackInstalledDirectory({
+      workspace: createFixture().workspace,
+      packId,
+      version: '1.0.0',
+      archiveDigest: `sha256:${'a'.repeat(64)}`,
+    })).toThrow(/unsafe path segment/iu);
+  });
+
+  it.each(['acme.conifer', 'com10', 'lpt10', 'prnter'])(
+    'preserves the valid portable pack ID %s and the full archive digest path',
+    (packId) => {
+      const fixture = createFixture();
+      const digest = '0123456789abcdef'.repeat(4);
+
+      const installedDirectory = assetPackInstalledDirectory({
+        workspace: fixture.workspace,
+        packId,
+        version: '1.2.3-beta.1',
+        archiveDigest: `sha256:${digest}`,
+      });
+
+      expect(installedDirectory).toBe(path.join(
+        fixture.workspace.installedRoot,
+        packId,
+        '1.2.3-beta.1',
+        digest,
+      ));
+      expect(path.basename(installedDirectory)).toHaveLength(64);
+    },
+  );
 });
 
 describe('installAssetPack transaction boundaries', () => {
@@ -831,6 +930,11 @@ describe('installAssetPack transaction boundaries', () => {
       mkdirSync(artistRoot, { recursive: true });
       writeFileSync(path.join(artistRoot, 'sentinel.txt'), 'artist sentinel\n');
       const artistBefore = snapshotTree(artistRoot);
+      const stagingSibling = path.join(fixture.workspace.stagingRoot, 'unlisted-sibling');
+      mkdirSync(stagingSibling);
+      writeFileSync(path.join(stagingSibling, 'sentinel.txt'), 'staging sibling\n');
+      const outputBefore = snapshotTree(fixture.workspace.outputRoot);
+      const stateBefore = snapshotTree(fixture.workspace.stateRoot);
 
       expectFailure(await installAssetPack({
         archivePath: archive.path,
@@ -856,7 +960,12 @@ describe('installAssetPack transaction boundaries', () => {
         'acme.crash',
         '1.0.0',
       ))).toBe(false);
-      expect(readRegistry(fixture.workspace).entries).toEqual([]);
+      expect(readdirSync(fixture.workspace.stagingRoot)).toEqual(['unlisted-sibling']);
+      expect(existsSync(fixture.workspace.registryPath)).toBe(false);
+      expect(snapshotTree(fixture.workspace.outputRoot)).toEqual(outputBefore);
+      expect(snapshotTree(fixture.workspace.stateRoot)).toEqual(stateBefore);
+      expect(readFileSync(path.join(stagingSibling, 'sentinel.txt'), 'utf8'))
+        .toBe('staging sibling\n');
       expect(snapshotTree(artistRoot)).toEqual(artistBefore);
     },
   );

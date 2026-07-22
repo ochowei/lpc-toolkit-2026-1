@@ -215,12 +215,8 @@ function stageInstalledPayload(options: {
   readonly workspaceId: string;
   readonly now: () => Date;
 }): { readonly sourceDirectory: string; readonly loaded: AssetPackPayloadSuccess } {
-  const sourceDirectory = path.join(options.stagingRoot.path, 'source');
-  const canonicalSourceDirectory = path.join(options.stagingRoot.canonicalPath, 'source');
-  extractVerifiedAssetPackPayload({
-    snapshot: options.snapshot,
-    targetDirectory: canonicalSourceDirectory,
-  });
+  const sourceDirectory = options.stagingRoot.path;
+  const canonicalSourceDirectory = options.stagingRoot.canonicalPath;
 
   const manifestBytes = normalizedManifestBytes(options.snapshot.payload.pack);
   const parsed = parseAssetPackPayload({
@@ -601,6 +597,7 @@ async function installUnderClaim(options: {
   if (!inspected.report.valid || !inspected.snapshot) {
     return diagnosticFailure(inspected.report.diagnostics);
   }
+  const snapshot = inspected.snapshot;
 
   const preparedCurrent = await prepareAssetPackDesiredState({
     workspace: options.workspace,
@@ -608,62 +605,53 @@ async function installUnderClaim(options: {
     mutation: { kind: 'none' },
   });
   if (!preparedCurrent.ok) return diagnosticFailure(preparedCurrent.diagnostics);
-  let current: AssetPackDesiredState = preparedCurrent;
-  if (!existsSync(options.workspace.registryPath)) {
-    const migration = await options.publisher.publish({
-      operation: 'sync',
-      desiredState: current,
-      cleanupInstalledSources: [],
-    });
-    if (!migration.ok) return migration;
-    const migrated = await prepareAssetPackDesiredState({
-      workspace: options.workspace,
-      runtime: options.runtime,
-      mutation: { kind: 'none' },
-    });
-    if (!migrated.ok) return diagnosticFailure(migrated.diagnostics);
-    current = migrated;
-  }
+  const current: AssetPackDesiredState = preparedCurrent;
 
   const action = lifecycleAction({
     current,
-    incoming: inspected.snapshot.payload,
-    archiveDigest: inspected.snapshot.archiveDigest,
+    incoming: snapshot.payload,
+    archiveDigest: snapshot.archiveDigest,
     archivePath: options.archivePath,
   });
   if (typeof action !== 'string') return action;
 
-  const pack = inspected.snapshot.payload.pack;
+  const pack = snapshot.payload.pack;
   const finalInstalledSource = assetPackInstalledDirectory({
     workspace: options.workspace,
     packId: pack.id,
     version: pack.version,
-    archiveDigest: inspected.snapshot.archiveDigest,
+    archiveDigest: snapshot.archiveDigest,
   });
   if (action === 'unchanged') {
     return installSuccess({
       action,
       packId: pack.id,
       version: pack.version,
-      archiveDigest: inspected.snapshot.archiveDigest,
+      archiveDigest: snapshot.archiveDigest,
       installedDirectory: finalInstalledSource,
       desiredState: current,
     });
   }
 
-  const stagingRoot = createAssetPackInstallStagingRoot(options.workspace);
+  const stagingRoot = createAssetPackInstallStagingRoot(
+    options.workspace,
+    (targetDirectory) => extractVerifiedAssetPackPayload({
+      snapshot,
+      targetDirectory,
+    }),
+  );
   let preserveForRecovery = false;
   try {
     const staged = stageInstalledPayload({
       stagingRoot,
-      snapshot: inspected.snapshot,
+      snapshot,
       workspaceId: current.registry.workspaceId,
       now: options.now,
     });
     const candidate: ValidatedActiveAssetPack = {
       kind: 'installed',
       sourceDirectory: finalInstalledSource,
-      archiveDigest: inspected.snapshot.archiveDigest,
+      archiveDigest: snapshot.archiveDigest,
       loaded: staged.loaded,
       diagnostics: inspected.report.diagnostics,
     };
@@ -698,7 +686,7 @@ async function installUnderClaim(options: {
       action,
       packId: pack.id,
       version: pack.version,
-      archiveDigest: inspected.snapshot.archiveDigest,
+      archiveDigest: snapshot.archiveDigest,
       installedDirectory: finalInstalledSource,
       desiredState: desired,
     });

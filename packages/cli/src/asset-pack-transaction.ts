@@ -10,6 +10,7 @@ import {
   readdirSync,
   readFileSync,
   renameSync,
+  rmdirSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -48,6 +49,7 @@ export type AssetPackRecoveryRoleEvidence =
   | {
     readonly role:
       | 'cleanup-installed-source'
+      | 'created-installed-parent'
       | 'incoming-installed-source'
       | 'published-installed-source';
     readonly path: string;
@@ -56,6 +58,7 @@ export type AssetPackRecoveryRoleEvidence =
   | {
     readonly role:
       | 'cleanup-installed-source'
+      | 'created-installed-parent'
       | 'incoming-installed-source'
       | 'published-installed-source';
     readonly path: string;
@@ -81,6 +84,7 @@ export interface AssetPackTransactionJournal {
   readonly stagedInstalledSource?: string;
   readonly finalInstalledSource?: string;
   readonly cleanupInstalledSources: readonly string[];
+  readonly createdInstalledParents?: readonly string[];
   readonly recoveryMode?: 'rollback' | 'cleanup';
   readonly recoveryCursor?: number;
   readonly oldRegistryDigest?: string;
@@ -93,6 +97,7 @@ export interface AssetTransactionFileOps {
   readonly writeFileSync: typeof writeFileSync;
   readonly readFileSync: typeof readFileSync;
   readonly renameSync: typeof renameSync;
+  readonly rmdirSync?: typeof rmdirSync;
   readonly rmSync: typeof rmSync;
   readonly openSync: typeof openSync;
   readonly fsyncSync: typeof fsyncSync;
@@ -158,6 +163,7 @@ interface ResolvedJournal {
   readonly stagedInstalledSource?: string;
   readonly finalInstalledSource?: string;
   readonly cleanupInstalledSources: readonly string[];
+  readonly createdInstalledParents: readonly string[];
 }
 
 interface DirectoryIdentity {
@@ -200,6 +206,7 @@ const JOURNAL_REQUIRED_KEYS = [
 ] as const;
 const JOURNAL_OPTIONAL_KEYS = [
   'oldRegistryBackup',
+  'createdInstalledParents',
   'incomingInstalledSource',
   'stagedInstalledSource',
   'finalInstalledSource',
@@ -222,6 +229,7 @@ const OPERATIONS: readonly AssetPackTransactionJournal['operation'][] = [
 ];
 const RECOVERY_ROLES: readonly AssetPackRecoveryRoleEvidence['role'][] = [
   'cleanup-installed-source',
+  'created-installed-parent',
   'incoming-installed-source',
   'published-installed-source',
 ];
@@ -234,6 +242,7 @@ const DEFAULT_FILE_OPS: AssetTransactionFileOps = {
   writeFileSync,
   readFileSync,
   renameSync,
+  rmdirSync,
   rmSync,
   openSync,
   fsyncSync,
@@ -726,6 +735,14 @@ function stringArrayValue(record: Record<string, unknown>, key: string): readonl
   return value;
 }
 
+function optionalStringArrayValue(
+  record: Record<string, unknown>,
+  key: string,
+): readonly string[] | undefined {
+  if (!(key in record)) return undefined;
+  return stringArrayValue(record, key);
+}
+
 function optionalRecoveryRoleEvidenceValue(
   record: Record<string, unknown>,
 ): readonly AssetPackRecoveryRoleEvidence[] | undefined {
@@ -816,6 +833,7 @@ function parseJournalRecord(value: unknown): AssetPackTransactionJournal {
   const incomingInstalledSource = optionalStringValue(value, 'incomingInstalledSource');
   const stagedInstalledSource = optionalStringValue(value, 'stagedInstalledSource');
   const finalInstalledSource = optionalStringValue(value, 'finalInstalledSource');
+  const createdInstalledParents = optionalStringArrayValue(value, 'createdInstalledParents');
   const recoveryMode = optionalStringValue(value, 'recoveryMode');
   const recoveryCursor = optionalIntegerValue(value, 'recoveryCursor');
   const oldRegistryDigest = optionalStringValue(value, 'oldRegistryDigest');
@@ -863,12 +881,19 @@ function parseJournalRecord(value: unknown): AssetPackTransactionJournal {
     incomingInstalledSource !== undefined
     || stagedInstalledSource !== undefined
     || finalInstalledSource !== undefined
+    || (createdInstalledParents?.length ?? 0) > 0
     || stringArrayValue(value, 'cleanupInstalledSources').length > 0
   )) {
     throw new Error('Sync transactions cannot publish or clean installed sources.');
   }
   if (operation === 'remove' && incomingInstalledSource !== undefined) {
     throw new Error('Remove transactions cannot publish an installed source.');
+  }
+  if (operation !== 'install' && (createdInstalledParents?.length ?? 0) > 0) {
+    throw new Error('Only install transactions can create installed parent directories.');
+  }
+  if ((createdInstalledParents?.length ?? 0) > 0 && finalInstalledSource === undefined) {
+    throw new Error('Created installed parents require a final installed source.');
   }
   if (operation === 'install' && stagedInstalledSource === undefined) {
     throw new Error('Install transactions must publish an installed source.');
@@ -887,6 +912,7 @@ function parseJournalRecord(value: unknown): AssetPackTransactionJournal {
     ...(stagedInstalledSource ? { stagedInstalledSource } : {}),
     ...(finalInstalledSource ? { finalInstalledSource } : {}),
     cleanupInstalledSources: stringArrayValue(value, 'cleanupInstalledSources'),
+    ...(createdInstalledParents ? { createdInstalledParents } : {}),
     ...(recoveryMode !== undefined
       ? {
         recoveryMode: recoveryMode as 'rollback' | 'cleanup',
@@ -939,6 +965,8 @@ function validateRecoveryRoleEvidencePaths(
       ...(journal.incomingInstalledSource
         ? [`incoming-installed-source:${journal.incomingInstalledSource}`]
         : []),
+      ...(journal.createdInstalledParents ?? []).map((entry) =>
+        `created-installed-parent:${entry}`),
     ]
     : [
       ...journal.cleanupInstalledSources.map((entry) =>
@@ -1036,6 +1064,8 @@ function resolveJournal(
     );
   const cleanupInstalledSources = journal.cleanupInstalledSources.map((entry) =>
     resolveRelativePath(workspace, entry, 'Asset transaction cleanupInstalledSources entry'));
+  const createdInstalledParents = (journal.createdInstalledParents ?? []).map((entry) =>
+    resolveRelativePath(workspace, entry, 'Asset transaction createdInstalledParents entry'));
 
   assertExactPath(
     oldOutputBackup,
@@ -1098,6 +1128,20 @@ function resolveJournal(
       finalInstalledSource,
       'Asset transaction finalInstalledSource',
     );
+    const allowedCreatedParents = [
+      path.dirname(finalInstalledSource),
+      path.dirname(path.dirname(finalInstalledSource)),
+    ];
+    if (
+      JSON.stringify(createdInstalledParents)
+      !== JSON.stringify(allowedCreatedParents.slice(0, createdInstalledParents.length))
+    ) {
+      throw new Error(
+        'Asset transaction created installed parents must be exact deepest-first final-source ancestors.',
+      );
+    }
+  } else if (createdInstalledParents.length > 0) {
+    throw new Error('Asset transaction created installed parents have no final source.');
   }
   for (const cleanupSource of cleanupInstalledSources) {
     assertInstalledGenerationPath(
@@ -1142,6 +1186,8 @@ function resolveJournal(
   }
   cleanupInstalledSources.forEach((entry) =>
     assertDirectoryIfPresent(entry, 'Asset transaction cleanup installed source'));
+  createdInstalledParents.forEach((entry) =>
+    assertDirectoryIfPresent(entry, 'Asset transaction created installed parent'));
 
   const outputRoles = [workspace.outputRoot, oldOutputBackup, stagedOutput];
   const presentOutputRoles = outputRoles.filter((root) => pathEntryExists(root));
@@ -1170,6 +1216,7 @@ function resolveJournal(
     ...(stagedInstalledSource ? { stagedInstalledSource } : {}),
     ...(finalInstalledSource ? { finalInstalledSource } : {}),
     cleanupInstalledSources,
+    createdInstalledParents,
   };
 }
 
@@ -1703,6 +1750,20 @@ function recoveryRoleEvidenceForAuthorization(
       fileOps,
     }));
   }
+  if (mode === 'rollback') {
+    resolved.createdInstalledParents.forEach((absolutePath, index) => {
+      const relativePath = resolved.journal.createdInstalledParents?.[index];
+      if (!relativePath) {
+        throw new Error('Asset transaction created installed parent path is missing.');
+      }
+      evidence.push(captureRecoveryRoleEvidence({
+        role: 'created-installed-parent',
+        path: relativePath,
+        candidates: [{ relativePath, absolutePath }],
+        fileOps,
+      }));
+    });
+  }
   if (mode === 'cleanup') {
     resolved.cleanupInstalledSources.forEach((absolutePath, index) => {
       const relativePath = resolved.journal.cleanupInstalledSources[index]!;
@@ -2183,7 +2244,13 @@ function removeListedPath(
     paths: [target],
     childPaths: [target],
     action: () => {
-      guard.fileOps.rmSync(path.basename(target), { recursive, force: true });
+      const name = path.basename(target);
+      const stats = transactionLstat(name, guard.fileOps);
+      if (!recursive && stats.isDirectory()) {
+        (guard.fileOps.rmdirSync ?? rmdirSync)(name);
+      } else {
+        guard.fileOps.rmSync(name, { recursive, force: true });
+      }
       guard.fileOps.afterMutationSync?.('remove', [target], 'mutation');
       fsyncCurrentDirectory(guard.fileOps);
       guard.fileOps.afterMutationSync?.('remove', [target], 'fsync');
@@ -2269,6 +2336,12 @@ function rollbackMutations(
         recursive: true,
       }] as const
       : []),
+    ...resolved.createdInstalledParents.map((target): RecoveryMutation => ({
+      kind: 'remove',
+      root: path.join(workspace.stateRoot, 'installed'),
+      target,
+      recursive: false,
+    })),
     {
       kind: 'remove',
       root: workspace.stateRoot,
@@ -2454,6 +2527,20 @@ function initialRecoveryPresences(
       resolved.journal.incomingInstalledSource,
     ).present
     : false;
+  const createdParentPresences = resolved.createdInstalledParents.map((parent, index) => {
+    const relativePath = resolved.journal.createdInstalledParents?.[index];
+    if (!relativePath) {
+      throw new Error('Asset transaction created installed parent path is missing.');
+    }
+    return {
+      parent,
+      present: recoveryRoleEvidenceEntry(
+        resolved.journal,
+        'created-installed-parent',
+        relativePath,
+      ).present,
+    };
+  });
   const variants: Map<string, boolean>[] = [];
   for (const registryLayout of registryLayouts) {
     for (const outputLayout of outputLayouts) {
@@ -2480,6 +2567,9 @@ function initialRecoveryPresences(
           resolved.incomingInstalledSource,
           incomingPresent,
         );
+        for (const parent of createdParentPresences) {
+          setRecoveryPresence(presence, parent.parent, parent.present);
+        }
         variants.push(presence);
       }
     }
@@ -2621,6 +2711,10 @@ function recoveryRoleCandidatePaths(
   if (evidence.role === 'incoming-installed-source') {
     return resolved.incomingInstalledSource ? [resolved.incomingInstalledSource] : [];
   }
+  if (evidence.role === 'created-installed-parent') {
+    const index = resolved.journal.createdInstalledParents?.indexOf(evidence.path) ?? -1;
+    return index === -1 ? [] : [resolved.createdInstalledParents[index]!];
+  }
   const index = resolved.journal.cleanupInstalledSources.indexOf(evidence.path);
   return index === -1 ? [] : [resolved.cleanupInstalledSources[index]!];
 }
@@ -2658,7 +2752,12 @@ function authenticateAuthorizedRecoveryRoles(
         `Asset transaction recovery role identity changed after authorization: ${evidence.path}`,
       );
     }
-    if (authenticatedDirectoryDigest(target, fileOps) !== evidence.contentDigest) {
+    // Rollback changes these parents by removing the transaction-owned child first.
+    // Their pinned identity plus a non-recursive removal still protects unrelated contents.
+    if (
+      evidence.role !== 'created-installed-parent'
+      && authenticatedDirectoryDigest(target, fileOps) !== evidence.contentDigest
+    ) {
       throw new Error(
         `Asset transaction recovery role contents changed after authorization: ${evidence.path}`,
       );
@@ -2726,7 +2825,10 @@ function authenticateAuthorizedRecoveryOutputs(
     ? resolved.oldRegistryBackup
     : hasActiveRegistry
       ? workspace.registryPath
-      : undefined;
+      : resolved.oldRegistryBackup === undefined
+          && resolved.journal.oldRegistryDigest === 'absent'
+        ? workspace.registryPath
+        : undefined;
   const oldOutputPath = hasOutputBackup
     ? resolved.oldOutputBackup
     : hasActiveOutput
@@ -3061,6 +3163,16 @@ function validatePublicationSources(options: PublishAssetPackGenerationOptions):
   }
 }
 
+function absentInstalledParents(
+  finalInstalledSource: string | undefined,
+): readonly string[] {
+  if (!finalInstalledSource) return [];
+  return [
+    path.dirname(finalInstalledSource),
+    path.dirname(path.dirname(finalInstalledSource)),
+  ].filter((entry) => !pathEntryExists(entry));
+}
+
 function materializeDesiredState(options: {
   readonly desiredState: AssetPackDesiredState;
   readonly stagedOutput: string;
@@ -3220,6 +3332,9 @@ function publishAssetPackGenerationUnderClaimFromStableDirectory(
   const localInstalledSource = options.finalInstalledSource
     ? transactionSiblingPath(options.finalInstalledSource, operationId, 'staged')
     : undefined;
+  const createdInstalledParents = absentInstalledParents(
+    options.finalInstalledSource,
+  );
   let journalWritten = false;
   let result: AssetPackPublicationResult;
 
@@ -3304,6 +3419,10 @@ function publishAssetPackGenerationUnderClaimFromStableDirectory(
         : {}),
       cleanupInstalledSources: options.cleanupInstalledSources.map((entry) =>
         canonicalRelativePath(options.workspace, entry)),
+      ...(createdInstalledParents.length > 0
+        ? { createdInstalledParents: createdInstalledParents.map((entry) =>
+          canonicalRelativePath(options.workspace, entry)) }
+        : {}),
     };
     resolveJournal(options.workspace, journal, fileOps);
     writeJournalDurably(options.workspace, journal, claim.guard);

@@ -1,4 +1,5 @@
 import {
+  chmodSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -123,6 +124,17 @@ function isInsideRoot(root: string, candidate: string): boolean {
       !relative.startsWith(`..${path.sep}`) &&
       !path.isAbsolute(relative))
   );
+}
+
+function isPortablePathSegment(segment: string): boolean {
+  return segment.length > 0
+    && segment !== '.'
+    && segment !== '..'
+    && !segment.includes('/')
+    && !segment.includes('\\')
+    && !/[\u0000-\u001f\u007f<>:"|?*]/u.test(segment)
+    && !/[. ]$/u.test(segment)
+    && !/^(con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])(?:\..*)?$/iu.test(segment);
 }
 
 function isAllowedRootAliasSymlink(target: string): boolean {
@@ -275,14 +287,33 @@ function pinRealDirectory(target: string, label: string): {
 
 export function createAssetPackInstallStagingRoot(
   workspace: AssetWorkspace,
+  initialize: (targetDirectory: string) => void,
 ): AssetPackInstallStagingRoot {
   assertSafeExistingSubpath(
     workspace.root,
     path.relative(workspace.root, workspace.stagingRoot),
   );
+  const originalParent = pinRealDirectory(workspace.stagingRoot, 'Asset-pack staging root');
+  if ((originalParent.status.mode & 0o077) !== 0) {
+    chmodSync(originalParent.canonicalPath, 0o700);
+  }
   const parent = pinRealDirectory(workspace.stagingRoot, 'Asset-pack staging root');
+  if (
+    parent.status.dev !== originalParent.status.dev
+    || parent.status.ino !== originalParent.status.ino
+    || parent.canonicalPath !== originalParent.canonicalPath
+  ) {
+    throw new AssetWorkspaceError(
+      `Asset-pack staging root identity changed: ${workspace.stagingRoot}`,
+    );
+  }
+  if ((parent.status.mode & 0o077) !== 0) {
+    throw new AssetWorkspaceError(
+      `Asset-pack staging root is not private: ${workspace.stagingRoot}`,
+    );
+  }
   const target = path.join(workspace.stagingRoot, `install-${randomUUID()}`);
-  mkdirSync(target, { mode: 0o700 });
+  initialize(path.join(parent.canonicalPath, path.basename(target)));
   const pinned = pinRealDirectory(target, 'Asset-pack install staging root');
   const confirmedParent = pinRealDirectory(workspace.stagingRoot, 'Asset-pack staging root');
   if (
@@ -346,12 +377,8 @@ export function assetPackInstalledDirectory(options: {
     throw new AssetWorkspaceError('Installed asset-pack archive digest is invalid.');
   }
   if (
-    path.basename(options.packId) !== options.packId
-    || path.basename(options.version) !== options.version
-    || options.packId === '.'
-    || options.packId === '..'
-    || options.version === '.'
-    || options.version === '..'
+    !isPortablePathSegment(options.packId)
+    || !isPortablePathSegment(options.version)
   ) {
     throw new AssetWorkspaceError('Installed asset-pack identity contains an unsafe path segment.');
   }
