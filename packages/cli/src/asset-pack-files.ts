@@ -227,8 +227,23 @@ function inspectSources(
 export function loadAssetPackFiles(root: string): AssetPackFilesResult {
   const absoluteRoot = path.resolve(root);
   const manifestPath = path.join(absoluteRoot, MANIFEST_FILE);
-  const manifestBytes = readFileSync(manifestPath);
-  const manifestMtimeMs = lstatSync(manifestPath).mtimeMs;
+  const inspectedManifest = inspectSourceEntryPath(absoluteRoot, MANIFEST_FILE);
+  if (!inspectedManifest.ok) {
+    return { ok: false, diagnostics: [inspectedManifest.diagnostic] };
+  }
+  const manifestStats = lstatSync(inspectedManifest.canonicalPath);
+  if (!manifestStats.isFile()) {
+    return {
+      ok: false,
+      diagnostics: [sourceDiagnostic(
+        'asset_source_not_regular',
+        absoluteRoot,
+        MANIFEST_FILE,
+      )],
+    };
+  }
+  const manifestBytes = readFileSync(inspectedManifest.canonicalPath);
+  const manifestMtimeMs = manifestStats.mtimeMs;
 
   let manifestJson: unknown;
   try {

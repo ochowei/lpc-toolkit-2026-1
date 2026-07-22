@@ -1,10 +1,13 @@
 import { createHash } from 'node:crypto';
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   renameSync,
   rmSync,
+  symlinkSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import os from 'node:os';
@@ -278,6 +281,48 @@ afterEach(() => {
 });
 
 describe('workspace runtime asset-pack activation', () => {
+  it('rejects an external linked manifest symlink during sync and runtime activation', async () => {
+    const fixture = createFixture();
+    const manifestBytes = readFileSync(fixture.manifestPath);
+    const outsideManifestPath = path.join(fixture.root, 'external-valid-asset-pack.json');
+    writeFileSync(outsideManifestPath, manifestBytes);
+    unlinkSync(fixture.manifestPath);
+    symlinkSync(outsideManifestPath, fixture.manifestPath);
+
+    const failedSync = await syncLinkedAssetPack({
+      packDirectory: fixture.packRoot,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+    });
+    expect(failedSync).toMatchObject({
+      ok: false,
+      diagnostics: [{
+        code: 'asset_source_symlink',
+        path: fixture.manifestPath,
+      }],
+    });
+    expect(existsSync(fixture.workspace.registryPath)).toBe(false);
+
+    unlinkSync(fixture.manifestPath);
+    writeFileSync(fixture.manifestPath, manifestBytes);
+    await syncFixture(fixture);
+    unlinkSync(fixture.manifestPath);
+    symlinkSync(outsideManifestPath, fixture.manifestPath);
+
+    let activated = false;
+    await expect(withWorkspaceRuntimeAssets({
+      runtime: fixture.runtime,
+      cwd: fixture.root,
+      action: async () => {
+        activated = true;
+      },
+    })).rejects.toMatchObject({
+      code: 'asset_source_symlink',
+      path: fixture.manifestPath,
+    });
+    expect(activated).toBe(false);
+  });
+
   it('rejects linked source bytes that no longer match authenticated registry v2 state', async () => {
     const fixture = createFixture();
     await syncFixture(fixture);

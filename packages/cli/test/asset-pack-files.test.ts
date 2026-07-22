@@ -117,6 +117,22 @@ describe('loadAssetPackFiles', () => {
     expect(lstatSync(manifestPath).mtimeMs).toBe(beforeMtimeMs);
   });
 
+  it('rejects manifest symlinks before parsing external bytes', () => {
+    const root = createDirectory('lpc-asset-pack-files-manifest-symlink-');
+    const outside = createDirectory('lpc-asset-pack-files-manifest-outside-');
+    const manifestPath = path.join(root, 'asset-pack.json');
+    const outsideManifestPath = path.join(outside, 'external.json');
+    writeFileSync(outsideManifestPath, '{"schema":');
+    symlinkSync(outsideManifestPath, manifestPath);
+
+    expect(requireFailure(root)).toEqual([{
+      code: 'asset_source_symlink',
+      message: 'Invalid asset-pack source: asset-pack.json',
+      path: manifestPath,
+      sourcePath: 'asset-pack.json',
+    }]);
+  });
+
   it('surfaces core schema diagnostics for invalid manifests', () => {
     const root = createDirectory('lpc-asset-pack-files-schema-');
     writePack(root, {
