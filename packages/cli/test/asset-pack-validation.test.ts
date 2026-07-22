@@ -5,6 +5,7 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import os from 'node:os';
@@ -525,6 +526,54 @@ describe('loadActiveAssetPackBaseline', () => {
 });
 
 describe('validateAssetPackDirectory', () => {
+  it('rejects an external manifest symlink without parsing its bytes', async () => {
+    const runtime = createRuntimeFixture().runtime;
+    const packRoot = createDirectory('lpc-asset-pack-validation-manifest-link-');
+    const outsideRoot = createDirectory('lpc-asset-pack-validation-manifest-outside-');
+    const manifestPath = path.join(packRoot, 'asset-pack.json');
+    const outsideManifestPath = path.join(outsideRoot, 'external.json');
+    writeFileSync(outsideManifestPath, '{"schema":');
+    symlinkSync(outsideManifestPath, manifestPath, 'file');
+
+    const report = await validateAssetPackDirectory({ packDirectory: packRoot, runtime });
+
+    expect(report).toMatchObject({
+      packDirectory: packRoot,
+      valid: false,
+      diagnostics: [{
+        code: 'asset_source_symlink',
+        severity: 'error',
+        path: manifestPath,
+        sourcePath: 'asset-pack.json',
+      }],
+      acknowledgementRecords: [],
+    });
+    expect(report.diagnostics.map((diagnostic) => diagnostic.code)).not.toContain(
+      'asset_pack_manifest_json_invalid',
+    );
+  });
+
+  it('reports a non-regular manifest path without reading it', async () => {
+    const runtime = createRuntimeFixture().runtime;
+    const packRoot = createDirectory('lpc-asset-pack-validation-manifest-directory-');
+    const manifestPath = path.join(packRoot, 'asset-pack.json');
+    mkdirSync(manifestPath);
+
+    const report = await validateAssetPackDirectory({ packDirectory: packRoot, runtime });
+
+    expect(report).toMatchObject({
+      packDirectory: packRoot,
+      valid: false,
+      diagnostics: [{
+        code: 'asset_source_not_regular',
+        severity: 'error',
+        path: manifestPath,
+        sourcePath: 'asset-pack.json',
+      }],
+      acknowledgementRecords: [],
+    });
+  });
+
   it.each([
     { label: 'wrong', width: 512, height: 256 },
     { label: 'huge', width: 0x7fff_ffff, height: 0x7fff_ffff },

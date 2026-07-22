@@ -15,7 +15,11 @@ import type {
   ItemDefinition,
   NormalizedAssetPackReplacement,
 } from '@lpc-toolkit/core';
-import type { AssetWorkspace } from './asset-workspace.js';
+import { readAssetPackManagedFile } from './asset-pack-managed-file.js';
+import {
+  assetPackInstalledDirectory,
+  type AssetWorkspace,
+} from './asset-workspace.js';
 
 export const ASSET_WORKSPACE_REGISTRY_V1_SCHEMA =
   'lpc-toolkit.asset-workspace-registry.v1' as const;
@@ -321,7 +325,7 @@ function readRegularManagedFile(root: string, logicalPath: string, label: string
     }
     if (!stats.isFile()) throw new Error(`${label} must be a regular file: ${current}.`);
   }
-  return readFileSync(current);
+  return readAssetPackManagedFile({ filePath: current, label }).bytes;
 }
 
 export function resolveLinkedAssetPackDirectory(
@@ -561,10 +565,26 @@ function readV2Entry(value: unknown, workspace: AssetWorkspace, workspaceId: str
     };
   }
   const archiveDigest = digestAt(record, 'archiveDigest', 'Asset-pack registry entry');
+  const installedDirectoryValue = stringAt(
+    record,
+    'installedDirectory',
+    'Asset-pack registry entry',
+  );
+  const expectedInstalledDirectory = assetPackInstalledDirectory({
+    workspace,
+    packId,
+    version,
+    archiveDigest,
+  });
+  if (installedDirectoryValue !== expectedInstalledDirectory) {
+    throw new Error(
+      `Installed asset-pack registry entry must use its exact content-addressed directory: ${expectedInstalledDirectory}.`,
+    );
+  }
   const installedDirectory = verifyInstalledAssetPackDirectory({
     workspace,
     workspaceId,
-    installedDirectory: stringAt(record, 'installedDirectory', 'Asset-pack registry entry'),
+    installedDirectory: installedDirectoryValue,
     entry: base,
     archiveDigest,
   });
@@ -853,13 +873,26 @@ export function assetPackCompileProjectionFromPlan(options: {
 
 export function readAssetPackRegistry(options: { readonly workspace: AssetWorkspace; readonly markerWorkspaceId: string }): AssetPackRegistryReadResult {
   try {
-    if (!existsSync(options.workspace.registryPath)) {
-      const files = snapshotManagedOutputFiles(options.workspace.outputRoot);
-      files.delete('.lpc-toolkit-managed.json');
-      if (files.size > 0) throw new Error('Managed asset output contains files but the asset-pack registry is missing.');
-      return { ok: true, document: emptyDocument(options.markerWorkspaceId), needsMigration: false };
+    let registryBytes: Buffer;
+    try {
+      registryBytes = readAssetPackManagedFile({
+        filePath: options.workspace.registryPath,
+        label: 'Asset workspace registry',
+      }).bytes;
+    } catch (error) {
+      if (
+        error instanceof Error
+        && 'code' in error
+        && (error.code === 'ENOENT' || error.code === 'ENOTDIR')
+      ) {
+        const files = snapshotManagedOutputFiles(options.workspace.outputRoot);
+        files.delete('.lpc-toolkit-managed.json');
+        if (files.size > 0) throw new Error('Managed asset output contains files but the asset-pack registry is missing.');
+        return { ok: true, document: emptyDocument(options.markerWorkspaceId), needsMigration: false };
+      }
+      throw error;
     }
-    const record = requireRecord(JSON.parse(readFileSync(options.workspace.registryPath, 'utf8')) as unknown, 'Asset workspace registry');
+    const record = requireRecord(JSON.parse(registryBytes.toString('utf8')) as unknown, 'Asset workspace registry');
     const schema = stringAt(record, 'schema', 'Asset workspace registry');
     if (schema === ASSET_WORKSPACE_REGISTRY_V1_SCHEMA) {
       exactKeys(record, V1_DOCUMENT_KEYS, 'Asset workspace registry');

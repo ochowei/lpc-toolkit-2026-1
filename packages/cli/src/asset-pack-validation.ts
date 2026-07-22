@@ -10,8 +10,6 @@ import {
   assetPackContentProjection,
   createCatalog,
   createPaletteCatalog,
-  normalizeAssetPack,
-  parseAssetPackSource,
   standardAnimationGeometry,
   validateAssetPack as validateCoreAssetPack,
   type AnimationAuditGeometry,
@@ -28,7 +26,11 @@ import {
   type RecolorConfig,
 } from '@lpc-toolkit/core';
 import type { AssetWorkspace } from './asset-workspace.js';
-import type { AssetPackFilesSuccess } from './asset-pack-files.js';
+import {
+  loadAssetPackFiles,
+  type AssetPackFileDiagnostic,
+  type AssetPackFilesSuccess,
+} from './asset-pack-files.js';
 import type { AssetPackPayloadSuccess } from './asset-pack-payload.js';
 import { loadJsonRecords } from './loaders.js';
 import { createNodeCanvasAdapter } from './node-canvas-adapter.js';
@@ -804,6 +806,22 @@ function invalidManifestReport(
   };
 }
 
+function invalidFileReport(
+  packDirectory: string,
+  diagnostics: readonly AssetPackFileDiagnostic[],
+): AssetPackValidationReport {
+  return {
+    schema: VALIDATION_SCHEMA,
+    packDirectory,
+    valid: false,
+    diagnostics: diagnostics.map((diagnostic) => ({
+      ...diagnostic,
+      severity: 'error' as const,
+    })),
+    acknowledgementRecords: [],
+  };
+}
+
 export async function validateAssetPackPayload(options: {
   readonly payload: AssetPackPayloadSuccess;
   readonly runtime: RuntimeAssets;
@@ -811,36 +829,89 @@ export async function validateAssetPackPayload(options: {
   readonly origin: string;
 }): Promise<AssetPackValidationReport> {
   const inspections = await inspectCapturedAssetPackSources(options.payload);
+  return validateInspectedAssetPack({
+    pack: options.payload.pack,
+    inspections,
+    contentDigest: options.payload.contentDigest,
+    runtime: options.runtime,
+    ...(options.workspace ? { workspace: options.workspace } : {}),
+    origin: options.origin,
+  });
+}
+
+function validateInspectedAssetPack(options: {
+  readonly pack: NormalizedAssetPack;
+  readonly inspections: readonly AssetPackSourceInspection[];
+  readonly contentDigest: string;
+  readonly runtime: RuntimeAssets;
+  readonly workspace?: AssetWorkspace;
+  readonly origin: string;
+}): AssetPackValidationReport {
   const baseline = loadActiveAssetPackBaseline({
     runtime: options.runtime,
     ...(options.workspace ? { workspace: options.workspace } : {}),
   });
   const result = validateCoreAssetPack({
-    pack: options.payload.pack,
+    pack: options.pack,
     baseline,
     palettes: baseline.palettes,
-    inspections,
-    contentDigest: options.payload.contentDigest,
+    inspections: options.inspections,
+    contentDigest: options.contentDigest,
   });
   const recolorDiagnostics = validateRecolorSourceRamps(
-    options.payload.pack,
+    options.pack,
     baseline.palettes,
-    inspections,
+    options.inspections,
   );
   const compatibilityDiagnostics = checkAssetPackCompatibility(
-    options.payload.pack,
+    options.pack,
     CLI_VERSION,
   );
 
   return {
     schema: VALIDATION_SCHEMA,
-    packId: options.payload.pack.id,
+    packId: options.pack.id,
     packDirectory: options.origin,
-    contentDigest: options.payload.contentDigest,
+    contentDigest: options.contentDigest,
     valid: result.ok && recolorDiagnostics.length === 0 && compatibilityDiagnostics.length === 0,
     diagnostics: [...compatibilityDiagnostics, ...result.diagnostics, ...recolorDiagnostics],
     acknowledgementRecords: result.acknowledgementRecords,
   };
+}
+
+async function inspectPartialAssetPackSources(options: {
+  readonly pack: NormalizedAssetPack;
+  readonly sourceBytes: ReadonlyMap<string, Buffer>;
+  readonly diagnostics: readonly AssetPackFileDiagnostic[];
+}): Promise<readonly AssetPackSourceInspection[]> {
+  const sourcePaths = collectUniqueSourcePaths(options.pack);
+  const uses = collectSourceUses(options.pack);
+  const diagnostics = new Map(
+    options.diagnostics
+      .filter((diagnostic) => diagnostic.sourcePath !== undefined)
+      .map((diagnostic) => [diagnostic.sourcePath!, diagnostic.code] as const),
+  );
+  return Promise.all(sourcePaths.map(async (sourcePath) => {
+    const bytes = options.sourceBytes.get(sourcePath);
+    if (bytes) {
+      return inspectCapturedSource(
+        sourcePath,
+        bytes,
+        `sha256:${sha256Buffer(bytes)}`,
+        uses.get(sourcePath) ?? [],
+      );
+    }
+    const code = diagnostics.get(sourcePath);
+    return {
+      sourcePath,
+      regularFile: false,
+      error: code === 'asset_source_missing'
+        ? 'missing' as const
+        : code === 'asset_source_outside_pack'
+          ? 'outside-pack' as const
+          : 'not-regular' as const,
+    };
+  }));
 }
 
 export async function validateAssetPackDirectory(options: {
@@ -850,73 +921,32 @@ export async function validateAssetPackDirectory(options: {
   readonly snapshot?: AssetPackFilesSuccess;
 }): Promise<AssetPackValidationReport> {
   const absoluteRoot = path.resolve(options.packDirectory);
-  let inspectedPack: NormalizedAssetPack;
-  let inspections: readonly AssetPackSourceInspection[];
-  let currentDigest: string;
-
-  if (options.snapshot) {
-    if (options.snapshot.root !== absoluteRoot) {
-      return invalidManifestReport(absoluteRoot, 'Asset-pack snapshot root does not match validation root.');
+  const snapshot = options.snapshot ?? loadAssetPackFiles(absoluteRoot);
+  if (!snapshot.ok) {
+    if (snapshot.partial) {
+      const inspections = await inspectPartialAssetPackSources({
+        pack: snapshot.partial.pack,
+        sourceBytes: snapshot.partial.sourceBytes,
+        diagnostics: snapshot.diagnostics,
+      });
+      return validateInspectedAssetPack({
+        pack: snapshot.partial.pack,
+        inspections,
+        contentDigest: contentDigest(snapshot.partial.pack, inspections),
+        runtime: options.runtime,
+        ...(options.workspace ? { workspace: options.workspace } : {}),
+        origin: absoluteRoot,
+      });
     }
-    return validateAssetPackPayload({
-      payload: options.snapshot,
-      runtime: options.runtime,
-      ...(options.workspace ? { workspace: options.workspace } : {}),
-      origin: absoluteRoot,
-    });
-  } else {
-    const manifestBytes = readFileSync(path.join(absoluteRoot, MANIFEST_FILE));
-
-    let manifestJson: unknown;
-    try {
-      manifestJson = JSON.parse(manifestBytes.toString('utf8')) as unknown;
-    } catch (error) {
-      return invalidManifestReport(
-        absoluteRoot,
-        error instanceof Error ? error.message : 'Invalid asset-pack JSON.',
-      );
-    }
-
-    const parsed = parseAssetPackSource(manifestJson);
-    if (!parsed.ok) {
-      return {
-        schema: VALIDATION_SCHEMA,
-        packDirectory: absoluteRoot,
-        valid: false,
-        diagnostics: parsed.diagnostics,
-        acknowledgementRecords: [],
-      };
-    }
-
-    inspectedPack = normalizeAssetPack(parsed.source);
-    inspections = await inspectAssetPackSources(absoluteRoot, inspectedPack);
-    currentDigest = contentDigest(inspectedPack, inspections);
+    return invalidFileReport(absoluteRoot, snapshot.diagnostics);
   }
-  const baseline = loadActiveAssetPackBaseline({
+  if (snapshot.root !== absoluteRoot) {
+    return invalidManifestReport(absoluteRoot, 'Asset-pack snapshot root does not match validation root.');
+  }
+  return validateAssetPackPayload({
+    payload: snapshot,
     runtime: options.runtime,
     ...(options.workspace ? { workspace: options.workspace } : {}),
+    origin: absoluteRoot,
   });
-  const result = validateCoreAssetPack({
-    pack: inspectedPack,
-    baseline,
-    palettes: baseline.palettes,
-    inspections,
-    contentDigest: currentDigest,
-  });
-  const recolorDiagnostics = validateRecolorSourceRamps(
-    inspectedPack,
-    baseline.palettes,
-    inspections,
-  );
-  const compatibilityDiagnostics = checkAssetPackCompatibility(inspectedPack, CLI_VERSION);
-
-  return {
-    schema: VALIDATION_SCHEMA,
-    packId: inspectedPack.id,
-    packDirectory: absoluteRoot,
-    contentDigest: currentDigest,
-    valid: result.ok && recolorDiagnostics.length === 0 && compatibilityDiagnostics.length === 0,
-    diagnostics: [...compatibilityDiagnostics, ...result.diagnostics, ...recolorDiagnostics],
-    acknowledgementRecords: result.acknowledgementRecords,
-  };
 }

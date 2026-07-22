@@ -29,6 +29,11 @@ export interface AssetPackFilesSuccess extends AssetPackPayloadSuccess {
 export interface AssetPackFilesFailure {
   readonly ok: false;
   readonly diagnostics: readonly AssetPackFileDiagnostic[];
+  readonly partial?: {
+    readonly manifestBytes: Buffer;
+    readonly pack: NormalizedAssetPack;
+    readonly sourceBytes: ReadonlyMap<string, Buffer>;
+  };
 }
 
 export type AssetPackFilesResult = AssetPackFilesSuccess | AssetPackFilesFailure;
@@ -267,7 +272,20 @@ export function loadAssetPackFiles(root: string): AssetPackFilesResult {
   const pack = normalizeAssetPack(parsed.source);
   const inspected = inspectSources(absoluteRoot, pack);
   if (inspected.diagnostics.length > 0) {
-    return { ok: false, diagnostics: inspected.diagnostics };
+    return {
+      ok: false,
+      diagnostics: inspected.diagnostics,
+      partial: {
+        manifestBytes: Buffer.from(manifestBytes),
+        pack,
+        sourceBytes: new Map(
+          [...inspected.sourceBytes].map(([sourcePath, bytes]) => [
+            sourcePath,
+            Buffer.from(bytes),
+          ]),
+        ),
+      },
+    };
   }
 
   const payload = parseAssetPackPayload({ manifestBytes, sourceBytes: inspected.sourceBytes });

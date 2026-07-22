@@ -3,6 +3,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  renameSync,
   rmSync,
   symlinkSync,
   unlinkSync,
@@ -315,7 +316,7 @@ function installedEntryFixture(workspace: ReturnType<typeof initializeAssetWorks
     'installed',
     linked.packId,
     linked.version,
-    'digest',
+    digest.slice('sha256:'.length),
   );
   const sourceFile = path.join(installedDirectory, sourcePath);
   mkdirSync(path.dirname(sourceFile), { recursive: true });
@@ -356,6 +357,28 @@ afterEach(() => {
 });
 
 describe('readAssetPackRegistry', () => {
+  it('rejects a valid registry reached through an external symbolic link', () => {
+    const workspace = workspaceFixture();
+    const outside = mkdtempSync(path.join(os.tmpdir(), 'lpc-asset-pack-registry-link-outside-'));
+    temporaryDirectories.push(outside);
+    const outsideRegistry = path.join(outside, 'registry.json');
+    writeRegistry(workspace, v2Document(workspace, []));
+    renameSync(workspace.registryPath, outsideRegistry);
+    symlinkSync(outsideRegistry, workspace.registryPath, 'file');
+
+    expect(readAssetPackRegistry({
+      workspace,
+      markerWorkspaceId: workspaceId(workspace),
+    })).toMatchObject({
+      ok: false,
+      diagnostics: [{
+        code: 'asset_digest_mismatch',
+        message: expect.stringMatching(/regular file|symbolic link/iu),
+        path: workspace.registryPath,
+      }],
+    });
+  });
+
   it('hashes one typed canonical compile projection with field sensitivity and order independence', () => {
     const projection = compileProjectionFixture();
     const expected = independentCompileDigest(projection);
@@ -563,6 +586,38 @@ describe('readAssetPackRegistry', () => {
     })}\n`);
     expectInvalid(workspace, v2Document(workspace, [installed]));
     expectInvalid(workspace, v2Document(workspace, [{ ...base, installedDirectory, archiveDigest: digest }]));
+  });
+
+  it('rejects a receipt-valid installed source outside its exact content-addressed path', () => {
+    const workspace = workspaceFixture();
+    const fixture = installedEntryFixture(workspace);
+    const canonicalDirectory = fixture.entry.installedDirectory!;
+    const aliasedDirectory = `${path.dirname(canonicalDirectory)}${path.sep}.${path.sep}${path.basename(canonicalDirectory)}`;
+    expectInvalidMessage(
+      workspace,
+      v2Document(workspace, [{
+        ...fixture.entry,
+        installedDirectory: aliasedDirectory,
+      }]),
+      'content-addressed',
+    );
+    const mislocatedDirectory = path.join(
+      workspace.stateRoot,
+      'installed',
+      fixture.entry.packId,
+      fixture.entry.version,
+      'mislocated',
+    );
+    renameSync(canonicalDirectory, mislocatedDirectory);
+
+    expectInvalidMessage(
+      workspace,
+      v2Document(workspace, [{
+        ...fixture.entry,
+        installedDirectory: mislocatedDirectory,
+      }]),
+      'content-addressed',
+    );
   });
 
   it('binds each entry generated destinations, sprite digests, and credits to its owned paths', () => {

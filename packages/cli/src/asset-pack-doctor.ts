@@ -7,6 +7,7 @@ import {
   type Stats,
 } from 'node:fs';
 import path from 'node:path';
+import { readAssetPackManagedFile } from './asset-pack-managed-file.js';
 import {
   ASSET_WORKSPACE_REGISTRY_SCHEMA,
   assetPackRegistryBytes,
@@ -289,18 +290,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function registrySourceRoles(options: {
-  readonly registryPath: string;
-  readonly readFile: typeof readFileSync;
+  readonly registryBytes?: Buffer;
 }): readonly {
   readonly kind: 'linked' | 'installed';
   readonly packId: string;
   readonly sourceRoot: string;
 }[] {
+  if (!options.registryBytes) return [];
   try {
-    const bytes = options.readFile(options.registryPath);
-    const parsed = JSON.parse(
-      Buffer.isBuffer(bytes) ? bytes.toString('utf8') : bytes,
-    ) as unknown;
+    const parsed = JSON.parse(options.registryBytes.toString('utf8')) as unknown;
     if (!isRecord(parsed) || !Array.isArray(parsed.entries)) return [];
     const roles: Array<{
       readonly kind: 'linked' | 'installed';
@@ -336,15 +334,14 @@ function registrySourceRoles(options: {
 }
 
 function sourceRolesDigest(options: {
-  readonly workspace: AssetWorkspace;
+  readonly registryBytes?: Buffer;
   readonly readFile: typeof readFileSync;
   readonly stat: typeof lstatSync;
 }): string {
   const hash = createHash('sha256');
-  for (const role of registrySourceRoles({
-    registryPath: options.workspace.registryPath,
-    readFile: options.readFile,
-  })) {
+  for (const role of registrySourceRoles(
+    options.registryBytes ? { registryBytes: options.registryBytes } : {},
+  )) {
     hash.update(`${JSON.stringify([
       role.kind,
       role.packId,
@@ -367,18 +364,42 @@ function readGenerationStamp(options: {
   const stat = options.fileOps?.lstatSync ?? lstatSync;
   if (transactionArtifactsPresent(options.workspace, stat)) return { status: 'busy' };
   const readFile = options.fileOps?.readFileSync ?? readFileSync;
-  const registryDigest = hashTree({
-    root: options.workspace.registryPath,
-    readFile,
-    stat,
-  }).digest;
+  let registrySnapshot: ReturnType<typeof readAssetPackManagedFile> | undefined;
+  try {
+    registrySnapshot = readAssetPackManagedFile({
+      filePath: options.workspace.registryPath,
+      label: 'Asset workspace registry',
+      ...(options.fileOps ? { fileOps: options.fileOps } : {}),
+    });
+  } catch (error) {
+    if (!(
+      error instanceof Error
+      && 'code' in error
+      && (error.code === 'ENOENT' || error.code === 'ENOTDIR')
+    )) {
+      return {
+        status: 'unsafe',
+        check: {
+          code: 'asset_digest_mismatch',
+          status: 'error',
+          message: errorMessage(error),
+          path: options.workspace.registryPath,
+        },
+      };
+    }
+  }
+  const registryDigest = `sha256:${createHash('sha256')
+    .update(registrySnapshot?.identity ?? 'missing')
+    .update('\0')
+    .update(registrySnapshot?.bytes ?? Buffer.alloc(0))
+    .digest('hex')}`;
   const outputDigest = hashTree({
     root: options.workspace.outputRoot,
     readFile,
     stat,
   }).digest;
   const sourceDigest = sourceRolesDigest({
-    workspace: options.workspace,
+    ...(registrySnapshot ? { registryBytes: registrySnapshot.bytes } : {}),
     readFile,
     stat,
   });

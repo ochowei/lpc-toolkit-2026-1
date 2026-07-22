@@ -281,6 +281,28 @@ afterEach(() => {
 });
 
 describe('workspace runtime asset-pack activation', () => {
+  it('rejects a valid registry reached through an external symbolic link before activation', async () => {
+    const fixture = createFixture();
+    await syncFixture(fixture);
+    const outside = createDirectory('lpc-runtime-registry-link-');
+    const outsideRegistry = path.join(outside, 'registry.json');
+    renameSync(fixture.workspace.registryPath, outsideRegistry);
+    symlinkSync(outsideRegistry, fixture.workspace.registryPath, 'file');
+
+    let activated = false;
+    await expect(withWorkspaceRuntimeAssets({
+      runtime: fixture.runtime,
+      cwd: fixture.root,
+      action: async () => {
+        activated = true;
+      },
+    })).rejects.toMatchObject({
+      code: 'asset_digest_mismatch',
+      path: fixture.workspace.registryPath,
+    });
+    expect(activated).toBe(false);
+  });
+
   it('rejects an external linked manifest symlink during sync and runtime activation', async () => {
     const fixture = createFixture();
     const manifestBytes = readFileSync(fixture.manifestPath);
@@ -342,6 +364,36 @@ describe('workspace runtime asset-pack activation', () => {
     writeFileSync(
       path.join(installed.installedDirectory, 'sprites/hair/walk.png'),
       walkPng('#3355aa'),
+    );
+
+    await expect(withWorkspaceRuntimeAssets({
+      runtime: fixture.runtime,
+      cwd: fixture.root,
+      action: async () => undefined,
+    })).rejects.toMatchObject({ code: 'asset_digest_mismatch' });
+  });
+
+  it('rejects a receipt-valid installed source outside its exact content-addressed path', async () => {
+    const fixture = createFixture();
+    const linked = await syncFixture(fixture);
+    const installed = convertLinkedToInstalled(fixture.workspace, linked);
+    const mislocatedDirectory = path.join(
+      fixture.workspace.installedRoot,
+      installed.packId,
+      installed.version,
+      'mislocated',
+    );
+    renameSync(installed.installedDirectory, mislocatedDirectory);
+    const document = readJson<AssetPackRegistryDocument>(fixture.workspace.registryPath);
+    writeFileSync(
+      fixture.workspace.registryPath,
+      assetPackRegistryBytes({
+        ...document,
+        entries: document.entries.map((entry): AssetPackRegistryEntry =>
+          entry.packId === installed.packId && entry.kind === 'installed'
+            ? { ...entry, installedDirectory: mislocatedDirectory }
+            : entry),
+      }),
     );
 
     await expect(withWorkspaceRuntimeAssets({

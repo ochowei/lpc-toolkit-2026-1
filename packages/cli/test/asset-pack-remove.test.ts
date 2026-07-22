@@ -12,6 +12,7 @@ import {
   readdirSync,
   renameSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import os from 'node:os';
@@ -583,6 +584,32 @@ describe('listAssetPacks', () => {
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error('Expected strict registry failure.');
     expect(result.diagnostics.map((entry) => entry.code)).toContain('asset_output_root_unowned');
+  });
+
+  it('fails closed on a valid registry reached through an external symbolic link', async () => {
+    const fixture = createFixture();
+    await linkPack(fixture, {
+      packId: 'alpha.linked-registry',
+      version: '1.0.0',
+      displayName: 'Alpha Linked Registry',
+      localId: 'alpha-hair',
+      color: '#aa3300',
+    });
+    const outside = createDirectory('lpc-asset-pack-list-registry-link-');
+    const outsideRegistry = path.join(outside, 'registry.json');
+    renameSync(fixture.workspace.registryPath, outsideRegistry);
+    symlinkSync(outsideRegistry, fixture.workspace.registryPath, 'file');
+
+    const result = listAssetPacks({ workspace: fixture.workspace });
+
+    expect(result).toMatchObject({
+      ok: false,
+      diagnostics: [{
+        code: 'asset_digest_mismatch',
+        message: expect.stringMatching(/regular file|symbolic link/iu),
+        path: fixture.workspace.registryPath,
+      }],
+    });
   });
 
   it('holds the transaction claim through the complete registry projection', async () => {

@@ -886,13 +886,14 @@ describe('doctorAssetPacks healthy and recovery reports', () => {
       fixture.assetsRoot,
       'sheet_definitions/hair/braid.json',
     );
-    let registryReads = 0;
+    const markerPath = path.join(fixture.workspace.outputRoot, '.lpc-toolkit-managed.json');
+    let markerReads = 0;
     let baselineChanged = false;
     const changingReadFileSync = ((target: Parameters<typeof readFileSync>[0]) => {
       const bytes = readFileSync(target);
-      if (path.resolve(String(target)) === fixture.workspace.registryPath) {
-        registryReads += 1;
-        if (registryReads === 3) {
+      if (path.resolve(String(target)) === markerPath) {
+        markerReads += 1;
+        if (markerReads === 3) {
           baselineChanged = true;
           writeJson(definitionPath, baseDefinition({
             credits: [{ ...BASE_CREDIT, notes: 'Changed base credit.' }],
@@ -910,7 +911,7 @@ describe('doctorAssetPacks healthy and recovery reports', () => {
 
     expect(baselineChanged).toBe(true);
     expect(report.healthy).toBe(false);
-    expect(registryReads).toBeGreaterThan(4);
+    expect(markerReads).toBeGreaterThan(4);
     expect(report.checks.map((check) => check.code)).toContain('asset_base_credit_changed');
   });
 
@@ -932,13 +933,14 @@ describe('doctorAssetPacks healthy and recovery reports', () => {
       bodyTypes: ['male'],
       color: '#aa3300',
     });
-    let registryReads = 0;
+    const markerPath = path.join(fixture.workspace.outputRoot, '.lpc-toolkit-managed.json');
+    let markerReads = 0;
     let baselineChanged = false;
     const changingReadFileSync = ((target: Parameters<typeof readFileSync>[0]) => {
       const bytes = readFileSync(target);
-      if (path.resolve(String(target)) === fixture.workspace.registryPath) {
-        registryReads += 1;
-        if (registryReads === 3) {
+      if (path.resolve(String(target)) === markerPath) {
+        markerReads += 1;
+        if (markerReads === 3) {
           baselineChanged = true;
           writeJson(definitionPath, baseDefinition({
             credits: [{ ...BASE_CREDIT, notes: 'Changed linked base credit.' }],
@@ -956,7 +958,7 @@ describe('doctorAssetPacks healthy and recovery reports', () => {
 
     expect(baselineChanged).toBe(true);
     expect(report.healthy).toBe(false);
-    expect(registryReads).toBeGreaterThan(4);
+    expect(markerReads).toBeGreaterThan(4);
     expect(report.checks.map((check) => check.code)).toContain('asset_base_credit_changed');
   });
 
@@ -987,13 +989,14 @@ describe('doctorAssetPacks healthy and recovery reports', () => {
     await linkNewPack(fixture, {
       packId: 'alpha.pack', localId: 'alpha', color: '#aa3300',
     });
-    let registryReads = 0;
+    const markerPath = path.join(fixture.workspace.outputRoot, '.lpc-toolkit-managed.json');
+    let markerReads = 0;
     let targetReplaced = false;
     const abaReadFileSync = ((target: Parameters<typeof readFileSync>[0]) => {
       const bytes = readFileSync(target);
-      if (path.resolve(String(target)) === fixture.workspace.registryPath) {
-        registryReads += 1;
-        if (registryReads === 3) {
+      if (path.resolve(String(target)) === markerPath) {
+        markerReads += 1;
+        if (markerReads === 3) {
           targetReplaced = true;
           const replacement = `${paletteFileTarget}.replacement`;
           writeFileSync(replacement, '{"type":"material","default":"other"}\n');
@@ -1014,7 +1017,7 @@ describe('doctorAssetPacks healthy and recovery reports', () => {
 
     expect(targetReplaced).toBe(true);
     expect(report).toMatchObject({ healthy: true, recovery: 'none' });
-    expect(registryReads).toBeGreaterThan(4);
+    expect(markerReads).toBeGreaterThan(4);
   });
 
   it('rejects a runtime-baseline symlink cycle before loading it', async () => {
@@ -1140,11 +1143,12 @@ describe('doctorAssetPacks healthy and recovery reports', () => {
 
     let publication: Promise<Awaited<ReturnType<typeof publishAssetPackGeneration>>> | undefined;
     let publishedDuringSnapshot = false;
+    const markerPath = path.join(fixture.workspace.outputRoot, '.lpc-toolkit-managed.json');
     const concurrentReadFileSync = ((target: Parameters<typeof readFileSync>[0]) => {
       const bytes = readFileSync(target);
       if (
         !publishedDuringSnapshot
-        && path.resolve(String(target)) === fixture.workspace.registryPath
+        && path.resolve(String(target)) === markerPath
       ) {
         publishedDuringSnapshot = true;
         publication = publishAssetPackGeneration({
@@ -1179,6 +1183,60 @@ describe('doctorAssetPacks healthy and recovery reports', () => {
 });
 
 describe('doctorAssetPacks registry, source, output, compiler, and attribution audits', () => {
+  it('rejects a valid registry reached through an external symbolic link without repair', async () => {
+    const fixture = createFixture();
+    await linkNewPack(fixture, {
+      packId: 'alpha.pack', localId: 'alpha', color: '#aa3300',
+    });
+    const outside = createDirectory('lpc-asset-pack-doctor-registry-link-');
+    const outsideRegistry = path.join(outside, 'registry.json');
+    renameSync(fixture.workspace.registryPath, outsideRegistry);
+    symlinkSync(outsideRegistry, fixture.workspace.registryPath, 'file');
+    const before = snapshotTree(fixture.root);
+
+    const report = await doctorAssetPacks({
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+    });
+
+    expect(report.healthy).toBe(false);
+    expect(report.checks).toContainEqual(expect.objectContaining({
+      code: 'asset_digest_mismatch',
+      path: fixture.workspace.registryPath,
+    }));
+    expect(snapshotTree(fixture.root)).toEqual(before);
+  });
+
+  it('detects registry target mutation while reading one authenticated snapshot', async () => {
+    const fixture = createFixture();
+    await linkNewPack(fixture, {
+      packId: 'alpha.pack', localId: 'alpha', color: '#aa3300',
+    });
+    const registryIdentity = lstatSync(fixture.workspace.registryPath);
+    let targetMutated = false;
+    const mutatingReadFileSync = ((target: Parameters<typeof readFileSync>[0]) => {
+      const bytes = readFileSync(target);
+      if (typeof target === 'number' && !targetMutated) {
+        const opened = fstatSync(target);
+        if (opened.dev === registryIdentity.dev && opened.ino === registryIdentity.ino) {
+          targetMutated = true;
+          writeFileSync(fixture.workspace.registryPath, '{"schema":');
+        }
+      }
+      return bytes;
+    }) as typeof readFileSync;
+
+    const report = await doctorAssetPacks({
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+      fileOps: { ...REAL_FILE_OPS, readFileSync: mutatingReadFileSync },
+    });
+
+    expect(targetMutated).toBe(true);
+    expect(report.healthy).toBe(false);
+    expect(report.checks.map((check) => check.code)).toContain('asset_digest_mismatch');
+  });
+
   it('reports a marker/workspace mismatch without repair', async () => {
     const fixture = createFixture();
     await linkNewPack(fixture, { packId: 'alpha.pack', localId: 'alpha', color: '#aa3300' });
@@ -1232,7 +1290,7 @@ describe('doctorAssetPacks registry, source, output, compiler, and attribution a
     },
   );
 
-  it.each(['escape', 'symlink', 'missing-receipt', 'receipt-drift', 'source-drift'] as const)(
+  it.each(['escape', 'symlink', 'mislocated', 'missing-receipt', 'receipt-drift', 'source-drift'] as const)(
     'reports installed source %s without repair',
     async (scenario) => {
       const fixture = createFixture();
@@ -1256,6 +1314,22 @@ describe('doctorAssetPacks registry, source, output, compiler, and attribution a
           installed.installedDirectory,
           process.platform === 'win32' ? 'junction' : 'dir',
         );
+      } else if (scenario === 'mislocated') {
+        const mislocatedDirectory = path.join(
+          fixture.workspace.installedRoot,
+          installed.packId,
+          installed.version,
+          'mislocated',
+        );
+        renameSync(installed.installedDirectory, mislocatedDirectory);
+        const registry = readRegistry(fixture.workspace);
+        writeRegistry(fixture.workspace, {
+          ...registry,
+          entries: registry.entries.map((entry): AssetPackRegistryEntry =>
+            entry.packId === installed.packId && entry.kind === 'installed'
+              ? { ...entry, installedDirectory: mislocatedDirectory }
+              : entry),
+        });
       } else if (scenario === 'missing-receipt') {
         rmSync(path.join(installed.installedDirectory, 'install-receipt.json'));
       } else if (scenario === 'receipt-drift') {

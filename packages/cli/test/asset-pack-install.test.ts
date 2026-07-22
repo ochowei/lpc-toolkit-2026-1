@@ -531,6 +531,8 @@ describe('installAssetPack lifecycle policy', () => {
     }));
 
     expect(second.action).toBe('unchanged');
+    const authenticatedCurrent = installedEntry(fixture.workspace, 'acme.moon-hair');
+    expect(second.installedDirectory).toBe(authenticatedCurrent.installedDirectory);
     const { action: _firstAction, ...firstIdentity } = first;
     const { action: _secondAction, ...secondIdentity } = second;
     expect(secondIdentity).toEqual(firstIdentity);

@@ -616,6 +616,10 @@ async function installUnderClaim(options: {
   if (typeof action !== 'string') return action;
 
   const pack = snapshot.payload.pack;
+  const currentInstalled = current.registry.entries.find(
+    (entry): entry is InstalledAssetPackRegistryEntry =>
+      entry.kind === 'installed' && entry.packId === pack.id,
+  );
   const finalInstalledSource = assetPackInstalledDirectory({
     workspace: options.workspace,
     packId: pack.id,
@@ -623,12 +627,19 @@ async function installUnderClaim(options: {
     archiveDigest: snapshot.archiveDigest,
   });
   if (action === 'unchanged') {
+    if (!currentInstalled) {
+      return failure(
+        'asset_digest_mismatch',
+        `Authenticated installed registry entry is missing for no-op install: ${pack.id}.`,
+        { path: options.workspace.registryPath, packId: pack.id },
+      );
+    }
     return installSuccess({
       action,
       packId: pack.id,
       version: pack.version,
       archiveDigest: snapshot.archiveDigest,
-      installedDirectory: finalInstalledSource,
+      installedDirectory: currentInstalled.installedDirectory,
       desiredState: current,
     });
   }
@@ -663,10 +674,6 @@ async function installUnderClaim(options: {
     });
     if (!desired.ok) return desired;
 
-    const currentInstalled = current.registry.entries.find(
-      (entry): entry is InstalledAssetPackRegistryEntry =>
-        entry.kind === 'installed' && entry.packId === pack.id,
-    );
     const publication = await options.publisher.publish({
       operation: 'install',
       desiredState: desired,
