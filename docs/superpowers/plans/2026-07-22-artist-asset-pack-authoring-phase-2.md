@@ -1944,7 +1944,7 @@ plugin: N/A — the audit skill stays read-only and asset-authoring skill design
   - Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-version.test.ts asset-pack-schema.test.ts asset-pack-compile.test.ts`
     PASS (3 files, 66 tests).
   - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-payload.test.ts asset-pack-archive-format.test.ts asset-pack-packaging.test.ts asset-pack-inspection.test.ts asset-pack-registry.test.ts asset-pack-state.test.ts asset-pack-transaction.test.ts asset-pack-install.test.ts asset-pack-remove.test.ts asset-pack-doctor.test.ts asset-lifecycle-e2e.test.ts`
-    PASS (11 files, 306 tests) after the final source-capture correction.
+    PASS (11 files, 307 tests) after the final whole-pack generation correction.
   - Verification: `rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifacts.test.ts`
     PASS (2 files, 3 tests).
   - Verification: `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS
@@ -1992,7 +1992,7 @@ Expected: PASS.
     330 tests).
   - Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
   - Verification: `rtk pnpm --filter @lpc-toolkit/cli test` PASS (54 files,
-    1016 passed, 1 intentional skip). A sandbox-only run produced 13
+    1020 passed, 1 intentional skip). A sandbox-only run produced 13
     `listen EPERM` failures in `web-server.test.ts`; the required permitted exact
     rerun passed the complete suite.
   - Verification: `rtk pnpm --filter @lpc-toolkit/cli build` PASS.
@@ -2001,7 +2001,7 @@ Expected: PASS.
   - Verification: `rtk pnpm --filter @lpc-toolkit/web test` PASS (78 files,
     698 tests).
   - Verification: `rtk pnpm verify` PASS (exit 0; boundaries, CLI docs policy, plugin,
-    all workspace typechecks, Core 330, Presets 3, Web 698, CLI 1016 passed and
+    all workspace typechecks, Core 330, Presets 3, Web 698, CLI 1020 passed and
     1 intentional skip).
 
 ```sh
@@ -2133,6 +2133,68 @@ root-readme: N/A — public workflow and command order are unchanged
 landing: N/A — browser/product messaging is unchanged
 architecture: N/A — existing trust boundaries are enforced without a boundary change
 engineering: N/A — commands and verification ownership are unchanged
+releasing: N/A — no publication, versioning, or release procedure changed
+plugin: N/A — no plugin contract or skill behavior changed
+```
+
+- [x] **Step 12: Close the final whole-pack generation consistency finding**
+
+  - Implementation: `loadAssetPackFiles` now retains the pinned root,
+    manifest, every captured source, and every traversed parent identity and
+    canonical path. After all source bytes are captured, it reopens and
+    byte-compares every captured file through the no-follow descriptor helper,
+    then performs a final root/manifest/parent/source identity and canonical
+    path barrier before `parseAssetPackPayload` can return a snapshot.
+  - Public regressions: deterministic injected file operations switch the
+    manifest and every source after manifest capture but before the first
+    source parent is pinned. Direct loading, `asset validate`, `asset pack`, and
+    linked `asset sync` all reject the mixed old-manifest/new-source generation
+    with `asset_digest_mismatch`; sync also leaves registry and managed output
+    byte-identical.
+  - TDD RED: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-files.test.ts asset-pack-validation.test.ts asset-pack-packaging.test.ts asset-pack-sync.test.ts`
+    FAIL as expected (4 failed, 91 passed) before the barrier. The adjusted
+    validation regression independently returned `valid: true` before the fix,
+    proving the mixed generation was otherwise accepted.
+  - TDD GREEN: the same command PASS (4 files, 95 tests).
+  - Product commit:
+    `82037bb4f46a1cd882424842455484ea1737bea1`.
+  - Correction verification:
+    `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-files.test.ts asset-pack-validation.test.ts asset-pack-packaging.test.ts asset-pack-sync.test.ts asset-pack-doctor.test.ts main-json.test.ts`
+    PASS (6 files, 170 tests); `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-validation.test.ts asset-pack-registry.test.ts asset-pack-remove.test.ts asset-pack-doctor.test.ts runtime-asset-pack-activation.test.ts asset-pack-install.test.ts main-json.test.ts asset-pack-files.test.ts`
+    PASS (8 files, 178 tests).
+  - Step 7 verification: Core focused PASS (3 files, 66 tests); CLI lifecycle
+    focused PASS (11 files, 307 tests); Web landing/artifacts PASS (2 files, 3
+    tests); packed CLI lifecycle smoke PASS.
+  - Step 8 verification: boundaries PASS; Core typecheck and full tests PASS
+    (24 files, 330 tests); CLI typecheck, build, full tests, and package smoke
+    PASS (54 files, 1020 passed, 1 intentional skip); Web full tests PASS (78
+    files, 698 tests); `rtk pnpm verify` PASS with Core 330, Presets 3, Web 698,
+    and CLI 1020 plus 1 intentional skip. The first sandboxed Web focused run
+    failed only with `tsx` IPC `listen EPERM`, the first sandboxed package smoke
+    failed only with npm DNS `ENOTFOUND`, and the first sandboxed full CLI run
+    failed only with 13 loopback `listen EPERM` cases; each exact permitted
+    rerun passed.
+  - Scope: product range
+    `844c01bc758eb30c4e3c40730262a040ca78c5eb..82037bb4f46a1cd882424842455484ea1737bea1`
+    contains 65 commits, 69 changed paths, 27,798 insertions, and 1,678
+    deletions. The product commit itself contains exactly five CLI source/test
+    paths (326 insertions, 2 deletions). No dependency, lockfile, `any`,
+    `upstream/`, checked-in asset/cache, release/plugin, Phase 3, remote, push,
+    PR, or unrelated path changed.
+  - Plan-record-inclusive range after this separate record commit will contain
+    66 commits and 69 changed paths, with 27,860 insertions and 1,678 deletions.
+  - Review status: `final-whole-branch-review-4.md` is addressed by the product
+    commit above. A new independent whole-branch review remains pending; no
+    final approval is claimed in this record.
+  - Correction-specific CLI documentation impact:
+
+```text
+help: N/A — internal coherent-capture enforcement; command help is unchanged
+cli-readme: N/A — documented immutable payload contract is unchanged
+root-readme: N/A — public workflow and command order are unchanged
+landing: N/A — browser/product messaging is unchanged
+architecture: N/A — the existing one-snapshot trust boundary is now enforced
+engineering: N/A — command ownership and verification mapping are unchanged
 releasing: N/A — no publication, versioning, or release procedure changed
 plugin: N/A — no plugin contract or skill behavior changed
 ```
