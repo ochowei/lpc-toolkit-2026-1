@@ -1818,11 +1818,12 @@ describe('syncLinkedAssetPack', () => {
     });
     expectSuccess(discoveryResult);
     const actionCount = discovery.actions.length;
-    const firstCommittedAction = discovery.actions.findIndex(
-      (action) => action.startsWith('rename:registry.json->') && action.endsWith('.backup'),
-    ) + 1;
+    const registryPublishAction = discovery.actions.findIndex(
+      (action) => action.startsWith('rename:.registry.json.') && action.endsWith('->registry.json'),
+    );
+    const firstCommittedAction = registryPublishAction + 2;
     expect(actionCount).toBeGreaterThan(0);
-    expect(firstCommittedAction).toBeGreaterThan(0);
+    expect(registryPublishAction).toBeGreaterThanOrEqual(0);
 
     for (let failAt = 1; failAt <= actionCount; failAt += 1) {
       const scenario = await createRollbackFixture();
@@ -1858,4 +1859,66 @@ describe('syncLinkedAssetPack', () => {
       expect(snapshotTree(scenario.packRoot)).toEqual(scenario.initialSource);
     }
   }, 45_000);
+
+  it('recovers a missing active output before fresh-command sync preflight', async () => {
+    const scenario = await createRollbackFixture();
+    let interrupted = false;
+    const transactionPath = path.join(scenario.fixture.workspace.stateRoot, 'transaction.json');
+    const crashingOps: AssetPublicationFileOps = {
+      mkdirSync,
+      writeFileSync,
+      readFileSync,
+      renameSync,
+      rmSync,
+      openSync,
+      fsyncSync,
+      closeSync,
+      fstatSync,
+      linkSync,
+      beforeMutationSync(operation, targets) {
+        if (
+          interrupted
+          && operation === 'write'
+          && targets.some((target) => path.basename(target).startsWith('transaction.json.'))
+        ) {
+          throw new Error('simulated process exit before in-command recovery');
+        }
+      },
+      afterMutationSync(operation, targets, boundary) {
+        if (
+          !interrupted
+          && operation === 'rename'
+          && boundary === 'mutation'
+          && path.resolve(targets[0] ?? '') === scenario.fixture.workspace.outputRoot
+          && path.basename(targets[1] ?? '').endsWith('.backup')
+        ) {
+          interrupted = true;
+          throw new Error('simulated crash after old output rename');
+        }
+      },
+    };
+
+    const interruptedResult = expectFailure(await syncLinkedAssetPack({
+      packDirectory: scenario.packRoot,
+      workspace: scenario.fixture.workspace,
+      runtime: scenario.fixture.runtime,
+      fileOps: crashingOps,
+    }));
+    expect(diagnosticCodes(interruptedResult.diagnostics)).toContain('asset_publish_failed');
+    expect(interrupted).toBe(true);
+    expect(existsSync(scenario.fixture.workspace.outputRoot)).toBe(false);
+    expect(existsSync(transactionPath)).toBe(true);
+
+    const recovered = expectSuccess(await syncLinkedAssetPack({
+      packDirectory: scenario.packRoot,
+      workspace: scenario.fixture.workspace,
+      runtime: scenario.fixture.runtime,
+    }));
+    expect(recovered.linked.version).toBe('1.1.0');
+    expect(existsSync(transactionPath)).toBe(false);
+    expect(snapshotTree(scenario.fixture.workspace.outputRoot)).not.toEqual(
+      scenario.initialOutput,
+    );
+    expect(snapshotTree(scenario.packRoot)).toEqual(scenario.initialSource);
+  });
 });

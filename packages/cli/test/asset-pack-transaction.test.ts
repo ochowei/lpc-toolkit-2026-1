@@ -2271,14 +2271,28 @@ describe('asset-pack transaction adversarial recovery', () => {
     },
   );
 
-  it.each(['after-old-registry-backup', 'after-new-registry-rename'] as const)(
-    'completes deterministically after a crash %s',
-    async (boundary) => {
+  it.each([
+    ['before-old-registry-rename', 'rolled-back'],
+    ['after-old-registry-backup', 'rolled-back'],
+    ['after-new-registry-rename', 'completed'],
+  ] as const)(
+    'uses the registry publication boundary after a crash %s',
+    async (boundary, expectedAction) => {
       const fixture = createFixture();
       let injected = false;
       const crashingOps: AssetTransactionFileOps = {
         ...REAL_FILE_OPS,
         afterMutationValidationSync(operation, targets) {
+          if (
+            boundary === 'before-old-registry-rename'
+            && !injected
+            && operation === 'rename'
+            && path.resolve(targets[0] ?? '') === fixture.workspace.registryPath
+            && path.basename(targets[1] ?? '').endsWith('.backup')
+          ) {
+            injected = true;
+            throw new Error('crash before old registry rename');
+          }
           if (
             boundary === 'after-old-registry-backup'
             && !injected
@@ -2312,62 +2326,21 @@ describe('asset-pack transaction adversarial recovery', () => {
         fileOps: crashingOps,
       });
       expect(publication.ok).toBe(false);
+      expect(readJournal(fixture).phase).toBe('sources-published');
       expect(recoverAssetPackTransaction({ workspace: fixture.workspace })).toEqual({
         ok: true,
-        action: 'completed',
+        action: expectedAction,
       });
-    },
-  );
-
-  it.each(['write', 'fsync'] as const)(
-    'rolls back when the durable commit-intent journal %s fails before registry mutation',
-    async (boundary) => {
-      const fixture = createFixture();
-      const descriptors = new Map<number, string>();
-      let journalWrites = 0;
-      let failIntentFsync = false;
-      const crashingOps: AssetTransactionFileOps = {
-        ...REAL_FILE_OPS,
-        writeFileSync(target, data, writeOptions) {
-          if (String(target).includes('transaction.json.')) {
-            journalWrites += 1;
-            if (journalWrites === 4) {
-              if (boundary === 'write') throw new Error('commit-intent write boundary');
-              failIntentFsync = true;
-            }
-          }
-          writeFileSync(target, data, writeOptions);
-        },
-        openSync(target, flags, mode) {
-          const descriptor = openSync(target, flags, mode);
-          descriptors.set(descriptor, String(target));
-          return descriptor;
-        },
-        fsyncSync(descriptor) {
-          const target = descriptors.get(descriptor) ?? '';
-          if (failIntentFsync && target.includes('transaction.json.')) {
-            failIntentFsync = false;
-            throw new Error('commit-intent fsync boundary');
-          }
-          fsyncSync(descriptor);
-        },
-        closeSync(descriptor) {
-          descriptors.delete(descriptor);
-          closeSync(descriptor);
-        },
-      };
-      const publication = await publishAssetPackGeneration({
-        operation: 'sync',
-        workspace: fixture.workspace,
-        desiredState: desiredState(fixture),
-        cleanupInstalledSources: [],
-        fileOps: crashingOps,
-      });
-      expect(publication.ok).toBe(false);
-      expect(recoverAssetPackTransaction({ workspace: fixture.workspace })).toEqual({
-        ok: true,
-        action: 'rolled-back',
-      });
+      const expectedRegistry = expectedAction === 'completed'
+        ? assetPackRegistryBytes(desiredState(fixture).registry)
+        : fixture.oldRegistryBytes;
+      const expectedMarker = expectedAction === 'completed'
+        ? fixture.newMarkerBytes
+        : fixture.oldMarkerBytes;
+      expect(readFileSync(fixture.workspace.registryPath)).toEqual(expectedRegistry);
+      expect(readFileSync(
+        path.join(fixture.workspace.outputRoot, '.lpc-toolkit-managed.json'),
+      )).toEqual(expectedMarker);
     },
   );
 

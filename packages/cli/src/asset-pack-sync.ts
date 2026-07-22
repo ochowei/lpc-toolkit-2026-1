@@ -596,12 +596,12 @@ export async function syncLinkedAssetPack(options: {
   readonly runtime: RuntimeAssets;
   readonly fileOps?: AssetPublicationFileOps;
 }): Promise<AssetPackSyncResult> {
-  const publishFailure = preflightPublish(options.workspace);
-  if (publishFailure) return publishFailure;
   const claimed = await withAssetPackTransactionClaim({
     workspace: options.workspace,
     ...(options.fileOps ? { fileOps: options.fileOps } : {}),
     action: async (publisher): Promise<AssetPackSyncResult> => {
+      const publishFailure = preflightPublish(options.workspace);
+      if (publishFailure) return publishFailure;
       const requested = await loadLinkedAssetPackCandidate(options);
       if (!requested.ok) return syncFailure(requested.diagnostics);
       const desiredState = await prepareAssetPackDesiredState({
@@ -645,5 +645,10 @@ export async function syncLinkedAssetPack(options: {
       };
     },
   });
-  return claimed.ok ? claimed.value : syncFailure(claimed.diagnostics);
+  if (claimed.ok) return claimed.value;
+  if (!existsSync(path.join(options.workspace.stateRoot, 'transaction.json'))) {
+    const publishFailure = preflightPublish(options.workspace);
+    if (publishFailure) return publishFailure;
+  }
+  return syncFailure(claimed.diagnostics);
 }

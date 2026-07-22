@@ -40,7 +40,6 @@ export type AssetPackTransactionPhase =
   | 'prepared'
   | 'output-published'
   | 'sources-published'
-  | 'registry-commit-intent'
   | 'registry-published';
 
 export type AssetPackRecoveryAction = 'none' | 'rolled-back' | 'completed';
@@ -214,7 +213,6 @@ const PHASES: readonly AssetPackTransactionPhase[] = [
   'prepared',
   'output-published',
   'sources-published',
-  'registry-commit-intent',
   'registry-published',
 ];
 const OPERATIONS: readonly AssetPackTransactionJournal['operation'][] = [
@@ -841,10 +839,7 @@ function parseJournalRecord(value: unknown): AssetPackTransactionJournal {
   }
   if (
     (recoveryMode === 'cleanup' && phase !== 'registry-published')
-    || (
-      recoveryMode === 'rollback'
-      && (phase === 'registry-commit-intent' || phase === 'registry-published')
-    )
+    || (recoveryMode === 'rollback' && phase === 'registry-published')
   ) {
     throw new Error('Asset transaction recovery mode does not match its durable phase.');
   }
@@ -1387,6 +1382,7 @@ interface RecoveryState {
   readonly newGeneration?: AuthenticatedGeneration;
   readonly oldRegistryPath: string;
   readonly newRegistryPath?: string;
+  readonly registryPublished: boolean;
 }
 
 function validateRecoveryState(
@@ -1410,68 +1406,71 @@ function validateRecoveryState(
     throw new Error('Transaction has both staged and final installed sources present.');
   }
 
-  const committed = resolved.journal.phase === 'registry-commit-intent'
-    || resolved.journal.phase === 'registry-published';
-  if (committed) {
+  let registryPublished: boolean;
+  let oldRegistryPath: string;
+  let newRegistryPath: string;
+  if (resolved.oldRegistryBackup) {
+    if (hasActiveRegistry && !hasStagedRegistry && hasRegistryBackup) {
+      registryPublished = true;
+      oldRegistryPath = resolved.oldRegistryBackup;
+      newRegistryPath = workspace.registryPath;
+    } else if (hasActiveRegistry && hasStagedRegistry && !hasRegistryBackup) {
+      registryPublished = false;
+      oldRegistryPath = workspace.registryPath;
+      newRegistryPath = resolved.stagedRegistry;
+    } else if (!hasActiveRegistry && hasStagedRegistry && hasRegistryBackup) {
+      registryPublished = false;
+      oldRegistryPath = resolved.oldRegistryBackup;
+      newRegistryPath = resolved.stagedRegistry;
+    } else {
+      throw new Error('Transaction registry layout is incomplete or ambiguous.');
+    }
+  } else if (hasActiveRegistry && !hasStagedRegistry && !hasRegistryBackup) {
+    registryPublished = true;
+    oldRegistryPath = path.join(resolved.transactionRoot, 'old-registry-absent');
+    newRegistryPath = workspace.registryPath;
+  } else if (!hasActiveRegistry && hasStagedRegistry && !hasRegistryBackup) {
+    registryPublished = false;
+    oldRegistryPath = workspace.registryPath;
+    newRegistryPath = resolved.stagedRegistry;
+  } else {
+    throw new Error('Transaction registry layout is incomplete or ambiguous.');
+  }
+
+  if (resolved.journal.phase === 'registry-published' && !registryPublished) {
+    throw new Error('Registry-published transaction does not have its active registry.');
+  }
+
+  if (registryPublished) {
     if (!hasOutputBackup || !hasActiveOutput || hasStagedOutput) {
       throw new Error('Committed transaction output layout is incomplete or ambiguous.');
-    }
-    if (resolved.oldRegistryBackup) {
-      const validRegistryLayout = (
-        hasActiveRegistry && hasStagedRegistry && !hasRegistryBackup
-      ) || (
-        !hasActiveRegistry && hasStagedRegistry && hasRegistryBackup
-      ) || (
-        hasActiveRegistry && !hasStagedRegistry && hasRegistryBackup
-      );
-      if (!validRegistryLayout) {
-        throw new Error('Committed transaction registry layout is incomplete or ambiguous.');
-      }
-    } else if (hasRegistryBackup || hasActiveRegistry === hasStagedRegistry) {
-      throw new Error('Committed transaction registry layout is incomplete or ambiguous.');
     }
     if (resolved.finalInstalledSource && (!hasFinalSource || hasStagedSource)) {
       throw new Error('Committed installed source state is incomplete or ambiguous.');
     }
-    if (
-      resolved.journal.phase === 'registry-published'
-      && (!hasActiveRegistry || hasStagedRegistry)
-    ) {
-      throw new Error('Registry-published transaction does not have its active registry.');
-    }
-    const oldRegistry = hasRegistryBackup
-      ? resolved.oldRegistryBackup!
-      : hasActiveRegistry && hasStagedRegistry
-        ? workspace.registryPath
-        : resolved.oldRegistryBackup
-          ? (() => { throw new Error('Committed transaction old registry is missing.'); })()
-          : path.join(resolved.transactionRoot, 'old-registry-absent');
     const oldGeneration = authenticateGeneration(
       workspace,
       resolved.oldOutputBackup,
-      oldRegistry,
+      oldRegistryPath,
       fileOps,
       true,
     );
-    const newRegistry = hasStagedRegistry ? resolved.stagedRegistry : workspace.registryPath;
     const newGeneration = authenticateGeneration(
       workspace,
       workspace.outputRoot,
-      newRegistry,
+      newRegistryPath,
       fileOps,
     );
     assertInstalledDelta(resolved, oldGeneration, newGeneration);
     return {
       oldGeneration,
       newGeneration,
-      oldRegistryPath: oldRegistry,
-      newRegistryPath: newRegistry,
+      oldRegistryPath,
+      newRegistryPath,
+      registryPublished: true,
     };
   }
 
-  if (hasRegistryBackup) {
-    throw new Error('Pre-commit transaction unexpectedly contains an old registry backup.');
-  }
   if (hasOutputBackup) {
     if (hasActiveOutput === hasStagedOutput) {
       throw new Error('Pre-commit output swap state is incomplete or ambiguous.');
@@ -1482,7 +1481,7 @@ function validateRecoveryState(
   const oldGeneration = authenticateGeneration(
     workspace,
     hasOutputBackup ? resolved.oldOutputBackup : workspace.outputRoot,
-    workspace.registryPath,
+    oldRegistryPath,
     fileOps,
     true,
   );
@@ -1550,15 +1549,17 @@ function validateRecoveryState(
     return {
       oldGeneration,
       newGeneration,
-      oldRegistryPath: workspace.registryPath,
-      newRegistryPath: resolved.stagedRegistry,
+      oldRegistryPath,
+      newRegistryPath,
+      registryPublished: false,
     };
   }
   return {
     oldGeneration,
     ...(newGeneration ? { newGeneration } : {}),
-    oldRegistryPath: workspace.registryPath,
-    ...(hasStagedRegistry ? { newRegistryPath: resolved.stagedRegistry } : {}),
+    oldRegistryPath,
+    newRegistryPath,
+    registryPublished: false,
   };
 }
 
@@ -2412,14 +2413,14 @@ function initialRecoveryPresences(
     return [presence];
   }
 
-  setRecoveryPresence(
-    base,
-    workspace.registryPath,
-    resolved.oldRegistryBackup !== undefined,
-  );
-  setRecoveryPresence(base, resolved.oldRegistryBackup, false);
-  setRecoveryPresence(base, resolved.stagedRegistry, true);
   setRecoveryPresence(base, resolved.journalTemporaryPath, false);
+
+  const registryLayouts = resolved.oldRegistryBackup
+    ? [
+      { active: true, backup: false, staged: true },
+      { active: false, backup: true, staged: true },
+    ] as const
+    : [{ active: false, backup: false, staged: true }] as const;
 
   const outputLayouts = [
     { active: true, backup: false, staged: true },
@@ -2454,28 +2455,33 @@ function initialRecoveryPresences(
     ).present
     : false;
   const variants: Map<string, boolean>[] = [];
-  for (const outputLayout of outputLayouts) {
-    for (const installedLayout of installedLayouts) {
-      const presence = new Map(base);
-      setRecoveryPresence(presence, workspace.outputRoot, outputLayout.active);
-      setRecoveryPresence(presence, resolved.oldOutputBackup, outputLayout.backup);
-      setRecoveryPresence(presence, resolved.stagedOutput, outputLayout.staged);
-      setRecoveryPresence(
-        presence,
-        resolved.finalInstalledSource,
-        installedLayout.final,
-      );
-      setRecoveryPresence(
-        presence,
-        resolved.stagedInstalledSource,
-        installedLayout.staged,
-      );
-      setRecoveryPresence(
-        presence,
-        resolved.incomingInstalledSource,
-        incomingPresent,
-      );
-      variants.push(presence);
+  for (const registryLayout of registryLayouts) {
+    for (const outputLayout of outputLayouts) {
+      for (const installedLayout of installedLayouts) {
+        const presence = new Map(base);
+        setRecoveryPresence(presence, workspace.registryPath, registryLayout.active);
+        setRecoveryPresence(presence, resolved.oldRegistryBackup, registryLayout.backup);
+        setRecoveryPresence(presence, resolved.stagedRegistry, registryLayout.staged);
+        setRecoveryPresence(presence, workspace.outputRoot, outputLayout.active);
+        setRecoveryPresence(presence, resolved.oldOutputBackup, outputLayout.backup);
+        setRecoveryPresence(presence, resolved.stagedOutput, outputLayout.staged);
+        setRecoveryPresence(
+          presence,
+          resolved.finalInstalledSource,
+          installedLayout.final,
+        );
+        setRecoveryPresence(
+          presence,
+          resolved.stagedInstalledSource,
+          installedLayout.staged,
+        );
+        setRecoveryPresence(
+          presence,
+          resolved.incomingInstalledSource,
+          incomingPresent,
+        );
+        variants.push(presence);
+      }
     }
   }
   return variants;
@@ -2899,29 +2905,8 @@ function recoverAssetPackTransactionUnderClaimFromStableDirectory(options: {
       runAuthorizedRecovery(resolved, options.workspace, options.claim.guard);
       return { ok: true, action };
     }
-    if (
-      resolved.journal.phase === 'registry-commit-intent'
-      || resolved.journal.phase === 'registry-published'
-    ) {
-      if (resolved.journal.phase === 'registry-commit-intent') {
-        if (pathEntryExists(resolved.stagedRegistry)) {
-          if (
-            resolved.oldRegistryBackup
-            && pathEntryExists(options.workspace.registryPath)
-            && !pathEntryExists(resolved.oldRegistryBackup)
-          ) {
-            durableRename(
-              options.workspace.registryPath,
-              resolved.oldRegistryBackup,
-              options.claim.guard,
-            );
-          }
-          durableRename(
-            resolved.stagedRegistry,
-            options.workspace.registryPath,
-            options.claim.guard,
-          );
-        }
+    if (recoveryState!.registryPublished) {
+      if (resolved.journal.phase !== 'registry-published') {
         const committedJournal = updatePhase(
           resolved.journal,
           'registry-published',
@@ -3180,15 +3165,12 @@ function updatePhase(
   return updated;
 }
 
-function updateCommitIntent(
+function clearRecoveryAuthorization(
   journal: AssetPackTransactionJournal,
   workspace: AssetWorkspace,
   guard: MutationGuard,
 ): AssetPackTransactionJournal {
-  const updated = {
-    ...journal,
-    phase: 'registry-commit-intent' as const,
-  };
+  const updated = { ...journal };
   delete updated.recoveryMode;
   delete updated.recoveryCursor;
   delete updated.oldRegistryDigest;
@@ -3368,7 +3350,7 @@ function publishAssetPackGenerationUnderClaimFromStableDirectory(
       options.workspace,
       fileOps,
     );
-    journal = updateCommitIntent(journal, options.workspace, claim.guard);
+    journal = clearRecoveryAuthorization(journal, options.workspace, claim.guard);
 
     if (journal.oldRegistryBackup) {
       durableRename(options.workspace.registryPath, oldRegistryBackup, claim.guard);
