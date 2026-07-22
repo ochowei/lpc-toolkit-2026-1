@@ -38,7 +38,7 @@ The character selection is saved under `./characters/`. Preview and render
 commands write the sprite together with metadata and both TXT and CSV credit
 files; keep those attribution artifacts with the generated image.
 
-## Artist asset-pack authoring (Phase 1)
+## Artist asset-pack authoring and lifecycle
 
 An artist can create and test local LPC asset packs using only the published
 CLI. Cloning this repository, initializing `upstream/`, and creating a local
@@ -52,6 +52,13 @@ lpc-toolkit asset init --new --pack-id acme.fantasy-hair --asset-id moon-braid -
 lpc-toolkit asset validate ./artist-packs/<pack-id>
 lpc-toolkit asset preview ./artist-packs/<pack-id>
 lpc-toolkit asset sync ./artist-packs/<pack-id>
+lpc-toolkit asset pack ./artist-packs/<pack-id>
+lpc-toolkit asset workspace init ../consumer-workspace
+cd ../consumer-workspace
+lpc-toolkit asset inspect ../my-lpc-art/artist-packs/<pack-id>-<version>.lpc-assets.zip
+lpc-toolkit asset install ../my-lpc-art/artist-packs/<pack-id>-<version>.lpc-assets.zip
+lpc-toolkit asset list
+lpc-toolkit asset doctor
 ```
 
 Place every authored PNG below
@@ -77,8 +84,10 @@ my-lpc-art/
 │   └── .lpc-toolkit-managed.json
 └── .lpc-toolkit/
     └── asset-packs/
-        ├── registry.json              created by the first successful sync
-        ├── installed/                 reserved for Phase 2
+        ├── registry.json              created by first successful publication
+        ├── installed/                 verified installed archive snapshots
+        ├── transaction.json           present only during active/recoverable work
+        ├── transactions/              operation staging/backups while journaled
         ├── validation/
         └── staging/
 ```
@@ -131,7 +140,7 @@ cache with the workspace root as its working context. A valid cache is reused
 offline. Artist commands never write the pack into that cache, checked-in
 assets, or `upstream/`.
 
-### Phase 1 asset commands and options
+### Asset commands, options, and defaults
 
 Every leaf command accepts `--help`; every command below also accepts `--json`.
 
@@ -143,6 +152,30 @@ Every leaf command accepts `--help`; every command below also accepts `--json`.
 | `asset validate <pack-directory>` | Validate the strict manifest, active catalog, complete PNG geometry/pixels, credits, ownership, conflicts, and acknowledgements. Optional: `--workspace`. |
 | `asset preview <pack-directory>` | Build a temporary overlay and write attributed PNG, metadata, TXT credits, and CSV credits below `<pack>/previews/<asset-id>/` without changing active sync state. Optional: `--asset`, `--animation`, `--body-type`, `--character <selection.json>`, and `--workspace`. The default preview uses a standard farmer body. |
 | `asset sync <pack-directory>` | Validate all active linked packs, rebuild the complete desired overlay, and link this source pack in the workspace registry. Optional: `--workspace`. |
+| `asset pack <pack-directory>` | Freshly validate source, complete PNGs, compatibility, acknowledgements, and attribution, then atomically publish `<pack-parent>/<pack-id>-<version>.lpc-assets.zip`. Optional: `--workspace`. |
+| `asset inspect <archive>` | Strictly inspect and validate an archive without installing it. This command has no workspace option; it reports schema `lpc-toolkit.asset-pack-inspection.v1`, digests, entry/byte counts, diagnostics, and acknowledgement records. |
+| `asset install <archive>` | Inspect the immutable archive snapshot, stage it below manager state, compile all active packs, and publish the installed source, generated output, and registry together. Optional: `--workspace`. |
+| `asset list` | List active linked and installed entries in pack-ID order, including version, source kind/path, content digest, and installed archive digest. Optional: `--workspace`. It does not prepare base assets. |
+| `asset remove <pack-id>` | Deactivate one linked or installed pack and publish the remaining desired state. Optional: `--workspace`. Linked artist source is retained; an installed source is deleted only after output and registry publication. |
+| `asset doctor` | Recover only a valid interrupted manager transaction, then audit registry, linked/installed sources, generated output, ownership, compile state, and attribution. Optional: `--workspace`. There is no `--repair` mode. |
+
+The Phase 2 `--json` success payloads are stable command reports:
+
+- `asset pack`: `packId`, `version`, `contentDigest`, `archiveDigest`, absolute
+  `archivePath`, and `entryCount`.
+- `asset inspect`: schema `lpc-toolkit.asset-pack-inspection.v1`, absolute
+  `archivePath`, available archive/pack/content digests and identity, `valid`,
+  `entryCount`, `totalUncompressedBytes`, sorted diagnostics, and exact
+  `acknowledgementRecords`.
+- `asset install`: `action`, identity/version/archive digest, absolute
+  `installedDirectory`, `outputPath`, and generated-file count.
+- `asset list`: recovery action plus sorted entries with identity, version,
+  display name, `linked`/`installed` kind, source path, content digest, and the
+  archive digest for installed entries.
+- `asset remove`: removed identity/kind, remaining sorted pack IDs/count, and
+  generated-file count.
+- `asset doctor`: schema `lpc-toolkit.asset-pack-doctor.v1`, `healthy`, recovery
+  action, deterministically sorted checks, and sorted active pack summaries.
 
 Common scaffold credit flags are repeatable `--author <name>`,
 `--license <license>`, and `--url <url>`; `--notes <text>` supplies credit
@@ -166,29 +199,129 @@ PNG invalidates the acknowledgement; changing only the acknowledgement array
 does not change the content digest. There is no broad force or ignore-warnings
 flag.
 
-Sync compiles every active linked pack in deterministic order and rejects path,
-semantic-field, baseline-digest, credit, or ownership conflicts instead of
-using last-write-wins. It stages the complete overlay and registry before
-publication. Normal caught publication failures restore the previous
-manager-owned output and registry bytes. If rollback itself fails, the command
-returns `asset_publish_failed` with the original publication error, the rollback
-error, and the existing backup/staging recovery paths. It retains those paths
-and stops without guessing at or deleting any further state. Persistent crash
-journals and automated recovery are not part of Phase 1.
+Sync, install, upgrade, downgrade, and removal compile every active linked and
+installed pack in deterministic order. Path, semantic-field, baseline-digest,
+credit, replacement, and ownership conflicts fail instead of using
+last-write-wins. Every mutation stages a complete desired generation before
+publishing it.
 
 Human-readable successes go to stdout. Human diagnostics and cache progress go
 to stderr. With `--json`, the response envelope is written to stdout and
 progress remains on stderr. Successful commands exit `0`; fatal input/runtime
-failures exit `1`. `asset validate` returns a completed response with
-`data.valid: false` and exits `1` when findings block the pack.
+failures exit `1`. `asset validate` and `asset inspect` return completed reports
+but exit `1` when `data.valid` is false. `asset doctor` returns its complete
+report but exits `1` when `data.healthy` is false.
 
-Phase 1 ends at local validation, attributed preview, and linked sync. The
-distribution/lifecycle commands `asset pack`, `asset inspect`, `asset install`,
-`asset list`, upgrade/downgrade, `asset remove`, and `asset doctor`, along with
-archive security and crash-journal recovery, are deferred to Phase 2. Browser
-upload, Web validation/editing, acknowledgement UI, and corrected-pack download
-are deferred to Phase 3; the current Web editor is not an asset-pack authoring
-surface.
+### Deterministic archive contract and trust boundary
+
+The archive contains only `asset-pack.json`, `checksums.json`, and the exact
+referenced regular files below `sprites/`. `checksums.json` uses strict schema
+`lpc-toolkit.asset-pack-checksums.v1`; its rows are sorted by `path` and contain
+`path`, uncompressed `size`, and a lowercase `sha256:<64-hex>` digest. Coverage
+must equal `asset-pack.json` plus every referenced sprite, with no omission or
+extra entry. `checksums.json` does not checksum itself.
+
+Archive creation normalizes the source manifest, recursively sorts JSON object
+keys, uses LF with a final newline, sorts ZIP entry names, writes no directory
+entries, fixes the DOS timestamp at `1980-01-01 00:00:00`, uses UNIX regular-file
+mode `0o100644`, and compresses at DEFLATE level 9. Equivalent normalized inputs
+therefore produce byte-identical archives and the same `archiveDigest`.
+
+Inspection parses and bounds the central directory before inflation. Phase 2
+accepts only stored or DEFLATE regular-file entries and rejects ZIP64,
+encryption, unsupported flags or compression, data-descriptor/metadata
+mismatches, directory/symlink/special entries, duplicate or Unicode/case
+canonical-collision paths, absolute or drive-qualified paths, backslashes,
+empty/dot/parent segments, unsafe platform names, checksum mismatches, and files
+outside the three allowed roots. Limits are exact and enforced before pixel
+decode:
+
+| Limit | Maximum |
+| --- | ---: |
+| Archive entries | 4,096 |
+| UTF-8 path length | 1,024 bytes |
+| `asset-pack.json` | 1 MiB uncompressed |
+| Any entry | 64 MiB uncompressed |
+| All entries | 512 MiB uncompressed |
+| Encoded archive | 1,074,110,485 bytes |
+
+PNG signature and IHDR geometry are checked against the declared animation
+before canvas decode. Install extracts only the already verified immutable
+snapshot into:
+
+```text
+<stateRoot>/installed/<pack-id>/<version>/<archive-sha256-without-prefix>/
+├── asset-pack.json
+├── sprites/
+└── install-receipt.json
+```
+
+The receipt schema is `lpc-toolkit.asset-pack-install-receipt.v1`. It binds the
+workspace ID, pack/version, archive and content digests, installation time, and
+every extracted payload digest. It is manager metadata, not an archive entry or
+artist input.
+
+The optional strict source field below declares compatibility. Omission means
+only the `lpc-toolkit.asset-pack.v1` schema is required. Unknown compatibility
+fields/capabilities, malformed versions, a minimum above the running CLI, or an
+unsupported capability fail inspection and install.
+
+```json
+{
+  "compatibility": {
+    "minimumCliVersion": "0.2.0",
+    "requiredCapabilities": [
+      "lpc-toolkit.asset-pack.v1",
+      "lpc-toolkit.asset-pack.lifecycle.v1"
+    ]
+  }
+}
+```
+
+### Install, registry, and recovery policy
+
+For the same pack ID, a greater semantic version is `upgraded`; the same version
+and identical archive digest is `unchanged`; the same version with different
+bytes is an error. A lower version is `downgraded` only when its incoming
+self-`replaces` entry matches the currently installed version and exactly covers
+all installed asset keys. There is no force-downgrade flag. Installing a pack ID
+that is active as a linked source fails with `asset_source_kind_conflict`; run
+`asset remove <pack-id>` first. Cross-pack replacement remains subject to exact
+Core owner/version/asset authorization.
+
+The registry schema is `lpc-toolkit.asset-workspace-registry.v2`. It stores a
+sorted union of linked and installed sources plus source/output digests,
+authorized logical destinations, generated sprite ownership and credits, and a
+compile digest. A valid Phase 1 v1 registry is read and enriched from freshly
+validated linked sources; the next successful publication writes only v2.
+Phase 2 never downgrades v2 state.
+
+Publication uses journal schema `lpc-toolkit.asset-pack-transaction.v1` with
+phases `prepared`, `output-published`, `sources-published`, and
+`registry-published`. Before registry publication, recovery deterministically
+rolls back; at or after registry publication, it completes cleanup. Lifecycle
+commands recover first and report `none`, `rolled-back`, or `completed`.
+Installed source deletion happens only after the new output and registry are
+durable; linked removal never deletes artist files.
+
+`asset doctor` is deliberately not a general repair command. Healthy or
+tampered state is audited without repair. Its only mutation is completing or
+rolling back an authentic interrupted manager-owned journal before the audit.
+It never adopts unregistered installed content, rewrites tampered sources or
+registry/output, fills missing credits, or deletes unknown installed/staging
+content.
+
+Installed manager output is activated through the same authorized overlay as
+linked output. Catalog audit, character preview, and render therefore see the
+installed definitions and sprites while arbitrary files in `assets_custom/`
+cannot shadow the base. Preview/render metadata and TXT/CSV credits come from
+one frozen composed credit manifest, retaining both inherited base credits and
+pack contributions through install, upgrade, and removal.
+
+Browser upload, Web validation/editing, acknowledgement UI, temporary browser
+overlays, and corrected-pack download remain deferred to Phase 3; the current
+Web editor is not an asset-pack authoring surface and does not define another
+manifest format.
 
 ### Codex Plugin
 

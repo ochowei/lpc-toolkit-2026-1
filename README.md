@@ -123,11 +123,12 @@ troubleshooting.
 
 Final render output includes a standalone `<name>.viewer.html` offline animation viewer.
 
-### Artist asset-pack quick start
+### Artist asset-pack lifecycle
 
-Artists can create, validate, preview, and locally sync a Phase 1 asset pack
-using only the public CLI. You do not need to clone this repository or
-initialize `upstream/`.
+Artists can author, validate, preview, link, and package an asset pack using
+only the public CLI. Git and a repository clone are optional; neither the
+author nor the consumer needs to initialize `upstream/` or create local base
+assets.
 
 ```sh
 npm install -g @lpc-toolkit/cli
@@ -137,17 +138,35 @@ lpc-toolkit asset init --new --pack-id acme.fantasy-hair --asset-id moon-braid -
 lpc-toolkit asset validate ./artist-packs/<pack-id>
 lpc-toolkit asset preview ./artist-packs/<pack-id>
 lpc-toolkit asset sync ./artist-packs/<pack-id>
+lpc-toolkit asset pack ./artist-packs/<pack-id>
+```
+
+Give the resulting `<pack-id>-<version>.lpc-assets.zip` to a consumer. They use
+a separate standalone workspace and run the lifecycle in order:
+
+```sh
+lpc-toolkit asset workspace init ./consumer-workspace
+cd ./consumer-workspace
+lpc-toolkit asset inspect ../my-lpc-art/artist-packs/<pack-id>-<version>.lpc-assets.zip
+lpc-toolkit asset install ../my-lpc-art/artist-packs/<pack-id>-<version>.lpc-assets.zip
+lpc-toolkit asset list
+lpc-toolkit asset doctor
+# When the pack is no longer needed:
+lpc-toolkit asset remove <pack-id>
 ```
 
 Put complete animation PNGs under
 `artist-packs/<pack-id>/sprites/`. The detailed
-[CLI asset-authoring guide](packages/cli/README.md#artist-asset-pack-authoring-phase-1)
-documents audit-derived scaffolds, acknowledgements, workspace ownership,
-cache behavior, output, and exit semantics.
+[CLI asset lifecycle guide](packages/cli/README.md#artist-asset-pack-authoring-and-lifecycle)
+documents audit-derived scaffolds, acknowledgements, deterministic archive
+security and limits, compatibility, install/upgrade/downgrade policy, registry
+and journal recovery, workspace ownership, attribution, output, and exit
+semantics.
 
-Phase 1 is local authoring only. Pack/install/upgrade/remove/doctor lifecycle
-commands remain deferred to Phase 2, and Web asset-pack authoring remains
-deferred to Phase 3.
+Installed packs participate in catalog audit, character preview, and render;
+their TXT/CSV attribution retains inherited base credits and pack contributions.
+Web asset-pack authoring remains deferred to Phase 3, and the browser editor
+does not edit or download corrected asset-pack manifests.
 
 Catalog and character searches return 20 items by default. Use `--limit 20`
 to set a bounded page size, `--offset 20` (or the returned `page.nextOffset`)

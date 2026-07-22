@@ -53,6 +53,11 @@ const artistWorkflowCommands = [
   'lpc-toolkit asset validate ./artist-packs/<pack-id>',
   'lpc-toolkit asset preview ./artist-packs/<pack-id>',
   'lpc-toolkit asset sync ./artist-packs/<pack-id>',
+  'lpc-toolkit asset pack ./artist-packs/<pack-id>',
+  'lpc-toolkit asset workspace init ../consumer-workspace',
+  'cd ../consumer-workspace',
+  'lpc-toolkit asset install ../my-lpc-art/artist-packs/<pack-id>-<version>.lpc-assets.zip',
+  'lpc-toolkit asset doctor',
 ] as const;
 
 const cliReadmeUrl =
@@ -152,7 +157,8 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           <p className="mt-2 max-w-3xl text-sm text-text-2">
             You do not need to clone this repository. The published CLI creates
             a standalone artist workspace, validates complete animation PNGs,
-            renders attributed previews, and syncs a local generated overlay.
+            renders attributed previews, packages a deterministic archive, and
+            installs it into a second standalone workspace.
           </p>
           <ol className="mt-5 space-y-3">
             {artistWorkflowCommands.map((command, index) => (
@@ -167,9 +173,9 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             image.
           </p>
           <p className="mt-2 text-sm text-text-2">
-            Phase 1 covers local authoring and linked sync. Distribution and
-            lifecycle commands remain deferred to Phase 2; Web asset-pack
-            authoring remains deferred to Phase 3.
+            The CLI owns package inspection, install, upgrade, removal, and
+            lifecycle diagnosis. Web asset-pack authoring remains deferred to
+            Phase 3; the browser composer does not edit pack manifests.
           </p>
         </section>
 

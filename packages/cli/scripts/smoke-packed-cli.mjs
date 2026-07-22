@@ -2,14 +2,18 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   readdirSync,
   rmSync,
+  writeFileSync,
 } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createCanvas } from '@napi-rs/canvas';
 import JSZip from 'jszip';
 import {
   installedCliInvocation,
@@ -39,6 +43,20 @@ function resolveNodeTool(...segments) {
 
 function runNodeTool(toolPath, args, options = {}) {
   return execFileSync(process.execPath, [toolPath, ...args], options);
+}
+
+function writeJson(filePath, value) {
+  mkdirSync(path.dirname(filePath), { recursive: true });
+  writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function writeWalkPng(filePath) {
+  const canvas = createCanvas(9 * 64, 4 * 64);
+  const context = canvas.getContext('2d');
+  context.fillStyle = '#9955cc';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  mkdirSync(path.dirname(filePath), { recursive: true });
+  writeFileSync(filePath, canvas.toBuffer('image/png'));
 }
 
 function parseViewerData(viewerHtml) {
@@ -369,7 +387,7 @@ try {
     `preset render ZIP is missing ${viewerFileName}`,
   );
 
-  function runInstalled(args) {
+  function runInstalled(args, cwd = emptyCwd) {
     const invocation = installedCliInvocation({
       platform: process.platform,
       nodePath: process.execPath,
@@ -378,12 +396,16 @@ try {
       args,
     });
     const result = spawnSync(invocation.command, invocation.args, {
-      cwd: emptyCwd,
+      cwd,
       encoding: 'utf8',
       env: { ...process.env, LPC_TOOLKIT_CACHE_DIR: cacheRoot },
     });
     assert.equal(result.status, 0, result.stderr);
     return result.stdout;
+  }
+
+  function runInstalledJson(args, cwd = emptyCwd) {
+    return JSON.parse(runInstalled([...args, '--json'], cwd));
   }
 
   runInstalled(['character', 'create', 'packed-hero', '--preset', 'farmer']);
@@ -421,6 +443,158 @@ try {
   ]) {
     assert.ok(existsSync(path.join(renderDir, fileName)), `render is missing ${fileName}`);
   }
+
+  const cacheSentinelPath = path.join(cacheRoot, 'packed-smoke-sentinel.txt');
+  writeFileSync(cacheSentinelPath, 'prepared pinned cache must stay unchanged\n');
+
+  const scaffoldOutput = runInstalledJson([
+    'asset', 'init', '--new',
+    '--pack-id', 'smoke.packed-hair',
+    '--version', '1.0.0',
+    '--asset-id', 'violet-hair',
+    '--display-name', 'Packed Violet Hair',
+    '--type', 'hair',
+    '--body-type', 'male',
+    '--animation', 'walk',
+    '--author', 'Packed Smoke Artist',
+    '--license', 'CC-BY-SA 4.0',
+    '--url', 'https://example.test/packed-smoke',
+  ], workspaceRoot);
+  assert.equal(scaffoldOutput.ok, true);
+  const packRoot = scaffoldOutput.data?.packRoot;
+  const manifestPath = scaffoldOutput.data?.manifestPath;
+  assert.equal(typeof packRoot, 'string', 'asset init is missing packRoot');
+  assert.equal(typeof manifestPath, 'string', 'asset init is missing manifestPath');
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  const spriteSource = manifest.assets?.[0]?.layers?.[0]?.sprites?.[0]?.source;
+  assert.equal(typeof spriteSource, 'string', 'scaffold is missing its sprite source');
+  writeWalkPng(path.join(packRoot, ...spriteSource.split('/')));
+
+  const validationOutput = runInstalledJson([
+    'asset', 'validate', packRoot,
+  ], workspaceRoot);
+  assert.equal(validationOutput.data?.valid, true);
+  const packOutput = runInstalledJson(['asset', 'pack', packRoot], workspaceRoot);
+  assert.equal(packOutput.ok, true);
+  const archivePath = packOutput.data?.archivePath;
+  assert.equal(typeof archivePath, 'string', 'asset pack is missing archivePath');
+  assert.ok(
+    path.relative(
+      realpathSync.native(workspaceRoot),
+      realpathSync.native(archivePath),
+    ).startsWith('artist-packs'),
+    'packed archive must stay below the author workspace',
+  );
+
+  const installedWorkspaceRoot = path.join(emptyCwd, 'installed-lifecycle');
+  const installedWorkspaceOutput = runInstalledJson([
+    'asset', 'workspace', 'init', installedWorkspaceRoot,
+  ]);
+  assert.equal(installedWorkspaceOutput.data?.root, installedWorkspaceRoot);
+  const inspectionOutput = runInstalledJson([
+    'asset', 'inspect', archivePath,
+  ], installedWorkspaceRoot);
+  assert.deepEqual(
+    {
+      valid: inspectionOutput.data?.valid,
+      packId: inspectionOutput.data?.packId,
+      version: inspectionOutput.data?.version,
+    },
+    { valid: true, packId: 'smoke.packed-hair', version: '1.0.0' },
+  );
+  const installOutput = runInstalledJson([
+    'asset', 'install', archivePath,
+  ], installedWorkspaceRoot);
+  assert.deepEqual(
+    {
+      action: installOutput.data?.action,
+      packId: installOutput.data?.packId,
+      version: installOutput.data?.version,
+    },
+    { action: 'installed', packId: 'smoke.packed-hair', version: '1.0.0' },
+  );
+  const listOutput = runInstalledJson(['asset', 'list'], installedWorkspaceRoot);
+  assert.deepEqual(
+    listOutput.data?.entries?.map(({ packId, version, kind }) => ({ packId, version, kind })),
+    [{ packId: 'smoke.packed-hair', version: '1.0.0', kind: 'installed' }],
+  );
+
+  writeJson(
+    path.join(
+      installedWorkspaceRoot,
+      'characters',
+      'packed-asset.selection.json',
+    ),
+    {
+      schema: 'lpc-toolkit.selection.v1',
+      name: 'packed-asset',
+      bodyType: 'male',
+      items: { hair: { name: 'smoke.packed-hair--violet-hair' } },
+    },
+  );
+  runInstalled([
+    'character', 'preview', 'packed-asset', '--animation', 'walk',
+  ], installedWorkspaceRoot);
+  const installedPreviewRoot = path.join(
+    installedWorkspaceRoot,
+    'characters',
+    'previews',
+    'packed-asset',
+  );
+  const installedPreviewTxt = readFileSync(
+    path.join(installedPreviewRoot, 'packed-asset.credits.txt'),
+    'utf8',
+  );
+  const installedPreviewCsv = readFileSync(
+    path.join(installedPreviewRoot, 'packed-asset.credits.csv'),
+    'utf8',
+  );
+  assert.match(installedPreviewTxt, /Packed Smoke Artist/u);
+  assert.match(installedPreviewCsv, /Packed Smoke Artist/u);
+
+  const installedRenderRoot = path.join(installedWorkspaceRoot, 'rendered-packed-asset');
+  runInstalled([
+    'character', 'render', 'packed-asset',
+    '--out', installedRenderRoot,
+    '--animation', 'walk',
+  ], installedWorkspaceRoot);
+  assert.match(
+    readFileSync(path.join(installedRenderRoot, 'packed-asset.credits.txt'), 'utf8'),
+    /Packed Smoke Artist/u,
+  );
+  assert.match(
+    readFileSync(path.join(installedRenderRoot, 'packed-asset.credits.csv'), 'utf8'),
+    /Packed Smoke Artist/u,
+  );
+
+  const doctorOutput = runInstalledJson(['asset', 'doctor'], installedWorkspaceRoot);
+  assert.equal(doctorOutput.data?.healthy, true);
+  assert.deepEqual(
+    doctorOutput.data?.packs?.map(({ packId, kind }) => ({ packId, kind })),
+    [{ packId: 'smoke.packed-hair', kind: 'installed' }],
+  );
+  const removeOutput = runInstalledJson([
+    'asset', 'remove', 'smoke.packed-hair',
+  ], installedWorkspaceRoot);
+  assert.deepEqual(
+    {
+      packId: removeOutput.data?.packId,
+      removedKind: removeOutput.data?.removedKind,
+      remainingCount: removeOutput.data?.remainingCount,
+    },
+    { packId: 'smoke.packed-hair', removedKind: 'installed', remainingCount: 0 },
+  );
+  assert.deepEqual(
+    runInstalledJson(['asset', 'list'], installedWorkspaceRoot).data?.entries,
+    [],
+  );
+  assert.equal(
+    readFileSync(cacheSentinelPath, 'utf8'),
+    'prepared pinned cache must stay unchanged\n',
+  );
+  assert.equal(existsSync(path.join(installedWorkspaceRoot, '.git')), false);
+  assert.equal(existsSync(path.join(installedWorkspaceRoot, 'assets')), false);
+  assert.equal(existsSync(path.join(emptyCwd, 'upstream')), false);
 
   console.log('Packed CLI install smoke test passed.');
 } finally {

@@ -459,6 +459,20 @@ function v1RegistryFromV2(registry: RegistryDocument): {
   };
 }
 
+type V1RegistryEntry = ReturnType<typeof v1RegistryFromV2>['entries'][number];
+
+const V1_DRIFT_MUTATIONS: readonly {
+  readonly name: string;
+  readonly apply: (entry: V1RegistryEntry) => void;
+}[] = [
+  { name: 'version', apply: (entry) => { entry.version = '2.0.0'; } },
+  { name: 'display name', apply: (entry) => { entry.displayName = 'Tampered Braid'; } },
+  { name: 'source digest', apply: (entry) => { entry.sourceDigests = {}; } },
+  { name: 'generated ownership', apply: (entry) => { entry.generatedPaths = []; } },
+  { name: 'definition baseline', apply: (entry) => { entry.baselineDefinitionDigests = { braid: `sha256:${'a'.repeat(64)}` }; } },
+  { name: 'credit baseline', apply: (entry) => { entry.baselineCreditDigests = { braid: `sha256:${'b'.repeat(64)}` }; } },
+];
+
 function expectSuccess(result: AssetPackSyncResult): AssetPackSyncSuccess {
   if (!result.ok) {
     throw new Error(
@@ -897,27 +911,9 @@ describe('syncLinkedAssetPack', () => {
       .toBe(ASSET_WORKSPACE_REGISTRY_V1_SCHEMA);
   });
 
-  it('rejects retained v1 identity, metadata, and baseline drift without publication', async () => {
-    const mutations: readonly {
-      readonly name: string;
-      readonly apply: (entry: {
-        version: string;
-        displayName: string;
-        sourceDigests: Readonly<Record<string, string>>;
-        generatedPaths: readonly string[];
-        baselineDefinitionDigests: Readonly<Record<string, string>>;
-        baselineCreditDigests: Readonly<Record<string, string>>;
-      }) => void;
-    }[] = [
-      { name: 'version', apply: (entry) => { entry.version = '2.0.0'; } },
-      { name: 'display name', apply: (entry) => { entry.displayName = 'Tampered Braid'; } },
-      { name: 'source digest', apply: (entry) => { entry.sourceDigests = {}; } },
-      { name: 'generated ownership', apply: (entry) => { entry.generatedPaths = []; } },
-      { name: 'definition baseline', apply: (entry) => { entry.baselineDefinitionDigests = { braid: `sha256:${'a'.repeat(64)}` }; } },
-      { name: 'credit baseline', apply: (entry) => { entry.baselineCreditDigests = { braid: `sha256:${'b'.repeat(64)}` }; } },
-    ];
-
-    for (const mutation of mutations) {
+  it.each(V1_DRIFT_MUTATIONS)(
+    'rejects retained v1 $name drift without publication',
+    async (mutation) => {
       const fixture = createWorkspaceFixture();
       const firstRoot = path.join(fixture.workspace.packsRoot, 'acme.wind-braid');
       const secondRoot = path.join(fixture.workspace.packsRoot, 'bravo.ribbon-braid');
@@ -943,8 +939,8 @@ describe('syncLinkedAssetPack', () => {
       expect(diagnosticCodes(failed.diagnostics), mutation.name).toContain('asset_digest_mismatch');
       expect(snapshotTree(fixture.workspace.outputRoot), mutation.name).toEqual(beforeOutput);
       expect(snapshotFile(fixture.workspace.registryPath), mutation.name).toEqual(beforeRegistry);
-    }
-  });
+    },
+  );
 
   it('re-syncs after source changes and publishes the new bytes', async () => {
     const fixture = createWorkspaceFixture();

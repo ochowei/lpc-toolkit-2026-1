@@ -143,7 +143,8 @@ not modify `upstream/`.
 - token and preset commands for automation
 - standalone artist-workspace discovery and ownership
 - artist pack scaffolding, PNG inspection, attributed preview, linked-pack
-  registry orchestration, and rollback-safe generated-overlay publication
+  registry orchestration, deterministic archive inspection/packaging,
+  linked/installed desired-state compilation, and journaled publication/recovery
 
 CLI code may use Node APIs, `@napi-rs/canvas` (MIT), and `jszip` (MIT) because
 it is a Node runtime package. Those dependencies must not move into
@@ -459,22 +460,99 @@ contribution. The compiler emits generated credits, overlay composition freezes
 them into `ComposedSheet.credits`, and preview/render publication writes the
 PNG plus metadata and TXT/CSV credit artifacts from that frozen manifest.
 
-Linked sync stages the complete generated overlay and registry, validates all
-paths and credits, and only then publishes. Normal caught publication failures
-restore the previous manager-owned output and registry bytes. If rollback
-itself fails, the command returns `asset_publish_failed` with the original
-publication error, the rollback error, and the backup/staging recovery paths
-that still exist. It retains those paths and stops without guessing at or
-deleting further state. Persistent crash journaling and automated recovery are
-outside the Phase 1 rollback boundary.
+Phase 1 linked sync stages the complete generated overlay and registry,
+validates all paths and credits, and only then publishes. Its original caught
+failure boundary restored prior bytes or retained explicit recovery paths.
+Phase 2 generalizes that publisher into the durable journal described below and
+routes linked sync through the same desired-generation transaction as install
+and removal.
 
-Phase 1 includes workspace initialization, new and audit-derived scaffolding,
-validation, attributed preview, linked sync, and overlay rendering only.
-Packing, archive inspection/security, install, upgrade/downgrade, list, remove,
-doctor, and crash-journal recovery are deferred to Phase 2. Browser upload,
-validation/editing, acknowledgement UI, temporary browser overlays, and pack
-download are deferred to Phase 3; the Web must later reuse the Core schema and
-must not introduce an alternate manifest format.
+### Phase 2 archive and installed lifecycle
+
+Directory sources and archives converge at one immutable payload snapshot:
+normalized `lpc-toolkit.asset-pack.v1` source, captured manifest/source bytes,
+source digests, PNG inspections, and content digest. Packaging performs fresh
+source, geometry, pixel, compatibility, acknowledgement, and attribution
+validation; inspection/install never trust a prior validation result or a
+mutable artist path.
+
+Archive writing is deterministic, but untrusted reading has a separate trust
+boundary. The reader validates encoded size, the end record, central and local
+headers, paths, flags, regular-file type, compression method, CRC/checksum
+coverage, and exact limits before bounded inflation or PNG decode. Only
+`asset-pack.json`, strict `lpc-toolkit.asset-pack-checksums.v1`, and referenced
+`sprites/**` files are accepted. ZIP64, encryption, aliases/collisions,
+directories, links, special files, unsafe paths, unsupported compression, and
+checksum drift are rejected. A verified snapshot alone may enter extraction.
+
+Installed payloads are manager-owned and content-addressed:
+
+```text
+<stateRoot>/installed/<pack-id>/<version>/<archive-digest>/
+├── asset-pack.json
+├── sprites/
+└── install-receipt.json
+```
+
+The strict receipt binds the workspace ID, pack/content/archive identity,
+installation time, and exact extracted payload digests. Installed-source reads
+recheck containment, directory identity, receipt coverage, and payload bytes;
+unknown or symlink-escaped content never becomes active.
+
+Registry `lpc-toolkit.asset-workspace-registry.v2` is a sorted union of linked
+and installed source entries. It records source and generated digests,
+acknowledgements, logical destinations, sprite consumers/ownership,
+replacements, baseline definition/credit digests, generated credits, and a
+compile digest. A valid Phase 1 v1 registry can be read and enriched from fresh
+linked snapshots, but every Phase 2 publication writes only v2.
+
+`prepareAssetPackDesiredState` is the lifecycle compiler. Under one source
+snapshot it loads all active linked/installed packs, applies exactly one
+upsert/removal mutation, reuses Core replacement/conflict decisions, compiles
+the whole set in pack-ID order, produces every manager-owned output byte, and
+projects the matching v2 registry. There is no incremental last-writer-wins
+overlay mutation.
+
+Install policy compares strict Core semantic versions. Greater is upgrade;
+equal plus identical archive digest is no-op; equal plus different bytes is a
+conflict. A lower version requires an incoming self-replacement matching the
+installed version and exactly covering its asset keys. An installed candidate
+cannot replace an active linked entry with the same ID; the linked pack must be
+removed first. Cross-pack replacement remains exact and compiler-authorized.
+
+Sync, install/upgrade/downgrade, and remove publish through durable journal
+`lpc-toolkit.asset-pack-transaction.v1`:
+
+```text
+prepared -> output-published -> sources-published -> registry-published
+```
+
+The transaction pins manager-owned directories and source identities, stages
+complete output/registry bytes, fsyncs durable boundaries, and uses an explicit
+cleanup allowlist. Recovery rolls back phases before registry publication and
+completes phases at/after registry publication; a second recovery is
+idempotent. Installed source cleanup occurs only after the replacement registry
+and output are durable. Linked removal never deletes artist source.
+
+Lifecycle reads recover a valid interrupted transaction before observing state.
+`asset doctor` then audits registry, linked/installed source snapshots,
+generated output, ownership, compile projection, baseline definitions/palettes,
+and attribution against one authenticated generation. Healthy/tampered audits
+are read-only: the only allowed mutation is deterministic rollback/completion
+of a valid manager journal. Doctor never adopts, repairs, or deletes unknown
+content.
+
+At runtime, the authenticated registry authorizes the generated definition and
+sprite logical paths passed to the existing overlay adapter. Catalog audit,
+character preview, render, frame, viewer, bundle, metadata, TXT, and CSV paths
+therefore consume installed and linked output without allowing arbitrary
+`assets_custom/` shadowing. Composition still freezes one credit manifest;
+extension credits union inherited base credits with the pack contribution, and
+all publication formats preserve that complete attribution.
+
+Browser upload, validation/editing, acknowledgement UI, temporary browser
+overlays, and pack download remain deferred to Phase 3. The Web must reuse the
+Core schema and must not introduce an alternate manifest format.
 
 Production asset resolution uses the local tree or pinned managed cache.
 `upstream/` is an optional read-only provenance dormant gitlink that preserves source

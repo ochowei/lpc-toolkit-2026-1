@@ -104,13 +104,13 @@ rtk pnpm --filter @lpc-toolkit/cli build
 rtk pnpm --filter @lpc-toolkit/cli test:package
 ```
 
-#### Phase 1 artist asset-pack authoring
+#### Artist asset-pack authoring and lifecycle
 
-Run the three focused Core modules whenever the source schema, validation, or
-compile decisions change:
+Run the focused Core lifecycle modules whenever compatibility, semantic
+version/replacement, source schema, or compile decisions change:
 
 ```sh
-rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-schema.test.ts asset-pack-validation.test.ts asset-pack-compile.test.ts
+rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-version.test.ts asset-pack-schema.test.ts asset-pack-compile.test.ts
 ```
 
 The seven focused CLI authoring modules cover workspace ownership, safe source
@@ -131,6 +131,26 @@ closure:
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-e2e.test.ts
 ```
 
+Phase 2 archive and lifecycle coverage is intentionally split by trust
+boundary. Run this complete focused set for payload snapshots, bounded ZIP
+parsing/checksums, deterministic packaging, inspection, strict registry/source
+state, crash recovery, install policy, cleanup, and doctor non-repair behavior:
+
+```sh
+rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-payload.test.ts asset-pack-archive-format.test.ts asset-pack-packaging.test.ts asset-pack-inspection.test.ts asset-pack-registry.test.ts asset-pack-state.test.ts asset-pack-transaction.test.ts asset-pack-install.test.ts asset-pack-remove.test.ts asset-pack-doctor.test.ts
+```
+
+The two-workspace acceptance drives the public CLI from clean author and
+consumer directories with an injected compatible base cache. It proves
+scaffold/validate/preview/sync/pack, inspect/install/list, installed catalog and
+animation behavior, attributed preview/render, upgrade identity, remove,
+remaining extension credits, doctor health, write containment, and untouched
+base-cache sentinel:
+
+```sh
+rtk pnpm --filter @lpc-toolkit/cli test -- asset-lifecycle-e2e.test.ts
+```
+
 Landing documentation and its checked-in attributed artifacts are verified
 together:
 
@@ -141,14 +161,25 @@ rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifac
 Run `rtk pnpm check:boundaries` for every asset-pack architecture change. Run
 the packed CLI smoke conditionally whenever CLI package metadata, build output,
 or `packages/cli/scripts/` changes; it installs the produced tarball in a clean
-consumer directory and proves `asset workspace init` needs neither a repository
-checkout nor cache/network preparation:
+consumer directory. After preparing one pinned cache, it proves no-repository
+workspace init, fixture authoring/validation/packing, second-workspace
+inspection/install/list, installed attributed preview/render, doctor, and
+removal through the installed package without `upstream/`:
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test:package
 ```
 
-Before handoff, run the complete Task 12 mapping below. `rtk pnpm verify`
+The complete Task 13 focused handoff gate is:
+
+```sh
+rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-version.test.ts asset-pack-schema.test.ts asset-pack-compile.test.ts
+rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-payload.test.ts asset-pack-archive-format.test.ts asset-pack-packaging.test.ts asset-pack-inspection.test.ts asset-pack-registry.test.ts asset-pack-state.test.ts asset-pack-transaction.test.ts asset-pack-install.test.ts asset-pack-remove.test.ts asset-pack-doctor.test.ts asset-lifecycle-e2e.test.ts
+rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifacts.test.ts
+rtk pnpm --filter @lpc-toolkit/cli test:package
+```
+
+Before handoff, run the complete Task 13 mapping below. `rtk pnpm verify`
 repeats the shared asset-pin, boundary, CLI documentation policy, plugin,
 workspace typecheck, and workspace Vitest stages; it does not replace the
 explicit CLI build/package smoke.

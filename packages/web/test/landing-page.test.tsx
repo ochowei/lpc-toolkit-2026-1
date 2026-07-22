@@ -71,6 +71,11 @@ describe('LandingPage', () => {
       'lpc-toolkit asset validate ./artist-packs/<pack-id>',
       'lpc-toolkit asset preview ./artist-packs/<pack-id>',
       'lpc-toolkit asset sync ./artist-packs/<pack-id>',
+      'lpc-toolkit asset pack ./artist-packs/<pack-id>',
+      'lpc-toolkit asset workspace init ../consumer-workspace',
+      'cd ../consumer-workspace',
+      'lpc-toolkit asset install ../my-lpc-art/artist-packs/<pack-id>-<version>.lpc-assets.zip',
+      'lpc-toolkit asset doctor',
     ];
     const positions = commands.map((command) => {
       expect(html).toContain(command);
@@ -80,7 +85,7 @@ describe('LandingPage', () => {
     expect(positions).toEqual([...positions].sort((left, right) => left - right));
     expect(html).toContain('artist-packs/<pack-id>/sprites/');
     expect(html).toContain('You do not need to clone this repository');
-    expect(html).toContain('Phase 2');
+    expect(html).not.toContain('Phase 2');
     expect(html).toContain('Phase 3');
   });
 });
