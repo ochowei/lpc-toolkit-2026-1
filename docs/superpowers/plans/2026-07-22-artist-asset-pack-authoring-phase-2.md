@@ -1265,7 +1265,9 @@ Then update this task's plan record and commit it separately.
 - Consumes: desired output/registry bytes, workspace marker/roots, and new/obsolete installed-source paths.
 - Produces: journal publisher/recovery under Stable Interfaces for Tasks 9–12.
 
-- [ ] **Step 1: Write failing journal schema and path tests**
+- [x] **Step 1: Write failing journal schema and path tests**
+
+  - Implementation: Added strict journal schema parsing, role-specific containment, workspace/operation identity checks, same-parent publication layout, persisted role ownership evidence, and child identity validation.
 
 Assert exact keys/schema/workspace ID/operation kind/phase, UUID operation ID, relative allowlisted paths, digest validation, no symlinks, no path outside `outputRoot`, `registryPath`, `stateRoot/staging`, `stateRoot/transactions`, or `stateRoot/installed`, and rejection of a journal that names artist source/base/cache/upstream.
 
@@ -1286,7 +1288,9 @@ export interface AssetPackTransactionJournal {
 }
 ```
 
-- [ ] **Step 2: Write failing phase-by-phase recovery tests**
+- [x] **Step 2: Write failing phase-by-phase recovery tests**
+
+  - Implementation: Added crash/restart coverage for all approved phases, rollback/completion transitions, cursor validation, persisted installed/staging role substitution, claim recovery, and idempotent replay.
 
 Inject failure/crash after journal durable write, output swap, source publication, and registry swap. Assert:
 
@@ -1297,11 +1301,15 @@ registry-published -> retain new output/registry/source, delete only recorded ba
 
 Repeat recovery to prove idempotence. A malformed journal returns `asset_transaction_unsafe` and mutates nothing.
 
-- [ ] **Step 3: Write failing durability adapter tests**
+- [x] **Step 3: Write failing durability adapter tests**
+
+  - Implementation: Added durable file/journal writes, fsync ordering, parent-directory durability, unsupported-directory error handling, stable-cwd coverage, and claim release failure coverage.
 
 Verify staged files are closed, file `fsyncSync` happens before rename, journal temp is fsynced then renamed, parent-directory fsync is attempted, and only `EINVAL`, `ENOTSUP`, or `EPERM` from directory fsync are tolerated. Other durability failures abort before active-state mutation.
 
-- [ ] **Step 4: Run the focused test and verify RED**
+- [x] **Step 4: Run the focused test and verify RED**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-transaction.test.ts` — RED before implementation as expected because the transaction module did not exist.
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-transaction.test.ts
@@ -1309,15 +1317,21 @@ rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-transaction.test.ts
 
 Expected: FAIL because the transaction module does not exist.
 
-- [ ] **Step 5: Implement durable journal and deterministic recovery**
+- [x] **Step 5: Implement durable journal and deterministic recovery**
+
+  - Implementation: Implemented durable journal publication/recovery with authenticated output, registry, installed-source, and staging roles; restartable rollback/cleanup cursors; serialized claims; parent-local mutations; and approved four-phase recovery semantics.
 
 Write every phase update through temp+fsync+rename. Record paths relative to workspace root and resolve them through strict role-specific containment on read. Before registry publication, rollback is the only policy; after registry publication, completion is the only policy. Never inspect or delete unlisted siblings.
 
-- [ ] **Step 6: Move sync to journaled publication**
+- [x] **Step 6: Move sync to journaled publication**
+
+  - Implementation: Moved sync recovery ahead of preflight and desired-state preparation under the shared transaction claim; sync now publishes through the durable publisher while preserving generated output and attribution.
 
 Materialize desired output/registry below a unique `stateRoot/staging` generation and call `publishAssetPackGeneration` with operation `sync`. Run `recoverAssetPackTransaction` before preparing new sync state. Remove the Phase 1 in-process-only publisher after regression tests pass.
 
-- [ ] **Step 7: Verify GREEN**
+- [x] **Step 7: Verify GREEN**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-transaction.test.ts asset-pack-sync.test.ts` PASS (121 tests); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS; `rtk pnpm check:boundaries` PASS; `rtk git diff --check afc2af7c89a10d968631310a100ef0ca2b2c2831..a6b4ec87fdcc844693a17df51c84ea5e14be2704` PASS; prohibited-`any` scan PASS.
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-transaction.test.ts asset-pack-sync.test.ts
@@ -1326,7 +1340,10 @@ rtk pnpm --filter @lpc-toolkit/cli run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit product code**
+- [x] **Step 8: Commit product code**
+
+  - Product/fix commits: `e9dea41eb6c6ada2ba71704bfb19b59169778e8c`, `2749644b3c937bcc54b04d87d37eba0a50d5ae0c`, `a41d2c1ad768f301463b6422449af5cc49f83acf`, `e1cf1a0ff92de2c2bdab6a0fef2aabdd59d5b4e5`, `a9d00ee85dece0da8f9820541edff3e6fb011dc4`, `19a0352c39870934cfc042785ffd012edc89df5c`, `b62539cc8dce1d35948e8a89b33e97c435194d7c`, `a6b4ec87fdcc844693a17df51c84ea5e14be2704`.
+  - Review: Final fresh reviewer APPROVED with no Critical, Important, or Minor findings in `.superpowers/sdd/task-8-review-final-7.md`.
 
 ```sh
 rtk git add packages/cli/src/asset-pack-transaction.ts packages/cli/src/asset-pack-sync.ts packages/cli/test/asset-pack-transaction.test.ts packages/cli/test/asset-pack-sync.test.ts
