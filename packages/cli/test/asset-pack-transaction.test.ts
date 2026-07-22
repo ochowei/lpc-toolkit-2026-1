@@ -2,13 +2,16 @@ import { createHash, randomUUID } from 'node:crypto';
 import {
   closeSync,
   existsSync,
+  fstatSync,
   fsyncSync,
+  linkSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
   openSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   renameSync,
   rmSync,
   symlinkSync,
@@ -51,6 +54,8 @@ const REAL_FILE_OPS: AssetTransactionFileOps = {
   openSync,
   fsyncSync,
   closeSync,
+  fstatSync,
+  linkSync,
 };
 
 interface Fixture {
@@ -263,6 +268,33 @@ function transactionClaimPath(workspace: AssetWorkspace): string {
   return path.join(workspace.stateRoot, 'transaction.lock');
 }
 
+function recoveryMutationKey(
+  workspace: AssetWorkspace,
+  operation: 'mkdir' | 'write' | 'rename' | 'remove',
+  targets: readonly string[],
+  boundary: 'mutation' | 'fsync',
+): string | undefined {
+  if (targets.some((target) => target.includes('transaction.lock'))) return undefined;
+  if (
+    operation !== 'remove'
+    && targets.some((target) => path.basename(target).startsWith('transaction.json'))
+  ) {
+    return undefined;
+  }
+  let journal: AssetPackTransactionJournal | undefined;
+  try {
+    journal = JSON.parse(
+      readFileSync(transactionPath(workspace), 'utf8'),
+    ) as AssetPackTransactionJournal;
+  } catch {
+    return undefined;
+  }
+  if (journal.recoveryMode === undefined) return undefined;
+  const relativeTargets = targets.map((target) =>
+    path.relative(workspace.root, target).split(path.sep).join('/'));
+  return `${journal.recoveryMode}:${operation}:${boundary}:${relativeTargets.join('->')}`;
+}
+
 function installedPath(workspace: AssetWorkspace, suffix = ARCHIVE_DIGEST): string {
   return path.join(workspace.stateRoot, 'installed', 'acme.pack', '1.0.0', suffix);
 }
@@ -426,11 +458,13 @@ describe('asset-pack transaction journal safety', () => {
     const fixture = createFixture();
     const failBeforeOutputMutation: AssetTransactionFileOps = {
       ...REAL_FILE_OPS,
-      renameSync(source, destination) {
-        if (path.resolve(String(source)) === fixture.workspace.outputRoot) {
+      afterMutationValidationSync(operation, targets) {
+        if (
+          operation === 'rename'
+          && path.resolve(targets[0] ?? '') === fixture.workspace.outputRoot
+        ) {
           throw new Error('stop after durable journal');
         }
-        renameSync(source, destination);
       },
     };
 
@@ -542,7 +576,7 @@ describe('asset-pack transaction journal safety', () => {
     expect(existsSync(path.join(outside, 'missing.json'))).toBe(false);
   });
 
-  it('reclaims a well-formed dead-process claim and rejects a corrupt claim without mutation', () => {
+  it('reclaims dead, empty, and partial claims but rejects a well-formed live foreign claim', () => {
     const reclaimable = createFixture();
     writeFileSync(transactionClaimPath(reclaimable.workspace), `${JSON.stringify({
       schema: ASSET_PACK_TRANSACTION_SCHEMA,
@@ -556,13 +590,63 @@ describe('asset-pack transaction journal safety', () => {
     });
     expect(existsSync(transactionClaimPath(reclaimable.workspace))).toBe(false);
 
-    const corrupt = createFixture();
-    writeFileSync(transactionClaimPath(corrupt.workspace), '{not-json\n');
-    const before = snapshotTree(corrupt.root);
-    const result = recoverAssetPackTransaction({ workspace: corrupt.workspace });
-    expect(result.ok).toBe(false);
-    expect(snapshotTree(corrupt.root)).toEqual(before);
+    for (const contents of ['', '{not-json\n']) {
+      const corrupt = createFixture();
+      const beforeOutput = snapshotTree(corrupt.workspace.outputRoot);
+      const beforeRegistry = readFileSync(corrupt.workspace.registryPath);
+      writeFileSync(transactionClaimPath(corrupt.workspace), contents);
+      expect(recoverAssetPackTransaction({ workspace: corrupt.workspace })).toEqual({
+        ok: true,
+        action: 'none',
+      });
+      expect(existsSync(transactionClaimPath(corrupt.workspace))).toBe(false);
+      expect(snapshotTree(corrupt.workspace.outputRoot)).toEqual(beforeOutput);
+      expect(readFileSync(corrupt.workspace.registryPath)).toEqual(beforeRegistry);
+    }
+
+    const foreign = createFixture();
+    writeFileSync(transactionClaimPath(foreign.workspace), `${JSON.stringify({
+      schema: ASSET_PACK_TRANSACTION_SCHEMA,
+      workspaceId: 'foreign-workspace',
+      operationId: OPERATION_ID,
+      pid: process.pid,
+    })}\n`);
+    const before = snapshotTree(foreign.root);
+    expect(recoverAssetPackTransaction({ workspace: foreign.workspace }).ok).toBe(false);
+    expect(snapshotTree(foreign.root)).toEqual(before);
   });
+
+  it.each(['after-old-output-rename', 'after-new-output-rename'] as const)(
+    'reclaims a dead claim with the active marker absent or replaced %s',
+    (boundary) => {
+      const fixture = createFixture();
+      const seeded = seedPhase(
+        fixture,
+        boundary === 'after-old-output-rename' ? 'prepared' : 'output-published',
+      );
+      if (boundary === 'after-old-output-rename') {
+        renameSync(
+          fixture.workspace.outputRoot,
+          path.resolve(fixture.workspace.root, seeded.journal.oldOutputBackup),
+        );
+      }
+      writeFileSync(transactionClaimPath(fixture.workspace), `${JSON.stringify({
+        schema: ASSET_PACK_TRANSACTION_SCHEMA,
+        workspaceId: fixture.workspaceId,
+        operationId: OPERATION_ID,
+        pid: 2_147_483_647,
+      })}\n`);
+
+      expect(recoverAssetPackTransaction({ workspace: fixture.workspace })).toEqual({
+        ok: true,
+        action: 'rolled-back',
+      });
+      expect(readFileSync(
+        path.join(fixture.workspace.outputRoot, '.lpc-toolkit-managed.json'),
+      )).toEqual(fixture.oldMarkerBytes);
+      expect(existsSync(transactionClaimPath(fixture.workspace))).toBe(false);
+    },
+  );
 });
 
 describe('asset-pack transaction recovery', () => {
@@ -657,24 +741,21 @@ describe('asset-pack transaction recovery', () => {
           }
           writeFileSync(target, data, writeOptions);
         },
-        renameSync(source, destination) {
+        afterMutationValidationSync(operation, targets) {
           if (
             crashPoint === 'journal durable write'
-            && path.resolve(String(source)) === fixture.workspace.outputRoot
+            && operation === 'rename'
+            && path.resolve(targets[0] ?? '') === fixture.workspace.outputRoot
           ) {
             throw new Error(`injected crash after ${crashPoint}`);
           }
-          renameSync(source, destination);
-        },
-        rmSync(target, removeOptions) {
           if (
             crashPoint === 'registry swap'
-            && String(target).includes(`${path.sep}transactions${path.sep}`)
-            && path.basename(String(target)) === 'old-output'
+            && operation === 'remove'
+            && targets.some((target) => path.basename(target) === 'old-output')
           ) {
             throw new Error(`injected crash after ${crashPoint}`);
           }
-          rmSync(target, removeOptions);
         },
       };
 
@@ -726,12 +807,15 @@ describe('asset-pack transaction recovery', () => {
     let failed = false;
     const interruptedRecovery: AssetTransactionFileOps = {
       ...REAL_FILE_OPS,
-      rmSync(target, removeOptions) {
-        if (!failed && path.resolve(String(target)) === transactionPath(fixture.workspace)) {
+      afterMutationValidationSync(operation, targets) {
+        if (
+          !failed
+          && operation === 'remove'
+          && targets.some((target) => path.resolve(target) === transactionPath(fixture.workspace))
+        ) {
           failed = true;
           throw new Error('injected recovery interruption');
         }
-        rmSync(target, removeOptions);
       },
     };
 
@@ -755,6 +839,144 @@ describe('asset-pack transaction recovery', () => {
       action: 'none',
     });
   });
+
+  it('restarts rollback after every remove, rename, and parent-fsync boundary', () => {
+    const discovery = createFixture();
+    seedPhase(discovery, 'sources-published');
+    const boundaries: string[] = [];
+    expect(recoverAssetPackTransaction({
+      workspace: discovery.workspace,
+      fileOps: {
+        ...REAL_FILE_OPS,
+        afterMutationSync(operation, targets, boundary) {
+          const key = recoveryMutationKey(
+            discovery.workspace,
+            operation,
+            targets,
+            boundary,
+          );
+          if (key) boundaries.push(key);
+        },
+      },
+    })).toEqual({ ok: true, action: 'rolled-back' });
+    expect(boundaries.length).toBeGreaterThan(0);
+
+    for (let boundaryIndex = 0; boundaryIndex < boundaries.length; boundaryIndex += 1) {
+      const fixture = createFixture();
+      const seeded = seedPhase(fixture, 'sources-published');
+      const sibling = path.join(
+        fixture.workspace.stateRoot,
+        'installed',
+        `rollback-sibling-${boundaryIndex}`,
+      );
+      writeTreeFile(sibling, 'sentinel.txt', 'outside rollback\n');
+      let eventIndex = 0;
+      let interrupted = false;
+      const result = recoverAssetPackTransaction({
+        workspace: fixture.workspace,
+        fileOps: {
+          ...REAL_FILE_OPS,
+          afterMutationSync(operation, targets, boundary) {
+            const key = recoveryMutationKey(
+              fixture.workspace,
+              operation,
+              targets,
+              boundary,
+            );
+            if (!key) return;
+            if (!interrupted && eventIndex === boundaryIndex) {
+              interrupted = true;
+              throw new Error(`rollback interruption at ${key}`);
+            }
+            eventIndex += 1;
+          },
+        },
+      });
+      expect(result.ok).toBe(false);
+      expect(interrupted).toBe(true);
+      const resumed = recoverAssetPackTransaction({ workspace: fixture.workspace });
+      expect(resumed.ok).toBe(true);
+      if (resumed.ok) expect(['rolled-back', 'none']).toContain(resumed.action);
+      expect(readFileSync(
+        path.join(fixture.workspace.outputRoot, '.lpc-toolkit-managed.json'),
+      )).toEqual(fixture.oldMarkerBytes);
+      expect(readFileSync(fixture.workspace.registryPath)).toEqual(fixture.oldRegistryBytes);
+      expect(existsSync(seeded.finalSource)).toBe(false);
+      expect(existsSync(seeded.cleanupSource)).toBe(true);
+      expect(readFileSync(path.join(sibling, 'sentinel.txt'), 'utf8'))
+        .toBe('outside rollback\n');
+    }
+  }, 20_000);
+
+  it('restarts authenticated committed cleanup after every deletion and fsync boundary', () => {
+    const discovery = createFixture();
+    seedPhase(discovery, 'registry-published');
+    const boundaries: string[] = [];
+    expect(recoverAssetPackTransaction({
+      workspace: discovery.workspace,
+      fileOps: {
+        ...REAL_FILE_OPS,
+        afterMutationSync(operation, targets, boundary) {
+          const key = recoveryMutationKey(
+            discovery.workspace,
+            operation,
+            targets,
+            boundary,
+          );
+          if (key) boundaries.push(key);
+        },
+      },
+    })).toEqual({ ok: true, action: 'completed' });
+    expect(boundaries.some((entry) => entry.includes('old-output'))).toBe(true);
+    expect(boundaries.some((entry) => entry.includes('installed/'))).toBe(true);
+    expect(boundaries.some((entry) => entry.includes('staging/'))).toBe(true);
+
+    for (let boundaryIndex = 0; boundaryIndex < boundaries.length; boundaryIndex += 1) {
+      const fixture = createFixture();
+      const seeded = seedPhase(fixture, 'registry-published');
+      const sibling = path.join(
+        fixture.workspace.stateRoot,
+        'installed',
+        `cleanup-sibling-${boundaryIndex}`,
+      );
+      writeTreeFile(sibling, 'sentinel.txt', 'outside cleanup\n');
+      let eventIndex = 0;
+      let interrupted = false;
+      const result = recoverAssetPackTransaction({
+        workspace: fixture.workspace,
+        fileOps: {
+          ...REAL_FILE_OPS,
+          afterMutationSync(operation, targets, boundary) {
+            const key = recoveryMutationKey(
+              fixture.workspace,
+              operation,
+              targets,
+              boundary,
+            );
+            if (!key) return;
+            if (!interrupted && eventIndex === boundaryIndex) {
+              interrupted = true;
+              throw new Error(`cleanup interruption at ${key}`);
+            }
+            eventIndex += 1;
+          },
+        },
+      });
+      expect(result.ok).toBe(false);
+      expect(interrupted).toBe(true);
+      const resumed = recoverAssetPackTransaction({ workspace: fixture.workspace });
+      expect(resumed.ok).toBe(true);
+      if (resumed.ok) expect(['completed', 'none']).toContain(resumed.action);
+      expect(readFileSync(
+        path.join(fixture.workspace.outputRoot, '.lpc-toolkit-managed.json'),
+      )).toEqual(fixture.newMarkerBytes);
+      expect(existsSync(seeded.finalSource)).toBe(true);
+      expect(existsSync(seeded.cleanupSource)).toBe(false);
+      expect(existsSync(transactionPath(fixture.workspace))).toBe(false);
+      expect(readFileSync(path.join(sibling, 'sentinel.txt'), 'utf8'))
+        .toBe('outside cleanup\n');
+    }
+  }, 20_000);
 
   it.each([
     ['only staged output remains', (fixture: Fixture, _seeded: ReturnType<typeof seedPhase>) => {
@@ -805,17 +1027,18 @@ describe('asset-pack transaction durability', () => {
       fileOps: {
         ...REAL_FILE_OPS,
         mkdirSync(target, mkdirOptions) {
-          events.push(`mkdir:${String(target)}`);
+          events.push(`mkdir:${path.resolve(String(target))}`);
           return mkdirSync(target, mkdirOptions);
         },
         writeFileSync(target, data, writeOptions) {
-          events.push(`write:${String(target)}`);
+          events.push(`write:${typeof target === 'number' ? target : path.resolve(String(target))}`);
           writeFileSync(target, data, writeOptions);
         },
         openSync(target, flags, mode) {
           const descriptor = openSync(target, flags, mode);
-          descriptors.set(descriptor, String(target));
-          events.push(`open:${String(target)}`);
+          const resolvedTarget = path.resolve(String(target));
+          descriptors.set(descriptor, resolvedTarget);
+          events.push(`open:${resolvedTarget}`);
           return descriptor;
         },
         fsyncSync(descriptor) {
@@ -837,7 +1060,7 @@ describe('asset-pack transaction durability', () => {
           closeSync(descriptor);
         },
         renameSync(source, destination) {
-          events.push(`rename:${String(source)}->${String(destination)}`);
+          events.push(`rename:${path.resolve(String(source))}->${path.resolve(String(destination))}`);
           renameSync(source, destination);
         },
       },
@@ -963,11 +1186,13 @@ describe('asset-pack transaction durability', () => {
     const state = desiredState(fixture);
     const stopAfterMaterialization: AssetTransactionFileOps = {
       ...recorder.fileOps,
-      renameSync(source, destination) {
-        if (path.resolve(String(source)) === fixture.workspace.outputRoot) {
+      afterMutationValidationSync(operation, targets) {
+        if (
+          operation === 'rename'
+          && path.resolve(targets[0] ?? '') === fixture.workspace.outputRoot
+        ) {
           throw new Error('stop after durable materialization');
         }
-        recorder.fileOps.renameSync(source, destination);
       },
     };
     const result = await publishAssetPackGeneration({
@@ -1012,8 +1237,12 @@ describe('asset-pack transaction durability', () => {
       path.join(fixture.workspace.stateRoot, 'installed', 'acme.pack'),
       path.join(fixture.workspace.stateRoot, 'installed', 'acme.pack', '1.0.0'),
     ]) {
-      expect(recorder.events).toContain(`mkdir:${directory}`);
-      expect(recorder.events).toContain(`fsync:${path.dirname(directory)}`);
+      const canonicalDirectory = path.join(
+        realpathSync(path.dirname(directory)),
+        path.basename(directory),
+      );
+      expect(recorder.events).toContain(`mkdir:${canonicalDirectory}`);
+      expect(recorder.events).toContain(`fsync:${realpathSync(path.dirname(directory))}`);
     }
   });
 });
@@ -1029,8 +1258,8 @@ describe('asset-pack transaction adversarial recovery', () => {
     let injected = false;
     const interleavingOps: AssetTransactionFileOps = {
       ...REAL_FILE_OPS,
-      mkdirSync(target, mkdirOptions) {
-        if (!injected && String(target).includes(`${path.sep}transactions${path.sep}`)) {
+      afterClaimAcquiredSync() {
+        if (!injected) {
           injected = true;
           activeBeforeLoser = snapshotTree(fixture.workspace.outputRoot);
           registryBeforeLoser = readFileSync(fixture.workspace.registryPath);
@@ -1043,7 +1272,6 @@ describe('asset-pack transaction adversarial recovery', () => {
           activeAfterLoser = snapshotTree(fixture.workspace.outputRoot);
           registryAfterLoser = readFileSync(fixture.workspace.registryPath);
         }
-        return mkdirSync(target, mkdirOptions);
       },
     };
 
@@ -1072,7 +1300,7 @@ describe('asset-pack transaction adversarial recovery', () => {
     let interleaved = false;
     const racingOps: AssetTransactionFileOps = {
       ...REAL_FILE_OPS,
-      beforeMutationSync(operation, targets) {
+      afterMutationValidationSync(operation, targets) {
         if (
           !interleaved
           && operation === 'remove'
@@ -1102,7 +1330,7 @@ describe('asset-pack transaction adversarial recovery', () => {
       let interleaved = false;
       const racingOps: AssetTransactionFileOps = {
         ...REAL_FILE_OPS,
-        beforeMutationSync(operation, targets) {
+        afterMutationValidationSync(operation, targets) {
           const source = targets[0];
           if (!source || interleaved || operation !== boundary) return;
           const stagingRoot = path.join(fixture.workspace.stateRoot, 'staging');

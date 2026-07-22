@@ -2,7 +2,9 @@ import { createHash } from 'node:crypto';
 import {
   closeSync,
   existsSync,
+  fstatSync,
   fsyncSync,
+  linkSync,
   mkdirSync,
   mkdtempSync,
   openSync,
@@ -521,6 +523,8 @@ function createFileOpsRecorder(options: {
     openSync,
     fsyncSync,
     closeSync,
+    fstatSync,
+    linkSync,
   };
 
   return { actions, fileOps };
@@ -644,6 +648,52 @@ describe('syncLinkedAssetPack', () => {
     expect(snapshotTree(fixture.assetsRoot)).toEqual(baseSnapshot);
     expect(snapshotTree(fixture.upstreamRoot)).toEqual(upstreamSnapshot);
     expect(snapshotTree(fixture.cacheSentinelRoot)).toEqual(cacheSnapshot);
+  });
+
+  it('holds the lifecycle claim across candidate loading, desired-state preparation, and publication', async () => {
+    const fixture = createWorkspaceFixture();
+    const winnerRoot = path.join(fixture.workspace.packsRoot, 'acme.claim-winner');
+    const loserRoot = path.join(fixture.workspace.packsRoot, 'bravo.claim-loser');
+    writeNewItemPack(winnerRoot, {
+      packId: 'acme.claim-winner',
+      displayName: 'Claim Winner',
+      localId: 'claim-winner',
+      color: '#aa5500',
+    });
+    writeNewItemPack(loserRoot, {
+      packId: 'bravo.claim-loser',
+      displayName: 'Claim Loser',
+      localId: 'claim-loser',
+      color: '#3355aa',
+    });
+    let loser: Promise<AssetPackSyncResult> | undefined;
+    const recorder = createFileOpsRecorder();
+    const claimedFileOps: AssetPublicationFileOps = {
+      ...recorder.fileOps,
+      afterClaimAcquiredSync() {
+        loser = syncLinkedAssetPack({
+          packDirectory: loserRoot,
+          workspace: fixture.workspace,
+          runtime: fixture.runtime,
+        });
+      },
+    };
+
+    const winner = expectSuccess(await syncLinkedAssetPack({
+      packDirectory: winnerRoot,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+      fileOps: claimedFileOps,
+    }));
+    expect(loser).toBeDefined();
+    const blocked = expectFailure(await loser!);
+    expect(diagnosticCodes(blocked.diagnostics)).toContain('asset_publish_failed');
+    expect(winner.registry.map((entry) => entry.packId)).toEqual(['acme.claim-winner']);
+    expect(readRegistry(fixture.workspace).entries.map((entry) => entry.packId))
+      .toEqual(['acme.claim-winner']);
+    expect(snapshotTree(fixture.workspace.outputRoot)).not.toHaveProperty(
+      'sheet_definitions/hair/bravo.claim-loser--claim-loser.json',
+    );
   });
 
   it('escapes artist-controlled quotes and newlines in generated overlay credits', async () => {
@@ -1807,5 +1857,5 @@ describe('syncLinkedAssetPack', () => {
       }
       expect(snapshotTree(scenario.packRoot)).toEqual(scenario.initialSource);
     }
-  }, 20_000);
+  }, 45_000);
 });

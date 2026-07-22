@@ -25,8 +25,7 @@ import {
   prepareAssetPackDesiredState,
 } from './asset-pack-state.js';
 import {
-  publishAssetPackGeneration,
-  recoverAssetPackTransaction,
+  withAssetPackTransactionClaim,
   type AssetTransactionFileOps,
 } from './asset-pack-transaction.js';
 import {
@@ -597,56 +596,54 @@ export async function syncLinkedAssetPack(options: {
   readonly runtime: RuntimeAssets;
   readonly fileOps?: AssetPublicationFileOps;
 }): Promise<AssetPackSyncResult> {
-  const recovery = recoverAssetPackTransaction({
+  const publishFailure = preflightPublish(options.workspace);
+  if (publishFailure) return publishFailure;
+  const claimed = await withAssetPackTransactionClaim({
     workspace: options.workspace,
     ...(options.fileOps ? { fileOps: options.fileOps } : {}),
+    action: async (publisher): Promise<AssetPackSyncResult> => {
+      const requested = await loadLinkedAssetPackCandidate(options);
+      if (!requested.ok) return syncFailure(requested.diagnostics);
+      const desiredState = await prepareAssetPackDesiredState({
+        workspace: options.workspace,
+        runtime: options.runtime,
+        mutation: { kind: 'upsert', candidate: requested.candidate },
+      });
+      if (!desiredState.ok) return syncFailure(desiredState.diagnostics);
+
+      const linked = desiredState.registry.entries.find((entry) =>
+        entry.packId === requested.candidate.loaded.pack.id && entry.kind === 'linked',
+      );
+      if (!linked || linked.kind !== 'linked') {
+        return syncFailure([{
+          code: 'asset_publish_failed',
+          severity: 'error',
+          message: 'Requested linked asset-pack registry entry was not generated.',
+          path: path.resolve(options.packDirectory),
+        }]);
+      }
+
+      const publication = await publisher.publish({
+        operation: 'sync',
+        desiredState,
+        cleanupInstalledSources: [],
+      });
+      if (!publication.ok) {
+        const rollback = publisher.recover();
+        return syncFailure([
+          ...publication.diagnostics,
+          ...(!rollback.ok ? rollback.diagnostics : []),
+        ]);
+      }
+
+      return {
+        ok: true,
+        linked,
+        registry: desiredState.registry.entries.filter(
+          (entry): entry is LinkedAssetPackRegistryEntry => entry.kind === 'linked',
+        ),
+      };
+    },
   });
-  if (!recovery.ok) return syncFailure(recovery.diagnostics);
-
-  const requested = await loadLinkedAssetPackCandidate(options);
-  if (!requested.ok) return syncFailure(requested.diagnostics);
-  const desiredState = await prepareAssetPackDesiredState({
-    workspace: options.workspace,
-    runtime: options.runtime,
-    mutation: { kind: 'upsert', candidate: requested.candidate },
-  });
-  if (!desiredState.ok) return syncFailure(desiredState.diagnostics);
-
-  const linked = desiredState.registry.entries.find((entry) =>
-    entry.packId === requested.candidate.loaded.pack.id && entry.kind === 'linked',
-  );
-  if (!linked || linked.kind !== 'linked') {
-    return syncFailure([{
-      code: 'asset_publish_failed',
-      severity: 'error',
-      message: 'Requested linked asset-pack registry entry was not generated.',
-      path: path.resolve(options.packDirectory),
-    }]);
-  }
-
-  const publication = await publishAssetPackGeneration({
-    operation: 'sync',
-    workspace: options.workspace,
-    desiredState,
-    cleanupInstalledSources: [],
-    ...(options.fileOps ? { fileOps: options.fileOps } : {}),
-  });
-  if (!publication.ok) {
-    const rollback = recoverAssetPackTransaction({
-      workspace: options.workspace,
-      ...(options.fileOps ? { fileOps: options.fileOps } : {}),
-    });
-    return syncFailure([
-      ...publication.diagnostics,
-      ...(!rollback.ok ? rollback.diagnostics : []),
-    ]);
-  }
-
-  return {
-    ok: true,
-    linked,
-    registry: desiredState.registry.entries.filter(
-      (entry): entry is LinkedAssetPackRegistryEntry => entry.kind === 'linked',
-    ),
-  };
+  return claimed.ok ? claimed.value : syncFailure(claimed.diagnostics);
 }
