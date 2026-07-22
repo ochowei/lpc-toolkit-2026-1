@@ -35,6 +35,7 @@ import {
 import {
   ASSET_PACK_TRANSACTION_SCHEMA,
   publishAssetPackGeneration,
+  readAssetPackTransactionSnapshot,
   recoverAssetPackTransaction,
   withAssetPackTransactionClaim,
   type AssetPackTransactionJournal,
@@ -2030,6 +2031,64 @@ describe('asset-pack transaction durability', () => {
       );
     },
   );
+
+  it('keeps a synchronous snapshot read under the exclusive lifecycle claim', () => {
+    const fixture = createFixture();
+    let readObservedClaim = false;
+
+    const result = readAssetPackTransactionSnapshot({
+      workspace: fixture.workspace,
+      read: () => {
+        readObservedClaim = existsSync(transactionClaimPath(fixture.workspace));
+        return { ok: true, value: readFileSync(fixture.workspace.registryPath) };
+      },
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        recovery: 'none',
+        snapshot: fixture.oldRegistryBytes,
+      },
+    });
+    expect(readObservedClaim).toBe(true);
+    expect(existsSync(transactionClaimPath(fixture.workspace))).toBe(false);
+  });
+
+  it('preserves a synchronous read failure when claim release also fails', () => {
+    const fixture = createFixture();
+    const releaseFailure: AssetTransactionFileOps = {
+      ...REAL_FILE_OPS,
+      rmSync(target, options) {
+        if (path.basename(String(target)) === 'transaction.lock') {
+          throw Object.assign(new Error('snapshot claim release failed'), { code: 'EIO' });
+        }
+        return rmSync(target, options);
+      },
+    };
+
+    const result = readAssetPackTransactionSnapshot({
+      workspace: fixture.workspace,
+      fileOps: releaseFailure,
+      read: () => ({
+        ok: false,
+        diagnostics: [{
+          code: 'asset_transaction_unsafe',
+          severity: 'error',
+          message: 'snapshot read failed',
+          path: fixture.workspace.registryPath,
+        }],
+      }),
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('Expected read and release failure.');
+    expect(result.diagnostics.map((entry) => entry.code)).toEqual([
+      'asset_transaction_unsafe',
+      'asset_publish_failed',
+    ]);
+    expect(result.diagnostics[1]?.message).toContain('snapshot claim release failed');
+  });
 
   it('fsyncs the parent of every newly created nested output and installed directory', async () => {
     const fixture = createFixture();

@@ -13,7 +13,7 @@ import {
 } from './asset-pack-registry.js';
 import { prepareAssetPackDesiredState } from './asset-pack-state.js';
 import {
-  recoverAssetPackTransaction,
+  readAssetPackTransactionSnapshot,
   withAssetPackTransactionClaim,
   type AssetPackClaimedPublisher,
   type AssetPackRecoveryAction,
@@ -136,22 +136,25 @@ function listEntry(entry: ListedRegistryEntry): AssetPackListEntry {
   };
 }
 
-export async function listAssetPacks(options: {
+export function listAssetPacks(options: {
   readonly workspace: AssetWorkspace;
   readonly fileOps?: AssetTransactionFileOps;
-}): Promise<AssetPackListResult> {
-  const recovered = recoverAssetPackTransaction({
+}): AssetPackListResult {
+  const claimed = readAssetPackTransactionSnapshot({
     workspace: options.workspace,
     ...(options.fileOps ? { fileOps: options.fileOps } : {}),
+    read: () => {
+      const registry = readCurrentRegistry(options.workspace);
+      return registry.ok
+        ? { ok: true, value: registry.entries }
+        : registry;
+    },
   });
-  if (!recovered.ok) return recovered;
-
-  const registry = readCurrentRegistry(options.workspace);
-  if (!registry.ok) return registry;
+  if (!claimed.ok) return claimed;
   return {
     ok: true,
-    recovery: recovered.action,
-    entries: registry.entries.map((entry) => listEntry(entry)),
+    recovery: claimed.value.recovery,
+    entries: claimed.value.snapshot.map((entry) => listEntry(entry)),
   };
 }
 

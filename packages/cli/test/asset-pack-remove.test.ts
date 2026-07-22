@@ -25,6 +25,7 @@ import {
   type ItemDefinition,
 } from '@lpc-toolkit/core';
 import { afterEach, describe, expect, it } from 'vitest';
+import { loadAssetPackFiles } from '../src/asset-pack-files.js';
 import {
   listAssetPacks,
   removeAssetPack,
@@ -41,6 +42,7 @@ import {
 } from '../src/asset-pack-registry.js';
 import { syncLinkedAssetPack } from '../src/asset-pack-sync.js';
 import type { AssetTransactionFileOps } from '../src/asset-pack-transaction.js';
+import { loadActiveAssetPackBaseline } from '../src/asset-pack-validation.js';
 import {
   ASSET_OUTPUT_MARKER_SCHEMA,
   initializeAssetWorkspace,
@@ -104,13 +106,55 @@ function geometryBounds(animation: AnimationName): { width: number; height: numb
   };
 }
 
-function pngBytes(color: string): Buffer {
-  const bounds = geometryBounds('walk');
+function pngBytes(color: string, animation: AnimationName = 'walk'): Buffer {
+  const bounds = geometryBounds(animation);
   const canvas = createCanvas(bounds.width, bounds.height);
   const context = canvas.getContext('2d');
   context.fillStyle = color;
   context.fillRect(0, 0, bounds.width, bounds.height);
   return canvas.toBuffer('image/png');
+}
+
+function extensionSource(options: {
+  readonly packId: string;
+  readonly displayName: string;
+  readonly definitionDigest: string;
+  readonly creditDigest: string;
+  readonly sourcePath: string;
+  readonly destinationPath: string;
+  readonly bodyTypes?: readonly ('male' | 'female')[];
+}): AssetPackSource {
+  return {
+    schema: ASSET_PACK_SCHEMA,
+    id: options.packId,
+    version: '1.0.0',
+    displayName: options.displayName,
+    credits: {
+      authors: [`${options.displayName} Artist`],
+      licenses: ['CC-BY-SA 4.0'],
+      urls: [`https://example.com/${options.packId}`],
+      notes: `${options.displayName} contribution.`,
+    },
+    assets: [{
+      kind: 'extend-item',
+      itemId: 'braid',
+      baseDefinitionDigest: options.definitionDigest,
+      baseCreditDigest: options.creditDigest,
+      addAnimations: [{
+        animation: 'climb',
+        layers: [{
+          layer: 'layer_1',
+          bodyTypes: options.bodyTypes ?? ['male'],
+          source: options.sourcePath,
+          destination: {
+            path: options.destinationPath,
+            evidence: 'artist-specified',
+            accepted: true,
+          },
+        }],
+      }],
+    }],
+  };
 }
 
 function baseDefinition(): ItemDefinition {
@@ -241,8 +285,70 @@ async function linkPack(
   return packRoot;
 }
 
+async function linkExtensionPack(
+  fixture: Fixture,
+  options: {
+    readonly packId: string;
+    readonly displayName: string;
+    readonly sourcePath: string;
+    readonly destinationPath: string;
+    readonly color: string;
+    readonly bodyTypes?: readonly ('male' | 'female')[];
+  },
+): Promise<string> {
+  const baseline = loadActiveAssetPackBaseline({
+    runtime: fixture.runtime,
+    workspace: fixture.workspace,
+  });
+  const definitionDigest = baseline.definitionDigests.get('braid');
+  const creditDigest = baseline.creditDigests.get('braid');
+  if (!definitionDigest || !creditDigest) throw new Error('Missing braid baseline digests.');
+  const root = path.join(fixture.workspace.packsRoot, options.packId);
+  writeJson(path.join(root, 'asset-pack.json'), extensionSource({
+    ...options,
+    definitionDigest,
+    creditDigest,
+  }));
+  const spritePath = path.join(root, ...options.sourcePath.split('/'));
+  mkdirSync(path.dirname(spritePath), { recursive: true });
+  writeFileSync(spritePath, pngBytes(options.color, 'climb'));
+  const result = await syncLinkedAssetPack({
+    packDirectory: root,
+    workspace: fixture.workspace,
+    runtime: fixture.runtime,
+  });
+  if (!result.ok) {
+    throw new Error(result.diagnostics.map((entry) => `${entry.code}:${entry.message}`).join(' | '));
+  }
+  return root;
+}
+
 function readRegistry(workspace: AssetWorkspace): AssetPackRegistryDocument {
   return readJson<AssetPackRegistryDocument>(workspace.registryPath);
+}
+
+function refreshLinkedRegistrySnapshot(workspace: AssetWorkspace, packId: string): void {
+  const document = readRegistry(workspace);
+  const entry = document.entries.find(
+    (candidate): candidate is LinkedAssetPackRegistryEntry =>
+      candidate.kind === 'linked' && candidate.packId === packId,
+  );
+  if (!entry) throw new Error(`Missing linked registry entry: ${packId}`);
+  const loaded = loadAssetPackFiles(entry.sourceDirectory);
+  if (!loaded.ok) {
+    throw new Error(loaded.diagnostics.map((diagnostic) => diagnostic.message).join(' | '));
+  }
+  const entries = document.entries.map((candidate): AssetPackRegistryEntry =>
+    candidate.packId === packId
+      ? {
+        ...entry,
+        contentDigest: loaded.contentDigest,
+        sourceDigests: Object.fromEntries(
+          [...loaded.sourceDigests].sort(([left], [right]) => left.localeCompare(right)),
+        ),
+      }
+      : candidate);
+  writeFileSync(workspace.registryPath, assetPackRegistryBytes({ ...document, entries }));
 }
 
 function convertLinkedToInstalled(
@@ -362,13 +468,61 @@ afterEach(() => {
 });
 
 describe('listAssetPacks', () => {
-  it('lists an empty workspace without runtime preparation', async () => {
+  it('returns the approved synchronous result without runtime preparation', () => {
     const fixture = createFixture();
 
-    const result = expectListSuccess(await listAssetPacks({ workspace: fixture.workspace }));
+    const directResult: AssetPackListResult = listAssetPacks({ workspace: fixture.workspace });
+    const result = expectListSuccess(directResult);
 
     expect(result).toEqual({ ok: true, recovery: 'none', entries: [] });
     expect(existsSync(fixture.workspace.registryPath)).toBe(false);
+  });
+
+  it('lists a linked-only registry with its artist source path', async () => {
+    const fixture = createFixture();
+    const sourcePath = await linkPack(fixture, {
+      packId: 'alpha.linked',
+      version: '1.2.3',
+      displayName: 'Alpha Linked',
+      localId: 'alpha-hair',
+      color: '#aa3300',
+    });
+    const entry = readRegistry(fixture.workspace).entries[0]!;
+
+    const result = expectListSuccess(listAssetPacks({ workspace: fixture.workspace }));
+
+    expect(result.entries).toEqual([{
+      packId: 'alpha.linked',
+      version: '1.2.3',
+      displayName: 'Alpha Linked',
+      kind: 'linked',
+      sourcePath,
+      contentDigest: entry.contentDigest,
+    }]);
+  });
+
+  it('lists an installed-only registry with archive and installed paths', async () => {
+    const fixture = createFixture();
+    await linkPack(fixture, {
+      packId: 'alpha.installed',
+      version: '2.0.0',
+      displayName: 'Alpha Installed',
+      localId: 'alpha-hair',
+      color: '#0033aa',
+    });
+    const installed = convertLinkedToInstalled(fixture.workspace, 'alpha.installed');
+
+    const result = expectListSuccess(listAssetPacks({ workspace: fixture.workspace }));
+
+    expect(result.entries).toEqual([{
+      packId: 'alpha.installed',
+      version: '2.0.0',
+      displayName: 'Alpha Installed',
+      kind: 'installed',
+      sourcePath: installed.installedDirectory,
+      contentDigest: installed.contentDigest,
+      archiveDigest: installed.archiveDigest,
+    }]);
   });
 
   it('lists linked and installed registry entries in stable pack-ID order', async () => {
@@ -390,7 +544,7 @@ describe('listAssetPacks', () => {
     const installed = convertLinkedToInstalled(fixture.workspace, 'alpha.installed');
     const registry = readRegistry(fixture.workspace);
 
-    const result = expectListSuccess(await listAssetPacks({ workspace: fixture.workspace }));
+    const result = expectListSuccess(listAssetPacks({ workspace: fixture.workspace }));
 
     expect(result.recovery).toBe('none');
     expect(result.entries).toEqual([
@@ -414,7 +568,7 @@ describe('listAssetPacks', () => {
     ]);
   });
 
-  it('fails closed on a malformed registry', async () => {
+  it('fails closed on a malformed registry', () => {
     const fixture = createFixture();
     writeJson(fixture.workspace.registryPath, {
       schema: ASSET_WORKSPACE_REGISTRY_SCHEMA,
@@ -424,11 +578,48 @@ describe('listAssetPacks', () => {
       compileDigest: `sha256:${'0'.repeat(64)}`,
     });
 
-    const result = await listAssetPacks({ workspace: fixture.workspace });
+    const result = listAssetPacks({ workspace: fixture.workspace });
 
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error('Expected strict registry failure.');
     expect(result.diagnostics.map((entry) => entry.code)).toContain('asset_output_root_unowned');
+  });
+
+  it('holds the transaction claim through the complete registry projection', async () => {
+    const fixture = createFixture();
+    await linkPack(fixture, {
+      packId: 'alpha.linked',
+      displayName: 'Alpha Linked',
+      localId: 'alpha-hair',
+      color: '#aa3300',
+    });
+    const outputBefore = snapshotTree(fixture.workspace.outputRoot);
+    const registryBefore = readFileSync(fixture.workspace.registryPath);
+    let concurrentRemoval: ReturnType<typeof removeAssetPack> | undefined;
+
+    const listed = listAssetPacks({
+      workspace: fixture.workspace,
+      fileOps: {
+        ...REAL_FILE_OPS,
+        afterClaimAcquiredSync() {
+          concurrentRemoval = removeAssetPack({
+            packId: 'alpha.linked',
+            workspace: fixture.workspace,
+            runtime: fixture.runtime,
+          });
+        },
+      },
+    });
+
+    expect(expectListSuccess(listed).entries.map((entry) => entry.packId))
+      .toEqual(['alpha.linked']);
+    expect(concurrentRemoval).toBeDefined();
+    const blocked = await concurrentRemoval!;
+    expect(blocked.ok).toBe(false);
+    if (blocked.ok) throw new Error('Expected concurrent lifecycle claim conflict.');
+    expect(blocked.diagnostics.map((entry) => entry.code)).toEqual(['asset_publish_failed']);
+    expect(snapshotTree(fixture.workspace.outputRoot)).toEqual(outputBefore);
+    expect(readFileSync(fixture.workspace.registryPath)).toEqual(registryBefore);
   });
 });
 
@@ -483,7 +674,7 @@ describe('removeAssetPack', () => {
     expect(snapshotTree(linkedRoot)).toEqual(artistBefore);
   });
 
-  it('validates all retained sources before mutating active state', async () => {
+  it('rejects a true retained compiler conflict without mutating active state', async () => {
     const fixture = createFixture();
     await linkPack(fixture, {
       packId: 'alpha.remove',
@@ -491,18 +682,36 @@ describe('removeAssetPack', () => {
       localId: 'alpha-hair',
       color: '#aa3300',
     });
-    const retainedRoot = await linkPack(fixture, {
+    await linkExtensionPack(fixture, {
       packId: 'bravo.retained',
       displayName: 'Bravo Retained',
-      localId: 'bravo-hair',
+      sourcePath: 'sprites/bravo/climb.png',
+      destinationPath: 'spritesheets/hair/braid/zz-bravo/climb.png',
       color: '#0033aa',
     });
+    const conflictingRoot = await linkExtensionPack(fixture, {
+      packId: 'charlie.retained',
+      displayName: 'Charlie Retained',
+      sourcePath: 'sprites/charlie/climb.png',
+      destinationPath: 'spritesheets/hair/braid/zz-charlie/climb.png',
+      color: '#00aa33',
+      bodyTypes: ['female'],
+    });
+    const baseline = loadActiveAssetPackBaseline({
+      runtime: fixture.runtime,
+      workspace: fixture.workspace,
+    });
+    writeJson(path.join(conflictingRoot, 'asset-pack.json'), extensionSource({
+      packId: 'charlie.retained',
+      displayName: 'Charlie Retained',
+      definitionDigest: baseline.definitionDigests.get('braid')!,
+      creditDigest: baseline.creditDigests.get('braid')!,
+      sourcePath: 'sprites/charlie/climb.png',
+      destinationPath: 'spritesheets/hair/braid/zz-bravo/climb.png',
+    }));
+    refreshLinkedRegistrySnapshot(fixture.workspace, 'charlie.retained');
     const outputBefore = snapshotTree(fixture.workspace.outputRoot);
     const registryBefore = readFileSync(fixture.workspace.registryPath);
-    writeFileSync(
-      path.join(retainedRoot, 'sprites/bravo-hair/foreground/walk.png'),
-      pngBytes('#00aa33'),
-    );
 
     const failed = await removeAssetPack({
       packId: 'alpha.remove',
@@ -511,10 +720,60 @@ describe('removeAssetPack', () => {
     });
 
     expect(failed.ok).toBe(false);
-    if (failed.ok) throw new Error('Expected retained-state validation failure.');
-    expect(failed.diagnostics.map((entry) => entry.code)).toContain('asset_digest_mismatch');
+    if (failed.ok) throw new Error('Expected retained compiler conflict.');
+    expect(failed.diagnostics.map((entry) => entry.code)).toContain('asset_path_conflict');
     expect(snapshotTree(fixture.workspace.outputRoot)).toEqual(outputBefore);
     expect(readFileSync(fixture.workspace.registryPath)).toEqual(registryBefore);
+  });
+
+  it('removes one installed pack after registry publication and preserves a registered near-name sibling', async () => {
+    const fixture = createFixture();
+    await linkPack(fixture, {
+      packId: 'alpha.pack',
+      displayName: 'Alpha Pack',
+      localId: 'alpha-hair',
+      color: '#aa3300',
+    });
+    await linkPack(fixture, {
+      packId: 'alpha.pack-extra',
+      displayName: 'Alpha Pack Extra',
+      localId: 'alpha-extra-hair',
+      color: '#0033aa',
+    });
+    const removedEntry = convertLinkedToInstalled(fixture.workspace, 'alpha.pack');
+    const retainedEntry = convertLinkedToInstalled(fixture.workspace, 'alpha.pack-extra');
+    const retainedBefore = snapshotTree(retainedEntry.installedDirectory);
+    let observedAfterRegistryPublication = false;
+    const observingFileOps: AssetTransactionFileOps = {
+      ...REAL_FILE_OPS,
+      afterMutationSync(operation, targets, boundary) {
+        if (
+          observedAfterRegistryPublication
+          || operation !== 'rename'
+          || boundary !== 'fsync'
+          || targets[1] !== fixture.workspace.registryPath
+        ) return;
+        observedAfterRegistryPublication = true;
+        expect(readRegistry(fixture.workspace).entries.map((entry) => entry.packId))
+          .toEqual(['alpha.pack-extra']);
+        expect(existsSync(removedEntry.installedDirectory)).toBe(true);
+        expect(snapshotTree(retainedEntry.installedDirectory)).toEqual(retainedBefore);
+      },
+    };
+
+    const removed = expectRemoveSuccess(await removeAssetPack({
+      packId: 'alpha.pack',
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+      fileOps: observingFileOps,
+    }));
+
+    expect(removed.remainingPackIds).toEqual(['alpha.pack-extra']);
+    expect(observedAfterRegistryPublication).toBe(true);
+    expect(existsSync(removedEntry.installedDirectory)).toBe(false);
+    expect(snapshotTree(retainedEntry.installedDirectory)).toEqual(retainedBefore);
+    expect(readRegistry(fixture.workspace).entries.map((entry) => entry.packId))
+      .toEqual(['alpha.pack-extra']);
   });
 
   it('removes the final installed pack and leaves only marker plus empty v2 registry state', async () => {
@@ -592,7 +851,7 @@ describe('removeAssetPack', () => {
         expect(snapshotTree(installed.installedDirectory)).toEqual(installedBefore);
       }
 
-      const listed = expectListSuccess(await listAssetPacks({ workspace: fixture.workspace }));
+      const listed = expectListSuccess(listAssetPacks({ workspace: fixture.workspace }));
 
       expect(listed.recovery).toBe(recoveryAction);
       expect(listed.entries.map((entry) => entry.packId)).toEqual(

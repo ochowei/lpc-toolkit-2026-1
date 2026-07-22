@@ -143,6 +143,11 @@ export type AssetPackClaimedLifecycleResult<T> =
   | { readonly ok: true; readonly value: T }
   | { readonly ok: false; readonly diagnostics: readonly AssetPackLifecycleDiagnostic[] };
 
+export interface AssetPackTransactionSnapshot<T> {
+  readonly recovery: AssetPackRecoveryAction;
+  readonly snapshot: T;
+}
+
 export interface AssetPackClaimedPublisher {
   publish(
     options: Omit<PublishAssetPackGenerationOptions, 'workspace' | 'fileOps'>,
@@ -3580,6 +3585,64 @@ export async function withAssetPackTransactionClaim<T>(options: {
       };
     }
   }
+  try {
+    releaseTransactionClaim(claim);
+  } catch (error) {
+    const releaseFailure = publicationFailure(error, options.workspace);
+    result = result.ok
+      ? releaseFailure
+      : {
+        ok: false,
+        diagnostics: [...result.diagnostics, ...releaseFailure.diagnostics],
+      };
+  }
+  return result;
+}
+
+export function readAssetPackTransactionSnapshot<T>(options: {
+  readonly workspace: AssetWorkspace;
+  readonly fileOps?: AssetTransactionFileOps;
+  readonly read: () => AssetPackClaimedLifecycleResult<T>;
+}): AssetPackClaimedLifecycleResult<AssetPackTransactionSnapshot<T>> {
+  const fileOps = options.fileOps ?? DEFAULT_FILE_OPS;
+  let claim: TransactionClaim;
+  try {
+    claim = acquireTransactionClaim(options.workspace, fileOps);
+  } catch (error) {
+    return {
+      ok: false,
+      diagnostics: publicationFailure(error, options.workspace).diagnostics,
+    };
+  }
+
+  let result: AssetPackClaimedLifecycleResult<AssetPackTransactionSnapshot<T>>;
+  const pending = recoverAssetPackTransactionUnderClaim({
+    workspace: options.workspace,
+    fileOps,
+    claim,
+  });
+  if (!pending.ok) {
+    result = pending;
+  } else {
+    try {
+      const read = options.read();
+      result = read.ok
+        ? {
+          ok: true,
+          value: {
+            recovery: pending.action,
+            snapshot: read.value,
+          },
+        }
+        : read;
+    } catch (error) {
+      result = {
+        ok: false,
+        diagnostics: publicationFailure(error, options.workspace).diagnostics,
+      };
+    }
+  }
+
   try {
     releaseTransactionClaim(claim);
   } catch (error) {
