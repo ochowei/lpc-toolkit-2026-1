@@ -39,7 +39,11 @@ import {
   type InstalledAssetPackRegistryEntry,
   type LinkedAssetPackRegistryEntry,
 } from '../src/asset-pack-registry.js';
-import type { AssetPackDesiredState } from '../src/asset-pack-state.js';
+import {
+  loadLinkedAssetPackCandidate,
+  prepareAssetPackDesiredState,
+  type AssetPackDesiredState,
+} from '../src/asset-pack-state.js';
 import { syncLinkedAssetPack } from '../src/asset-pack-sync.js';
 import {
   publishAssetPackGeneration,
@@ -71,6 +75,51 @@ const REAL_FILE_OPS: AssetTransactionFileOps = {
   fstatSync,
   linkSync,
 };
+
+function mutationRecordingFileOps(options: {
+  readonly failOnMutation?: boolean;
+} = {}): {
+  readonly events: string[];
+  readonly fileOps: AssetTransactionFileOps;
+} {
+  const events: string[] = [];
+  const record = (event: string): void => {
+    events.push(event);
+    if (options.failOnMutation) {
+      throw new Error(`unexpected doctor mutation: ${event}`);
+    }
+  };
+  return {
+    events,
+    fileOps: {
+      ...REAL_FILE_OPS,
+      mkdirSync(target, mkdirOptions) {
+        record(`mkdir:${String(target)}`);
+        return mkdirSync(target, mkdirOptions);
+      },
+      writeFileSync(target, data, writeOptions) {
+        record(`write:${String(target)}`);
+        writeFileSync(target, data, writeOptions);
+      },
+      renameSync(source, destination) {
+        record(`rename:${String(source)}->${String(destination)}`);
+        renameSync(source, destination);
+      },
+      rmSync(target, rmOptions) {
+        record(`remove:${String(target)}`);
+        rmSync(target, rmOptions);
+      },
+      fsyncSync(descriptor) {
+        record(`fsync:${descriptor}`);
+        fsyncSync(descriptor);
+      },
+      linkSync(existingPath, newPath) {
+        record(`link:${String(existingPath)}->${String(newPath)}`);
+        linkSync(existingPath, newPath);
+      },
+    },
+  };
+}
 
 const BASE_CREDIT = {
   file: 'hair/braid',
@@ -535,7 +584,12 @@ function transactionPath(workspace: AssetWorkspace): string {
 
 async function seedCrashedPhase(
   fixture: Fixture,
-  crashPoint: 'journal-durable' | 'output-swap' | 'source-phase' | 'registry-swap',
+  crashPoint:
+    | 'journal-durable'
+    | 'output-swap'
+    | 'source-phase'
+    | 'sources-published'
+    | 'registry-swap',
 ): Promise<AssetPackTransactionPhase> {
   let journalWriteCount = 0;
   const crashingOps: AssetTransactionFileOps = {
@@ -566,6 +620,18 @@ async function seedCrashedPhase(
         && targets.some((target) =>
           path.dirname(target) === path.dirname(fixture.workspace.outputRoot)
           && path.basename(target).endsWith('.backup'))
+      ) {
+        throw new Error(`injected crash after ${crashPoint}`);
+      }
+    },
+    afterMutationSync(operation, targets, boundary) {
+      if (
+        crashPoint === 'sources-published'
+        && operation === 'rename'
+        && boundary === 'fsync'
+        && path.resolve(targets[1] ?? '') === transactionPath(fixture.workspace)
+        && readJson<AssetPackTransactionJournal>(transactionPath(fixture.workspace)).phase
+          === 'sources-published'
       ) {
         throw new Error(`injected crash after ${crashPoint}`);
       }
@@ -661,16 +727,20 @@ describe('doctorAssetPacks healthy and recovery reports', () => {
     ['journal-durable', 'prepared', 'rolled-back'],
     ['output-swap', 'prepared', 'rolled-back'],
     ['source-phase', 'output-published', 'rolled-back'],
+    ['sources-published', 'sources-published', 'rolled-back'],
     ['registry-swap', 'registry-published', 'completed'],
   ] as const)(
     'recovers %s transaction state, audits it, and is idempotent',
     async (crashPoint, expectedPhase, expectedRecovery) => {
       const fixture = createFixture();
       expect(await seedCrashedPhase(fixture, crashPoint)).toBe(expectedPhase);
+      const beforeRecovery = guardSnapshot(fixture);
+      const mutations = mutationRecordingFileOps();
 
       const report = await doctorAssetPacks({
         workspace: fixture.workspace,
         runtime: fixture.runtime,
+        fileOps: mutations.fileOps,
       });
 
       expect(report).toMatchObject({
@@ -679,17 +749,116 @@ describe('doctorAssetPacks healthy and recovery reports', () => {
         recovery: expectedRecovery,
         packs: [],
       });
+      expect(mutations.events.length).toBeGreaterThan(0);
       expect(existsSync(transactionPath(fixture.workspace))).toBe(false);
       const recovered = guardSnapshot(fixture);
+      expect(recovered).not.toEqual(beforeRecovery);
 
+      const readOnly = mutationRecordingFileOps({ failOnMutation: true });
       const repeated = await doctorAssetPacks({
         workspace: fixture.workspace,
         runtime: fixture.runtime,
+        fileOps: readOnly.fileOps,
       });
       expect(repeated).toMatchObject({ healthy: true, recovery: 'none', packs: [] });
+      expect(readOnly.events).toEqual([]);
       expectGuardsUnchanged(fixture, recovered);
     },
   );
+
+  it('performs no transaction mutations for healthy or tampered no-journal audits', async () => {
+    const healthyFixture = createFixture();
+    await linkNewPack(healthyFixture, {
+      packId: 'alpha.pack', localId: 'alpha', color: '#aa3300',
+    });
+    const healthyOps = mutationRecordingFileOps({ failOnMutation: true });
+    const healthy = await doctorAssetPacks({
+      workspace: healthyFixture.workspace,
+      runtime: healthyFixture.runtime,
+      fileOps: healthyOps.fileOps,
+    });
+    expect(healthy.healthy).toBe(true);
+    expect(healthyOps.events).toEqual([]);
+
+    const tamperedFixture = createFixture();
+    const sourceRoot = await linkNewPack(tamperedFixture, {
+      packId: 'alpha.pack', localId: 'alpha', color: '#aa3300',
+    });
+    writeFileSync(path.join(sourceRoot, 'sprites/alpha/walk.png'), pngBytes('#0033aa'));
+    const tamperedOps = mutationRecordingFileOps({ failOnMutation: true });
+    const tampered = await doctorAssetPacks({
+      workspace: tamperedFixture.workspace,
+      runtime: tamperedFixture.runtime,
+      fileOps: tamperedOps.fileOps,
+    });
+    expect(tampered.healthy).toBe(false);
+    expect(tampered.checks.map((check) => check.code)).toContain('asset_digest_mismatch');
+    expect(tamperedOps.events).toEqual([]);
+  });
+
+  it('retries a generation snapshot when publication completes during the audit', async () => {
+    const fixture = createFixture();
+    await linkNewPack(fixture, {
+      packId: 'alpha.pack', localId: 'alpha', color: '#aa3300',
+    });
+    const bravoRoot = writePack(fixture, packSource({
+      packId: 'bravo.pack',
+      displayName: 'bravo.pack',
+      localId: 'bravo',
+    }), '#0033aa');
+    const candidate = await loadLinkedAssetPackCandidate({
+      packDirectory: bravoRoot,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+    });
+    expect(candidate.ok).toBe(true);
+    if (!candidate.ok) return;
+    const desired = await prepareAssetPackDesiredState({
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+      mutation: { kind: 'upsert', candidate: candidate.candidate },
+    });
+    expect(desired.ok).toBe(true);
+    if (!desired.ok) return;
+
+    let publication: Promise<Awaited<ReturnType<typeof publishAssetPackGeneration>>> | undefined;
+    let publishedDuringSnapshot = false;
+    const concurrentReadFileSync = ((target: Parameters<typeof readFileSync>[0]) => {
+      const bytes = readFileSync(target);
+      if (
+        !publishedDuringSnapshot
+        && path.resolve(String(target)) === fixture.workspace.registryPath
+      ) {
+        publishedDuringSnapshot = true;
+        publication = publishAssetPackGeneration({
+          operation: 'sync',
+          workspace: fixture.workspace,
+          desiredState: desired,
+          cleanupInstalledSources: [],
+        });
+      }
+      return bytes;
+    }) as typeof readFileSync;
+    const concurrentOps: AssetTransactionFileOps = {
+      ...REAL_FILE_OPS,
+      readFileSync: concurrentReadFileSync,
+    };
+
+    const report = await doctorAssetPacks({
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+      fileOps: concurrentOps,
+    });
+    expect(publishedDuringSnapshot).toBe(true);
+    expect(publication).toBeDefined();
+    const publicationResult = await publication;
+    expect(publicationResult?.ok).toBe(true);
+    expect(report).toMatchObject({ healthy: true, recovery: 'none' });
+    expect(report.packs.map((entry) => entry.packId)).toEqual([
+      'alpha.pack',
+      'bravo.pack',
+    ]);
+  });
 });
 
 describe('doctorAssetPacks registry, source, output, compiler, and attribution audits', () => {
