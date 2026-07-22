@@ -5,8 +5,10 @@ import {
   readFileSync,
   readdirSync,
   realpathSync,
+  rmSync,
   writeFileSync,
 } from 'node:fs';
+import type { Stats } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
@@ -20,6 +22,7 @@ const OUTPUT_MARKER_FILE = '.lpc-toolkit-managed.json';
 const DEFAULT_PACKS_DIRECTORY = 'artist-packs';
 const DEFAULT_OUTPUT_DIRECTORY = 'assets_custom';
 const DEFAULT_STATE_DIRECTORY = '.lpc-toolkit/asset-packs';
+const INSTALL_STAGING_NAME = /^install-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 export interface AssetWorkspace {
   readonly root: string;
@@ -27,7 +30,17 @@ export interface AssetWorkspace {
   readonly packsRoot: string;
   readonly outputRoot: string;
   readonly stateRoot: string;
+  readonly installedRoot: string;
+  readonly stagingRoot: string;
+  readonly transactionsRoot: string;
   readonly registryPath: string;
+}
+
+export interface AssetPackInstallStagingRoot {
+  readonly path: string;
+  readonly canonicalPath: string;
+  readonly device: number;
+  readonly inode: number;
 }
 
 interface AssetWorkspaceConfig {
@@ -231,8 +244,127 @@ function createWorkspace(root: string, config: AssetWorkspaceConfig): AssetWorks
     packsRoot,
     outputRoot,
     stateRoot,
+    installedRoot: path.join(stateRoot, 'installed'),
+    stagingRoot: path.join(stateRoot, 'staging'),
+    transactionsRoot: path.join(stateRoot, 'transactions'),
     registryPath: path.join(stateRoot, 'registry.json'),
   };
+}
+
+function pinRealDirectory(target: string, label: string): {
+  readonly canonicalPath: string;
+  readonly status: Stats;
+} {
+  const before: Stats = lstatSync(target);
+  if (before.isSymbolicLink() || !before.isDirectory()) {
+    throw new AssetWorkspaceError(`${label} is not a real directory: ${target}`);
+  }
+  const canonicalPath = realpathSync.native(target);
+  const status: Stats = lstatSync(target);
+  if (
+    status.isSymbolicLink()
+    || !status.isDirectory()
+    || status.dev !== before.dev
+    || status.ino !== before.ino
+    || realpathSync.native(target) !== canonicalPath
+  ) {
+    throw new AssetWorkspaceError(`${label} identity changed: ${target}`);
+  }
+  return { canonicalPath, status };
+}
+
+export function createAssetPackInstallStagingRoot(
+  workspace: AssetWorkspace,
+): AssetPackInstallStagingRoot {
+  assertSafeExistingSubpath(
+    workspace.root,
+    path.relative(workspace.root, workspace.stagingRoot),
+  );
+  const parent = pinRealDirectory(workspace.stagingRoot, 'Asset-pack staging root');
+  const target = path.join(workspace.stagingRoot, `install-${randomUUID()}`);
+  mkdirSync(target, { mode: 0o700 });
+  const pinned = pinRealDirectory(target, 'Asset-pack install staging root');
+  const confirmedParent = pinRealDirectory(workspace.stagingRoot, 'Asset-pack staging root');
+  if (
+    confirmedParent.status.dev !== parent.status.dev
+    || confirmedParent.status.ino !== parent.status.ino
+    || confirmedParent.canonicalPath !== parent.canonicalPath
+  ) {
+    throw new AssetWorkspaceError(
+      `Asset-pack staging root identity changed: ${workspace.stagingRoot}`,
+    );
+  }
+  const { status } = pinned;
+  if ((status.mode & 0o077) !== 0) {
+    throw new AssetWorkspaceError(
+      `Asset-pack install staging root is not private: ${target}`,
+    );
+  }
+  return {
+    path: target,
+    canonicalPath: pinned.canonicalPath,
+    device: status.dev,
+    inode: status.ino,
+  };
+}
+
+export function removeAssetPackInstallStagingRoot(
+  workspace: AssetWorkspace,
+  staging: AssetPackInstallStagingRoot,
+): void {
+  if (
+    path.dirname(path.resolve(staging.path)) !== path.resolve(workspace.stagingRoot)
+    || !INSTALL_STAGING_NAME.test(path.basename(staging.path))
+  ) {
+    throw new AssetWorkspaceError(
+      `Asset-pack install staging root is outside the managed staging root: ${staging.path}`,
+    );
+  }
+  const status = lstatSync(staging.path, { throwIfNoEntry: false });
+  if (!status) return;
+  if (
+    status.isSymbolicLink()
+    || !status.isDirectory()
+    || status.dev !== staging.device
+    || status.ino !== staging.inode
+    || realpathSync.native(staging.path) !== staging.canonicalPath
+  ) {
+    throw new AssetWorkspaceError(
+      `Asset-pack install staging root identity changed: ${staging.path}`,
+    );
+  }
+  rmSync(staging.path, { recursive: true });
+}
+
+export function assetPackInstalledDirectory(options: {
+  readonly workspace: AssetWorkspace;
+  readonly packId: string;
+  readonly version: string;
+  readonly archiveDigest: string;
+}): string {
+  if (!/^sha256:[0-9a-f]{64}$/.test(options.archiveDigest)) {
+    throw new AssetWorkspaceError('Installed asset-pack archive digest is invalid.');
+  }
+  if (
+    path.basename(options.packId) !== options.packId
+    || path.basename(options.version) !== options.version
+    || options.packId === '.'
+    || options.packId === '..'
+    || options.version === '.'
+    || options.version === '..'
+  ) {
+    throw new AssetWorkspaceError('Installed asset-pack identity contains an unsafe path segment.');
+  }
+  const directory = path.join(
+    options.workspace.installedRoot,
+    options.packId,
+    options.version,
+    options.archiveDigest.slice('sha256:'.length),
+  );
+  if (!isInsideRoot(options.workspace.installedRoot, directory)) {
+    throw new AssetWorkspaceError('Installed asset-pack directory escapes the installed root.');
+  }
+  return directory;
 }
 
 function readWorkspaceConfig(root: string, explicit: boolean): AssetWorkspaceConfig {
@@ -401,7 +533,7 @@ export function initializeAssetWorkspace(target: string): AssetWorkspace {
   ensureDirectoryUnderRoot(root, path.relative(root, workspace.stateRoot));
   ensureDirectoryUnderRoot(
     root,
-    path.relative(root, path.join(workspace.stateRoot, 'installed')),
+    path.relative(root, workspace.installedRoot),
   );
   ensureDirectoryUnderRoot(
     root,
@@ -409,9 +541,8 @@ export function initializeAssetWorkspace(target: string): AssetWorkspace {
   );
   ensureDirectoryUnderRoot(
     root,
-    path.relative(root, path.join(workspace.stateRoot, 'staging')),
+    path.relative(root, workspace.stagingRoot),
   );
-
   if (!existsSync(configPath)) writeWorkspaceConfig(root);
   if (!existsSync(path.join(workspace.outputRoot, OUTPUT_MARKER_FILE))) {
     writeOutputMarker(workspace.outputRoot);
