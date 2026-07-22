@@ -139,6 +139,14 @@ export type AssetPackRecoveryResult =
   | { readonly ok: true; readonly action: AssetPackRecoveryAction }
   | { readonly ok: false; readonly diagnostics: readonly AssetPackLifecycleDiagnostic[] };
 
+export type AssetPackRecoveryEligibility =
+  | { readonly status: 'idle' }
+  | { readonly status: 'recoverable' }
+  | {
+    readonly status: 'unsafe';
+    readonly diagnostic: AssetPackLifecycleDiagnostic;
+  };
+
 export type AssetPackClaimedLifecycleResult<T> =
   | { readonly ok: true; readonly value: T }
   | { readonly ok: false; readonly diagnostics: readonly AssetPackLifecycleDiagnostic[] };
@@ -2984,16 +2992,10 @@ function recoverAssetPackTransactionUnderClaimFromStableDirectory(options: {
   let resolved: ResolvedJournal;
   let recoveryState: RecoveryState | undefined;
   try {
-    assertNoExistingSymlink(options.workspace.stateRoot, transactionPath, 'Asset transaction journal');
-    assertRegularFileIfPresent(transactionPath, 'Asset transaction journal');
-    const parsed = JSON.parse(options.fileOps.readFileSync(transactionPath).toString('utf8')) as unknown;
-    const journal = parseJournalRecord(parsed);
-    resolved = resolveJournal(options.workspace, journal, options.fileOps);
-    if (journal.recoveryMode === undefined) {
-      recoveryState = validateRecoveryState(resolved, options.workspace, options.fileOps);
-    } else {
-      validateAuthorizedRecovery(resolved, options.workspace, options.fileOps);
-    }
+    ({ resolved, recoveryState } = readRecoveryEligibility({
+      workspace: options.workspace,
+      fileOps: options.fileOps,
+    }));
   } catch (error) {
     return recoveryFailure('asset_transaction_unsafe', error, options.workspace);
   }
@@ -3046,6 +3048,60 @@ function recoverAssetPackTransactionUnderClaimFromStableDirectory(options: {
     return { ok: true, action: 'rolled-back' };
   } catch (error) {
     return recoveryFailure('asset_publish_failed', error, options.workspace);
+  }
+}
+
+function readRecoveryEligibility(options: {
+  readonly workspace: AssetWorkspace;
+  readonly fileOps: AssetTransactionFileOps;
+}): {
+  readonly resolved: ResolvedJournal;
+  readonly recoveryState?: RecoveryState;
+} {
+  const transactionPath = path.join(options.workspace.stateRoot, JOURNAL_FILE);
+  assertNoExistingSymlink(
+    options.workspace.stateRoot,
+    transactionPath,
+    'Asset transaction journal',
+  );
+  assertRegularFileIfPresent(transactionPath, 'Asset transaction journal');
+  const parsed = JSON.parse(
+    options.fileOps.readFileSync(transactionPath).toString('utf8'),
+  ) as unknown;
+  const journal = parseJournalRecord(parsed);
+  const resolved = resolveJournal(options.workspace, journal, options.fileOps);
+  if (journal.recoveryMode === undefined) {
+    return {
+      resolved,
+      recoveryState: validateRecoveryState(resolved, options.workspace, options.fileOps),
+    };
+  }
+  validateAuthorizedRecovery(resolved, options.workspace, options.fileOps);
+  return { resolved };
+}
+
+export function inspectAssetPackTransactionRecoveryEligibility(options: {
+  readonly workspace: AssetWorkspace;
+  readonly fileOps?: AssetTransactionFileOps;
+}): AssetPackRecoveryEligibility {
+  const transactionPath = path.join(options.workspace.stateRoot, JOURNAL_FILE);
+  if (!pathEntryExists(transactionPath)) return { status: 'idle' };
+  try {
+    readRecoveryEligibility({
+      workspace: options.workspace,
+      fileOps: options.fileOps ?? DEFAULT_FILE_OPS,
+    });
+    return { status: 'recoverable' };
+  } catch (error) {
+    return {
+      status: 'unsafe',
+      diagnostic: {
+        code: 'asset_transaction_unsafe',
+        severity: 'error',
+        message: errorMessage(error),
+        path: transactionPath,
+      },
+    };
   }
 }
 

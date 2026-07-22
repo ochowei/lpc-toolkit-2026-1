@@ -18,6 +18,7 @@ import {
 import type { AssetPackListEntry } from './asset-pack-remove.js';
 import { prepareAssetPackDesiredState } from './asset-pack-state.js';
 import {
+  inspectAssetPackTransactionRecoveryEligibility,
   recoverAssetPackTransaction,
   type AssetPackRecoveryAction,
   type AssetTransactionFileOps,
@@ -374,29 +375,6 @@ function liveClaimPresent(options: {
   }
 }
 
-function journalLooksRecoverable(value: unknown): boolean {
-  if (!isRecord(value)) return false;
-  return value.schema === 'lpc-toolkit.asset-pack-transaction.v1'
-    && typeof value.workspaceId === 'string'
-    && value.workspaceId.length > 0
-    && typeof value.operationId === 'string'
-    && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
-      value.operationId,
-    )
-    && (value.operation === 'sync'
-      || value.operation === 'install'
-      || value.operation === 'remove')
-    && (value.phase === 'prepared'
-      || value.phase === 'output-published'
-      || value.phase === 'sources-published'
-      || value.phase === 'registry-published')
-    && typeof value.oldOutputBackup === 'string'
-    && typeof value.stagedOutput === 'string'
-    && typeof value.stagedRegistry === 'string'
-    && Array.isArray(value.cleanupInstalledSources)
-    && value.cleanupInstalledSources.every((entry) => typeof entry === 'string');
-}
-
 function inspectTransaction(options: {
   readonly workspace: AssetWorkspace;
   readonly fileOps?: AssetTransactionFileOps;
@@ -426,16 +404,18 @@ function inspectTransaction(options: {
     };
   }
   try {
-    const bytes = readFile(journalPath);
-    const parsed = JSON.parse(
-      Buffer.isBuffer(bytes) ? bytes.toString('utf8') : bytes,
-    ) as unknown;
+    const eligibility = inspectAssetPackTransactionRecoveryEligibility(options);
     const after = pathEntryStats(journalPath, stat);
     if (!after || !sameEntryIdentity(journalStats, after)) return { status: 'busy' };
-    if (!journalLooksRecoverable(parsed)) {
-      throw new Error('Asset transaction journal is malformed or incomplete.');
+    if (eligibility.status === 'unsafe') {
+      return {
+        status: 'unsafe',
+        diagnostic: eligibility.diagnostic,
+      };
     }
-    return { status: 'recoverable' };
+    return eligibility.status === 'recoverable'
+      ? { status: 'recoverable' }
+      : { status: 'idle' };
   } catch (error) {
     return {
       status: 'unsafe',

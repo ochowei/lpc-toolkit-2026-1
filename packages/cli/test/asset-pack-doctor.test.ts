@@ -1296,4 +1296,47 @@ describe('doctorAssetPacks non-repair boundary', () => {
     writeFileSync(transactionPath(fixture.workspace), '{not-json\n');
     await expectDoctorReadOnlyFailure(fixture, 'asset_transaction_unsafe');
   });
+
+  it.each([
+    ['an unknown key', (journal: AssetPackTransactionJournal) => ({
+      ...journal,
+      unexpected: true,
+    })],
+    ['an unsafe staged-output path', (journal: AssetPackTransactionJournal) => ({
+      ...journal,
+      stagedOutput: '../outside',
+    })],
+  ] as const)(
+    'rejects a pending journal with %s before any transaction mutation',
+    async (_scenario, mutateJournal) => {
+      const fixture = createFixture();
+      expect(await seedCrashedPhase(fixture, 'journal-durable')).toBe('prepared');
+      writeJson(
+        transactionPath(fixture.workspace),
+        mutateJournal(
+          readJson<AssetPackTransactionJournal>(transactionPath(fixture.workspace)),
+        ),
+      );
+      const journalBytes = readFileSync(transactionPath(fixture.workspace));
+      const before = guardSnapshot(fixture);
+      const mutations = mutationRecordingFileOps({ failOnMutation: true });
+
+      const report = await doctorAssetPacks({
+        workspace: fixture.workspace,
+        runtime: fixture.runtime,
+        fileOps: mutations.fileOps,
+      });
+
+      expect(report).toMatchObject({
+        healthy: false,
+        recovery: 'none',
+      });
+      expect(report.checks.map((check) => check.code)).toEqual([
+        'asset_transaction_unsafe',
+      ]);
+      expect(mutations.events).toEqual([]);
+      expect(readFileSync(transactionPath(fixture.workspace))).toEqual(journalBytes);
+      expectGuardsUnchanged(fixture, before);
+    },
+  );
 });
