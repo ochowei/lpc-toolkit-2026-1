@@ -24,6 +24,7 @@ import {
   auditPublishedManagedOutput,
   assetPackRegistryBytes,
   readAssetPackRegistry,
+  verifyInstalledAssetPackDirectory,
   type AssetPackLifecycleDiagnostic,
   type AssetPackRegistryDocument,
   type AssetPackRegistryV1Read,
@@ -301,6 +302,41 @@ function withPinnedWorkingDirectory<T>(options: {
     return options.action();
   } finally {
     process.chdir(previousWorkingDirectory);
+  }
+}
+
+function withStableWorkspaceWorkingDirectory<T>(options: {
+  readonly workspace: AssetWorkspace;
+  readonly fileOps: AssetTransactionFileOps;
+  readonly action: () => T;
+}): T {
+  const stableWorkingDirectory = path.resolve(options.workspace.root);
+  const expectedIdentity = directoryIdentity(stableWorkingDirectory, options.fileOps);
+  const previousWorkingDirectory = process.cwd();
+  process.chdir(stableWorkingDirectory);
+  const actualIdentity = directoryIdentity('.', options.fileOps);
+  if (!sameIdentity(actualIdentity, expectedIdentity)) {
+    process.chdir(previousWorkingDirectory);
+    throw new Error(
+      `Asset transaction stable working directory identity changed: ${stableWorkingDirectory}`,
+    );
+  }
+
+  let actionError: unknown;
+  try {
+    return options.action();
+  } catch (error) {
+    actionError = error;
+    throw error;
+  } finally {
+    try {
+      process.chdir(previousWorkingDirectory);
+    } catch (restoreError) {
+      process.chdir(stableWorkingDirectory);
+      if (actionError === undefined && pathEntryExists(previousWorkingDirectory)) {
+        throw restoreError;
+      }
+    }
   }
 }
 
@@ -1993,6 +2029,18 @@ function recoverAssetPackTransactionUnderClaim(options: {
   readonly fileOps: AssetTransactionFileOps;
   readonly claim: TransactionClaim;
 }): AssetPackRecoveryResult {
+  return withStableWorkspaceWorkingDirectory({
+    workspace: options.workspace,
+    fileOps: options.fileOps,
+    action: () => recoverAssetPackTransactionUnderClaimFromStableDirectory(options),
+  });
+}
+
+function recoverAssetPackTransactionUnderClaimFromStableDirectory(options: {
+  readonly workspace: AssetWorkspace;
+  readonly fileOps: AssetTransactionFileOps;
+  readonly claim: TransactionClaim;
+}): AssetPackRecoveryResult {
   const transactionPath = path.join(options.workspace.stateRoot, JOURNAL_FILE);
   if (!pathEntryExists(transactionPath)) return { ok: true, action: 'none' };
   let resolved: ResolvedJournal;
@@ -2256,6 +2304,34 @@ function copyInstalledSourceDurably(options: {
   visit(options.source, options.destination);
 }
 
+function authenticateDestinationLocalInstalledSource(options: {
+  readonly workspace: AssetWorkspace;
+  readonly desiredState: AssetPackDesiredState;
+  readonly localInstalledSource: string | undefined;
+  readonly finalInstalledSource: string | undefined;
+}): void {
+  if (!options.localInstalledSource || !options.finalInstalledSource) return;
+  const matchingEntries = options.desiredState.registry.entries.filter(
+    (entry): entry is InstalledAssetPackRegistryEntry => (
+      entry.kind === 'installed'
+      && path.resolve(entry.installedDirectory) === path.resolve(options.finalInstalledSource!)
+    ),
+  );
+  if (matchingEntries.length !== 1) {
+    throw new Error(
+      'Destination-local installed source must match exactly one desired registry entry.',
+    );
+  }
+  const entry = matchingEntries[0]!;
+  verifyInstalledAssetPackDirectory({
+    workspace: options.workspace,
+    workspaceId: options.desiredState.registry.workspaceId,
+    installedDirectory: options.localInstalledSource,
+    entry,
+    archiveDigest: entry.archiveDigest,
+  });
+}
+
 function updatePhase(
   journal: AssetPackTransactionJournal,
   phase: AssetPackTransactionPhase,
@@ -2267,10 +2343,38 @@ function updatePhase(
   return updated;
 }
 
+function updateCommitIntent(
+  journal: AssetPackTransactionJournal,
+  workspace: AssetWorkspace,
+  guard: MutationGuard,
+): AssetPackTransactionJournal {
+  const updated = {
+    ...journal,
+    phase: 'registry-commit-intent' as const,
+  };
+  delete updated.recoveryMode;
+  delete updated.recoveryCursor;
+  delete updated.oldRegistryDigest;
+  delete updated.newRegistryDigest;
+  writeJournalDurably(workspace, updated, guard);
+  return updated;
+}
+
 async function publishAssetPackGenerationUnderClaim(
   options: PublishAssetPackGenerationOptions,
   claim: TransactionClaim,
 ): Promise<AssetPackPublicationResult> {
+  return withStableWorkspaceWorkingDirectory({
+    workspace: options.workspace,
+    fileOps: options.fileOps ?? DEFAULT_FILE_OPS,
+    action: () => publishAssetPackGenerationUnderClaimFromStableDirectory(options, claim),
+  });
+}
+
+function publishAssetPackGenerationUnderClaimFromStableDirectory(
+  options: PublishAssetPackGenerationOptions,
+  claim: TransactionClaim,
+): AssetPackPublicationResult {
   const fileOps = options.fileOps ?? DEFAULT_FILE_OPS;
   const operationId = claim.operationId;
   const stagedOutput = transactionSiblingPath(
@@ -2393,6 +2497,20 @@ async function publishAssetPackGenerationUnderClaim(
         guard: claim.guard,
       });
     }
+    authenticateDestinationLocalInstalledSource({
+      workspace: options.workspace,
+      desiredState: options.desiredState,
+      localInstalledSource,
+      finalInstalledSource: options.finalInstalledSource,
+    });
+    const prepared = resolveJournal(options.workspace, journal, fileOps);
+    journal = authorizeRecovery(
+      prepared,
+      options.workspace,
+      validateRecoveryState(prepared, options.workspace, fileOps),
+      'rollback',
+      claim.guard,
+    );
 
     durableRename(options.workspace.outputRoot, oldOutputBackup, claim.guard);
     durableRename(stagedOutput, options.workspace.outputRoot, claim.guard);
@@ -2407,12 +2525,12 @@ async function publishAssetPackGenerationUnderClaim(
     }
     journal = updatePhase(journal, 'sources-published', options.workspace, claim.guard);
 
-    journal = updatePhase(
-      journal,
-      'registry-commit-intent',
+    validateRecoveryState(
+      resolveJournal(options.workspace, journal, fileOps),
       options.workspace,
-      claim.guard,
+      fileOps,
     );
+    journal = updateCommitIntent(journal, options.workspace, claim.guard);
 
     if (journal.oldRegistryBackup) {
       durableRename(options.workspace.registryPath, oldRegistryBackup, claim.guard);

@@ -500,11 +500,15 @@ describe('asset-pack transaction journal safety', () => {
     ) as AssetPackTransactionJournal;
     expect(Object.keys(journal).sort()).toEqual([
       'cleanupInstalledSources',
+      'newRegistryDigest',
       'oldOutputBackup',
       'oldRegistryBackup',
+      'oldRegistryDigest',
       'operation',
       'operationId',
       'phase',
+      'recoveryCursor',
+      'recoveryMode',
       'schema',
       'stagedOutput',
       'stagedRegistry',
@@ -515,6 +519,8 @@ describe('asset-pack transaction journal safety', () => {
       workspaceId: fixture.workspaceId,
       operation: 'sync',
       phase: 'prepared',
+      recoveryMode: 'rollback',
+      recoveryCursor: 0,
       cleanupInstalledSources: [],
     });
     expect(journal.operationId).toMatch(
@@ -668,6 +674,123 @@ describe('asset-pack transaction journal safety', () => {
 });
 
 describe('asset-pack transaction recovery', () => {
+  it.each([
+    ['output root', false],
+    ['nested output directory', true],
+  ] as const)(
+    'publishes successfully when invoked from the %s without changing cwd',
+    async (_label, nested) => {
+      const fixture = createFixture();
+      const callerWorkingDirectory = process.cwd();
+      const invocationDirectory = nested
+        ? path.join(fixture.workspace.outputRoot, 'nested', 'working')
+        : fixture.workspace.outputRoot;
+      if (nested) mkdirSync(invocationDirectory, { recursive: true });
+      let preparedNestedOutput = false;
+      const fileOps: AssetTransactionFileOps = {
+        ...REAL_FILE_OPS,
+        afterMutationValidationSync(operation, targets) {
+          if (
+            nested
+            && !preparedNestedOutput
+            && operation === 'rename'
+            && path.resolve(targets[0] ?? '') === fixture.workspace.outputRoot
+          ) {
+            const stagedOutputName = readdirSync(path.dirname(fixture.workspace.outputRoot))
+              .find((name) => name.endsWith('.staged'));
+            expect(stagedOutputName).toBeDefined();
+            mkdirSync(
+              path.join(
+                path.dirname(fixture.workspace.outputRoot),
+                stagedOutputName!,
+                'nested',
+                'working',
+              ),
+              { recursive: true },
+            );
+            preparedNestedOutput = true;
+          }
+        },
+      };
+
+      try {
+        process.chdir(invocationDirectory);
+        const expectedWorkingDirectory = process.cwd();
+        expect(await publishAssetPackGeneration({
+          operation: 'sync',
+          workspace: fixture.workspace,
+          desiredState: desiredState(fixture),
+          cleanupInstalledSources: [],
+          fileOps,
+        })).toEqual({ ok: true });
+        expect(process.cwd()).toBe(expectedWorkingDirectory);
+        expect(existsSync(transactionPath(fixture.workspace))).toBe(false);
+      } finally {
+        process.chdir(callerWorkingDirectory);
+      }
+    },
+  );
+
+  it.each([
+    ['output root', false],
+    ['nested output directory', true],
+  ] as const)(
+    'rolls back successfully when invoked from the %s without changing cwd',
+    (_label, nested) => {
+      const fixture = createFixture();
+      const callerWorkingDirectory = process.cwd();
+      const nestedRelative = path.join('nested', 'working');
+      if (nested) {
+        mkdirSync(path.join(fixture.workspace.outputRoot, nestedRelative), { recursive: true });
+      }
+      seedPhase(fixture, 'output-published');
+      if (nested) {
+        mkdirSync(path.join(fixture.workspace.outputRoot, nestedRelative), { recursive: true });
+      }
+      const invocationDirectory = nested
+        ? path.join(fixture.workspace.outputRoot, nestedRelative)
+        : fixture.workspace.outputRoot;
+
+      try {
+        process.chdir(invocationDirectory);
+        const expectedWorkingDirectory = process.cwd();
+        expect(recoverAssetPackTransaction({ workspace: fixture.workspace })).toEqual({
+          ok: true,
+          action: 'rolled-back',
+        });
+        expect(process.cwd()).toBe(expectedWorkingDirectory);
+        expect(recoverAssetPackTransaction({ workspace: fixture.workspace })).toEqual({
+          ok: true,
+          action: 'none',
+        });
+      } finally {
+        process.chdir(callerWorkingDirectory);
+      }
+    },
+  );
+
+  it('completes cleanup from the removed installed directory and keeps cwd stable', () => {
+    const fixture = createFixture();
+    const seeded = seedPhase(fixture, 'registry-published');
+    const callerWorkingDirectory = process.cwd();
+
+    try {
+      process.chdir(seeded.cleanupSource);
+      expect(recoverAssetPackTransaction({ workspace: fixture.workspace })).toEqual({
+        ok: true,
+        action: 'completed',
+      });
+      expect(existsSync(seeded.cleanupSource)).toBe(false);
+      expect(process.cwd()).toBe(realpathSync(fixture.workspace.root));
+      expect(recoverAssetPackTransaction({ workspace: fixture.workspace })).toEqual({
+        ok: true,
+        action: 'none',
+      });
+    } finally {
+      process.chdir(callerWorkingDirectory);
+    }
+  });
+
   for (const phase of ['prepared', 'output-published', 'sources-published'] as const) {
     it(`rolls back ${phase} exactly and is idempotent`, () => {
       const fixture = createFixture();
@@ -751,8 +874,8 @@ describe('asset-pack transaction recovery', () => {
           if (String(target).includes('transaction.json.')) {
             journalWriteCount += 1;
             if (
-              (crashPoint === 'output swap' && journalWriteCount === 2)
-              || (crashPoint === 'source publication' && journalWriteCount === 3)
+              (crashPoint === 'output swap' && journalWriteCount === 3)
+              || (crashPoint === 'source publication' && journalWriteCount === 4)
             ) {
               throw new Error(`injected crash after ${crashPoint}`);
             }
@@ -867,6 +990,82 @@ describe('asset-pack transaction recovery', () => {
     expect(existsSync(finalSource)).toBe(false);
     expect(readFileSync(fixture.workspace.registryPath)).toEqual(fixture.oldRegistryBytes);
   });
+
+  it.each(['receipt', 'payload-coverage', 'payload-bytes'] as const)(
+    'rolls back when destination-local installed %s changes before output publication',
+    async (mutation) => {
+      const fixture = createFixture();
+      const stagedSource = path.join(
+        fixture.workspace.stateRoot,
+        'staging',
+        'incoming-install',
+      );
+      const finalSource = installedPath(fixture.workspace);
+      writeInstalledSource(fixture, stagedSource, '1.0.0', ARCHIVE_DIGEST);
+      const beforeOutput = snapshotTree(fixture.workspace.outputRoot);
+      const beforeRegistry = readFileSync(fixture.workspace.registryPath);
+      let injected = false;
+      const mutatingOps: AssetTransactionFileOps = {
+        ...REAL_FILE_OPS,
+        afterMutationValidationSync(operation, targets) {
+          if (
+            injected
+            || operation !== 'rename'
+            || path.resolve(targets[0] ?? '') !== fixture.workspace.outputRoot
+          ) return;
+          const localSourceName = readdirSync(path.dirname(finalSource)).find((name) =>
+            name.startsWith(`.${path.basename(finalSource)}.`) && name.endsWith('.staged'));
+          expect(localSourceName).toBeDefined();
+          const localSource = path.join(path.dirname(finalSource), localSourceName!);
+          if (mutation === 'payload-bytes') {
+            writeFileSync(path.join(localSource, 'asset-pack.json'), '{"changed":true}\n');
+          } else {
+            const receiptPath = path.join(localSource, 'install-receipt.json');
+            const receipt = JSON.parse(readFileSync(receiptPath, 'utf8')) as {
+              version: string;
+              payloadDigests: Record<string, string>;
+            };
+            if (mutation === 'receipt') {
+              receipt.version = '9.9.9';
+            } else {
+              receipt.payloadDigests['unexpected.txt'] = digestBytes(Buffer.from('unexpected\n'));
+            }
+            writeFileSync(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
+          }
+          injected = true;
+        },
+      };
+
+      expect((await publishAssetPackGeneration({
+        operation: 'install',
+        workspace: fixture.workspace,
+        desiredState: installedDesiredState(fixture, finalSource),
+        stagedInstalledSource: stagedSource,
+        finalInstalledSource: finalSource,
+        cleanupInstalledSources: [],
+        fileOps: mutatingOps,
+      })).ok).toBe(false);
+      expect(injected).toBe(true);
+      const journal = JSON.parse(
+        readFileSync(transactionPath(fixture.workspace), 'utf8'),
+      ) as AssetPackTransactionJournal;
+      expect(journal.phase).toBe('sources-published');
+      expect(journal.recoveryMode).toBe('rollback');
+      expect(readFileSync(fixture.workspace.registryPath)).toEqual(beforeRegistry);
+
+      expect(recoverAssetPackTransaction({ workspace: fixture.workspace })).toEqual({
+        ok: true,
+        action: 'rolled-back',
+      });
+      expect(snapshotTree(fixture.workspace.outputRoot)).toEqual(beforeOutput);
+      expect(readFileSync(fixture.workspace.registryPath)).toEqual(beforeRegistry);
+      expect(existsSync(finalSource)).toBe(false);
+      expect(recoverAssetPackTransaction({ workspace: fixture.workspace })).toEqual({
+        ok: true,
+        action: 'none',
+      });
+    },
+  );
 
   it('resumes an interrupted rollback without deleting unlisted state', () => {
     const fixture = createFixture();
