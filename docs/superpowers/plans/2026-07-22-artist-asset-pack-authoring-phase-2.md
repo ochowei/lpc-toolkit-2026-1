@@ -2053,8 +2053,11 @@ Expected: only planned files and plan records; no `upstream/`, checked-in assets
     The product tree was clean before this plan-record update.
   - Review status: the earlier Task 13 approval was superseded by the final
     whole-branch review that identified three Important trust-boundary gaps.
-    Those findings are fixed in the product commit above; a fresh final review
-    of the updated branch is pending after this plan-record commit.
+    Those findings are fixed in the product commit above. A fresh ephemeral,
+    read-only `gpt-5.6-sol`/`xhigh` reviewer was requested after the plan-record
+    commit, but tenant policy rejected sending the private repository to that
+    external runner. A second local read-only whole-branch audit found no
+    remaining Critical or Important issue; no independent approval is claimed.
 
 ```sh
 rtk git add packages/cli/test/asset-lifecycle-e2e.test.ts packages/cli/scripts/smoke-packed-cli.mjs packages/cli/README.md README.md packages/web/src/components/landing-page.tsx packages/web/test/landing-page.test.tsx docs/ARCHITECTURE.md docs/ENGINEERING.md
