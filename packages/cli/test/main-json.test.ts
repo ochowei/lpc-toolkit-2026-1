@@ -427,6 +427,48 @@ describe('main json behavior', () => {
     });
   });
 
+  it('rejects a symlinked pack root before public validation parses target bytes', async () => {
+    const workspaceRoot = mkdtempSync(path.join(tmpdir(), 'lpc-main-json-validate-root-link-'));
+    initializeAssetWorkspace(workspaceRoot);
+    const outsideRoot = mkdtempSync(path.join(tmpdir(), 'lpc-main-json-validate-root-target-'));
+    const outsideManifestPath = path.join(outsideRoot, 'asset-pack.json');
+    writeFileSync(outsideManifestPath, '{"schema":');
+    const packRoot = path.join(workspaceRoot, 'artist-packs', 'linked-pack');
+    symlinkSync(
+      outsideRoot,
+      packRoot,
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+
+    const code = await runCli([
+      'asset', 'validate', packRoot, '--workspace', workspaceRoot, '--json',
+    ], {
+      cwd: workspaceRoot,
+      stdout: (text) => stdout.push(text),
+      stderr: (text) => stderr.push(text),
+    }, {
+      prepareRuntimeAssets: async () => createRuntime(),
+    });
+
+    expect(code).toBe(1);
+    expect(stderr).toEqual([]);
+    expect(JSON.parse(stdout.join(''))).toMatchObject({
+      ok: true,
+      command: 'asset validate',
+      data: {
+        packDirectory: packRoot,
+        valid: false,
+        diagnostics: [{
+          code: 'asset_source_symlink',
+          severity: 'error',
+          path: packRoot,
+        }],
+      },
+    });
+  });
+
   it.each(['preview', 'sync'])('uses a fatal envelope for asset %s failures', async (command) => {
     const workspaceRoot = mkdtempSync(path.join(tmpdir(), `lpc-main-json-${command}-`));
     initializeAssetWorkspace(workspaceRoot);

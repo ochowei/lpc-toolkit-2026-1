@@ -5,10 +5,12 @@ import {
   fstatSync,
   fsyncSync,
   linkSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   openSync,
   readFileSync,
+  realpathSync,
   readdirSync,
   renameSync,
   rmSync,
@@ -42,6 +44,7 @@ import {
   type InstalledAssetPackRegistryEntry,
 } from '../src/asset-pack-registry.js';
 import { loadActiveAssetPackBaseline } from '../src/asset-pack-validation.js';
+import type { AssetPackDirectoryFileOps } from '../src/asset-pack-files.js';
 import { createDirectoryAssetStore } from '../src/asset-store.js';
 import { createRuntimeContext } from '../src/context.js';
 import {
@@ -542,6 +545,40 @@ function createFileOpsRecorder(options: {
   };
 
   return { actions, fileOps };
+}
+
+function replacingSourceFileOps(options: {
+  readonly targetPath: string;
+}): {
+  readonly fileOps: AssetPackDirectoryFileOps;
+  readonly replaced: () => boolean;
+} {
+  const targetIdentity = lstatSync(options.targetPath);
+  const replacementPath = `${options.targetPath}.sync-replacement`;
+  writeFileSync(replacementPath, readFileSync(options.targetPath));
+  let replaced = false;
+  const mutatingReadFileSync = ((target: Parameters<typeof readFileSync>[0]) => {
+    const bytes = readFileSync(target);
+    if (typeof target === 'number' && !replaced) {
+      const opened = fstatSync(target);
+      if (opened.dev === targetIdentity.dev && opened.ino === targetIdentity.ino) {
+        replaced = true;
+        renameSync(replacementPath, options.targetPath);
+      }
+    }
+    return bytes;
+  }) as typeof readFileSync;
+  return {
+    fileOps: {
+      openSync,
+      closeSync,
+      fstatSync,
+      readFileSync: mutatingReadFileSync,
+      lstatSync,
+      realpathSync: realpathSync.native,
+    },
+    replaced: () => replaced,
+  };
 }
 
 function createRollbackFixture(): {
@@ -1561,6 +1598,38 @@ describe('syncLinkedAssetPack', () => {
     expect(snapshotTree(fixture.workspace.outputRoot)).toEqual(beforeOutput);
     expect(snapshotFile(fixture.workspace.registryPath)).toEqual(beforeRegistry);
   });
+
+  it.each(['manifest', 'source'] as const)(
+    'rejects deterministic requested-pack %s replacement during sync capture',
+    async (targetKind) => {
+      const fixture = createWorkspaceFixture();
+      const packRoot = path.join(fixture.workspace.packsRoot, 'acme.wind-braid');
+      writeNewItemPack(packRoot, {
+        packId: 'acme.wind-braid',
+        displayName: 'Wind Braid',
+        localId: 'wind-braid',
+        color: '#aa5500',
+      });
+      const targetPath = targetKind === 'manifest'
+        ? path.join(packRoot, 'asset-pack.json')
+        : path.join(packRoot, 'sprites/wind-braid/foreground/walk.png');
+      const capture = replacingSourceFileOps({ targetPath });
+      const beforeOutput = snapshotTree(fixture.workspace.outputRoot);
+      const beforeRegistry = snapshotFile(fixture.workspace.registryPath);
+
+      const failed = expectFailure(await syncLinkedAssetPack({
+        packDirectory: packRoot,
+        workspace: fixture.workspace,
+        runtime: fixture.runtime,
+        sourceFileOps: capture.fileOps,
+      }));
+
+      expect(capture.replaced()).toBe(true);
+      expect(diagnosticCodes(failed.diagnostics)).toContain('asset_digest_mismatch');
+      expect(snapshotTree(fixture.workspace.outputRoot)).toEqual(beforeOutput);
+      expect(snapshotFile(fixture.workspace.registryPath)).toEqual(beforeRegistry);
+    },
+  );
 
   it('rejects requested linked packs when packsRoot is a symlink without mutating managed output', async () => {
     const fixture = createWorkspaceFixture();

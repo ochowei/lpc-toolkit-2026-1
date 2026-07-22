@@ -28,6 +28,7 @@ import {
 import type { AssetWorkspace } from './asset-workspace.js';
 import {
   loadAssetPackFiles,
+  type AssetPackDirectoryFileOps,
   type AssetPackFileDiagnostic,
   type AssetPackFilesSuccess,
 } from './asset-pack-files.js';
@@ -919,11 +920,19 @@ export async function validateAssetPackDirectory(options: {
   readonly runtime: RuntimeAssets;
   readonly workspace?: AssetWorkspace;
   readonly snapshot?: AssetPackFilesSuccess;
+  readonly fileOps?: AssetPackDirectoryFileOps;
 }): Promise<AssetPackValidationReport> {
   const absoluteRoot = path.resolve(options.packDirectory);
-  const snapshot = options.snapshot ?? loadAssetPackFiles(absoluteRoot);
+  const snapshot = options.snapshot ?? loadAssetPackFiles(
+    absoluteRoot,
+    options.fileOps,
+  );
   if (!snapshot.ok) {
-    if (snapshot.partial) {
+    if (
+      snapshot.partial
+      && !snapshot.diagnostics.some((diagnostic) =>
+        diagnostic.code === 'asset_digest_mismatch')
+    ) {
       const inspections = await inspectPartialAssetPackSources({
         pack: snapshot.partial.pack,
         sourceBytes: snapshot.partial.sourceBytes,

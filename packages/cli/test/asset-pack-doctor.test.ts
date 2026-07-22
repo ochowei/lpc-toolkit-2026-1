@@ -31,6 +31,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { doctorAssetPacks } from '../src/asset-pack-doctor.js';
 import { loadAssetPackFiles } from '../src/asset-pack-files.js';
 import {
+  ASSET_WORKSPACE_REGISTRY_SCHEMA,
   assetPackCompileDigest,
   assetPackCompileProjectionFromRegistry,
   assetPackRegistryBytes,
@@ -1235,6 +1236,82 @@ describe('doctorAssetPacks registry, source, output, compiler, and attribution a
     expect(targetMutated).toBe(true);
     expect(report.healthy).toBe(false);
     expect(report.checks.map((check) => check.code)).toContain('asset_digest_mismatch');
+  });
+
+  it('does not traverse external source roles from an invalid registry snapshot', async () => {
+    const fixture = createFixture();
+    const outside = createDirectory('lpc-asset-pack-doctor-invalid-registry-role-');
+    const sentinelPath = path.join(outside, 'sentinel.txt');
+    writeFileSync(sentinelPath, 'external sentinel\n');
+    const marker = readJson<{ readonly workspaceId: string }>(path.join(
+      fixture.workspace.outputRoot,
+      '.lpc-toolkit-managed.json',
+    ));
+    writeJson(fixture.workspace.registryPath, {
+      schema: ASSET_WORKSPACE_REGISTRY_SCHEMA,
+      workspaceId: marker.workspaceId,
+      entries: [{
+        kind: 'linked',
+        packId: 'outside.pack',
+        sourceDirectory: outside,
+      }],
+      generatedDigests: {},
+      compileDigest: `sha256:${'0'.repeat(64)}`,
+    });
+    const before = snapshotTree(fixture.root);
+    let sentinelReads = 0;
+    const guardedReadFileSync = ((target: Parameters<typeof readFileSync>[0]) => {
+      if (typeof target !== 'number' && path.resolve(String(target)) === sentinelPath) {
+        sentinelReads += 1;
+      }
+      return readFileSync(target);
+    }) as typeof readFileSync;
+
+    const report = await doctorAssetPacks({
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+      fileOps: { ...REAL_FILE_OPS, readFileSync: guardedReadFileSync },
+    });
+
+    expect(report.healthy).toBe(false);
+    expect(report.checks.map((check) => check.code)).toContain('asset_digest_mismatch');
+    expect(sentinelReads).toBe(0);
+    expect(snapshotTree(fixture.root)).toEqual(before);
+  });
+
+  it('does not traverse a complete linked registry entry whose source escapes the workspace', async () => {
+    const fixture = createFixture();
+    await linkNewPack(fixture, {
+      packId: 'alpha.pack', localId: 'alpha', color: '#aa3300',
+    });
+    const outside = createDirectory('lpc-asset-pack-doctor-outside-registry-role-');
+    const sentinelPath = path.join(outside, 'sentinel.txt');
+    writeFileSync(sentinelPath, 'external sentinel\n');
+    const registry = readRegistry(fixture.workspace);
+    const escapedEntries = registry.entries.map((entry): AssetPackRegistryEntry =>
+      entry.kind === 'linked'
+        ? { ...entry, sourceDirectory: outside }
+        : entry);
+    writeRegistry(fixture.workspace, { ...registry, entries: escapedEntries });
+    const before = snapshotTree(fixture.root);
+    let sentinelReads = 0;
+    const guardedReadFileSync = ((target: Parameters<typeof readFileSync>[0]) => {
+      if (typeof target !== 'number' && path.resolve(String(target)) === sentinelPath) {
+        sentinelReads += 1;
+      }
+      return readFileSync(target);
+    }) as typeof readFileSync;
+
+    const report = await doctorAssetPacks({
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+      fileOps: { ...REAL_FILE_OPS, readFileSync: guardedReadFileSync },
+    });
+
+    expect(report.healthy).toBe(false);
+    expect(report.checks.map((check) => check.code)).toContain('asset_digest_mismatch');
+    expect(sentinelReads).toBe(0);
+    expect(snapshotTree(fixture.root)).toEqual(before);
   });
 
   it('reports a marker/workspace mismatch without repair', async () => {

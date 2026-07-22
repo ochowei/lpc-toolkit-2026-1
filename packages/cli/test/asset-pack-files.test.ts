@@ -1,8 +1,13 @@
 import {
+  closeSync,
+  fstatSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readFileSync,
+  realpathSync,
+  renameSync,
   rmSync,
   symlinkSync,
   utimesSync,
@@ -13,7 +18,10 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { AssetPackSource } from '@lpc-toolkit/core';
 import { ASSET_PACK_SCHEMA } from '@lpc-toolkit/core';
-import { loadAssetPackFiles } from '../src/asset-pack-files.js';
+import {
+  loadAssetPackFiles,
+  type AssetPackDirectoryFileOps,
+} from '../src/asset-pack-files.js';
 
 const temporaryDirectories: string[] = [];
 
@@ -92,6 +100,54 @@ function requireSuccess(root: string) {
   return result;
 }
 
+function replacingCaptureFileOps(options: {
+  readonly targetPath: string;
+  readonly replacementBytes: Buffer;
+}): {
+  readonly fileOps: AssetPackDirectoryFileOps;
+  readonly replaced: () => boolean;
+} {
+  const replacementPath = `${options.targetPath}.replacement`;
+  writeFileSync(replacementPath, options.replacementBytes);
+  return captureFileOpsWithMutation({
+    targetPath: options.targetPath,
+    mutate: () => renameSync(replacementPath, options.targetPath),
+  });
+}
+
+function captureFileOpsWithMutation(options: {
+  readonly targetPath: string;
+  readonly mutate: () => void;
+}): {
+  readonly fileOps: AssetPackDirectoryFileOps;
+  readonly replaced: () => boolean;
+} {
+  const targetIdentity = lstatSync(options.targetPath);
+  let replaced = false;
+  const mutatingReadFileSync = ((target: Parameters<typeof readFileSync>[0]) => {
+    const bytes = readFileSync(target);
+    if (typeof target === 'number' && !replaced) {
+      const opened = fstatSync(target);
+      if (opened.dev === targetIdentity.dev && opened.ino === targetIdentity.ino) {
+        replaced = true;
+        options.mutate();
+      }
+    }
+    return bytes;
+  }) as typeof readFileSync;
+  return {
+    fileOps: {
+      openSync,
+      closeSync,
+      fstatSync,
+      readFileSync: mutatingReadFileSync,
+      lstatSync,
+      realpathSync: realpathSync.native,
+    },
+    replaced: () => replaced,
+  };
+}
+
 afterEach(() => {
   for (const directory of temporaryDirectories.splice(0)) {
     rmSync(directory, { recursive: true, force: true });
@@ -99,6 +155,19 @@ afterEach(() => {
 });
 
 describe('loadAssetPackFiles', () => {
+  it('rejects a symlinked supplied pack root before reading its manifest', () => {
+    const parent = createDirectory('lpc-asset-pack-files-root-link-');
+    const outside = createDirectory('lpc-asset-pack-files-root-target-');
+    writeFileSync(path.join(outside, 'asset-pack.json'), '{"schema":');
+    const linkedRoot = path.join(parent, 'linked-pack');
+    symlinkSync(outside, linkedRoot, process.platform === 'win32' ? 'junction' : 'dir');
+
+    expect(requireFailure(linkedRoot)).toEqual([expect.objectContaining({
+      code: 'asset_source_symlink',
+      path: linkedRoot,
+    })]);
+  });
+
   it('reports manifest JSON parse failures without mutating the manifest file', () => {
     const root = createDirectory('lpc-asset-pack-files-json-');
     mkdirSync(root, { recursive: true });
@@ -308,6 +377,79 @@ describe('loadAssetPackFiles', () => {
       }),
     ]);
   });
+
+  it.each(['manifest', 'source'] as const)(
+    'rejects deterministic %s replacement during descriptor capture',
+    (targetKind) => {
+      const root = createDirectory(`lpc-asset-pack-files-${targetKind}-replacement-`);
+      writePack(root, packFixture(), {
+        'sprites/wind-braid/foreground/walk.png': 'walk',
+        'sprites/wind-braid/foreground/climb.png': 'climb',
+      });
+      const targetPath = targetKind === 'manifest'
+        ? path.join(root, 'asset-pack.json')
+        : path.join(root, 'sprites/wind-braid/foreground/walk.png');
+      const capture = replacingCaptureFileOps({
+        targetPath,
+        replacementBytes: readFileSync(targetPath),
+      });
+
+      const result = loadAssetPackFiles(root, capture.fileOps);
+
+      expect(capture.replaced()).toBe(true);
+      expect(result.ok).toBe(false);
+      if (result.ok) throw new Error('Expected replacement during capture to fail.');
+      expect(result.diagnostics).toContainEqual(expect.objectContaining({
+        code: 'asset_digest_mismatch',
+        path: targetPath,
+      }));
+    },
+  );
+
+  it.each(['root', 'source-parent'] as const)(
+    'rejects deterministic %s directory replacement during capture',
+    (targetKind) => {
+      const parent = createDirectory(`lpc-asset-pack-files-${targetKind}-directory-race-`);
+      const root = path.join(parent, 'pack');
+      const replacementRoot = path.join(parent, 'replacement-pack');
+      const sources = {
+        'sprites/wind-braid/foreground/walk.png': 'walk',
+        'sprites/wind-braid/foreground/climb.png': 'climb',
+      } as const;
+      writePack(root, packFixture(), sources);
+      writePack(replacementRoot, packFixture(), sources);
+      const sourceParent = path.join(root, 'sprites/wind-braid/foreground');
+      const replacementSourceParent = path.join(
+        replacementRoot,
+        'sprites/wind-braid/foreground',
+      );
+      const targetPath = targetKind === 'root'
+        ? path.join(root, 'asset-pack.json')
+        : path.join(sourceParent, 'walk.png');
+      const capture = captureFileOpsWithMutation({
+        targetPath,
+        mutate: () => {
+          if (targetKind === 'root') {
+            renameSync(root, path.join(parent, 'original-pack'));
+            renameSync(replacementRoot, root);
+          } else {
+            renameSync(sourceParent, path.join(root, 'sprites/wind-braid/original-foreground'));
+            renameSync(replacementSourceParent, sourceParent);
+          }
+        },
+      });
+
+      const result = loadAssetPackFiles(root, capture.fileOps);
+
+      expect(capture.replaced()).toBe(true);
+      expect(result.ok).toBe(false);
+      if (result.ok) throw new Error('Expected directory replacement during capture to fail.');
+      expect(result.diagnostics).toContainEqual(expect.objectContaining({
+        code: 'asset_digest_mismatch',
+        path: targetPath,
+      }));
+    },
+  );
 
   it('keeps the content digest stable across manifest property order changes and acknowledgement-only edits', () => {
     const firstRoot = createDirectory('lpc-asset-pack-files-digest-a-');

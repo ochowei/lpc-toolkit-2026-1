@@ -40,7 +40,7 @@ function sameIdentity(left: Stats, right: Stats): boolean {
     && left.birthtimeMs === right.birthtimeMs;
 }
 
-function identity(stats: Stats): string {
+export function assetPackManagedFileIdentity(stats: Stats): string {
   return JSON.stringify([
     String(stats.dev),
     String(stats.ino),
@@ -101,7 +101,7 @@ export function readAssetPackManagedFile(options: {
         `${options.label} changed while it was being read: ${options.filePath}.`,
       );
     }
-    return { bytes, identity: identity(descriptorAfter) };
+    return { bytes, identity: assetPackManagedFileIdentity(descriptorAfter) };
   } catch (error) {
     actionError = error;
     throw error;

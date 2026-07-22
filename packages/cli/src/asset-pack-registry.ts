@@ -871,26 +871,34 @@ export function assetPackCompileProjectionFromPlan(options: {
   };
 }
 
-export function readAssetPackRegistry(options: { readonly workspace: AssetWorkspace; readonly markerWorkspaceId: string }): AssetPackRegistryReadResult {
+export function readAssetPackRegistry(options: {
+  readonly workspace: AssetWorkspace;
+  readonly markerWorkspaceId: string;
+  readonly registryBytes?: Buffer;
+}): AssetPackRegistryReadResult {
   try {
     let registryBytes: Buffer;
-    try {
-      registryBytes = readAssetPackManagedFile({
-        filePath: options.workspace.registryPath,
-        label: 'Asset workspace registry',
-      }).bytes;
-    } catch (error) {
-      if (
-        error instanceof Error
-        && 'code' in error
-        && (error.code === 'ENOENT' || error.code === 'ENOTDIR')
-      ) {
-        const files = snapshotManagedOutputFiles(options.workspace.outputRoot);
-        files.delete('.lpc-toolkit-managed.json');
-        if (files.size > 0) throw new Error('Managed asset output contains files but the asset-pack registry is missing.');
-        return { ok: true, document: emptyDocument(options.markerWorkspaceId), needsMigration: false };
+    if (options.registryBytes !== undefined) {
+      registryBytes = Buffer.from(options.registryBytes);
+    } else {
+      try {
+        registryBytes = readAssetPackManagedFile({
+          filePath: options.workspace.registryPath,
+          label: 'Asset workspace registry',
+        }).bytes;
+      } catch (error) {
+        if (
+          error instanceof Error
+          && 'code' in error
+          && (error.code === 'ENOENT' || error.code === 'ENOTDIR')
+        ) {
+          const files = snapshotManagedOutputFiles(options.workspace.outputRoot);
+          files.delete('.lpc-toolkit-managed.json');
+          if (files.size > 0) throw new Error('Managed asset output contains files but the asset-pack registry is missing.');
+          return { ok: true, document: emptyDocument(options.markerWorkspaceId), needsMigration: false };
+        }
+        throw error;
       }
-      throw error;
     }
     const record = requireRecord(JSON.parse(registryBytes.toString('utf8')) as unknown, 'Asset workspace registry');
     const schema = stringAt(record, 'schema', 'Asset workspace registry');

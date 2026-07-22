@@ -10,11 +10,15 @@ import {
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import {
+  closeSync,
   existsSync,
+  fstatSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readFileSync,
+  realpathSync,
   readdirSync,
   renameSync,
   rmSync,
@@ -32,6 +36,7 @@ import {
 } from '../src/asset-pack-compatibility.js';
 import { readAssetPackArchive } from '../src/asset-pack-archive-format.js';
 import { createDirectoryAssetStore } from '../src/asset-store.js';
+import type { AssetPackDirectoryFileOps } from '../src/asset-pack-files.js';
 import { initializeAssetWorkspace } from '../src/asset-workspace.js';
 import {
   packAssetPack,
@@ -239,6 +244,41 @@ function defaultFileOps(
   };
 }
 
+function replacingSourceFileOps(options: {
+  readonly targetPath: string;
+  readonly replacementBytes: Buffer;
+}): {
+  readonly fileOps: AssetPackDirectoryFileOps;
+  readonly replaced: () => boolean;
+} {
+  const targetIdentity = lstatSync(options.targetPath);
+  const replacementPath = `${options.targetPath}.capture-replacement`;
+  writeFileSync(replacementPath, options.replacementBytes);
+  let replaced = false;
+  const mutatingReadFileSync = ((target: Parameters<typeof readFileSync>[0]) => {
+    const bytes = readFileSync(target);
+    if (typeof target === 'number' && !replaced) {
+      const opened = fstatSync(target);
+      if (opened.dev === targetIdentity.dev && opened.ino === targetIdentity.ino) {
+        replaced = true;
+        renameSync(replacementPath, options.targetPath);
+      }
+    }
+    return bytes;
+  }) as typeof readFileSync;
+  return {
+    fileOps: {
+      openSync,
+      closeSync,
+      fstatSync,
+      readFileSync: mutatingReadFileSync,
+      lstatSync,
+      realpathSync: realpathSync.native,
+    },
+    replaced: () => replaced,
+  };
+}
+
 function packOk(result: Awaited<ReturnType<typeof packAssetPack>>): PackAssetPackSuccess {
   expect(result.ok).toBe(true);
   if (!result.ok) throw new Error(`Expected asset pack success: ${JSON.stringify(result.diagnostics)}`);
@@ -285,6 +325,58 @@ describe('checkAssetPackCompatibility', () => {
 });
 
 describe('packAssetPack', () => {
+  it('rejects a symlinked supplied pack root before parsing the target manifest', async () => {
+    const { runtime, workspaceRoot } = createRuntimeFixture();
+    const workspace = initializeAssetWorkspace(workspaceRoot);
+    const outsideRoot = createDirectory('lpc-asset-pack-packaging-root-target-');
+    writeFileSync(path.join(outsideRoot, 'asset-pack.json'), '{"schema":');
+    const packDirectory = path.join(workspace.packsRoot, 'linked-pack');
+    symlinkSync(
+      outsideRoot,
+      packDirectory,
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+
+    const result = await packAssetPack({ packDirectory, workspace, runtime });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('Expected symlinked root packaging to fail.');
+    expect(result.diagnostics).toEqual([expect.objectContaining({
+      code: 'asset_source_symlink',
+      path: packDirectory,
+    })]);
+  });
+
+  it.each(['manifest', 'source'] as const)(
+    'rejects deterministic %s replacement during packaging capture',
+    async (targetKind) => {
+      const { runtime, workspaceRoot } = createRuntimeFixture();
+      const { workspace, packDirectory, manifestPath } = createPack(workspaceRoot);
+      const sourcePath = path.join(packDirectory, 'sprites/wind-braid/walk.png');
+      writeWalkPng(sourcePath);
+      const targetPath = targetKind === 'manifest' ? manifestPath : sourcePath;
+      const capture = replacingSourceFileOps({
+        targetPath,
+        replacementBytes: readFileSync(targetPath),
+      });
+
+      const result = await packAssetPack({
+        packDirectory,
+        workspace,
+        runtime,
+        sourceFileOps: capture.fileOps,
+      });
+
+      expect(capture.replaced()).toBe(true);
+      expect(result.ok).toBe(false);
+      if (result.ok) throw new Error('Expected replacement during packaging capture to fail.');
+      expect(result.diagnostics).toContainEqual(expect.objectContaining({
+        code: 'asset_digest_mismatch',
+        path: targetPath,
+      }));
+    },
+  );
+
   it('packages one immutable validated snapshot as a normalized deterministic sibling archive', async () => {
     const { runtime, workspaceRoot } = createRuntimeFixture();
     const workspace = initializeAssetWorkspace(workspaceRoot);

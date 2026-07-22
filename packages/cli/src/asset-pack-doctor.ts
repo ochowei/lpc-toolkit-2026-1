@@ -12,6 +12,7 @@ import {
   ASSET_WORKSPACE_REGISTRY_SCHEMA,
   assetPackRegistryBytes,
   readAssetPackRegistry,
+  resolveLinkedAssetPackDirectory,
   type AssetPackLifecycleDiagnostic,
   type AssetPackRegistryEntry,
   type AssetPackRegistryV1Read,
@@ -290,58 +291,47 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function registrySourceRoles(options: {
-  readonly registryBytes?: Buffer;
+  readonly workspace: AssetWorkspace;
+  readonly document: AssetPackRegistryV1Read | {
+    readonly entries: readonly AssetPackRegistryEntry[];
+  };
 }): readonly {
   readonly kind: 'linked' | 'installed';
   readonly packId: string;
   readonly sourceRoot: string;
 }[] {
-  if (!options.registryBytes) return [];
-  try {
-    const parsed = JSON.parse(options.registryBytes.toString('utf8')) as unknown;
-    if (!isRecord(parsed) || !Array.isArray(parsed.entries)) return [];
-    const roles: Array<{
-      readonly kind: 'linked' | 'installed';
-      readonly packId: string;
-      readonly sourceRoot: string;
-    }> = [];
-    for (const entry of parsed.entries) {
-      if (!isRecord(entry) || typeof entry.packId !== 'string') continue;
-      if (entry.kind === 'linked' && typeof entry.sourceDirectory === 'string') {
-        roles.push({
-          kind: 'linked',
-          packId: entry.packId,
-          sourceRoot: path.resolve(entry.sourceDirectory),
-        });
-      } else if (
-        entry.kind === 'installed'
-        && typeof entry.installedDirectory === 'string'
-      ) {
-        roles.push({
-          kind: 'installed',
-          packId: entry.packId,
-          sourceRoot: path.resolve(entry.installedDirectory),
-        });
-      }
-    }
-    return roles.sort((left, right) =>
+  return options.document.entries
+    .map((entry) => entry.kind === 'linked'
+      ? {
+        kind: entry.kind,
+        packId: entry.packId,
+        sourceRoot: resolveLinkedAssetPackDirectory(
+          options.workspace,
+          entry.sourceDirectory,
+        ),
+      } as const
+      : {
+        kind: entry.kind,
+        packId: entry.packId,
+        sourceRoot: entry.installedDirectory,
+      } as const)
+    .sort((left, right) =>
       compareCodeUnits(left.kind, right.kind)
         || compareCodeUnits(left.packId, right.packId)
         || compareCodeUnits(left.sourceRoot, right.sourceRoot));
-  } catch {
-    return [];
-  }
 }
 
 function sourceRolesDigest(options: {
-  readonly registryBytes?: Buffer;
+  readonly roles: readonly {
+    readonly kind: 'linked' | 'installed';
+    readonly packId: string;
+    readonly sourceRoot: string;
+  }[];
   readonly readFile: typeof readFileSync;
   readonly stat: typeof lstatSync;
 }): string {
   const hash = createHash('sha256');
-  for (const role of registrySourceRoles(
-    options.registryBytes ? { registryBytes: options.registryBytes } : {},
-  )) {
+  for (const role of options.roles) {
     hash.update(`${JSON.stringify([
       role.kind,
       role.packId,
@@ -393,13 +383,50 @@ function readGenerationStamp(options: {
     .update('\0')
     .update(registrySnapshot?.bytes ?? Buffer.alloc(0))
     .digest('hex')}`;
+  let sourceRoles: ReturnType<typeof registrySourceRoles> = [];
+  let registryAuthenticated = false;
+  const marker = markerWorkspaceId(options);
+  if (marker.ok) {
+    const registry = readAssetPackRegistry({
+      workspace: options.workspace,
+      markerWorkspaceId: marker.workspaceId,
+      ...(registrySnapshot ? { registryBytes: registrySnapshot.bytes } : {}),
+    });
+    if (registry.ok) {
+      try {
+        sourceRoles = registrySourceRoles({
+          workspace: options.workspace,
+          document: registry.document,
+        });
+        registryAuthenticated = true;
+      } catch {
+        sourceRoles = [];
+      }
+    }
+  }
+  if (!registryAuthenticated) {
+    if (transactionArtifactsPresent(options.workspace, stat)) return { status: 'busy' };
+    const skippedDigest = `sha256:${createHash('sha256')
+      .update('registry-not-authenticated')
+      .digest('hex')}`;
+    return {
+      status: 'idle',
+      stamp: {
+        registryDigest,
+        outputDigest: skippedDigest,
+        sourceRolesDigest: skippedDigest,
+        sheetDefinitionsDigest: skippedDigest,
+        paletteDefinitionsDigest: skippedDigest,
+      },
+    };
+  }
   const outputDigest = hashTree({
     root: options.workspace.outputRoot,
     readFile,
     stat,
   }).digest;
   const sourceDigest = sourceRolesDigest({
-    ...(registrySnapshot ? { registryBytes: registrySnapshot.bytes } : {}),
+    roles: sourceRoles,
     readFile,
     stat,
   });

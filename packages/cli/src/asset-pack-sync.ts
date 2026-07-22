@@ -30,6 +30,7 @@ import {
 } from './asset-pack-transaction.js';
 import {
   loadAssetPackFiles,
+  type AssetPackDirectoryFileOps,
   type AssetPackFileDiagnostic,
   type AssetPackFilesSuccess,
 } from './asset-pack-files.js';
@@ -595,6 +596,7 @@ export async function syncLinkedAssetPack(options: {
   readonly workspace: AssetWorkspace;
   readonly runtime: RuntimeAssets;
   readonly fileOps?: AssetPublicationFileOps;
+  readonly sourceFileOps?: AssetPackDirectoryFileOps;
 }): Promise<AssetPackSyncResult> {
   const claimed = await withAssetPackTransactionClaim({
     workspace: options.workspace,
@@ -602,7 +604,12 @@ export async function syncLinkedAssetPack(options: {
     action: async (publisher): Promise<AssetPackSyncResult> => {
       const publishFailure = preflightPublish(options.workspace);
       if (publishFailure) return publishFailure;
-      const requested = await loadLinkedAssetPackCandidate(options);
+      const requested = await loadLinkedAssetPackCandidate({
+        packDirectory: options.packDirectory,
+        workspace: options.workspace,
+        runtime: options.runtime,
+        ...(options.sourceFileOps ? { sourceFileOps: options.sourceFileOps } : {}),
+      });
       if (!requested.ok) return syncFailure(requested.diagnostics);
       const desiredState = await prepareAssetPackDesiredState({
         workspace: options.workspace,

@@ -16,7 +16,10 @@ import {
   createDeterministicAssetPackArchive,
 } from './asset-pack-archive-format.js';
 import type { AssetPackLifecycleDiagnostic } from './asset-pack-compatibility.js';
-import { loadAssetPackFiles } from './asset-pack-files.js';
+import {
+  loadAssetPackFiles,
+  type AssetPackDirectoryFileOps,
+} from './asset-pack-files.js';
 import type { AssetWorkspace } from './asset-workspace.js';
 import {
   validateAssetPackDirectory,
@@ -248,6 +251,7 @@ export async function packAssetPack(options: {
   readonly workspace: AssetWorkspace;
   readonly runtime: RuntimeAssets;
   readonly fileOps?: AssetPackArchivePublicationFileOps;
+  readonly sourceFileOps?: AssetPackDirectoryFileOps;
 }): Promise<PackAssetPackResult> {
   const fileOps: AssetPackArchivePublicationFileOps = options.fileOps ?? {
     lstatSync,
@@ -258,7 +262,7 @@ export async function packAssetPack(options: {
   const packDirectory = path.resolve(options.packDirectory);
   let snapshot;
   try {
-    snapshot = loadAssetPackFiles(packDirectory);
+    snapshot = loadAssetPackFiles(packDirectory, options.sourceFileOps);
   } catch (error) {
     return failure(
       'asset_pack_load_failed',

@@ -31,6 +31,7 @@ import {
 } from './asset-pack-registry.js';
 import {
   loadAssetPackFiles,
+  type AssetPackDirectoryFileOps,
   type AssetPackFileDiagnostic,
 } from './asset-pack-files.js';
 import type { AssetPackPayloadSuccess } from './asset-pack-payload.js';
@@ -282,10 +283,11 @@ function loadPayloadDirectory(options: {
   readonly sourceDirectory: string;
   readonly archiveDigest?: string;
   readonly entry?: RegistrySourceEntry;
+  readonly sourceFileOps?: AssetPackDirectoryFileOps;
 }): LinkedAssetPackCandidateResult {
   let loaded: ReturnType<typeof loadAssetPackFiles>;
   try {
-    loaded = loadAssetPackFiles(options.sourceDirectory);
+    loaded = loadAssetPackFiles(options.sourceDirectory, options.sourceFileOps);
   } catch (error) {
     const missing = isNodeError(error) && ['ENOENT', 'ENOTDIR'].includes(error.code ?? '');
     return candidateFailure([{
@@ -318,6 +320,7 @@ export async function loadLinkedAssetPackCandidate(options: {
   readonly packDirectory: string;
   readonly workspace: AssetWorkspace;
   readonly runtime: RuntimeAssets;
+  readonly sourceFileOps?: AssetPackDirectoryFileOps;
 }): Promise<LinkedAssetPackCandidateResult> {
   let sourceDirectory: string;
   try {
@@ -330,7 +333,11 @@ export async function loadLinkedAssetPackCandidate(options: {
       path: path.resolve(options.packDirectory),
     }]);
   }
-  const loaded = loadPayloadDirectory({ kind: 'linked', sourceDirectory });
+  const loaded = loadPayloadDirectory({
+    kind: 'linked',
+    sourceDirectory,
+    ...(options.sourceFileOps ? { sourceFileOps: options.sourceFileOps } : {}),
+  });
   if (!loaded.ok) return loaded;
   return validateSnapshot({
     active: loaded.candidate,

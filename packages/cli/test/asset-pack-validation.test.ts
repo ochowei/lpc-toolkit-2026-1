@@ -1,9 +1,15 @@
 import { createHash } from 'node:crypto';
 import {
+  closeSync,
+  fstatSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readFileSync,
+  realpathSync,
   readdirSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -34,7 +40,10 @@ import {
   validateAssetPackDirectory,
 } from '../src/asset-pack-validation.js';
 import { parseAssetPackPayload } from '../src/asset-pack-payload.js';
-import { loadAssetPackFiles } from '../src/asset-pack-files.js';
+import {
+  loadAssetPackFiles,
+  type AssetPackDirectoryFileOps,
+} from '../src/asset-pack-files.js';
 import type { RuntimeAssets } from '../src/runtime-assets.js';
 
 const temporaryDirectories: string[] = [];
@@ -383,6 +392,40 @@ function writePack(
   }
 }
 
+function replacingCaptureFileOps(options: {
+  readonly targetPath: string;
+}): {
+  readonly fileOps: AssetPackDirectoryFileOps;
+  readonly replaced: () => boolean;
+} {
+  const targetIdentity = lstatSync(options.targetPath);
+  const replacementPath = `${options.targetPath}.validation-replacement`;
+  writeFileSync(replacementPath, readFileSync(options.targetPath));
+  let replaced = false;
+  const mutatingReadFileSync = ((target: Parameters<typeof readFileSync>[0]) => {
+    const bytes = readFileSync(target);
+    if (typeof target === 'number' && !replaced) {
+      const opened = fstatSync(target);
+      if (opened.dev === targetIdentity.dev && opened.ino === targetIdentity.ino) {
+        replaced = true;
+        renameSync(replacementPath, options.targetPath);
+      }
+    }
+    return bytes;
+  }) as typeof readFileSync;
+  return {
+    fileOps: {
+      openSync,
+      closeSync,
+      fstatSync,
+      readFileSync: mutatingReadFileSync,
+      lstatSync,
+      realpathSync: realpathSync.native,
+    },
+    replaced: () => replaced,
+  };
+}
+
 function snapshotTree(root: string): Readonly<Record<string, string>> {
   const snapshot: Record<string, string> = {};
 
@@ -573,6 +616,40 @@ describe('validateAssetPackDirectory', () => {
       acknowledgementRecords: [],
     });
   });
+
+  it.each(['manifest', 'source'] as const)(
+    'rejects deterministic %s replacement during public directory validation capture',
+    async (targetKind) => {
+      const runtime = createRuntimeFixture().runtime;
+      const packRoot = createDirectory(`lpc-asset-pack-validation-${targetKind}-replacement-`);
+      const sourcePath = 'sprites/wind-braid/walk.png';
+      writePack(packRoot, newItemSource([
+        { animation: 'walk', source: sourcePath },
+      ]), {
+        [sourcePath]: sheetPng(
+          'walk',
+          Object.fromEntries(requiredCells('walk').map((cell) => [cell, '#111111'])),
+        ),
+      });
+      const targetPath = targetKind === 'manifest'
+        ? path.join(packRoot, 'asset-pack.json')
+        : path.join(packRoot, sourcePath);
+      const capture = replacingCaptureFileOps({ targetPath });
+
+      const report = await validateAssetPackDirectory({
+        packDirectory: packRoot,
+        runtime,
+        fileOps: capture.fileOps,
+      });
+
+      expect(capture.replaced()).toBe(true);
+      expect(report.valid).toBe(false);
+      expect(report.diagnostics).toContainEqual(expect.objectContaining({
+        code: 'asset_digest_mismatch',
+        path: targetPath,
+      }));
+    },
+  );
 
   it.each([
     { label: 'wrong', width: 512, height: 256 },
