@@ -1757,7 +1757,7 @@ describe('syncLinkedAssetPack', () => {
     expect(snapshotFile(fixture.workspace.registryPath)).toEqual(beforeRegistry);
   });
 
-  it('rolls back every injected publish write or rename failure and preserves the previous bytes', async () => {
+  it('recovers every injected publish failure according to the durable commit boundary', async () => {
     const discoveryFixture = await createRollbackFixture();
     const discovery = createFileOpsRecorder();
     const discoveryResult = await syncLinkedAssetPack({
@@ -1768,7 +1768,11 @@ describe('syncLinkedAssetPack', () => {
     });
     expectSuccess(discoveryResult);
     const actionCount = discovery.actions.length;
+    const firstCommittedAction = discovery.actions.findIndex(
+      (action) => action === 'rename:registry.json->old-registry.json',
+    ) + 1;
     expect(actionCount).toBeGreaterThan(0);
+    expect(firstCommittedAction).toBeGreaterThan(0);
 
     for (let failAt = 1; failAt <= actionCount; failAt += 1) {
       const scenario = await createRollbackFixture();
@@ -1782,9 +1786,26 @@ describe('syncLinkedAssetPack', () => {
       }));
 
       expect(diagnosticCodes(failed.diagnostics)).toContain('asset_publish_failed');
-      expect(snapshotTree(scenario.fixture.workspace.outputRoot)).toEqual(scenario.initialOutput);
-      expect(snapshotFile(scenario.fixture.workspace.registryPath)).toEqual(scenario.initialRegistry);
+      if (failAt < firstCommittedAction) {
+        expect(
+          snapshotTree(scenario.fixture.workspace.outputRoot),
+          `pre-commit publication action ${failAt}: ${failing.actions.join(', ')}`,
+        ).toEqual(scenario.initialOutput);
+        expect(snapshotFile(scenario.fixture.workspace.registryPath)).toEqual(
+          scenario.initialRegistry,
+        );
+      } else {
+        const recoveredOutput = snapshotTree(scenario.fixture.workspace.outputRoot);
+        const recoveredRegistry = snapshotFile(scenario.fixture.workspace.registryPath);
+        expectSuccess(await syncLinkedAssetPack({
+          packDirectory: scenario.packRoot,
+          workspace: scenario.fixture.workspace,
+          runtime: scenario.fixture.runtime,
+        }));
+        expect(snapshotTree(scenario.fixture.workspace.outputRoot)).toEqual(recoveredOutput);
+        expect(snapshotFile(scenario.fixture.workspace.registryPath)).toEqual(recoveredRegistry);
+      }
       expect(snapshotTree(scenario.packRoot)).toEqual(scenario.initialSource);
     }
-  });
+  }, 20_000);
 });

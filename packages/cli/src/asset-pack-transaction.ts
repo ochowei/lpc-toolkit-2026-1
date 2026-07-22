@@ -17,8 +17,13 @@ import {
   type AssetWorkspace,
 } from './asset-workspace.js';
 import {
+  ASSET_WORKSPACE_REGISTRY_SCHEMA,
+  auditPublishedManagedOutput,
   assetPackRegistryBytes,
+  readAssetPackRegistry,
   type AssetPackLifecycleDiagnostic,
+  type AssetPackRegistryDocument,
+  type AssetPackRegistryV1Read,
   type InstalledAssetPackRegistryEntry,
 } from './asset-pack-registry.js';
 import type { AssetPackDesiredState } from './asset-pack-state.js';
@@ -30,6 +35,7 @@ export type AssetPackTransactionPhase =
   | 'prepared'
   | 'output-published'
   | 'sources-published'
+  | 'registry-commit-intent'
   | 'registry-published';
 
 export type AssetPackRecoveryAction = 'none' | 'rolled-back' | 'completed';
@@ -58,6 +64,11 @@ export interface AssetTransactionFileOps {
   readonly openSync: typeof openSync;
   readonly fsyncSync: typeof fsyncSync;
   readonly closeSync: typeof closeSync;
+  readonly lstatSync?: typeof lstatSync;
+  readonly beforeMutationSync?: (
+    operation: 'mkdir' | 'write' | 'rename' | 'remove',
+    paths: readonly string[],
+  ) => void;
 }
 
 export interface PublishAssetPackGenerationOptions {
@@ -92,8 +103,24 @@ interface ResolvedJournal {
   readonly cleanupInstalledSources: readonly string[];
 }
 
+interface DirectoryIdentity {
+  readonly device: string;
+  readonly inode: string;
+}
+
+interface MutationGuard {
+  readonly workspaceRoot: string;
+  readonly roots: Map<string, DirectoryIdentity>;
+  readonly fileOps: AssetTransactionFileOps;
+}
+
+interface AuthenticatedGeneration {
+  readonly registry: AssetPackRegistryDocument | AssetPackRegistryV1Read;
+}
+
 const OUTPUT_MARKER_FILE = '.lpc-toolkit-managed.json';
 const JOURNAL_FILE = 'transaction.json';
+const CLAIM_FILE = 'transaction.lock';
 const JOURNAL_REQUIRED_KEYS = [
   'schema',
   'workspaceId',
@@ -114,6 +141,7 @@ const PHASES: readonly AssetPackTransactionPhase[] = [
   'prepared',
   'output-published',
   'sources-published',
+  'registry-commit-intent',
   'registry-published',
 ];
 const OPERATIONS: readonly AssetPackTransactionJournal['operation'][] = [
@@ -142,6 +170,115 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && 'code' in error;
+}
+
+function transactionLstat(
+  target: string,
+  fileOps: AssetTransactionFileOps,
+): ReturnType<typeof lstatSync> & object {
+  const stats = (fileOps.lstatSync ?? lstatSync)(target);
+  if (!stats) throw new Error(`Asset transaction path disappeared: ${target}`);
+  return stats;
+}
+
+function directoryIdentity(
+  target: string,
+  fileOps: AssetTransactionFileOps,
+): DirectoryIdentity {
+  const stats = transactionLstat(target, fileOps);
+  if (stats.isSymbolicLink() || !stats.isDirectory()) {
+    throw new Error(`Asset transaction directory is not a real directory: ${target}`);
+  }
+  return { device: String(stats.dev), inode: String(stats.ino) };
+}
+
+function sameIdentity(left: DirectoryIdentity, right: DirectoryIdentity): boolean {
+  return left.device === right.device && left.inode === right.inode;
+}
+
+function rememberDirectory(guard: MutationGuard, target: string): void {
+  guard.roots.set(path.resolve(target), directoryIdentity(target, guard.fileOps));
+}
+
+function forgetPath(guard: MutationGuard, target: string): void {
+  const absolute = path.resolve(target);
+  for (const candidate of [...guard.roots.keys()]) {
+    if (candidate === absolute || isInside(absolute, candidate)) {
+      guard.roots.delete(candidate);
+    }
+  }
+}
+
+function assertPinnedDirectories(guard: MutationGuard): void {
+  for (const [target, expected] of guard.roots) {
+    let actual: DirectoryIdentity;
+    try {
+      actual = directoryIdentity(target, guard.fileOps);
+    } catch (error) {
+      throw new Error(
+        `Asset transaction directory identity changed: ${target}; ${errorMessage(error)}`,
+      );
+    }
+    if (!sameIdentity(actual, expected)) {
+      throw new Error(`Asset transaction directory identity changed: ${target}`);
+    }
+  }
+}
+
+function beforeGuardedMutation(
+  guard: MutationGuard,
+  operation: 'mkdir' | 'write' | 'rename' | 'remove',
+  paths: readonly string[],
+): void {
+  guard.fileOps.beforeMutationSync?.(operation, paths);
+  assertPinnedDirectories(guard);
+}
+
+function createMutationGuard(
+  workspace: AssetWorkspace,
+  fileOps: AssetTransactionFileOps,
+): MutationGuard {
+  const guard: MutationGuard = {
+    workspaceRoot: path.resolve(workspace.root),
+    roots: new Map(),
+    fileOps,
+  };
+  const candidates = [
+    workspace.root,
+    workspace.stateRoot,
+    path.join(workspace.stateRoot, 'staging'),
+    path.join(workspace.stateRoot, 'transactions'),
+    path.join(workspace.stateRoot, 'installed'),
+  ];
+  for (const candidate of candidates) {
+    if (pathEntryExists(candidate)) rememberDirectory(guard, candidate);
+  }
+  return guard;
+}
+
+function rememberExistingAncestors(
+  guard: MutationGuard,
+  root: string,
+  target: string,
+): void {
+  const absoluteRoot = path.resolve(root);
+  const absoluteTarget = path.resolve(target);
+  if (!isInside(absoluteRoot, absoluteTarget)) {
+    throw new Error(`Asset transaction mutation escapes its pinned root: ${target}`);
+  }
+  if (!guard.roots.has(absoluteRoot)) rememberDirectory(guard, absoluteRoot);
+  const relative = path.relative(absoluteRoot, absoluteTarget);
+  if (relative === '') return;
+  let current = absoluteRoot;
+  for (const segment of relative.split(path.sep)) {
+    current = path.join(current, segment);
+    if (!pathEntryExists(current)) break;
+    const stats = transactionLstat(current, guard.fileOps);
+    if (stats.isSymbolicLink()) {
+      throw new Error(`Asset transaction mutation traverses a symlink: ${current}`);
+    }
+    if (stats.isDirectory()) rememberDirectory(guard, current);
+  }
 }
 
 function pathEntryExists(target: string): boolean {
@@ -445,6 +582,7 @@ function resolveJournal(
   fileOps: AssetTransactionFileOps,
 ): ResolvedJournal {
   const transactionPath = path.join(workspace.stateRoot, JOURNAL_FILE);
+  const journalTemporaryPath = `${transactionPath}.${journal.operationId}.tmp`;
   const transactionRoot = path.join(
     workspace.stateRoot,
     'transactions',
@@ -550,6 +688,12 @@ function resolveJournal(
 
   assertNoExistingSymlink(workspace.stateRoot, transactionPath, 'Asset transaction journal');
   assertRegularFileIfPresent(transactionPath, 'Asset transaction journal');
+  assertNoExistingSymlink(
+    workspace.stateRoot,
+    journalTemporaryPath,
+    'Asset transaction journal temp',
+  );
+  assertRegularFileIfPresent(journalTemporaryPath, 'Asset transaction journal temp');
   assertDirectoryIfPresent(oldOutputBackup, 'Asset transaction old output backup');
   if (oldRegistryBackup) {
     assertRegularFileIfPresent(oldRegistryBackup, 'Asset transaction old registry backup');
@@ -575,7 +719,7 @@ function resolveJournal(
   return {
     journal,
     transactionPath,
-    journalTemporaryPath: `${transactionPath}.${journal.operationId}.tmp`,
+    journalTemporaryPath,
     transactionRoot,
     oldOutputBackup,
     ...(oldRegistryBackup ? { oldRegistryBackup } : {}),
@@ -587,10 +731,174 @@ function resolveJournal(
   };
 }
 
+function authenticateGeneration(
+  workspace: AssetWorkspace,
+  outputRoot: string,
+  registryPath: string,
+  fileOps: AssetTransactionFileOps,
+  allowV1 = false,
+): AuthenticatedGeneration {
+  assertDirectoryIfPresent(outputRoot, 'Asset transaction generation output');
+  if (!pathEntryExists(outputRoot)) {
+    throw new Error(`Asset transaction generation output is missing: ${outputRoot}`);
+  }
+  assertNoExistingSymlink(workspace.root, outputRoot, 'Asset transaction generation output');
+  assertNoExistingSymlink(workspace.stateRoot, registryPath, 'Asset transaction generation registry');
+  assertRegularFileIfPresent(registryPath, 'Asset transaction generation registry');
+  const markerPath = path.join(outputRoot, OUTPUT_MARKER_FILE);
+  const markerBytes = fileOps.readFileSync(markerPath);
+  const markerWorkspaceId = readOutputWorkspaceId(outputRoot, fileOps);
+  if (!markerWorkspaceId) throw new Error('Asset transaction generation marker is missing.');
+  const generationWorkspace: AssetWorkspace = {
+    ...workspace,
+    outputRoot,
+    registryPath,
+  };
+  const registryResult = readAssetPackRegistry({
+    workspace: generationWorkspace,
+    markerWorkspaceId,
+  });
+  if (!registryResult.ok) {
+    throw new Error(registryResult.diagnostics.map((entry) => entry.message).join('; '));
+  }
+  if (
+    !allowV1
+    && (
+      registryResult.needsMigration
+      || registryResult.document.schema !== ASSET_WORKSPACE_REGISTRY_SCHEMA
+    )
+  ) {
+    throw new Error('Asset transaction generation registry must use schema v2.');
+  }
+  const audit = auditPublishedManagedOutput({
+    workspace: generationWorkspace,
+    markerBytes,
+    generatedDigests: registryResult.document.generatedDigests,
+  });
+  if (audit) throw new Error(audit.message);
+  return { registry: registryResult.document };
+}
+
+function installedDirectories(
+  generation: AuthenticatedGeneration,
+): readonly string[] {
+  return generation.registry.entries
+    .flatMap((entry) => (
+      entry.kind === 'installed' && 'installedDirectory' in entry
+        ? [path.resolve(entry.installedDirectory)]
+        : []
+    ))
+    .sort();
+}
+
+function setDifference(left: readonly string[], right: readonly string[]): readonly string[] {
+  const excluded = new Set(right);
+  return left.filter((entry) => !excluded.has(entry));
+}
+
+function assertInstalledPathDelta(
+  cleanupInstalledSources: readonly string[],
+  finalInstalledSource: string | undefined,
+  oldInstalled: readonly string[],
+  newInstalled: readonly string[],
+): void {
+  const removals = [...setDifference(oldInstalled, newInstalled)].sort();
+  const additions = [...setDifference(newInstalled, oldInstalled)].sort();
+  const listedCleanup = cleanupInstalledSources.map((entry) => path.resolve(entry)).sort();
+  if (JSON.stringify(removals) !== JSON.stringify(listedCleanup)) {
+    throw new Error('Asset transaction cleanup sources do not match the old-to-new registry delta.');
+  }
+  const final = finalInstalledSource
+    ? [path.resolve(finalInstalledSource)]
+    : [];
+  if (JSON.stringify(additions) !== JSON.stringify(final)) {
+    throw new Error('Asset transaction final installed source does not match the old-to-new registry delta.');
+  }
+}
+
+function assertInstalledDeltaPaths(
+  cleanupInstalledSources: readonly string[],
+  finalInstalledSource: string | undefined,
+  oldGeneration: AuthenticatedGeneration,
+  newGeneration: AuthenticatedGeneration,
+): void {
+  const oldInstalled = installedDirectories(oldGeneration);
+  const newInstalled = installedDirectories(newGeneration);
+  assertInstalledPathDelta(
+    cleanupInstalledSources,
+    finalInstalledSource,
+    oldInstalled,
+    newInstalled,
+  );
+}
+
+function readInstalledPathsFromRegistry(
+  workspace: AssetWorkspace,
+  registryPath: string,
+  workspaceId: string,
+  fileOps: AssetTransactionFileOps,
+): readonly string[] {
+  assertNoExistingSymlink(workspace.stateRoot, registryPath, 'Asset transaction staged registry');
+  assertRegularFileIfPresent(registryPath, 'Asset transaction staged registry');
+  const parsed = JSON.parse(fileOps.readFileSync(registryPath).toString('utf8')) as unknown;
+  if (!isRecord(parsed)) throw new Error('Asset transaction staged registry must be an object.');
+  if (parsed.schema !== ASSET_WORKSPACE_REGISTRY_SCHEMA || parsed.workspaceId !== workspaceId) {
+    throw new Error('Asset transaction staged registry identity is invalid.');
+  }
+  if (!Array.isArray(parsed.entries)) {
+    throw new Error('Asset transaction staged registry entries must be an array.');
+  }
+  const installedRoot = path.join(workspace.stateRoot, 'installed');
+  const installed: string[] = [];
+  for (const value of parsed.entries) {
+    if (!isRecord(value)) throw new Error('Asset transaction staged registry entry is invalid.');
+    if (value.kind === 'linked') continue;
+    if (value.kind !== 'installed') {
+      throw new Error('Asset transaction staged registry entry kind is invalid.');
+    }
+    if (typeof value.installedDirectory !== 'string') {
+      throw new Error('Asset transaction staged installedDirectory is invalid.');
+    }
+    const installedDirectory = path.resolve(value.installedDirectory);
+    assertInstalledGenerationPath(
+      installedRoot,
+      installedDirectory,
+      'Asset transaction staged registry installedDirectory',
+    );
+    if (value.archiveDigest !== `sha256:${path.basename(installedDirectory)}`) {
+      throw new Error('Asset transaction staged registry archive digest is invalid.');
+    }
+    installed.push(installedDirectory);
+  }
+  if (new Set(installed).size !== installed.length) {
+    throw new Error('Asset transaction staged registry repeats an installed directory.');
+  }
+  return installed.sort();
+}
+
+function assertInstalledDelta(
+  resolved: ResolvedJournal,
+  oldGeneration: AuthenticatedGeneration,
+  newGeneration: AuthenticatedGeneration,
+): void {
+  assertInstalledDeltaPaths(
+    resolved.cleanupInstalledSources,
+    resolved.finalInstalledSource,
+    oldGeneration,
+    newGeneration,
+  );
+}
+
+interface RecoveryState {
+  readonly oldGeneration: AuthenticatedGeneration;
+  readonly newGeneration?: AuthenticatedGeneration;
+}
+
 function validateRecoveryState(
   resolved: ResolvedJournal,
   workspace: AssetWorkspace,
-): void {
+  fileOps: AssetTransactionFileOps,
+): RecoveryState {
   const hasActiveOutput = pathEntryExists(workspace.outputRoot);
   const hasOutputBackup = pathEntryExists(resolved.oldOutputBackup);
   const hasStagedOutput = pathEntryExists(resolved.stagedOutput);
@@ -603,28 +911,108 @@ function validateRecoveryState(
   const hasFinalSource = resolved.finalInstalledSource !== undefined
     && pathEntryExists(resolved.finalInstalledSource);
 
-  if (resolved.journal.phase === 'registry-published') {
-    if (!hasActiveOutput || hasStagedOutput || !hasActiveRegistry || hasStagedRegistry) {
-      throw new Error('Registry-published transaction state is incomplete or ambiguous.');
-    }
-    if (resolved.finalInstalledSource && (!hasFinalSource || hasStagedSource)) {
-      throw new Error('Registry-published installed source state is incomplete or ambiguous.');
-    }
-    return;
-  }
-
-  if (!hasActiveOutput && !hasOutputBackup && !hasStagedOutput) {
-    throw new Error('Rollback transaction has no recoverable output generation.');
-  }
-  if (resolved.oldRegistryBackup && !hasActiveRegistry && !hasRegistryBackup) {
-    throw new Error('Rollback transaction cannot recover the old registry.');
-  }
-  if (resolved.journal.phase === 'prepared' && hasFinalSource) {
-    throw new Error('Prepared transaction unexpectedly names a published installed source.');
-  }
   if (hasStagedSource && hasFinalSource) {
     throw new Error('Transaction has both staged and final installed sources present.');
   }
+
+  const committed = resolved.journal.phase === 'registry-commit-intent'
+    || resolved.journal.phase === 'registry-published';
+  if (committed) {
+    if (!hasOutputBackup || !hasActiveOutput || hasStagedOutput) {
+      throw new Error('Committed transaction output layout is incomplete or ambiguous.');
+    }
+    if (resolved.oldRegistryBackup) {
+      const validRegistryLayout = (
+        hasActiveRegistry && hasStagedRegistry && !hasRegistryBackup
+      ) || (
+        !hasActiveRegistry && hasStagedRegistry && hasRegistryBackup
+      ) || (
+        hasActiveRegistry && !hasStagedRegistry && hasRegistryBackup
+      );
+      if (!validRegistryLayout) {
+        throw new Error('Committed transaction registry layout is incomplete or ambiguous.');
+      }
+    } else if (hasRegistryBackup || hasActiveRegistry === hasStagedRegistry) {
+      throw new Error('Committed transaction registry layout is incomplete or ambiguous.');
+    }
+    if (resolved.finalInstalledSource && (!hasFinalSource || hasStagedSource)) {
+      throw new Error('Committed installed source state is incomplete or ambiguous.');
+    }
+    if (
+      resolved.journal.phase === 'registry-published'
+      && (!hasActiveRegistry || hasStagedRegistry)
+    ) {
+      throw new Error('Registry-published transaction does not have its active registry.');
+    }
+    const oldRegistry = hasRegistryBackup
+      ? resolved.oldRegistryBackup!
+      : hasActiveRegistry && hasStagedRegistry
+        ? workspace.registryPath
+        : resolved.oldRegistryBackup
+          ? (() => { throw new Error('Committed transaction old registry is missing.'); })()
+          : path.join(resolved.transactionRoot, 'old-registry-absent');
+    const oldGeneration = authenticateGeneration(
+      workspace,
+      resolved.oldOutputBackup,
+      oldRegistry,
+      fileOps,
+      true,
+    );
+    const newRegistry = hasStagedRegistry ? resolved.stagedRegistry : workspace.registryPath;
+    const newGeneration = authenticateGeneration(
+      workspace,
+      workspace.outputRoot,
+      newRegistry,
+      fileOps,
+    );
+    assertInstalledDelta(resolved, oldGeneration, newGeneration);
+    return { oldGeneration, newGeneration };
+  }
+
+  if (hasRegistryBackup) {
+    throw new Error('Pre-commit transaction unexpectedly contains an old registry backup.');
+  }
+  if (hasOutputBackup) {
+    if (hasActiveOutput === hasStagedOutput) {
+      throw new Error('Pre-commit output swap state is incomplete or ambiguous.');
+    }
+  } else if (!hasActiveOutput) {
+    throw new Error('Rollback transaction has no coherent active old output generation.');
+  }
+  const oldGeneration = authenticateGeneration(
+    workspace,
+    hasOutputBackup ? resolved.oldOutputBackup : workspace.outputRoot,
+    workspace.registryPath,
+    fileOps,
+    true,
+  );
+  if (hasStagedRegistry) {
+    assertInstalledPathDelta(
+      resolved.cleanupInstalledSources,
+      resolved.finalInstalledSource,
+      installedDirectories(oldGeneration),
+      readInstalledPathsFromRegistry(
+        workspace,
+        resolved.stagedRegistry,
+        resolved.journal.workspaceId,
+        fileOps,
+      ),
+    );
+  }
+  if (hasFinalSource) {
+    if (!hasStagedRegistry || !hasActiveOutput || !hasOutputBackup) {
+      throw new Error('Published source cannot be authenticated against a staged new generation.');
+    }
+    const newGeneration = authenticateGeneration(
+      workspace,
+      workspace.outputRoot,
+      resolved.stagedRegistry,
+      fileOps,
+    );
+    assertInstalledDelta(resolved, oldGeneration, newGeneration);
+    return { oldGeneration, newGeneration };
+  }
+  return { oldGeneration };
 }
 
 function closeAfter<T>(
@@ -682,28 +1070,247 @@ function fsyncDirectory(target: string, fileOps: AssetTransactionFileOps): void 
   });
 }
 
+interface TransactionClaim {
+  readonly operationId: string;
+  readonly path: string;
+  readonly stateRoot: string;
+  readonly workspace: AssetWorkspace;
+  readonly workspaceId: string;
+  readonly identity: DirectoryIdentity;
+  readonly guard: MutationGuard;
+}
+
+interface TransactionClaimRecord {
+  readonly schema: typeof ASSET_PACK_TRANSACTION_SCHEMA;
+  readonly workspaceId: string;
+  readonly operationId: string;
+  readonly pid: number;
+}
+
+function claimIdentity(
+  target: string,
+  fileOps: AssetTransactionFileOps,
+): DirectoryIdentity {
+  const stats = transactionLstat(target, fileOps);
+  if (stats.isSymbolicLink() || !stats.isFile()) {
+    throw new Error(`Asset transaction claim is not a regular file: ${target}`);
+  }
+  return { device: String(stats.dev), inode: String(stats.ino) };
+}
+
+function readClaimRecord(
+  workspace: AssetWorkspace,
+  claimPath: string,
+  fileOps: AssetTransactionFileOps,
+  expectedWorkspaceId?: string,
+): TransactionClaimRecord {
+  assertNoExistingSymlink(workspace.stateRoot, claimPath, 'Asset transaction claim');
+  assertRegularFileIfPresent(claimPath, 'Asset transaction claim');
+  const parsed = JSON.parse(fileOps.readFileSync(claimPath).toString('utf8')) as unknown;
+  if (!isRecord(parsed)) throw new Error('Asset transaction claim must be a JSON object.');
+  const keys = Object.keys(parsed).sort();
+  if (JSON.stringify(keys) !== JSON.stringify(['operationId', 'pid', 'schema', 'workspaceId'])) {
+    throw new Error('Asset transaction claim keys are invalid.');
+  }
+  if (parsed.schema !== ASSET_PACK_TRANSACTION_SCHEMA) {
+    throw new Error('Asset transaction claim schema is invalid.');
+  }
+  if (typeof parsed.workspaceId !== 'string' || parsed.workspaceId.length === 0) {
+    throw new Error('Asset transaction claim workspaceId is invalid.');
+  }
+  if (
+    parsed.workspaceId
+    !== (expectedWorkspaceId ?? readOutputWorkspaceId(workspace.outputRoot, fileOps))
+  ) {
+    throw new Error('Asset transaction claim workspaceId does not match the workspace.');
+  }
+  if (typeof parsed.operationId !== 'string' || !UUID_V4.test(parsed.operationId)) {
+    throw new Error('Asset transaction claim operationId is invalid.');
+  }
+  if (!Number.isSafeInteger(parsed.pid) || (parsed.pid as number) <= 0) {
+    throw new Error('Asset transaction claim pid is invalid.');
+  }
+  return {
+    schema: ASSET_PACK_TRANSACTION_SCHEMA,
+    workspaceId: parsed.workspaceId,
+    operationId: parsed.operationId,
+    pid: parsed.pid as number,
+  };
+}
+
+function processIsAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    if (isNodeError(error) && error.code === 'ESRCH') return false;
+    return true;
+  }
+}
+
+function workspaceIdForClaim(
+  workspace: AssetWorkspace,
+  fileOps: AssetTransactionFileOps,
+): string {
+  const active = readOutputWorkspaceId(workspace.outputRoot, fileOps);
+  if (active) return active;
+  const journalPath = path.join(workspace.stateRoot, JOURNAL_FILE);
+  assertNoExistingSymlink(workspace.stateRoot, journalPath, 'Asset transaction journal');
+  assertRegularFileIfPresent(journalPath, 'Asset transaction journal');
+  if (!pathEntryExists(journalPath)) {
+    throw new Error('Managed asset output marker and recovery journal are missing.');
+  }
+  const parsed = JSON.parse(fileOps.readFileSync(journalPath).toString('utf8')) as unknown;
+  if (!isRecord(parsed) || typeof parsed.workspaceId !== 'string' || parsed.workspaceId.length === 0) {
+    throw new Error('Asset transaction recovery journal workspaceId is invalid.');
+  }
+  return parsed.workspaceId;
+}
+
+function removeClaimWithIdentity(
+  claimPath: string,
+  expected: DirectoryIdentity,
+  guard: MutationGuard,
+): void {
+  beforeGuardedMutation(guard, 'remove', [claimPath]);
+  const actual = claimIdentity(claimPath, guard.fileOps);
+  if (!sameIdentity(actual, expected)) {
+    throw new Error('Asset transaction claim identity changed before release.');
+  }
+  guard.fileOps.rmSync(claimPath, { force: false });
+  fsyncDirectory(path.dirname(claimPath), guard.fileOps);
+}
+
+function acquireTransactionClaim(
+  workspace: AssetWorkspace,
+  fileOps: AssetTransactionFileOps,
+  operationId = randomUUID(),
+): TransactionClaim {
+  const guard = createMutationGuard(workspace, fileOps);
+  const claimPath = path.join(workspace.stateRoot, CLAIM_FILE);
+  const workspaceId = workspaceIdForClaim(workspace, fileOps);
+  assertNoExistingSymlink(workspace.stateRoot, claimPath, 'Asset transaction claim');
+  beforeGuardedMutation(guard, 'write', [claimPath]);
+  let descriptor: number;
+  try {
+    descriptor = fileOps.openSync(claimPath, 'wx', 0o600);
+  } catch (error) {
+    if (isNodeError(error) && error.code === 'EEXIST') {
+      const existingIdentity = claimIdentity(claimPath, fileOps);
+      const existing = readClaimRecord(workspace, claimPath, fileOps);
+      if (processIsAlive(existing.pid)) {
+        throw new Error('Another asset lifecycle transaction already owns this workspace.');
+      }
+      removeClaimWithIdentity(claimPath, existingIdentity, guard);
+      return acquireTransactionClaim(workspace, fileOps, operationId);
+    }
+    throw error;
+  }
+  try {
+    closeAfter(descriptor, fileOps, () => {
+      fileOps.writeFileSync(descriptor, Buffer.from(`${JSON.stringify({
+        schema: ASSET_PACK_TRANSACTION_SCHEMA,
+        workspaceId,
+        operationId,
+        pid: process.pid,
+      })}\n`));
+      fileOps.fsyncSync(descriptor);
+    });
+    fsyncDirectory(workspace.stateRoot, fileOps);
+    return {
+      operationId,
+      path: claimPath,
+      stateRoot: workspace.stateRoot,
+      workspace,
+      workspaceId,
+      identity: claimIdentity(claimPath, fileOps),
+      guard,
+    };
+  } catch (error) {
+    if (pathEntryExists(claimPath)) {
+      try {
+        removeClaimWithIdentity(claimPath, claimIdentity(claimPath, fileOps), guard);
+      } catch {
+        // The claim durability error remains primary.
+      }
+    }
+    throw error;
+  }
+}
+
+function releaseTransactionClaim(claim: TransactionClaim): void {
+  const record = readClaimRecord(
+    claim.workspace,
+    claim.path,
+    claim.guard.fileOps,
+    claim.workspaceId,
+  );
+  if (record.operationId !== claim.operationId || record.pid !== process.pid) {
+    throw new Error('Asset transaction claim ownership changed before release.');
+  }
+  const releaseGuard = createMutationGuard(claim.workspace, claim.guard.fileOps);
+  removeClaimWithIdentity(claim.path, claim.identity, releaseGuard);
+}
+
+function createDirectoriesDurably(
+  root: string,
+  target: string,
+  guard: MutationGuard,
+): void {
+  const absoluteRoot = path.resolve(root);
+  const absoluteTarget = path.resolve(target);
+  if (!isInside(absoluteRoot, absoluteTarget)) {
+    throw new Error(`Asset transaction directory escapes its durable root: ${target}`);
+  }
+  if (!guard.roots.has(absoluteRoot)) rememberDirectory(guard, absoluteRoot);
+  const relative = path.relative(absoluteRoot, absoluteTarget);
+  if (relative === '') return;
+  let current = absoluteRoot;
+  for (const segment of relative.split(path.sep)) {
+    const parent = current;
+    current = path.join(parent, segment);
+    if (pathEntryExists(current)) {
+      rememberDirectory(guard, current);
+      continue;
+    }
+    beforeGuardedMutation(guard, 'mkdir', [current]);
+    guard.fileOps.mkdirSync(current);
+    rememberDirectory(guard, current);
+    fsyncDirectory(parent, guard.fileOps);
+  }
+}
+
 function durableWrite(
+  root: string,
   target: string,
   bytes: Buffer,
-  fileOps: AssetTransactionFileOps,
+  guard: MutationGuard,
 ): void {
-  assertNoExistingSymlink(path.dirname(target), target, 'Durable transaction file');
-  assertRegularFileIfPresent(target, 'Durable transaction file');
-  fileOps.mkdirSync(path.dirname(target), { recursive: true });
-  fileOps.writeFileSync(target, bytes);
-  fsyncFile(target, fileOps);
-  fsyncDirectory(path.dirname(target), fileOps);
+  createDirectoriesDurably(root, path.dirname(target), guard);
+  assertNoExistingSymlink(root, target, 'Durable transaction file');
+  if (pathEntryExists(target)) {
+    throw new Error(`Durable transaction file already exists: ${target}`);
+  }
+  rememberExistingAncestors(guard, root, path.dirname(target));
+  beforeGuardedMutation(guard, 'write', [target]);
+  guard.fileOps.writeFileSync(target, bytes, { flag: 'wx', mode: 0o600 });
+  fsyncFile(target, guard.fileOps);
+  fsyncDirectory(path.dirname(target), guard.fileOps);
 }
 
 function durableRename(
   source: string,
   destination: string,
-  fileOps: AssetTransactionFileOps,
+  guard: MutationGuard,
 ): void {
-  fileOps.renameSync(source, destination);
-  fsyncDirectory(path.dirname(source), fileOps);
+  rememberExistingAncestors(guard, guard.workspaceRoot, source);
+  rememberExistingAncestors(guard, guard.workspaceRoot, path.dirname(destination));
+  beforeGuardedMutation(guard, 'rename', [source, destination]);
+  forgetPath(guard, source);
+  guard.fileOps.renameSync(source, destination);
+  fsyncDirectory(path.dirname(source), guard.fileOps);
   if (path.resolve(path.dirname(destination)) !== path.resolve(path.dirname(source))) {
-    fsyncDirectory(path.dirname(destination), fileOps);
+    fsyncDirectory(path.dirname(destination), guard.fileOps);
   }
 }
 
@@ -714,25 +1321,28 @@ function journalBytes(journal: AssetPackTransactionJournal): Buffer {
 function writeJournalDurably(
   workspace: AssetWorkspace,
   journal: AssetPackTransactionJournal,
-  fileOps: AssetTransactionFileOps,
+  guard: MutationGuard,
 ): void {
   const transactionPath = path.join(workspace.stateRoot, JOURNAL_FILE);
   const temporaryPath = `${transactionPath}.${journal.operationId}.tmp`;
   assertNoExistingSymlink(workspace.stateRoot, temporaryPath, 'Asset transaction journal temp');
-  durableWrite(temporaryPath, journalBytes(journal), fileOps);
-  durableRename(temporaryPath, transactionPath, fileOps);
+  durableWrite(workspace.stateRoot, temporaryPath, journalBytes(journal), guard);
+  durableRename(temporaryPath, transactionPath, guard);
 }
 
 function removeListedPath(
   root: string,
   target: string,
   recursive: boolean,
-  fileOps: AssetTransactionFileOps,
+  guard: MutationGuard,
 ): void {
   if (!pathEntryExists(target)) return;
   assertNoExistingSymlink(root, target, 'Asset transaction cleanup path');
-  fileOps.rmSync(target, { recursive, force: true });
-  fsyncDirectory(path.dirname(target), fileOps);
+  rememberExistingAncestors(guard, root, target);
+  beforeGuardedMutation(guard, 'remove', [target]);
+  forgetPath(guard, target);
+  guard.fileOps.rmSync(target, { recursive, force: true });
+  fsyncDirectory(path.dirname(target), guard.fileOps);
 }
 
 function restoreListedPath(
@@ -741,55 +1351,58 @@ function restoreListedPath(
   activeRoot: string,
   active: string,
   recursiveActive: boolean,
-  fileOps: AssetTransactionFileOps,
+  guard: MutationGuard,
 ): void {
   if (!pathEntryExists(backup)) return;
   assertNoExistingSymlink(backupRoot, backup, 'Asset transaction backup');
   if (pathEntryExists(active)) {
     assertNoExistingSymlink(activeRoot, active, 'Asset transaction active path');
-    fileOps.rmSync(active, { recursive: recursiveActive, force: true });
-    fsyncDirectory(path.dirname(active), fileOps);
+    rememberExistingAncestors(guard, activeRoot, active);
+    beforeGuardedMutation(guard, 'remove', [active]);
+    forgetPath(guard, active);
+    guard.fileOps.rmSync(active, { recursive: recursiveActive, force: true });
+    fsyncDirectory(path.dirname(active), guard.fileOps);
   }
-  durableRename(backup, active, fileOps);
+  durableRename(backup, active, guard);
 }
 
 function finishJournal(
   resolved: ResolvedJournal,
   workspace: AssetWorkspace,
-  fileOps: AssetTransactionFileOps,
+  guard: MutationGuard,
 ): void {
   removeListedPath(
     path.join(workspace.stateRoot, 'transactions'),
     resolved.oldOutputBackup,
     true,
-    fileOps,
+    guard,
   );
   if (resolved.oldRegistryBackup) {
     removeListedPath(
       path.join(workspace.stateRoot, 'transactions'),
       resolved.oldRegistryBackup,
       false,
-      fileOps,
+      guard,
     );
   }
   removeListedPath(
     path.join(workspace.stateRoot, 'staging'),
     resolved.stagedOutput,
     true,
-    fileOps,
+    guard,
   );
   removeListedPath(
     path.join(workspace.stateRoot, 'staging'),
     resolved.stagedRegistry,
     false,
-    fileOps,
+    guard,
   );
   if (resolved.stagedInstalledSource) {
     removeListedPath(
       path.join(workspace.stateRoot, 'staging'),
       resolved.stagedInstalledSource,
       true,
-      fileOps,
+      guard,
     );
   }
   for (const cleanupSource of resolved.cleanupInstalledSources) {
@@ -797,27 +1410,39 @@ function finishJournal(
       path.join(workspace.stateRoot, 'installed'),
       cleanupSource,
       true,
-      fileOps,
+      guard,
     );
   }
   removeListedPath(
     workspace.stateRoot,
     resolved.journalTemporaryPath,
     false,
-    fileOps,
+    guard,
   );
   removeListedPath(
     workspace.stateRoot,
     resolved.transactionPath,
     false,
-    fileOps,
+    guard,
+  );
+  removeListedPath(
+    path.join(workspace.stateRoot, 'staging'),
+    path.dirname(resolved.stagedOutput),
+    true,
+    guard,
+  );
+  removeListedPath(
+    path.join(workspace.stateRoot, 'transactions'),
+    resolved.transactionRoot,
+    true,
+    guard,
   );
 }
 
 function rollBackJournal(
   resolved: ResolvedJournal,
   workspace: AssetWorkspace,
-  fileOps: AssetTransactionFileOps,
+  guard: MutationGuard,
 ): void {
   if (resolved.oldRegistryBackup) {
     restoreListedPath(
@@ -826,10 +1451,10 @@ function rollBackJournal(
       workspace.stateRoot,
       workspace.registryPath,
       false,
-      fileOps,
+      guard,
     );
   } else if (!pathEntryExists(resolved.stagedRegistry) && pathEntryExists(workspace.registryPath)) {
-    removeListedPath(workspace.stateRoot, workspace.registryPath, false, fileOps);
+    removeListedPath(workspace.stateRoot, workspace.registryPath, false, guard);
   }
   restoreListedPath(
     path.join(workspace.stateRoot, 'transactions'),
@@ -837,7 +1462,7 @@ function rollBackJournal(
     workspace.root,
     workspace.outputRoot,
     true,
-    fileOps,
+    guard,
   );
   if (resolved.finalInstalledSource && pathEntryExists(resolved.finalInstalledSource)) {
     if (resolved.stagedInstalledSource && pathEntryExists(resolved.stagedInstalledSource)) {
@@ -849,36 +1474,116 @@ function rollBackJournal(
       path.join(workspace.stateRoot, 'installed'),
       resolved.finalInstalledSource,
       true,
-      fileOps,
+      guard,
     );
   }
   removeListedPath(
     path.join(workspace.stateRoot, 'staging'),
     resolved.stagedOutput,
     true,
-    fileOps,
+    guard,
   );
   removeListedPath(
     path.join(workspace.stateRoot, 'staging'),
     resolved.stagedRegistry,
     false,
-    fileOps,
+    guard,
   );
   if (resolved.stagedInstalledSource) {
     removeListedPath(
       path.join(workspace.stateRoot, 'staging'),
       resolved.stagedInstalledSource,
       true,
-      fileOps,
+      guard,
     );
   }
   removeListedPath(
     workspace.stateRoot,
     resolved.journalTemporaryPath,
     false,
-    fileOps,
+    guard,
   );
-  removeListedPath(workspace.stateRoot, resolved.transactionPath, false, fileOps);
+  removeListedPath(workspace.stateRoot, resolved.transactionPath, false, guard);
+  removeListedPath(
+    path.join(workspace.stateRoot, 'staging'),
+    path.dirname(resolved.stagedOutput),
+    true,
+    guard,
+  );
+  removeListedPath(
+    path.join(workspace.stateRoot, 'transactions'),
+    resolved.transactionRoot,
+    true,
+    guard,
+  );
+}
+
+function recoverAssetPackTransactionUnderClaim(options: {
+  readonly workspace: AssetWorkspace;
+  readonly fileOps: AssetTransactionFileOps;
+  readonly claim: TransactionClaim;
+}): AssetPackRecoveryResult {
+  const transactionPath = path.join(options.workspace.stateRoot, JOURNAL_FILE);
+  if (!pathEntryExists(transactionPath)) return { ok: true, action: 'none' };
+  let resolved: ResolvedJournal;
+  try {
+    assertNoExistingSymlink(options.workspace.stateRoot, transactionPath, 'Asset transaction journal');
+    assertRegularFileIfPresent(transactionPath, 'Asset transaction journal');
+    const parsed = JSON.parse(options.fileOps.readFileSync(transactionPath).toString('utf8')) as unknown;
+    const journal = parseJournalRecord(parsed);
+    resolved = resolveJournal(options.workspace, journal, options.fileOps);
+    validateRecoveryState(resolved, options.workspace, options.fileOps);
+  } catch (error) {
+    return recoveryFailure('asset_transaction_unsafe', error, options.workspace);
+  }
+
+  try {
+    removeListedPath(
+      options.workspace.stateRoot,
+      resolved.journalTemporaryPath,
+      false,
+      options.claim.guard,
+    );
+    if (
+      resolved.journal.phase === 'registry-commit-intent'
+      || resolved.journal.phase === 'registry-published'
+    ) {
+      if (resolved.journal.phase === 'registry-commit-intent') {
+        if (pathEntryExists(resolved.stagedRegistry)) {
+          if (
+            resolved.oldRegistryBackup
+            && pathEntryExists(options.workspace.registryPath)
+            && !pathEntryExists(resolved.oldRegistryBackup)
+          ) {
+            durableRename(
+              options.workspace.registryPath,
+              resolved.oldRegistryBackup,
+              options.claim.guard,
+            );
+          }
+          durableRename(
+            resolved.stagedRegistry,
+            options.workspace.registryPath,
+            options.claim.guard,
+          );
+        }
+        const committedJournal = updatePhase(
+          resolved.journal,
+          'registry-published',
+          options.workspace,
+          options.claim.guard,
+        );
+        resolved = resolveJournal(options.workspace, committedJournal, options.fileOps);
+        validateRecoveryState(resolved, options.workspace, options.fileOps);
+      }
+      finishJournal(resolved, options.workspace, options.claim.guard);
+      return { ok: true, action: 'completed' };
+    }
+    rollBackJournal(resolved, options.workspace, options.claim.guard);
+    return { ok: true, action: 'rolled-back' };
+  } catch (error) {
+    return recoveryFailure('asset_publish_failed', error, options.workspace);
+  }
 }
 
 export function recoverAssetPackTransaction(options: {
@@ -887,29 +1592,28 @@ export function recoverAssetPackTransaction(options: {
 }): AssetPackRecoveryResult {
   const fileOps = options.fileOps ?? DEFAULT_FILE_OPS;
   const transactionPath = path.join(options.workspace.stateRoot, JOURNAL_FILE);
-  if (!pathEntryExists(transactionPath)) return { ok: true, action: 'none' };
-
-  let resolved: ResolvedJournal;
-  try {
-    assertNoExistingSymlink(options.workspace.stateRoot, transactionPath, 'Asset transaction journal');
-    assertRegularFileIfPresent(transactionPath, 'Asset transaction journal');
-    const parsed = JSON.parse(fileOps.readFileSync(transactionPath).toString('utf8')) as unknown;
-    const journal = parseJournalRecord(parsed);
-    resolved = resolveJournal(options.workspace, journal, fileOps);
-    validateRecoveryState(resolved, options.workspace);
-  } catch (error) {
-    return recoveryFailure('asset_transaction_unsafe', error, options.workspace);
+  const claimPath = path.join(options.workspace.stateRoot, CLAIM_FILE);
+  if (!pathEntryExists(transactionPath) && !pathEntryExists(claimPath)) {
+    return { ok: true, action: 'none' };
   }
-
+  let claim: TransactionClaim;
   try {
-    if (resolved.journal.phase === 'registry-published') {
-      finishJournal(resolved, options.workspace, fileOps);
-      return { ok: true, action: 'completed' };
-    }
-    rollBackJournal(resolved, options.workspace, fileOps);
-    return { ok: true, action: 'rolled-back' };
+    claim = acquireTransactionClaim(options.workspace, fileOps);
   } catch (error) {
     return recoveryFailure('asset_publish_failed', error, options.workspace);
+  }
+  try {
+    return recoverAssetPackTransactionUnderClaim({
+      workspace: options.workspace,
+      fileOps,
+      claim,
+    });
+  } finally {
+    try {
+      releaseTransactionClaim(claim);
+    } catch {
+      // The recovery result remains primary; a stale claim fails closed later.
+    }
   }
 }
 
@@ -993,18 +1697,23 @@ function materializeDesiredState(options: {
   readonly desiredState: AssetPackDesiredState;
   readonly stagedOutput: string;
   readonly stagedRegistry: string;
-  readonly fileOps: AssetTransactionFileOps;
+  readonly workspace: AssetWorkspace;
+  readonly guard: MutationGuard;
 }): void {
-  options.fileOps.mkdirSync(options.stagedOutput, { recursive: true });
-  fsyncDirectory(path.dirname(options.stagedOutput), options.fileOps);
+  createDirectoriesDurably(
+    path.join(options.workspace.stateRoot, 'staging'),
+    options.stagedOutput,
+    options.guard,
+  );
   for (const [logicalPath, bytes] of options.desiredState.outputFiles) {
     const destination = safeOutputDestination(options.stagedOutput, logicalPath);
-    durableWrite(destination, Buffer.from(bytes), options.fileOps);
+    durableWrite(options.stagedOutput, destination, Buffer.from(bytes), options.guard);
   }
   durableWrite(
+    path.join(options.workspace.stateRoot, 'staging'),
     options.stagedRegistry,
     assetPackRegistryBytes(options.desiredState.registry),
-    options.fileOps,
+    options.guard,
   );
 }
 
@@ -1012,10 +1721,10 @@ function updatePhase(
   journal: AssetPackTransactionJournal,
   phase: AssetPackTransactionPhase,
   workspace: AssetWorkspace,
-  fileOps: AssetTransactionFileOps,
+  guard: MutationGuard,
 ): AssetPackTransactionJournal {
   const updated: AssetPackTransactionJournal = { ...journal, phase };
-  writeJournalDurably(workspace, updated, fileOps);
+  writeJournalDurably(workspace, updated, guard);
   return updated;
 }
 
@@ -1023,10 +1732,27 @@ export async function publishAssetPackGeneration(
   options: PublishAssetPackGenerationOptions,
 ): Promise<AssetPackPublicationResult> {
   const fileOps = options.fileOps ?? DEFAULT_FILE_OPS;
-  const pending = recoverAssetPackTransaction({ workspace: options.workspace, fileOps });
-  if (!pending.ok) return pending;
+  let claim: TransactionClaim;
+  try {
+    claim = acquireTransactionClaim(options.workspace, fileOps);
+  } catch (error) {
+    return publicationFailure(error, options.workspace);
+  }
+  const pending = recoverAssetPackTransactionUnderClaim({
+    workspace: options.workspace,
+    fileOps,
+    claim,
+  });
+  if (!pending.ok) {
+    try {
+      releaseTransactionClaim(claim);
+    } catch {
+      // The recovery diagnostic remains primary.
+    }
+    return pending;
+  }
 
-  const operationId = randomUUID();
+  const operationId = claim.operationId;
   const stagingRoot = path.join(options.workspace.stateRoot, 'staging', operationId);
   const stagedOutput = path.join(stagingRoot, 'output');
   const stagedRegistry = path.join(stagingRoot, 'registry.json');
@@ -1038,6 +1764,7 @@ export async function publishAssetPackGeneration(
   const oldOutputBackup = path.join(transactionRoot, 'old-output');
   const oldRegistryBackup = path.join(transactionRoot, 'old-registry.json');
   let journalWritten = false;
+  let result: AssetPackPublicationResult;
 
   try {
     if (pathEntryExists(stagingRoot) || pathEntryExists(transactionRoot)) {
@@ -1055,16 +1782,41 @@ export async function publishAssetPackGeneration(
     if (options.desiredState.registry.workspaceId !== workspaceId) {
       throw new Error('Desired asset-pack registry workspaceId does not match the workspace.');
     }
+    const oldGeneration = authenticateGeneration(
+      options.workspace,
+      options.workspace.outputRoot,
+      options.workspace.registryPath,
+      fileOps,
+      true,
+    );
+    assertInstalledDeltaPaths(
+      options.cleanupInstalledSources,
+      options.finalInstalledSource,
+      oldGeneration,
+      { registry: options.desiredState.registry },
+    );
 
-    fileOps.mkdirSync(stagingRoot, { recursive: true });
-    fileOps.mkdirSync(transactionRoot, { recursive: true });
-    fsyncDirectory(path.join(options.workspace.stateRoot, 'staging'), fileOps);
-    fsyncDirectory(path.join(options.workspace.stateRoot, 'transactions'), fileOps);
+    createDirectoriesDurably(
+      path.join(options.workspace.stateRoot, 'staging'),
+      stagingRoot,
+      claim.guard,
+    );
+    createDirectoriesDurably(
+      options.workspace.stateRoot,
+      path.join(options.workspace.stateRoot, 'transactions'),
+      claim.guard,
+    );
+    createDirectoriesDurably(
+      path.join(options.workspace.stateRoot, 'transactions'),
+      transactionRoot,
+      claim.guard,
+    );
     materializeDesiredState({
       desiredState: options.desiredState,
       stagedOutput,
       stagedRegistry,
-      fileOps,
+      workspace: options.workspace,
+      guard: claim.guard,
     });
     if (readOutputWorkspaceId(stagedOutput, fileOps) !== workspaceId) {
       throw new Error('Desired asset output marker does not match the workspace.');
@@ -1098,29 +1850,49 @@ export async function publishAssetPackGeneration(
         canonicalRelativePath(options.workspace, entry)),
     };
     resolveJournal(options.workspace, journal, fileOps);
-    writeJournalDurably(options.workspace, journal, fileOps);
+    writeJournalDurably(options.workspace, journal, claim.guard);
     journalWritten = true;
 
-    durableRename(options.workspace.outputRoot, oldOutputBackup, fileOps);
-    durableRename(stagedOutput, options.workspace.outputRoot, fileOps);
-    journal = updatePhase(journal, 'output-published', options.workspace, fileOps);
+    durableRename(options.workspace.outputRoot, oldOutputBackup, claim.guard);
+    durableRename(stagedOutput, options.workspace.outputRoot, claim.guard);
+    journal = updatePhase(journal, 'output-published', options.workspace, claim.guard);
 
     if (options.stagedInstalledSource && options.finalInstalledSource) {
-      fileOps.mkdirSync(path.dirname(options.finalInstalledSource), { recursive: true });
-      fsyncDirectory(path.dirname(path.dirname(options.finalInstalledSource)), fileOps);
-      durableRename(options.stagedInstalledSource, options.finalInstalledSource, fileOps);
+      createDirectoriesDurably(
+        path.join(options.workspace.stateRoot, 'installed'),
+        path.dirname(options.finalInstalledSource),
+        claim.guard,
+      );
+      durableRename(
+        options.stagedInstalledSource,
+        options.finalInstalledSource,
+        claim.guard,
+      );
     }
-    journal = updatePhase(journal, 'sources-published', options.workspace, fileOps);
+    journal = updatePhase(journal, 'sources-published', options.workspace, claim.guard);
+
+    journal = updatePhase(
+      journal,
+      'registry-commit-intent',
+      options.workspace,
+      claim.guard,
+    );
 
     if (journal.oldRegistryBackup) {
-      durableRename(options.workspace.registryPath, oldRegistryBackup, fileOps);
+      durableRename(options.workspace.registryPath, oldRegistryBackup, claim.guard);
     }
-    durableRename(stagedRegistry, options.workspace.registryPath, fileOps);
-    journal = updatePhase(journal, 'registry-published', options.workspace, fileOps);
+    durableRename(stagedRegistry, options.workspace.registryPath, claim.guard);
+    journal = updatePhase(
+      journal,
+      'registry-published',
+      options.workspace,
+      claim.guard,
+    );
 
     const resolved = resolveJournal(options.workspace, journal, fileOps);
-    finishJournal(resolved, options.workspace, fileOps);
-    return { ok: true };
+    validateRecoveryState(resolved, options.workspace, fileOps);
+    finishJournal(resolved, options.workspace, claim.guard);
+    result = { ok: true };
   } catch (error) {
     if (!journalWritten) {
       try {
@@ -1128,18 +1900,30 @@ export async function publishAssetPackGeneration(
           path.join(options.workspace.stateRoot, 'staging'),
           stagingRoot,
           true,
-          fileOps,
+          claim.guard,
+        );
+        removeListedPath(
+          path.join(options.workspace.stateRoot, 'transactions'),
+          transactionRoot,
+          true,
+          claim.guard,
         );
         removeListedPath(
           options.workspace.stateRoot,
           `${path.join(options.workspace.stateRoot, JOURNAL_FILE)}.${operationId}.tmp`,
           false,
-          fileOps,
+          claim.guard,
         );
       } catch {
         // The publication diagnostic remains the primary failure. No active state moved.
       }
     }
-    return publicationFailure(error, options.workspace);
+    result = publicationFailure(error, options.workspace);
   }
+  try {
+    releaseTransactionClaim(claim);
+  } catch (error) {
+    if (result.ok) result = publicationFailure(error, options.workspace);
+  }
+  return result;
 }
