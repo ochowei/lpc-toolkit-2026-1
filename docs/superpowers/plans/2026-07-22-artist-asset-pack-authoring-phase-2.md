@@ -1944,7 +1944,7 @@ plugin: N/A — the audit skill stays read-only and asset-authoring skill design
   - Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-version.test.ts asset-pack-schema.test.ts asset-pack-compile.test.ts`
     PASS (3 files, 66 tests).
   - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-payload.test.ts asset-pack-archive-format.test.ts asset-pack-packaging.test.ts asset-pack-inspection.test.ts asset-pack-registry.test.ts asset-pack-state.test.ts asset-pack-transaction.test.ts asset-pack-install.test.ts asset-pack-remove.test.ts asset-pack-doctor.test.ts asset-lifecycle-e2e.test.ts`
-    PASS (11 files, 301 tests).
+    PASS (11 files, 306 tests) after the final source-capture correction.
   - Verification: `rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifacts.test.ts`
     PASS (2 files, 3 tests).
   - Verification: `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS
@@ -1966,6 +1966,14 @@ plugin: N/A — the audit skill stays read-only and asset-authoring skill design
   - Final correctness GREEN: that same 7-module command PASS (156 tests); the
     expanded command including `asset-pack-files.test.ts` PASS (8 files, 166
     tests).
+  - Final review-2 RED: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-files.test.ts asset-pack-validation.test.ts asset-pack-packaging.test.ts asset-pack-sync.test.ts asset-pack-doctor.test.ts main-json.test.ts`
+    FAIL as expected (14 failed, 151 passed) before the correction. The failures
+    covered supplied root symlinks, descriptor-time manifest/source replacement,
+    root/source-parent replacement, the public validate/pack/sync paths, and
+    invalid-registry external source traversal.
+  - Final review-2 GREEN: the same command PASS (6 files, 166 tests).
+  - Correction suite: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-validation.test.ts asset-pack-registry.test.ts asset-pack-remove.test.ts asset-pack-doctor.test.ts runtime-asset-pack-activation.test.ts asset-pack-install.test.ts main-json.test.ts asset-pack-files.test.ts`
+    PASS (8 files, 176 tests).
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-version.test.ts asset-pack-schema.test.ts asset-pack-compile.test.ts
@@ -1984,7 +1992,7 @@ Expected: PASS.
     330 tests).
   - Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
   - Verification: `rtk pnpm --filter @lpc-toolkit/cli test` PASS (54 files,
-    1001 passed, 1 intentional skip). A sandbox-only run produced 13
+    1016 passed, 1 intentional skip). A sandbox-only run produced 13
     `listen EPERM` failures in `web-server.test.ts`; the required permitted exact
     rerun passed the complete suite.
   - Verification: `rtk pnpm --filter @lpc-toolkit/cli build` PASS.
@@ -1993,7 +2001,7 @@ Expected: PASS.
   - Verification: `rtk pnpm --filter @lpc-toolkit/web test` PASS (78 files,
     698 tests).
   - Verification: `rtk pnpm verify` PASS (exit 0; boundaries, CLI docs policy, plugin,
-    all workspace typechecks, Core 330, Presets 3, Web 698, CLI 1001 passed and
+    all workspace typechecks, Core 330, Presets 3, Web 698, CLI 1016 passed and
     1 intentional skip).
 
 ```sh
@@ -2023,6 +2031,17 @@ Expected: PASS. Fix implementation failures; do not weaken archive limits, attri
     locations. There are no dependency/lockfile, `any` type, `upstream/`,
     checked-in asset/cache, release/plugin, generated workspace,
     archive-fixture, Phase 3, remote, push, or PR changes.
+  - Final review-2 product range:
+    `844c01bc758eb30c4e3c40730262a040ca78c5eb..a68f27180ece6e0bcbdde66ea6aa31b5d6859763`
+    contains 63 commits and 69 changed paths. The final review-2 product commit
+    itself contains exactly 15 CLI source/test paths (942 insertions, 180
+    deletions), with no new dependency, lockfile, `any`, `upstream/`, asset,
+    cache, Phase 3, remote, push, PR, or unrelated path.
+  - Final plan-record-inclusive range:
+    `844c01bc758eb30c4e3c40730262a040ca78c5eb..<this plan-record commit>`
+    contains exactly 64 commits and 69 changed paths. This plan file was already
+    in the product range, so the separate record commit adds one commit and no
+    changed path.
 
 ```sh
 rtk git status --short
@@ -2057,7 +2076,10 @@ Expected: only planned files and plan records; no `upstream/`, checked-in assets
     read-only `gpt-5.6-sol`/`xhigh` reviewer was requested after the plan-record
     commit, but tenant policy rejected sending the private repository to that
     external runner. A second local read-only whole-branch audit found no
-    remaining Critical or Important issue; no independent approval is claimed.
+    remaining Critical or Important issue. This status was subsequently
+    superseded by `final-whole-branch-review-2.md`, whose two Important findings
+    and one plan-record Minor are addressed in Step 11 below. No independent
+    approval is claimed.
 
 ```sh
 rtk git add packages/cli/test/asset-lifecycle-e2e.test.ts packages/cli/scripts/smoke-packed-cli.mjs packages/cli/README.md README.md packages/web/src/components/landing-page.tsx packages/web/test/landing-page.test.tsx docs/ARCHITECTURE.md docs/ENGINEERING.md
@@ -2065,6 +2087,55 @@ rtk git commit -m "docs: publish asset package lifecycle"
 ```
 
 Then update this task's plan record with the full verification evidence and commit it separately.
+
+- [x] **Step 11: Correct final whole-branch review-2 findings**
+
+  - Implementation: directory payload capture now rejects a symlinked supplied
+    pack root, pins the root and every traversed parent/file identity, performs
+    manifest/source reads through the shared no-follow descriptor helper, and
+    rechecks descriptor, pathname, canonical containment, root, and parent
+    identities before accepting bytes. Captured bytes are discarded before
+    parse/validation/publication whenever a root, parent, manifest, or source is
+    replaced during capture.
+  - Implementation: doctor generation stamping now obtains source roles only
+    from a strict registry projection parsed from the same stable registry byte
+    snapshot. Invalid or unauthenticated registry state stamps only registry
+    bytes/identity plus fixed skipped-role digests, reports unhealthy, and never
+    recursively walks permissively declared external paths. Healthy source
+    drift, byte-identical ABA, publication retry, and registry-target-change
+    coverage remain green.
+  - Public regressions: validate, packaging, and sync reject supplied root
+    symlinks and deterministic descriptor-time manifest/source replacement;
+    direct capture also rejects root and source-parent replacement. Doctor
+    proves that malformed and structurally complete out-of-workspace linked
+    registry entries never read an external sentinel.
+  - Product commit:
+    `a68f27180ece6e0bcbdde66ea6aa31b5d6859763`.
+  - Verification: the final review-2 focused command PASS (6 files, 166 tests),
+    the correction suite PASS (8 files, 176 tests), Task 13 Step 7 PASS (Core 66,
+    CLI 306, Web 3, packed CLI smoke), and every exact Step 8 command PASS
+    (boundaries; Core typecheck/330 tests; CLI typecheck/1016 passed plus 1
+    intentional skip/build/package smoke; Web 698; repository `verify`). The
+    first sandboxed package smoke failed only with npm DNS `ENOTFOUND` and the
+    first sandboxed full CLI run failed only with 13 loopback `listen EPERM`
+    cases; their exact permitted reruns passed.
+  - Scope verification: `rtk git diff --check` PASS; no added `any`; product
+    commit is the 15-path, 942-insertion, 180-deletion change recorded in Step 9.
+  - Review status: this correctness fix resolves the two Important findings and
+    the plan Minor from `final-whole-branch-review-2.md`. It is a fixer self-review,
+    not an independent approval, and no independent approval is claimed.
+  - Correction-specific CLI documentation impact:
+
+```text
+help: N/A — internal capture and doctor trust enforcement; command help is unchanged
+cli-readme: N/A — documented source and registry boundaries are unchanged
+root-readme: N/A — public workflow and command order are unchanged
+landing: N/A — browser/product messaging is unchanged
+architecture: N/A — existing trust boundaries are enforced without a boundary change
+engineering: N/A — commands and verification ownership are unchanged
+releasing: N/A — no publication, versioning, or release procedure changed
+plugin: N/A — no plugin contract or skill behavior changed
+```
 
 ## Final Handoff Evidence
 
