@@ -1800,6 +1800,17 @@ CLI documentation impact: `help` updated in this task; `cli-readme` and `root-re
 - Modify: `docs/ENGINEERING.md`
 - Modify: this plan's CLI Documentation Impact matrix if reassessment changes it
 
+**Actual expanded implementation scope:** Task 13 spans 27 tracked paths,
+including this plan record. The original acceptance/documentation paths remain,
+plus runtime activation and snapshot-aware consumer integration in
+`packages/cli/src/{animation-audit,asset-overlay-store,catalog-commands,character-commands,command-spec,compose-selection,loaders,main,preset-commands,runtime-assets,selection-document-file}.ts`,
+linked-manifest containment in `packages/cli/src/asset-pack-files.ts`, and the
+matching authoring, lifecycle, sync, command, main-assets, asset-pack-files, and
+runtime-activation tests. This expansion authenticates one runtime generation
+and closes the linked `asset-pack.json` symlink boundary; it does not add a
+dependency, lockfile change, `any`, `upstream/`, checked-in asset/cache,
+release/plugin, Phase 3, remote, push, or PR change.
+
 **Interfaces:**
 - Consumes: the complete Phase 1+2 public CLI.
 - Produces: clean installed-package acceptance, updated public/engineering contracts, and final verification evidence.
@@ -1819,6 +1830,16 @@ CLI documentation impact: `help` updated in this task; `cli-readme` and `root-re
   - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-lifecycle-e2e.test.ts`
     PASS (1 file, 1 test).
   - Commit: `a874b2418423323a7f4c3267b2b43d0c8bc5da52`
+  - Runtime authentication follow-up: registry v2-only activation, strict
+    linked/installed source and desired-state authentication, managed-cache
+    baseline selection, in-memory catalog/sprite snapshots, and claim retention
+    through lazy consumption were committed as
+    `4f19983b4d1fe10dd3bebbd3b45d0a3f55cd73d1`.
+  - Linked-manifest security follow-up: manifest path components are checked for
+    symlinks, regular-file status, and canonical pack-root containment before
+    bytes are read; malicious sync and runtime activation are rejected before
+    activation. Commit:
+    `b763c4c0a4e74e1077e59e01fcb0300b317f8330`.
 
 Drive `runCli` through two fresh directories with injected compatible runtime/cache:
 
@@ -1890,7 +1911,9 @@ Landing shows `asset pack`, second-workspace `asset install`, and `asset doctor`
 
   - Result: the matrix below is final; help plus CLI/root/landing/architecture/
     engineering are updated, while release and plugin surfaces remain N/A for
-    the stated reasons.
+    the stated reasons. The linked-manifest containment follow-up is an internal
+    enforcement of the already documented source boundary and requires no
+    additional public, architecture, engineering, release, or plugin wording.
   - Verification: `rtk pnpm verify` PASS, including CLI documentation-policy
     tests (19 passed).
   - Commit: `13a3b016aa8757e057823f3467a587dde14680fd`
@@ -1918,6 +1941,13 @@ plugin: N/A — the audit skill stays read-only and asset-authoring skill design
     PASS (2 files, 3 tests).
   - Verification: `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS
     (`Packed CLI install smoke test passed.`).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- runtime-asset-pack-activation.test.ts`
+    PASS (1 file, 7 tests), including external linked-manifest symlink rejection
+    before runtime action execution.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-files.test.ts asset-pack-state.test.ts asset-pack-sync.test.ts runtime-asset-pack-activation.test.ts`
+    PASS (4 files, 67 tests), covering pre-read manifest checks, linked path
+    components, desired-state authentication, sync publication, and runtime
+    activation.
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-version.test.ts asset-pack-schema.test.ts asset-pack-compile.test.ts
@@ -1935,18 +1965,17 @@ Expected: PASS.
   - Verification: `rtk pnpm --filter @lpc-toolkit/core test` PASS (24 files,
     330 tests).
   - Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
-  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test` PASS (53 files,
-    981 passed, 1 intentional skip). The first full-suite run exposed one
-    shared 5-second timeout around six independent v1-drift scenarios; they
-    were split with `it.each` without raising or weakening the timeout, and the
-    focused sync suite then passed 37 tests.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test` PASS (54 files,
+    990 passed, 1 intentional skip). A sandbox-only run produced 13
+    `listen EPERM` failures in `web-server.test.ts`; the required permitted exact
+    rerun passed the complete suite.
   - Verification: `rtk pnpm --filter @lpc-toolkit/cli build` PASS.
   - Verification: `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS
     (`Packed CLI install smoke test passed.`).
   - Verification: `rtk pnpm --filter @lpc-toolkit/web test` PASS (78 files,
     698 tests).
-  - Verification: `rtk pnpm verify` PASS (boundaries, CLI docs policy, plugin,
-    all workspace typechecks, Core 330, Presets 3, Web 698, CLI 981 passed and
+  - Verification: `rtk pnpm verify` PASS (exit 0; boundaries, CLI docs policy, plugin,
+    all workspace typechecks, Core 330, Presets 3, Web 698, CLI 990 passed and
     1 intentional skip).
 
 ```sh
@@ -1967,11 +1996,13 @@ Expected: PASS. Fix implementation failures; do not weaken archive limits, attri
 
   - Verification: `rtk git status --short`, `rtk git diff --check`,
     `rtk git diff --stat`, and the scoped `rtk git diff` inspection PASS.
-    The pre-record implementation range contains only 11 Task 13 files,
-    including the minimal sync-test integration split and runtime activation
-    fix; this checked-in plan is the twelfth tracked file in the final range.
-    There are no dependency/lockfile, `any` type, `upstream/`, checked-in
-    asset/cache, release, generated workspace, or archive-fixture changes.
+    The implementation range
+    `3caefcb39668936c4165950850be0e0da960b2c0..b763c4c0a4e74e1077e59e01fcb0300b317f8330`
+    contains the 27 Task 13 paths summarized above. The expanded runtime and
+    security paths are traceable to authenticated generation activation and
+    linked-manifest containment. There are no dependency/lockfile, `any` type,
+    `upstream/`, checked-in asset/cache, release/plugin, generated workspace,
+    archive-fixture, Phase 3, remote, push, or PR changes.
 
 ```sh
 rtk git status --short
@@ -1988,8 +2019,19 @@ Expected: only planned files and plan records; no `upstream/`, checked-in assets
     `a874b2418423323a7f4c3267b2b43d0c8bc5da52`.
   - Acceptance/documentation commit:
     `13a3b016aa8757e057823f3467a587dde14680fd`.
-  - Verification: `rtk git diff --check 3caefcb39668936c4165950850be0e0da960b2c0..HEAD`
-    PASS and the product tree was clean before this plan-record update.
+  - Prior verification-record commit:
+    `3c73268d3b9abb58c97955149814f4f345b7c510`.
+  - Runtime-generation authentication commit:
+    `4f19983b4d1fe10dd3bebbd3b45d0a3f55cd73d1`.
+  - Linked-manifest containment commit:
+    `b763c4c0a4e74e1077e59e01fcb0300b317f8330`.
+  - Verification: `rtk git diff --check 3caefcb39668936c4165950850be0e0da960b2c0..b763c4c0a4e74e1077e59e01fcb0300b317f8330`
+    PASS; focused manifest/runtime tests and CLI typecheck passed again after
+    the permitted exact Step 7/8 runs, and the product tree was clean before
+    this plan-record update.
+  - Review status: the latest independent review requested the two findings
+    addressed by `b763c4c0a4e74e1077e59e01fcb0300b317f8330` and this record;
+    no subsequent independent approval is claimed here.
 
 ```sh
 rtk git add packages/cli/test/asset-lifecycle-e2e.test.ts packages/cli/scripts/smoke-packed-cli.mjs packages/cli/README.md README.md packages/web/src/components/landing-page.tsx packages/web/test/landing-page.test.tsx docs/ARCHITECTURE.md docs/ENGINEERING.md
