@@ -10,10 +10,13 @@ import {
   type SelectionJson,
 } from '@lpc-toolkit/core';
 import { AssetStoreError } from './asset-store.js';
-import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
 import { createNodeCanvasAdapter } from './node-canvas-adapter.js';
 import type { CliIssue } from './response.js';
-import type { RuntimeAssets } from './runtime-assets.js';
+import {
+  loadRuntimeCatalog,
+  loadRuntimePalettes,
+  type RuntimeAssets,
+} from './runtime-assets.js';
 import { validateSelections } from './validation.js';
 
 export interface ComposeSelectionOptions {
@@ -44,11 +47,8 @@ export class SelectionOutputError extends Error {
 export async function composeSelectionForOutput(
   options: ComposeSelectionOptions,
 ): Promise<ComposedSelectionOutput> {
-  const catalog = loadCatalogFromRoots(
-    options.runtime.context.sheetDefinitionsRoot,
-    options.runtime.context.customSheetDefinitionsRoot,
-  );
-  const palettes = loadPalettesFromRoot(options.runtime.context.paletteDefinitionsRoot);
+  const catalog = loadRuntimeCatalog(options.runtime);
+  const palettes = loadRuntimePalettes(options.runtime);
   const parsed = parseSelectionJson(options.selectionJson);
   const validation = validateSelections(parsed.selections, {
     catalog: catalog.catalog,

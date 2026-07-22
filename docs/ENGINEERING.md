@@ -140,6 +140,15 @@ state, crash recovery, install policy, cleanup, and doctor non-repair behavior:
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-payload.test.ts asset-pack-archive-format.test.ts asset-pack-packaging.test.ts asset-pack-inspection.test.ts asset-pack-registry.test.ts asset-pack-state.test.ts asset-pack-transaction.test.ts asset-pack-install.test.ts asset-pack-remove.test.ts asset-pack-doctor.test.ts
 ```
 
+Runtime activation has its own integrity boundary. This focused suite proves
+linked and installed tamper rejection, v1 refusal, managed-cache baseline
+selection, immutable definition/sprite snapshots, and claim retention through
+lazy consumption:
+
+```sh
+rtk pnpm --filter @lpc-toolkit/cli test -- runtime-asset-pack-activation.test.ts
+```
+
 The two-workspace acceptance drives the public CLI from clean author and
 consumer directories with an injected compatible base cache. It proves
 scaffold/validate/preview/sync/pack, inspect/install/list, installed catalog and

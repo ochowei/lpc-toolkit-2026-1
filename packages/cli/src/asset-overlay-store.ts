@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import {
+  AssetStoreError,
   createDirectoryAssetStore,
   type AssetImageSource,
   type AssetStore,
@@ -10,6 +11,7 @@ export interface OverlayAssetStoreOptions {
   readonly base: AssetStore;
   readonly overlayRoot: string;
   readonly logicalPaths: readonly string[];
+  readonly fileSnapshot?: ReadonlyMap<string, Buffer>;
 }
 
 export function createOverlayAssetStore(
@@ -18,6 +20,13 @@ export function createOverlayAssetStore(
   const overlayRoot = path.resolve(options.overlayRoot);
   const authorizedLogicalPaths = new Set(options.logicalPaths);
   const overlayDirectory = createDirectoryAssetStore(overlayRoot);
+  const fileSnapshot = options.fileSnapshot === undefined
+    ? undefined
+    : new Map(
+      [...options.fileSnapshot.entries()]
+        .filter(([logicalPath]) => authorizedLogicalPaths.has(logicalPath))
+        .map(([logicalPath, bytes]) => [logicalPath, Buffer.from(bytes)] as const),
+    );
 
   const overlayPathFor = (logicalPath: string): string =>
     path.join(overlayRoot, logicalPath);
@@ -55,6 +64,9 @@ export function createOverlayAssetStore(
       return options.base.logicalPath(sourcePath);
     },
     has(logicalPath) {
+      if (fileSnapshot !== undefined && authorizedLogicalPaths.has(logicalPath)) {
+        return fileSnapshot.has(logicalPath);
+      }
       if (validAuthorizedOverlayPathFor(logicalPath) !== undefined) {
         return true;
       }
@@ -64,6 +76,17 @@ export function createOverlayAssetStore(
     async load(sourcePath): Promise<AssetImageSource> {
       const logicalPath = options.base.logicalPath(sourcePath);
       if (logicalPath !== undefined) {
+        if (fileSnapshot !== undefined && authorizedLogicalPaths.has(logicalPath)) {
+          const bytes = fileSnapshot.get(logicalPath);
+          if (bytes === undefined) {
+            throw new AssetStoreError(
+              'asset_image_missing',
+              `Captured overlay asset is missing: ${logicalPath}`,
+              logicalPath,
+            );
+          }
+          return Buffer.from(bytes);
+        }
         const overlayPath = existingAuthorizedOverlayPathFor(logicalPath);
         if (overlayPath !== undefined) return overlayDirectory.load(overlayPath);
       }

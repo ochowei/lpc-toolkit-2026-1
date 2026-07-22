@@ -30,7 +30,6 @@ import {
   runCharacterCommand,
 } from './character-commands.js';
 import { helpForCommand, validateCommandOptions } from './command-spec.js';
-import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
 import { materializePreset, runPresetCommand } from './preset-commands.js';
 import { CLI_VERSION } from './package-info.js';
 import { renderSelection } from './render.js';
@@ -44,9 +43,12 @@ import {
   type CliResponse,
 } from './response.js';
 import {
-  activateWorkspaceRuntimeAssets,
   AssetWorkspaceRuntimeError,
+  findRuntimeAssetWorkspace,
+  loadRuntimeCatalog,
+  loadRuntimePalettes,
   prepareRuntimeAssets,
+  withWorkspaceRuntimeAssets,
   type RuntimeAssets,
 } from './runtime-assets.js';
 import { runSelectionCommand } from './selection-commands.js';
@@ -317,6 +319,15 @@ export async function runCli(
   io: CliIo,
   dependencies: Partial<CliDependencies> = {},
 ): Promise<number> {
+  return runCliWithRuntime(argv, io, dependencies);
+}
+
+async function runCliWithRuntime(
+  argv: readonly string[],
+  io: CliIo,
+  dependencies: Partial<CliDependencies>,
+  activeRuntime?: RuntimeAssets,
+): Promise<number> {
   const resolvedDependencies: CliDependencies = { ...DEFAULT_DEPENDENCIES, ...dependencies };
   if (argv.length === 0 || argv[0] === '--help' || argv[0] === '-h') {
     io.stdout(helpForCommand([]));
@@ -465,18 +476,28 @@ export async function runCli(
     return writeResponse(response, parsed, io, 'Asset command completed.\n');
   }
 
-  let runtime: RuntimeAssets | undefined;
-  if (commandNeedsAssets(parsed)) {
+  let runtime: RuntimeAssets | undefined = activeRuntime;
+  if (runtime === undefined && commandNeedsAssets(parsed)) {
     try {
+      const workspace = findRuntimeAssetWorkspace(io.cwd);
       const preparedRuntime = await resolvedDependencies.prepareRuntimeAssets({
         cwd: io.cwd,
-        ...(parsed.command[0] === 'web' ? { managedCacheOnly: true } : {}),
+        ...(parsed.command[0] === 'web' || workspace !== undefined
+          ? { managedCacheOnly: true }
+          : {}),
         onProgress: (progress) =>
           io.stderr(formatProgress(progress.phase, progress.message)),
       });
-      runtime = activateWorkspaceRuntimeAssets({
+      return await withWorkspaceRuntimeAssets({
         runtime: preparedRuntime,
         cwd: io.cwd,
+        ...(workspace === undefined ? {} : { workspace }),
+        action: (workspaceRuntime) => runCliWithRuntime(
+          argv,
+          io,
+          resolvedDependencies,
+          workspaceRuntime,
+        ),
       });
     } catch (error) {
       return writeResponse(
@@ -631,12 +652,8 @@ export async function runCli(
     }
 
     try {
-      const context = runtime!.context;
-      const catalog = loadCatalogFromRoots(
-        context.sheetDefinitionsRoot,
-        context.customSheetDefinitionsRoot,
-      );
-      const palettes = loadPalettesFromRoot(context.paletteDefinitionsRoot);
+      const catalog = loadRuntimeCatalog(runtime!);
+      const palettes = loadRuntimePalettes(runtime!);
       const selectionJson = materializePreset(presetId, {
         catalog: catalog.catalog,
         palettes: palettes.palettes,

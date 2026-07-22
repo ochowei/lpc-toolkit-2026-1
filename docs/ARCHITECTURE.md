@@ -365,11 +365,17 @@ do not replace a valid release.
 
 `prepareRuntimeAssets` selects assets in this order:
 
-1. A complete working-directory `assets/` tree takes precedence.
+1. Outside an artist workspace, a complete working-directory `assets/` tree
+   takes precedence.
 2. Otherwise, the verified platform cache for the pinned release is created or
    reused.
 3. The working-directory `assets_custom/` tree overlays custom definitions and
    sprites without replacing the base asset source.
+
+Asset-dependent runtime commands discovered inside an initialized artist
+workspace are the deliberate exception: they always prepare the verified
+managed cache used by lifecycle compilation, never a coincidental local
+`assets/` tree.
 
 Verified cache reuse requires no network access. Offline first use, a missing
 release, checksum failure, corrupt archive, or incomplete cache produces a
@@ -542,13 +548,18 @@ are read-only: the only allowed mutation is deterministic rollback/completion
 of a valid manager journal. Doctor never adopts, repairs, or deletes unknown
 content.
 
-At runtime, the authenticated registry authorizes the generated definition and
-sprite logical paths passed to the existing overlay adapter. Catalog audit,
-character preview, render, frame, viewer, bundle, metadata, TXT, and CSV paths
-therefore consume installed and linked output without allowing arbitrary
-`assets_custom/` shadowing. Composition still freezes one credit manifest;
-extension credits union inherited base credits with the pack contribution, and
-all publication formats preserve that complete attribution.
+At runtime, only registry v2 is activatable; v1 remains readable by lifecycle
+manager commands solely so their next successful publication can migrate it.
+Activation holds the exclusive lifecycle claim while it revalidates linked and
+installed sources, receipts, generated output, and the freshly compiled desired
+state over the managed-cache baseline. It then captures generated definition,
+palette, and sprite data in memory, and the claim remains held until the command
+finishes consuming that snapshot. Catalog audit, character preview, render,
+frame, viewer, bundle, metadata, TXT, and CSV paths therefore cannot mix
+generations or allow arbitrary `assets_custom/` shadowing. Composition still
+freezes one credit manifest; extension credits union inherited base credits
+with the pack contribution, and all publication formats preserve that complete
+attribution.
 
 Browser upload, validation/editing, acknowledgement UI, temporary browser
 overlays, and pack download remain deferred to Phase 3. The Web must reuse the

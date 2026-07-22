@@ -162,7 +162,7 @@ function createPreparedRuntime(root: string, workspaceRoot: string): RuntimeAsse
       spritesheetsBaseUrl: store.baseUrl,
     }),
     store,
-    source: 'working-directory',
+    source: 'managed-cache',
   };
 }
 

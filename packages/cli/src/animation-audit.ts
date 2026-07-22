@@ -18,10 +18,13 @@ import {
 import { flagString, flagStrings, type ParsedArgs } from './args.js';
 import { AssetStoreError, type AssetStore } from './asset-store.js';
 import { editDistance } from './catalog-discovery.js';
-import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
 import { createNodeCanvasAdapter } from './node-canvas-adapter.js';
 import { commandError, commandOk, type CliIssue, type CliResponse } from './response.js';
-import type { RuntimeAssets } from './runtime-assets.js';
+import {
+  loadRuntimeCatalog,
+  loadRuntimePalettes,
+  type RuntimeAssets,
+} from './runtime-assets.js';
 
 type Direction = NonNullable<AnimationAuditGeometry['rows'][number]['direction']>;
 
@@ -156,11 +159,8 @@ export async function runAnimationAuditCommand(
     const targets = flagStrings(parsed.flags, 'animation');
     const typeName = flagString(parsed.flags, 'type');
     const bodyType = flagString(parsed.flags, 'body-type');
-    const loaded = loadCatalogFromRoots(
-      runtime.context.sheetDefinitionsRoot,
-      runtime.context.customSheetDefinitionsRoot,
-    );
-    const palettes = loadPalettesFromRoot(runtime.context.paletteDefinitionsRoot);
+    const loaded = loadRuntimeCatalog(runtime);
+    const palettes = loadRuntimePalettes(runtime);
     const warnings = [...loaded.warnings, ...palettes.warnings];
     const issue = auditInputIssue(loaded.catalog, {
       targets,

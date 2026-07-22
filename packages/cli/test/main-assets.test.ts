@@ -519,6 +519,31 @@ describe('asset preparation dispatch', () => {
     expect(prepare).toHaveBeenCalledTimes(1);
   });
 
+  it('discovers an enclosing asset workspace before choosing a local assets baseline', async () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'lpc-main-workspace-runtime-'));
+    initializeAssetWorkspace(root);
+    const localAssetsRoot = path.join(root, 'assets');
+    mkdirSync(path.join(localAssetsRoot, 'sheet_definitions'), { recursive: true });
+    mkdirSync(path.join(localAssetsRoot, 'palette_definitions'), { recursive: true });
+    mkdirSync(path.join(localAssetsRoot, 'spritesheets'), { recursive: true });
+    writeFileSync(path.join(localAssetsRoot, 'CREDITS.csv'), 'local baseline\n');
+    const managedRuntime: RuntimeAssets = {
+      ...runtime,
+      source: 'managed-cache',
+      releaseTag: 'fixture-pinned-release',
+    };
+    const prepare = vi.fn(async (_options: PrepareRuntimeAssetsOptions) => managedRuntime);
+    const capture = captureIo(root);
+
+    expect(await runCli(['catalog', 'types', '--json'], capture.io, {
+      prepareRuntimeAssets: prepare,
+    })).toBe(0);
+    expect(prepare).toHaveBeenCalledWith(expect.objectContaining({
+      cwd: root,
+      managedCacheOnly: true,
+    }));
+  });
+
   it('does not prepare assets for help', async () => {
     const prepare = vi.fn(async (_options: PrepareRuntimeAssetsOptions) => runtime);
     const capture = captureIo(runtime.context.repoRoot);

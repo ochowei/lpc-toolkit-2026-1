@@ -126,11 +126,13 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
   {
     command: ['asset'],
     usage: 'lpc-toolkit asset <command>',
-    description: 'Create, validate, preview, and synchronize local artist asset packs.',
+    description: 'Author, package, install, inspect, and diagnose attributed artist asset packs.',
     options: [HELP_OPTION],
     examples: [
       'lpc-toolkit asset workspace init ./my-lpc-art',
       'lpc-toolkit asset validate ./artist-packs/acme.hair',
+      'lpc-toolkit asset install ./dist/acme.hair-1.0.0.lpc-assets.zip',
+      'lpc-toolkit asset doctor --json',
     ],
   },
   {

@@ -293,8 +293,9 @@ The registry schema is `lpc-toolkit.asset-workspace-registry.v2`. It stores a
 sorted union of linked and installed sources plus source/output digests,
 authorized logical destinations, generated sprite ownership and credits, and a
 compile digest. A valid Phase 1 v1 registry is read and enriched from freshly
-validated linked sources; the next successful publication writes only v2.
-Phase 2 never downgrades v2 state.
+validated linked sources by lifecycle manager commands; the next successful
+publication writes only v2. Runtime catalog, preview, and render commands refuse
+v1 activation until that migration occurs. Phase 2 never downgrades v2 state.
 
 Publication uses journal schema `lpc-toolkit.asset-pack-transaction.v1` with
 phases `prepared`, `output-published`, `sources-published`, and
@@ -312,11 +313,15 @@ registry/output, fills missing credits, or deletes unknown installed/staging
 content.
 
 Installed manager output is activated through the same authorized overlay as
-linked output. Catalog audit, character preview, and render therefore see the
-installed definitions and sprites while arbitrary files in `assets_custom/`
-cannot shadow the base. Preview/render metadata and TXT/CSV credits come from
-one frozen composed credit manifest, retaining both inherited base credits and
-pack contributions through install, upgrade, and removal.
+linked output. Activation holds the lifecycle claim while it strictly verifies
+registry v2, linked/installed source identity, receipts, generated output, and
+the freshly compiled desired state. Definitions, palettes, and generated sprite
+bytes are then consumed from one in-memory generation snapshot for the complete
+command. Catalog audit, character preview, and render therefore cannot mix a
+concurrent publication or arbitrary files from `assets_custom/`. Preview/render
+metadata and TXT/CSV credits come from one frozen composed credit manifest,
+retaining both inherited base credits and pack contributions through install,
+upgrade, and removal.
 
 Browser upload, Web validation/editing, acknowledgement UI, temporary browser
 overlays, and corrected-pack download remain deferred to Phase 3; the current
@@ -562,6 +567,10 @@ The current working directory controls local asset discovery:
   checked whether the base comes from `./assets` or the cache.
 - An incomplete `./assets` tree is not mixed into the managed base; the CLI uses
   the verified cache instead.
+- When the command runs inside an initialized artist workspace, the verified
+  managed cache is always the compilation/runtime base. A complete local
+  `./assets` tree is not combined with registry-owned output, and only the
+  authenticated workspace generation may supply custom definitions or sprites.
 
 Run from the directory containing those folders when using local or custom
 assets.

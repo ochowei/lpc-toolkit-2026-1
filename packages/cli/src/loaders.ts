@@ -123,9 +123,12 @@ function filterLoadableCatalogRecords(
 export function loadCatalogFromRoots(
   sheetDefinitionsRoot: string,
   customSheetDefinitionsRoot: string,
+  customRecordSnapshot?: Readonly<Record<string, unknown>>,
 ): { readonly catalog: Catalog; readonly warnings: readonly CliIssue[] } {
   const base = loadJsonRecords(sheetDefinitionsRoot);
-  const custom = loadJsonRecords(customSheetDefinitionsRoot);
+  const custom = customRecordSnapshot === undefined
+    ? loadJsonRecords(customSheetDefinitionsRoot)
+    : { records: { ...customRecordSnapshot }, warnings: [] };
   const baseRecords = filterCatalogRecords(base.records);
   const customRecords = filterCatalogRecords(custom.records);
   const records = {

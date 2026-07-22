@@ -119,6 +119,9 @@ describe('helpForCommand', () => {
 
   it('renders the complete Phase 2 asset command tree', () => {
     const rootHelp = helpForCommand(['asset']);
+    expect(rootHelp).toContain(
+      'Author, package, install, inspect, and diagnose attributed artist asset packs.',
+    );
     expect(rootHelp).toContain('lpc-toolkit asset workspace <command>');
     expect(rootHelp).toContain('lpc-toolkit asset init');
     expect(rootHelp).toContain('lpc-toolkit asset validate');
@@ -130,6 +133,13 @@ describe('helpForCommand', () => {
     expect(rootHelp).toContain('lpc-toolkit asset list');
     expect(rootHelp).toContain('lpc-toolkit asset remove');
     expect(rootHelp).toContain('lpc-toolkit asset doctor');
+    expect(rootHelp).toContain(
+      'lpc-toolkit asset install ./dist/acme.hair-1.0.0.lpc-assets.zip',
+    );
+    expect(rootHelp).toContain('lpc-toolkit asset doctor --json');
+    expect(rootHelp).not.toContain(
+      'Create, validate, preview, and synchronize local artist asset packs.',
+    );
 
     const workspaceHelp = helpForCommand(['asset', 'workspace']);
     expect(workspaceHelp).toContain(

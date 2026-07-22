@@ -226,7 +226,10 @@ The CLI performs first-time asset preparation from a pinned release download,
 verifies checksums, and stores a platform cache. Later commands rely on
 verified cache reuse. A valid offline cache needs no network; a missing or invalid
 offline cache fails with recovery guidance. A complete working-directory
-`assets/` tree takes precedence, with `assets_custom/` applied as an overlay.
+`assets/` tree takes precedence outside an artist workspace, with
+`assets_custom/` applied as an overlay. Inside an initialized artist workspace,
+asset-dependent commands use the same verified managed-cache baseline as
+lifecycle compilation and activate only an authenticated registry v2 generation.
 
 CLI rendering writes the composed sheet with required metadata and credit
 files, plus optional animation strips, frames, and ZIP bundles. Node-specific
