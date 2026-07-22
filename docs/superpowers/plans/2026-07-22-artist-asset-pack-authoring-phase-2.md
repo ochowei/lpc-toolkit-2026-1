@@ -521,7 +521,7 @@ landing: update
 architecture: update
 engineering: update
 releasing: N/A — no npm publication, CLI versioning, or pinned base-asset release procedure changes
-plugin: N/A — the animation-audit skill remains read-only and no asset-authoring skill is added
+plugin: N/A — the audit skill stays read-only and asset-authoring skill design remains separate
 ```
 
 The implementation pull request must declare:
@@ -1804,7 +1804,21 @@ CLI documentation impact: `help` updated in this task; `cli-readme` and `root-re
 - Consumes: the complete Phase 1+2 public CLI.
 - Produces: clean installed-package acceptance, updated public/engineering contracts, and final verification evidence.
 
-- [ ] **Step 1: Write the clean two-workspace E2E before documentation**
+- [x] **Step 1: Write the clean two-workspace E2E before documentation**
+
+  - Implementation: added the clean author/consumer lifecycle E2E and activated
+    authenticated linked/installed manager output for non-lifecycle runtime
+    commands. The test covers scaffold, complete animation PNGs, validate,
+    preview, sync, deterministic pack, inspect/install/list, catalog audit,
+    attributed preview/render, upgrade, stable selection identity, remove,
+    retained extension credits, doctor, two-workspace write containment, and an
+    untouched injected-cache sentinel.
+  - RED: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-lifecycle-e2e.test.ts`
+    FAIL (1 failed; installed catalog audit reported 2 incomplete items and 2
+    missing files before runtime activation).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-lifecycle-e2e.test.ts`
+    PASS (1 file, 1 test).
+  - Commit: `a874b2418423323a7f4c3267b2b43d0c8bc5da52`
 
 Drive `runCli` through two fresh directories with injected compatible runtime/cache:
 
@@ -1815,11 +1829,28 @@ workspace B: init -> inspect both -> install both -> list -> render selection wi
 
 Re-run the same-scope animation audit after install and removal to prove the intended extension appears/disappears through catalog behavior. Assert every write is below the two workspaces except the injected base cache and no write touches its sentinel.
 
-- [ ] **Step 2: Extend packed-public-CLI smoke**
+- [x] **Step 2: Extend packed-public-CLI smoke**
+
+  - Implementation: extended the npm-tarball smoke to author and validate a
+    minimal attributed pack, pack it, initialize a second workspace, inspect,
+    install, list, preview/render with TXT/CSV credits, doctor, and remove using
+    only the installed CLI and prepared pinned cache. It asserts no repository,
+    `upstream/`, local base-assets tree, or cache-sentinel mutation.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS
+    (`Packed CLI install smoke test passed.`).
+  - Commit: `13a3b016aa8757e057823f3467a587dde14680fd`
 
 Using the npm tarball installation and an isolated consumer directory, run workspace init, create a minimal attributed pack fixture, validate, pack, initialize a second workspace, inspect, install, list, render/preview installed content with TXT/CSV credits, doctor, and remove. Reuse the prepared pinned cache; require no repository checkout or initialized `upstream/`.
 
-- [ ] **Step 3: Run acceptance/package tests and verify behavior before docs**
+- [x] **Step 3: Run acceptance/package tests and verify behavior before docs**
+
+  - Pre-doc verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-lifecycle-e2e.test.ts`
+    PASS (1 file, 1 test); `rtk pnpm --filter @lpc-toolkit/cli test:package`
+    PASS; `rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx`
+    RED (1 failed, 1 passed) on the old Phase 2 deferral contract.
+  - Post-doc verification: `rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx`
+    PASS (1 file, 2 tests).
+  - Commit: `13a3b016aa8757e057823f3467a587dde14680fd`
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-lifecycle-e2e.test.ts
@@ -1829,17 +1860,40 @@ rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx
 
 Expected before landing copy is updated: lifecycle E2E and package smoke PASS; landing test FAIL on the old Phase 2 deferral text.
 
-- [ ] **Step 4: Update CLI and root public workflows**
+- [x] **Step 4: Update CLI and root public workflows**
+
+  - Implementation: documented the full author/consumer command order,
+    options/defaults/reports/exits, deterministic archive/checksum contract,
+    exact security limits, compatibility, lifecycle policy, v2 registry,
+    installed ownership, journal recovery, doctor exception, and frozen
+    base-plus-pack attribution. Phase 3 Web authoring remains deferred.
+  - Verification: `rtk pnpm verify` PASS.
+  - Commit: `13a3b016aa8757e057823f3467a587dde14680fd`
 
 Document every command/options/default path/report/exit code, normalized archive/checksum schema, exact limits, unsupported archive features, compatibility fields, install/no-op/upgrade/downgrade policy, linked conflict, registry v2 migration, installed ownership, journal recovery, doctor mutation exception, and attribution retention.
 
 Root README must show author and consumer commands in order and state that Git/repository clone is optional. Remove only the Phase 2 deferral; retain the Phase 3 Web authoring deferral.
 
-- [ ] **Step 5: Update landing, architecture, and engineering**
+- [x] **Step 5: Update landing, architecture, and engineering**
+
+  - Implementation: landing now shows pack, second-workspace install, and
+    doctor; architecture records the archive/payload/registry/compiler/journal
+    trust boundaries and attribution flow; engineering maps focused and full
+    lifecycle verification. Browser pack authoring is still Phase 3.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifacts.test.ts`
+    PASS (2 files, 3 tests); `rtk pnpm check:boundaries` PASS.
+  - Commit: `13a3b016aa8757e057823f3467a587dde14680fd`
 
 Landing shows `asset pack`, second-workspace `asset install`, and `asset doctor` without implying browser authoring. Architecture records archive trust boundaries, payload snapshot, registry v2, linked/installed source union, lifecycle policy, desired-state compiler, journal phases/recovery, installed cleanup, and credit flow. Engineering maps all focused security/lifecycle tests, package smoke, E2E, boundary gate, and complete verification.
 
-- [ ] **Step 6: Reassess the mandatory CLI documentation matrix**
+- [x] **Step 6: Reassess the mandatory CLI documentation matrix**
+
+  - Result: the matrix below is final; help plus CLI/root/landing/architecture/
+    engineering are updated, while release and plugin surfaces remain N/A for
+    the stated reasons.
+  - Verification: `rtk pnpm verify` PASS, including CLI documentation-policy
+    tests (19 passed).
+  - Commit: `13a3b016aa8757e057823f3467a587dde14680fd`
 
 Expected final result:
 
@@ -1854,7 +1908,16 @@ releasing: N/A — no npm publication, CLI versioning, or pinned base-asset rele
 plugin: N/A — the audit skill stays read-only and asset-authoring skill design remains separate
 ```
 
-- [ ] **Step 7: Run focused security, lifecycle, docs, and package checks**
+- [x] **Step 7: Run focused security, lifecycle, docs, and package checks**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-version.test.ts asset-pack-schema.test.ts asset-pack-compile.test.ts`
+    PASS (3 files, 66 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-payload.test.ts asset-pack-archive-format.test.ts asset-pack-packaging.test.ts asset-pack-inspection.test.ts asset-pack-registry.test.ts asset-pack-state.test.ts asset-pack-transaction.test.ts asset-pack-install.test.ts asset-pack-remove.test.ts asset-pack-doctor.test.ts asset-lifecycle-e2e.test.ts`
+    PASS (11 files, 295 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifacts.test.ts`
+    PASS (2 files, 3 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS
+    (`Packed CLI install smoke test passed.`).
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-version.test.ts asset-pack-schema.test.ts asset-pack-compile.test.ts
@@ -1865,7 +1928,26 @@ rtk pnpm --filter @lpc-toolkit/cli test:package
 
 Expected: PASS.
 
-- [ ] **Step 8: Run full repository verification**
+- [x] **Step 8: Run full repository verification**
+
+  - Verification: `rtk pnpm check:boundaries` PASS.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core test` PASS (24 files,
+    330 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test` PASS (53 files,
+    981 passed, 1 intentional skip). The first full-suite run exposed one
+    shared 5-second timeout around six independent v1-drift scenarios; they
+    were split with `it.each` without raising or weakening the timeout, and the
+    focused sync suite then passed 37 tests.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli build` PASS.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS
+    (`Packed CLI install smoke test passed.`).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web test` PASS (78 files,
+    698 tests).
+  - Verification: `rtk pnpm verify` PASS (boundaries, CLI docs policy, plugin,
+    all workspace typechecks, Core 330, Presets 3, Web 698, CLI 981 passed and
+    1 intentional skip).
 
 ```sh
 rtk pnpm check:boundaries
@@ -1881,7 +1963,15 @@ rtk pnpm verify
 
 Expected: PASS. Fix implementation failures; do not weaken archive limits, attribution, architecture boundaries, or verification gates.
 
-- [ ] **Step 9: Inspect final scope and manager-owned boundaries**
+- [x] **Step 9: Inspect final scope and manager-owned boundaries**
+
+  - Verification: `rtk git status --short`, `rtk git diff --check`,
+    `rtk git diff --stat`, and the scoped `rtk git diff` inspection PASS.
+    The pre-record implementation range contains only 11 Task 13 files,
+    including the minimal sync-test integration split and runtime activation
+    fix; this checked-in plan is the twelfth tracked file in the final range.
+    There are no dependency/lockfile, `any` type, `upstream/`, checked-in
+    asset/cache, release, generated workspace, or archive-fixture changes.
 
 ```sh
 rtk git status --short
@@ -1892,7 +1982,14 @@ rtk git diff -- packages/core packages/cli README.md packages/web/src/components
 
 Expected: only planned files and plan records; no `upstream/`, checked-in assets, cache, generated test workspace, archive fixture, lockfile, dependency, or unrelated change.
 
-- [ ] **Step 10: Commit acceptance and documentation**
+- [x] **Step 10: Commit acceptance and documentation**
+
+  - Product/runtime E2E fix commit:
+    `a874b2418423323a7f4c3267b2b43d0c8bc5da52`.
+  - Acceptance/documentation commit:
+    `13a3b016aa8757e057823f3467a587dde14680fd`.
+  - Verification: `rtk git diff --check 3caefcb39668936c4165950850be0e0da960b2c0..HEAD`
+    PASS and the product tree was clean before this plan-record update.
 
 ```sh
 rtk git add packages/cli/test/asset-lifecycle-e2e.test.ts packages/cli/scripts/smoke-packed-cli.mjs packages/cli/README.md README.md packages/web/src/components/landing-page.tsx packages/web/test/landing-page.test.tsx docs/ARCHITECTURE.md docs/ENGINEERING.md
