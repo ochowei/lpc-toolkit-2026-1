@@ -1484,7 +1484,9 @@ Then update this task's plan record and commit it separately.
 - Consumes: transaction recovery, registry v2, desired-state remove mutation, and journaled publisher.
 - Produces: `listAssetPacks`, `removeAssetPack`, and result summaries for Task 12.
 
-- [ ] **Step 1: Write failing list tests**
+- [x] **Step 1: Write failing list tests**
+
+  - Implementation: Added synchronous empty/linked/installed/mixed list projections, stable ordering, recovery actions, strict registry failures, and claimed snapshot concurrency coverage.
 
 Cover empty, linked, installed, and mixed registries; stable pack-ID order; source-kind-specific path; version/display name/content/archive digest; pending transaction recovery action; strict registry failure; and no base-runtime preparation requirement.
 
@@ -1508,15 +1510,21 @@ export type AssetPackListResult =
   | { readonly ok: false; readonly diagnostics: readonly AssetPackLifecycleDiagnostic[] };
 ```
 
-- [ ] **Step 2: Write failing linked-removal tests**
+- [x] **Step 2: Write failing linked-removal tests**
+
+  - Implementation: Added mixed linked removal, complete retained-state recompilation/credits, artist-source immutability, repeated removal, and true conflict byte-for-byte no-mutation coverage.
 
 Remove a linked pack from a mixed registry and assert its generated output disappears, remaining output/credits compile, artist source remains byte-identical, repeated removal returns `asset_pack_not_installed`, and conflicts in the remaining desired state prevent all mutation.
 
-- [ ] **Step 3: Write failing installed-removal tests**
+- [x] **Step 3: Write failing installed-removal tests**
+
+  - Implementation: Added mixed installed removal, registry-publication/cleanup boundary checks, rollback preservation, near-name/same-parent sibling protection, final marker-only output, and base/cache/upstream sentinels.
 
 Assert the target installed source persists through staging and registry publication, is deleted only during completed cleanup, rolls back intact before registry publication, other installed directories remain, removing the final pack leaves exactly the manager marker plus empty v2 registry/generated digests, and base/cache/upstream sentinels remain unchanged.
 
-- [ ] **Step 4: Run the focused test and verify RED**
+- [x] **Step 4: Run the focused test and verify RED**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-remove.test.ts` — RED before implementation as expected because list/remove services did not exist.
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-remove.test.ts
@@ -1524,7 +1532,9 @@ rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-remove.test.ts
 
 Expected: FAIL because list/remove services do not exist.
 
-- [ ] **Step 5: Implement list and desired-state removal**
+- [x] **Step 5: Implement list and desired-state removal**
+
+  - Implementation: Implemented exact synchronous `listAssetPacks` under a claimed recovery/registry snapshot and journaled linked/installed removal with authenticated cleanup deltas.
 
 Both services recover a valid pending transaction first. List then reads only registry state. Remove requires runtime, validates the complete remaining desired state, materializes it, and calls journal publication with operation `remove`; cleanup includes only the removed installed entry's canonical manager-owned directory.
 
@@ -1542,7 +1552,9 @@ export type AssetPackRemoveResult =
   | { readonly ok: false; readonly diagnostics: readonly AssetPackLifecycleDiagnostic[] };
 ```
 
-- [ ] **Step 6: Verify GREEN**
+- [x] **Step 6: Verify GREEN**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-remove.test.ts asset-pack-state.test.ts asset-pack-transaction.test.ts` PASS (120 tests); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS; `rtk pnpm check:boundaries` PASS; diff and prohibited-`any` checks PASS.
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-remove.test.ts asset-pack-state.test.ts asset-pack-transaction.test.ts
@@ -1551,7 +1563,11 @@ rtk pnpm --filter @lpc-toolkit/cli run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit product code**
+- [x] **Step 7: Commit product code**
+
+  - Product/fix commits: `7384d437b6e495e3d56abd78915f7ac68189c7df`, `489c408650c2ba78d8a4207844d0d5e6c4c8b624`.
+  - Documentation impact: No Task 10 public command surface changed; the plan's public CLI documentation updates remain scheduled for Task 11 and final reassessment.
+  - Review: Final fresh reviewer APPROVED with no Critical, Important, or Minor findings in `.superpowers/sdd/task-10-review-final.md`.
 
 ```sh
 rtk git add packages/cli/src/asset-pack-remove.ts packages/cli/test/asset-pack-remove.test.ts
