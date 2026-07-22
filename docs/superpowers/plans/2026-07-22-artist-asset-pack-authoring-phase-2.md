@@ -1588,19 +1588,25 @@ Then update this task's plan record and commit it separately.
 - Consumes: transaction recovery, registry/output auditors, linked/installed payload loaders, desired-state compilation, and runtime attribution data.
 - Produces: `doctorAssetPacks` and stable health/recovery report for Task 12.
 
-- [ ] **Step 1: Write failing healthy and recovery tests**
+- [x] **Step 1: Write failing healthy and recovery tests**
 
 Assert an empty workspace, linked-only, installed-only, and mixed workspace are healthy. Seed every valid transaction phase and assert doctor reports `rolled-back` or `completed`, then audits the recovered state. Re-running reports `none` and makes no write.
 
-- [ ] **Step 2: Write failing registry/source/output audit tests**
+Implemented healthy empty, linked-only, installed-only, and mixed workspace coverage, all four valid recovery phases, and an idempotent zero-write rerun.
+
+- [x] **Step 2: Write failing registry/source/output audit tests**
 
 Cover marker/workspace mismatch, registry unknown field/digest tamper, linked source missing/content drift, installed directory escape/symlink/missing receipt/receipt drift/source drift, generated output missing/extra/digest drift, compile digest mismatch, ownership mismatch, replacement conflict, stale baseline, missing generated credit, and incomplete credit coverage.
 
-- [ ] **Step 3: Write failing non-repair tests**
+Implemented the complete registry, linked/installed source, generated output, compile, ownership, replacement, baseline, and attribution audit matrix.
+
+- [x] **Step 3: Write failing non-repair tests**
 
 For every tampered or unknown state, snapshot workspace bytes before/after doctor and assert equality. Doctor must not recreate output, rewrite registry, adopt an unregistered installed directory, delete orphan staging/installed content, or change artist source. A malformed/unsafe journal is reported and left untouched.
 
-- [ ] **Step 4: Run the focused test and verify RED**
+Implemented byte-for-byte non-repair assertions, live-claim observation, and malformed, unknown-key, unsafe-path, and unauthenticated-journal zero-write coverage.
+
+- [x] **Step 4: Run the focused test and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-doctor.test.ts
@@ -1608,7 +1614,9 @@ rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-doctor.test.ts
 
 Expected: FAIL because doctor does not exist.
 
-- [ ] **Step 5: Implement deterministic checks and report**
+Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-doctor.test.ts` FAIL before implementation because the doctor service did not exist. Later review regressions also failed before their corresponding snapshot fixes.
+
+- [x] **Step 5: Implement deterministic checks and report**
 
 ```ts
 export interface AssetPackDoctorCheck {
@@ -1630,7 +1638,9 @@ export interface AssetPackDoctorReport {
 
 Sort checks by status severity, code, pack ID, then path. `healthy` is false for any error; warnings do not fail health unless the warning represents an unacknowledged pack diagnostic, which desired-state validation already emits as an error.
 
-- [ ] **Step 6: Verify GREEN**
+Implemented the stable v1 report, deterministic severity/code/pack/path sorting, authoritative pre-claim recovery validation, serialized optimistic audits, and generation stamps covering registry, output, linked/installed sources, and the runtime definition/palette baseline. Content and identity checks cover ordinary files, symlink roots and entries, external targets, ABA changes, and cycles.
+
+- [x] **Step 6: Verify GREEN**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-doctor.test.ts asset-pack-registry.test.ts asset-pack-transaction.test.ts
@@ -1639,7 +1649,9 @@ rtk pnpm --filter @lpc-toolkit/cli run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit product code**
+Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-doctor.test.ts asset-pack-registry.test.ts asset-pack-transaction.test.ts` PASS (155/155); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS; `rtk pnpm check:boundaries` PASS; diff and prohibited-`any` checks PASS.
+
+- [x] **Step 7: Commit product code**
 
 ```sh
 rtk git add packages/cli/src/asset-pack-doctor.ts packages/cli/test/asset-pack-doctor.test.ts
@@ -1647,6 +1659,10 @@ rtk git commit -m "feat(cli): diagnose asset lifecycle integrity"
 ```
 
 Then update this task's plan record and commit it separately.
+
+Product commits: `2f6da1f94f91366aa2b32ea982ab51d6f6cbe73f`, `dad7e6d64dc1267c4aacd14d9b2f14943c1af259`, `5408f1359eca0ade9ad09efb9e5fe6fde66f9133`, `a51c4fe933f0a01a659752ced2bd224762972d9a`, `52ca0071b1d1cdc9f88610fa773fc6b2a0ffcec5`, and `026b42331e2cc5ad896892ddbad2aec6ce3b2d5f`. Final independent review: `.superpowers/sdd/task-11-review-final-5.md` APPROVED with no findings.
+
+CLI documentation impact: `help`, `cli-readme`, `root-readme`, `landing`, `architecture`, `engineering`, `releasing`, and `plugin` are N/A for this internal doctor service; Task 12 exposes and documents the public command surface.
 
 ---
 
