@@ -63,11 +63,21 @@ type ListedRegistryEntry = AssetPackRegistryEntry | LinkedAssetPackRegistryEntry
 interface GenerationStamp {
   readonly registryDigest: string;
   readonly outputDigest: string;
+  readonly sourceRolesDigest: string;
 }
 
 type GenerationStampResult =
   | { readonly status: 'idle'; readonly stamp: GenerationStamp }
   | { readonly status: 'busy' };
+
+type TransactionInspection =
+  | { readonly status: 'idle' }
+  | { readonly status: 'busy' }
+  | { readonly status: 'recoverable' }
+  | {
+    readonly status: 'unsafe';
+    readonly diagnostic: AssetPackLifecycleDiagnostic;
+  };
 
 type GenerationAudit = {
   readonly checks: readonly AssetPackDoctorCheck[];
@@ -123,6 +133,33 @@ function pathEntryExists(
   }
 }
 
+function pathEntryStats(
+  target: string,
+  stat: typeof lstatSync,
+): Stats | undefined {
+  try {
+    return stat(target);
+  } catch (error) {
+    if (
+      error instanceof Error
+      && 'code' in error
+      && (error.code === 'ENOENT' || error.code === 'ENOTDIR')
+    ) {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+function sameEntryIdentity(left: Stats, right: Stats): boolean {
+  return left.dev === right.dev
+    && left.ino === right.ino
+    && left.mode === right.mode
+    && left.size === right.size
+    && left.ctimeMs === right.ctimeMs
+    && left.birthtimeMs === right.birthtimeMs;
+}
+
 function transactionArtifactsPresent(
   workspace: AssetWorkspace,
   stat: typeof lstatSync,
@@ -152,7 +189,17 @@ function hashTree(options: {
         : stats.isSymbolicLink()
           ? 'symlink'
           : 'other';
-    hash.update(`${JSON.stringify([relativePath, kind])}\n`);
+    hash.update(`${JSON.stringify([
+      relativePath,
+      kind,
+      String(stats.dev),
+      String(stats.ino),
+      stats.mode,
+      stats.size,
+      stats.mtimeMs,
+      stats.ctimeMs,
+      stats.birthtimeMs,
+    ])}\n`);
     if (kind === 'directory') {
       let names: string[];
       try {
@@ -177,6 +224,81 @@ function hashTree(options: {
   return `sha256:${hash.digest('hex')}`;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function registrySourceRoles(options: {
+  readonly registryPath: string;
+  readonly readFile: typeof readFileSync;
+}): readonly {
+  readonly kind: 'linked' | 'installed';
+  readonly packId: string;
+  readonly sourceRoot: string;
+}[] {
+  try {
+    const bytes = options.readFile(options.registryPath);
+    const parsed = JSON.parse(
+      Buffer.isBuffer(bytes) ? bytes.toString('utf8') : bytes,
+    ) as unknown;
+    if (!isRecord(parsed) || !Array.isArray(parsed.entries)) return [];
+    const roles: Array<{
+      readonly kind: 'linked' | 'installed';
+      readonly packId: string;
+      readonly sourceRoot: string;
+    }> = [];
+    for (const entry of parsed.entries) {
+      if (!isRecord(entry) || typeof entry.packId !== 'string') continue;
+      if (entry.kind === 'linked' && typeof entry.sourceDirectory === 'string') {
+        roles.push({
+          kind: 'linked',
+          packId: entry.packId,
+          sourceRoot: path.resolve(entry.sourceDirectory),
+        });
+      } else if (
+        entry.kind === 'installed'
+        && typeof entry.installedDirectory === 'string'
+      ) {
+        roles.push({
+          kind: 'installed',
+          packId: entry.packId,
+          sourceRoot: path.resolve(entry.installedDirectory),
+        });
+      }
+    }
+    return roles.sort((left, right) =>
+      compareCodeUnits(left.kind, right.kind)
+        || compareCodeUnits(left.packId, right.packId)
+        || compareCodeUnits(left.sourceRoot, right.sourceRoot));
+  } catch {
+    return [];
+  }
+}
+
+function sourceRolesDigest(options: {
+  readonly workspace: AssetWorkspace;
+  readonly readFile: typeof readFileSync;
+  readonly stat: typeof lstatSync;
+}): string {
+  const hash = createHash('sha256');
+  for (const role of registrySourceRoles({
+    registryPath: options.workspace.registryPath,
+    readFile: options.readFile,
+  })) {
+    hash.update(`${JSON.stringify([
+      role.kind,
+      role.packId,
+      role.sourceRoot,
+      hashTree({
+        root: role.sourceRoot,
+        readFile: options.readFile,
+        stat: options.stat,
+      }),
+    ])}\n`);
+  }
+  return `sha256:${hash.digest('hex')}`;
+}
+
 function readGenerationStamp(options: {
   readonly workspace: AssetWorkspace;
   readonly fileOps?: AssetTransactionFileOps;
@@ -194,16 +316,137 @@ function readGenerationStamp(options: {
     readFile,
     stat,
   });
+  const sourceDigest = sourceRolesDigest({
+    workspace: options.workspace,
+    readFile,
+    stat,
+  });
   if (transactionArtifactsPresent(options.workspace, stat)) return { status: 'busy' };
   return {
     status: 'idle',
-    stamp: { registryDigest, outputDigest },
+    stamp: {
+      registryDigest,
+      outputDigest,
+      sourceRolesDigest: sourceDigest,
+    },
   };
 }
 
 function sameGeneration(left: GenerationStamp, right: GenerationStamp): boolean {
   return left.registryDigest === right.registryDigest
-    && left.outputDigest === right.outputDigest;
+    && left.outputDigest === right.outputDigest
+    && left.sourceRolesDigest === right.sourceRolesDigest;
+}
+
+function processIsAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return !(
+      error instanceof Error
+      && 'code' in error
+      && error.code === 'ESRCH'
+    );
+  }
+}
+
+function liveClaimPresent(options: {
+  readonly claimPath: string;
+  readonly readFile: typeof readFileSync;
+  readonly stat: typeof lstatSync;
+}): boolean {
+  const before = pathEntryStats(options.claimPath, options.stat);
+  if (!before) return false;
+  try {
+    const bytes = options.readFile(options.claimPath);
+    const parsed = JSON.parse(
+      Buffer.isBuffer(bytes) ? bytes.toString('utf8') : bytes,
+    ) as unknown;
+    const after = pathEntryStats(options.claimPath, options.stat);
+    if (!after || !sameEntryIdentity(before, after)) return true;
+    return isRecord(parsed)
+      && Number.isSafeInteger(parsed.pid)
+      && (parsed.pid as number) > 0
+      && processIsAlive(parsed.pid as number);
+  } catch {
+    return true;
+  }
+}
+
+function journalLooksRecoverable(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  return value.schema === 'lpc-toolkit.asset-pack-transaction.v1'
+    && typeof value.workspaceId === 'string'
+    && value.workspaceId.length > 0
+    && typeof value.operationId === 'string'
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
+      value.operationId,
+    )
+    && (value.operation === 'sync'
+      || value.operation === 'install'
+      || value.operation === 'remove')
+    && (value.phase === 'prepared'
+      || value.phase === 'output-published'
+      || value.phase === 'sources-published'
+      || value.phase === 'registry-published')
+    && typeof value.oldOutputBackup === 'string'
+    && typeof value.stagedOutput === 'string'
+    && typeof value.stagedRegistry === 'string'
+    && Array.isArray(value.cleanupInstalledSources)
+    && value.cleanupInstalledSources.every((entry) => typeof entry === 'string');
+}
+
+function inspectTransaction(options: {
+  readonly workspace: AssetWorkspace;
+  readonly fileOps?: AssetTransactionFileOps;
+}): TransactionInspection {
+  const stat = options.fileOps?.lstatSync ?? lstatSync;
+  const readFile = options.fileOps?.readFileSync ?? readFileSync;
+  const journalPath = path.join(options.workspace.stateRoot, JOURNAL_FILE);
+  const claimPath = path.join(options.workspace.stateRoot, CLAIM_FILE);
+  const journalStats = pathEntryStats(journalPath, stat);
+  const claimStats = pathEntryStats(claimPath, stat);
+
+  if (claimStats && liveClaimPresent({ claimPath, readFile, stat })) {
+    return { status: 'busy' };
+  }
+  if (!journalStats) {
+    return claimStats ? { status: 'busy' } : { status: 'idle' };
+  }
+  if (journalStats.isSymbolicLink() || !journalStats.isFile()) {
+    return {
+      status: 'unsafe',
+      diagnostic: {
+        code: 'asset_transaction_unsafe',
+        severity: 'error',
+        message: 'Asset transaction journal is not a regular file.',
+        path: journalPath,
+      },
+    };
+  }
+  try {
+    const bytes = readFile(journalPath);
+    const parsed = JSON.parse(
+      Buffer.isBuffer(bytes) ? bytes.toString('utf8') : bytes,
+    ) as unknown;
+    const after = pathEntryStats(journalPath, stat);
+    if (!after || !sameEntryIdentity(journalStats, after)) return { status: 'busy' };
+    if (!journalLooksRecoverable(parsed)) {
+      throw new Error('Asset transaction journal is malformed or incomplete.');
+    }
+    return { status: 'recoverable' };
+  } catch (error) {
+    return {
+      status: 'unsafe',
+      diagnostic: {
+        code: 'asset_transaction_unsafe',
+        severity: 'error',
+        message: errorMessage(error),
+        path: journalPath,
+      },
+    };
+  }
 }
 
 function listEntry(entry: ListedRegistryEntry): AssetPackListEntry {
@@ -372,18 +615,34 @@ export async function doctorAssetPacks(options: {
   readonly runtime: RuntimeAssets;
   readonly fileOps?: AssetTransactionFileOps;
 }): Promise<AssetPackDoctorReport> {
-  const recovery = recoverAssetPackTransaction({
-    workspace: options.workspace,
-    ...(options.fileOps ? { fileOps: options.fileOps } : {}),
-  });
-  if (!recovery.ok) {
-    return report({
-      recovery: 'none',
-      checks: recovery.diagnostics.map(diagnosticCheck),
-      packs: [],
-    });
-  }
+  let recoveryAction: AssetPackRecoveryAction = 'none';
   for (let attempt = 0; attempt < SNAPSHOT_ATTEMPTS; attempt += 1) {
+    const transaction = inspectTransaction(options);
+    if (transaction.status === 'busy') {
+      await yieldToLifecyclePublisher();
+      continue;
+    }
+    if (transaction.status === 'unsafe') {
+      return report({
+        recovery: recoveryAction,
+        checks: [diagnosticCheck(transaction.diagnostic)],
+        packs: [],
+      });
+    }
+    if (transaction.status === 'recoverable') {
+      const recovery = recoverAssetPackTransaction({
+        workspace: options.workspace,
+        ...(options.fileOps ? { fileOps: options.fileOps } : {}),
+      });
+      if (!recovery.ok) {
+        return report({
+          recovery: recoveryAction,
+          checks: recovery.diagnostics.map(diagnosticCheck),
+          packs: [],
+        });
+      }
+      if (recovery.action !== 'none') recoveryAction = recovery.action;
+    }
     const before = readGenerationStamp(options);
     if (before.status === 'busy') {
       await yieldToLifecyclePublisher();
@@ -393,8 +652,8 @@ export async function doctorAssetPacks(options: {
     const after = readGenerationStamp(options);
     if (after.status === 'idle' && sameGeneration(before.stamp, after.stamp)) {
       return report({
-        recovery: recovery.action,
-        checks: [recoveryCheck(recovery.action), ...audit.checks],
+        recovery: recoveryAction,
+        checks: [recoveryCheck(recoveryAction), ...audit.checks],
         packs: audit.packs,
       });
     }
@@ -402,9 +661,9 @@ export async function doctorAssetPacks(options: {
   }
 
   return report({
-    recovery: recovery.action,
+    recovery: recoveryAction,
     checks: [
-      recoveryCheck(recovery.action),
+      recoveryCheck(recoveryAction),
       {
         code: 'asset_doctor_snapshot_unstable',
         status: 'error',

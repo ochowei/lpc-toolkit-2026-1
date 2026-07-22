@@ -47,6 +47,7 @@ import {
 import { syncLinkedAssetPack } from '../src/asset-pack-sync.js';
 import {
   publishAssetPackGeneration,
+  withAssetPackTransactionClaim,
   type AssetPackTransactionJournal,
   type AssetPackTransactionPhase,
   type AssetTransactionFileOps,
@@ -794,6 +795,160 @@ describe('doctorAssetPacks healthy and recovery reports', () => {
     expect(tampered.healthy).toBe(false);
     expect(tampered.checks.map((check) => check.code)).toContain('asset_digest_mismatch');
     expect(tamperedOps.events).toEqual([]);
+  });
+
+  it('waits read-only for a live lifecycle claim and audits the completed generation', async () => {
+    const fixture = createFixture();
+    await linkNewPack(fixture, {
+      packId: 'alpha.pack', localId: 'alpha', color: '#aa3300',
+    });
+    let releaseClaim: (() => void) | undefined;
+    const release = new Promise<void>((resolve) => {
+      releaseClaim = resolve;
+    });
+    let claimAcquired: (() => void) | undefined;
+    const acquired = new Promise<void>((resolve) => {
+      claimAcquired = resolve;
+    });
+    const lifecycle = withAssetPackTransactionClaim({
+      workspace: fixture.workspace,
+      action: async () => {
+        claimAcquired?.();
+        await release;
+      },
+    });
+    await acquired;
+
+    const mutations = mutationRecordingFileOps({ failOnMutation: true });
+    const claimPath = path.join(fixture.workspace.stateRoot, 'transaction.lock');
+    expect(existsSync(claimPath)).toBe(true);
+    setImmediate(() => releaseClaim?.());
+
+    const report = await doctorAssetPacks({
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+      fileOps: mutations.fileOps,
+    });
+    const lifecycleResult = await lifecycle;
+
+    expect(lifecycleResult.ok).toBe(true);
+    expect(report).toMatchObject({ healthy: true, recovery: 'none' });
+    expect(report.packs.map((entry) => entry.packId)).toEqual(['alpha.pack']);
+    expect(mutations.events).toEqual([]);
+  });
+
+  it('rejects a healthy mixed report when a linked source drifts mid-audit', async () => {
+    const fixture = createFixture();
+    const sourceRoot = await linkNewPack(fixture, {
+      packId: 'alpha.pack', localId: 'alpha', color: '#aa3300',
+    });
+    const markerPath = path.join(
+      fixture.workspace.outputRoot,
+      '.lpc-toolkit-managed.json',
+    );
+    let markerReads = 0;
+    let sourceChanged = false;
+    const driftingReadFileSync = ((target: Parameters<typeof readFileSync>[0]) => {
+      const bytes = readFileSync(target);
+      if (path.resolve(String(target)) === markerPath) {
+        markerReads += 1;
+        if (markerReads === 3) {
+          sourceChanged = true;
+          writeFileSync(
+            path.join(sourceRoot, 'sprites/alpha/walk.png'),
+            pngBytes('#0033aa'),
+          );
+        }
+      }
+      return bytes;
+    }) as typeof readFileSync;
+
+    const report = await doctorAssetPacks({
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+      fileOps: { ...REAL_FILE_OPS, readFileSync: driftingReadFileSync },
+    });
+
+    expect(sourceChanged).toBe(true);
+    expect(report.healthy).toBe(false);
+    expect(report.checks.map((check) => check.code)).toContain('asset_digest_mismatch');
+  });
+
+  it('retries when serialized publication returns from A to byte-identical A', async () => {
+    const fixture = createFixture();
+    await linkNewPack(fixture, {
+      packId: 'alpha.pack', localId: 'alpha', color: '#aa3300',
+    });
+    const generationA = await prepareAssetPackDesiredState({
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+      mutation: { kind: 'none' },
+    });
+    expect(generationA.ok).toBe(true);
+    if (!generationA.ok) return;
+    const bravoRoot = writePack(fixture, packSource({
+      packId: 'bravo.pack',
+      displayName: 'bravo.pack',
+      localId: 'bravo',
+    }), '#0033aa');
+    const candidate = await loadLinkedAssetPackCandidate({
+      packDirectory: bravoRoot,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+    });
+    expect(candidate.ok).toBe(true);
+    if (!candidate.ok) return;
+    const generationB = await prepareAssetPackDesiredState({
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+      mutation: { kind: 'upsert', candidate: candidate.candidate },
+    });
+    expect(generationB.ok).toBe(true);
+    if (!generationB.ok) return;
+
+    const markerPath = path.join(
+      fixture.workspace.outputRoot,
+      '.lpc-toolkit-managed.json',
+    );
+    let markerReads = 0;
+    let publication: Promise<unknown> | undefined;
+    const abaReadFileSync = ((target: Parameters<typeof readFileSync>[0]) => {
+      const bytes = readFileSync(target);
+      if (path.resolve(String(target)) === markerPath) {
+        markerReads += 1;
+        if (markerReads === 2) {
+          publication = withAssetPackTransactionClaim({
+            workspace: fixture.workspace,
+            action: async (publisher) => {
+              const publishedB = publisher.publish({
+                operation: 'sync',
+                desiredState: generationB,
+                cleanupInstalledSources: [],
+              });
+              const publishedA = publisher.publish({
+                operation: 'sync',
+                desiredState: generationA,
+                cleanupInstalledSources: [],
+              });
+              const results = await Promise.all([publishedB, publishedA]);
+              expect(results.every((result) => result.ok)).toBe(true);
+            },
+          });
+        }
+      }
+      return bytes;
+    }) as typeof readFileSync;
+
+    const report = await doctorAssetPacks({
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+      fileOps: { ...REAL_FILE_OPS, readFileSync: abaReadFileSync },
+    });
+    await publication;
+
+    expect(report).toMatchObject({ healthy: true, recovery: 'none' });
+    expect(report.packs.map((entry) => entry.packId)).toEqual(['alpha.pack']);
+    expect(markerReads).toBeGreaterThanOrEqual(6);
   });
 
   it('retries a generation snapshot when publication completes during the audit', async () => {
