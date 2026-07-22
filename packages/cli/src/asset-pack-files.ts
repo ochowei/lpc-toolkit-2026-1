@@ -302,6 +302,58 @@ function captureContainedFile(options: {
   return { ...pinned, bytes: snapshot.bytes };
 }
 
+function verifyCapturedEntry(
+  root: PinnedPackRoot,
+  entry: CapturedContainedFile,
+  fileOps: AssetPackDirectoryFileOps,
+): void {
+  verifyPinnedEntry(root, 'directory', fileOps);
+  for (const parent of entry.parents) {
+    verifyPinnedEntry(parent, 'directory', fileOps);
+  }
+  verifyPinnedEntry(entry, 'file', fileOps);
+}
+
+function verifyCapturedEntryBytes(
+  root: PinnedPackRoot,
+  entry: CapturedContainedFile,
+  fileOps: AssetPackDirectoryFileOps,
+): void {
+  verifyCapturedEntry(root, entry, fileOps);
+  const snapshot = readAssetPackManagedFile({
+    filePath: entry.targetPath,
+    label: 'Captured asset-pack file',
+    fileOps,
+  });
+  if (
+    snapshot.identity !== assetPackManagedFileIdentity(entry.stats)
+    || !snapshot.bytes.equals(entry.bytes)
+  ) {
+    captureError(
+      'asset_digest_mismatch',
+      entry.targetPath,
+      `Asset-pack file changed between generation captures: ${entry.targetPath}.`,
+    );
+  }
+  verifyCapturedEntry(root, entry, fileOps);
+}
+
+function verifyCapturedGeneration(options: {
+  readonly root: PinnedPackRoot;
+  readonly manifest: CapturedContainedFile;
+  readonly sources: readonly CapturedContainedFile[];
+  readonly fileOps: AssetPackDirectoryFileOps;
+}): void {
+  const entries = [options.manifest, ...options.sources];
+  for (const entry of entries) {
+    verifyCapturedEntryBytes(options.root, entry, options.fileOps);
+  }
+  verifyPinnedEntry(options.root, 'directory', options.fileOps);
+  for (const entry of entries) {
+    verifyCapturedEntry(options.root, entry, options.fileOps);
+  }
+}
+
 function uniqueSourcePaths(pack: NormalizedAssetPack): readonly string[] {
   const seen = new Set<string>();
   const sourcePaths: string[] = [];
@@ -378,9 +430,11 @@ function inspectSources(
 ): {
   readonly diagnostics: readonly AssetPackFileDiagnostic[];
   readonly sourceBytes: ReadonlyMap<string, Buffer>;
+  readonly capturedSources: readonly CapturedContainedFile[];
 } {
   const diagnostics: AssetPackFileDiagnostic[] = [];
   const sourceBytes = new Map<string, Buffer>();
+  const capturedSources: CapturedContainedFile[] = [];
   const canonicalOwners = new Map<string, string>();
 
   uniqueSourcePaths(pack).forEach((sourcePath) => {
@@ -408,9 +462,10 @@ function inspectSources(
     }
     canonicalOwners.set(captured.canonicalPath, sourcePath);
     sourceBytes.set(sourcePath, captured.bytes);
+    capturedSources.push(captured);
   });
 
-  return { diagnostics, sourceBytes };
+  return { diagnostics, sourceBytes, capturedSources };
 }
 
 export function loadAssetPackFiles(
@@ -481,7 +536,12 @@ export function loadAssetPackFiles(
   }
 
   try {
-    verifyPinnedEntry(pinnedRoot, 'directory', fileOps);
+    verifyCapturedGeneration({
+      root: pinnedRoot,
+      manifest,
+      sources: inspected.capturedSources,
+      fileOps,
+    });
   } catch (error) {
     return {
       ok: false,

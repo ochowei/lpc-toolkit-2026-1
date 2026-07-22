@@ -279,6 +279,37 @@ function replacingSourceFileOps(options: {
   };
 }
 
+function switchingPackGenerationFileOps(options: {
+  readonly triggerPath: string;
+  readonly replacements: ReadonlyMap<string, Buffer>;
+}): {
+  readonly fileOps: AssetPackDirectoryFileOps;
+  readonly switched: () => boolean;
+} {
+  const triggerPath = path.resolve(options.triggerPath);
+  let switched = false;
+  const switchingLstatSync = ((target: Parameters<typeof lstatSync>[0]) => {
+    if (!switched && path.resolve(String(target)) === triggerPath) {
+      switched = true;
+      for (const [targetPath, bytes] of options.replacements) {
+        writeFileSync(targetPath, bytes);
+      }
+    }
+    return lstatSync(target);
+  }) as typeof lstatSync;
+  return {
+    fileOps: {
+      openSync,
+      closeSync,
+      fstatSync,
+      readFileSync,
+      lstatSync: switchingLstatSync,
+      realpathSync: realpathSync.native,
+    },
+    switched: () => switched,
+  };
+}
+
 function packOk(result: Awaited<ReturnType<typeof packAssetPack>>): PackAssetPackSuccess {
   expect(result.ok).toBe(true);
   if (!result.ok) throw new Error(`Expected asset pack success: ${JSON.stringify(result.diagnostics)}`);
@@ -376,6 +407,38 @@ describe('packAssetPack', () => {
       }));
     },
   );
+
+  it('rejects a whole-pack generation switch through public packaging', async () => {
+    const { runtime, workspaceRoot } = createRuntimeFixture();
+    const source = sourceFixture();
+    const { workspace, packDirectory, manifestPath } = createPack(workspaceRoot, source);
+    const sourcePath = path.join(packDirectory, 'sprites/wind-braid/walk.png');
+    writeWalkPng(sourcePath, '#cc5500');
+    const replacementPngPath = path.join(workspaceRoot, 'replacement-walk.png');
+    writeWalkPng(replacementPngPath, '#3355aa');
+    const capture = switchingPackGenerationFileOps({
+      triggerPath: path.join(packDirectory, 'sprites'),
+      replacements: new Map([
+        [manifestPath, Buffer.from(`${JSON.stringify({ ...source, version: '10.0.0' }, null, 2)}\n`)],
+        [sourcePath, readFileSync(replacementPngPath)],
+      ]),
+    });
+
+    const result = await packAssetPack({
+      packDirectory,
+      workspace,
+      runtime,
+      sourceFileOps: capture.fileOps,
+    });
+
+    expect(capture.switched()).toBe(true);
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('Expected mixed-generation packaging to fail.');
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({
+      code: 'asset_digest_mismatch',
+      path: manifestPath,
+    }));
+  });
 
   it('packages one immutable validated snapshot as a normalized deterministic sibling archive', async () => {
     const { runtime, workspaceRoot } = createRuntimeFixture();

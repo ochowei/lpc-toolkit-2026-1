@@ -426,6 +426,37 @@ function replacingCaptureFileOps(options: {
   };
 }
 
+function switchingPackGenerationFileOps(options: {
+  readonly triggerPath: string;
+  readonly replacements: ReadonlyMap<string, Buffer>;
+}): {
+  readonly fileOps: AssetPackDirectoryFileOps;
+  readonly switched: () => boolean;
+} {
+  const triggerPath = path.resolve(options.triggerPath);
+  let switched = false;
+  const switchingLstatSync = ((target: Parameters<typeof lstatSync>[0]) => {
+    if (!switched && path.resolve(String(target)) === triggerPath) {
+      switched = true;
+      for (const [targetPath, bytes] of options.replacements) {
+        writeFileSync(targetPath, bytes);
+      }
+    }
+    return lstatSync(target);
+  }) as typeof lstatSync;
+  return {
+    fileOps: {
+      openSync,
+      closeSync,
+      fstatSync,
+      readFileSync,
+      lstatSync: switchingLstatSync,
+      realpathSync: realpathSync.native,
+    },
+    switched: () => switched,
+  };
+}
+
 function snapshotTree(root: string): Readonly<Record<string, string>> {
   const snapshot: Record<string, string> = {};
 
@@ -650,6 +681,48 @@ describe('validateAssetPackDirectory', () => {
       }));
     },
   );
+
+  it('rejects a whole-pack generation switch through public directory validation', async () => {
+    const runtime = createRuntimeFixture().runtime;
+    const packRoot = createDirectory('lpc-asset-pack-validation-generation-switch-');
+    const sourcePath = 'sprites/wind-braid/walk.png';
+    const manifest = newItemSource([{ animation: 'walk', source: sourcePath }]);
+    const manifestPath = path.join(packRoot, 'asset-pack.json');
+    const absoluteSourcePath = path.join(packRoot, sourcePath);
+    const completeWalkCells = {
+      ...filledRequiredCells('walk'),
+      '0:0': '#111111',
+      '1:0': '#111111',
+      '2:0': '#111111',
+      '3:0': '#111111',
+    } as const;
+    writePack(packRoot, manifest, {
+      [sourcePath]: sheetPng('walk', completeWalkCells),
+    });
+    const capture = switchingPackGenerationFileOps({
+      triggerPath: path.join(packRoot, 'sprites'),
+      replacements: new Map([
+        [manifestPath, Buffer.from(`${JSON.stringify({ ...manifest, version: '10.0.0' }, null, 2)}\n`)],
+        [absoluteSourcePath, sheetPng('walk', {
+          ...completeWalkCells,
+          '0:0': '#3355aa',
+        })],
+      ]),
+    });
+
+    const report = await validateAssetPackDirectory({
+      packDirectory: packRoot,
+      runtime,
+      fileOps: capture.fileOps,
+    });
+
+    expect(capture.switched()).toBe(true);
+    expect(report.valid).toBe(false);
+    expect(report.diagnostics).toContainEqual(expect.objectContaining({
+      code: 'asset_digest_mismatch',
+      path: manifestPath,
+    }));
+  });
 
   it.each([
     { label: 'wrong', width: 512, height: 256 },

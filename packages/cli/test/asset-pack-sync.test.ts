@@ -581,6 +581,37 @@ function replacingSourceFileOps(options: {
   };
 }
 
+function switchingPackGenerationFileOps(options: {
+  readonly triggerPath: string;
+  readonly replacements: ReadonlyMap<string, Buffer>;
+}): {
+  readonly fileOps: AssetPackDirectoryFileOps;
+  readonly switched: () => boolean;
+} {
+  const triggerPath = path.resolve(options.triggerPath);
+  let switched = false;
+  const switchingLstatSync = ((target: Parameters<typeof lstatSync>[0]) => {
+    if (!switched && path.resolve(String(target)) === triggerPath) {
+      switched = true;
+      for (const [targetPath, bytes] of options.replacements) {
+        writeFileSync(targetPath, bytes);
+      }
+    }
+    return lstatSync(target);
+  }) as typeof lstatSync;
+  return {
+    fileOps: {
+      openSync,
+      closeSync,
+      fstatSync,
+      readFileSync,
+      lstatSync: switchingLstatSync,
+      realpathSync: realpathSync.native,
+    },
+    switched: () => switched,
+  };
+}
+
 function createRollbackFixture(): {
   readonly fixture: WorkspaceFixture;
   readonly packRoot: string;
@@ -1630,6 +1661,43 @@ describe('syncLinkedAssetPack', () => {
       expect(snapshotFile(fixture.workspace.registryPath)).toEqual(beforeRegistry);
     },
   );
+
+  it('rejects a whole-pack generation switch through public linked sync', async () => {
+    const fixture = createWorkspaceFixture();
+    const packRoot = path.join(fixture.workspace.packsRoot, 'acme.wind-braid');
+    const source = writeNewItemPack(packRoot, {
+      packId: 'acme.wind-braid',
+      displayName: 'Wind Braid',
+      localId: 'wind-braid',
+      color: '#aa5500',
+    });
+    const manifestPath = path.join(packRoot, 'asset-pack.json');
+    const sourcePath = path.join(packRoot, 'sprites/wind-braid/foreground/walk.png');
+    const replacementPngPath = path.join(fixture.cwd, 'replacement-walk.png');
+    writeSheetPng(replacementPngPath, 'walk', '#3355aa');
+    const capture = switchingPackGenerationFileOps({
+      triggerPath: path.join(packRoot, 'sprites'),
+      replacements: new Map([
+        [manifestPath, Buffer.from(`${JSON.stringify({ ...source, version: '10.0.0' }, null, 2)}\n`)],
+        [sourcePath, readFileSync(replacementPngPath)],
+      ]),
+    });
+    const beforeOutput = snapshotTree(fixture.workspace.outputRoot);
+    const beforeRegistry = snapshotFile(fixture.workspace.registryPath);
+
+    const failed = expectFailure(await syncLinkedAssetPack({
+      packDirectory: packRoot,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+      sourceFileOps: capture.fileOps,
+    }));
+
+    expect(capture.switched()).toBe(true);
+    expect(diagnosticCodes(failed.diagnostics)).toContain('asset_digest_mismatch');
+    expect(failed.diagnostics).toContainEqual(expect.objectContaining({ path: manifestPath }));
+    expect(snapshotTree(fixture.workspace.outputRoot)).toEqual(beforeOutput);
+    expect(snapshotFile(fixture.workspace.registryPath)).toEqual(beforeRegistry);
+  });
 
   it('rejects requested linked packs when packsRoot is a symlink without mutating managed output', async () => {
     const fixture = createWorkspaceFixture();

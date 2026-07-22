@@ -148,6 +148,37 @@ function captureFileOpsWithMutation(options: {
   };
 }
 
+function switchingPackGenerationFileOps(options: {
+  readonly triggerPath: string;
+  readonly replacements: ReadonlyMap<string, Buffer>;
+}): {
+  readonly fileOps: AssetPackDirectoryFileOps;
+  readonly switched: () => boolean;
+} {
+  const triggerPath = path.resolve(options.triggerPath);
+  let switched = false;
+  const switchingLstatSync = ((target: Parameters<typeof lstatSync>[0]) => {
+    if (!switched && path.resolve(String(target)) === triggerPath) {
+      switched = true;
+      for (const [targetPath, bytes] of options.replacements) {
+        writeFileSync(targetPath, bytes);
+      }
+    }
+    return lstatSync(target);
+  }) as typeof lstatSync;
+  return {
+    fileOps: {
+      openSync,
+      closeSync,
+      fstatSync,
+      readFileSync,
+      lstatSync: switchingLstatSync,
+      realpathSync: realpathSync.native,
+    },
+    switched: () => switched,
+  };
+}
+
 afterEach(() => {
   for (const directory of temporaryDirectories.splice(0)) {
     rmSync(directory, { recursive: true, force: true });
@@ -450,6 +481,35 @@ describe('loadAssetPackFiles', () => {
       }));
     },
   );
+
+  it('rejects a whole-pack generation switch between manifest and source capture', () => {
+    const root = createDirectory('lpc-asset-pack-files-generation-switch-');
+    const manifestPath = writePack(root, packFixture(), {
+      'sprites/wind-braid/foreground/walk.png': 'walk-old',
+      'sprites/wind-braid/foreground/climb.png': 'climb-old',
+    });
+    const walkPath = path.join(root, 'sprites/wind-braid/foreground/walk.png');
+    const climbPath = path.join(root, 'sprites/wind-braid/foreground/climb.png');
+    const nextManifest = Buffer.from(`${JSON.stringify(packFixture({ version: '10.0.0' }), null, 2)}\n`);
+    const capture = switchingPackGenerationFileOps({
+      triggerPath: path.join(root, 'sprites'),
+      replacements: new Map([
+        [manifestPath, nextManifest],
+        [walkPath, Buffer.from('walk-new-generation')],
+        [climbPath, Buffer.from('climb-new-generation')],
+      ]),
+    });
+
+    const result = loadAssetPackFiles(root, capture.fileOps);
+
+    expect(capture.switched()).toBe(true);
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('Expected a mixed whole-pack generation to fail.');
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({
+      code: 'asset_digest_mismatch',
+      path: manifestPath,
+    }));
+  });
 
   it('keeps the content digest stable across manifest property order changes and acknowledgement-only edits', () => {
     const firstRoot = createDirectory('lpc-asset-pack-files-digest-a-');
