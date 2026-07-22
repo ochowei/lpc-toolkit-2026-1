@@ -36,6 +36,7 @@ import {
   ASSET_PACK_TRANSACTION_SCHEMA,
   publishAssetPackGeneration,
   recoverAssetPackTransaction,
+  withAssetPackTransactionClaim,
   type AssetPackTransactionJournal,
   type AssetPackTransactionPhase,
   type AssetTransactionFileOps,
@@ -515,6 +516,7 @@ describe('asset-pack transaction journal safety', () => {
       'phase',
       'recoveryCursor',
       'recoveryMode',
+      'recoveryRoleEvidence',
       'schema',
       'stagedOutput',
       'stagedRegistry',
@@ -527,6 +529,7 @@ describe('asset-pack transaction journal safety', () => {
       phase: 'prepared',
       recoveryMode: 'rollback',
       recoveryCursor: 0,
+      recoveryRoleEvidence: [],
       cleanupInstalledSources: [],
     });
     expect(journal.operationId).toMatch(
@@ -998,7 +1001,7 @@ describe('asset-pack transaction recovery', () => {
   });
 
   it.each(['receipt', 'payload-coverage', 'payload-bytes'] as const)(
-    'rolls back when destination-local installed %s changes before output publication',
+    'rejects fresh recovery when destination-local installed %s changes after authorization',
     async (mutation) => {
       const fixture = createFixture();
       const stagedSource = path.join(
@@ -1008,7 +1011,6 @@ describe('asset-pack transaction recovery', () => {
       );
       const finalSource = installedPath(fixture.workspace);
       writeInstalledSource(fixture, stagedSource, '1.0.0', ARCHIVE_DIGEST);
-      const beforeOutput = snapshotTree(fixture.workspace.outputRoot);
       const beforeRegistry = readFileSync(fixture.workspace.registryPath);
       let injected = false;
       const mutatingOps: AssetTransactionFileOps = {
@@ -1058,18 +1060,15 @@ describe('asset-pack transaction recovery', () => {
       expect(journal.phase).toBe('sources-published');
       expect(journal.recoveryMode).toBe('rollback');
       expect(readFileSync(fixture.workspace.registryPath)).toEqual(beforeRegistry);
-
-      expect(recoverAssetPackTransaction({ workspace: fixture.workspace })).toEqual({
-        ok: true,
-        action: 'rolled-back',
-      });
-      expect(snapshotTree(fixture.workspace.outputRoot)).toEqual(beforeOutput);
-      expect(readFileSync(fixture.workspace.registryPath)).toEqual(beforeRegistry);
-      expect(existsSync(finalSource)).toBe(false);
-      expect(recoverAssetPackTransaction({ workspace: fixture.workspace })).toEqual({
-        ok: true,
-        action: 'none',
-      });
+      const beforeRecovery = snapshotTree(fixture.root);
+      const recovery = recoverAssetPackTransaction({ workspace: fixture.workspace });
+      expect(recovery.ok).toBe(false);
+      if (recovery.ok) throw new Error('Expected unsafe installed-source recovery.');
+      expect(recovery.diagnostics.map((entry) => entry.code)).toEqual([
+        'asset_transaction_unsafe',
+      ]);
+      expect(snapshotTree(fixture.root)).toEqual(beforeRecovery);
+      expect(existsSync(finalSource)).toBe(true);
     },
   );
 
@@ -1251,6 +1250,166 @@ describe('asset-pack transaction recovery', () => {
         .toBe('outside cleanup\n');
     }
   }, 20_000);
+
+  it.each([
+    ['final installed source', 'sources-published', 'final'] as const,
+    ['destination-local staged source', 'prepared', 'staged'] as const,
+    ['incoming staging source', 'sources-published', 'incoming'] as const,
+  ])(
+    'rejects a substituted rollback %s on fresh recovery after authorization',
+    (_label, phase, role) => {
+      const fixture = createFixture();
+      const seeded = seedPhase(fixture, phase);
+      const stagedOutput = path.resolve(fixture.workspace.root, seeded.journal.stagedOutput);
+      const authorizationStopTarget = phase === 'prepared'
+        ? stagedOutput
+        : fixture.workspace.outputRoot;
+      let interrupted = false;
+      const first = recoverAssetPackTransaction({
+        workspace: fixture.workspace,
+        fileOps: {
+          ...REAL_FILE_OPS,
+          afterMutationValidationSync(operation, targets) {
+            if (
+              interrupted
+              || operation !== 'remove'
+              || !targets.some((target) =>
+                path.resolve(target) === path.resolve(authorizationStopTarget))
+            ) return;
+            interrupted = true;
+            throw new Error('stop after rollback authorization');
+          },
+        },
+      });
+      expect(first.ok).toBe(false);
+      expect(interrupted).toBe(true);
+
+      const authorized = readJournal(fixture);
+      expect(authorized.recoveryMode).toBe('rollback');
+      const evidence = (authorized as AssetPackTransactionJournal & {
+        readonly recoveryRoleEvidence?: readonly {
+          readonly role: string;
+          readonly path: string;
+          readonly present: boolean;
+          readonly device?: string;
+          readonly inode?: string;
+          readonly type?: string;
+          readonly contentDigest?: string;
+        }[];
+      }).recoveryRoleEvidence;
+      const expectedRole = role === 'incoming'
+        ? 'incoming-installed-source'
+        : 'published-installed-source';
+      const expectedPath = role === 'incoming'
+        ? authorized.incomingInstalledSource!
+        : authorized.finalInstalledSource!;
+      expect(evidence?.find((entry) =>
+        entry.role === expectedRole && entry.path === expectedPath)).toMatchObject({
+        present: true,
+        device: expect.any(String),
+        inode: expect.any(String),
+        type: 'directory',
+        contentDigest: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
+      });
+
+      const target = role === 'final'
+        ? seeded.finalSource
+        : role === 'staged'
+          ? path.resolve(fixture.workspace.root, authorized.stagedInstalledSource!)
+          : path.resolve(fixture.workspace.root, authorized.incomingInstalledSource!);
+      const held = `${target}.held-after-authorization`;
+      renameSync(target, held);
+      writeTreeFile(target, 'replacement-sentinel.txt', `${role} replacement\n`);
+      const before = snapshotTree(fixture.root);
+
+      const resumed = recoverAssetPackTransaction({ workspace: fixture.workspace });
+      expect(resumed.ok).toBe(false);
+      if (resumed.ok) throw new Error('Expected unsafe fresh rollback recovery.');
+      expect(resumed.diagnostics.map((entry) => entry.code)).toEqual([
+        'asset_transaction_unsafe',
+      ]);
+      expect(snapshotTree(fixture.root)).toEqual(before);
+      expect(readFileSync(path.join(target, 'replacement-sentinel.txt'), 'utf8'))
+        .toBe(`${role} replacement\n`);
+      expect(existsSync(held)).toBe(true);
+    },
+  );
+
+  it.each([
+    ['obsolete installed source', 'cleanup'] as const,
+    ['incoming staging source', 'incoming'] as const,
+  ])(
+    'rejects a substituted committed-cleanup %s on fresh recovery after authorization',
+    (_label, role) => {
+      const fixture = createFixture();
+      const seeded = seedPhase(fixture, 'registry-published');
+      let interrupted = false;
+      const first = recoverAssetPackTransaction({
+        workspace: fixture.workspace,
+        fileOps: {
+          ...REAL_FILE_OPS,
+          afterMutationValidationSync(operation, targets) {
+            if (
+              interrupted
+              || operation !== 'remove'
+              || !targets.some((target) => path.resolve(target) === seeded.cleanupSource)
+            ) return;
+            interrupted = true;
+            throw new Error('stop after cleanup authorization');
+          },
+        },
+      });
+      expect(first.ok).toBe(false);
+      expect(interrupted).toBe(true);
+
+      const authorized = readJournal(fixture);
+      expect(authorized.recoveryMode).toBe('cleanup');
+      const evidence = (authorized as AssetPackTransactionJournal & {
+        readonly recoveryRoleEvidence?: readonly {
+          readonly role: string;
+          readonly path: string;
+          readonly present: boolean;
+          readonly device?: string;
+          readonly inode?: string;
+          readonly type?: string;
+          readonly contentDigest?: string;
+        }[];
+      }).recoveryRoleEvidence;
+      const expectedRole = role === 'cleanup'
+        ? 'cleanup-installed-source'
+        : 'incoming-installed-source';
+      const expectedPath = role === 'cleanup'
+        ? authorized.cleanupInstalledSources[0]!
+        : authorized.incomingInstalledSource!;
+      expect(evidence?.find((entry) =>
+        entry.role === expectedRole && entry.path === expectedPath)).toMatchObject({
+        present: true,
+        device: expect.any(String),
+        inode: expect.any(String),
+        type: 'directory',
+        contentDigest: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
+      });
+
+      const target = role === 'cleanup'
+        ? seeded.cleanupSource
+        : path.resolve(fixture.workspace.root, authorized.incomingInstalledSource!);
+      const held = `${target}.held-after-authorization`;
+      renameSync(target, held);
+      writeTreeFile(target, 'replacement-sentinel.txt', `${role} replacement\n`);
+      const before = snapshotTree(fixture.root);
+
+      const resumed = recoverAssetPackTransaction({ workspace: fixture.workspace });
+      expect(resumed.ok).toBe(false);
+      if (resumed.ok) throw new Error('Expected unsafe fresh cleanup recovery.');
+      expect(resumed.diagnostics.map((entry) => entry.code)).toEqual([
+        'asset_transaction_unsafe',
+      ]);
+      expect(snapshotTree(fixture.root)).toEqual(before);
+      expect(readFileSync(path.join(target, 'replacement-sentinel.txt'), 'utf8'))
+        .toBe(`${role} replacement\n`);
+      expect(existsSync(held)).toBe(true);
+    },
+  );
 
   it.each([
     ['only staged output remains', (fixture: Fixture, _seeded: ReturnType<typeof seedPhase>) => {
@@ -1612,6 +1771,60 @@ describe('asset-pack transaction durability', () => {
     expect(result.diagnostics[1]?.message).toContain('claim release fsync failed');
     expect(existsSync(transactionClaimPath(fixture.workspace))).toBe(false);
   });
+
+  it.each(['unlink', 'fsync'] as const)(
+    'preserves an unsafe wrapper result when claim-release %s also fails',
+    async (boundary) => {
+      const fixture = createFixture();
+      writeJournal(fixture, { unsafe: true });
+      let actionCalled = false;
+      let claimRemoved = false;
+      let releaseFailed = false;
+      const releaseFailure: AssetTransactionFileOps = {
+        ...REAL_FILE_OPS,
+        rmSync(target, options) {
+          if (
+            boundary === 'unlink'
+            && path.basename(String(target)) === 'transaction.lock'
+          ) {
+            releaseFailed = true;
+            throw Object.assign(new Error('wrapper claim release unlink failed'), { code: 'EIO' });
+          }
+          const result = rmSync(target, options);
+          if (path.basename(String(target)) === 'transaction.lock') claimRemoved = true;
+          return result;
+        },
+        fsyncSync(descriptor) {
+          if (boundary === 'fsync' && claimRemoved && !releaseFailed) {
+            releaseFailed = true;
+            throw Object.assign(new Error('wrapper claim release fsync failed'), { code: 'EIO' });
+          }
+          fsyncSync(descriptor);
+        },
+      };
+
+      const result = await withAssetPackTransactionClaim({
+        workspace: fixture.workspace,
+        fileOps: releaseFailure,
+        action: async () => {
+          actionCalled = true;
+          return 'unreachable';
+        },
+      });
+
+      expect(actionCalled).toBe(false);
+      expect(releaseFailed).toBe(true);
+      expect(result.ok).toBe(false);
+      if (result.ok) throw new Error('Expected unsafe wrapper and release failure.');
+      expect(result.diagnostics.map((entry) => entry.code)).toEqual([
+        'asset_transaction_unsafe',
+        'asset_publish_failed',
+      ]);
+      expect(result.diagnostics[1]?.message).toContain(
+        `wrapper claim release ${boundary} failed`,
+      );
+    },
+  );
 
   it('fsyncs the parent of every newly created nested output and installed directory', async () => {
     const fixture = createFixture();

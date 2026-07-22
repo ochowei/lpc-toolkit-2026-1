@@ -45,6 +45,29 @@ export type AssetPackTransactionPhase =
 
 export type AssetPackRecoveryAction = 'none' | 'rolled-back' | 'completed';
 
+export type AssetPackRecoveryRoleEvidence =
+  | {
+    readonly role:
+      | 'cleanup-installed-source'
+      | 'incoming-installed-source'
+      | 'published-installed-source';
+    readonly path: string;
+    readonly present: false;
+  }
+  | {
+    readonly role:
+      | 'cleanup-installed-source'
+      | 'incoming-installed-source'
+      | 'published-installed-source';
+    readonly path: string;
+    readonly present: true;
+    readonly initialPath: string;
+    readonly device: string;
+    readonly inode: string;
+    readonly type: 'directory';
+    readonly contentDigest: string;
+  };
+
 export interface AssetPackTransactionJournal {
   readonly schema: typeof ASSET_PACK_TRANSACTION_SCHEMA;
   readonly workspaceId: string;
@@ -63,6 +86,7 @@ export interface AssetPackTransactionJournal {
   readonly recoveryCursor?: number;
   readonly oldRegistryDigest?: string;
   readonly newRegistryDigest?: string;
+  readonly recoveryRoleEvidence?: readonly AssetPackRecoveryRoleEvidence[];
 }
 
 export interface AssetTransactionFileOps {
@@ -184,6 +208,7 @@ const JOURNAL_OPTIONAL_KEYS = [
   'recoveryCursor',
   'oldRegistryDigest',
   'newRegistryDigest',
+  'recoveryRoleEvidence',
 ] as const;
 const PHASES: readonly AssetPackTransactionPhase[] = [
   'prepared',
@@ -196,6 +221,11 @@ const OPERATIONS: readonly AssetPackTransactionJournal['operation'][] = [
   'sync',
   'install',
   'remove',
+];
+const RECOVERY_ROLES: readonly AssetPackRecoveryRoleEvidence['role'][] = [
+  'cleanup-installed-source',
+  'incoming-installed-source',
+  'published-installed-source',
 ];
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const SHA256_DIRECTORY = /^[0-9a-f]{64}$/;
@@ -698,6 +728,73 @@ function stringArrayValue(record: Record<string, unknown>, key: string): readonl
   return value;
 }
 
+function optionalRecoveryRoleEvidenceValue(
+  record: Record<string, unknown>,
+): readonly AssetPackRecoveryRoleEvidence[] | undefined {
+  if (!('recoveryRoleEvidence' in record)) return undefined;
+  const value = record.recoveryRoleEvidence;
+  if (!Array.isArray(value)) {
+    throw new Error('Asset transaction journal recoveryRoleEvidence must be an array.');
+  }
+  const evidence = value.map((entry, index): AssetPackRecoveryRoleEvidence => {
+    if (!isRecord(entry)) {
+      throw new Error(`Asset transaction recovery role evidence ${index} must be an object.`);
+    }
+    const role = stringValue(entry, 'role');
+    if (!RECOVERY_ROLES.includes(role as AssetPackRecoveryRoleEvidence['role'])) {
+      throw new Error(`Unknown asset transaction recovery role: ${role}.`);
+    }
+    const recoveryRole = role as AssetPackRecoveryRoleEvidence['role'];
+    const rolePath = stringValue(entry, 'path');
+    if (entry.present === false) {
+      const keys = Object.keys(entry).sort();
+      if (JSON.stringify(keys) !== JSON.stringify(['path', 'present', 'role'])) {
+        throw new Error(`Asset transaction absent recovery role evidence ${index} has invalid keys.`);
+      }
+      return { role: recoveryRole, path: rolePath, present: false };
+    }
+    if (entry.present !== true) {
+      throw new Error(`Asset transaction recovery role evidence ${index} present must be boolean.`);
+    }
+    const keys = Object.keys(entry).sort();
+    const expectedKeys = [
+      'contentDigest',
+      'device',
+      'initialPath',
+      'inode',
+      'path',
+      'present',
+      'role',
+      'type',
+    ];
+    if (JSON.stringify(keys) !== JSON.stringify(expectedKeys)) {
+      throw new Error(`Asset transaction present recovery role evidence ${index} has invalid keys.`);
+    }
+    if (entry.type !== 'directory') {
+      throw new Error(`Asset transaction recovery role evidence ${index} type must be directory.`);
+    }
+    const contentDigest = stringValue(entry, 'contentDigest');
+    if (!/^sha256:[0-9a-f]{64}$/.test(contentDigest)) {
+      throw new Error(`Asset transaction recovery role evidence ${index} digest is invalid.`);
+    }
+    return {
+      role: recoveryRole,
+      path: rolePath,
+      present: true,
+      initialPath: stringValue(entry, 'initialPath'),
+      device: stringValue(entry, 'device'),
+      inode: stringValue(entry, 'inode'),
+      type: 'directory',
+      contentDigest,
+    };
+  });
+  const keys = evidence.map((entry) => `${entry.role}:${entry.path}`);
+  if (new Set(keys).size !== keys.length) {
+    throw new Error('Asset transaction recovery role evidence contains duplicates.');
+  }
+  return evidence;
+}
+
 function parseJournalRecord(value: unknown): AssetPackTransactionJournal {
   if (!isRecord(value)) throw new Error('Asset transaction journal must be a JSON object.');
   exactKeys(value);
@@ -725,11 +822,13 @@ function parseJournalRecord(value: unknown): AssetPackTransactionJournal {
   const recoveryCursor = optionalIntegerValue(value, 'recoveryCursor');
   const oldRegistryDigest = optionalStringValue(value, 'oldRegistryDigest');
   const newRegistryDigest = optionalStringValue(value, 'newRegistryDigest');
+  const recoveryRoleEvidence = optionalRecoveryRoleEvidenceValue(value);
   const recoveryValues = [
     recoveryMode,
     recoveryCursor,
     oldRegistryDigest,
     newRegistryDigest,
+    recoveryRoleEvidence,
   ];
   if (
     recoveryValues.some((entry) => entry !== undefined)
@@ -799,6 +898,7 @@ function parseJournalRecord(value: unknown): AssetPackTransactionJournal {
         recoveryCursor: recoveryCursor!,
         oldRegistryDigest: oldRegistryDigest!,
         newRegistryDigest: newRegistryDigest!,
+        recoveryRoleEvidence: recoveryRoleEvidence!,
       }
       : {}),
   };
@@ -825,6 +925,62 @@ function readOutputWorkspaceId(
     throw new Error('Asset output marker must include a string workspaceId.');
   }
   return parsed.workspaceId;
+}
+
+function validateRecoveryRoleEvidencePaths(
+  workspace: AssetWorkspace,
+  journal: AssetPackTransactionJournal,
+): void {
+  if (journal.recoveryMode === undefined) return;
+  const evidence = journal.recoveryRoleEvidence;
+  if (evidence === undefined) {
+    throw new Error('Asset transaction recovery role evidence is missing.');
+  }
+  const expected = journal.recoveryMode === 'rollback'
+    ? [
+      ...(journal.finalInstalledSource
+        ? [`published-installed-source:${journal.finalInstalledSource}`]
+        : []),
+      ...(journal.incomingInstalledSource
+        ? [`incoming-installed-source:${journal.incomingInstalledSource}`]
+        : []),
+    ]
+    : [
+      ...journal.cleanupInstalledSources.map((entry) =>
+        `cleanup-installed-source:${entry}`),
+      ...(journal.incomingInstalledSource
+        ? [`incoming-installed-source:${journal.incomingInstalledSource}`]
+        : []),
+    ];
+  const actual = evidence.map((entry) => `${entry.role}:${entry.path}`);
+  if (JSON.stringify([...actual].sort()) !== JSON.stringify([...expected].sort())) {
+    throw new Error('Asset transaction recovery role evidence does not match its mutation roles.');
+  }
+  for (const entry of evidence) {
+    resolveRelativePath(
+      workspace,
+      entry.path,
+      'Asset transaction recovery role evidence path',
+    );
+    if (!entry.present) continue;
+    resolveRelativePath(
+      workspace,
+      entry.initialPath,
+      'Asset transaction recovery role evidence initialPath',
+    );
+    if (entry.role === 'published-installed-source') {
+      if (
+        entry.initialPath !== journal.stagedInstalledSource
+        && entry.initialPath !== journal.finalInstalledSource
+      ) {
+        throw new Error(
+          'Asset transaction published installed-source evidence has an invalid initial path.',
+        );
+      }
+    } else if (entry.initialPath !== entry.path) {
+      throw new Error('Asset transaction recovery role evidence initial path is invalid.');
+    }
+  }
 }
 
 function resolveJournal(
@@ -961,6 +1117,7 @@ function resolveJournal(
   ) {
     throw new Error('Asset transaction cannot clean its final installed source.');
   }
+  validateRecoveryRoleEvidencePaths(workspace, journal);
 
   assertNoExistingSymlink(workspace.stateRoot, transactionPath, 'Asset transaction journal');
   assertRegularFileIfPresent(transactionPath, 'Asset transaction journal');
@@ -1411,6 +1568,152 @@ function digestFileOrAbsent(
 ): string {
   if (target === undefined || !pathEntryExists(target)) return 'absent';
   return `sha256:${createHash('sha256').update(fileOps.readFileSync(target)).digest('hex')}`;
+}
+
+function authenticatedDirectoryDigest(
+  root: string,
+  fileOps: AssetTransactionFileOps,
+): string {
+  const rootIdentity = pathEntryIdentity(root, fileOps);
+  if (!rootIdentity.present || rootIdentity.type !== 'directory') {
+    throw new Error(`Asset transaction recovery role is not a directory: ${root}`);
+  }
+  const digest = createHash('sha256');
+  const visit = (directory: string, relativeDirectory: string): void => {
+    const directoryEntry = pathEntryIdentity(directory, fileOps);
+    if (!directoryEntry.present || directoryEntry.type !== 'directory') {
+      throw new Error(`Asset transaction recovery role contains an unsafe directory: ${directory}`);
+    }
+    digest.update('directory\0');
+    digest.update(relativeDirectory);
+    digest.update('\0');
+    for (const name of readdirSync(directory).sort()) {
+      const target = path.join(directory, name);
+      const relative = relativeDirectory.length === 0
+        ? name
+        : `${relativeDirectory}/${name}`;
+      const before = pathEntryIdentity(target, fileOps);
+      if (!before.present || before.type === 'symlink' || before.type === 'other') {
+        throw new Error(`Asset transaction recovery role contains an unsafe entry: ${target}`);
+      }
+      if (before.type === 'directory') {
+        visit(target, relative);
+      } else {
+        const bytes = Buffer.from(fileOps.readFileSync(target));
+        const after = pathEntryIdentity(target, fileOps);
+        if (!samePathEntryIdentity(before, after)) {
+          throw new Error(`Asset transaction recovery role entry changed during authentication: ${target}`);
+        }
+        digest.update('file\0');
+        digest.update(relative);
+        digest.update('\0');
+        digest.update(String(bytes.length));
+        digest.update('\0');
+        digest.update(bytes);
+      }
+    }
+  };
+  visit(root, '');
+  if (!samePathEntryIdentity(rootIdentity, pathEntryIdentity(root, fileOps))) {
+    throw new Error(`Asset transaction recovery role changed during authentication: ${root}`);
+  }
+  return `sha256:${digest.digest('hex')}`;
+}
+
+function captureRecoveryRoleEvidence(options: {
+  readonly role: AssetPackRecoveryRoleEvidence['role'];
+  readonly path: string;
+  readonly candidates: readonly {
+    readonly relativePath: string;
+    readonly absolutePath: string;
+  }[];
+  readonly fileOps: AssetTransactionFileOps;
+}): AssetPackRecoveryRoleEvidence {
+  const present = options.candidates.filter((candidate) => pathEntryExists(candidate.absolutePath));
+  if (present.length > 1) {
+    throw new Error(`Asset transaction recovery role has multiple active paths: ${options.path}`);
+  }
+  const candidate = present[0];
+  if (!candidate) {
+    return { role: options.role, path: options.path, present: false };
+  }
+  const identity = pathEntryIdentity(candidate.absolutePath, options.fileOps);
+  if (!identity.present || identity.type !== 'directory') {
+    throw new Error(`Asset transaction recovery role is not a directory: ${candidate.absolutePath}`);
+  }
+  const contentDigest = authenticatedDirectoryDigest(candidate.absolutePath, options.fileOps);
+  if (!samePathEntryIdentity(identity, pathEntryIdentity(candidate.absolutePath, options.fileOps))) {
+    throw new Error(
+      `Asset transaction recovery role changed while authorization was recorded: ${candidate.absolutePath}`,
+    );
+  }
+  return {
+    role: options.role,
+    path: options.path,
+    present: true,
+    initialPath: candidate.relativePath,
+    device: identity.device,
+    inode: identity.inode,
+    type: 'directory',
+    contentDigest,
+  };
+}
+
+function recoveryRoleEvidenceForAuthorization(
+  resolved: ResolvedJournal,
+  mode: 'rollback' | 'cleanup',
+  fileOps: AssetTransactionFileOps,
+): readonly AssetPackRecoveryRoleEvidence[] {
+  const evidence: AssetPackRecoveryRoleEvidence[] = [];
+  if (
+    mode === 'rollback'
+    && resolved.journal.finalInstalledSource
+    && resolved.finalInstalledSource
+    && resolved.journal.stagedInstalledSource
+    && resolved.stagedInstalledSource
+  ) {
+    evidence.push(captureRecoveryRoleEvidence({
+      role: 'published-installed-source',
+      path: resolved.journal.finalInstalledSource,
+      candidates: [
+        {
+          relativePath: resolved.journal.stagedInstalledSource,
+          absolutePath: resolved.stagedInstalledSource,
+        },
+        {
+          relativePath: resolved.journal.finalInstalledSource,
+          absolutePath: resolved.finalInstalledSource,
+        },
+      ],
+      fileOps,
+    }));
+  }
+  if (
+    resolved.journal.incomingInstalledSource
+    && resolved.incomingInstalledSource
+  ) {
+    evidence.push(captureRecoveryRoleEvidence({
+      role: 'incoming-installed-source',
+      path: resolved.journal.incomingInstalledSource,
+      candidates: [{
+        relativePath: resolved.journal.incomingInstalledSource,
+        absolutePath: resolved.incomingInstalledSource,
+      }],
+      fileOps,
+    }));
+  }
+  if (mode === 'cleanup') {
+    resolved.cleanupInstalledSources.forEach((absolutePath, index) => {
+      const relativePath = resolved.journal.cleanupInstalledSources[index]!;
+      evidence.push(captureRecoveryRoleEvidence({
+        role: 'cleanup-installed-source',
+        path: relativePath,
+        candidates: [{ relativePath, absolutePath }],
+        fileOps,
+      }));
+    });
+  }
+  return evidence;
 }
 
 function assertDigestIfPresent(
@@ -2050,6 +2353,19 @@ function setRecoveryPresence(
   if (target !== undefined) presence.set(recoveryPathKey(target), present);
 }
 
+function recoveryRoleEvidenceEntry(
+  journal: AssetPackTransactionJournal,
+  role: AssetPackRecoveryRoleEvidence['role'],
+  rolePath: string,
+): AssetPackRecoveryRoleEvidence {
+  const evidence = journal.recoveryRoleEvidence?.find((entry) =>
+    entry.role === role && entry.path === rolePath);
+  if (!evidence) {
+    throw new Error(`Asset transaction recovery role evidence is missing: ${role}:${rolePath}`);
+  }
+  return evidence;
+}
+
 function initialRecoveryPresences(
   resolved: ResolvedJournal,
   workspace: AssetWorkspace,
@@ -2076,10 +2392,22 @@ function initialRecoveryPresences(
     setRecoveryPresence(presence, resolved.stagedRegistry, false);
     setRecoveryPresence(presence, resolved.finalInstalledSource, true);
     setRecoveryPresence(presence, resolved.stagedInstalledSource, false);
-    setRecoveryPresence(presence, resolved.incomingInstalledSource, true);
-    for (const cleanupSource of resolved.cleanupInstalledSources) {
-      setRecoveryPresence(presence, cleanupSource, true);
+    if (resolved.journal.incomingInstalledSource) {
+      const incoming = recoveryRoleEvidenceEntry(
+        resolved.journal,
+        'incoming-installed-source',
+        resolved.journal.incomingInstalledSource,
+      );
+      setRecoveryPresence(presence, resolved.incomingInstalledSource, incoming.present);
     }
+    resolved.cleanupInstalledSources.forEach((cleanupSource, index) => {
+      const cleanup = recoveryRoleEvidenceEntry(
+        resolved.journal,
+        'cleanup-installed-source',
+        resolved.journal.cleanupInstalledSources[index]!,
+      );
+      setRecoveryPresence(presence, cleanupSource, cleanup.present);
+    });
     setRecoveryPresence(presence, resolved.journalTemporaryPath, false);
     return [presence];
   }
@@ -2099,40 +2427,55 @@ function initialRecoveryPresences(
     { active: true, backup: true, staged: false },
   ] as const;
   const installedLayouts = resolved.finalInstalledSource
-    ? [
-      { final: false, staged: true },
-      { final: true, staged: false },
-      { final: false, staged: false },
-    ] as const
+    && resolved.journal.finalInstalledSource
+    && resolved.journal.stagedInstalledSource
+    ? (() => {
+      const published = recoveryRoleEvidenceEntry(
+        resolved.journal,
+        'published-installed-source',
+        resolved.journal.finalInstalledSource!,
+      );
+      if (!published.present) return [{ final: false, staged: false }] as const;
+      if (published.initialPath === resolved.journal.finalInstalledSource) {
+        return [{ final: true, staged: false }] as const;
+      }
+      return [
+        { final: false, staged: true },
+        { final: true, staged: false },
+      ] as const;
+    })()
     : [{ final: false, staged: false }] as const;
-  const incomingStates = resolved.incomingInstalledSource
-    ? [true, false] as const
-    : [false] as const;
+  const incomingPresent = resolved.incomingInstalledSource
+    && resolved.journal.incomingInstalledSource
+    ? recoveryRoleEvidenceEntry(
+      resolved.journal,
+      'incoming-installed-source',
+      resolved.journal.incomingInstalledSource,
+    ).present
+    : false;
   const variants: Map<string, boolean>[] = [];
   for (const outputLayout of outputLayouts) {
     for (const installedLayout of installedLayouts) {
-      for (const incomingPresent of incomingStates) {
-        const presence = new Map(base);
-        setRecoveryPresence(presence, workspace.outputRoot, outputLayout.active);
-        setRecoveryPresence(presence, resolved.oldOutputBackup, outputLayout.backup);
-        setRecoveryPresence(presence, resolved.stagedOutput, outputLayout.staged);
-        setRecoveryPresence(
-          presence,
-          resolved.finalInstalledSource,
-          installedLayout.final,
-        );
-        setRecoveryPresence(
-          presence,
-          resolved.stagedInstalledSource,
-          installedLayout.staged,
-        );
-        setRecoveryPresence(
-          presence,
-          resolved.incomingInstalledSource,
-          incomingPresent,
-        );
-        variants.push(presence);
-      }
+      const presence = new Map(base);
+      setRecoveryPresence(presence, workspace.outputRoot, outputLayout.active);
+      setRecoveryPresence(presence, resolved.oldOutputBackup, outputLayout.backup);
+      setRecoveryPresence(presence, resolved.stagedOutput, outputLayout.staged);
+      setRecoveryPresence(
+        presence,
+        resolved.finalInstalledSource,
+        installedLayout.final,
+      );
+      setRecoveryPresence(
+        presence,
+        resolved.stagedInstalledSource,
+        installedLayout.staged,
+      );
+      setRecoveryPresence(
+        presence,
+        resolved.incomingInstalledSource,
+        incomingPresent,
+      );
+      variants.push(presence);
     }
   }
   return variants;
@@ -2251,9 +2594,75 @@ function authorizeRecovery(
     recoveryCursor: 0,
     oldRegistryDigest: digestFileOrAbsent(state.oldRegistryPath, guard.fileOps),
     newRegistryDigest: digestFileOrAbsent(state.newRegistryPath, guard.fileOps),
+    recoveryRoleEvidence: recoveryRoleEvidenceForAuthorization(
+      resolved,
+      mode,
+      guard.fileOps,
+    ),
   };
   writeJournalDurably(workspace, authorized, guard);
   return authorized;
+}
+
+function recoveryRoleCandidatePaths(
+  resolved: ResolvedJournal,
+  evidence: AssetPackRecoveryRoleEvidence,
+): readonly string[] {
+  if (evidence.role === 'published-installed-source') {
+    return [resolved.stagedInstalledSource, resolved.finalInstalledSource]
+      .filter((entry): entry is string => entry !== undefined);
+  }
+  if (evidence.role === 'incoming-installed-source') {
+    return resolved.incomingInstalledSource ? [resolved.incomingInstalledSource] : [];
+  }
+  const index = resolved.journal.cleanupInstalledSources.indexOf(evidence.path);
+  return index === -1 ? [] : [resolved.cleanupInstalledSources[index]!];
+}
+
+function authenticateAuthorizedRecoveryRoles(
+  resolved: ResolvedJournal,
+  fileOps: AssetTransactionFileOps,
+): void {
+  for (const evidence of resolved.journal.recoveryRoleEvidence ?? []) {
+    const candidates = recoveryRoleCandidatePaths(resolved, evidence);
+    const present = candidates.filter((candidate) => pathEntryExists(candidate));
+    if (!evidence.present) {
+      if (present.length > 0) {
+        throw new Error(
+          `Asset transaction absent recovery role appeared after authorization: ${evidence.path}`,
+        );
+      }
+      continue;
+    }
+    if (present.length > 1) {
+      throw new Error(
+        `Asset transaction recovery role has multiple paths after authorization: ${evidence.path}`,
+      );
+    }
+    const target = present[0];
+    if (!target) continue;
+    const identity = pathEntryIdentity(target, fileOps);
+    if (
+      !identity.present
+      || identity.type !== evidence.type
+      || identity.device !== evidence.device
+      || identity.inode !== evidence.inode
+    ) {
+      throw new Error(
+        `Asset transaction recovery role identity changed after authorization: ${evidence.path}`,
+      );
+    }
+    if (authenticatedDirectoryDigest(target, fileOps) !== evidence.contentDigest) {
+      throw new Error(
+        `Asset transaction recovery role contents changed after authorization: ${evidence.path}`,
+      );
+    }
+    if (!samePathEntryIdentity(identity, pathEntryIdentity(target, fileOps))) {
+      throw new Error(
+        `Asset transaction recovery role changed during reauthentication: ${evidence.path}`,
+      );
+    }
+  }
 }
 
 function authenticateAuthorizedRecoveryOutputs(
@@ -2365,6 +2774,7 @@ function validateAuthorizedRecovery(
     ? cleanupMutations(resolved, workspace)
     : rollbackMutations(resolved, workspace);
   validateRecoveryCursorState(resolved, workspace, mutations);
+  authenticateAuthorizedRecoveryRoles(resolved, fileOps);
   if (journal.recoveryMode === 'cleanup') {
     assertDigestIfPresent(
       workspace.registryPath,
@@ -2783,6 +3193,7 @@ function updateCommitIntent(
   delete updated.recoveryCursor;
   delete updated.oldRegistryDigest;
   delete updated.newRegistryDigest;
+  delete updated.recoveryRoleEvidence;
   writeJournalDurably(workspace, updated, guard);
   return updated;
 }
@@ -3071,12 +3482,13 @@ export async function withAssetPackTransactionClaim<T>(options: {
   try {
     releaseTransactionClaim(claim);
   } catch (error) {
-    if (result.ok) {
-      result = {
+    const releaseFailure = publicationFailure(error, options.workspace);
+    result = result.ok
+      ? releaseFailure
+      : {
         ok: false,
-        diagnostics: publicationFailure(error, options.workspace).diagnostics,
+        diagnostics: [...result.diagnostics, ...releaseFailure.diagnostics],
       };
-    }
   }
   return result;
 }
