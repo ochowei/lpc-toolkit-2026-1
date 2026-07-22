@@ -1365,7 +1365,9 @@ Then update this task's plan record and commit it separately.
 - Consumes: verified inspection snapshot, Core version/lifecycle decisions, registry v2, desired state, archive extractor, and journaled publisher.
 - Produces: `installAssetPack`, installed receipt, and installed registry entries for Tasks 10–13.
 
-- [ ] **Step 1: Write failing lifecycle-policy tests**
+- [x] **Step 1: Write failing lifecycle-policy tests**
+
+  - Implementation: Added first install, exact no-op, same-version conflict, upgrade, authorized/unauthorized downgrade, linked-ID conflict, and compiler replacement tests.
 
 Cover first install, identical archive no-op, same version/different digest rejection, greater-version upgrade, lower-version rejection, authorized downgrade with exact self pack/range/all asset keys, incomplete downgrade coverage, wrong range, active linked same-ID conflict, and cross-package replacement accepted/rejected by the compiler.
 
@@ -1376,7 +1378,9 @@ expect(installOk(await installAssetPack(upgradeOptions)).action).toBe('upgraded'
 expect(installOk(await installAssetPack(authorizedDowngradeOptions)).action).toBe('downgraded');
 ```
 
-- [ ] **Step 2: Write failing staging and receipt tests**
+- [x] **Step 2: Write failing staging and receipt tests**
+
+  - Implementation: Added verified-snapshot extraction, normalized receipt/payload digest, full archive-digest path, portable reserved-name rejection, archive immutability, and staging cleanup coverage.
 
 Assert extraction only beneath a newly created `stateRoot/staging/install-*`, final path uses full archive digest, no symlink traversal, receipt exact keys/digests/workspace ID, installed manifest is normalized, source bytes equal verified archive bytes, registry points inside installed root, and archive input remains untouched.
 
@@ -1398,11 +1402,15 @@ export interface AssetPackInstallReceipt {
 
 Inject `now` into install options and use ISO-8601 UTC only for receipt metadata; it does not enter deterministic compile/archive digests.
 
-- [ ] **Step 3: Write failing transaction tests at install boundaries**
+- [x] **Step 3: Write failing transaction tests at install boundaries**
+
+  - Implementation: Added pre-source, post-source, and post-registry crash/recovery tests, including exact rollback to an originally absent registry and authenticated install-parent cleanup.
 
 Crash before source publication, after source publication, and after registry publication. Assert recovery removes a new unreferenced installed directory on rollback, retains it on completion, and deletes the prior installed version only after completed upgrade/downgrade. Artist sources and other installed packs remain byte-identical.
 
-- [ ] **Step 4: Run the focused test and verify RED**
+- [x] **Step 4: Run the focused test and verify RED**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-install.test.ts` — RED before implementation as expected because install orchestration did not exist.
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-install.test.ts
@@ -1410,7 +1418,9 @@ rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-install.test.ts
 
 Expected: FAIL because install orchestration does not exist.
 
-- [ ] **Step 5: Implement inspect-first lifecycle policy**
+- [x] **Step 5: Implement inspect-first lifecycle policy**
+
+  - Implementation: Implemented one-transaction inspect-first install/no-op/upgrade/downgrade orchestration using verified archive bytes, complete desired-state compilation, normalized receipts, durable publication, and exact absent-registry recovery.
 
 Run transaction recovery, inspect the archive with the active runtime, require `valid: true`, read registry, then choose:
 
@@ -1438,7 +1448,9 @@ export type AssetPackInstallResult =
 
 The no-op path verifies current installed receipt/source and returns without writing. All other paths stage verified source, create an installed candidate, prepare complete desired state, then journal-publish output/source/registry with the old installed directory in cleanup paths when applicable.
 
-- [ ] **Step 6: Verify GREEN**
+- [x] **Step 6: Verify GREEN**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-install.test.ts asset-pack-transaction.test.ts asset-pack-state.test.ts` PASS (128 tests); `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-registry.test.ts asset-workspace.test.ts` PASS (37 tests); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS; `rtk pnpm check:boundaries` PASS; diff and prohibited-`any` checks PASS.
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-install.test.ts asset-pack-transaction.test.ts asset-pack-state.test.ts
@@ -1447,7 +1459,11 @@ rtk pnpm --filter @lpc-toolkit/cli run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit product code**
+- [x] **Step 7: Commit product code**
+
+  - Product/fix commits: `4dd3def267dffbb866fd36c0e56416404200c58c`, `aa4ddb54fac919bbbe268643e1688c337b6185de`.
+  - Documentation impact: No Task 9 public command surface changed; the plan's help/README/landing/architecture/engineering updates remain scheduled for the public CLI integration and final reassessment.
+  - Review: Final fresh reviewer APPROVED with no Critical, Important, or Minor findings in `.superpowers/sdd/task-9-review-final.md`.
 
 ```sh
 rtk git add packages/cli/src/asset-pack-install.ts packages/cli/src/asset-workspace.ts packages/cli/test/asset-pack-install.test.ts
