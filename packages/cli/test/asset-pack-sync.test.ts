@@ -1,8 +1,11 @@
 import { createHash } from 'node:crypto';
 import {
+  closeSync,
   existsSync,
+  fsyncSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readFileSync,
   readdirSync,
   renameSync,
@@ -514,6 +517,10 @@ function createFileOpsRecorder(options: {
     rmSync(target, optionsArg) {
       rmSync(target, optionsArg);
     },
+    readFileSync,
+    openSync,
+    fsyncSync,
+    closeSync,
   };
 
   return { actions, fileOps };

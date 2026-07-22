@@ -1,10 +1,4 @@
-import { mkdtempSync, readFileSync, existsSync, statSync } from 'node:fs';
-import {
-  mkdirSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { readFileSync, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import {
   compileAssetPacks,
@@ -20,7 +14,6 @@ import {
 } from './asset-workspace.js';
 import {
   assetPackCompileProjectionFromPlan,
-  assetPackRegistryBytes,
   auditPublishedManagedOutput,
   readAssetPackRegistry,
   resolveLinkedAssetPackDirectory,
@@ -31,6 +24,11 @@ import {
   loadLinkedAssetPackCandidate,
   prepareAssetPackDesiredState,
 } from './asset-pack-state.js';
+import {
+  publishAssetPackGeneration,
+  recoverAssetPackTransaction,
+  type AssetTransactionFileOps,
+} from './asset-pack-transaction.js';
 import {
   loadAssetPackFiles,
   type AssetPackFileDiagnostic,
@@ -72,12 +70,7 @@ export interface AssetPackSyncFailure {
 
 export type AssetPackSyncResult = AssetPackSyncSuccess | AssetPackSyncFailure;
 
-export interface AssetPublicationFileOps {
-  readonly mkdirSync: typeof mkdirSync;
-  readonly writeFileSync: typeof writeFileSync;
-  readonly renameSync: typeof renameSync;
-  readonly rmSync: typeof rmSync;
-}
+export type AssetPublicationFileOps = AssetTransactionFileOps;
 
 interface ManagedOutputMarker {
   readonly schema: typeof ASSET_OUTPUT_MARKER_SCHEMA;
@@ -105,13 +98,6 @@ export interface LinkedAssetPackDesiredState {
 export type LinkedAssetPackDesiredStateResult =
   | LinkedAssetPackDesiredState
   | AssetPackSyncFailure;
-
-const DEFAULT_FILE_OPS: AssetPublicationFileOps = {
-  mkdirSync,
-  writeFileSync,
-  renameSync,
-  rmSync,
-};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -367,86 +353,6 @@ function preflightPublish(workspace: AssetWorkspace): AssetPackSyncFailure | und
   }
 }
 
-function publishStagedGeneration(options: {
-  readonly fileOps: AssetPublicationFileOps;
-  readonly generationRoot: string;
-  readonly stagedOutputRoot: string;
-  readonly stagedRegistryPath: string;
-  readonly workspace: AssetWorkspace;
-}): {
-  readonly failure?: AssetPackSyncFailure;
-  readonly retainGenerationRoot: boolean;
-} {
-  const backupRoot = path.join(options.generationRoot, '.backup');
-  const backupOutputRoot = path.join(backupRoot, 'assets_custom');
-  const backupRegistryPath = path.join(backupRoot, 'registry.json');
-  let movedCurrentOutput = false;
-  let movedCurrentRegistry = false;
-  let publishedOutput = false;
-  let publishedRegistry = false;
-
-  try {
-    options.fileOps.mkdirSync(backupRoot, { recursive: true });
-    options.fileOps.renameSync(options.workspace.outputRoot, backupOutputRoot);
-    movedCurrentOutput = true;
-
-    if (existsSync(options.workspace.registryPath)) {
-      options.fileOps.renameSync(options.workspace.registryPath, backupRegistryPath);
-      movedCurrentRegistry = true;
-    }
-
-    options.fileOps.renameSync(options.stagedOutputRoot, options.workspace.outputRoot);
-    publishedOutput = true;
-    options.fileOps.renameSync(options.stagedRegistryPath, options.workspace.registryPath);
-    publishedRegistry = true;
-    options.fileOps.rmSync(backupRoot, { recursive: true, force: true });
-    return { retainGenerationRoot: false };
-  } catch (error) {
-    try {
-      if (publishedRegistry && existsSync(options.workspace.registryPath)) {
-        options.fileOps.rmSync(options.workspace.registryPath, { force: true });
-      }
-      if (publishedOutput && existsSync(options.workspace.outputRoot)) {
-        options.fileOps.rmSync(options.workspace.outputRoot, { recursive: true, force: true });
-      }
-      if (movedCurrentRegistry && existsSync(backupRegistryPath)) {
-        options.fileOps.renameSync(backupRegistryPath, options.workspace.registryPath);
-      }
-      if (movedCurrentOutput && existsSync(backupOutputRoot)) {
-        options.fileOps.renameSync(backupOutputRoot, options.workspace.outputRoot);
-      }
-      return {
-        retainGenerationRoot: false,
-        failure: syncFailure([{
-          code: 'asset_publish_failed',
-          severity: 'error',
-          message: errorMessage(error),
-          path: options.workspace.outputRoot,
-        }]),
-      };
-    } catch (rollbackError) {
-      return {
-        retainGenerationRoot: true,
-        failure: syncFailure([{
-          code: 'asset_publish_failed',
-          severity: 'error',
-          message: errorMessage(error),
-          path: options.workspace.outputRoot,
-          details: {
-            rollbackError: errorMessage(rollbackError),
-            recoveryPaths: [
-              backupOutputRoot,
-              backupRegistryPath,
-              options.stagedOutputRoot,
-              options.stagedRegistryPath,
-            ].filter((candidate) => existsSync(candidate)),
-          },
-        }]),
-      };
-    }
-  }
-}
-
 export async function prepareLinkedAssetPackDesiredState(options: {
   readonly packDirectory: string;
   readonly workspace: AssetWorkspace;
@@ -691,7 +597,12 @@ export async function syncLinkedAssetPack(options: {
   readonly runtime: RuntimeAssets;
   readonly fileOps?: AssetPublicationFileOps;
 }): Promise<AssetPackSyncResult> {
-  const fileOps = options.fileOps ?? DEFAULT_FILE_OPS;
+  const recovery = recoverAssetPackTransaction({
+    workspace: options.workspace,
+    ...(options.fileOps ? { fileOps: options.fileOps } : {}),
+  });
+  if (!recovery.ok) return syncFailure(recovery.diagnostics);
+
   const requested = await loadLinkedAssetPackCandidate(options);
   if (!requested.ok) return syncFailure(requested.diagnostics);
   const desiredState = await prepareAssetPackDesiredState({
@@ -713,49 +624,29 @@ export async function syncLinkedAssetPack(options: {
     }]);
   }
 
-  const generationRoot = mkdtempSync(
-    path.join(options.workspace.stateRoot, 'staging', 'sync-'),
-  );
-  const stagedOutputRoot = path.join(generationRoot, 'assets_custom');
-  const stagedRegistryPath = path.join(generationRoot, 'registry.json');
-  let keepGenerationRoot = false;
-
-  try {
-    fileOps.mkdirSync(stagedOutputRoot, { recursive: true });
-    for (const [logicalPath, bytes] of desiredState.outputFiles) {
-      const destinationPath = path.join(stagedOutputRoot, logicalPath);
-      fileOps.mkdirSync(path.dirname(destinationPath), { recursive: true });
-      fileOps.writeFileSync(destinationPath, bytes);
-    }
-    fileOps.writeFileSync(stagedRegistryPath, assetPackRegistryBytes(desiredState.registry));
-
-    const publishResult = publishStagedGeneration({
-      fileOps,
-      generationRoot,
-      stagedOutputRoot,
-      stagedRegistryPath,
+  const publication = await publishAssetPackGeneration({
+    operation: 'sync',
+    workspace: options.workspace,
+    desiredState,
+    cleanupInstalledSources: [],
+    ...(options.fileOps ? { fileOps: options.fileOps } : {}),
+  });
+  if (!publication.ok) {
+    const rollback = recoverAssetPackTransaction({
       workspace: options.workspace,
+      ...(options.fileOps ? { fileOps: options.fileOps } : {}),
     });
-    keepGenerationRoot = publishResult.retainGenerationRoot;
-    if (publishResult.failure) return publishResult.failure;
-
-    return {
-      ok: true,
-      linked,
-      registry: desiredState.registry.entries.filter(
-        (entry): entry is LinkedAssetPackRegistryEntry => entry.kind === 'linked',
-      ),
-    };
-  } catch (error) {
-    return syncFailure([{
-      code: 'asset_publish_failed',
-      severity: 'error',
-      message: errorMessage(error),
-      path: options.workspace.outputRoot,
-    }]);
-  } finally {
-    if (!keepGenerationRoot) {
-      rmSync(generationRoot, { recursive: true, force: true });
-    }
+    return syncFailure([
+      ...publication.diagnostics,
+      ...(!rollback.ok ? rollback.diagnostics : []),
+    ]);
   }
+
+  return {
+    ok: true,
+    linked,
+    registry: desiredState.registry.entries.filter(
+      (entry): entry is LinkedAssetPackRegistryEntry => entry.kind === 'linked',
+    ),
+  };
 }
