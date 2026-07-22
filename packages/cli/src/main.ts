@@ -44,6 +44,8 @@ import {
   type CliResponse,
 } from './response.js';
 import {
+  activateWorkspaceRuntimeAssets,
+  AssetWorkspaceRuntimeError,
   prepareRuntimeAssets,
   type RuntimeAssets,
 } from './runtime-assets.js';
@@ -466,15 +468,28 @@ export async function runCli(
   let runtime: RuntimeAssets | undefined;
   if (commandNeedsAssets(parsed)) {
     try {
-      runtime = await resolvedDependencies.prepareRuntimeAssets({
+      const preparedRuntime = await resolvedDependencies.prepareRuntimeAssets({
         cwd: io.cwd,
         ...(parsed.command[0] === 'web' ? { managedCacheOnly: true } : {}),
         onProgress: (progress) =>
           io.stderr(formatProgress(progress.phase, progress.message)),
       });
+      runtime = activateWorkspaceRuntimeAssets({
+        runtime: preparedRuntime,
+        cwd: io.cwd,
+      });
     } catch (error) {
       return writeResponse(
-        commandError(parsed.command.join(' '), assetCacheErrorIssue(error)),
+        commandError(
+          parsed.command.join(' '),
+          error instanceof AssetWorkspaceRuntimeError
+            ? {
+              code: error.code,
+              message: error.message,
+              ...(error.path === undefined ? {} : { path: error.path }),
+            }
+            : assetCacheErrorIssue(error),
+        ),
         parsed,
         io,
         '',
