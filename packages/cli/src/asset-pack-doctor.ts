@@ -65,6 +65,8 @@ interface GenerationStamp {
   readonly registryDigest: string;
   readonly outputDigest: string;
   readonly sourceRolesDigest: string;
+  readonly sheetDefinitionsDigest: string;
+  readonly paletteDefinitionsDigest: string;
 }
 
 type GenerationStampResult =
@@ -302,6 +304,7 @@ function sourceRolesDigest(options: {
 
 function readGenerationStamp(options: {
   readonly workspace: AssetWorkspace;
+  readonly runtime: RuntimeAssets;
   readonly fileOps?: AssetTransactionFileOps;
 }): GenerationStampResult {
   const stat = options.fileOps?.lstatSync ?? lstatSync;
@@ -322,6 +325,16 @@ function readGenerationStamp(options: {
     readFile,
     stat,
   });
+  const sheetDefinitionsDigest = hashTree({
+    root: options.runtime.context.sheetDefinitionsRoot,
+    readFile,
+    stat,
+  });
+  const paletteDefinitionsDigest = hashTree({
+    root: options.runtime.context.paletteDefinitionsRoot,
+    readFile,
+    stat,
+  });
   if (transactionArtifactsPresent(options.workspace, stat)) return { status: 'busy' };
   return {
     status: 'idle',
@@ -329,6 +342,8 @@ function readGenerationStamp(options: {
       registryDigest,
       outputDigest,
       sourceRolesDigest: sourceDigest,
+      sheetDefinitionsDigest,
+      paletteDefinitionsDigest,
     },
   };
 }
@@ -336,7 +351,9 @@ function readGenerationStamp(options: {
 function sameGeneration(left: GenerationStamp, right: GenerationStamp): boolean {
   return left.registryDigest === right.registryDigest
     && left.outputDigest === right.outputDigest
-    && left.sourceRolesDigest === right.sourceRolesDigest;
+    && left.sourceRolesDigest === right.sourceRolesDigest
+    && left.sheetDefinitionsDigest === right.sheetDefinitionsDigest
+    && left.paletteDefinitionsDigest === right.paletteDefinitionsDigest;
 }
 
 function processIsAlive(pid: number): boolean {

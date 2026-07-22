@@ -874,6 +874,46 @@ describe('doctorAssetPacks healthy and recovery reports', () => {
     expect(report.checks.map((check) => check.code)).toContain('asset_digest_mismatch');
   });
 
+  it('retries when base definition credits change after audit consumption', async () => {
+    const fixture = createFixture();
+    await linkExtensionPack(fixture, {
+      packId: 'alpha.extension',
+      destinationPath: 'spritesheets/hair/braid/alpha/climb.png',
+      bodyTypes: ['male'],
+      color: '#aa3300',
+    });
+    const definitionPath = path.join(
+      fixture.assetsRoot,
+      'sheet_definitions/hair/braid.json',
+    );
+    let registryReads = 0;
+    let baselineChanged = false;
+    const changingReadFileSync = ((target: Parameters<typeof readFileSync>[0]) => {
+      const bytes = readFileSync(target);
+      if (path.resolve(String(target)) === fixture.workspace.registryPath) {
+        registryReads += 1;
+        if (registryReads === 3) {
+          baselineChanged = true;
+          writeJson(definitionPath, baseDefinition({
+            credits: [{ ...BASE_CREDIT, notes: 'Changed base credit.' }],
+          }));
+        }
+      }
+      return bytes;
+    }) as typeof readFileSync;
+
+    const report = await doctorAssetPacks({
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+      fileOps: { ...REAL_FILE_OPS, readFileSync: changingReadFileSync },
+    });
+
+    expect(baselineChanged).toBe(true);
+    expect(report.healthy).toBe(false);
+    expect(registryReads).toBeGreaterThan(4);
+    expect(report.checks.map((check) => check.code)).toContain('asset_base_credit_changed');
+  });
+
   it('retries when serialized publication returns from A to byte-identical A', async () => {
     const fixture = createFixture();
     await linkNewPack(fixture, {
