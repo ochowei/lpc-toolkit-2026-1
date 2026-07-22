@@ -22,6 +22,7 @@ import {
   auditPublishedManagedOutput,
   readAssetPackRegistry,
   resolveLinkedAssetPackDirectory,
+  verifyInstalledAssetPackDirectory,
   type AssetPackLifecycleDiagnostic,
   type AssetPackRegistryDocument,
   type AssetPackRegistryEntry,
@@ -43,6 +44,14 @@ const OUTPUT_MARKER_FILE = '.lpc-toolkit-managed.json';
 const OUTPUT_MARKER_KEYS = ['schema', 'workspaceId'] as const;
 
 type RegistrySourceEntry = AssetPackRegistryEntry | LinkedAssetPackRegistryEntryV1;
+
+interface AssetPackSourceSnapshot {
+  readonly packId: string;
+  readonly version: string;
+  readonly displayName: string;
+  readonly contentDigest: string;
+  readonly sourceDigests: Readonly<Record<string, string>>;
+}
 
 export interface ValidatedActiveAssetPack {
   readonly kind: 'linked' | 'installed';
@@ -192,7 +201,7 @@ function readOutputMarker(workspace: AssetWorkspace): {
 
 function sourceSnapshotMatches(
   loaded: AssetPackPayloadSuccess,
-  entry: RegistrySourceEntry,
+  entry: AssetPackSourceSnapshot,
 ): boolean {
   return loaded.pack.id === entry.packId
     && loaded.pack.version === entry.version
@@ -263,7 +272,7 @@ async function validateSnapshot(options: {
     ok: true,
     candidate: {
       ...options.active,
-      diagnostics: [...options.active.diagnostics, ...diagnostics],
+      diagnostics,
     },
   };
 }
@@ -363,6 +372,79 @@ async function loadRegistryEntry(options: {
     runtime: options.runtime,
     workspace: options.workspace,
     expected: options.entry,
+  });
+}
+
+async function loadInstalledCandidate(options: {
+  readonly candidate: ValidatedActiveAssetPack;
+  readonly workspace: AssetWorkspace;
+  readonly workspaceId: string;
+  readonly runtime: RuntimeAssets;
+}): Promise<LinkedAssetPackCandidateResult> {
+  const { candidate } = options;
+  if (!candidate.archiveDigest) {
+    return candidateFailure([{
+      code: 'asset_digest_mismatch',
+      severity: 'error',
+      message: `Installed asset-pack candidate is missing archive digest: ${candidate.loaded.pack.id}.`,
+      path: candidate.sourceDirectory,
+      packId: candidate.loaded.pack.id,
+    }]);
+  }
+
+  let sourceDirectory: string;
+  try {
+    sourceDirectory = verifyInstalledAssetPackDirectory({
+      workspace: options.workspace,
+      workspaceId: options.workspaceId,
+      installedDirectory: candidate.sourceDirectory,
+      archiveDigest: candidate.archiveDigest,
+      entry: {
+        packId: candidate.loaded.pack.id,
+        version: candidate.loaded.pack.version,
+        contentDigest: candidate.loaded.contentDigest,
+        sourceDigests: digestRecord(candidate.loaded.sourceDigests),
+      },
+    });
+  } catch (error) {
+    return candidateFailure([{
+      code: 'asset_digest_mismatch',
+      severity: 'error',
+      message: errorMessage(error),
+      path: candidate.sourceDirectory,
+      packId: candidate.loaded.pack.id,
+    }]);
+  }
+
+  const loaded = loadPayloadDirectory({
+    kind: 'installed',
+    sourceDirectory,
+    archiveDigest: candidate.archiveDigest,
+  });
+  if (!loaded.ok) return loaded;
+  const expected: AssetPackSourceSnapshot = {
+    packId: candidate.loaded.pack.id,
+    version: candidate.loaded.pack.version,
+    displayName: candidate.loaded.pack.displayName,
+    contentDigest: candidate.loaded.contentDigest,
+    sourceDigests: digestRecord(candidate.loaded.sourceDigests),
+  };
+  if (!sourceSnapshotMatches(loaded.candidate.loaded, expected)) {
+    return candidateFailure([{
+      code: 'asset_digest_mismatch',
+      severity: 'error',
+      message: `Installed asset-pack source differs from the candidate snapshot: ${expected.packId}.`,
+      path: sourceDirectory,
+      packId: expected.packId,
+    }]);
+  }
+  return validateSnapshot({
+    active: {
+      ...loaded.candidate,
+      diagnostics: candidate.diagnostics,
+    },
+    runtime: options.runtime,
+    workspace: options.workspace,
   });
 }
 
@@ -614,7 +696,16 @@ export async function prepareAssetPackDesiredState(options: {
   }
 
   if (candidate) {
-    if (candidate.kind === 'linked') {
+    if (candidate.kind === 'installed') {
+      const installed = await loadInstalledCandidate({
+        candidate,
+        workspace: options.workspace,
+        workspaceId: marker.workspaceId,
+        runtime: options.runtime,
+      });
+      if (!installed.ok) return failure(installed.diagnostics);
+      active.push(installed.candidate);
+    } else {
       let resolved: string;
       try {
         resolved = resolveLinkedAssetPackDirectory(options.workspace, candidate.sourceDirectory);
@@ -636,14 +727,14 @@ export async function prepareAssetPackDesiredState(options: {
           packId: candidate.loaded.pack.id,
         }]);
       }
+      const validated = await validateSnapshot({
+        active: candidate,
+        runtime: options.runtime,
+        workspace: options.workspace,
+      });
+      if (!validated.ok) return failure(validated.diagnostics);
+      active.push(validated.candidate);
     }
-    const validated = await validateSnapshot({
-      active: candidate,
-      runtime: options.runtime,
-      workspace: options.workspace,
-    });
-    if (!validated.ok) return failure(validated.diagnostics);
-    active.push(validated.candidate);
   }
 
   active.sort((left, right) => left.loaded.pack.id.localeCompare(right.loaded.pack.id));

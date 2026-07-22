@@ -1,9 +1,12 @@
 import { createHash } from 'node:crypto';
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import os from 'node:os';
@@ -44,6 +47,22 @@ interface StateFixture {
   readonly assetsRoot: string;
   readonly workspace: AssetWorkspace;
   readonly runtime: RuntimeAssets;
+}
+
+interface InstalledCandidateFixture {
+  readonly candidate: ValidatedActiveAssetPack;
+  readonly receiptPath: string;
+}
+
+interface InstallReceiptFixture {
+  readonly schema: string;
+  readonly workspaceId: string;
+  readonly packId: string;
+  readonly version: string;
+  readonly archiveDigest: string;
+  readonly contentDigest: string;
+  readonly installedAt: string;
+  readonly payloadDigests: Readonly<Record<string, string>>;
 }
 
 const BASE_CREDIT = {
@@ -363,6 +382,68 @@ async function linkedCandidate(
   };
 }
 
+function installedCandidate(
+  fixture: StateFixture,
+  installedDirectory: string,
+): InstalledCandidateFixture {
+  const loaded = loadAssetPackFiles(installedDirectory);
+  if (!loaded.ok) {
+    throw new Error(loaded.diagnostics.map((diagnostic) => diagnostic.message).join(' | '));
+  }
+  const archiveDigest = sha256(`archive:${loaded.pack.id}:${loaded.pack.version}`);
+  const receiptPath = path.join(installedDirectory, 'install-receipt.json');
+  writeJson(receiptPath, {
+    schema: 'lpc-toolkit.asset-pack-install-receipt.v1',
+    workspaceId: workspaceId(fixture.workspace),
+    packId: loaded.pack.id,
+    version: loaded.pack.version,
+    archiveDigest,
+    contentDigest: loaded.contentDigest,
+    installedAt: '2026-07-22T00:00:00.000Z',
+    payloadDigests: Object.fromEntries([
+      ['asset-pack.json', sha256(readFileSync(path.join(installedDirectory, 'asset-pack.json')))] as const,
+      ...loaded.sourceDigests,
+    ].sort(([left], [right]) => left.localeCompare(right))),
+  });
+  return {
+    candidate: {
+      kind: 'installed',
+      sourceDirectory: path.resolve(installedDirectory),
+      archiveDigest,
+      loaded,
+      diagnostics: [],
+    },
+    receiptPath,
+  };
+}
+
+async function expectInstalledCandidateRejectedWithoutPublication(
+  fixture: StateFixture,
+  candidate: ValidatedActiveAssetPack,
+  message: string,
+): Promise<void> {
+  const markerPath = path.join(fixture.workspace.outputRoot, '.lpc-toolkit-managed.json');
+  const markerBefore = readFileSync(markerPath);
+  expect(existsSync(fixture.workspace.registryPath)).toBe(false);
+
+  const result = await prepareAssetPackDesiredState({
+    workspace: fixture.workspace,
+    runtime: fixture.runtime,
+    mutation: { kind: 'upsert', candidate },
+  });
+
+  expect(result).toMatchObject({
+    ok: false,
+    diagnostics: [expect.objectContaining({
+      code: 'asset_digest_mismatch',
+      message: expect.stringContaining(message),
+    })],
+  });
+  expect(readFileSync(markerPath)).toEqual(markerBefore);
+  expect(readdirSync(fixture.workspace.outputRoot)).toEqual(['.lpc-toolkit-managed.json']);
+  expect(existsSync(fixture.workspace.registryPath)).toBe(false);
+}
+
 function outputSnapshot(files: ReadonlyMap<string, Buffer>): Readonly<Record<string, string>> {
   return Object.fromEntries(
     [...files.entries()]
@@ -517,6 +598,149 @@ describe('prepareAssetPackDesiredState', () => {
       diagnostics: [{ code: 'asset_digest_mismatch' }],
     });
   });
+
+  it('accepts a direct installed upsert only from a verified managed directory', async () => {
+    const fixture = createStateFixture();
+    const installedDirectory = path.join(
+      fixture.workspace.stateRoot,
+      'installed/acme.direct/1.0.0/archive',
+    );
+    writePack(installedDirectory, newItemSource({
+      packId: 'acme.direct', localId: 'direct', author: 'Direct Artist', color: '#aa5500',
+    }), {});
+    const installed = installedCandidate(fixture, installedDirectory);
+
+    const result = await prepareAssetPackDesiredState({
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+      mutation: { kind: 'upsert', candidate: installed.candidate },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.diagnostics[0]?.message);
+    expect(result.registry.entries).toEqual([
+      expect.objectContaining({
+        kind: 'installed',
+        packId: 'acme.direct',
+        installedDirectory: path.resolve(installedDirectory),
+        archiveDigest: installed.candidate.archiveDigest,
+      }),
+    ]);
+    expect(existsSync(fixture.workspace.registryPath)).toBe(false);
+  });
+
+  it('rejects direct installed upserts outside the managed root without publication', async () => {
+    const fixture = createStateFixture();
+    const outsideDirectory = createDirectory('lpc-asset-pack-state-installed-outside-');
+    writePack(outsideDirectory, newItemSource({
+      packId: 'acme.outside', localId: 'outside', author: 'Outside Artist', color: '#aa5500',
+    }), {});
+    const installed = installedCandidate(fixture, outsideDirectory);
+
+    await expectInstalledCandidateRejectedWithoutPublication(
+      fixture,
+      installed.candidate,
+      'must be contained',
+    );
+  });
+
+  it('rejects direct installed upserts through a symlink without publication', async () => {
+    const fixture = createStateFixture();
+    const outsideDirectory = createDirectory('lpc-asset-pack-state-installed-symlink-');
+    writePack(outsideDirectory, newItemSource({
+      packId: 'acme.symlink', localId: 'symlink', author: 'Symlink Artist', color: '#aa5500',
+    }), {});
+    const installedRoot = path.join(fixture.workspace.stateRoot, 'installed');
+    const linkedDirectory = path.join(installedRoot, 'acme.symlink');
+    mkdirSync(installedRoot, { recursive: true });
+    symlinkSync(
+      outsideDirectory,
+      linkedDirectory,
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+    const installed = installedCandidate(fixture, linkedDirectory);
+
+    await expectInstalledCandidateRejectedWithoutPublication(
+      fixture,
+      installed.candidate,
+      'must not traverse a symbolic link',
+    );
+  });
+
+  it.each(['missing', 'identity', 'coverage'] as const)(
+    'rejects an installed receipt with %s failure without publication',
+    async (scenario) => {
+      const fixture = createStateFixture();
+      const installedDirectory = path.join(
+        fixture.workspace.stateRoot,
+        `installed/acme.${scenario}/1.0.0/archive`,
+      );
+      writePack(installedDirectory, newItemSource({
+        packId: `acme.${scenario}`,
+        localId: scenario,
+        author: 'Receipt Artist',
+        color: '#aa5500',
+      }), {});
+      const installed = installedCandidate(fixture, installedDirectory);
+      if (scenario === 'missing') {
+        rmSync(installed.receiptPath);
+      } else {
+        const receipt = readJson<InstallReceiptFixture>(installed.receiptPath);
+        writeJson(installed.receiptPath, scenario === 'identity'
+          ? { ...receipt, packId: 'wrong.pack' }
+          : {
+              ...receipt,
+              payloadDigests: Object.fromEntries(
+                Object.entries(receipt.payloadDigests)
+                  .filter(([payloadPath]) => payloadPath !== 'asset-pack.json'),
+              ),
+            });
+      }
+
+      await expectInstalledCandidateRejectedWithoutPublication(
+        fixture,
+        installed.candidate,
+        scenario === 'missing'
+          ? 'receipt is missing'
+          : scenario === 'identity'
+            ? 'receipt does not match registry entry'
+            : 'payload coverage does not match registry source payload',
+      );
+    },
+  );
+
+  it.each(['manifest', 'source'] as const)(
+    'rejects installed %s tampering in a direct upsert without publication',
+    async (payload) => {
+      const fixture = createStateFixture();
+      const installedDirectory = path.join(
+        fixture.workspace.stateRoot,
+        `installed/acme.${payload}-tamper/1.0.0/archive`,
+      );
+      writePack(installedDirectory, newItemSource({
+        packId: `acme.${payload}-tamper`,
+        localId: `${payload}-tamper`,
+        author: 'Tamper Artist',
+        color: '#aa5500',
+      }), {});
+      const installed = installedCandidate(fixture, installedDirectory);
+      if (payload === 'manifest') {
+        writeFileSync(path.join(installedDirectory, 'asset-pack.json'), '{}\n');
+      } else {
+        writePng(
+          path.join(installedDirectory, `sprites/${payload}-tamper/walk.png`),
+          'walk',
+          '#3355aa',
+        );
+      }
+
+      await expectInstalledCandidateRejectedWithoutPublication(
+        fixture,
+        installed.candidate,
+        'payload digest does not match its receipt',
+      );
+    },
+  );
 
   it('materializes deterministic immutable output, v2 registry metadata, ownership, and attribution', async () => {
     const left = createStateFixture();

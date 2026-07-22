@@ -560,12 +560,50 @@ function readV2Entry(value: unknown, workspace: AssetWorkspace, workspaceId: str
       ),
     };
   }
-  const installedDirectory = containedPath(path.join(workspace.stateRoot, 'installed'), stringAt(record, 'installedDirectory', 'Asset-pack registry entry'), 'Installed asset-pack installedDirectory');
-  verifyInstallReceipt(installedDirectory, workspaceId, base, digestAt(record, 'archiveDigest', 'Asset-pack registry entry'));
-  return { ...base, kind, installedDirectory, archiveDigest: digestAt(record, 'archiveDigest', 'Asset-pack registry entry') };
+  const archiveDigest = digestAt(record, 'archiveDigest', 'Asset-pack registry entry');
+  const installedDirectory = verifyInstalledAssetPackDirectory({
+    workspace,
+    workspaceId,
+    installedDirectory: stringAt(record, 'installedDirectory', 'Asset-pack registry entry'),
+    entry: base,
+    archiveDigest,
+  });
+  return { ...base, kind, installedDirectory, archiveDigest };
 }
 
-function verifyInstallReceipt(directory: string, workspaceId: string, entry: AssetPackRegistryEntryBase, archiveDigest: string): void {
+export function verifyInstalledAssetPackDirectory(options: {
+  readonly workspace: AssetWorkspace;
+  readonly workspaceId: string;
+  readonly installedDirectory: string;
+  readonly entry: Pick<
+    AssetPackRegistryEntryBase,
+    'packId' | 'version' | 'contentDigest' | 'sourceDigests'
+  >;
+  readonly archiveDigest: string;
+}): string {
+  const directory = containedPath(
+    path.join(options.workspace.stateRoot, 'installed'),
+    options.installedDirectory,
+    'Installed asset-pack installedDirectory',
+  );
+  verifyInstallReceipt(
+    directory,
+    options.workspaceId,
+    options.entry,
+    options.archiveDigest,
+  );
+  return directory;
+}
+
+function verifyInstallReceipt(
+  directory: string,
+  workspaceId: string,
+  entry: Pick<
+    AssetPackRegistryEntryBase,
+    'packId' | 'version' | 'contentDigest' | 'sourceDigests'
+  >,
+  archiveDigest: string,
+): void {
   const receiptPath = path.join(directory, 'install-receipt.json');
   if (!existsSync(receiptPath)) throw new Error(`Installed asset-pack receipt is missing: ${receiptPath}.`);
   const receipt = requireRecord(

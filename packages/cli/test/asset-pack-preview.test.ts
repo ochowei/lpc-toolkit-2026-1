@@ -32,7 +32,10 @@ import {
   previewValidationDirectoryName,
 } from '../src/asset-pack-preview.js';
 import { syncLinkedAssetPack } from '../src/asset-pack-sync.js';
-import { loadActiveAssetPackBaseline } from '../src/asset-pack-validation.js';
+import {
+  loadActiveAssetPackBaseline,
+  validateAssetPackDirectory,
+} from '../src/asset-pack-validation.js';
 import { createDirectoryAssetStore } from '../src/asset-store.js';
 import {
   initializeAssetWorkspace,
@@ -612,6 +615,86 @@ describe('previewAssetPack', () => {
         resolvedPaths: expect.arrayContaining(['hair/braid/climb.png']),
       },
     });
+    expect(validationEntries(fixture.workspace)).toEqual([]);
+  }, 30000);
+
+  it('returns one acknowledged validation warning with the existing preview result schema', async () => {
+    const fixture = createPreviewFixture();
+    const baseline = loadActiveAssetPackBaseline({
+      runtime: fixture.runtime,
+      workspace: fixture.workspace,
+    });
+    const packRoot = path.join(fixture.workspace.packsRoot, 'acme.preview-warning');
+    const manifest: AssetPackSource = {
+      schema: ASSET_PACK_SCHEMA,
+      id: 'acme.preview-warning',
+      version: '1.0.0',
+      displayName: 'Preview Warning',
+      credits: PACK_CREDITS,
+      assets: [{
+        kind: 'extend-item',
+        itemId: 'braid',
+        baseDefinitionDigest: baseline.definitionDigests.get('braid')!,
+        baseCreditDigest: baseline.creditDigests.get('braid')!,
+        addAnimations: [{
+          animation: 'climb',
+          layers: [{
+            layer: 'layer_1',
+            bodyTypes: ['male', 'female'],
+            source: 'sprites/braid/climb.png',
+            destination: {
+              path: 'spritesheets/hair/braid/climb.png',
+              evidence: 'audit-inferred',
+              accepted: true,
+            },
+          }],
+        }],
+      }],
+    };
+    writeJson(path.join(packRoot, 'asset-pack.json'), manifest);
+    writeSheetPng(path.join(packRoot, 'sprites/braid/climb.png'), 'climb', '#aa3377');
+    const unacknowledged = await validateAssetPackDirectory({
+      packDirectory: packRoot,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+    });
+    const acknowledgement = unacknowledged.acknowledgementRecords.find(
+      (record) => record.code === 'asset_path_inferred',
+    );
+    if (!acknowledgement) throw new Error('Expected inferred-path acknowledgement template.');
+    writeJson(path.join(packRoot, 'asset-pack.json'), {
+      ...manifest,
+      acknowledgements: [{ ...acknowledgement, reason: 'Reviewed inferred preview path.' }],
+    });
+
+    const result = await previewAssetPack({
+      packDirectory: packRoot,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+      animation: 'climb',
+    });
+
+    expect(result).toMatchObject({
+      packId: 'acme.preview-warning',
+      assetId: 'braid',
+      artifacts: expect.any(Array),
+      warnings: [{
+        code: 'asset_path_inferred',
+        severity: 'warning',
+        packId: 'acme.preview-warning',
+      }],
+      metadataPath: expect.any(String),
+      outDir: expect.any(String),
+    });
+    expect(result.warnings).toHaveLength(1);
+    expect(Object.keys(result).sort()).toEqual([
+      'artifacts',
+      'assetId',
+      'metadataPath',
+      'outDir',
+      'packId',
+      'warnings',
+    ]);
     expect(validationEntries(fixture.workspace)).toEqual([]);
   }, 30000);
 
