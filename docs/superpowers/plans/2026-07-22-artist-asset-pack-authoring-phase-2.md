@@ -1682,7 +1682,7 @@ CLI documentation impact: `help`, `cli-readme`, `root-readme`, `landing`, `archi
 - Consumes: all Phase 2 services and reports.
 - Produces: the approved six-command public surface and CLI envelopes used by Task 13 acceptance.
 
-- [ ] **Step 1: Write failing command/help tests**
+- [x] **Step 1: Write failing command/help tests**
 
 Add these exact leaves and examples:
 
@@ -1697,7 +1697,9 @@ lpc-toolkit asset doctor [--workspace <directory>] [--json]
 
 Pack/inspect/install require exactly one path positional; remove requires exactly one pack ID; list/doctor accept none. No `--force`, `--ignore-warnings`, `--allow-downgrade`, `--repair`, archive-limit, or concurrency option exists.
 
-- [ ] **Step 2: Write failing workspace/runtime requirement tests**
+Implemented exact leaf usage/examples, positional arity, accepted options, and prohibited-option coverage for all six public commands.
+
+- [x] **Step 2: Write failing workspace/runtime requirement tests**
 
 Implement and assert:
 
@@ -1710,15 +1712,21 @@ Implement and assert:
 
 Help and invalid preflight never prepare workspace/runtime. List may run filesystem transaction recovery but never prepares base assets.
 
-- [ ] **Step 3: Write failing JSON/exit tests**
+Implemented the declared requirements matrix, managed-cache-only cwd/workspace-root selection, dependency-free help/invalid preflight, and list recovery without runtime preparation.
+
+- [x] **Step 3: Write failing JSON/exit tests**
 
 Use existing envelopes and exact command names. `asset inspect` with `data.valid: false` and `asset doctor` with `data.healthy: false` return exit `1` while preserving structured report data, matching `asset validate`. Pack/install/remove fatal diagnostics use `ok: false`. List and install no-op use exit `0`.
 
-- [ ] **Step 4: Write failing human-output tests**
+Implemented structured data-preserving invalid/doctor exit status, fatal diagnostic envelopes, and successful list/install no-op behavior.
+
+- [x] **Step 4: Write failing human-output tests**
 
 Pack prints archive/content digests and path. Inspect groups archive/compatibility/pixel/credit diagnostics and acknowledgement JSON. Install prints action/source/output. List prints stable columns `PACK ID`, `VERSION`, `KIND`, `SOURCE`. Remove prints removed kind and remaining count. Doctor prints recovery action, grouped checks, and never suggests a broad force/repair command.
 
-- [ ] **Step 5: Run focused tests and verify RED**
+Implemented and tested the required pack, inspect, install, list, remove, and doctor human presentations, including stable list columns and narrow doctor guidance.
+
+- [x] **Step 5: Run focused tests and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- command-spec.test.ts main-assets.test.ts main-json.test.ts main-human.test.ts
@@ -1726,7 +1734,9 @@ rtk pnpm --filter @lpc-toolkit/cli test -- command-spec.test.ts main-assets.test
 
 Expected: FAIL because Phase 2 leaves and routing do not exist.
 
-- [ ] **Step 6: Refactor asset command context by declared requirements**
+Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- command-spec.test.ts main-assets.test.ts main-json.test.ts main-human.test.ts` FAIL before implementation (40 failed, 183 passed) because the six lifecycle leaves and routing did not exist.
+
+- [x] **Step 6: Refactor asset command context by declared requirements**
 
 ```ts
 export interface AssetCommandRequirements {
@@ -1748,7 +1758,9 @@ interface AssetCommandContext {
 
 Main resolves only declared dependencies, then `runAssetCommand` asserts the service-specific requirements through typed helper functions. Inspection compatibility uses `CLI_VERSION`. Omit internal archive snapshots from response data.
 
-- [ ] **Step 7: Implement human formatters and verify GREEN**
+Implemented declared dependency resolution, typed service assertions, `CLI_VERSION` archive inspection compatibility, and public response projection without internal archive snapshots.
+
+- [x] **Step 7: Implement human formatters and verify GREEN**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- command-spec.test.ts main-assets.test.ts main-json.test.ts main-human.test.ts
@@ -1758,7 +1770,9 @@ rtk pnpm --filter @lpc-toolkit/cli build
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit product code**
+Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- command-spec.test.ts main-assets.test.ts main-json.test.ts main-human.test.ts` PASS (223/223); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS; `rtk pnpm --filter @lpc-toolkit/cli build` PASS; `rtk pnpm check:boundaries` PASS; diff and prohibited-`any` checks PASS.
+
+- [x] **Step 8: Commit product code**
 
 ```sh
 rtk git add packages/cli/src/asset-commands.ts packages/cli/src/command-spec.ts packages/cli/src/main.ts packages/cli/src/response.ts packages/cli/test/command-spec.test.ts packages/cli/test/main-assets.test.ts packages/cli/test/main-json.test.ts packages/cli/test/main-human.test.ts
@@ -1766,6 +1780,10 @@ rtk git commit -m "feat(cli): expose asset package lifecycle"
 ```
 
 Then update this task's plan record and commit it separately.
+
+Product commit: `1553474c20b109334bee5a5f555737e1712e1a08`. Final independent review: `.superpowers/sdd/task-12-review.md` APPROVED with no findings.
+
+CLI documentation impact: `help` updated in this task; `cli-readme` and `root-readme` are deferred to Task 13's public lifecycle documentation; `landing`, `architecture`, `engineering`, `releasing`, and `plugin` are N/A because this task does not change those owned contracts or workflows.
 
 ---
 
