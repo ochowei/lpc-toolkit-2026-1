@@ -7,7 +7,14 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { createCanvas } from '@napi-rs/canvas';
+import {
+  ASSET_PACK_SCHEMA,
+  standardAnimationGeometry,
+  type AssetPackSource,
+} from '@lpc-toolkit/core';
 import { describe, expect, it } from 'vitest';
+import { createDeterministicAssetPackArchive } from '../src/asset-pack-archive-format.js';
 import { createDirectoryAssetStore } from '../src/asset-store.js';
 import { initializeAssetWorkspace } from '../src/asset-workspace.js';
 import { createRuntimeContext } from '../src/context.js';
@@ -37,12 +44,99 @@ function createRuntime(): RuntimeAssets {
     }),
   );
   writeFileSync(path.join(assetsRoot, 'spritesheets', 'body', 'bodies', 'male', 'walk.png'), '');
+  writeFileSync(
+    path.join(assetsRoot, 'CREDITS.csv'),
+    'filename,notes,authors,licenses,urls\n',
+  );
   const store = createDirectoryAssetStore(assetsRoot);
   return {
     context: createRuntimeContext({ cwd, assetsRoot, spritesheetsBaseUrl: store.baseUrl }),
     store,
     source: 'working-directory',
   };
+}
+
+function createLifecycleRuntime(workspaceRoot: string): RuntimeAssets {
+  const assetsRoot = path.join(workspaceRoot, 'base-assets');
+  mkdirSync(path.join(assetsRoot, 'sheet_definitions'), { recursive: true });
+  mkdirSync(path.join(assetsRoot, 'palette_definitions'), { recursive: true });
+  mkdirSync(path.join(assetsRoot, 'spritesheets'), { recursive: true });
+  writeFileSync(
+    path.join(assetsRoot, 'CREDITS.csv'),
+    'filename,notes,authors,licenses,urls\n',
+  );
+  const hairDefinitionPath = path.join(
+    assetsRoot,
+    'sheet_definitions',
+    'hair',
+    'braid.json',
+  );
+  mkdirSync(path.dirname(hairDefinitionPath), { recursive: true });
+  writeFileSync(hairDefinitionPath, JSON.stringify({
+    name: 'Braid',
+    type_name: 'hair',
+    animations: ['walk'],
+    credits: [],
+    layer_1: { zPos: 50, male: 'hair/braid/', female: 'hair/braid/' },
+  }));
+  const store = createDirectoryAssetStore(assetsRoot);
+  return {
+    context: createRuntimeContext({
+      cwd: workspaceRoot,
+      assetsRoot,
+      customAssetsRoot: path.join(workspaceRoot, 'assets_custom'),
+      spritesheetsBaseUrl: store.baseUrl,
+    }),
+    store,
+    source: 'managed-cache',
+  };
+}
+
+async function createInstallArchive(workspaceRoot: string): Promise<string> {
+  const sourcePath = 'sprites/moon-braid/foreground/walk.png';
+  const geometry = standardAnimationGeometry('walk');
+  const maxColumn = Math.max(
+    ...geometry.rows.flatMap((row) => row.cells.map((cell) => cell.sourceColumn)),
+  );
+  const canvas = createCanvas(
+    (maxColumn + 1) * geometry.frameSize,
+    geometry.rows.length * geometry.frameSize,
+  );
+  const context = canvas.getContext('2d');
+  context.fillStyle = '#884422';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  const source: AssetPackSource = {
+    schema: ASSET_PACK_SCHEMA,
+    id: 'acme.lifecycle',
+    version: '1.0.0',
+    displayName: 'ACME Lifecycle',
+    credits: {
+      authors: ['Pack Artist'],
+      licenses: ['CC-BY-SA 4.0'],
+      urls: ['https://example.test/pack-artist'],
+      notes: 'Task 12 CLI fixture.',
+    },
+    assets: [{
+      kind: 'new-item',
+      localId: 'moon-braid',
+      displayName: 'Moon Braid',
+      typeName: 'hair',
+      bodyTypes: ['male', 'female'],
+      animations: ['walk'],
+      layers: [{
+        id: 'foreground',
+        zPos: 120,
+        sprites: [{ animation: 'walk', source: sourcePath }],
+      }],
+    }],
+  };
+  const bytes = await createDeterministicAssetPackArchive({
+    manifestBytes: Buffer.from(`${JSON.stringify(source, null, 2)}\n`),
+    sourceBytes: new Map([[sourcePath, canvas.toBuffer('image/png')]]),
+  });
+  const archivePath = path.join(workspaceRoot, 'acme.lifecycle-1.0.0.lpc-assets.zip');
+  writeFileSync(archivePath, bytes);
+  return archivePath;
 }
 
 function createAuditRuntime(): RuntimeAssets {
@@ -324,6 +418,171 @@ describe('main json behavior', () => {
       ]),
     });
   });
+
+  it('keeps invalid archive inspection data in a completed response and omits its snapshot', async () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-main-json-inspect-'));
+    const archivePath = path.join(cwd, 'invalid.lpc-assets.zip');
+    writeFileSync(archivePath, 'not a zip');
+    const runtime = createLifecycleRuntime(cwd);
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+
+    const code = await runCli([
+      'asset', 'inspect', archivePath, '--json',
+    ], {
+      cwd,
+      stdout: (text) => stdout.push(text),
+      stderr: (text) => stderr.push(text),
+    }, {
+      prepareRuntimeAssets: async () => runtime,
+      findAssetWorkspace: () => {
+        throw new Error('asset inspect must not discover a workspace');
+      },
+    });
+
+    const response = JSON.parse(stdout.join('')) as {
+      readonly data: Readonly<Record<string, unknown>>;
+    };
+    expect(code).toBe(1);
+    expect(stderr).toEqual([]);
+    expect(response).toMatchObject({
+      ok: true,
+      command: 'asset inspect',
+      data: {
+        archivePath,
+        valid: false,
+        diagnostics: expect.arrayContaining([
+          expect.objectContaining({ code: 'asset_archive_invalid' }),
+        ]),
+      },
+      warnings: [],
+      errors: [],
+    });
+    expect(response.data).not.toHaveProperty('snapshot');
+  });
+
+  it('keeps unhealthy doctor data in a completed response while exiting one', async () => {
+    const workspaceRoot = mkdtempSync(path.join(tmpdir(), 'lpc-main-json-doctor-'));
+    const workspace = initializeAssetWorkspace(workspaceRoot);
+    writeFileSync(path.join(workspace.outputRoot, '.lpc-toolkit-managed.json'), '{}');
+    const runtime = createLifecycleRuntime(workspaceRoot);
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+
+    const code = await runCli([
+      'asset', 'doctor', '--workspace', workspaceRoot, '--json',
+    ], {
+      cwd: workspaceRoot,
+      stdout: (text) => stdout.push(text),
+      stderr: (text) => stderr.push(text),
+    }, { prepareRuntimeAssets: async () => runtime });
+
+    expect(code).toBe(1);
+    expect(stderr).toEqual([]);
+    expect(JSON.parse(stdout.join(''))).toMatchObject({
+      ok: true,
+      command: 'asset doctor',
+      data: {
+        healthy: false,
+        recovery: 'none',
+        checks: expect.arrayContaining([
+          expect.objectContaining({ status: 'error' }),
+        ]),
+      },
+      warnings: [],
+      errors: [],
+    });
+  });
+
+  it.each([
+    ['pack', 'missing-pack'],
+    ['install', 'invalid.lpc-assets.zip'],
+    ['remove', 'missing.pack'],
+  ])('uses a fatal envelope for asset %s lifecycle failures', async (command, positional) => {
+    const workspaceRoot = mkdtempSync(path.join(tmpdir(), `lpc-main-json-${command}-`));
+    initializeAssetWorkspace(workspaceRoot);
+    writeFileSync(path.join(workspaceRoot, 'invalid.lpc-assets.zip'), 'not a zip');
+    const runtime = createLifecycleRuntime(workspaceRoot);
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+
+    const code = await runCli([
+      'asset', command, positional, '--workspace', workspaceRoot, '--json',
+    ], {
+      cwd: workspaceRoot,
+      stdout: (text) => stdout.push(text),
+      stderr: (text) => stderr.push(text),
+    }, { prepareRuntimeAssets: async () => runtime });
+
+    expect(code).toBe(1);
+    expect(stderr).toEqual([]);
+    expect(JSON.parse(stdout.join(''))).toMatchObject({
+      ok: false,
+      command: `asset ${command}`,
+      data: null,
+      errors: expect.arrayContaining([
+        expect.objectContaining({ code: expect.any(String) }),
+      ]),
+    });
+  });
+
+  it('returns an empty list as a successful no-op', async () => {
+    const workspaceRoot = mkdtempSync(path.join(tmpdir(), 'lpc-main-json-list-'));
+    initializeAssetWorkspace(workspaceRoot);
+    const stdout: string[] = [];
+
+    const code = await runCli([
+      'asset', 'list', '--workspace', workspaceRoot, '--json',
+    ], {
+      cwd: workspaceRoot,
+      stdout: (text) => stdout.push(text),
+      stderr: () => undefined,
+    }, {
+      prepareRuntimeAssets: async () => {
+        throw new Error('asset list must not prepare runtime assets');
+      },
+    });
+
+    expect(code).toBe(0);
+    expect(JSON.parse(stdout.join(''))).toEqual({
+      ok: true,
+      command: 'asset list',
+      data: { recovery: 'none', entries: [] },
+      warnings: [],
+      errors: [],
+    });
+  });
+
+  it('returns an identical install as a successful no-op without exposing archive snapshots', async () => {
+    const workspaceRoot = mkdtempSync(path.join(tmpdir(), 'lpc-main-json-install-noop-'));
+    initializeAssetWorkspace(workspaceRoot);
+    const runtime = createLifecycleRuntime(workspaceRoot);
+    const archivePath = await createInstallArchive(workspaceRoot);
+    const runInstall = async () => {
+      const stdout: string[] = [];
+      const code = await runCli([
+        'asset', 'install', archivePath, '--workspace', workspaceRoot, '--json',
+      ], {
+        cwd: workspaceRoot,
+        stdout: (text) => stdout.push(text),
+        stderr: () => undefined,
+      }, { prepareRuntimeAssets: async () => runtime });
+      return { code, response: JSON.parse(stdout.join('')) as Readonly<Record<string, unknown>> };
+    };
+
+    const first = await runInstall();
+    expect(first.code, JSON.stringify(first.response, null, 2)).toBe(0);
+    const second = await runInstall();
+    expect(second.code).toBe(0);
+    expect(second.response).toMatchObject({
+      ok: true,
+      command: 'asset install',
+      data: { action: 'unchanged', packId: 'acme.lifecycle', version: '1.0.0' },
+      warnings: [],
+      errors: [],
+    });
+    expect(second.response.data).not.toHaveProperty('snapshot');
+  }, 30000);
 
   it('reports normalization in the JSON envelope after an upstream character mutation', async () => {
     const runtime = createRuntime();

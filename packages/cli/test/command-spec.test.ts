@@ -117,15 +117,19 @@ describe('helpForCommand', () => {
     );
   });
 
-  it('renders the complete Phase 1 asset command tree', () => {
+  it('renders the complete Phase 2 asset command tree', () => {
     const rootHelp = helpForCommand(['asset']);
     expect(rootHelp).toContain('lpc-toolkit asset workspace <command>');
     expect(rootHelp).toContain('lpc-toolkit asset init');
     expect(rootHelp).toContain('lpc-toolkit asset validate');
     expect(rootHelp).toContain('lpc-toolkit asset preview');
     expect(rootHelp).toContain('lpc-toolkit asset sync');
-    expect(rootHelp).not.toContain('lpc-toolkit asset pack');
-    expect(rootHelp).not.toContain('lpc-toolkit asset install');
+    expect(rootHelp).toContain('lpc-toolkit asset pack');
+    expect(rootHelp).toContain('lpc-toolkit asset inspect');
+    expect(rootHelp).toContain('lpc-toolkit asset install');
+    expect(rootHelp).toContain('lpc-toolkit asset list');
+    expect(rootHelp).toContain('lpc-toolkit asset remove');
+    expect(rootHelp).toContain('lpc-toolkit asset doctor');
 
     const workspaceHelp = helpForCommand(['asset', 'workspace']);
     expect(workspaceHelp).toContain(
@@ -133,7 +137,7 @@ describe('helpForCommand', () => {
     );
   });
 
-  it('documents every Phase 1 asset leaf and no Phase 2 commands', () => {
+  it('documents every Phase 1 asset leaf', () => {
     expect(helpForCommand(['asset', 'workspace', 'init'])).toContain(
       'lpc-toolkit asset workspace init <directory>',
     );
@@ -188,6 +192,60 @@ describe('helpForCommand', () => {
     expect(syncHelp).toContain('lpc-toolkit asset sync <pack-directory>');
     expect(syncHelp).toContain('--workspace <directory>');
     expect(syncHelp).toContain('--json');
+  });
+
+  it.each([
+    [
+      'pack',
+      'lpc-toolkit asset pack <pack-directory> [--workspace <directory>] [--json]',
+    ],
+    [
+      'inspect',
+      'lpc-toolkit asset inspect <pack.lpc-assets.zip> [--json]',
+    ],
+    [
+      'install',
+      'lpc-toolkit asset install <pack.lpc-assets.zip> [--workspace <directory>] [--json]',
+    ],
+    [
+      'list',
+      'lpc-toolkit asset list [--workspace <directory>] [--json]',
+    ],
+    [
+      'remove',
+      'lpc-toolkit asset remove <pack-id> [--workspace <directory>] [--json]',
+    ],
+    [
+      'doctor',
+      'lpc-toolkit asset doctor [--workspace <directory>] [--json]',
+    ],
+  ])('documents the exact asset %s usage and an example', (command, usage) => {
+    const help = helpForCommand(['asset', command]);
+
+    expect(help).toContain(`Usage:\n  ${usage}`);
+    expect(help).toContain(`Examples:\n  lpc-toolkit asset ${command}`);
+    expect(help).toContain('--json');
+    if (command === 'inspect') {
+      expect(help).not.toContain('--workspace');
+    } else {
+      expect(help).toContain('--workspace <directory>');
+    }
+  });
+
+  it('does not advertise unapproved lifecycle bypass or tuning options', () => {
+    for (const command of ['pack', 'inspect', 'install', 'list', 'remove', 'doctor']) {
+      const help = helpForCommand(['asset', command]);
+      for (const option of [
+        '--force',
+        '--ignore-warnings',
+        '--allow-downgrade',
+        '--repair',
+        '--archive-limit',
+        '--concurrency',
+      ]) {
+        expect(help).not.toContain(option);
+      }
+    }
   });
 });
 
@@ -288,6 +346,30 @@ describe('validateCommandOptions', () => {
     ]))).toMatchObject({
       code: 'invalid_option',
       path: '--pack-id',
+    });
+  });
+
+  it.each([
+    ['pack', '--force'],
+    ['inspect', '--archive-limit'],
+    ['install', '--allow-downgrade'],
+    ['list', '--concurrency'],
+    ['remove', '--ignore-warnings'],
+    ['doctor', '--repair'],
+  ])('rejects the prohibited asset %s option %s', (command, option) => {
+    const positional = command === 'pack'
+      ? ['pack-directory']
+      : command === 'inspect' || command === 'install'
+        ? ['pack.lpc-assets.zip']
+        : command === 'remove'
+          ? ['acme.pack']
+          : [];
+
+    expect(validateCommandOptions(parseArgs([
+      'asset', command, ...positional, option,
+    ]))).toMatchObject({
+      code: 'unknown_option',
+      path: option,
     });
   });
 });

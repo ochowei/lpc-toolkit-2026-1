@@ -11,6 +11,10 @@ import {
   flagStrings,
   type ParsedArgs,
 } from './args.js';
+import { doctorAssetPacks } from './asset-pack-doctor.js';
+import { inspectAssetPackArchive } from './asset-pack-inspection.js';
+import { installAssetPack } from './asset-pack-install.js';
+import { packAssetPack } from './asset-pack-packaging.js';
 import {
   scaffoldAuditAssetPack,
   scaffoldNewAssetPack,
@@ -19,6 +23,7 @@ import {
   AssetPackPreviewError,
   previewAssetPack,
 } from './asset-pack-preview.js';
+import { listAssetPacks, removeAssetPack } from './asset-pack-remove.js';
 import { syncLinkedAssetPack } from './asset-pack-sync.js';
 import {
   loadActiveAssetPackBaseline,
@@ -40,11 +45,92 @@ const LOCAL_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 const SEMVER_PATTERN =
   /^\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/u;
 
+export interface AssetCommandRequirements {
+  readonly workspace: boolean;
+  readonly runtime: boolean;
+}
+
 interface AssetCommandContext {
   readonly parsed: ParsedArgs;
   readonly cwd: string;
+  readonly workspace?: AssetWorkspace;
+  readonly runtime?: RuntimeAssets;
+}
+
+type WorkspaceAssetCommandContext = AssetCommandContext & {
   readonly workspace: AssetWorkspace;
+};
+
+type RuntimeAssetCommandContext = AssetCommandContext & {
   readonly runtime: RuntimeAssets;
+};
+
+type WorkspaceRuntimeAssetCommandContext = WorkspaceAssetCommandContext &
+  RuntimeAssetCommandContext;
+
+const NO_ASSET_COMMAND_REQUIREMENTS: AssetCommandRequirements = {
+  workspace: false,
+  runtime: false,
+};
+const INSPECTION_REQUIREMENTS: AssetCommandRequirements = {
+  workspace: false,
+  runtime: true,
+};
+const LIST_REQUIREMENTS: AssetCommandRequirements = {
+  workspace: true,
+  runtime: false,
+};
+const WORKSPACE_RUNTIME_REQUIREMENTS: AssetCommandRequirements = {
+  workspace: true,
+  runtime: true,
+};
+
+export function assetCommandRequirements(
+  parsed: ParsedArgs,
+): AssetCommandRequirements | undefined {
+  if (parsed.command[0] !== 'asset') return undefined;
+  if (parsed.command[1] === 'workspace' && parsed.command[2] === 'init') {
+    return NO_ASSET_COMMAND_REQUIREMENTS;
+  }
+  if (parsed.command[1] === 'inspect') return INSPECTION_REQUIREMENTS;
+  if (parsed.command[1] === 'list') return LIST_REQUIREMENTS;
+  if ([
+    'init',
+    'validate',
+    'preview',
+    'sync',
+    'pack',
+    'install',
+    'remove',
+    'doctor',
+  ].includes(parsed.command[1] ?? '')) {
+    return WORKSPACE_RUNTIME_REQUIREMENTS;
+  }
+  return undefined;
+}
+
+function requireWorkspace<T extends AssetCommandContext>(
+  context: T,
+): T & WorkspaceAssetCommandContext {
+  if (context.workspace === undefined) {
+    throw new Error(`Asset command requires a workspace: ${context.parsed.command.join(' ')}.`);
+  }
+  return { ...context, workspace: context.workspace };
+}
+
+function requireRuntime<T extends AssetCommandContext>(
+  context: T,
+): T & RuntimeAssetCommandContext {
+  if (context.runtime === undefined) {
+    throw new Error(`Asset command requires runtime assets: ${context.parsed.command.join(' ')}.`);
+  }
+  return { ...context, runtime: context.runtime };
+}
+
+function requireWorkspaceRuntime(
+  context: AssetCommandContext,
+): WorkspaceRuntimeAssetCommandContext {
+  return requireRuntime(requireWorkspace(context));
 }
 
 function issue(
@@ -223,21 +309,34 @@ function initIssue(parsed: ParsedArgs): CliIssue | undefined {
   return undefined;
 }
 
-function positionalPackIssue(parsed: ParsedArgs): CliIssue | undefined {
+function exactlyOnePositionalIssue(
+  parsed: ParsedArgs,
+  argument: string,
+): CliIssue | undefined {
   if (!parsed.positionals[0]) {
     return issue(
       'missing_argument',
-      `${parsed.command.join(' ')} requires a pack directory.`,
+      `${parsed.command.join(' ')} requires ${argument}.`,
     );
   }
   if (parsed.positionals.length > 1) {
     return issue(
       'unexpected_argument',
-      `${parsed.command.join(' ')} accepts only one pack directory.`,
+      `${parsed.command.join(' ')} accepts exactly one ${argument}.`,
       parsed.positionals[1],
     );
   }
   return undefined;
+}
+
+function noPositionalIssue(parsed: ParsedArgs): CliIssue | undefined {
+  return parsed.positionals.length === 0
+    ? undefined
+    : issue(
+      'unexpected_argument',
+      `${parsed.command.join(' ')} does not accept positional arguments.`,
+      parsed.positionals[0],
+    );
 }
 
 export function preflightAssetCommand(
@@ -267,10 +366,36 @@ export function preflightAssetCommand(
     return initInputIssue ? commandError('asset init', initInputIssue) : undefined;
   }
 
-  if (subcommand === 'validate' || subcommand === 'preview' || subcommand === 'sync') {
-    const packIssue = positionalPackIssue(parsed);
+  if (
+    subcommand === 'validate'
+    || subcommand === 'preview'
+    || subcommand === 'sync'
+    || subcommand === 'pack'
+  ) {
+    const packIssue = exactlyOnePositionalIssue(parsed, 'a pack directory');
     return packIssue
       ? commandError(`asset ${subcommand}`, packIssue)
+      : undefined;
+  }
+
+  if (subcommand === 'inspect' || subcommand === 'install') {
+    const archiveIssue = exactlyOnePositionalIssue(parsed, 'an asset-pack archive');
+    return archiveIssue
+      ? commandError(`asset ${subcommand}`, archiveIssue)
+      : undefined;
+  }
+
+  if (subcommand === 'remove') {
+    const packIdIssue = exactlyOnePositionalIssue(parsed, 'a pack id');
+    return packIdIssue
+      ? commandError('asset remove', packIdIssue)
+      : undefined;
+  }
+
+  if (subcommand === 'list' || subcommand === 'doctor') {
+    const positionalIssue = noPositionalIssue(parsed);
+    return positionalIssue
+      ? commandError(`asset ${subcommand}`, positionalIssue)
       : undefined;
   }
 
@@ -359,7 +484,7 @@ function packDirectory(parsed: ParsedArgs, cwd: string): string {
 async function runInitCommand(
   context: AssetCommandContext,
 ): Promise<CliResponse<unknown>> {
-  const { parsed, cwd, workspace, runtime } = context;
+  const { parsed, cwd, workspace, runtime } = requireWorkspaceRuntime(context);
   const outputDirectory = scaffoldOutputDirectory(parsed, cwd, workspace);
   if (typeof outputDirectory !== 'string') {
     return commandError('asset init', outputDirectory);
@@ -427,11 +552,12 @@ function previewErrorResponse(error: unknown): CliResponse<null> {
 export async function runAssetCommand(
   context: AssetCommandContext,
 ): Promise<CliResponse<unknown>> {
-  const { parsed, cwd, workspace, runtime } = context;
+  const { parsed, cwd } = context;
   const subcommand = parsed.command[1];
   try {
     if (subcommand === 'init') return await runInitCommand(context);
     if (subcommand === 'validate') {
+      const { workspace, runtime } = requireWorkspaceRuntime(context);
       const report = await validateAssetPackDirectory({
         packDirectory: packDirectory(parsed, cwd),
         workspace,
@@ -440,6 +566,7 @@ export async function runAssetCommand(
       return commandOk('asset validate', report);
     }
     if (subcommand === 'preview') {
+      const { workspace, runtime } = requireWorkspaceRuntime(context);
       const result = await previewAssetPack({
         packDirectory: packDirectory(parsed, cwd),
         workspace,
@@ -460,6 +587,7 @@ export async function runAssetCommand(
       return commandOk('asset preview', result, result.warnings);
     }
     if (subcommand === 'sync') {
+      const { workspace, runtime } = requireWorkspaceRuntime(context);
       const result = await syncLinkedAssetPack({
         packDirectory: packDirectory(parsed, cwd),
         workspace,
@@ -472,6 +600,78 @@ export async function runAssetCommand(
         generatedFileCount: result.linked.generatedPaths.length,
         outputPath: workspace.outputRoot,
       });
+    }
+    if (subcommand === 'pack') {
+      const { workspace, runtime } = requireWorkspaceRuntime(context);
+      const result = await packAssetPack({
+        packDirectory: packDirectory(parsed, cwd),
+        workspace,
+        runtime,
+      });
+      if (!result.ok) return commandFailure('asset pack', result.diagnostics);
+      return commandOk('asset pack', {
+        packId: result.packId,
+        version: result.version,
+        contentDigest: result.contentDigest,
+        archiveDigest: result.archiveDigest,
+        archivePath: result.archivePath,
+        entryCount: result.entryCount,
+      });
+    }
+    if (subcommand === 'inspect') {
+      const { runtime } = requireRuntime(context);
+      const result = await inspectAssetPackArchive({
+        archivePath: path.resolve(cwd, parsed.positionals[0]!),
+        runtime,
+      });
+      return commandOk('asset inspect', result.report);
+    }
+    if (subcommand === 'install') {
+      const { workspace, runtime } = requireWorkspaceRuntime(context);
+      const result = await installAssetPack({
+        archivePath: path.resolve(cwd, parsed.positionals[0]!),
+        workspace,
+        runtime,
+      });
+      if (!result.ok) return commandFailure('asset install', result.diagnostics);
+      return commandOk('asset install', {
+        action: result.action,
+        packId: result.packId,
+        version: result.version,
+        archiveDigest: result.archiveDigest,
+        installedDirectory: result.installedDirectory,
+        outputPath: workspace.outputRoot,
+        generatedFileCount: result.generatedFileCount,
+      });
+    }
+    if (subcommand === 'list') {
+      const { workspace } = requireWorkspace(context);
+      const result = listAssetPacks({ workspace });
+      if (!result.ok) return commandFailure('asset list', result.diagnostics);
+      return commandOk('asset list', {
+        recovery: result.recovery,
+        entries: result.entries,
+      });
+    }
+    if (subcommand === 'remove') {
+      const { workspace, runtime } = requireWorkspaceRuntime(context);
+      const result = await removeAssetPack({
+        packId: parsed.positionals[0]!,
+        workspace,
+        runtime,
+      });
+      if (!result.ok) return commandFailure('asset remove', result.diagnostics);
+      return commandOk('asset remove', {
+        packId: result.packId,
+        removedKind: result.removedKind,
+        remainingPackIds: result.remainingPackIds,
+        remainingCount: result.remainingPackIds.length,
+        generatedFileCount: result.generatedFileCount,
+      });
+    }
+    if (subcommand === 'doctor') {
+      const { workspace, runtime } = requireWorkspaceRuntime(context);
+      return commandOk('asset doctor', await doctorAssetPacks({ workspace, runtime }));
     }
   } catch (error) {
     if (subcommand === 'preview') return previewErrorResponse(error);

@@ -189,6 +189,54 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
     examples: ['lpc-toolkit asset sync ./artist-packs/acme.hair --json'],
   },
   {
+    command: ['asset', 'pack'],
+    usage: 'lpc-toolkit asset pack <pack-directory> [--workspace <directory>] [--json]',
+    description: 'Validate and publish a deterministic asset-pack archive.',
+    options: [HELP_OPTION, JSON_OPTION, ASSET_WORKSPACE_OPTION],
+    examples: [
+      'lpc-toolkit asset pack ./artist-packs/acme.hair --workspace ./my-lpc-art --json',
+    ],
+  },
+  {
+    command: ['asset', 'inspect'],
+    usage: 'lpc-toolkit asset inspect <pack.lpc-assets.zip> [--json]',
+    description: 'Inspect and validate an asset-pack archive without installing it.',
+    options: [HELP_OPTION, JSON_OPTION],
+    examples: [
+      'lpc-toolkit asset inspect ./acme.hair-1.0.0.lpc-assets.zip --json',
+    ],
+  },
+  {
+    command: ['asset', 'install'],
+    usage: 'lpc-toolkit asset install <pack.lpc-assets.zip> [--workspace <directory>] [--json]',
+    description: 'Install or update a verified asset-pack archive.',
+    options: [HELP_OPTION, JSON_OPTION, ASSET_WORKSPACE_OPTION],
+    examples: [
+      'lpc-toolkit asset install ./acme.hair-1.0.0.lpc-assets.zip --workspace ./my-lpc-art --json',
+    ],
+  },
+  {
+    command: ['asset', 'list'],
+    usage: 'lpc-toolkit asset list [--workspace <directory>] [--json]',
+    description: 'List active linked and installed asset packs.',
+    options: [HELP_OPTION, JSON_OPTION, ASSET_WORKSPACE_OPTION],
+    examples: ['lpc-toolkit asset list --workspace ./my-lpc-art --json'],
+  },
+  {
+    command: ['asset', 'remove'],
+    usage: 'lpc-toolkit asset remove <pack-id> [--workspace <directory>] [--json]',
+    description: 'Deactivate an asset pack and rebuild managed output.',
+    options: [HELP_OPTION, JSON_OPTION, ASSET_WORKSPACE_OPTION],
+    examples: ['lpc-toolkit asset remove acme.hair --workspace ./my-lpc-art --json'],
+  },
+  {
+    command: ['asset', 'doctor'],
+    usage: 'lpc-toolkit asset doctor [--workspace <directory>] [--json]',
+    description: 'Audit asset-pack lifecycle state and narrowly recover interrupted publication.',
+    options: [HELP_OPTION, JSON_OPTION, ASSET_WORKSPACE_OPTION],
+    examples: ['lpc-toolkit asset doctor --workspace ./my-lpc-art --json'],
+  },
+  {
     command: ['catalog'],
     usage: 'lpc-toolkit catalog <command>',
     description: 'Inspect the LPC asset catalog.',

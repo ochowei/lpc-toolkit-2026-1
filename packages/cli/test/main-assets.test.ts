@@ -10,6 +10,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { parseArgs } from '../src/args.js';
+import { assetCommandRequirements } from '../src/asset-commands.js';
 import { AssetCacheError } from '../src/asset-cache.js';
 import { createDirectoryAssetStore } from '../src/asset-store.js';
 import { initializeAssetWorkspace } from '../src/asset-workspace.js';
@@ -106,6 +107,25 @@ describe('asset preparation dispatch', () => {
   const runtime = makeRuntimeAssets();
 
   it.each([
+    { argv: ['asset', 'workspace', 'init', 'workspace'], workspace: false, runtime: false },
+    { argv: ['asset', 'inspect', 'pack.lpc-assets.zip'], workspace: false, runtime: true },
+    { argv: ['asset', 'list'], workspace: true, runtime: false },
+    { argv: ['asset', 'init', '--new'], workspace: true, runtime: true },
+    { argv: ['asset', 'validate', 'pack'], workspace: true, runtime: true },
+    { argv: ['asset', 'preview', 'pack'], workspace: true, runtime: true },
+    { argv: ['asset', 'sync', 'pack'], workspace: true, runtime: true },
+    { argv: ['asset', 'pack', 'pack'], workspace: true, runtime: true },
+    { argv: ['asset', 'install', 'pack.lpc-assets.zip'], workspace: true, runtime: true },
+    { argv: ['asset', 'remove', 'acme.pack'], workspace: true, runtime: true },
+    { argv: ['asset', 'doctor'], workspace: true, runtime: true },
+  ])('declares workspace/runtime requirements for $argv', ({ argv, workspace, runtime: needsRuntime }) => {
+    expect(assetCommandRequirements(parseArgs(argv))).toEqual({
+      workspace,
+      runtime: needsRuntime,
+    });
+  });
+
+  it.each([
     [['token', 'decode', '--token', 'v1.example']],
     [['preset', 'list']],
     [['character', 'list']],
@@ -148,6 +168,12 @@ describe('asset preparation dispatch', () => {
     ['asset', 'validate', '--help'],
     ['asset', 'preview', '--help'],
     ['asset', 'sync', '--help'],
+    ['asset', 'pack', '--help'],
+    ['asset', 'inspect', '--help'],
+    ['asset', 'install', '--help'],
+    ['asset', 'list', '--help'],
+    ['asset', 'remove', '--help'],
+    ['asset', 'doctor', '--help'],
   ])('shows asset help for %j without preparing runtime assets', async (...argv) => {
     const prepare = vi.fn(async (_options: PrepareRuntimeAssetsOptions) => runtime);
     const capture = captureIo(runtime.context.repoRoot);
@@ -251,6 +277,30 @@ describe('asset preparation dispatch', () => {
         writeFileSync(path.join(pack, 'asset-pack.json'), '{}');
       },
     },
+    {
+      name: 'packaging',
+      argv: ['asset', 'pack', 'artist-packs/invalid'],
+      prepareWorkspace: (root: string) => {
+        const pack = path.join(root, 'artist-packs', 'invalid');
+        mkdirSync(pack, { recursive: true });
+        writeFileSync(path.join(pack, 'asset-pack.json'), '{}');
+      },
+    },
+    {
+      name: 'installation',
+      argv: ['asset', 'install', 'invalid.lpc-assets.zip'],
+      prepareWorkspace: (root: string) => {
+        writeFileSync(path.join(root, 'invalid.lpc-assets.zip'), 'not a zip');
+      },
+    },
+    {
+      name: 'removal',
+      argv: ['asset', 'remove', 'missing.pack'],
+    },
+    {
+      name: 'doctor',
+      argv: ['asset', 'doctor'],
+    },
   ])('discovers the workspace before preparing assets for $name', async ({
     argv,
     prepareWorkspace,
@@ -287,16 +337,77 @@ describe('asset preparation dispatch', () => {
     ['asset', 'validate'],
     ['asset', 'preview'],
     ['asset', 'sync'],
-    ['asset', 'pack', 'artist-packs/acme.hair'],
+    ['asset', 'pack'],
+    ['asset', 'pack', 'one', 'two'],
+    ['asset', 'inspect'],
+    ['asset', 'inspect', 'one.zip', 'two.zip'],
+    ['asset', 'install'],
+    ['asset', 'install', 'one.zip', 'two.zip'],
+    ['asset', 'list', 'unexpected'],
+    ['asset', 'remove'],
+    ['asset', 'remove', 'one', 'two'],
+    ['asset', 'doctor', 'unexpected'],
+    ['asset', 'doctor', '--repair'],
   ])('rejects invalid asset input before preparing assets: %j', async (...argv) => {
     const prepare = vi.fn(async (_options: PrepareRuntimeAssetsOptions) => runtime);
+    const findWorkspace = vi.fn(() => {
+      throw new Error('invalid preflight must not discover a workspace');
+    });
     const capture = captureIo(runtime.context.repoRoot);
 
     expect(await runCli([...argv, '--json'], capture.io, {
       prepareRuntimeAssets: prepare,
+      findAssetWorkspace: findWorkspace,
     })).toBe(1);
     expect(prepare).not.toHaveBeenCalled();
+    expect(findWorkspace).not.toHaveBeenCalled();
     expect(JSON.parse(capture.stdout.join(''))).toMatchObject({ ok: false });
+  });
+
+  it('inspects at the current cwd with managed cache assets and no workspace discovery', async () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-main-asset-inspect-'));
+    writeFileSync(path.join(cwd, 'invalid.lpc-assets.zip'), 'not a zip');
+    const prepare = vi.fn(async (_options: PrepareRuntimeAssetsOptions) => runtime);
+    const findWorkspace = vi.fn(() => {
+      throw new Error('asset inspect must not discover a workspace');
+    });
+    const capture = captureIo(cwd);
+
+    expect(await runCli([
+      'asset', 'inspect', 'invalid.lpc-assets.zip', '--json',
+    ], capture.io, {
+      prepareRuntimeAssets: prepare,
+      findAssetWorkspace: findWorkspace,
+    })).toBe(1);
+
+    expect(findWorkspace).not.toHaveBeenCalled();
+    expect(prepare).toHaveBeenCalledWith(expect.objectContaining({
+      cwd,
+      managedCacheOnly: true,
+    }));
+  });
+
+  it('lists and recovers workspace state without preparing base assets', async () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'lpc-main-asset-list-'));
+    const workspace = initializeAssetWorkspace(root);
+    const prepare = vi.fn(async (_options: PrepareRuntimeAssetsOptions) => {
+      throw new Error('asset list must not prepare runtime assets');
+    });
+    const findWorkspace = vi.fn(() => workspace);
+    const capture = captureIo(root);
+
+    expect(await runCli(['asset', 'list', '--json'], capture.io, {
+      prepareRuntimeAssets: prepare,
+      findAssetWorkspace: findWorkspace,
+    })).toBe(0);
+
+    expect(findWorkspace).toHaveBeenCalledOnce();
+    expect(prepare).not.toHaveBeenCalled();
+    expect(JSON.parse(capture.stdout.join(''))).toMatchObject({
+      ok: true,
+      command: 'asset list',
+      data: { recovery: 'none', entries: [] },
+    });
   });
 
   it('writes non-JSON validation diagnostics to stderr', async () => {

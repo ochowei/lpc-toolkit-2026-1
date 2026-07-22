@@ -9,6 +9,7 @@ import {
   type ParsedArgs,
 } from './args.js';
 import {
+  assetCommandRequirements,
   preflightAssetCommand,
   preflightAssetWorkspaceCommand,
   runAssetCommand,
@@ -18,6 +19,7 @@ import { AssetStoreError } from './asset-store.js';
 import {
   findAssetWorkspace,
   initializeAssetWorkspace,
+  type AssetWorkspace,
 } from './asset-workspace.js';
 import { runAnimationAuditCommand } from './animation-audit.js';
 import { SelectionOutputError } from './compose-selection.js';
@@ -112,13 +114,22 @@ function writeResponse(
   io: CliIo,
   humanSuccess: string,
 ): number {
-  const validationFailed = response.ok
-    && response.command === 'asset validate'
+  const reportFailed = response.ok
+    && (
+      response.command === 'asset validate'
+      || response.command === 'asset inspect'
+    )
     && typeof response.data === 'object'
     && response.data !== null
     && 'valid' in response.data
     && response.data.valid === false;
-  const exitCode = response.ok && !validationFailed ? 0 : 1;
+  const doctorFailed = response.ok
+    && response.command === 'asset doctor'
+    && typeof response.data === 'object'
+    && response.data !== null
+    && 'healthy' in response.data
+    && response.data.healthy === false;
+  const exitCode = response.ok && !reportFailed && !doctorFailed ? 0 : 1;
   if (flagBoolean(parsed.flags, 'json')) {
     io.stdout(formatJsonResponse(response));
   } else if (exitCode === 0) {
@@ -132,8 +143,7 @@ function writeResponse(
 export function commandNeedsAssets(parsed: ParsedArgs): boolean {
   if (parsed.flags.has('help')) return false;
   if (parsed.command[0] === 'asset') {
-    return parsed.command[1] !== undefined
-      && parsed.command[1] !== 'workspace';
+    return assetCommandRequirements(parsed)?.runtime ?? false;
   }
   if (parsed.command[0] === 'catalog') return true;
   if (parsed.command[0] === 'selection') return true;
@@ -382,18 +392,12 @@ export async function runCli(
   }
 
   if (parsed.command[0] === 'asset') {
-    let workspace;
-    try {
-      workspace = resolvedDependencies.findAssetWorkspace(
-        io.cwd,
-        flagString(parsed.flags, 'workspace'),
-      );
-    } catch (error) {
+    const requirements = assetCommandRequirements(parsed);
+    if (requirements === undefined) {
       return writeResponse(
         commandError(parsed.command.join(' '), {
-          code: 'asset_workspace_not_found',
-          message: error instanceof Error ? error.message : 'Asset workspace not found.',
-          path: flagString(parsed.flags, 'workspace') ?? io.cwd,
+          code: 'unknown_command',
+          message: `Unknown asset command: ${parsed.command.join(' ')}`,
         }),
         parsed,
         io,
@@ -401,37 +405,60 @@ export async function runCli(
       );
     }
 
-    const workspacePreflightResponse = preflightAssetWorkspaceCommand(
-      parsed,
-      io.cwd,
-      workspace,
-    );
-    if (workspacePreflightResponse !== undefined) {
-      return writeResponse(workspacePreflightResponse, parsed, io, '');
+    let workspace: AssetWorkspace | undefined;
+    if (requirements.workspace) {
+      try {
+        workspace = resolvedDependencies.findAssetWorkspace(
+          io.cwd,
+          flagString(parsed.flags, 'workspace'),
+        );
+      } catch (error) {
+        return writeResponse(
+          commandError(parsed.command.join(' '), {
+            code: 'asset_workspace_not_found',
+            message: error instanceof Error ? error.message : 'Asset workspace not found.',
+            path: flagString(parsed.flags, 'workspace') ?? io.cwd,
+          }),
+          parsed,
+          io,
+          '',
+        );
+      }
+
+      const workspacePreflightResponse = preflightAssetWorkspaceCommand(
+        parsed,
+        io.cwd,
+        workspace,
+      );
+      if (workspacePreflightResponse !== undefined) {
+        return writeResponse(workspacePreflightResponse, parsed, io, '');
+      }
     }
 
-    let assetRuntime: RuntimeAssets;
-    try {
-      assetRuntime = await resolvedDependencies.prepareRuntimeAssets({
-        cwd: workspace.root,
-        managedCacheOnly: true,
-        onProgress: (progress) =>
-          io.stderr(formatProgress(progress.phase, progress.message)),
-      });
-    } catch (error) {
-      return writeResponse(
-        commandError(parsed.command.join(' '), assetCacheErrorIssue(error)),
-        parsed,
-        io,
-        '',
-      );
+    let assetRuntime: RuntimeAssets | undefined;
+    if (requirements.runtime) {
+      try {
+        assetRuntime = await resolvedDependencies.prepareRuntimeAssets({
+          cwd: workspace?.root ?? io.cwd,
+          managedCacheOnly: true,
+          onProgress: (progress) =>
+            io.stderr(formatProgress(progress.phase, progress.message)),
+        });
+      } catch (error) {
+        return writeResponse(
+          commandError(parsed.command.join(' '), assetCacheErrorIssue(error)),
+          parsed,
+          io,
+          '',
+        );
+      }
     }
 
     const response = await runAssetCommand({
       parsed,
       cwd: io.cwd,
-      workspace,
-      runtime: assetRuntime,
+      ...(workspace === undefined ? {} : { workspace }),
+      ...(assetRuntime === undefined ? {} : { runtime: assetRuntime }),
     });
     return writeResponse(response, parsed, io, 'Asset command completed.\n');
   }

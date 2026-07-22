@@ -365,6 +365,201 @@ describe('human-readable CLI output', () => {
     expect(output).toContain('Workspace output: /workspace/assets_custom');
   });
 
+  it('prints packaged archive identity, digests, and path', () => {
+    const output = formatHumanResponse({
+      ok: true,
+      command: 'asset pack',
+      data: {
+        packId: 'acme.hair',
+        version: '1.0.0',
+        archivePath: '/workspace/artist-packs/acme.hair-1.0.0.lpc-assets.zip',
+        archiveDigest: `sha256:${'a'.repeat(64)}`,
+        contentDigest: `sha256:${'b'.repeat(64)}`,
+        entryCount: 4,
+      },
+      warnings: [],
+      errors: [],
+    }, 'fallback\n');
+
+    expect(output).toContain('Asset pack archived: acme.hair 1.0.0');
+    expect(output).toContain(
+      'Archive: /workspace/artist-packs/acme.hair-1.0.0.lpc-assets.zip',
+    );
+    expect(output).toContain(`Archive digest: sha256:${'a'.repeat(64)}`);
+    expect(output).toContain(`Content digest: sha256:${'b'.repeat(64)}`);
+  });
+
+  it('groups inspection diagnostics and prints exact acknowledgement JSON', () => {
+    const acknowledgement = {
+      code: 'asset_optional_frame_blank',
+      subject: { assetId: 'moon-braid', animation: 'walk' },
+      contentDigest: `sha256:${'c'.repeat(64)}`,
+      reason: '',
+    };
+    const output = formatHumanResponse({
+      ok: true,
+      command: 'asset inspect',
+      data: {
+        schema: 'lpc-toolkit.asset-pack-inspection.v1',
+        archivePath: '/packs/acme.hair.lpc-assets.zip',
+        archiveDigest: `sha256:${'a'.repeat(64)}`,
+        packId: 'acme.hair',
+        version: '1.0.0',
+        contentDigest: `sha256:${'b'.repeat(64)}`,
+        valid: false,
+        entryCount: 4,
+        totalUncompressedBytes: 2048,
+        diagnostics: [
+          {
+            code: 'asset_checksum_invalid',
+            severity: 'error',
+            message: 'Checksum coverage is invalid.',
+            path: 'checksums.json',
+          },
+          {
+            code: 'asset_cli_version_incompatible',
+            severity: 'error',
+            message: 'CLI version is too old.',
+          },
+          {
+            code: 'asset_required_frame_blank',
+            severity: 'error',
+            message: 'A required frame is blank.',
+            path: 'sprites/moon-braid/walk.png',
+          },
+          {
+            code: 'asset_base_credit_changed',
+            severity: 'error',
+            message: 'Baseline credit changed.',
+          },
+        ],
+        acknowledgementRecords: [acknowledgement],
+      },
+      warnings: [],
+      errors: [],
+    }, 'fallback\n');
+
+    expect(output).toContain('Asset pack inspection: invalid');
+    expect(output).toContain('Archive diagnostics (1):');
+    expect(output).toContain('Compatibility diagnostics (1):');
+    expect(output).toContain('Pixel diagnostics (1):');
+    expect(output).toContain('Credit diagnostics (1):');
+    expect(output).toContain('Acknowledgements (copy exact JSON and add a non-empty reason):');
+    expect(output).toContain(JSON.stringify([acknowledgement], null, 2));
+  });
+
+  it('prints install action, source, and generated output', () => {
+    const output = formatHumanResponse({
+      ok: true,
+      command: 'asset install',
+      data: {
+        action: 'upgraded',
+        packId: 'acme.hair',
+        version: '2.0.0',
+        archiveDigest: `sha256:${'a'.repeat(64)}`,
+        installedDirectory: '/workspace/.lpc-toolkit/asset-packs/installed/acme.hair/2.0.0/digest',
+        outputPath: '/workspace/assets_custom',
+        generatedFileCount: 7,
+      },
+      warnings: [],
+      errors: [],
+    }, 'fallback\n');
+
+    expect(output).toContain('Asset pack install: upgraded acme.hair 2.0.0');
+    expect(output).toContain(
+      'Source: /workspace/.lpc-toolkit/asset-packs/installed/acme.hair/2.0.0/digest',
+    );
+    expect(output).toContain('Workspace output: /workspace/assets_custom');
+  });
+
+  it('prints stable asset list columns', () => {
+    const output = formatHumanResponse({
+      ok: true,
+      command: 'asset list',
+      data: {
+        recovery: 'none',
+        entries: [
+          {
+            packId: 'acme.hair',
+            version: '1.0.0',
+            displayName: 'ACME Hair',
+            kind: 'linked',
+            sourcePath: '/workspace/artist-packs/acme.hair',
+            contentDigest: `sha256:${'a'.repeat(64)}`,
+          },
+          {
+            packId: 'acme.hats',
+            version: '2.0.0',
+            displayName: 'ACME Hats',
+            kind: 'installed',
+            sourcePath: '/workspace/.lpc-toolkit/asset-packs/installed/acme.hats',
+            contentDigest: `sha256:${'b'.repeat(64)}`,
+            archiveDigest: `sha256:${'c'.repeat(64)}`,
+          },
+        ],
+      },
+      warnings: [],
+      errors: [],
+    }, 'fallback\n');
+
+    expect(output).toContain('PACK ID');
+    expect(output).toContain('VERSION');
+    expect(output).toContain('KIND');
+    expect(output).toContain('SOURCE');
+    expect(output).toContain('acme.hair');
+    expect(output).toContain('linked');
+    expect(output).toContain('/workspace/artist-packs/acme.hair');
+    expect(output).toContain('acme.hats');
+    expect(output).toContain('installed');
+  });
+
+  it('prints removed kind and remaining count', () => {
+    const output = formatHumanResponse({
+      ok: true,
+      command: 'asset remove',
+      data: {
+        packId: 'acme.hair',
+        removedKind: 'linked',
+        remainingPackIds: ['acme.hats'],
+        remainingCount: 1,
+        generatedFileCount: 3,
+      },
+      warnings: [],
+      errors: [],
+    }, 'fallback\n');
+
+    expect(output).toContain('Asset pack removed: acme.hair (linked)');
+    expect(output).toContain('Remaining packs: 1');
+  });
+
+  it('prints doctor recovery and grouped checks without broad repair guidance', () => {
+    const output = formatHumanResponse({
+      ok: true,
+      command: 'asset doctor',
+      data: {
+        schema: 'lpc-toolkit.asset-pack-doctor.v1',
+        healthy: false,
+        recovery: 'rolled-back',
+        checks: [
+          { code: 'asset_output_root_unowned', status: 'error', message: 'Output is unowned.' },
+          { code: 'asset_registry_migration_required', status: 'warning', message: 'Migration is required.' },
+          { code: 'asset_transaction_recovery', status: 'pass', message: 'Transaction rolled back.' },
+        ],
+        packs: [],
+      },
+      warnings: [],
+      errors: [],
+    }, 'fallback\n');
+
+    expect(output).toContain('Asset pack doctor: unhealthy');
+    expect(output).toContain('Recovery: rolled-back');
+    expect(output).toContain('Errors (1):');
+    expect(output).toContain('Warnings (1):');
+    expect(output).toContain('Passed checks (1):');
+    expect(output).not.toContain('--force');
+    expect(output).not.toContain('--repair');
+  });
+
   it('prints warnings when they are the only reason an asset sync is blocked', () => {
     const output = formatHumanResponse({
       ok: false,
