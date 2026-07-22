@@ -1168,15 +1168,21 @@ Then update this task's plan record and commit it separately.
 - Consumes: registry v2, directory/payload loading, runtime baseline, validator, compiler, and Stable Interfaces.
 - Produces: `prepareAssetPackDesiredState` plus staged-generation materialization used by Tasks 8–11.
 
-- [ ] **Step 1: Write failing mixed-state tests**
+- [x] **Step 1: Write failing mixed-state tests**
+
+  - Implementation: Added linked-only, installed-only, mixed, upsert/remove/none, ordering, conflict, replacement, attribution, and stale-baseline tests.
 
 Build registries with linked only, installed only, and both. Assert stable pack-ID order, fresh linked validation, installed payload/receipt verification, upsert replacing the same pack ID candidate only, remove excluding exactly one pack, none preserving all, disjoint patches merging, cross-package replacement authorization, true conflict, attribution union, and stale baseline rejection.
 
-- [ ] **Step 2: Write failing generated-state tests**
+- [x] **Step 2: Write failing generated-state tests**
+
+  - Implementation: Added deterministic definitions/sprites/CREDITS/ownership/digest/registry output and manager-generated baseline exclusion coverage.
 
 Assert definitions, sprites, `CREDITS.csv`, ownership, generated digests, logical destinations, generated credits, compile digest, and registry v2 bytes are deterministic across reversed source/registry order. Assert manager-generated output is excluded from baseline digests.
 
-- [ ] **Step 3: Run focused tests and verify RED**
+- [x] **Step 3: Run focused tests and verify RED**
+
+  - Verification: Initial desired-state test run was RED because generalized desired state did not exist.
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-state.test.ts
@@ -1184,11 +1190,15 @@ rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-state.test.ts
 
 Expected: FAIL because generalized desired state does not exist.
 
-- [ ] **Step 4: Implement active-source loading and mutation**
+- [x] **Step 4: Implement active-source loading and mutation**
+
+  - Implementation: Added linked/installed active-source loading with containment, receipts, payload validation, one mutation semantics, and safe candidate replacement/removal.
 
 Resolve linked directories through existing containment rules. Resolve installed directories only beneath canonical `stateRoot/installed`, verify `install-receipt.json`, then parse their exact manifest/source bytes. Apply one mutation before compilation; duplicate pack IDs or candidate/registry source-kind ambiguity are errors.
 
-- [ ] **Step 5: Implement generated-state materialization as values**
+- [x] **Step 5: Implement generated-state materialization as values**
+
+  - Implementation: Added immutable output byte maps, deterministic compiler/registry materialization, generated ownership/digests/credits, and attribution-preserving state values.
 
 Return immutable byte maps rather than writing:
 
@@ -1205,11 +1215,15 @@ export interface AssetPackDesiredState {
 
 The map includes the manager marker, definitions, sprites, and `CREDITS.csv`; registry bytes remain separate for the transaction publisher.
 
-- [ ] **Step 6: Migrate sync and preview orchestration**
+- [x] **Step 6: Migrate sync and preview orchestration**
+
+  - Implementation: Migrated sync and preview to generalized state while preserving Phase 1 result schemas and ensuring previews do not publish or duplicate warnings.
 
 Sync creates a linked candidate and publishes the generalized state with its existing publisher until Task 8. Preview uses mutation `upsert` for its transient target, materializes to validation state, and never changes the active registry/output. Preserve all Phase 1 result schemas.
 
-- [ ] **Step 7: Verify GREEN and Phase 1 behavior**
+- [x] **Step 7: Verify GREEN and Phase 1 behavior**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-state.test.ts asset-pack-sync.test.ts asset-pack-preview.test.ts asset-authoring-e2e.test.ts` PASS (56 tests); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS; `rtk pnpm check:boundaries` PASS.
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-state.test.ts asset-pack-sync.test.ts asset-pack-preview.test.ts asset-authoring-e2e.test.ts
@@ -1219,12 +1233,21 @@ rtk pnpm check:boundaries
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit product code**
+- [x] **Step 8: Commit product code**
+
+  - Commits: `1dc27a6abc628464329cd8af3047c43dd0920cf5`, `79442f04e487275720d75c760197bbb96192fb7c`.
 
 ```sh
 rtk git add packages/cli/src/asset-pack-state.ts packages/cli/src/asset-pack-sync.ts packages/cli/src/asset-pack-preview.ts packages/cli/test/asset-pack-state.test.ts packages/cli/test/asset-pack-sync.test.ts packages/cli/test/asset-pack-preview.test.ts
 rtk git commit -m "refactor(cli): unify linked and installed asset state"
 ```
+
+Task 7 record:
+
+- Implementation: Unified linked and installed desired state, deterministic immutable generation, mixed-source mutations, attribution/ownership, stale-baseline/conflict handling, and no-publication previews.
+- Product/fix commits: `1dc27a6abc628464329cd8af3047c43dd0920cf5`, `79442f04e487275720d75c760197bbb96192fb7c`.
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-state.test.ts asset-pack-sync.test.ts asset-pack-preview.test.ts asset-authoring-e2e.test.ts` PASS (56 tests); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS; `rtk pnpm check:boundaries` PASS.
+- Review: Initial review found installed-candidate trust and preview-warning duplication; final reviewer APPROVED with no Critical or Important findings after the fix wave.
 
 Then update this task's plan record and commit it separately.
 
