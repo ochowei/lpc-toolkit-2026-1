@@ -1819,7 +1819,7 @@ describe('syncLinkedAssetPack', () => {
     expectSuccess(discoveryResult);
     const actionCount = discovery.actions.length;
     const firstCommittedAction = discovery.actions.findIndex(
-      (action) => action === 'rename:registry.json->old-registry.json',
+      (action) => action.startsWith('rename:registry.json->') && action.endsWith('.backup'),
     ) + 1;
     expect(actionCount).toBeGreaterThan(0);
     expect(firstCommittedAction).toBeGreaterThan(0);

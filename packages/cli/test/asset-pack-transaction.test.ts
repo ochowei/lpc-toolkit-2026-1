@@ -299,6 +299,17 @@ function installedPath(workspace: AssetWorkspace, suffix = ARCHIVE_DIGEST): stri
   return path.join(workspace.stateRoot, 'installed', 'acme.pack', '1.0.0', suffix);
 }
 
+function transactionSiblingPathForTest(
+  target: string,
+  operationId: string,
+  role: 'staged' | 'backup',
+): string {
+  return path.join(
+    path.dirname(target),
+    `.${path.basename(target)}.${operationId}.${role}`,
+  );
+}
+
 function writeTreeFile(root: string, relativePath: string, contents: string): void {
   const target = path.join(root, relativePath);
   mkdirSync(path.dirname(target), { recursive: true });
@@ -331,12 +342,8 @@ function baseJournal(
   fixture: Fixture,
   phase: AssetPackTransactionPhase,
 ): AssetPackTransactionJournal {
-  const transactionRoot = path.join(
-    fixture.workspace.stateRoot,
-    'transactions',
-    OPERATION_ID,
-  );
   const stagingRoot = path.join(fixture.workspace.stateRoot, 'staging', OPERATION_ID);
+  const finalInstalledSource = installedPath(fixture.workspace);
   return {
     schema: ASSET_PACK_TRANSACTION_SCHEMA,
     workspaceId: fixture.workspaceId,
@@ -345,24 +352,31 @@ function baseJournal(
     phase,
     oldOutputBackup: relativeToWorkspace(
       fixture.workspace,
-      path.join(transactionRoot, 'old-output'),
+      transactionSiblingPathForTest(fixture.workspace.outputRoot, OPERATION_ID, 'backup'),
     ),
     oldRegistryBackup: relativeToWorkspace(
       fixture.workspace,
-      path.join(transactionRoot, 'old-registry.json'),
+      transactionSiblingPathForTest(fixture.workspace.registryPath, OPERATION_ID, 'backup'),
     ),
-    stagedOutput: relativeToWorkspace(fixture.workspace, path.join(stagingRoot, 'output')),
+    stagedOutput: relativeToWorkspace(
+      fixture.workspace,
+      transactionSiblingPathForTest(fixture.workspace.outputRoot, OPERATION_ID, 'staged'),
+    ),
     stagedRegistry: relativeToWorkspace(
       fixture.workspace,
-      path.join(stagingRoot, 'registry.json'),
+      transactionSiblingPathForTest(fixture.workspace.registryPath, OPERATION_ID, 'staged'),
+    ),
+    incomingInstalledSource: relativeToWorkspace(
+      fixture.workspace,
+      path.join(stagingRoot, 'incoming-installed-source'),
     ),
     stagedInstalledSource: relativeToWorkspace(
       fixture.workspace,
-      path.join(stagingRoot, 'installed-source'),
+      transactionSiblingPathForTest(finalInstalledSource, OPERATION_ID, 'staged'),
     ),
     finalInstalledSource: relativeToWorkspace(
       fixture.workspace,
-      installedPath(fixture.workspace),
+      finalInstalledSource,
     ),
     cleanupInstalledSources: [
       relativeToWorkspace(
@@ -393,12 +407,14 @@ function seedPhase(fixture: Fixture, phase: AssetPackTransactionPhase): {
   const oldRegistry = path.resolve(fixture.workspace.root, journal.oldRegistryBackup!);
   const stagedOutput = path.resolve(fixture.workspace.root, journal.stagedOutput);
   const stagedRegistry = path.resolve(fixture.workspace.root, journal.stagedRegistry);
+  const incomingSource = path.resolve(fixture.workspace.root, journal.incomingInstalledSource!);
   const stagedSource = path.resolve(fixture.workspace.root, journal.stagedInstalledSource!);
   const finalSource = path.resolve(fixture.workspace.root, journal.finalInstalledSource!);
   const cleanupSource = path.resolve(fixture.workspace.root, journal.cleanupInstalledSources[0]!);
 
-  mkdirSync(path.dirname(oldOutput), { recursive: true });
   mkdirSync(path.dirname(stagedOutput), { recursive: true });
+  mkdirSync(path.dirname(stagedSource), { recursive: true });
+  mkdirSync(path.dirname(incomingSource), { recursive: true });
   installOldRegistryGeneration(fixture, cleanupSource, '0.9.0');
   const nextState = installedDesiredState(fixture, finalSource);
   if (phase === 'prepared') {
@@ -409,6 +425,7 @@ function seedPhase(fixture: Fixture, phase: AssetPackTransactionPhase): {
     );
     writeFileSync(path.join(stagedOutput, 'CREDITS.csv'), Buffer.alloc(0));
     writeFileSync(stagedRegistry, assetPackRegistryBytes(nextState.registry));
+    writeInstalledSource(fixture, incomingSource, '1.0.0', ARCHIVE_DIGEST);
     writeInstalledSource(fixture, stagedSource, '1.0.0', ARCHIVE_DIGEST);
   } else {
     renameSync(fixture.workspace.outputRoot, oldOutput);
@@ -419,6 +436,7 @@ function seedPhase(fixture: Fixture, phase: AssetPackTransactionPhase): {
     );
     writeFileSync(path.join(fixture.workspace.outputRoot, 'CREDITS.csv'), Buffer.alloc(0));
     writeFileSync(stagedRegistry, assetPackRegistryBytes(nextState.registry));
+    writeInstalledSource(fixture, incomingSource, '1.0.0', ARCHIVE_DIGEST);
     writeInstalledSource(fixture, stagedSource, '1.0.0', ARCHIVE_DIGEST);
 
     if (phase === 'sources-published' || phase === 'registry-published') {
@@ -752,7 +770,9 @@ describe('asset-pack transaction recovery', () => {
           if (
             crashPoint === 'registry swap'
             && operation === 'remove'
-            && targets.some((target) => path.basename(target) === 'old-output')
+            && targets.some((target) =>
+              path.dirname(target) === path.dirname(fixture.workspace.outputRoot)
+              && path.basename(target).endsWith('.backup'))
           ) {
             throw new Error(`injected crash after ${crashPoint}`);
           }
@@ -798,6 +818,55 @@ describe('asset-pack transaction recovery', () => {
       });
     },
   );
+
+  it('journals the destination-local installed stage before copying into it', async () => {
+    const fixture = createFixture();
+    const stagedSource = path.join(
+      fixture.workspace.stateRoot,
+      'staging',
+      'incoming-install',
+    );
+    const finalSource = installedPath(fixture.workspace);
+    writeInstalledSource(fixture, stagedSource, '1.0.0', ARCHIVE_DIGEST);
+    let injected = false;
+    const crashingOps: AssetTransactionFileOps = {
+      ...REAL_FILE_OPS,
+      afterMutationSync(operation, targets, boundary) {
+        if (
+          !injected
+          && operation === 'write'
+          && boundary === 'mutation'
+          && targets.some((target) =>
+            isPathWithinForTest(
+              path.join(fixture.workspace.stateRoot, 'installed'),
+              target,
+            ))
+        ) {
+          injected = true;
+          throw new Error('crash during destination-local installed staging');
+        }
+      },
+    };
+
+    expect((await publishAssetPackGeneration({
+      operation: 'install',
+      workspace: fixture.workspace,
+      desiredState: installedDesiredState(fixture, finalSource),
+      stagedInstalledSource: stagedSource,
+      finalInstalledSource: finalSource,
+      cleanupInstalledSources: [],
+      fileOps: crashingOps,
+    })).ok).toBe(false);
+    expect(injected).toBe(true);
+    expect(existsSync(transactionPath(fixture.workspace))).toBe(true);
+    expect(recoverAssetPackTransaction({ workspace: fixture.workspace })).toEqual({
+      ok: true,
+      action: 'rolled-back',
+    });
+    expect(existsSync(stagedSource)).toBe(false);
+    expect(existsSync(finalSource)).toBe(false);
+    expect(readFileSync(fixture.workspace.registryPath)).toEqual(fixture.oldRegistryBytes);
+  });
 
   it('resumes an interrupted rollback without deleting unlisted state', () => {
     const fixture = createFixture();
@@ -927,7 +996,7 @@ describe('asset-pack transaction recovery', () => {
         },
       },
     })).toEqual({ ok: true, action: 'completed' });
-    expect(boundaries.some((entry) => entry.includes('old-output'))).toBe(true);
+    expect(boundaries.some((entry) => entry.includes('.backup'))).toBe(true);
     expect(boundaries.some((entry) => entry.includes('installed/'))).toBe(true);
     expect(boundaries.some((entry) => entry.includes('staging/'))).toBe(true);
 
@@ -1322,49 +1391,123 @@ describe('asset-pack transaction adversarial recovery', () => {
   });
 
   it.each(['write', 'rename'] as const)(
-    'does not traverse a staging parent replaced immediately before %s',
+    'does not traverse a publication parent replaced immediately before %s',
     async (boundary) => {
       const fixture = createFixture();
       const outside = createDirectory(`lpc-asset-pack-transaction-${boundary}-race-`);
       let outsideSentinel: string | undefined;
-      let interleaved = false;
+      let replacedParent: string | undefined;
+      let heldParent: string | undefined;
       const racingOps: AssetTransactionFileOps = {
         ...REAL_FILE_OPS,
         afterMutationValidationSync(operation, targets) {
           const source = targets[0];
-          if (!source || interleaved || operation !== boundary) return;
-          const stagingRoot = path.join(fixture.workspace.stateRoot, 'staging');
-          if (!isPathWithinForTest(stagingRoot, source)) return;
-          const relative = path.relative(stagingRoot, source);
-          const operationId = relative.split(path.sep)[0];
-          if (!operationId) return;
-          const operationRoot = path.join(stagingRoot, operationId);
+          const destination = targets[1];
+          if (!source || replacedParent || operation !== boundary) return;
           const isTargetBoundary = boundary === 'write'
             ? path.basename(source) === '.lpc-toolkit-managed.json'
-            : path.basename(source) === 'output';
+              && path.basename(path.dirname(source)).endsWith('.staged')
+            : destination !== undefined
+              && path.resolve(destination) === path.resolve(fixture.workspace.outputRoot)
+              && path.basename(source).endsWith('.staged');
           if (!isTargetBoundary) return;
-          interleaved = true;
+          replacedParent = path.dirname(source);
+          heldParent = `${replacedParent}.held`;
           const relativeTarget = boundary === 'write'
-            ? path.relative(operationRoot, source)
-            : path.join('output', '.lpc-toolkit-managed.json');
+            ? path.basename(source)
+            : path.join(path.basename(source), '.lpc-toolkit-managed.json');
           outsideSentinel = path.join(outside, relativeTarget);
           writeTreeFile(outside, relativeTarget, 'outside\n');
-          renameSync(operationRoot, `${operationRoot}-held`);
-          symlinkSync(outside, operationRoot);
+          renameSync(replacedParent, heldParent);
+          symlinkSync(
+            outside,
+            replacedParent,
+            process.platform === 'win32' ? 'junction' : 'dir',
+          );
         },
       };
 
-      const result = await publishAssetPackGeneration({
-        operation: 'sync',
-        workspace: fixture.workspace,
-        desiredState: desiredState(fixture),
-        cleanupInstalledSources: [],
-        fileOps: racingOps,
-      });
-      expect(result.ok).toBe(false);
-      expect(outsideSentinel).toBeDefined();
-      expect(readFileSync(outsideSentinel!, 'utf8')).toBe('outside\n');
-      expect(existsSync(transactionClaimPath(fixture.workspace))).toBe(false);
+      try {
+        const result = await publishAssetPackGeneration({
+          operation: 'sync',
+          workspace: fixture.workspace,
+          desiredState: desiredState(fixture),
+          cleanupInstalledSources: [],
+          fileOps: racingOps,
+        });
+        expect(result.ok).toBe(false);
+        expect(outsideSentinel).toBeDefined();
+        expect(readFileSync(outsideSentinel!, 'utf8')).toBe('outside\n');
+      } finally {
+        if (replacedParent && heldParent) {
+          rmSync(replacedParent, { recursive: true, force: true });
+          renameSync(heldParent, replacedParent);
+        }
+      }
+    },
+  );
+
+  it.each(['output', 'registry', 'installed-source'] as const)(
+    'does not traverse a %s publication destination parent replaced after validation',
+    async (boundary) => {
+      const fixture = createFixture();
+      const outside = createDirectory(`lpc-asset-pack-transaction-${boundary}-destination-race-`);
+      const sentinel = path.join(outside, 'sentinel.txt');
+      writeFileSync(sentinel, 'outside\n');
+      const stagedSource = path.join(fixture.workspace.stateRoot, 'staging', 'incoming-install');
+      const finalSource = installedPath(fixture.workspace);
+      if (boundary === 'installed-source') {
+        writeInstalledSource(fixture, stagedSource, '1.0.0', ARCHIVE_DIGEST);
+      }
+
+      let replacedParent: string | undefined;
+      let heldParent: string | undefined;
+      let outsideDestination: string | undefined;
+      const racingOps: AssetTransactionFileOps = {
+        ...REAL_FILE_OPS,
+        afterMutationValidationSync(operation, targets) {
+          if (operation !== 'rename' || replacedParent !== undefined) return;
+          const source = path.resolve(targets[0] ?? '');
+          const destination = path.resolve(targets[1] ?? '');
+          const matches = boundary === 'output'
+            ? source === path.resolve(fixture.workspace.outputRoot)
+            : boundary === 'registry'
+              ? source === path.resolve(fixture.workspace.registryPath)
+              : destination === path.resolve(finalSource);
+          if (!matches) return;
+          replacedParent = path.dirname(destination);
+          heldParent = `${replacedParent}.held`;
+          outsideDestination = path.join(outside, path.basename(destination));
+          renameSync(replacedParent, heldParent);
+          symlinkSync(outside, replacedParent, process.platform === 'win32' ? 'junction' : 'dir');
+        },
+      };
+
+      try {
+        const result = await publishAssetPackGeneration({
+          operation: boundary === 'installed-source' ? 'install' : 'sync',
+          workspace: fixture.workspace,
+          desiredState: boundary === 'installed-source'
+            ? installedDesiredState(fixture, finalSource)
+            : desiredState(fixture),
+          ...(boundary === 'installed-source'
+            ? { stagedInstalledSource: stagedSource, finalInstalledSource: finalSource }
+            : {}),
+          cleanupInstalledSources: [],
+          fileOps: racingOps,
+        });
+        expect(result.ok).toBe(false);
+        expect(replacedParent).toBeDefined();
+        expect(heldParent).toBeDefined();
+        expect(outsideDestination).toBeDefined();
+        expect(readFileSync(sentinel, 'utf8')).toBe('outside\n');
+        expect(existsSync(outsideDestination!)).toBe(false);
+      } finally {
+        if (replacedParent && heldParent) {
+          rmSync(replacedParent, { recursive: true, force: true });
+          renameSync(heldParent, replacedParent);
+        }
+      }
     },
   );
 
@@ -1434,23 +1577,26 @@ describe('asset-pack transaction adversarial recovery', () => {
       let injected = false;
       const crashingOps: AssetTransactionFileOps = {
         ...REAL_FILE_OPS,
-        renameSync(source, destination) {
-          const sourcePath = path.resolve(String(source));
-          const destinationPath = path.resolve(String(destination));
+        afterMutationValidationSync(operation, targets) {
           if (
             boundary === 'after-old-registry-backup'
             && !injected
-            && sourcePath.includes(`${path.sep}staging${path.sep}`)
-            && destinationPath === fixture.workspace.registryPath
+            && operation === 'rename'
+            && path.basename(targets[0] ?? '').endsWith('.staged')
+            && path.resolve(targets[1] ?? '') === fixture.workspace.registryPath
           ) {
             injected = true;
             throw new Error('crash after old registry backup');
           }
-          renameSync(source, destination);
+        },
+        afterMutationSync(operation, targets, mutationBoundary) {
           if (
             boundary === 'after-new-registry-rename'
             && !injected
-            && destinationPath === fixture.workspace.registryPath
+            && operation === 'rename'
+            && mutationBoundary === 'mutation'
+            && path.basename(targets[0] ?? '').endsWith('.staged')
+            && path.resolve(targets[1] ?? '') === fixture.workspace.registryPath
           ) {
             injected = true;
             throw new Error('crash after new registry rename');
@@ -1545,6 +1691,7 @@ describe('asset-pack transaction adversarial recovery', () => {
       cleanupInstalledSources: [],
     })).toEqual({ ok: true });
     expect(readdirSync(path.join(fixture.workspace.stateRoot, 'staging'))).toEqual([]);
-    expect(readdirSync(path.join(fixture.workspace.stateRoot, 'transactions'))).toEqual([]);
+    const transactionsRoot = path.join(fixture.workspace.stateRoot, 'transactions');
+    expect(existsSync(transactionsRoot) ? readdirSync(transactionsRoot) : []).toEqual([]);
   });
 });

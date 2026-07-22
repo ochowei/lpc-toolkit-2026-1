@@ -7,6 +7,7 @@ import {
   lstatSync,
   mkdirSync,
   openSync,
+  readdirSync,
   readFileSync,
   renameSync,
   rmSync,
@@ -52,6 +53,7 @@ export interface AssetPackTransactionJournal {
   readonly oldRegistryBackup?: string;
   readonly stagedOutput: string;
   readonly stagedRegistry: string;
+  readonly incomingInstalledSource?: string;
   readonly stagedInstalledSource?: string;
   readonly finalInstalledSource?: string;
   readonly cleanupInstalledSources: readonly string[];
@@ -127,6 +129,7 @@ interface ResolvedJournal {
   readonly oldRegistryBackup?: string;
   readonly stagedOutput: string;
   readonly stagedRegistry: string;
+  readonly incomingInstalledSource?: string;
   readonly stagedInstalledSource?: string;
   readonly finalInstalledSource?: string;
   readonly cleanupInstalledSources: readonly string[];
@@ -163,6 +166,7 @@ const JOURNAL_REQUIRED_KEYS = [
 ] as const;
 const JOURNAL_OPTIONAL_KEYS = [
   'oldRegistryBackup',
+  'incomingInstalledSource',
   'stagedInstalledSource',
   'finalInstalledSource',
   'recoveryMode',
@@ -361,6 +365,17 @@ function pathEntryExists(target: string): boolean {
     }
     throw error;
   }
+}
+
+function transactionSiblingPath(
+  target: string,
+  operationId: string,
+  role: 'staged' | 'backup',
+): string {
+  return path.join(
+    path.dirname(target),
+    `.${path.basename(target)}.${operationId}.${role}`,
+  );
 }
 
 function errorMessage(error: unknown): string {
@@ -599,6 +614,7 @@ function parseJournalRecord(value: unknown): AssetPackTransactionJournal {
     throw new Error(`Unknown asset transaction phase: ${phase}.`);
   }
   const oldRegistryBackup = optionalStringValue(value, 'oldRegistryBackup');
+  const incomingInstalledSource = optionalStringValue(value, 'incomingInstalledSource');
   const stagedInstalledSource = optionalStringValue(value, 'stagedInstalledSource');
   const finalInstalledSource = optionalStringValue(value, 'finalInstalledSource');
   const recoveryMode = optionalStringValue(value, 'recoveryMode');
@@ -637,19 +653,23 @@ function parseJournalRecord(value: unknown): AssetPackTransactionJournal {
       throw new Error(`Asset transaction journal ${label} is invalid.`);
     }
   }
-  if ((stagedInstalledSource === undefined) !== (finalInstalledSource === undefined)) {
+  if (
+    (incomingInstalledSource === undefined) !== (stagedInstalledSource === undefined)
+    || (stagedInstalledSource === undefined) !== (finalInstalledSource === undefined)
+  ) {
     throw new Error(
-      'Asset transaction stagedInstalledSource and finalInstalledSource must appear together.',
+      'Asset transaction incomingInstalledSource, stagedInstalledSource, and finalInstalledSource must appear together.',
     );
   }
   if (operation === 'sync' && (
-    stagedInstalledSource !== undefined
+    incomingInstalledSource !== undefined
+    || stagedInstalledSource !== undefined
     || finalInstalledSource !== undefined
     || stringArrayValue(value, 'cleanupInstalledSources').length > 0
   )) {
     throw new Error('Sync transactions cannot publish or clean installed sources.');
   }
-  if (operation === 'remove' && stagedInstalledSource !== undefined) {
+  if (operation === 'remove' && incomingInstalledSource !== undefined) {
     throw new Error('Remove transactions cannot publish an installed source.');
   }
   if (operation === 'install' && stagedInstalledSource === undefined) {
@@ -665,6 +685,7 @@ function parseJournalRecord(value: unknown): AssetPackTransactionJournal {
     ...(oldRegistryBackup ? { oldRegistryBackup } : {}),
     stagedOutput: stringValue(value, 'stagedOutput'),
     stagedRegistry: stringValue(value, 'stagedRegistry'),
+    ...(incomingInstalledSource ? { incomingInstalledSource } : {}),
     ...(stagedInstalledSource ? { stagedInstalledSource } : {}),
     ...(finalInstalledSource ? { finalInstalledSource } : {}),
     cleanupInstalledSources: stringArrayValue(value, 'cleanupInstalledSources'),
@@ -714,11 +735,6 @@ function resolveJournal(
     'transactions',
     journal.operationId,
   );
-  const operationStagingRoot = path.join(
-    workspace.stateRoot,
-    'staging',
-    journal.operationId,
-  );
   const installedRoot = path.join(workspace.stateRoot, 'installed');
   const oldOutputBackup = resolveRelativePath(
     workspace,
@@ -742,6 +758,13 @@ function resolveJournal(
     journal.stagedRegistry,
     'Asset transaction stagedRegistry',
   );
+  const incomingInstalledSource = journal.incomingInstalledSource === undefined
+    ? undefined
+    : resolveRelativePath(
+      workspace,
+      journal.incomingInstalledSource,
+      'Asset transaction incomingInstalledSource',
+    );
   const stagedInstalledSource = journal.stagedInstalledSource === undefined
     ? undefined
     : resolveRelativePath(
@@ -761,32 +784,55 @@ function resolveJournal(
 
   assertExactPath(
     oldOutputBackup,
-    path.join(transactionRoot, 'old-output'),
+    transactionSiblingPath(workspace.outputRoot, journal.operationId, 'backup'),
     'Asset transaction oldOutputBackup',
   );
   if (oldRegistryBackup) {
     assertExactPath(
       oldRegistryBackup,
-      path.join(transactionRoot, 'old-registry.json'),
+      transactionSiblingPath(workspace.registryPath, journal.operationId, 'backup'),
       'Asset transaction oldRegistryBackup',
     );
   }
   assertExactPath(
     stagedOutput,
-    path.join(operationStagingRoot, 'output'),
+    transactionSiblingPath(workspace.outputRoot, journal.operationId, 'staged'),
     'Asset transaction stagedOutput',
   );
   assertExactPath(
     stagedRegistry,
-    path.join(operationStagingRoot, 'registry.json'),
+    transactionSiblingPath(workspace.registryPath, journal.operationId, 'staged'),
     'Asset transaction stagedRegistry',
   );
   assertContainedChild(path.join(workspace.stateRoot, 'transactions'), transactionRoot, 'Asset transaction data');
-  assertContainedChild(path.join(workspace.stateRoot, 'staging'), stagedOutput, 'Asset transaction stagedOutput');
-  assertContainedChild(path.join(workspace.stateRoot, 'staging'), stagedRegistry, 'Asset transaction stagedRegistry');
-  if (stagedInstalledSource) {
+  assertContainedChild(workspace.root, stagedOutput, 'Asset transaction stagedOutput');
+  assertContainedChild(workspace.root, oldOutputBackup, 'Asset transaction oldOutputBackup');
+  assertContainedChild(workspace.stateRoot, stagedRegistry, 'Asset transaction stagedRegistry');
+  if (oldRegistryBackup) {
+    assertContainedChild(
+      workspace.stateRoot,
+      oldRegistryBackup,
+      'Asset transaction oldRegistryBackup',
+    );
+  }
+  if (incomingInstalledSource) {
     assertContainedChild(
       path.join(workspace.stateRoot, 'staging'),
+      incomingInstalledSource,
+      'Asset transaction incomingInstalledSource',
+    );
+  }
+  if (stagedInstalledSource) {
+    if (!finalInstalledSource) {
+      throw new Error('Asset transaction staged installed source has no final path.');
+    }
+    assertExactPath(
+      stagedInstalledSource,
+      transactionSiblingPath(finalInstalledSource, journal.operationId, 'staged'),
+      'Asset transaction stagedInstalledSource',
+    );
+    assertContainedChild(
+      installedRoot,
       stagedInstalledSource,
       'Asset transaction stagedInstalledSource',
     );
@@ -826,6 +872,12 @@ function resolveJournal(
   }
   assertDirectoryIfPresent(stagedOutput, 'Asset transaction staged output');
   assertRegularFileIfPresent(stagedRegistry, 'Asset transaction staged registry');
+  if (incomingInstalledSource) {
+    assertDirectoryIfPresent(
+      incomingInstalledSource,
+      'Asset transaction incoming installed source',
+    );
+  }
   if (stagedInstalledSource) {
     assertDirectoryIfPresent(stagedInstalledSource, 'Asset transaction staged installed source');
   }
@@ -851,6 +903,7 @@ function resolveJournal(
     ...(oldRegistryBackup ? { oldRegistryBackup } : {}),
     stagedOutput,
     stagedRegistry,
+    ...(incomingInstalledSource ? { incomingInstalledSource } : {}),
     ...(stagedInstalledSource ? { stagedInstalledSource } : {}),
     ...(finalInstalledSource ? { finalInstalledSource } : {}),
     cleanupInstalledSources,
@@ -1570,28 +1623,26 @@ function durableRename(
   destination: string,
   guard: MutationGuard,
 ): void {
-  rememberExistingAncestors(guard, guard.workspaceRoot, source);
-  rememberExistingAncestors(guard, guard.workspaceRoot, path.dirname(destination));
   const sourceParent = path.dirname(source);
   const destinationParent = path.dirname(destination);
+  if (path.resolve(sourceParent) !== path.resolve(destinationParent)) {
+    throw new Error(
+      `Asset transaction rename must stay within one authenticated directory: ${source} -> ${destination}`,
+    );
+  }
+  rememberExistingAncestors(guard, guard.workspaceRoot, sourceParent);
   withPinnedWorkingDirectory({
     guard,
     parent: sourceParent,
     operation: 'rename',
     paths: [source, destination],
     action: () => {
-      const destinationTarget = path.resolve(sourceParent) === path.resolve(destinationParent)
-        ? path.basename(destination)
-        : destination;
-      guard.fileOps.renameSync(path.basename(source), destinationTarget);
+      guard.fileOps.renameSync(path.basename(source), path.basename(destination));
       guard.fileOps.afterMutationSync?.('rename', [source, destination], 'mutation');
       fsyncCurrentDirectory(guard.fileOps);
     },
   });
   forgetPath(guard, source);
-  if (path.resolve(destinationParent) !== path.resolve(sourceParent)) {
-    fsyncDirectory(destinationParent, guard.fileOps);
-  }
   guard.fileOps.afterMutationSync?.('rename', [source, destination], 'fsync');
 }
 
@@ -1691,21 +1742,29 @@ function rollbackMutations(
       : []),
     {
       kind: 'remove',
-      root: path.join(workspace.stateRoot, 'staging'),
+      root: workspace.root,
       target: resolved.stagedOutput,
       recursive: true,
     },
     {
       kind: 'remove',
-      root: path.join(workspace.stateRoot, 'staging'),
+      root: workspace.stateRoot,
       target: resolved.stagedRegistry,
       recursive: false,
     },
     ...(resolved.stagedInstalledSource
       ? [{
         kind: 'remove',
-        root: path.join(workspace.stateRoot, 'staging'),
+        root: path.join(workspace.stateRoot, 'installed'),
         target: resolved.stagedInstalledSource,
+        recursive: true,
+      }] as const
+      : []),
+    ...(resolved.incomingInstalledSource
+      ? [{
+        kind: 'remove',
+        root: path.join(workspace.stateRoot, 'staging'),
+        target: resolved.incomingInstalledSource,
         recursive: true,
       }] as const
       : []),
@@ -1714,18 +1773,6 @@ function rollbackMutations(
       root: workspace.stateRoot,
       target: resolved.journalTemporaryPath,
       recursive: false,
-    },
-    {
-      kind: 'remove',
-      root: path.join(workspace.stateRoot, 'staging'),
-      target: path.dirname(resolved.stagedOutput),
-      recursive: true,
-    },
-    {
-      kind: 'remove',
-      root: path.join(workspace.stateRoot, 'transactions'),
-      target: resolved.transactionRoot,
-      recursive: true,
     },
   ];
 }
@@ -1743,34 +1790,42 @@ function cleanupMutations(
     })),
     {
       kind: 'remove',
-      root: path.join(workspace.stateRoot, 'staging'),
+      root: workspace.root,
       target: resolved.stagedOutput,
       recursive: true,
     },
     {
       kind: 'remove',
-      root: path.join(workspace.stateRoot, 'staging'),
+      root: workspace.stateRoot,
       target: resolved.stagedRegistry,
       recursive: false,
     },
     ...(resolved.stagedInstalledSource
       ? [{
         kind: 'remove',
-        root: path.join(workspace.stateRoot, 'staging'),
+        root: path.join(workspace.stateRoot, 'installed'),
         target: resolved.stagedInstalledSource,
+        recursive: true,
+      }] as const
+      : []),
+    ...(resolved.incomingInstalledSource
+      ? [{
+        kind: 'remove',
+        root: path.join(workspace.stateRoot, 'staging'),
+        target: resolved.incomingInstalledSource,
         recursive: true,
       }] as const
       : []),
     {
       kind: 'remove',
-      root: path.join(workspace.stateRoot, 'transactions'),
+      root: workspace.root,
       target: resolved.oldOutputBackup,
       recursive: true,
     },
     ...(resolved.oldRegistryBackup
       ? [{
         kind: 'remove',
-        root: path.join(workspace.stateRoot, 'transactions'),
+        root: workspace.stateRoot,
         target: resolved.oldRegistryBackup,
         recursive: false,
       }] as const
@@ -1780,18 +1835,6 @@ function cleanupMutations(
       root: workspace.stateRoot,
       target: resolved.journalTemporaryPath,
       recursive: false,
-    },
-    {
-      kind: 'remove',
-      root: path.join(workspace.stateRoot, 'staging'),
-      target: path.dirname(resolved.stagedOutput),
-      recursive: true,
-    },
-    {
-      kind: 'remove',
-      root: path.join(workspace.stateRoot, 'transactions'),
-      target: resolved.transactionRoot,
-      recursive: true,
     },
   ];
 }
@@ -2156,7 +2199,7 @@ function materializeDesiredState(options: {
   readonly guard: MutationGuard;
 }): void {
   createDirectoriesDurably(
-    path.join(options.workspace.stateRoot, 'staging'),
+    options.workspace.root,
     options.stagedOutput,
     options.guard,
   );
@@ -2165,11 +2208,52 @@ function materializeDesiredState(options: {
     durableWrite(options.stagedOutput, destination, Buffer.from(bytes), options.guard);
   }
   durableWrite(
-    path.join(options.workspace.stateRoot, 'staging'),
+    options.workspace.stateRoot,
     options.stagedRegistry,
     assetPackRegistryBytes(options.desiredState.registry),
     options.guard,
   );
+}
+
+function copyInstalledSourceDurably(options: {
+  readonly source: string;
+  readonly destination: string;
+  readonly workspace: AssetWorkspace;
+  readonly guard: MutationGuard;
+}): void {
+  const sourceRoot = path.join(options.workspace.stateRoot, 'staging');
+  const installedRoot = path.join(options.workspace.stateRoot, 'installed');
+  assertContainedChild(sourceRoot, options.source, 'Incoming installed source');
+  assertContainedChild(installedRoot, options.destination, 'Local installed staging source');
+  rememberExistingAncestors(options.guard, sourceRoot, options.source);
+
+  const visit = (sourceDirectory: string, destinationDirectory: string): void => {
+    const sourceStats = transactionLstat(sourceDirectory, options.guard.fileOps);
+    if (sourceStats.isSymbolicLink() || !sourceStats.isDirectory()) {
+      throw new Error(`Installed source copy encountered an unsafe directory: ${sourceDirectory}`);
+    }
+    createDirectoriesDurably(installedRoot, destinationDirectory, options.guard);
+    for (const name of readdirSync(sourceDirectory).sort()) {
+      const sourceEntry = path.join(sourceDirectory, name);
+      const destinationEntry = path.join(destinationDirectory, name);
+      assertNoExistingSymlink(sourceRoot, sourceEntry, 'Incoming installed source entry');
+      const stats = transactionLstat(sourceEntry, options.guard.fileOps);
+      if (stats.isDirectory()) {
+        visit(sourceEntry, destinationEntry);
+      } else if (stats.isFile()) {
+        durableWrite(
+          installedRoot,
+          destinationEntry,
+          Buffer.from(options.guard.fileOps.readFileSync(sourceEntry)),
+          options.guard,
+        );
+      } else {
+        throw new Error(`Installed source copy encountered a non-file entry: ${sourceEntry}`);
+      }
+    }
+  };
+
+  visit(options.source, options.destination);
 }
 
 function updatePhase(
@@ -2189,22 +2273,43 @@ async function publishAssetPackGenerationUnderClaim(
 ): Promise<AssetPackPublicationResult> {
   const fileOps = options.fileOps ?? DEFAULT_FILE_OPS;
   const operationId = claim.operationId;
-  const stagingRoot = path.join(options.workspace.stateRoot, 'staging', operationId);
-  const stagedOutput = path.join(stagingRoot, 'output');
-  const stagedRegistry = path.join(stagingRoot, 'registry.json');
-  const transactionRoot = path.join(
-    options.workspace.stateRoot,
-    'transactions',
+  const stagedOutput = transactionSiblingPath(
+    options.workspace.outputRoot,
     operationId,
+    'staged',
   );
-  const oldOutputBackup = path.join(transactionRoot, 'old-output');
-  const oldRegistryBackup = path.join(transactionRoot, 'old-registry.json');
+  const oldOutputBackup = transactionSiblingPath(
+    options.workspace.outputRoot,
+    operationId,
+    'backup',
+  );
+  const stagedRegistry = transactionSiblingPath(
+    options.workspace.registryPath,
+    operationId,
+    'staged',
+  );
+  const oldRegistryBackup = transactionSiblingPath(
+    options.workspace.registryPath,
+    operationId,
+    'backup',
+  );
+  const localInstalledSource = options.finalInstalledSource
+    ? transactionSiblingPath(options.finalInstalledSource, operationId, 'staged')
+    : undefined;
   let journalWritten = false;
   let result: AssetPackPublicationResult;
 
   try {
-    if (pathEntryExists(stagingRoot) || pathEntryExists(transactionRoot)) {
-      throw new Error(`Asset transaction operation path already exists: ${operationId}`);
+    for (const artifact of [
+      stagedOutput,
+      oldOutputBackup,
+      stagedRegistry,
+      oldRegistryBackup,
+      ...(localInstalledSource ? [localInstalledSource] : []),
+    ]) {
+      if (pathEntryExists(artifact)) {
+        throw new Error(`Asset transaction operation path already exists: ${artifact}`);
+      }
     }
     assertManagedAssetOutput(options.workspace);
     assertNoExistingSymlink(options.workspace.root, options.workspace.outputRoot, 'Managed asset output');
@@ -2232,21 +2337,6 @@ async function publishAssetPackGenerationUnderClaim(
       { registry: options.desiredState.registry },
     );
 
-    createDirectoriesDurably(
-      path.join(options.workspace.stateRoot, 'staging'),
-      stagingRoot,
-      claim.guard,
-    );
-    createDirectoriesDurably(
-      options.workspace.stateRoot,
-      path.join(options.workspace.stateRoot, 'transactions'),
-      claim.guard,
-    );
-    createDirectoriesDurably(
-      path.join(options.workspace.stateRoot, 'transactions'),
-      transactionRoot,
-      claim.guard,
-    );
     materializeDesiredState({
       desiredState: options.desiredState,
       stagedOutput,
@@ -2271,9 +2361,15 @@ async function publishAssetPackGenerationUnderClaim(
       stagedOutput: canonicalRelativePath(options.workspace, stagedOutput),
       stagedRegistry: canonicalRelativePath(options.workspace, stagedRegistry),
       ...(options.stagedInstalledSource
-        ? { stagedInstalledSource: canonicalRelativePath(
+        ? { incomingInstalledSource: canonicalRelativePath(
           options.workspace,
           options.stagedInstalledSource,
+        ) }
+        : {}),
+      ...(localInstalledSource
+        ? { stagedInstalledSource: canonicalRelativePath(
+          options.workspace,
+          localInstalledSource,
         ) }
         : {}),
       ...(options.finalInstalledSource
@@ -2289,18 +2385,22 @@ async function publishAssetPackGenerationUnderClaim(
     writeJournalDurably(options.workspace, journal, claim.guard);
     journalWritten = true;
 
+    if (options.stagedInstalledSource && localInstalledSource) {
+      copyInstalledSourceDurably({
+        source: options.stagedInstalledSource,
+        destination: localInstalledSource,
+        workspace: options.workspace,
+        guard: claim.guard,
+      });
+    }
+
     durableRename(options.workspace.outputRoot, oldOutputBackup, claim.guard);
     durableRename(stagedOutput, options.workspace.outputRoot, claim.guard);
     journal = updatePhase(journal, 'output-published', options.workspace, claim.guard);
 
-    if (options.stagedInstalledSource && options.finalInstalledSource) {
-      createDirectoriesDurably(
-        path.join(options.workspace.stateRoot, 'installed'),
-        path.dirname(options.finalInstalledSource),
-        claim.guard,
-      );
+    if (localInstalledSource && options.finalInstalledSource) {
       durableRename(
-        options.stagedInstalledSource,
+        localInstalledSource,
         options.finalInstalledSource,
         claim.guard,
       );
@@ -2344,17 +2444,25 @@ async function publishAssetPackGenerationUnderClaim(
     if (!journalWritten) {
       try {
         removeListedPath(
-          path.join(options.workspace.stateRoot, 'staging'),
-          stagingRoot,
+          options.workspace.root,
+          stagedOutput,
           true,
           claim.guard,
         );
         removeListedPath(
-          path.join(options.workspace.stateRoot, 'transactions'),
-          transactionRoot,
-          true,
+          options.workspace.stateRoot,
+          stagedRegistry,
+          false,
           claim.guard,
         );
+        if (localInstalledSource) {
+          removeListedPath(
+            path.join(options.workspace.stateRoot, 'installed'),
+            localInstalledSource,
+            true,
+            claim.guard,
+          );
+        }
         removeListedPath(
           options.workspace.stateRoot,
           `${path.join(options.workspace.stateRoot, JOURNAL_FILE)}.${operationId}.tmp`,
