@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import {
   lstatSync,
   readFileSync,
+  realpathSync,
   readdirSync,
   type Stats,
 } from 'node:fs';
@@ -71,7 +72,19 @@ interface GenerationStamp {
 
 type GenerationStampResult =
   | { readonly status: 'idle'; readonly stamp: GenerationStamp }
-  | { readonly status: 'busy' };
+  | { readonly status: 'busy' }
+  | {
+    readonly status: 'unsafe';
+    readonly check: AssetPackDoctorCheck;
+  };
+
+interface TreeHashResult {
+  readonly digest: string;
+  readonly unsafe?: {
+    readonly message: string;
+    readonly path: string;
+  };
+}
 
 type TransactionInspection =
   | { readonly status: 'idle' }
@@ -175,9 +188,19 @@ function hashTree(options: {
   readonly root: string;
   readonly readFile: typeof readFileSync;
   readonly stat: typeof lstatSync;
-}): string {
+  readonly followSymlinks?: boolean;
+}): TreeHashResult {
   const hash = createHash('sha256');
-  const visit = (target: string, relativePath: string): void => {
+  let unsafe: TreeHashResult['unsafe'];
+  const markUnsafe = (target: string, message: string): void => {
+    unsafe ??= { message, path: target };
+    hash.update(`${JSON.stringify([target, 'unsafe', message])}\n`);
+  };
+  const visit = (
+    target: string,
+    relativePath: string,
+    directoryAncestors: ReadonlySet<string>,
+  ): void => {
     let stats: Stats;
     try {
       stats = options.stat(target);
@@ -204,6 +227,16 @@ function hashTree(options: {
       stats.birthtimeMs,
     ])}\n`);
     if (kind === 'directory') {
+      const identity = `${String(stats.dev)}:${String(stats.ino)}`;
+      if (directoryAncestors.has(identity)) {
+        markUnsafe(
+          target,
+          `Runtime baseline symlink cycle reaches an ancestor directory: ${target}`,
+        );
+        return;
+      }
+      const childAncestors = new Set(directoryAncestors);
+      childAncestors.add(identity);
       let names: string[];
       try {
         names = readdirSync(target).sort(compareCodeUnits);
@@ -212,7 +245,11 @@ function hashTree(options: {
         return;
       }
       for (const name of names) {
-        visit(path.join(target, name), relativePath === '' ? name : `${relativePath}/${name}`);
+        visit(
+          path.join(target, name),
+          relativePath === '' ? name : `${relativePath}/${name}`,
+          childAncestors,
+        );
       }
     } else if (kind === 'file') {
       try {
@@ -221,10 +258,30 @@ function hashTree(options: {
       } catch (error) {
         hash.update(`${JSON.stringify([relativePath, 'unreadable', errorMessage(error)])}\n`);
       }
+    } else if (kind === 'symlink' && options.followSymlinks) {
+      let canonicalTarget: string;
+      try {
+        canonicalTarget = realpathSync.native(target);
+      } catch (error) {
+        markUnsafe(
+          target,
+          `Runtime baseline symlink target is unreadable: ${errorMessage(error)}`,
+        );
+        return;
+      }
+      hash.update(`${JSON.stringify([
+        relativePath,
+        'symlink-target',
+        canonicalTarget,
+      ])}\n`);
+      visit(canonicalTarget, relativePath, directoryAncestors);
     }
   };
-  visit(options.root, '');
-  return `sha256:${hash.digest('hex')}`;
+  visit(options.root, '', new Set());
+  return {
+    digest: `sha256:${hash.digest('hex')}`,
+    ...(unsafe ? { unsafe } : {}),
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -296,7 +353,7 @@ function sourceRolesDigest(options: {
         root: role.sourceRoot,
         readFile: options.readFile,
         stat: options.stat,
-      }),
+      }).digest,
     ])}\n`);
   }
   return `sha256:${hash.digest('hex')}`;
@@ -314,27 +371,41 @@ function readGenerationStamp(options: {
     root: options.workspace.registryPath,
     readFile,
     stat,
-  });
+  }).digest;
   const outputDigest = hashTree({
     root: options.workspace.outputRoot,
     readFile,
     stat,
-  });
+  }).digest;
   const sourceDigest = sourceRolesDigest({
     workspace: options.workspace,
     readFile,
     stat,
   });
-  const sheetDefinitionsDigest = hashTree({
+  const sheetDefinitions = hashTree({
     root: options.runtime.context.sheetDefinitionsRoot,
     readFile,
     stat,
+    followSymlinks: true,
   });
-  const paletteDefinitionsDigest = hashTree({
+  const paletteDefinitions = hashTree({
     root: options.runtime.context.paletteDefinitionsRoot,
     readFile,
     stat,
+    followSymlinks: true,
   });
+  const unsafeBaseline = sheetDefinitions.unsafe ?? paletteDefinitions.unsafe;
+  if (unsafeBaseline) {
+    return {
+      status: 'unsafe',
+      check: {
+        code: 'asset_runtime_baseline_unsafe',
+        status: 'error',
+        message: unsafeBaseline.message,
+        path: unsafeBaseline.path,
+      },
+    };
+  }
   if (transactionArtifactsPresent(options.workspace, stat)) return { status: 'busy' };
   return {
     status: 'idle',
@@ -342,8 +413,8 @@ function readGenerationStamp(options: {
       registryDigest,
       outputDigest,
       sourceRolesDigest: sourceDigest,
-      sheetDefinitionsDigest,
-      paletteDefinitionsDigest,
+      sheetDefinitionsDigest: sheetDefinitions.digest,
+      paletteDefinitionsDigest: paletteDefinitions.digest,
     },
   };
 }
@@ -644,6 +715,13 @@ export async function doctorAssetPacks(options: {
     if (before.status === 'busy') {
       await yieldToLifecyclePublisher();
       continue;
+    }
+    if (before.status === 'unsafe') {
+      return report({
+        recovery: recoveryAction,
+        checks: [recoveryCheck(recoveryAction), before.check],
+        packs: [],
+      });
     }
     const audit = await auditGeneration(options);
     const after = readGenerationStamp(options);

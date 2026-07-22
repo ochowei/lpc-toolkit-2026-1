@@ -914,6 +914,128 @@ describe('doctorAssetPacks healthy and recovery reports', () => {
     expect(report.checks.map((check) => check.code)).toContain('asset_base_credit_changed');
   });
 
+  it('retries when a symlinked base-definition target changes after audit consumption', async () => {
+    const fixture = createFixture();
+    const definitionRoot = fixture.runtime.context.sheetDefinitionsRoot;
+    const targetRoot = createDirectory('lpc-asset-pack-doctor-definition-target-');
+    const definitionPath = path.join(targetRoot, 'hair/braid.json');
+    writeJson(definitionPath, baseDefinition());
+    rmSync(definitionRoot, { recursive: true, force: true });
+    symlinkSync(
+      targetRoot,
+      definitionRoot,
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+    await linkExtensionPack(fixture, {
+      packId: 'alpha.extension',
+      destinationPath: 'spritesheets/hair/braid/alpha/climb.png',
+      bodyTypes: ['male'],
+      color: '#aa3300',
+    });
+    let registryReads = 0;
+    let baselineChanged = false;
+    const changingReadFileSync = ((target: Parameters<typeof readFileSync>[0]) => {
+      const bytes = readFileSync(target);
+      if (path.resolve(String(target)) === fixture.workspace.registryPath) {
+        registryReads += 1;
+        if (registryReads === 3) {
+          baselineChanged = true;
+          writeJson(definitionPath, baseDefinition({
+            credits: [{ ...BASE_CREDIT, notes: 'Changed linked base credit.' }],
+          }));
+        }
+      }
+      return bytes;
+    }) as typeof readFileSync;
+
+    const report = await doctorAssetPacks({
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+      fileOps: { ...REAL_FILE_OPS, readFileSync: changingReadFileSync },
+    });
+
+    expect(baselineChanged).toBe(true);
+    expect(report.healthy).toBe(false);
+    expect(registryReads).toBeGreaterThan(4);
+    expect(report.checks.map((check) => check.code)).toContain('asset_base_credit_changed');
+  });
+
+  it('retries a nested palette symlink target after byte-identical ABA replacement', async () => {
+    const fixture = createFixture();
+    const paletteRoot = fixture.runtime.context.paletteDefinitionsRoot;
+    const paletteDirectoryTarget = createDirectory(
+      'lpc-asset-pack-doctor-palette-directory-target-',
+    );
+    const paletteFileRoot = createDirectory('lpc-asset-pack-doctor-palette-file-target-');
+    const paletteFileTarget = path.join(paletteFileRoot, 'meta_hair.json');
+    const originalBytes = Buffer.from(`${JSON.stringify({
+      type: 'material',
+      default: 'ulpc',
+      base: 'black',
+    }, null, 2)}\n`);
+    writeFileSync(paletteFileTarget, originalBytes);
+    symlinkSync(
+      paletteFileTarget,
+      path.join(paletteDirectoryTarget, 'meta_hair.json'),
+      'file',
+    );
+    symlinkSync(
+      paletteDirectoryTarget,
+      path.join(paletteRoot, 'hair'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+    await linkNewPack(fixture, {
+      packId: 'alpha.pack', localId: 'alpha', color: '#aa3300',
+    });
+    let registryReads = 0;
+    let targetReplaced = false;
+    const abaReadFileSync = ((target: Parameters<typeof readFileSync>[0]) => {
+      const bytes = readFileSync(target);
+      if (path.resolve(String(target)) === fixture.workspace.registryPath) {
+        registryReads += 1;
+        if (registryReads === 3) {
+          targetReplaced = true;
+          const replacement = `${paletteFileTarget}.replacement`;
+          writeFileSync(replacement, '{"type":"material","default":"other"}\n');
+          renameSync(replacement, paletteFileTarget);
+          const restored = `${paletteFileTarget}.restored`;
+          writeFileSync(restored, originalBytes);
+          renameSync(restored, paletteFileTarget);
+        }
+      }
+      return bytes;
+    }) as typeof readFileSync;
+
+    const report = await doctorAssetPacks({
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+      fileOps: { ...REAL_FILE_OPS, readFileSync: abaReadFileSync },
+    });
+
+    expect(targetReplaced).toBe(true);
+    expect(report).toMatchObject({ healthy: true, recovery: 'none' });
+    expect(registryReads).toBeGreaterThan(4);
+  });
+
+  it('rejects a runtime-baseline symlink cycle before loading it', async () => {
+    const fixture = createFixture();
+    symlinkSync(
+      '.',
+      path.join(fixture.runtime.context.paletteDefinitionsRoot, 'loop'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+
+    const report = await doctorAssetPacks({
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+    });
+
+    expect(report).toMatchObject({ healthy: false, recovery: 'none' });
+    expect(report.checks.map((check) => check.code)).toContain(
+      'asset_runtime_baseline_unsafe',
+    );
+  });
+
   it('retries when serialized publication returns from A to byte-identical A', async () => {
     const fixture = createFixture();
     await linkNewPack(fixture, {
