@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { AssetPackAcknowledgement } from '@lpc-toolkit/core';
 import type { AssetPackWorkbenchDiagnostic } from '../../lib/asset-pack-worker-protocol';
 import { diagnosticTargetId, DiagnosticTarget } from './diagnostic-list';
@@ -12,14 +12,18 @@ export interface WarningsEditorProps {
   readonly onAcknowledge: (candidate: AssetPackAcknowledgement, reason: string) => void;
 }
 
-export function WarningsEditor({ warnings, acknowledgementRecords, diagnostics = [], versionBlocked, onAcknowledge }: WarningsEditorProps) {
+export function WarningsEditor({ warnings, acknowledgementRecords, diagnostics = [], revision = 0, versionBlocked, onAcknowledge }: WarningsEditorProps) {
   const [reasons, setReasons] = useState<Readonly<Record<string, string>>>({});
+  const warningsKey = JSON.stringify(warnings.map((warning) => acknowledgementKey(warning)).sort());
+  useEffect(() => {
+    setReasons((current) => synchronizeWarningReasons(current, warnings, revision));
+  }, [revision, warningsKey]);
   return (
     <section aria-labelledby="asset-pack-warnings-heading">
       <h3 id="asset-pack-warnings-heading" className="text-lg font-semibold text-text">Warnings</h3>
       <p className="mt-1 text-sm text-text-2">Review each current warning and record its reason individually.</p>
       <div className="mt-4 space-y-3">{warnings.map((warning) => {
-        const key = warningBindingKey(warning);
+        const key = warningCandidateKey(warning, revision);
         const imported = acknowledgementRecords.find((record) => acknowledgementKey(record) === acknowledgementKey(warning));
         const reason = reasons[key] ?? imported?.reason ?? '';
         const confirmed = imported !== undefined && imported.reason.trim().length !== 0;
@@ -46,6 +50,15 @@ export function WarningsEditor({ warnings, acknowledgementRecords, diagnostics =
 
 function warningBindingKey(warning: AssetPackAcknowledgement): string {
   return `${warning.code}\u0000${JSON.stringify(warning.subject)}`;
+}
+
+export function warningCandidateKey(warning: AssetPackAcknowledgement, revision: number): string {
+  return `${revision}\u0000${acknowledgementKey(warning)}`;
+}
+
+export function synchronizeWarningReasons(current: Readonly<Record<string, string>>, warnings: readonly AssetPackAcknowledgement[], revision: number): Readonly<Record<string, string>> {
+  const currentKeys = new Set(warnings.map((warning) => warningCandidateKey(warning, revision)));
+  return Object.fromEntries(Object.entries(current).filter(([key]) => currentKeys.has(key)));
 }
 
 function acknowledgementKey(warning: AssetPackAcknowledgement): string {

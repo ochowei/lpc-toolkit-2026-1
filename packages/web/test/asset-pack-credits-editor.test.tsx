@@ -12,8 +12,8 @@ const credits: AssetPackCreditsProjection = {
 
 describe('CreditsEditor', () => {
   it('synchronizes clean credit projections and reports a conflict for active typing', () => {
-    expect(synchronizeCreditsDraft({ credits, dirty: false }, { ...credits, notes: 'Updated' })).toEqual({ credits: { ...credits, notes: 'Updated' }, conflict: false });
-    expect(synchronizeCreditsDraft({ credits: { ...credits, notes: 'Typing' }, dirty: true }, { ...credits, notes: 'Updated' })).toEqual({ credits: { ...credits, notes: 'Typing' }, conflict: true });
+    expect(synchronizeCreditsDraft({ credits, dirtyFields: new Set() }, { ...credits, notes: 'Updated' })).toEqual({ credits: { ...credits, notes: 'Updated' }, conflict: false });
+    expect(synchronizeCreditsDraft({ credits: { ...credits, notes: 'Typing' }, dirtyFields: new Set(['notes']) }, { ...credits, notes: 'Updated' })).toEqual({ credits: { ...credits, notes: 'Typing' }, conflict: true });
   });
 
   it('renders repeatable credit fields, notes, and credit override navigation', () => {

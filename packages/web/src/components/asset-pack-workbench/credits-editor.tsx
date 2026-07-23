@@ -13,11 +13,13 @@ export interface CreditsEditorProps {
 
 export interface CreditsDraftState {
   readonly credits: AssetPackCreditsProjection;
-  readonly dirty: boolean;
+  readonly dirtyFields: ReadonlySet<CreditsDraftField>;
 }
 
+export type CreditsDraftField = 'authors' | 'licenses' | 'urls' | 'notes';
+
 export function synchronizeCreditsDraft(current: CreditsDraftState, nextCredits: AssetPackCreditsProjection): { readonly credits: AssetPackCreditsProjection; readonly conflict: boolean } {
-  return current.dirty ? { credits: current.credits, conflict: true } : { credits: nextCredits, conflict: false };
+  return current.dirtyFields.size !== 0 ? { credits: current.credits, conflict: true } : { credits: nextCredits, conflict: false };
 }
 
 interface EditableRow { readonly id: string; readonly value: string }
@@ -28,14 +30,14 @@ export function CreditsEditor({ credits, onSubmit, onNavigateOverrides, diagnost
   const [licenses, setLicenses] = useState(() => rows('license', credits.licenses, sequence));
   const [urls, setUrls] = useState(() => rows('url', credits.urls, sequence));
   const [notes, setNotes] = useState(credits.notes);
-  const dirty = useRef(false);
+  const dirtyFields = useRef<Set<CreditsDraftField>>(new Set());
   const previousCreditsKey = useRef(JSON.stringify(credits));
   const [conflict, setConflict] = useState(false);
   const creditsKey = JSON.stringify(credits);
   useEffect(() => {
     if (previousCreditsKey.current === creditsKey) return;
     previousCreditsKey.current = creditsKey;
-    const current: CreditsDraftState = { credits: { authors: values(authors), licenses: values(licenses) as AssetPackCreditsProjection['licenses'], urls: values(urls), notes }, dirty: dirty.current };
+    const current: CreditsDraftState = { credits: { authors: values(authors), licenses: values(licenses) as AssetPackCreditsProjection['licenses'], urls: values(urls), notes }, dirtyFields: dirtyFields.current };
     const next = synchronizeCreditsDraft(current, credits);
     if (next.conflict) setConflict(true);
     else {
@@ -49,19 +51,19 @@ export function CreditsEditor({ credits, onSubmit, onNavigateOverrides, diagnost
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [creditsKey, revision]);
   const update = (kind: 'author' | 'license' | 'url', id: string, value: string) => {
-    dirty.current = true;
+    dirtyFields.current.add(kind === 'author' ? 'authors' : kind === 'license' ? 'licenses' : 'urls');
     const setter = kind === 'author' ? setAuthors : kind === 'license' ? setLicenses : setUrls;
     setter((current) => current.map((row) => row.id === id ? { ...row, value } : row));
   };
   const add = (kind: 'author' | 'license' | 'url') => {
-    dirty.current = true;
+    dirtyFields.current.add(kind === 'author' ? 'authors' : kind === 'license' ? 'licenses' : 'urls');
     const row = { id: `${kind}-${sequence.current}`, value: '' };
     sequence.current += 1;
     const setter = kind === 'author' ? setAuthors : kind === 'license' ? setLicenses : setUrls;
     setter((current) => [...current, row]);
   };
   const remove = (kind: 'author' | 'license' | 'url', id: string) => {
-    dirty.current = true;
+    dirtyFields.current.add(kind === 'author' ? 'authors' : kind === 'license' ? 'licenses' : 'urls');
     const setter = kind === 'author' ? setAuthors : kind === 'license' ? setLicenses : setUrls;
     setter((current) => current.filter((row) => row.id !== id));
   };
@@ -70,13 +72,13 @@ export function CreditsEditor({ credits, onSubmit, onNavigateOverrides, diagnost
     <h3 id="asset-pack-credits-heading" className="text-lg font-semibold text-text">Credits</h3>
     {diagnostics.map((diagnostic) => <DiagnosticTarget key={diagnosticTargetId(diagnostic)} diagnostic={diagnostic}><span className="sr-only">{diagnostic.message}</span></DiagnosticTarget>)}
     <p className="mt-1 text-sm text-text-2">Preserve the artist, license, and source attribution in the pack.</p>
-    <form className="mt-4 space-y-4" onSubmit={(event) => { event.preventDefault(); if (conflict) return; dirty.current = false; onSubmit({ authors: values(authors), licenses: values(licenses) as AssetPackCreditsProjection['licenses'], urls: values(urls), notes }); }}>
+    <form className="mt-4 space-y-4" onSubmit={(event) => { event.preventDefault(); if (conflict) return; dirtyFields.current.clear(); onSubmit({ authors: values(authors), licenses: values(licenses) as AssetPackCreditsProjection['licenses'], urls: values(urls), notes }); }}>
       <EditableList label="Authors" kind="author" rows={authors} onChange={update} onAdd={add} onRemove={remove} />
       <EditableList label="Licenses" kind="license" rows={licenses} onChange={update} onAdd={add} onRemove={remove} />
       <EditableList label="URLs" kind="url" rows={urls} onChange={update} onAdd={add} onRemove={remove} />
-      <label className="block text-sm text-text">Notes<textarea value={notes} onChange={(event) => setNotes(event.currentTarget.value)} className="mt-1 min-h-20 w-full rounded border border-border bg-surface-2 px-2 py-1" /></label>
+      <label className="block text-sm text-text">Notes<textarea value={notes} onChange={(event) => { dirtyFields.current.add('notes'); setNotes(event.currentTarget.value); }} className="mt-1 min-h-20 w-full rounded border border-border bg-surface-2 px-2 py-1" /></label>
       {conflict && <div className="rounded border border-red-700 p-2 text-sm text-red-700" role="alert">The Worker approved newer credits. Reload the current revision before saving.</div>}
-      <div className="flex flex-wrap gap-2">{conflict && <button type="button" className="rounded border border-border px-3 py-2 text-sm text-text" onClick={() => { dirty.current = false; setConflict(false); setAuthors(rows('author', credits.authors, sequence)); setLicenses(rows('license', credits.licenses, sequence)); setUrls(rows('url', credits.urls, sequence)); setNotes(credits.notes); }}>Reload current revision</button>}<button type="submit" disabled={conflict} className="rounded bg-accent px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">Save credits</button><button type="button" className="rounded border border-border px-3 py-2 text-sm text-text" onClick={onNavigateOverrides}>Credit overrides</button></div>
+      <div className="flex flex-wrap gap-2">{conflict && <button type="button" className="rounded border border-border px-3 py-2 text-sm text-text" onClick={() => { dirtyFields.current.clear(); setConflict(false); setAuthors(rows('author', credits.authors, sequence)); setLicenses(rows('license', credits.licenses, sequence)); setUrls(rows('url', credits.urls, sequence)); setNotes(credits.notes); }}>Reload current revision</button>}<button type="submit" disabled={conflict} className="rounded bg-accent px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">Save credits</button><button type="button" className="rounded border border-border px-3 py-2 text-sm text-text" onClick={onNavigateOverrides}>Credit overrides</button></div>
     </form>
   </section>;
 }

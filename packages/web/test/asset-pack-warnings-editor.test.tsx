@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import type { AssetPackAcknowledgement } from '@lpc-toolkit/core';
-import { WarningsEditor } from '../src/components/asset-pack-workbench/warnings-editor';
+import { WarningsEditor, synchronizeWarningReasons, warningCandidateKey } from '../src/components/asset-pack-workbench/warnings-editor';
 
 const warning: AssetPackAcknowledgement = {
   code: 'asset_path_inferred',
@@ -11,6 +11,15 @@ const warning: AssetPackAcknowledgement = {
 };
 
 describe('WarningsEditor', () => {
+  it('does not carry a reason from an older warning candidate into a newer digest or revision', () => {
+    const olderKey = warningCandidateKey(warning, 4);
+    const newerWarning = { ...warning, contentDigest: `sha256:${'c'.repeat(64)}` };
+
+    expect(synchronizeWarningReasons({ [olderKey]: 'Only true for the older candidate' }, [newerWarning], 4)).toEqual({});
+    expect(warningCandidateKey(warning, 4)).not.toBe(warningCandidateKey(newerWarning, 5));
+    expect(synchronizeWarningReasons({ [olderKey]: 'Only true for the older candidate' }, [newerWarning], 5)).toEqual({});
+  });
+
   it('shows one governed confirmation per warning and no acknowledge-all control', () => {
     const html = renderToStaticMarkup(<WarningsEditor
       warnings={[warning]}
