@@ -30,6 +30,7 @@ export function WorkbenchNav({
         {panels.map((panel) => (
           <button
             key={panel}
+            id={`asset-pack-panel-${panel}`}
             type="button"
             className={`rounded-md px-3 py-2 text-left text-sm ${activePanel === panel ? 'bg-surface-2 font-semibold text-text' : 'text-text-2 hover:bg-surface-2'}`}
             aria-current={activePanel === panel ? 'page' : undefined}
@@ -43,6 +44,7 @@ export function WorkbenchNav({
         {panels.map((panel) => (
           <button
             key={panel}
+            id={`asset-pack-tab-${panel}`}
             type="button"
             role="tab"
             aria-selected={activePanel === panel}

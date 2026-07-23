@@ -12,6 +12,9 @@ export interface AssetPackWorkbenchShellProps {
   readonly onReset: () => void;
   readonly onBack: () => void;
   readonly onNavigate: (panel: AssetPackWorkbenchPanel) => void;
+  readonly onReplaceManifest?: (manifestText: string, origin: 'overview-form' | 'credits-form' | 'advanced-json' | 'raw-repair' | 'acknowledgement') => void;
+  readonly onReplaceSource?: (path: string, file: File) => void;
+  readonly onRemoveSource?: (path: string) => void;
 }
 
 export function AssetPackWorkbenchShell({
@@ -20,13 +23,16 @@ export function AssetPackWorkbenchShell({
   onReset,
   onBack,
   onNavigate,
+  onReplaceManifest,
+  onReplaceSource,
+  onRemoveSource,
 }: AssetPackWorkbenchShellProps) {
   return (
     <div className="min-h-screen bg-app text-text">
       <div className="grid min-h-screen lg:grid-cols-[220px_minmax(0,1fr)_320px]">
         <WorkbenchNav activePanel={state.activePanel} onNavigate={onNavigate} />
         <WorkbenchPreview state={state} onUpload={onUpload} onReset={onReset} onBack={onBack} />
-        <WorkbenchEditor state={state} />
+        <WorkbenchEditor state={state} onReplaceManifest={onReplaceManifest} onReplaceSource={onReplaceSource} onRemoveSource={onRemoveSource} onNavigate={onNavigate} />
       </div>
     </div>
   );
@@ -60,6 +66,9 @@ export function AssetPackWorkbenchHarness({
       onReset={workbench.reset}
       onBack={onNavigateBack}
       onNavigate={workbench.navigate}
+      onReplaceManifest={(manifestText, origin) => void workbench.replaceManifest(manifestText, origin)}
+      onReplaceSource={(path, file) => void workbench.replaceSource(path, file)}
+      onRemoveSource={(path) => void workbench.removeSource(path)}
     />
   );
 }
