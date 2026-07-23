@@ -1704,18 +1704,20 @@ Record the full hash and PASS evidence, then commit the plan record separately.
 - Create: `packages/web/src/hooks/use-unsaved-work-guard.ts`
 - Create: `packages/web/src/components/asset-pack-workbench/download-bar.tsx`
 - Modify: `packages/web/src/components/asset-pack-workbench/harness.tsx`
+- Modify: `packages/web/src/components/asset-pack-workbench/workbench-preview.tsx`
 - Modify: `packages/web/src/App.tsx`
 - Modify: `packages/web/src/hooks/use-asset-pack-workbench.ts`
 - Create: `packages/web/test/asset-pack-download.test.ts`
 - Create: `packages/web/test/use-unsaved-work-guard.test.ts`
 - Create: `packages/web/test/asset-pack-download-bar.test.tsx`
 - Modify: `packages/web/test/app-shell.test.tsx`
+- Modify: `packages/web/test/asset-pack-workbench-shell.test.tsx`
 
 **Interfaces:**
 - Consumes: Task 9 formal gate, Task 8 assembly response, existing `downloadBlob`.
 - Produces: deterministic filenames, exact-revision draft/formal download, downloaded-revision tracking, `beforeunload`, and in-app route blocking.
 
-- [ ] **Step 1: Write failing filename and exact-revision tests**
+- [x] **Step 1: Write failing filename and exact-revision tests**
 
 Assert:
 
@@ -1734,15 +1736,22 @@ expect(assetPackDownloadFilename({
 
 Start assembly for revision `8`, accept revision `9` edit, then resolve revision `8`; assert no download and no saved marker. Only exact current revision bytes may reach `downloadBlob`.
 
-- [ ] **Step 2: Write failing download-gate and status tests**
+  - Added deterministic filename, stale-response, exact-byte, failed-handoff, and success-only downloaded-marker tests in `packages/web/test/asset-pack-download.test.ts` and `packages/web/test/use-asset-pack-workbench.test.ts`.
+  - RED was confirmed before implementation by the focused command in Step 4.
+
+- [x] **Step 2: Write failing download-gate and status tests**
 
 Draft button is enabled only at `draftSerializable`. It lists remaining errors/warnings before confirmation. Formal button is enabled only when `AssetPackFormalGate.ready` and Worker candidate digest belongs to the current revision. Buttons remain disabled while assembling and expose status through `aria-live`.
 
-- [ ] **Step 3: Write failing unload and route-navigation tests**
+  - Added draft/formal gate, current diagnostics, assembling status, and rejected-download alert coverage in `packages/web/test/asset-pack-download-bar.test.tsx` and `packages/web/test/asset-pack-workbench-shell.test.tsx`.
+
+- [x] **Step 3: Write failing unload and route-navigation tests**
 
 Assert no prompt immediately after upload, a prompt after revision change, no prompt after exact current draft/formal download, and prompt again after another edit. Cover reload/close `beforeunload`, Home CTA, programmatic navigation, and browser back. Cancelled navigation must leave pathname and workbench state unchanged.
 
-- [ ] **Step 4: Run focused tests and verify RED**
+  - Added pure guard and App navigation-owner coverage for beforeunload eligibility, accepted/cancelled programmatic navigation, popstate cancellation, and no history growth in `packages/web/test/use-unsaved-work-guard.test.ts` and `packages/web/test/app-shell.test.tsx`.
+
+- [x] **Step 4: Run focused tests and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-download.test.ts use-unsaved-work-guard.test.ts asset-pack-download-bar.test.tsx app-shell.test.tsx
@@ -1750,19 +1759,29 @@ rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-download.test.ts use-unsav
 
 Expected: FAIL because download and navigation guards do not exist.
 
-- [ ] **Step 5: Implement exact download handoff**
+  - RED: the exact command failed as required with missing download/guard modules and navigation owner before implementation; the permitted rerun reached Vitest and preserved the two existing App passes.
+
+- [x] **Step 5: Implement exact download handoff**
 
 Convert transferred bytes to `Blob` with `application/zip`, call existing `downloadBlob`, and mark `latestDownloadedRevision` only after the handoff returns without throwing. Do not regenerate or edit bytes on the main thread.
 
 Formal click rechecks current gate, requests the cached exact candidate, verifies response revision/kind/digest metadata, and downloads. Draft click shows remaining diagnostics and requests current draft assembly.
 
-- [ ] **Step 6: Implement unsaved-work guards**
+  - Implemented `packages/web/src/lib/asset-pack-download.ts` and controller handoff in `packages/web/src/hooks/use-asset-pack-workbench.ts`; Worker bytes are transferred directly to an `application/zip` Blob, with no main-thread regeneration or durable storage.
+  - Formal gate, revision, kind, and digest are rechecked before handoff; `latestDownloadedRevision` is dispatched only after `downloadBlob` returns successfully.
+  - Product commit: `e7719ca4083a6f9a0973c11a23398a4318300f03` (`feat(web): download governed asset pack archives`).
+
+- [x] **Step 6: Implement unsaved-work guards**
 
 `useUnsavedWorkGuard` registers `beforeunload` only while `currentRevision > latestDownloadedRevision`. Add a blocker registration to the App navigation owner so in-app navigation and `popstate` consult the same injected confirm function before changing route state. Remove listeners/blocker on workbench unmount.
 
 Do not use a custom modal for browser reload/close because browsers control that text. Use one concise confirm message for in-app navigation.
 
-- [ ] **Step 7: Verify GREEN**
+  - Implemented `useUnsavedWorkGuard` with conditional `beforeunload` registration and cleanup, plus one App navigation owner for programmatic and popstate confirmation.
+  - Review fix `ace0983076808266135119cb6c1992a06ddbc7aa` corrected current diagnostics and cancelled history restoration without duplicate `pushState` entries.
+  - Final UI fix `241b5612469d90994ec44d1ce47a94a8a0bb6fef` surfaces rejected downloads as retryable transient alerts.
+
+- [x] **Step 7: Verify GREEN**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-download.test.ts use-unsaved-work-guard.test.ts asset-pack-download-bar.test.tsx app-shell.test.tsx use-asset-pack-workbench.test.ts
@@ -1771,7 +1790,12 @@ rtk pnpm --filter @lpc-toolkit/web run typecheck
 
 Expected: PASS with exact revision ownership and no durable browser storage.
 
-- [ ] **Step 8: Commit Task 13**
+  - Focused GREEN: `rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-download.test.ts use-unsaved-work-guard.test.ts asset-pack-download-bar.test.tsx app-shell.test.tsx asset-pack-workbench-shell.test.tsx use-asset-pack-workbench.test.ts` PASS — 6 files, 30 tests.
+  - `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS; `rtk pnpm check:boundaries` PASS; `rtk git diff --check` PASS.
+  - Full `rtk pnpm verify` PASS: Core 338 tests, format 70, presets 3, Web 823, CLI 1032 passed + 1 skipped. Existing optional-spritesheet/catalog warning logs remain non-failing and are documented in the evidence report.
+  - Final Luna review: Approved; no Critical or Important findings. Minor notes were lifecycle coverage and pre-existing warning noise.
+
+- [x] **Step 8: Commit Task 13**
 
 ```sh
 rtk git add packages/web/src/lib/asset-pack-download.ts packages/web/src/hooks/use-unsaved-work-guard.ts packages/web/src/components/asset-pack-workbench/download-bar.tsx packages/web/src/components/asset-pack-workbench/harness.tsx packages/web/src/App.tsx packages/web/src/hooks/use-asset-pack-workbench.ts packages/web/test/asset-pack-download.test.ts packages/web/test/use-unsaved-work-guard.test.ts packages/web/test/asset-pack-download-bar.test.tsx packages/web/test/app-shell.test.tsx
@@ -1779,6 +1803,10 @@ rtk git commit -m "feat(web): download governed asset pack archives"
 ```
 
 Record the full hash and PASS evidence, then commit the plan record separately.
+
+  - Product commits: `e7719ca4083a6f9a0973c11a23398a4318300f03` (`feat(web): download governed asset pack archives`), `ace0983076808266135119cb6c1992a06ddbc7aa` (`fix(web): close Task 13 review findings`), and `241b5612469d90994ec44d1ce47a94a8a0bb6fef` (`fix(web): surface asset pack download failures`).
+  - Evidence commits: `6b1d69501a21324d925b1b6d357b14e192958b6e`, `b9dc11f4da09a7851e18e6d54a8e35ee4c58a903`, and `9f7f97468fb2b6e47a30acc724684ff03f026dc7`.
+  - Scope: Web-only; no dependencies, CLI documentation matrix, Task 14 files, assets, caches, or `upstream/` content changed. Plan record commit follows this update.
 
 ---
 
