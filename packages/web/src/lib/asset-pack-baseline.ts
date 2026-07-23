@@ -5,7 +5,6 @@ import {
   type ItemDefinition,
   type PaletteMetadata,
 } from '@lpc-toolkit/core';
-import { encodeCanonicalJson } from '@lpc-toolkit/asset-pack-format';
 import { createBrowserAssetPackFormatRuntime } from '../adapter/asset-pack-format-runtime';
 import release from '../../../../asset-release.json';
 
@@ -54,5 +53,8 @@ async function digestProjection(
   runtime: ReturnType<typeof createBrowserAssetPackFormatRuntime>,
   projection: unknown,
 ): Promise<string> {
-  return runtime.sha256(encodeCanonicalJson(projection, runtime.encodeUtf8));
+  // Match the Node baseline's compact JSON digest over the shared, recursively
+  // sorted Core projection. The byte contract is persisted in asset-pack
+  // registries, so pretty-printing here would create a different baseline.
+  return runtime.sha256(runtime.encodeUtf8(JSON.stringify(projection)));
 }

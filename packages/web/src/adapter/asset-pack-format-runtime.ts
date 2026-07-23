@@ -13,7 +13,7 @@ export class AssetPackBrowserCapabilityError extends Error {
 }
 
 interface BrowserAssetPackFormatRuntimeOptions {
-  readonly crypto?: Crypto;
+  readonly crypto?: Crypto | null;
   readonly createDecompressionStream?: (
     format: CompressionFormat,
   ) => DecompressionStream;
@@ -22,7 +22,7 @@ interface BrowserAssetPackFormatRuntimeOptions {
 export function createBrowserAssetPackFormatRuntime(
   options: BrowserAssetPackFormatRuntimeOptions = {},
 ): AssetPackFormatRuntime {
-  const cryptoApi = options.crypto ?? globalThis.crypto;
+  const cryptoApi = options.crypto === undefined ? globalThis.crypto : options.crypto;
   const createStream = options.createDecompressionStream ?? ((format: CompressionFormat) => {
     if (typeof globalThis.DecompressionStream !== 'function') {
       throw new AssetPackBrowserCapabilityError('DecompressionStream');
@@ -50,35 +50,50 @@ export function createBrowserAssetPackFormatRuntime(
         if (error instanceof AssetPackBrowserCapabilityError) throw error;
         throw new AssetPackBrowserCapabilityError('DecompressionStream(deflate-raw)');
       }
-      const writer = stream.writable.getWriter();
-      await writer.write(compressed);
-      await writer.close();
       const reader = stream.readable.getReader();
+      const writer = stream.writable.getWriter();
       const chunks: Uint8Array[] = [];
       let total = 0;
-      try {
-        while (true) {
-          const next = await reader.read();
-          if (next.done) break;
-          const chunk = next.value;
-          if (total + chunk.byteLength > maximumSize) {
-            await reader.cancel('bounded output exceeded');
-            throw new Error('Raw DEFLATE output exceeds the bounded output limit.');
+      let readerCancelled = false;
+      const cancelReader = async (reason: unknown): Promise<void> => {
+        if (readerCancelled) return;
+        readerCancelled = true;
+        await reader.cancel(reason).catch(() => undefined);
+      };
+      const readOutput = async (): Promise<Uint8Array> => {
+        try {
+          while (true) {
+            const next = await reader.read();
+            if (next.done) break;
+            const chunk = next.value;
+            if (total + chunk.byteLength > maximumSize) {
+              await cancelReader('bounded output exceeded');
+              throw new Error('Raw DEFLATE output exceeds the bounded output limit.');
+            }
+            total += chunk.byteLength;
+            chunks.push(new Uint8Array(chunk));
           }
-          total += chunk.byteLength;
-          chunks.push(new Uint8Array(chunk));
+        } finally {
+          reader.releaseLock();
         }
-      } finally {
-        reader.releaseLock();
+        if (total !== declaredSize) throw new Error('Raw DEFLATE output length does not match its declaration.');
+        const output = new Uint8Array(total);
+        let offset = 0;
+        for (const chunk of chunks) {
+          output.set(chunk, offset);
+          offset += chunk.byteLength;
+        }
+        return output;
+      };
+      try {
+        const outputPromise = readOutput();
+        await writer.write(compressed);
+        await writer.close();
+        return await outputPromise;
+      } catch (error) {
+        await cancelReader(error);
+        throw error;
       }
-      if (total !== declaredSize) throw new Error('Raw DEFLATE output length does not match its declaration.');
-      const output = new Uint8Array(total);
-      let offset = 0;
-      for (const chunk of chunks) {
-        output.set(chunk, offset);
-        offset += chunk.byteLength;
-      }
-      return output;
     },
   };
 }

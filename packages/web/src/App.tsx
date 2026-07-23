@@ -12,6 +12,7 @@ import {
   type Locale,
 } from './i18n';
 import { LayerStackHarness } from './components/layer-stack/harness';
+import { runBrowserAssetPackConformance } from './lib/asset-pack-browser-conformance';
 import { LandingPage } from './components/landing-page';
 import { NotFoundPage } from './components/not-found-page';
 import {
@@ -24,6 +25,21 @@ import {
   type AppPath,
   type NavigableAppRoute,
 } from './lib/app-route';
+
+interface LpcAssetPackConformanceProbe {
+  readonly status: 'verified' | 'error';
+  readonly archiveDigest?: string;
+  readonly contentDigest?: string;
+  readonly sourceDigest?: string;
+  readonly diagnostics?: readonly unknown[];
+  readonly message?: string;
+}
+
+declare global {
+  interface Window {
+    __LPC_ASSET_PACK_CONFORMANCE__?: LpcAssetPackConformanceProbe;
+  }
+}
 
 function useAppPathname(): [string, (path: AppPath) => void] {
   const [pathname, setPathname] = useState(() => window.location.pathname);
@@ -100,6 +116,24 @@ function ComposerApp({ onNavigateHome }: { onNavigateHome: () => void }) {
 export default function App() {
   const [pathname, navigate] = useAppPathname();
   const route = routeFromPathname(pathname);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('assetPackConformance') !== '1') {
+      delete window.__LPC_ASSET_PACK_CONFORMANCE__;
+      return;
+    }
+
+    void runBrowserAssetPackConformance()
+      .then((result) => {
+        window.__LPC_ASSET_PACK_CONFORMANCE__ = result;
+      })
+      .catch((error: unknown) => {
+        window.__LPC_ASSET_PACK_CONFORMANCE__ = {
+          status: 'error',
+          message: error instanceof Error ? error.message : String(error),
+        };
+      });
+  }, []);
 
   document.documentElement.className = 'lpc dark';
 

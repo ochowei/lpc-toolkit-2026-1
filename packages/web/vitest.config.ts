@@ -1,8 +1,9 @@
 import { defineConfig } from 'vitest/config';
 import { fileURLToPath } from 'node:url';
+import cliPackage from '../cli/package.json';
 
 export default defineConfig({
-  define: { __LPC_CLI_VERSION__: JSON.stringify('0.2.0') },
+  define: { __LPC_CLI_VERSION__: JSON.stringify(cliPackage.version) },
   resolve: {
     alias: {
       // Match vite.config.ts so tests read core's source directly.

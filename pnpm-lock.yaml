@@ -63,6 +63,9 @@ importers:
 
   packages/web:
     dependencies:
+      '@lpc-toolkit/asset-pack-format':
+        specifier: workspace:*
+        version: link:../asset-pack-format
       '@lpc-toolkit/core':
         specifier: workspace:*
         version: link:../core

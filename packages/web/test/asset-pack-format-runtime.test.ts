@@ -46,4 +46,23 @@ describe('browser asset-pack format runtime', () => {
     );
     expect(cancel).toHaveBeenCalledTimes(1);
   });
+
+  it('reports missing crypto and decompression capabilities with typed diagnostics', async () => {
+    const cryptoMissing = createBrowserAssetPackFormatRuntime({ crypto: null });
+    await expect(cryptoMissing.sha256(new Uint8Array([1]))).rejects.toMatchObject({
+      code: 'asset_browser_capability_missing',
+    });
+
+    const decompressionMissing = createBrowserAssetPackFormatRuntime({
+      crypto: globalThis.crypto,
+      createDecompressionStream: () => {
+        throw new Error('missing');
+      },
+    });
+    await expect(decompressionMissing.inflateRawBounded({
+      compressed: new Uint8Array([1]),
+      declaredSize: 0,
+      maximumSize: 0,
+    })).rejects.toMatchObject({ code: 'asset_browser_capability_missing' });
+  });
 });
