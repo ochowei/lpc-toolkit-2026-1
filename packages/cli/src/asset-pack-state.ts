@@ -34,6 +34,7 @@ import {
   type AssetPackDirectoryFileOps,
   type AssetPackFileDiagnostic,
 } from './asset-pack-files.js';
+import { draftAssetPackDiagnostic } from './asset-pack-compatibility.js';
 import type { AssetPackPayloadSuccess } from './asset-pack-payload.js';
 import {
   loadActiveAssetPackBaseline,
@@ -238,6 +239,9 @@ async function validateSnapshot(options: {
   const diagnostics = report.diagnostics.map((diagnostic) =>
     toLifecycleDiagnostic(diagnostic, options.active.loaded.pack.id));
   if (!report.valid) return candidateFailure(diagnostics);
+  if (options.active.loaded.pack.status === 'draft') {
+    return candidateFailure([draftAssetPackDiagnostic(options.active.loaded.pack.id)]);
+  }
   if (report.contentDigest !== options.active.loaded.contentDigest) {
     return candidateFailure([{
       code: 'asset_digest_mismatch',

@@ -613,6 +613,26 @@ describe('packAssetPack', () => {
     expect(readFileSync(accepted.archivePath)).toEqual(previousArchive);
   });
 
+  it('refuses to package a draft source instead of stripping the draft marker', async () => {
+    const { runtime, workspaceRoot } = createRuntimeFixture();
+    const { workspace, packDirectory } = createPack(workspaceRoot, sourceFixture({ status: 'draft' }));
+    writeWalkPng(path.join(packDirectory, 'sprites/wind-braid/walk.png'));
+    const archivePath = path.join(workspace.packsRoot, 'acme.wind-braid-1.0.0.lpc-assets.zip');
+
+    const result = await packAssetPack({ packDirectory, workspace, runtime });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('Expected draft packaging to fail.');
+    expect(result.diagnostics).toEqual([expect.objectContaining({
+      code: 'asset_pack_draft',
+      severity: 'error',
+      message: 'Draft asset-pack archives are not installable.',
+      details: { status: 'draft' },
+    })]);
+    expect(existsSync(archivePath)).toBe(false);
+    expect(siblingPublicationPaths(archivePath)).toEqual([]);
+  });
+
   it('packages acknowledged extend attribution and rejects unacknowledged or stale warnings', async () => {
     const { runtime, workspaceRoot } = createRuntimeFixture();
     const baseline = loadActiveAssetPackBaseline({ runtime });

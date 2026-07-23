@@ -14,12 +14,16 @@ import {
   standardAnimationGeometry,
   type AssetPackSource,
 } from '@lpc-toolkit/core';
+import { createAssetPackArchive } from '@lpc-toolkit/asset-pack-format';
 import { describe, expect, it } from 'vitest';
-import { createDeterministicAssetPackArchive } from '../src/asset-pack-archive-format.js';
+import {
+  createDeterministicAssetPackArchive,
+} from '../src/asset-pack-archive-format.js';
 import { createDirectoryAssetStore } from '../src/asset-store.js';
 import { initializeAssetWorkspace } from '../src/asset-workspace.js';
 import { createRuntimeContext } from '../src/context.js';
 import { runCli } from '../src/main.js';
+import { nodeAssetPackFormatRuntime } from '../src/asset-pack-node-runtime.js';
 import type { RuntimeAssets } from '../src/runtime-assets.js';
 import {
   acknowledgeWarning,
@@ -93,7 +97,10 @@ function createLifecycleRuntime(workspaceRoot: string): RuntimeAssets {
   };
 }
 
-async function createInstallArchive(workspaceRoot: string): Promise<string> {
+async function createInstallArchive(
+  workspaceRoot: string,
+  options: { readonly status?: AssetPackSource['status'] } = {},
+): Promise<string> {
   const sourcePath = 'sprites/moon-braid/foreground/walk.png';
   const geometry = standardAnimationGeometry('walk');
   const maxColumn = Math.max(
@@ -111,6 +118,7 @@ async function createInstallArchive(workspaceRoot: string): Promise<string> {
     id: 'acme.lifecycle',
     version: '1.0.0',
     displayName: 'ACME Lifecycle',
+    ...(options.status ? { status: options.status } : {}),
     credits: {
       authors: ['Pack Artist'],
       licenses: ['CC-BY-SA 4.0'],
@@ -131,10 +139,18 @@ async function createInstallArchive(workspaceRoot: string): Promise<string> {
       }],
     }],
   };
-  const bytes = await createDeterministicAssetPackArchive({
-    manifestBytes: Buffer.from(`${JSON.stringify(source, null, 2)}\n`),
-    sourceBytes: new Map([[sourcePath, canvas.toBuffer('image/png')]]),
-  });
+  const sourceBytes = new Map([[sourcePath, canvas.toBuffer('image/png')]]);
+  const bytes = source.status === 'draft'
+    ? Buffer.from((await createAssetPackArchive({
+      kind: 'draft',
+      manifestDocument: source as unknown as Readonly<Record<string, unknown>>,
+      sourceBytes,
+      runtime: nodeAssetPackFormatRuntime,
+    })).archiveBytes)
+    : await createDeterministicAssetPackArchive({
+      manifestBytes: Buffer.from(`${JSON.stringify(source, null, 2)}\n`),
+      sourceBytes,
+    });
   const archivePath = path.join(workspaceRoot, 'acme.lifecycle-1.0.0.lpc-assets.zip');
   writeFileSync(archivePath, bytes);
   return archivePath;
@@ -536,6 +552,48 @@ describe('main json behavior', () => {
         valid: false,
         diagnostics: expect.arrayContaining([
           expect.objectContaining({ code: 'asset_archive_invalid' }),
+        ]),
+      },
+      warnings: [],
+      errors: [],
+    });
+    expect(response.data).not.toHaveProperty('snapshot');
+  });
+
+  it('keeps draft inspection data in a completed response and reports draft status in JSON', async () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-main-json-inspect-draft-'));
+    const archivePath = await createInstallArchive(cwd, { status: 'draft' });
+    const runtime = createLifecycleRuntime(cwd);
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+
+    const code = await runCli([
+      'asset', 'inspect', archivePath, '--json',
+    ], {
+      cwd,
+      stdout: (text) => stdout.push(text),
+      stderr: (text) => stderr.push(text),
+    }, {
+      prepareRuntimeAssets: async () => runtime,
+      findAssetWorkspace: () => {
+        throw new Error('asset inspect must not discover a workspace');
+      },
+    });
+
+    const response = JSON.parse(stdout.join('')) as {
+      readonly data: Readonly<Record<string, unknown>>;
+    };
+    expect(code).toBe(1);
+    expect(stderr).toEqual([]);
+    expect(response).toMatchObject({
+      ok: true,
+      command: 'asset inspect',
+      data: {
+        archivePath,
+        valid: false,
+        status: 'draft',
+        diagnostics: expect.arrayContaining([
+          expect.objectContaining({ code: 'asset_pack_draft' }),
         ]),
       },
       warnings: [],

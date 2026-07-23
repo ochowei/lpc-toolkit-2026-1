@@ -405,6 +405,7 @@ describe('human-readable CLI output', () => {
         archiveDigest: `sha256:${'a'.repeat(64)}`,
         packId: 'acme.hair',
         version: '1.0.0',
+        status: 'draft',
         contentDigest: `sha256:${'b'.repeat(64)}`,
         valid: false,
         entryCount: 4,
@@ -440,6 +441,7 @@ describe('human-readable CLI output', () => {
     }, 'fallback\n');
 
     expect(output).toContain('Asset pack inspection: invalid');
+    expect(output).toContain('DRAFT');
     expect(output).toContain('Archive diagnostics (1):');
     expect(output).toContain('Compatibility diagnostics (1):');
     expect(output).toContain('Pixel diagnostics (1):');

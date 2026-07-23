@@ -202,7 +202,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
   {
     command: ['asset', 'inspect'],
     usage: 'lpc-toolkit asset inspect <pack.lpc-assets.zip> [--json]',
-    description: 'Inspect and validate an asset-pack archive without installing it.',
+    description: 'Inspect and validate an asset-pack archive, including draft status, without installing it.',
     options: [HELP_OPTION, JSON_OPTION],
     examples: [
       'lpc-toolkit asset inspect ./acme.hair-1.0.0.lpc-assets.zip --json',
@@ -211,7 +211,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
   {
     command: ['asset', 'install'],
     usage: 'lpc-toolkit asset install <pack.lpc-assets.zip> [--workspace <directory>] [--json]',
-    description: 'Install or update a verified asset-pack archive.',
+    description: 'Install or update a verified asset-pack archive. Draft archives are rejected.',
     options: [HELP_OPTION, JSON_OPTION, ASSET_WORKSPACE_OPTION],
     examples: [
       'lpc-toolkit asset install ./acme.hair-1.0.0.lpc-assets.zip --workspace ./my-lpc-art --json',

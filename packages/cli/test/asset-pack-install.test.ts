@@ -28,6 +28,7 @@ import {
   type AssetPackSource,
   type ItemDefinition,
 } from '@lpc-toolkit/core';
+import { createAssetPackArchive } from '@lpc-toolkit/asset-pack-format';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   createDeterministicAssetPackArchive,
@@ -58,6 +59,7 @@ import {
 } from '../src/asset-workspace.js';
 import { createDirectoryAssetStore } from '../src/asset-store.js';
 import { createRuntimeContext } from '../src/context.js';
+import { nodeAssetPackFormatRuntime } from '../src/asset-pack-node-runtime.js';
 import type { RuntimeAssets } from '../src/runtime-assets.js';
 
 const temporaryDirectories: string[] = [];
@@ -255,6 +257,7 @@ function newItemSource(options: {
   readonly localIds?: readonly string[];
   readonly displayName?: string;
   readonly replacements?: AssetPackSource['replaces'];
+  readonly status?: AssetPackSource['status'];
 }): AssetPackSource {
   const localIds = options.localIds ?? ['moon-braid'];
   return {
@@ -263,6 +266,7 @@ function newItemSource(options: {
     version: options.version,
     displayName: options.displayName ?? `Pack ${options.version}`,
     credits: PACK_CREDITS,
+    ...(options.status ? { status: options.status } : {}),
     ...(options.replacements ? { replaces: options.replacements } : {}),
     assets: localIds.map((localId) => ({
       kind: 'new-item' as const,
@@ -344,10 +348,17 @@ async function createArchive(
   name: string,
   manifestBytes = Buffer.from(`${JSON.stringify(source, null, 2)}\n`),
 ): Promise<ArchiveFixture> {
-  const bytes = await createDeterministicAssetPackArchive({
-    manifestBytes,
-    sourceBytes: payloadFiles(source),
-  });
+  const bytes = source.status === 'draft'
+    ? Buffer.from((await createAssetPackArchive({
+      kind: 'draft',
+      manifestDocument: source as unknown as Readonly<Record<string, unknown>>,
+      sourceBytes: payloadFiles(source),
+      runtime: nodeAssetPackFormatRuntime,
+    })).archiveBytes)
+    : await createDeterministicAssetPackArchive({
+      manifestBytes,
+      sourceBytes: payloadFiles(source),
+    });
   const archivePath = path.join(fixture.archiveRoot, `${name}.lpc-assets.zip`);
   writeFileSync(archivePath, bytes);
   return { path: archivePath, bytes, digest: sha256(bytes), source };
@@ -697,6 +708,38 @@ describe('installAssetPack lifecycle policy', () => {
 
     expect(diagnostics[0]?.code).toBe('asset_source_kind_conflict');
     expect(snapshotTree(linkedRoot)).toEqual(before);
+  });
+
+  it('rejects draft archives before staging or managed-state mutation', async () => {
+    const fixture = createFixture();
+    const archive = await createArchive(fixture, newItemSource({
+      packId: 'acme.draft-hair',
+      version: '1.0.0',
+      status: 'draft',
+    }), 'draft-pack');
+    const beforeOutput = snapshotTree(fixture.workspace.outputRoot);
+    const beforeState = snapshotTree(fixture.workspace.stateRoot);
+
+    const diagnostics = expectFailure(await installAssetPack({
+      archivePath: archive.path,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+    }));
+
+    expect(diagnostics).toEqual([expect.objectContaining({
+      code: 'asset_pack_draft',
+      severity: 'error',
+      packId: 'acme.draft-hair',
+      details: { status: 'draft' },
+    })]);
+    expect(snapshotTree(fixture.workspace.outputRoot)).toEqual(beforeOutput);
+    expect(snapshotTree(fixture.workspace.stateRoot)).toEqual(beforeState);
+    expect(existsSync(assetPackInstalledDirectory({
+      workspace: fixture.workspace,
+      packId: 'acme.draft-hair',
+      version: '1.0.0',
+      archiveDigest: archive.digest,
+    }))).toBe(false);
   });
 
   it('accepts and rejects cross-package replacement according to compiler authorization', async () => {

@@ -18,6 +18,7 @@ import {
   type AssetPackSource,
   type ItemDefinition,
 } from '@lpc-toolkit/core';
+import { createAssetPackArchive } from '@lpc-toolkit/asset-pack-format';
 import JSZip from 'jszip';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
@@ -28,6 +29,7 @@ import {
   SUPPORTED_ASSET_PACK_CAPABILITIES,
 } from '../src/asset-pack-compatibility.js';
 import { inspectAssetPackArchive } from '../src/asset-pack-inspection.js';
+import { nodeAssetPackFormatRuntime } from '../src/asset-pack-node-runtime.js';
 import { createDirectoryAssetStore } from '../src/asset-store.js';
 import { createRuntimeContext } from '../src/context.js';
 import { CLI_VERSION } from '../src/package-info.js';
@@ -146,6 +148,7 @@ function newItemSource(options: {
   readonly sourcePath?: string;
   readonly compatibility?: AssetPackSource['compatibility'];
   readonly acknowledgements?: readonly AssetPackAcknowledgement[];
+  readonly status?: AssetPackSource['status'];
   readonly sprites?: readonly {
     readonly animation: AnimationName;
     readonly source: string;
@@ -161,6 +164,7 @@ function newItemSource(options: {
     version: '1.0.0',
     displayName: 'ACME Wind Braid',
     credits: PACK_CREDITS,
+    ...(options.status ? { status: options.status } : {}),
     ...(options.compatibility ? { compatibility: options.compatibility } : {}),
     ...(options.acknowledgements ? { acknowledgements: options.acknowledgements } : {}),
     assets: [{
@@ -218,6 +222,15 @@ async function archiveFor(
     sheetPng('climb', filledRequiredCells('climb')),
   ]]),
 ): Promise<Buffer> {
+  if (source.status === 'draft') {
+    const draft = await createAssetPackArchive({
+      kind: 'draft',
+      manifestDocument: source as unknown as Readonly<Record<string, unknown>>,
+      sourceBytes,
+      runtime: nodeAssetPackFormatRuntime,
+    });
+    return Buffer.from(draft.archiveBytes);
+  }
   return createDeterministicAssetPackArchive({
     manifestBytes: Buffer.from(`${JSON.stringify(source, null, 2)}\n`),
     sourceBytes,
@@ -427,6 +440,30 @@ describe('inspectAssetPackArchive compatibility and archive validation', () => {
 });
 
 describe('inspectAssetPackArchive report and captured-byte validation', () => {
+  it('reports checksum-valid draft archives as invalid lifecycle findings without a snapshot', async () => {
+    const result = await inspectAssetPackArchive({
+      archivePath: ARCHIVE_PATH,
+      archiveBytes: await archiveFor(newItemSource({ status: 'draft' })),
+      runtime: createRuntimeFixture(),
+    });
+
+    expect(result.report).toMatchObject({
+      schema: 'lpc-toolkit.asset-pack-inspection.v1',
+      archivePath: ARCHIVE_PATH,
+      packId: 'acme.wind-braid',
+      version: '1.0.0',
+      valid: false,
+      status: 'draft',
+      diagnostics: [expect.objectContaining({
+        code: 'asset_pack_draft',
+        severity: 'error',
+        details: { status: 'draft' },
+      })],
+      acknowledgementRecords: [],
+    });
+    expect(result).not.toHaveProperty('snapshot');
+  });
+
   it('returns archive identity and byte totals in a JSON-safe report only alongside a valid snapshot', async () => {
     const archiveBytes = await archiveFor(newItemSource());
     const result = await inspectAssetPackArchive({

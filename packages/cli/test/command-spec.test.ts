@@ -257,6 +257,15 @@ describe('helpForCommand', () => {
       }
     }
   });
+
+  it('documents draft reporting and rejection in inspect and install help', () => {
+    expect(helpForCommand(['asset', 'inspect'])).toContain(
+      'Inspect and validate an asset-pack archive, including draft status, without installing it.',
+    );
+    expect(helpForCommand(['asset', 'install'])).toContain(
+      'Install or update a verified asset-pack archive. Draft archives are rejected.',
+    );
+  });
 });
 
 describe('validateCommandOptions', () => {

@@ -483,6 +483,7 @@ function formatAssetInspect(data: JsonRecord): string | undefined {
   const archivePath = stringValue(data, 'archivePath');
   const entryCount = numberValue(data, 'entryCount');
   const totalUncompressedBytes = numberValue(data, 'totalUncompressedBytes');
+  const status = stringValue(data, 'status');
   const diagnostics = recordArrayValue(data, 'diagnostics');
   const acknowledgements = recordArrayValue(data, 'acknowledgementRecords');
   if (
@@ -504,7 +505,11 @@ function formatAssetInspect(data: JsonRecord): string | undefined {
   const version = stringValue(data, 'version');
   const archiveDigest = stringValue(data, 'archiveDigest');
   const contentDigest = stringValue(data, 'contentDigest');
-  if (packId) lines.push(`Pack: ${packId}${version ? ` ${version}` : ''}`);
+  if (packId) {
+    lines.push(
+      `Pack: ${packId}${version ? ` ${version}` : ''}${status === 'draft' ? ' (DRAFT)' : ''}`,
+    );
+  }
   if (archiveDigest) lines.push(`Archive digest: ${archiveDigest}`);
   if (contentDigest) lines.push(`Content digest: ${contentDigest}`);
   lines.push(

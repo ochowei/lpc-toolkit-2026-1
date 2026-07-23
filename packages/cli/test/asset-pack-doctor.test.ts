@@ -243,12 +243,14 @@ function packSource(options: {
   readonly displayName: string;
   readonly localId: string;
   readonly sourcePath?: string;
+  readonly status?: AssetPackSource['status'];
 }): AssetPackSource {
   return {
     schema: ASSET_PACK_SCHEMA,
     id: options.packId,
     version: options.version ?? '1.0.0',
     displayName: options.displayName,
+    ...(options.status ? { status: options.status } : {}),
     credits: {
       authors: [`${options.displayName} Artist`],
       licenses: ['CC-BY-SA 4.0'],
@@ -796,6 +798,41 @@ describe('doctorAssetPacks healthy and recovery reports', () => {
     expect(tampered.healthy).toBe(false);
     expect(tampered.checks.map((check) => check.code)).toContain('asset_digest_mismatch');
     expect(tamperedOps.events).toEqual([]);
+  });
+
+  it('marks a managed draft source unhealthy without mutating doctor state', async () => {
+    const fixture = createFixture();
+    const sourceRoot = await linkNewPack(fixture, {
+      packId: 'alpha.pack',
+      localId: 'alpha',
+      color: '#aa3300',
+    });
+    writeJson(path.join(sourceRoot, 'asset-pack.json'), packSource({
+      packId: 'alpha.pack',
+      displayName: 'alpha.pack',
+      localId: 'alpha',
+      status: 'draft',
+    }));
+    await refreshLinkedSourceSnapshot(fixture.workspace, 'alpha.pack');
+    const before = guardSnapshot(fixture);
+    const readOnly = mutationRecordingFileOps({ failOnMutation: true });
+
+    const report = await doctorAssetPacks({
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+      fileOps: readOnly.fileOps,
+    });
+
+    expect(report.healthy).toBe(false);
+    expect(report.checks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'asset_pack_draft',
+        status: 'error',
+        packId: 'alpha.pack',
+      }),
+    ]));
+    expect(readOnly.events).toEqual([]);
+    expectGuardsUnchanged(fixture, before);
   });
 
   it('waits read-only for a live lifecycle claim and audits the completed generation', async () => {

@@ -15,7 +15,10 @@ import {
 import {
   createDeterministicAssetPackArchive,
 } from './asset-pack-archive-format.js';
-import type { AssetPackLifecycleDiagnostic } from './asset-pack-compatibility.js';
+import {
+  draftAssetPackDiagnostic,
+  type AssetPackLifecycleDiagnostic,
+} from './asset-pack-compatibility.js';
 import {
   loadAssetPackFiles,
   type AssetPackDirectoryFileOps,
@@ -272,6 +275,9 @@ export async function packAssetPack(options: {
   }
   if (!snapshot.ok) {
     return { ok: false, diagnostics: asLifecycleDiagnostics(snapshot.diagnostics) };
+  }
+  if (snapshot.pack.status === 'draft') {
+    return { ok: false, diagnostics: [draftAssetPackDiagnostic(snapshot.pack.id)] };
   }
 
   const validation = await validateAssetPackDirectory({

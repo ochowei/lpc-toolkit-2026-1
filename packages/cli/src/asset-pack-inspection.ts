@@ -5,7 +5,10 @@ import {
   type AssetPackArchiveDiagnostic,
   type AssetPackArchiveSnapshot,
 } from './asset-pack-archive-format.js';
-import type { AssetPackLifecycleDiagnostic } from './asset-pack-compatibility.js';
+import {
+  draftAssetPackDiagnostic,
+  type AssetPackLifecycleDiagnostic,
+} from './asset-pack-compatibility.js';
 import { validateAssetPackPayload } from './asset-pack-validation.js';
 import type { RuntimeAssets } from './runtime-assets.js';
 
@@ -15,6 +18,7 @@ export interface AssetPackInspectionReport {
   readonly archiveDigest?: string;
   readonly packId?: string;
   readonly version?: string;
+  readonly status?: 'draft';
   readonly contentDigest?: string;
   readonly valid: boolean;
   readonly entryCount: number;
@@ -72,21 +76,29 @@ export async function inspectAssetPackArchive(options: {
     ...(options.workspace ? { workspace: options.workspace } : {}),
     origin: options.archivePath,
   });
+  const draftDiagnostic = archive.snapshot.payload.pack.status === 'draft'
+    ? [draftAssetPackDiagnostic(archive.snapshot.payload.pack.id)]
+    : [];
+  const diagnostics = [...draftDiagnostic, ...validation.diagnostics];
+  const valid = validation.valid && draftDiagnostic.length === 0;
   const report: AssetPackInspectionReport = {
     schema: INSPECTION_SCHEMA,
     archivePath: options.archivePath,
     archiveDigest: archive.snapshot.archiveDigest,
     packId: archive.snapshot.payload.pack.id,
     version: archive.snapshot.payload.pack.version,
+    ...(archive.snapshot.payload.pack.status === 'draft'
+      ? { status: 'draft' as const }
+      : {}),
     contentDigest: archive.snapshot.payload.contentDigest,
-    valid: validation.valid,
+    valid,
     entryCount: archive.snapshot.entryCount,
     totalUncompressedBytes: archive.snapshot.totalUncompressedBytes,
-    diagnostics: validation.diagnostics,
+    diagnostics,
     acknowledgementRecords: validation.acknowledgementRecords,
   };
 
-  return validation.valid
+  return valid
     ? { report, snapshot: archive.snapshot }
     : { report };
 }
