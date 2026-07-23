@@ -106,3 +106,57 @@ PASS
 The report update is intentionally a separate documentation commit. No Task 9
 files, dependencies, plan files, assets, caches, artist workspaces, or
 `upstream/` content changed.
+
+## Task 8 worker pipeline review follow-up — 2026-07-23
+
+### RED evidence
+
+Added regressions for the three Important findings in the independent review:
+
+- valid non-object JSON preserves raw text and reports Core's exact
+  `asset_pack_schema_invalid` diagnostic, while parse failures retain the JSON
+  diagnostic;
+- session, formal-candidate, and assembled responses retain original archive
+  digest, uploaded version/status, baseline release tag, final digest, and
+  filename;
+- draft serialization rejects oversized canonical manifests before assembly.
+
+The repository package test command again hit the known sandbox `tsx` IPC
+restriction (`listen EPERM`), so the same suites were run through Vitest
+directly. The red run failed 3 of 21 tests for the expected missing metadata,
+non-object diagnostic, and incomplete serializability behavior.
+
+### GREEN evidence
+
+Product commit:
+
+```text
+50ab2ff87ac9f19cbca0716b9fdec08504a006d4 fix(web): preserve asset pack worker metadata
+```
+
+The implementation now consumes `AssetPackWorkerBaseline.releaseTag`, keeps
+immutable upload metadata in the session and stable responses, uses Core schema
+diagnostics for safely decoded non-object JSON, and computes
+`draftSerializable` from canonical manifest bytes, generated checksum metadata,
+source count/path/entry/total limits, and the two archive metadata entries.
+
+Exact verification after the fix:
+
+```text
+rtk pnpm --filter @lpc-toolkit/web exec vitest run test/asset-pack-baseline.test.ts test/asset-pack-worker-session.test.ts test/asset-pack-worker-protocol.test.ts
+PASS — 3 files, 22 tests
+
+rtk pnpm --filter @lpc-toolkit/web run typecheck
+PASS
+
+rtk pnpm check:boundaries
+PASS — Architecture boundary check passed.
+
+rtk git diff --check
+PASS
+```
+
+The package-level test command remains blocked before Vitest by the existing
+sandbox `tsx` IPC restriction; the direct Vitest command exercises the same
+focused suites. No Task 9 files, dependencies, assets, caches, artist
+workspaces, or `upstream/` content changed.
