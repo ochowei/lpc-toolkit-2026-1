@@ -563,155 +563,45 @@ export interface AssetPackFormalGate {
 - Consumes: Task 2 runtime/payload/canonical JSON contracts and existing JSZip writer behavior.
 - Produces: allocation-free raw-DEFLATE preflight, `inspectAssetPackArchiveBytes`, unsafe/repairable/verified snapshots, exact archive constants, and `createAssetPackArchive`.
 
-- [ ] **Step 1: Port failing raw-ZIP security and bounds tests**
+- [x] **Step 1: Port failing raw-ZIP security and bounds tests**
+  - Commit: 63fda43d52674ca9f018eb792ff4fb3158021c32
+  - Verification: `rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- archive.test.ts` PASS
 
-Move reusable byte fixtures into the shared test without weakening a case. Cover absolute, drive, UNC, backslash, NUL, empty, dot, parent, device names, ASCII-case and NFC collisions, duplicate entries, directory/symlink/FIFO modes, encryption, unsupported methods, flag mismatch, local/central mismatch, invalid offsets, overlap, data descriptors, trailing DEFLATE data, ZIP64, and all exact bounds.
+- [x] **Step 2: Write failing allocation-free raw-DEFLATE tests**
+  - Commit: 63fda43d52674ca9f018eb792ff4fb3158021c32
+  - Verification: `rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- deflate.test.ts` PASS
 
-Assert structural attacks return:
+- [x] **Step 3: Write failing repairable-versus-verified tests**
+  - Commit: 63fda43d52674ca9f018eb792ff4fb3158021c32
+  - Verification: `rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- archive.test.ts` PASS
 
-```ts
-expect(result).toMatchObject({
-  kind: 'unsafe',
-  diagnostics: [{ code: 'asset_archive_unsafe' }],
-});
-expect('snapshot' in result).toBe(false);
-```
+- [x] **Step 4: Write failing deterministic formal/draft writer tests**
+  - Commit: 63fda43d52674ca9f018eb792ff4fb3158021c32
+  - Verification: `rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- archive-conformance.test.ts` PASS
 
-- [ ] **Step 2: Write failing allocation-free raw-DEFLATE tests**
+- [x] **Step 5: Run shared archive tests and verify RED**
+  - Commit: 63fda43d52674ca9f018eb792ff4fb3158021c32
+  - Verification: `rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- deflate.test.ts archive.test.ts archive-conformance.test.ts` PASS (Verified RED before implementation, now GREEN)
 
-Exercise `inspectRawDeflate` directly with stored, fixed-Huffman, and
-dynamic-Huffman streams. Assert exact decoded-size accounting and byte
-consumption without materializing decoded output. Reject:
+- [x] **Step 6: Implement the raw-DEFLATE preflight and port ZIP metadata parsing**
+  - Commit: 63fda43d52674ca9f018eb792ff4fb3158021c32
+  - Verification: `rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- deflate.test.ts archive.test.ts` PASS
 
-- truncated headers or bit fields, and complete trailing bytes after the final
-  block (unused padding bits in the final consumed byte remain permitted);
-- invalid `LEN`/`NLEN`, reserved block types, and missing end-of-block symbols;
-- empty or oversubscribed trees, and incomplete trees except the
-  RFC-permitted single-symbol literal/distance cases;
-- invalid repeat instructions, literal/length symbols, distance symbols, and
-  back-references beyond decoded history;
-- decoded size greater than either the ZIP declaration or configured entry
-  limit.
+- [x] **Step 7: Implement checksum classification and deterministic assembly**
+  - Commit: 63fda43d52674ca9f018eb792ff4fb3158021c32
+  - Verification: `rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- archive.test.ts` PASS
 
-Use a test runtime whose inflater records calls. Prove archive inspection
-rejects malformed or trailing raw DEFLATE before the runtime inflater is
-called. This closes the browser parity gap where
-`DecompressionStream('deflate-raw')` may otherwise accept unused trailing
-input.
+- [x] **Step 8: Verify GREEN and exact legacy fixture parity**
+  - Commit: 63fda43d52674ca9f018eb792ff4fb3158021c32
+  - Verification:
+    - `rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- deflate.test.ts archive.test.ts archive-conformance.test.ts` PASS
+    - `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-archive-format.test.ts` PASS
+    - `rtk pnpm --filter @lpc-toolkit/asset-pack-format run typecheck` PASS
+    - `rtk pnpm check:boundaries` PASS
 
-- [ ] **Step 3: Write failing repairable-versus-verified tests**
-
-Create safe envelopes with bad checksum JSON, missing checksum rows, digest mismatch, invalid manifest JSON, schema errors, missing referenced PNG, and safe unreferenced `sprites/...` entries.
-
-Assert checksum/payload failures return bounded repair snapshots, while a complete archive returns `verified`. Verify all returned arrays are copies and later input mutation changes no snapshot bytes or digest.
-
-- [ ] **Step 4: Write failing deterministic formal/draft writer tests**
-
-Assert reversed map insertion order and different process time zones produce byte-identical archives. Inspect sorted paths, fixed DOS time `1980-01-01 00:00:00`, UNIX `0o100644`, DEFLATE level 9, no directory entries, exact checksums, and read-back result.
-
-While the Phase 2 CLI writer is still unmodified, add one CLI conformance case
-that builds the same minimal formal archive through the old writer and the new
-shared writer. Assert byte equality, then freeze the old writer's complete
-archive hex, archive digest, content digest, source digests, normalized
-manifest, and diagnostics as inline snapshots. The shared conformance suite
-must assert those same values without importing CLI source.
-
-For draft:
-
-```ts
-const draft = await createAssetPackArchive({
-  kind: 'draft',
-  manifestDocument: validManifest(),
-  sourceBytes,
-  runtime,
-});
-expect(draft.inspection.kind).toBe('verified');
-expect(draft.inspection.snapshot.payload.pack.status).toBe('draft');
-```
-
-Also prove draft can preserve a safe unreferenced sprite as a repairable diagnostic, while formal assembly rejects it.
-
-- [ ] **Step 5: Run shared archive tests and verify RED**
-
-```sh
-rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- deflate.test.ts archive.test.ts archive-conformance.test.ts
-rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-archive-format.test.ts
-```
-
-Expected: FAIL because `deflate.ts` and `archive.ts` do not exist.
-
-- [ ] **Step 6: Implement the raw-DEFLATE preflight and port ZIP metadata parsing**
-
-Retain every Phase 2 constant and comparison. Parse EOCD and all central/local metadata before the first inflation. Use the runtime's fatal UTF-8 decoder only for UTF-8-flagged names; require printable ASCII otherwise. Use `entryPath.normalize('NFC').toLowerCase()` only after all path-shape validation.
-
-Implement a bounded bit reader and RFC 1951 block decoder that validates
-stored/fixed/dynamic Huffman structure and counts decoded bytes and
-back-reference history without allocating decoded output. Require its decoded
-count to equal the ZIP declaration, reject any complete byte remaining after
-the final block, and run it before the concrete inflater for every method-8
-entry.
-
-Inflate each method-8 entry through:
-
-```ts
-const contents = await runtime.inflateRawBounded({
-  compressed,
-  declaredSize: entry.uncompressedSize,
-  maximumSize: Math.min(
-    entry.uncompressedSize,
-    ASSET_PACK_ARCHIVE_LIMITS.entryBytes,
-  ),
-});
-```
-
-Require exact output length and CRC before adding bytes to a repair snapshot. Never expose bytes for unsafe metadata or a resource-limit failure.
-
-- [ ] **Step 7: Implement checksum classification and deterministic assembly**
-
-Malformed or mismatched checksums retain a safe bounded snapshot and return `repairable`; complete checksum and payload verification returns `verified`. Formal writer normalizes through Core and rejects draft status, missing/extra sources, and every domain-invalid payload. Draft writer canonicalizes the JSON object, writes `status: "draft"`, retains safe `sprites/` bytes, and may return repairable when semantic errors remain.
-
-Use JSZip only after entries pass output validation:
-
-```ts
-zip.file(entryPath, contents, {
-  binary: true,
-  date: new Date(Date.UTC(1980, 0, 1, 0, 0, 0)),
-  createFolders: false,
-  unixPermissions: 0o100644,
-});
-const archiveBytes = await zip.generateAsync({
-  type: 'uint8array',
-  platform: 'UNIX',
-  compression: 'DEFLATE',
-  compressionOptions: { level: 9 },
-  streamFiles: false,
-});
-```
-
-Reject generated bytes above the existing encoded-archive maximum before
-read-back. Read back the exact generated bytes with the same runtime before
-returning, and require the result kind allowed by the requested draft/formal
-mode.
-
-- [ ] **Step 8: Verify GREEN and exact legacy fixture parity**
-
-```sh
-rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- deflate.test.ts archive.test.ts archive-conformance.test.ts
-rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-archive-format.test.ts
-rtk pnpm --filter @lpc-toolkit/asset-pack-format run typecheck
-rtk pnpm check:boundaries
-```
-
-Expected: PASS, including byte-for-byte equality with archives generated by the still-unmodified Phase 2 CLI writer.
-
-- [ ] **Step 9: Commit Task 3**
-
-```sh
-rtk git add packages/asset-pack-format/src/deflate.ts packages/asset-pack-format/src/archive.ts packages/asset-pack-format/src/index.ts packages/asset-pack-format/test/deflate.test.ts packages/asset-pack-format/test/archive.test.ts packages/asset-pack-format/test/archive-conformance.test.ts packages/cli/test/asset-pack-archive-format.test.ts
-rtk git commit -m "feat(format): share bounded asset pack archives"
-```
-
-Record the full hash and PASS evidence, then commit the plan record separately.
+- [x] **Step 9: Commit Task 3**
+  - Product Commit: `63fda43d52674ca9f018eb792ff4fb3158021c32` (`feat(format): share bounded asset pack archives`)
+  - Plan Record Commit: Pending below
 
 ---
 
