@@ -2,6 +2,10 @@ import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 import { loadCatalogFromUpstream } from './catalog/load-catalog';
 import { loadPalettesFromUpstream } from './catalog/load-palettes';
 import {
+  loadBrowserAssetPackBaseline,
+  type BrowserAssetPackBaseline,
+} from './lib/asset-pack-baseline';
+import {
   pickInitialSelections,
   sliceReducer,
 } from './slice/selection';
@@ -15,6 +19,8 @@ import { LayerStackHarness } from './components/layer-stack/harness';
 import { runBrowserAssetPackConformance } from './lib/asset-pack-browser-conformance';
 import { LandingPage } from './components/landing-page';
 import { NotFoundPage } from './components/not-found-page';
+import { AssetPackWorkbenchHarness } from './components/asset-pack-workbench/harness';
+import { Button } from './components/ui/button';
 import {
   bootstrapStateFromHash,
   readWindowHash,
@@ -112,6 +118,54 @@ function ComposerApp({ onNavigateHome }: { onNavigateHome: () => void }) {
   );
 }
 
+function AssetPackApp({ onNavigateHome }: { onNavigateHome: () => void }) {
+  const baselinePromise = useMemo(() => loadBrowserAssetPackBaseline(), []);
+  const [baseline, setBaseline] = useState<BrowserAssetPackBaseline>();
+  const [error, setError] = useState<string>();
+
+  useEffect(() => {
+    let active = true;
+    void baselinePromise.then(
+      (loaded) => {
+        if (active) setBaseline(loaded);
+      },
+      (reason: unknown) => {
+        if (active) setError(reason instanceof Error ? reason.message : String(reason));
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [baselinePromise]);
+
+  if (error) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-app px-5 text-text">
+        <section className="w-full max-w-lg rounded-md border border-border bg-surface p-6">
+          <h1 className="text-2xl font-semibold">Asset Pack Workbench</h1>
+          <p className="mt-3 text-sm text-text-2">Unable to load the browser baseline: {error}</p>
+          <Button variant="default" className="mt-6" onClick={onNavigateHome}>
+            Back
+          </Button>
+        </section>
+      </main>
+    );
+  }
+
+  if (!baseline) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-app px-5 text-text">
+        <section className="w-full max-w-lg rounded-md border border-border bg-surface p-6">
+          <h1 className="text-2xl font-semibold">Asset Pack Workbench</h1>
+          <p className="mt-3 text-sm text-text-2">Loading the pinned browser baseline…</p>
+        </section>
+      </main>
+    );
+  }
+
+  return <AssetPackWorkbenchHarness baseline={baseline} onNavigateBack={onNavigateHome} />;
+}
+
 /** Root application shell that routes between landing, composer, and 404 pages. */
 export default function App() {
   const [pathname, navigate] = useAppPathname();
@@ -143,6 +197,10 @@ export default function App() {
 
   if (route === 'compose') {
     return <ComposerApp onNavigateHome={() => navigateToRoute('landing')} />;
+  }
+
+  if (route === 'asset-packs') {
+    return <AssetPackApp onNavigateHome={() => navigateToRoute('landing')} />;
   }
 
   if (route === 'not-found') {

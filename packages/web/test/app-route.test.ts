@@ -10,6 +10,10 @@ describe('app route helpers', () => {
     expect(routeFromPathname('/compose')).toBe('compose');
   });
 
+  it('classifies the asset-pack workbench route', () => {
+    expect(routeFromPathname('/asset-packs')).toBe('asset-packs');
+  });
+
   it('classifies unknown paths as not-found', () => {
     expect(routeFromPathname('/missing')).toBe('not-found');
     expect(routeFromPathname('/compose/extra')).toBe('not-found');
@@ -18,5 +22,6 @@ describe('app route helpers', () => {
   it('returns concrete paths for navigable routes', () => {
     expect(pathForRoute('landing')).toBe('/');
     expect(pathForRoute('compose')).toBe('/compose');
+    expect(pathForRoute('asset-packs')).toBe('/asset-packs');
   });
 });

@@ -14,6 +14,7 @@ describe('LandingPage', () => {
     expect(html).toContain('hero.credits.csv');
 
     expect(html.match(/Open Composer/g)).toHaveLength(1);
+    expect(html).toContain('Repair an Asset Pack');
     expect(html).toContain('href="#cli-quick-start"');
     expect(html).toContain('Use the CLI');
     expect(html).toContain('id="cli-quick-start"');
@@ -85,7 +86,9 @@ describe('LandingPage', () => {
     expect(positions).toEqual([...positions].sort((left, right) => left - right));
     expect(html).toContain('artist-packs/<pack-id>/sprites/');
     expect(html).toContain('You do not need to clone this repository');
-    expect(html).not.toContain('Phase 2');
-    expect(html).toContain('Phase 3');
+    expect(html).not.toContain('Phase 3');
+    expect(html).toContain('browser can inspect, validate, repair, and assemble');
+    expect(html).toContain('CLI owns package inspection, install, upgrade, removal, and lifecycle diagnosis');
+    expect(html).toContain('Web edits happen in-memory');
   });
 });

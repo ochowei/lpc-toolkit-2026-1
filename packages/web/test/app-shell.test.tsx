@@ -5,6 +5,7 @@ import App from '../src/App';
 const mocks = vi.hoisted(() => ({
   loadCatalogFromUpstream: vi.fn(),
   loadPalettesFromUpstream: vi.fn(),
+  loadBrowserAssetPackBaseline: vi.fn(),
   pickInitialSelections: vi.fn(),
   sliceReducer: vi.fn(),
   bootstrapStateFromHash: vi.fn(),
@@ -19,6 +20,10 @@ vi.mock('../src/catalog/load-palettes', () => ({
   loadPalettesFromUpstream: mocks.loadPalettesFromUpstream,
 }));
 
+vi.mock('../src/lib/asset-pack-baseline', () => ({
+  loadBrowserAssetPackBaseline: mocks.loadBrowserAssetPackBaseline,
+}));
+
 vi.mock('../src/slice/selection', () => ({
   pickInitialSelections: mocks.pickInitialSelections,
   sliceReducer: mocks.sliceReducer,
@@ -31,6 +36,10 @@ vi.mock('../src/lib/url-hash-sync', () => ({
 
 vi.mock('../src/components/layer-stack/harness', () => ({
   LayerStackHarness: () => <div>Composer Harness</div>,
+}));
+
+vi.mock('../src/components/asset-pack-workbench/harness', () => ({
+  AssetPackWorkbenchHarness: () => <div>Asset Pack Workbench Harness</div>,
 }));
 
 interface MockWindow {
@@ -79,6 +88,16 @@ describe('App shell routing', () => {
 
     mocks.loadCatalogFromUpstream.mockReturnValue(catalog);
     mocks.loadPalettesFromUpstream.mockReturnValue(palettes);
+    mocks.loadBrowserAssetPackBaseline.mockResolvedValue({
+      catalog,
+      palettes,
+      definitionDigest: 'sha256:baseline',
+      creditDigest: 'sha256:credits',
+      definitionDigests: new Map(),
+      creditDigests: new Map(),
+      releaseTag: 'test',
+      cliVersion: '0.0.0',
+    });
     mocks.pickInitialSelections.mockReturnValue({
       state: defaultState,
       shownTypeNames: [],
@@ -101,6 +120,7 @@ describe('App shell routing', () => {
     expect(html).not.toContain('Composer Harness');
     expect(mocks.loadCatalogFromUpstream).not.toHaveBeenCalled();
     expect(mocks.loadPalettesFromUpstream).not.toHaveBeenCalled();
+    expect(mocks.loadBrowserAssetPackBaseline).not.toHaveBeenCalled();
   });
 
   it('renders the composer and initializes composer data on /compose', () => {
@@ -112,6 +132,19 @@ describe('App shell routing', () => {
     expect(mocks.loadCatalogFromUpstream).toHaveBeenCalledTimes(1);
     expect(mocks.loadPalettesFromUpstream).toHaveBeenCalledTimes(1);
     expect(mocks.bootstrapStateFromHash).toHaveBeenCalledTimes(1);
+    expect(mocks.loadBrowserAssetPackBaseline).not.toHaveBeenCalled();
+  });
+
+  it('renders the asset-pack workbench and initializes only its baseline on /asset-packs', () => {
+    setLocation('/asset-packs');
+
+    const html = renderToStaticMarkup(<App />);
+
+    expect(html).toContain('Asset Pack Workbench');
+    expect(mocks.loadBrowserAssetPackBaseline).toHaveBeenCalledTimes(1);
+    expect(mocks.loadCatalogFromUpstream).not.toHaveBeenCalled();
+    expect(mocks.loadPalettesFromUpstream).not.toHaveBeenCalled();
+    expect(mocks.bootstrapStateFromHash).not.toHaveBeenCalled();
   });
 
   it('renders a 404 page without initializing composer data on unknown paths', () => {
@@ -123,5 +156,7 @@ describe('App shell routing', () => {
     expect(html).not.toContain('Composer Harness');
     expect(mocks.loadCatalogFromUpstream).not.toHaveBeenCalled();
     expect(mocks.loadPalettesFromUpstream).not.toHaveBeenCalled();
+    expect(mocks.loadBrowserAssetPackBaseline).not.toHaveBeenCalled();
   });
+
 });

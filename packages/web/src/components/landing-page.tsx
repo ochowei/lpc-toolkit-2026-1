@@ -86,6 +86,9 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               <Button variant="primary" onClick={() => onNavigate('compose')}>
                 Open Composer
               </Button>
+              <Button onClick={() => onNavigate('asset-packs')}>
+                Repair an Asset Pack
+              </Button>
               <Button asChild>
                 <a href="#cli-quick-start">Use the CLI</a>
               </Button>
@@ -173,9 +176,10 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             image.
           </p>
           <p className="mt-2 text-sm text-text-2">
-            The CLI owns package inspection, install, upgrade, removal, and
-            lifecycle diagnosis. Web asset-pack authoring remains deferred to
-            Phase 3; the browser composer does not edit pack manifests.
+            The browser can inspect, validate, repair, and assemble an uploaded
+            asset pack locally. The CLI owns package inspection, install,
+            upgrade, removal, and lifecycle diagnosis; Web edits happen
+            in-memory and do not write an artist workspace.
           </p>
         </section>
 
