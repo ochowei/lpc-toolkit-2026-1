@@ -533,7 +533,8 @@ export interface AssetPackFormalGate {
   - Created `packages/asset-pack-format/package.json`, `tsconfig.json`, `vitest.config.ts`, `src/runtime.ts`, `src/canonical-json.ts`, `src/payload.ts`, `src/compatibility.ts`, `src/index.ts`.
 
 - [x] **Step 5: Extend boundaries and CI routing**
-  - Updated `scripts/check-boundaries.mjs`, `.github/workflows/ci.yml`, and `pnpm-lock.yaml` via `rtk pnpm install`.
+  - Updated `scripts/check-boundaries.mjs` and `.github/workflows/ci.yml`.
+  - Historical correction: the `pnpm-lock.yaml` workspace entry was omitted from the Task 2 product commit and landed in Task 3 product commit `63fda43d551ac2c761eb6fbfccac0cf3ab7b80ab`.
 
 - [x] **Step 6: Verify GREEN**
   - `rtk pnpm --filter @lpc-toolkit/asset-pack-format test`: PASS (7 passed)
@@ -564,35 +565,35 @@ export interface AssetPackFormalGate {
 - Produces: allocation-free raw-DEFLATE preflight, `inspectAssetPackArchiveBytes`, unsafe/repairable/verified snapshots, exact archive constants, and `createAssetPackArchive`.
 
 - [x] **Step 1: Port failing raw-ZIP security and bounds tests**
-  - Commit: 63fda43d52674ca9f018eb792ff4fb3158021c32
+  - Commit: 63fda43d551ac2c761eb6fbfccac0cf3ab7b80ab
   - Verification: `rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- archive.test.ts` PASS
 
 - [x] **Step 2: Write failing allocation-free raw-DEFLATE tests**
-  - Commit: 63fda43d52674ca9f018eb792ff4fb3158021c32
+  - Commit: 63fda43d551ac2c761eb6fbfccac0cf3ab7b80ab
   - Verification: `rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- deflate.test.ts` PASS
 
 - [x] **Step 3: Write failing repairable-versus-verified tests**
-  - Commit: 63fda43d52674ca9f018eb792ff4fb3158021c32
+  - Commit: 63fda43d551ac2c761eb6fbfccac0cf3ab7b80ab
   - Verification: `rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- archive.test.ts` PASS
 
 - [x] **Step 4: Write failing deterministic formal/draft writer tests**
-  - Commit: 63fda43d52674ca9f018eb792ff4fb3158021c32
+  - Commit: 63fda43d551ac2c761eb6fbfccac0cf3ab7b80ab
   - Verification: `rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- archive-conformance.test.ts` PASS
 
 - [x] **Step 5: Run shared archive tests and verify RED**
-  - Commit: 63fda43d52674ca9f018eb792ff4fb3158021c32
+  - Commit: 63fda43d551ac2c761eb6fbfccac0cf3ab7b80ab
   - Verification: `rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- deflate.test.ts archive.test.ts archive-conformance.test.ts` PASS (Verified RED before implementation, now GREEN)
 
 - [x] **Step 6: Implement the raw-DEFLATE preflight and port ZIP metadata parsing**
-  - Commit: 63fda43d52674ca9f018eb792ff4fb3158021c32
+  - Commit: 63fda43d551ac2c761eb6fbfccac0cf3ab7b80ab
   - Verification: `rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- deflate.test.ts archive.test.ts` PASS
 
 - [x] **Step 7: Implement checksum classification and deterministic assembly**
-  - Commit: 63fda43d52674ca9f018eb792ff4fb3158021c32
+  - Commit: 63fda43d551ac2c761eb6fbfccac0cf3ab7b80ab
   - Verification: `rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- archive.test.ts` PASS
 
 - [x] **Step 8: Verify GREEN and exact legacy fixture parity**
-  - Commit: 63fda43d52674ca9f018eb792ff4fb3158021c32
+  - Commit: 63fda43d551ac2c761eb6fbfccac0cf3ab7b80ab
   - Verification:
     - `rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- deflate.test.ts archive.test.ts archive-conformance.test.ts` PASS
     - `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-archive-format.test.ts` PASS
@@ -600,8 +601,8 @@ export interface AssetPackFormalGate {
     - `rtk pnpm check:boundaries` PASS
 
 - [x] **Step 9: Commit Task 3**
-  - Product Commit: `63fda43d52674ca9f018eb792ff4fb3158021c32` (`feat(format): share bounded asset pack archives`)
-  - Plan Record Commit: Pending below
+  - Product Commit: `63fda43d551ac2c761eb6fbfccac0cf3ab7b80ab` (`feat(format): share bounded asset pack archives`)
+  - Plan Record Commit: `1a904b152c5433930b43859b9903dbc29030331c` (`docs(plan): record task 3 implementation evidence`)
 
 ---
 
@@ -627,11 +628,15 @@ export interface AssetPackFormalGate {
 - Consumes: Tasks 2–3 shared package and Phase 2 filesystem/extraction contracts.
 - Produces: Node runtime adapter, asynchronous shared archive inspection, unchanged CLI public reports, and a packed CLI with vendored format code.
 
-- [ ] **Step 1: Write failing Node-adapter and vendoring tests**
+- [x] **Step 1: Write failing Node-adapter and vendoring tests**
 
 Assert SHA-256 includes the `sha256:` prefix, fatal UTF-8 rejects invalid bytes, and bounded inflate rejects output beyond `declaredSize` or `maximumSize`. Extend package metadata and smoke assertions so the built CLI contains `dist/vendor/@lpc-toolkit/asset-pack-format/dist/index.js` and no unresolved workspace import.
 
-- [ ] **Step 2: Change existing archive tests to await shared inspection**
+  - Added `asset-pack-node-runtime.test.ts`, package metadata assertions, and packed-smoke vendoring assertions.
+  - Commit: `96e70f4592ecd47686fc414fcaca551b318950c7`
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-node-runtime.test.ts package-metadata.test.ts` PASS.
+
+- [x] **Step 2: Change existing archive tests to await shared inspection**
 
 Update each direct `readAssetPackArchive(...)` call to `await`. Preserve every existing expected diagnostic, byte count, immutable snapshot, extraction, and deterministic writer assertion. Do not delete raw ZIP cases merely because they also exist in the shared suite.
 
@@ -640,7 +645,12 @@ the legacy writer body is removed, make the same test exercise the shared
 package through `nodeAssetPackFormatRuntime`; the expected values must not be
 updated.
 
-- [ ] **Step 3: Run CLI focused tests and verify RED**
+  - Awaited every archive inspection call while retaining raw ZIP, limit, diagnostic, extraction, and immutable-copy coverage.
+  - The production Node runtime now drives frozen archive hex, digest, and manifest-byte assertions.
+  - Commits: `96e70f4592ecd47686fc414fcaca551b318950c7`, `dca93ac2a7963ae3f417adffa6d18e7a94afbfca`
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-archive-format.test.ts` PASS.
+
+- [x] **Step 3: Run CLI focused tests and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-payload.test.ts asset-pack-archive-format.test.ts asset-pack-packaging.test.ts asset-pack-inspection.test.ts asset-pack-install.test.ts package-metadata.test.ts
@@ -648,7 +658,9 @@ rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-payload.test.ts asset-pack
 
 Expected: FAIL because CLI is not wired to the new package and vendoring omits it.
 
-- [ ] **Step 4: Implement the Node runtime and thin wrappers**
+  - RED: FAIL with 111 passed and 27 failed across the six requested suites; failures covered incomplete async migration, snapshot shape/copy mismatches, safety-limit parity, and deterministic output.
+
+- [x] **Step 4: Implement the Node runtime and thin wrappers**
 
 Use `node:crypto`, `node:zlib`, and WHATWG encoders only in CLI:
 
@@ -672,7 +684,13 @@ export const nodeAssetPackFormatRuntime: AssetPackFormatRuntime = {
 
 Keep descriptor-capped regular-file reads, no-follow filesystem checks, pinned staging identity, and verified extraction in CLI. The wrapper converts shared `Uint8Array` snapshots to copied `Buffer` values and brands only `verified` snapshots for extraction.
 
-- [ ] **Step 5: Migrate callers without changing public output**
+  - Added the Node runtime and thin archive/payload wrappers; shared snapshots are copied into CLI `Buffer` values and extraction remains verified-snapshot-only.
+  - Preserved the legacy persisted `contentDigest` bytes while keeping archive JSON ordering locale-independent.
+  - Removed the shared package's DOM dependency by routing UTF-8 path measurement through the injected runtime.
+  - Commits: `96e70f4592ecd47686fc414fcaca551b318950c7`, `dca93ac2a7963ae3f417adffa6d18e7a94afbfca`
+  - Verification: `rtk pnpm exec vitest run packages/asset-pack-format/test/payload.test.ts packages/cli/test/asset-pack-archive-format.test.ts packages/cli/test/asset-pack-install.test.ts` PASS (91 tests).
+
+- [x] **Step 5: Migrate callers without changing public output**
 
 Await archive inspection in packaging, inspection, and tests. Keep `asset-pack-payload.ts` and `asset-pack-compatibility.ts` as narrow compatibility wrappers while call sites migrate; they must contain no duplicate domain decisions. A repairable shared result maps to the existing CLI invalid inspection report and never exposes an install snapshot.
 
@@ -682,7 +700,23 @@ add format source aliases to development/build tsconfigs, and vendor it beside
 Core/presets. Keep JSZip as the existing public runtime dependency used by the
 vendored format writer.
 
-- [ ] **Step 6: Verify focused parity and packed output**
+  - Migrated archive, payload, files, packaging, inspection, install, state, sync, validation, doctor, and remove call sites without changing public command syntax or report shapes.
+  - Added the format production build, CLI source/build/test aliases, workspace dependency, vendor rewrite, and packed-smoke coverage.
+  - Commit: `96e70f4592ecd47686fc414fcaca551b318950c7`
+  - CLI documentation impact reassessment:
+
+```text
+help: N/A — public command syntax and human/JSON output are unchanged.
+cli-readme: N/A — no user-facing CLI workflow or option changed.
+root-readme: N/A — package-internal archive implementation only.
+landing: N/A — no website or product messaging changed.
+architecture: N/A — the approved shared-format/runtime boundary is implemented, not redesigned.
+engineering: N/A — existing verification commands remain accurate.
+releasing: N/A — no release or publication procedure changed.
+plugin: N/A — plugin contracts and command workflow are unchanged.
+```
+
+- [x] **Step 6: Verify focused parity and packed output**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-payload.test.ts asset-pack-archive-format.test.ts asset-pack-packaging.test.ts asset-pack-inspection.test.ts asset-pack-install.test.ts package-metadata.test.ts
@@ -693,7 +727,19 @@ rtk pnpm --filter @lpc-toolkit/cli test:package
 
 Expected: PASS. Existing formal archive fixtures retain exact bytes and SHA-256. The packed smoke runs without a workspace checkout or `upstream/`.
 
-- [ ] **Step 7: Commit Task 4**
+  - `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-payload.test.ts asset-pack-archive-format.test.ts asset-pack-packaging.test.ts asset-pack-inspection.test.ts asset-pack-install.test.ts package-metadata.test.ts` PASS (139 tests).
+  - `rtk pnpm --filter @lpc-toolkit/asset-pack-format test` PASS (57 tests).
+  - Extended archive/lifecycle matrix PASS (308 tests).
+  - `rtk pnpm --filter @lpc-toolkit/asset-pack-format run typecheck` PASS.
+  - `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+  - `rtk pnpm check:boundaries` PASS.
+  - `rtk pnpm --filter @lpc-toolkit/cli build` PASS.
+  - `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS.
+  - `rtk pnpm --filter @lpc-toolkit/cli test` PASS with local-loopback permission.
+  - `rtk pnpm verify` PASS with local-loopback permission.
+  - Independent Task 4 review: spec compliant and task quality approved; no Critical, Important, or Minor findings remain.
+
+- [x] **Step 7: Commit Task 4**
 
 ```sh
 rtk git add packages/cli/src packages/cli/test packages/cli/package.json packages/cli/tsconfig.json packages/cli/tsconfig.build.json packages/cli/scripts/vendor-workspace-deps.mjs
@@ -701,6 +747,10 @@ rtk git commit -m "refactor(cli): consume shared asset pack archives"
 ```
 
 Record the full hash and PASS evidence, then commit the plan record separately.
+
+  - Product Commit: `96e70f4592ecd47686fc414fcaca551b318950c7` (`refactor(cli): consume shared asset pack archives`)
+  - Review Fix Commit: `dca93ac2a7963ae3f417adffa6d18e7a94afbfca` (`fix(format): preserve archive compatibility boundaries`)
+  - Plan Record Commit: recorded separately after these product commits.
 
 ---
 
