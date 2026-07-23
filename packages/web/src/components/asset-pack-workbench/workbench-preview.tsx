@@ -1,4 +1,11 @@
+import { useEffect, useRef, useState } from 'react';
+import type { ChangeEvent } from 'react';
+import type { Direction } from '@lpc-toolkit/core';
+import type { BrowserAssetPackBaseline } from '../../lib/asset-pack-baseline';
+import { useAnimationPlayer } from '../../hooks/use-animation-player';
+import { useAssetPackPreview } from '../../hooks/use-asset-pack-preview';
 import type { AssetPackWorkbenchState } from '../../slice/asset-pack-workbench';
+import { AttributionPanel } from './attribution-panel';
 import { AssetPackUploadPanel } from './upload-panel';
 
 const progressLabels: Readonly<Record<NonNullable<AssetPackWorkbenchState['progress']>['stage'], string>> = {
@@ -27,11 +34,13 @@ function statusIcon(state: AssetPackWorkbenchState): string {
 }
 
 export function WorkbenchPreview({
+  baseline,
   state,
   onUpload,
   onReset,
   onBack,
 }: {
+  readonly baseline?: BrowserAssetPackBaseline;
   readonly state: AssetPackWorkbenchState;
   readonly onUpload: (file: File) => void;
   readonly onReset: () => void;
@@ -64,7 +73,96 @@ export function WorkbenchPreview({
             onBack={onBack}
           />
         </div>
+        {baseline ? <PackPreviewContent baseline={baseline} state={state} /> : null}
       </div>
     </main>
+  );
+}
+
+function PackPreviewContent({
+  baseline,
+  state,
+}: {
+  readonly baseline: BrowserAssetPackBaseline;
+  readonly state: AssetPackWorkbenchState;
+}) {
+  const payload = state.workbench?.preview;
+  const [focusedAssetId, setFocusedAssetId] = useState<string | undefined>();
+  const [bodyType, setBodyType] = useState('male');
+  const [animation, setAnimation] = useState('walk');
+  const [direction, setDirection] = useState<Direction>('down');
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    setFocusedAssetId(payload?.compilePlan.definitions[0]?.assetId);
+  }, [payload?.revision]);
+
+  const focusedAssetIsCurrent = payload?.compilePlan.definitions.some((definition) => definition.assetId === focusedAssetId) ?? false;
+  const activeFocusedAssetId = focusedAssetIsCurrent
+    ? focusedAssetId
+    : payload?.compilePlan.definitions[0]?.assetId;
+
+  const preview = useAssetPackPreview({
+    baseline,
+    ...(payload ? { payload } : {}),
+    ...(activeFocusedAssetId ? { focusedAssetId: activeFocusedAssetId } : {}),
+    bodyType,
+    animation,
+  });
+  const player = useAnimationPlayer(canvasRef, preview.result.animation, direction, true, 4);
+
+  if (!payload) return null;
+
+  const onImport = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
+    if (file) void preview.importCharacter(file);
+  };
+
+  return (
+    <section aria-label="Current revision preview" className="mt-6 rounded-xl border border-border bg-surface p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-lg font-semibold text-text">Current revision preview</h2>
+        <span className="text-xs text-text-mute">Revision {payload.revision}</span>
+      </div>
+      <div className="mt-4 grid gap-4 sm:grid-cols-3">
+        <label className="text-xs text-text-2">Asset
+          <select className="mt-1 block w-full rounded border border-border bg-app p-2 text-sm" value={activeFocusedAssetId ?? ''} onChange={(event) => setFocusedAssetId(event.currentTarget.value || undefined)}>
+            {payload.compilePlan.definitions.map((definition) => (
+              <option key={definition.assetId} value={definition.assetId}>{definition.definition.display_name ?? definition.definition.name}</option>
+            ))}
+          </select>
+        </label>
+        <label className="text-xs text-text-2">Body type
+          <select className="mt-1 block w-full rounded border border-border bg-app p-2 text-sm" value={bodyType} onChange={(event) => setBodyType(event.currentTarget.value)}>
+            {preview.bodyTypeOptions.map((option) => <option key={option}>{option}</option>)}
+          </select>
+        </label>
+        <label className="text-xs text-text-2">Animation
+          <select className="mt-1 block w-full rounded border border-border bg-app p-2 text-sm" value={animation} onChange={(event) => setAnimation(event.currentTarget.value)}>
+            {preview.animationOptions.map((option) => <option key={option}>{option}</option>)}
+          </select>
+        </label>
+        <label className="text-xs text-text-2">Direction
+          <select className="mt-1 block w-full rounded border border-border bg-app p-2 text-sm" value={direction} onChange={(event) => setDirection(event.currentTarget.value as Direction)}>
+            {preview.directionOptions.map((option) => <option key={option}>{option}</option>)}
+          </select>
+        </label>
+        <label className="text-xs text-text-2 sm:col-span-2">Import canonical character JSON
+          <input className="mt-1 block w-full text-sm" type="file" accept="application/json,.json" onChange={onImport} />
+        </label>
+      </div>
+      <div className="mt-5 flex min-h-64 items-center justify-center rounded-lg bg-app p-4">
+        {preview.result.status === 'ready' ? <canvas ref={canvasRef} aria-label="Composed asset pack animation" /> : null}
+        {preview.result.status === 'pending' ? <p role="status">Composing current revision…</p> : null}
+        {preview.result.status === 'error' ? <p role="alert">{preview.result.error}</p> : null}
+      </div>
+      <p className="mt-2 text-xs text-text-mute">Frame {player.currentFrame + 1} of {player.totalFrames || 0} at {player.fps} FPS</p>
+      <AttributionPanel
+        credits={preview.result.credits}
+        effectiveLicense={preview.result.effectiveLicense}
+        releaseTag={baseline.releaseTag}
+        error={preview.result.status === 'error' ? preview.result.error : null}
+      />
+    </section>
   );
 }

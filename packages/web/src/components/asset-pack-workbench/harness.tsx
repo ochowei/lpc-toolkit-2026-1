@@ -7,6 +7,7 @@ import { WorkbenchNav } from './workbench-nav';
 import { WorkbenchPreview } from './workbench-preview';
 
 export interface AssetPackWorkbenchShellProps {
+  readonly baseline?: BrowserAssetPackBaseline;
   readonly state: AssetPackWorkbenchState;
   readonly onUpload: (file: File) => void;
   readonly onReset: () => void;
@@ -18,6 +19,7 @@ export interface AssetPackWorkbenchShellProps {
 }
 
 export function AssetPackWorkbenchShell({
+  baseline,
   state,
   onUpload,
   onReset,
@@ -31,7 +33,7 @@ export function AssetPackWorkbenchShell({
     <div className="min-h-screen bg-app text-text">
       <div className="grid min-h-screen lg:grid-cols-[220px_minmax(0,1fr)_320px]">
         <WorkbenchNav activePanel={state.activePanel} onNavigate={onNavigate} />
-        <WorkbenchPreview state={state} onUpload={onUpload} onReset={onReset} onBack={onBack} />
+        <WorkbenchPreview {...(baseline ? { baseline } : {})} state={state} onUpload={onUpload} onReset={onReset} onBack={onBack} />
         <WorkbenchEditor state={state} onReplaceManifest={onReplaceManifest} onReplaceSource={onReplaceSource} onRemoveSource={onRemoveSource} onNavigate={onNavigate} />
       </div>
     </div>
@@ -61,6 +63,7 @@ export function AssetPackWorkbenchHarness({
 
   return (
     <AssetPackWorkbenchShell
+      baseline={baseline}
       state={workbench.state}
       onUpload={(file) => void workbench.upload(file)}
       onReset={workbench.reset}
