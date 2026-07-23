@@ -9,14 +9,19 @@ function workerFactory() {
   const workers: Array<{
     messages: unknown[];
     emit: (response: AssetPackWorkerResponse) => void;
+    emitError: (error: Event) => void;
     terminate: ReturnType<typeof vi.fn>;
   }> = [];
   const factory = vi.fn(() => {
     const listeners = new Set<(event: MessageEvent<AssetPackWorkerResponse>) => void>();
+    const errorListeners = new Set<(event: Event) => void>();
     const worker = {
       messages: [] as unknown[],
       emit(response: AssetPackWorkerResponse) {
         listeners.forEach((listener) => listener({ data: response } as MessageEvent<AssetPackWorkerResponse>));
+      },
+      emitError(error: Event) {
+        errorListeners.forEach((listener) => listener(error));
       },
       terminate: vi.fn(),
     };
@@ -24,12 +29,14 @@ function workerFactory() {
     return {
       postMessage: (message: unknown) => worker.messages.push(message),
       addEventListener: (type: string, listener: EventListenerOrEventListenerObject) => {
-        if (type !== 'message') return;
-        if (typeof listener === 'function') listeners.add(listener as (event: MessageEvent<AssetPackWorkerResponse>) => void);
+        if (typeof listener !== 'function') return;
+        if (type === 'message') listeners.add(listener as (event: MessageEvent<AssetPackWorkerResponse>) => void);
+        if (type === 'error') errorListeners.add(listener as (event: Event) => void);
       },
       removeEventListener: (type: string, listener: EventListenerOrEventListenerObject) => {
-        if (type !== 'message') return;
-        if (typeof listener === 'function') listeners.delete(listener as (event: MessageEvent<AssetPackWorkerResponse>) => void);
+        if (typeof listener !== 'function') return;
+        if (type === 'message') listeners.delete(listener as (event: MessageEvent<AssetPackWorkerResponse>) => void);
+        if (type === 'error') errorListeners.delete(listener as (event: Event) => void);
       },
       terminate: worker.terminate,
     };
@@ -54,6 +61,49 @@ const editingWithError = (requestId: number): AssetPackWorkerResponse => ({
     diagnostics: [{ code: 'asset_pack_invalid', severity: 'error', message: 'invalid', scope: 'manifest' }],
     acknowledgementRecords: [],
     releaseFingerprint: `sha256:${'a'.repeat(64)}`,
+    draftSerializable: true,
+  },
+});
+
+const readyEditing = (requestId: number): AssetPackWorkerResponse => ({
+  type: 'session',
+  requestId,
+  revision: 0,
+  outcome: 'editing',
+  workbench: {
+    revision: 0,
+    manifestText: JSON.stringify({
+      schema: 'lpc-toolkit.asset-pack.v1',
+      id: 'acme.demo',
+      displayName: 'Demo',
+      version: '1.2.3',
+      credits: { authors: ['A'], licenses: ['CC0'], urls: [], notes: '' },
+      assets: [],
+    }),
+    uploadMetadata: {
+      originalArchiveDigest: `sha256:${'a'.repeat(64)}`,
+      uploadedVersion: '1.2.3',
+      uploadedStatus: 'formal',
+      baselineReleaseTag: 'test',
+    },
+    sourceSummaries: [],
+    diagnostics: [],
+    acknowledgementRecords: [],
+    contentDigest: `sha256:${'c'.repeat(64)}`,
+    releaseFingerprint: `sha256:${'r'.repeat(64)}`,
+    formalCandidate: {
+      revision: 0,
+      archiveDigest: `sha256:${'a'.repeat(64)}`,
+      filename: 'acme.demo-1.2.3.lpc-assets.zip',
+      version: '1.2.3',
+      byteIdenticalToUploadedFormal: true,
+      uploadMetadata: {
+        originalArchiveDigest: `sha256:${'a'.repeat(64)}`,
+        uploadedVersion: '1.2.3',
+        uploadedStatus: 'formal',
+        baselineReleaseTag: 'test',
+      },
+    },
     draftSerializable: true,
   },
 });
@@ -98,6 +148,28 @@ describe('useAssetPackWorkbench orchestration', () => {
     expect(controller.state.ready).toBe(false);
     expect(workers.workers[0]!.messages).toHaveLength(messageCount);
     controller.dispose();
+  });
+
+  it('blocks formal assembly after an undiagnosed Worker crash from a ready session', async () => {
+    const workers = workerFactory();
+    const controller = new AssetPackWorkbenchController({ baseline, workerFactory: workers.factory });
+    const opened = controller.upload(new File(['zip'], 'ready.zip'));
+    workers.workers[0]!.emit(readyEditing(1));
+    await opened;
+
+    expect(controller.state.phase).toBe('editing');
+    expect(controller.state.ready).toBe(true);
+    expect(controller.state.formalBlockers).toEqual([]);
+
+    workers.workers[0]!.emitError(new Event('error'));
+
+    expect(controller.state.phase).toBe('failed');
+    expect(controller.state.formalBlockers.length).toBeGreaterThan(0);
+    expect(controller.state.ready).toBe(false);
+    await expect(controller.assemble('formal')).rejects.toMatchObject({
+      name: 'AssetPackFormalAssemblyBlockedError',
+    });
+    expect(controller.state.formalBlockers.length).toBeGreaterThan(0);
   });
 
   it('computes authoritative formal blockers and refuses formal assembly while not ready', async () => {

@@ -173,6 +173,7 @@ export class AssetPackWorkbenchController {
   }
 
   private currentFormalBlockers(): readonly AssetPackFormalBlocker[] {
+    if (this.currentState.phase === 'failed') return this.currentState.formalBlockers;
     const workbench = this.currentState.workbench;
     if (!workbench) {
       return this.currentState.formalBlockers.length > 0

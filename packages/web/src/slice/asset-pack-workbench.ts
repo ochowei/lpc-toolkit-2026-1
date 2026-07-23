@@ -23,6 +23,10 @@ const missingCandidateBlocker: AssetPackFormalBlocker = {
   code: 'missing-candidate',
   message: 'The current revision has no verified formal archive candidate.',
 };
+const workerFailedBlocker: AssetPackFormalBlocker = {
+  code: 'worker-failed',
+  message: 'The asset-pack Worker session failed; retry before formal download.',
+};
 
 export interface AssetPackWorkbenchState {
   readonly phase: AssetPackWorkbenchPhase;
@@ -120,7 +124,10 @@ export function assetPackWorkbenchReducer(
     case 'worker-failed': {
       const { progress: _progress, pendingEdits: _pendingEdits, ...withoutProgress } = state;
       const diagnostics = action.diagnostic ? [...state.diagnostics, action.diagnostic] : state.diagnostics;
-      const blockers = action.diagnostic ? currentRevisionBlockers({ ...state, diagnostics }, state.revision, action.diagnostic) : state.formalBlockers;
+      const computedBlockers = action.diagnostic
+        ? currentRevisionBlockers({ ...state, diagnostics }, state.revision, action.diagnostic)
+        : state.formalBlockers;
+      const blockers = computedBlockers.length > 0 ? computedBlockers : [workerFailedBlocker];
       return withReady({ ...withoutProgress, phase: 'failed', pendingEdits: [], diagnostics, formalBlockers: blockers, error: action.message });
     }
     case 'retry': {

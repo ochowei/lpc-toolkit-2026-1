@@ -10,6 +10,7 @@ import type {
 
 export type AssetPackFormalBlockerCode =
   | 'unsafe-archive'
+  | 'worker-failed'
   | 'validation-error'
   | 'unacknowledged-warning'
   | 'missing-candidate'
