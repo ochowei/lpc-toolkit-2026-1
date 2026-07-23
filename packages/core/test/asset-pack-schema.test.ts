@@ -790,4 +790,21 @@ describe('asset pack schema', () => {
     expect(normalized).not.toHaveProperty('compatibility');
     expect(assetPackSourceFromNormalized(normalized)).not.toHaveProperty('compatibility');
   });
+
+  it('parses strict draft status and omits status from content projection', () => {
+    const draft = parseAssetPackSource({ ...validPack, status: 'draft' });
+    expect(draft.ok && draft.source.status).toBe('draft');
+    expect(parseAssetPackSource({ ...validPack, status: 'ready' })).toMatchObject({
+      ok: false,
+    });
+
+    const formal = normalizeAssetPack(validPack);
+    const draftNormalized = normalizeAssetPack({ ...validPack, status: 'draft' });
+    expect(assetPackContentProjection(draftNormalized)).toEqual(
+      assetPackContentProjection(formal),
+    );
+    expect(assetPackSourceFromNormalized(draftNormalized).status).toBe('draft');
+    expect(assetPackSourceFromNormalized(formal).status).toBeUndefined();
+  });
 });
+

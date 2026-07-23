@@ -608,4 +608,45 @@ describe('asset-pack validation', () => {
       expect.objectContaining({ code: 'asset_path_inferred', contentDigest: sha('e') }),
     );
   });
+
+  it('keeps an acknowledgement matched when only draft status changes', () => {
+    const source = extendItemSource();
+    const firstPass = validateSource(source, [
+      inspectionFor('sprites/braid/climb-female.png', 'climb'),
+    ]);
+
+    const acknowledgement = firstPass.acknowledgementRecords.find(
+      (record) => record.code === 'asset_path_inferred',
+    );
+    expect(acknowledgement).toBeDefined();
+    if (!acknowledgement) throw new Error('Expected inferred-path acknowledgement');
+
+    const draftSource = extendItemSource({ status: 'draft' }, [{
+      ...acknowledgement,
+      reason: 'Accepted inferred destination.',
+    }]);
+
+    const acceptedDraft = validateSource(
+      draftSource,
+      [inspectionFor('sprites/braid/climb-female.png', 'climb')],
+      firstPass.contentDigest,
+    );
+    expect(acceptedDraft.ok).toBe(true);
+
+    const versionChangedSource = extendItemSource({ version: '1.0.1' }, [{
+      ...acknowledgement,
+      reason: 'Accepted inferred destination.',
+    }]);
+    const versionChangedPack = normalizeAssetPack(versionChangedSource);
+    const versionChangedDigest = sha('version-changed');
+    const versionChangedResult = validateAssetPack({
+      pack: versionChangedPack,
+      baseline,
+      palettes,
+      inspections: [inspectionFor('sprites/braid/climb-female.png', 'climb')],
+      contentDigest: versionChangedDigest,
+    });
+    expect(versionChangedResult.ok).toBe(false);
+  });
 });
+

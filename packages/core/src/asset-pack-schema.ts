@@ -117,10 +117,13 @@ export interface ExtendItemAssetSource {
   readonly addAnimations: readonly ExtendItemAnimationSource[];
 }
 
+export type AssetPackStatus = 'draft';
+
 export type AssetPackAssetSource = NewItemAssetSource | ExtendItemAssetSource;
 
 export interface AssetPackSource {
   readonly schema: typeof ASSET_PACK_SCHEMA;
+  readonly status?: AssetPackStatus;
   readonly id: string;
   readonly version: string;
   readonly displayName: string;
@@ -206,6 +209,7 @@ function parsePackRecord(
 
   exactKeys(record, path, [
     'schema',
+    'status',
     'id',
     'version',
     'displayName',
@@ -218,6 +222,21 @@ function parsePackRecord(
   ], diagnostics);
 
   const schema = readString(record, 'schema', `${path}.schema`, diagnostics);
+  const rawStatus = record.status;
+  let status: AssetPackStatus | undefined;
+  if (rawStatus !== undefined) {
+    if (rawStatus === 'draft') {
+      status = 'draft';
+    } else {
+      pushDiagnostic(diagnostics, {
+        code: 'asset_pack_schema_invalid',
+        severity: 'error',
+        message: `Invalid asset-pack status at ${path}.status.`,
+        details: { path: `${path}.status`, value: rawStatus },
+      });
+    }
+  }
+
   const id = readString(record, 'id', `${path}.id`, diagnostics);
   const version = readString(record, 'version', `${path}.version`, diagnostics);
   const displayName = readString(
@@ -285,6 +304,7 @@ function parsePackRecord(
 
   return {
     schema: ASSET_PACK_SCHEMA,
+    ...(status ? { status } : {}),
     id,
     version,
     displayName,
@@ -296,6 +316,7 @@ function parsePackRecord(
     assets,
   };
 }
+
 
 function parseCompatibility(
   input: unknown,

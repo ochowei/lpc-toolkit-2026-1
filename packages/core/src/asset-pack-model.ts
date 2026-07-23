@@ -1,6 +1,6 @@
 import { BODY_TYPES } from './constants.js';
 import type { AnimationName, BodyType, CreditEntry, ItemId, RawRecolors, TypeName } from './types.js';
-import { ASSET_PACK_SCHEMA, type AssetPackAcknowledgement, type AssetPackAssetSource, type AssetPackCompatibilitySource, type AssetPackDiagnostic, type AssetPackReplacementSource, type AssetPackSource, type ExtendItemAnimationSource, type ExtendItemDestinationSource, type ExtendItemLayerSource, type ExtendItemAssetSource, type NewItemAssetSource, type NewItemLayerSource, type NewItemSpriteSource } from './asset-pack-schema.js';
+import { ASSET_PACK_SCHEMA, type AssetPackAcknowledgement, type AssetPackAssetSource, type AssetPackCompatibilitySource, type AssetPackDiagnostic, type AssetPackReplacementSource, type AssetPackSource, type AssetPackStatus, type ExtendItemAnimationSource, type ExtendItemDestinationSource, type ExtendItemLayerSource, type ExtendItemAssetSource, type NewItemAssetSource, type NewItemLayerSource, type NewItemSpriteSource } from './asset-pack-schema.js';
 
 export type AssetPackCreditRecord = Omit<CreditEntry, 'file'>;
 
@@ -77,6 +77,7 @@ export type NormalizedAssetPackAsset =
 
 export interface NormalizedAssetPack {
   readonly schema: typeof ASSET_PACK_SCHEMA;
+  readonly status?: AssetPackStatus;
   readonly id: string;
   readonly version: string;
   readonly displayName: string;
@@ -103,6 +104,7 @@ export function normalizeAssetPack(source: AssetPackSource): NormalizedAssetPack
 
   return {
     schema: ASSET_PACK_SCHEMA,
+    ...(source.status ? { status: source.status } : {}),
     id: source.id,
     version: source.version,
     displayName: source.displayName,
@@ -141,6 +143,7 @@ export function assetPackSourceFromNormalized(pack: NormalizedAssetPack): AssetP
   );
   return {
     schema: pack.schema,
+    ...(pack.status ? { status: pack.status } : {}),
     id: pack.id,
     version: pack.version,
     displayName: pack.displayName,
@@ -165,6 +168,7 @@ export function assetPackSourceFromNormalized(pack: NormalizedAssetPack): AssetP
     assets: pack.assets.map(assetPackAssetSourceFromNormalized),
   };
 }
+
 
 export function warningAcknowledged(
   diagnostic: AssetPackDiagnostic,

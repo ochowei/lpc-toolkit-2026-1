@@ -74,6 +74,7 @@ export type {
   AssetPackParseResult,
   AssetPackReplacementSource,
   AssetPackSource,
+  AssetPackStatus,
   ExtendItemAnimationSource,
   ExtendItemAssetSource,
   ExtendItemDestinationSource,
@@ -86,6 +87,11 @@ export {
   ASSET_PACK_SCHEMA,
   parseAssetPackSource,
 } from './asset-pack-schema.js';
+export {
+  assetPackCreditProjection,
+  assetPackDefinitionProjection,
+} from './asset-pack-baseline.js';
+
 export type {
   AssetPackCreditRecord,
   NormalizedAssetPack,
