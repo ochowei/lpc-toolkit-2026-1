@@ -170,7 +170,9 @@ function bytesFromHex(hex: string): Uint8Array {
   return bytes;
 }
 
-describe('browser asset-pack archive conformance', () => {
+describe.skipIf(
+  !globalThis.crypto?.subtle || typeof globalThis.DecompressionStream !== 'function',
+)('browser asset-pack archive conformance', () => {
   it('matches the frozen Task 3 archive bytes, digests, normalized manifest, and diagnostics', async () => {
     const browserRuntime = runtime();
     const sourceBytes = new Map([[SOURCE_PATH, new TextEncoder().encode('walk-pixels')]]);
