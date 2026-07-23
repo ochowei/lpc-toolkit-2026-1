@@ -519,103 +519,31 @@ export interface AssetPackFormalGate {
 - Consumes: Core parse/normalize/content projection/version comparison, existing supported capability list, injected `AssetPackFormatRuntime`.
 - Produces: public runtime types, canonical JSON bytes, immutable `AssetPackPayloadSuccess`, and shared compatibility diagnostics.
 
-- [ ] **Step 1: Write failing package payload and compatibility tests**
+- [x] **Step 1: Write failing package payload and compatibility tests**
+  - Created `packages/asset-pack-format/test/payload.test.ts` and `packages/asset-pack-format/test/compatibility.test.ts`.
 
-Port the immutable payload cases from `packages/cli/test/asset-pack-payload.test.ts`. Assert missing and unexpected sources, copied bytes, deterministic source ordering, identical content digests for formal versus draft status, acknowledgement-only stability, and substantive invalidation.
+- [x] **Step 2: Write failing boundary and CI-routing tests**
+  - Added format package boundary check cases to `packages/web/test/boundary-check.test.ts` and CI filter verification to `packages/web/test/package-scripts.test.ts`.
 
-Use an explicit fake runtime:
+- [x] **Step 3: Run focused tests and verify RED**
+  - Ran `rtk pnpm --filter @lpc-toolkit/asset-pack-format test`: RED (No projects matched filter)
+  - Ran `rtk pnpm --filter @lpc-toolkit/web test -- boundary-check.test.ts package-scripts.test.ts`: RED (9 tests failed: boundary check rules missing for format package, CI filter missing in ci.yml)
 
-```ts
-const runtime: AssetPackFormatRuntime = {
-  sha256: async (bytes) => `sha256:${createHash('sha256').update(bytes).digest('hex')}`,
-  decodeUtf8Fatal: (bytes) => new TextDecoder('utf-8', { fatal: true }).decode(bytes),
-  encodeUtf8: (value) => new TextEncoder().encode(value),
-  inflateRawBounded: async () => {
-    throw new Error('not used by payload tests');
-  },
-};
-```
+- [x] **Step 4: Create the package and minimal payload implementation**
+  - Created `packages/asset-pack-format/package.json`, `tsconfig.json`, `vitest.config.ts`, `src/runtime.ts`, `src/canonical-json.ts`, `src/payload.ts`, `src/compatibility.ts`, `src/index.ts`.
 
-Port compatibility expectations for absent/equal/higher minimum CLI versions, the two exact supported capabilities, and unknown capabilities.
+- [x] **Step 5: Extend boundaries and CI routing**
+  - Updated `scripts/check-boundaries.mjs`, `.github/workflows/ci.yml`, and `pnpm-lock.yaml` via `rtk pnpm install`.
 
-- [ ] **Step 2: Write failing boundary and CI-routing tests**
+- [x] **Step 6: Verify GREEN**
+  - `rtk pnpm --filter @lpc-toolkit/asset-pack-format test`: PASS (7 passed)
+  - `rtk pnpm --filter @lpc-toolkit/asset-pack-format run typecheck`: PASS
+  - `rtk pnpm --filter @lpc-toolkit/asset-pack-format build`: PASS
+  - `rtk pnpm --filter @lpc-toolkit/web test -- boundary-check.test.ts package-scripts.test.ts`: PASS (115 passed)
+  - `node scripts/check-boundaries.mjs`: PASS
 
-Extend the executable boundary fixture to prove:
-
-- Web and CLI may import `@lpc-toolkit/asset-pack-format`.
-- The format package may import only its local files, public Core, and JSZip.
-- The format package rejects `node:*`, React, DOM runtime globals, CLI/Web source imports, filesystem imports, and internal Core paths.
-- Core still rejects importing the format package.
-- Changes below `packages/asset-pack-format/**` activate both Web E2E and CLI package CI filters.
-
-- [ ] **Step 3: Run focused tests and verify RED**
-
-```sh
-rtk pnpm --filter @lpc-toolkit/asset-pack-format test
-rtk pnpm --filter @lpc-toolkit/web test -- boundary-check.test.ts package-scripts.test.ts
-```
-
-Expected: FAIL because the workspace package and boundary ownership do not exist.
-
-- [ ] **Step 4: Create the package and minimal payload implementation**
-
-Use this package metadata shape:
-
-```json
-{
-  "name": "@lpc-toolkit/asset-pack-format",
-  "version": "0.0.0",
-  "private": true,
-  "license": "GPL-3.0-or-later",
-  "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    }
-  },
-  "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
-  },
-  "dependencies": {
-    "@lpc-toolkit/core": "workspace:*",
-    "jszip": "^3.10.1"
-  }
-}
-```
-
-`parseAssetPackPayload` accepts `Uint8Array` and a runtime, copies every input byte array, parses through Core, reports exact expected/missing/extra source paths, hashes recursively sorted content input, and returns readonly maps. It must not import `Buffer` or call a global runtime API.
-
-Move `SUPPORTED_ASSET_PACK_CAPABILITIES`, `AssetPackLifecycleDiagnostic`, and `checkAssetPackCompatibility(pack, cliVersion)` into the new package without changing messages or sorting.
-
-- [ ] **Step 5: Extend boundaries and CI routing**
-
-Teach `scripts/check-boundaries.mjs` the new package root and dependency direction. Add `packages/asset-pack-format/**` to both `web` and `cli` path filters. Keep the existing unit job unchanged because `rtk pnpm verify` already traverses every workspace package.
-
-- [ ] **Step 6: Verify GREEN**
-
-```sh
-rtk pnpm --filter @lpc-toolkit/asset-pack-format test
-rtk pnpm --filter @lpc-toolkit/asset-pack-format run typecheck
-rtk pnpm --filter @lpc-toolkit/asset-pack-format build
-rtk pnpm --filter @lpc-toolkit/web test -- boundary-check.test.ts package-scripts.test.ts
-rtk pnpm check:boundaries
-```
-
-Expected: PASS. Inspect `pnpm-lock.yaml` and confirm only the new workspace importer and existing JSZip/Core edges changed.
-
-- [ ] **Step 7: Commit Task 2**
-
-```sh
-rtk git add packages/asset-pack-format pnpm-lock.yaml scripts/check-boundaries.mjs packages/web/test/boundary-check.test.ts packages/web/test/package-scripts.test.ts .github/workflows/ci.yml
-rtk git commit -m "feat(format): add shared asset pack payload contracts"
-```
-
-Record the full hash and PASS evidence, then commit the plan record separately.
+- [x] **Step 7: Commit Task 2**
+  - Product Commit: `9b6b09f150dd30dd45f72bffe2019143b4dbb158` (`feat(format): add shared asset pack payload contracts`)
 
 ---
 
