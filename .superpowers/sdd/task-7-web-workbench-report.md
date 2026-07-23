@@ -119,3 +119,9 @@ PASS
 - No new third-party dependency or `any` was added.
 - Attribution, Core boundaries, and existing Web E2E conventions remain unchanged.
 - Final fix commit: `bd30d3e0e6f66dc21091a34711d3c183b80256c9` (`fix(web): complete asset pack adapter parity`).
+
+## Follow-up capability-skip fix
+
+- TDD RED: with `NODE_OPTIONS=--no-experimental-global-webcrypto`, the focused conformance suite failed both tests with `asset_browser_capability_missing` from `crypto.subtle`.
+- Product fix: `247d2c783a26d99bd60f436717696cbce82f2ff1` (`fix(web): skip unsupported archive conformance`), explicitly skips the Vitest conformance suite when `globalThis.crypto?.subtle` or `DecompressionStream` is unavailable.
+- Verification: normal focused runtime/conformance tests PASS (2 files, 5 tests); simulated missing Web Crypto and missing `DecompressionStream` each report 2 skipped tests; Web typecheck PASS; `rtk pnpm check:boundaries` PASS; Chromium E2E PASS (1 test, no skip); `rtk git diff --check` PASS.
