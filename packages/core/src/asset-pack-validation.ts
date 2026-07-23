@@ -803,11 +803,10 @@ function geometryForEveryDeclaredUse(
 ): AnimationAuditGeometry | undefined {
   const first = uses[0]?.geometry;
   if (!first) return undefined;
-  const key = `${width}x${height}`;
-  return uses.every((use) => {
-    const bounds = geometryBounds(use.geometry);
-    return `${bounds.width}x${bounds.height}` === key;
-  })
+  const bounds = geometryBounds(first);
+  if (bounds.width !== width || bounds.height !== height) return undefined;
+  const signature = geometrySignature(first);
+  return uses.every((use) => geometrySignature(use.geometry) === signature)
     ? first
     : undefined;
 }

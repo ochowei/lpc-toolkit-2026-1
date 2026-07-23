@@ -56,7 +56,7 @@ function sha(character: string): string {
   return `sha256:${character.repeat(64)}`;
 }
 
-function geometryBounds(animation: 'walk' | 'climb'): { width: number; height: number } {
+function geometryBounds(animation: AnimationName): { width: number; height: number } {
   const geometry = standardAnimationGeometry(animation);
   const maxColumn = Math.max(
     ...geometry.rows.flatMap((row) => row.cells.map((cell) => cell.sourceColumn)),
@@ -68,13 +68,13 @@ function geometryBounds(animation: 'walk' | 'climb'): { width: number; height: n
   };
 }
 
-function requiredCells(animation: 'walk' | 'climb'): readonly string[] {
+function requiredCells(animation: AnimationName): readonly string[] {
   return standardAnimationGeometry(animation).rows.flatMap((row) =>
     row.cells.map((cell) => `${row.sourceRow}:${cell.sourceColumn}`),
   );
 }
 
-function allCells(animation: 'walk' | 'climb'): readonly string[] {
+function allCells(animation: AnimationName): readonly string[] {
   const geometry = standardAnimationGeometry(animation);
   const maxColumn = Math.max(
     ...geometry.rows.flatMap((row) => row.cells.map((cell) => cell.sourceColumn)),
@@ -158,7 +158,7 @@ function extendItemSource(
 
 function inspectionFor(
   sourcePath: string,
-  animation: 'walk' | 'climb',
+  animation: AnimationName,
   overrides?: Partial<AssetPackSourceInspection>,
 ): AssetPackSourceInspection {
   const bounds = geometryBounds(animation);
@@ -649,6 +649,50 @@ describe('asset-pack validation', () => {
 
     expect(result.diagnostics).not.toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'asset_pack_schema_invalid', sourcePath: 'sprites/wind-braid/foreground/climb.png' }),
+    ]));
+  });
+
+  it('does not apply recolor source-ramp diagnostics when a shared source is reused across incompatible same-bounds layouts', () => {
+    const result = validateSource(newItemSource({
+      assets: [{
+        kind: 'new-item',
+        localId: 'wind-braid',
+        displayName: 'Wind Braid',
+        typeName: 'hair',
+        bodyTypes: ['male', 'female'],
+        animations: ['slash', 'watering'],
+        recolor: { material: 'hair', palettes: ['ulpc'] },
+        layers: [{
+          id: 'foreground',
+          zPos: 120,
+          sprites: [
+            { animation: 'slash', source: 'sprites/wind-braid/shared.png' },
+            { animation: 'watering', source: 'sprites/wind-braid/shared.png' },
+          ],
+        }],
+      }],
+    }), [
+      inspectionFor('sprites/wind-braid/shared.png', 'slash', {
+        decoded: {
+          width: 384,
+          height: 256,
+          nonTransparentCells: allCells('slash'),
+          paletteColors: ['#111111'],
+        },
+      }),
+    ]);
+
+    expect(result.ok).toBe(false);
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({
+      code: 'asset_geometry_mismatch',
+      sourcePath: 'sprites/wind-braid/shared.png',
+    }));
+    expect(result.diagnostics).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'asset_pack_schema_invalid',
+        sourcePath: 'sprites/wind-braid/shared.png',
+        message: 'Configured recolor source ramp is not present in sprites/wind-braid/shared.png.',
+      }),
     ]));
   });
 

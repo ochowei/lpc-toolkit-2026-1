@@ -267,21 +267,21 @@ describe('inspectAssetPackSourceBytes', () => {
     expect(decoder.decode).toHaveBeenCalledTimes(1);
   });
 
-  it('treats same-source multi-use geometry as incompatible when declared uses do not all share one exact layout', async () => {
-    const walkBounds = geometryBounds('walk');
+  it('treats same-source multi-use geometry as incompatible when same-bounds declared uses do not share one exact layout', async () => {
+    const slashBounds = geometryBounds('slash');
     const pack = packFixture([
-      { animation: 'walk', source: 'sprites/wind-braid/shared.png' },
-      { animation: 'climb', source: 'sprites/wind-braid/shared.png' },
+      { animation: 'slash', source: 'sprites/wind-braid/shared.png' },
+      { animation: 'watering', source: 'sprites/wind-braid/shared.png' },
     ]);
     const sourceBytes = new Map([[
       'sprites/wind-braid/shared.png',
-      minimalPngBytes(walkBounds.width, walkBounds.height),
+      minimalPngBytes(slashBounds.width, slashBounds.height),
     ]]);
     const decoder: AssetPackPngDecoder = {
       decode: vi.fn(async () => ({
-        width: walkBounds.width,
-        height: walkBounds.height,
-        pixels: new Uint8ClampedArray(walkBounds.width * walkBounds.height * 4),
+        width: slashBounds.width,
+        height: slashBounds.height,
+        pixels: new Uint8ClampedArray(slashBounds.width * slashBounds.height * 4),
       })),
     };
 
@@ -297,8 +297,8 @@ describe('inspectAssetPackSourceBytes', () => {
       digest: 'sha256:0000000000000000000000000000000000000000000000000000000000000001',
       regularFile: true,
       decoded: {
-        width: walkBounds.width,
-        height: walkBounds.height,
+        width: slashBounds.width,
+        height: slashBounds.height,
         nonTransparentCells: [],
         paletteColors: [],
       },
