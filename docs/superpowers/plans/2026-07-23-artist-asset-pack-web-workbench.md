@@ -771,7 +771,7 @@ Record the full hash and PASS evidence, then commit the plan record separately.
 - Consumes: normalized pack source uses, Core `standardAnimationGeometry`, runtime-decoded RGBA pixels, palette metadata.
 - Produces: strict PNG IHDR preflight, shared `inspectAssetPackSourceBytes`, Node PNG decoder port, and Core-owned recolor source-ramp diagnostics.
 
-- [ ] **Step 1: Write failing shared PNG tests**
+- [x] **Step 1: Write failing shared PNG tests**
 
 Port PNG signature, IHDR length/type/CRC, zero/oversized dimensions, bit-depth/color-type, compression, filter, interlace, dimension mismatch, required/optional cell, palette color, and multi-use geometry cases.
 
@@ -796,11 +796,15 @@ export async function inspectAssetPackSourceBytes(options: {
 
 Assert malformed IHDR never calls `decoder.decode`.
 
-- [ ] **Step 2: Write failing Core recolor tests**
+  - Added `packages/asset-pack-format/test/png.test.ts` covering signature, IHDR structure/CRC, dimensions, bit depth/color type, compression/filter/interlace, geometry, required/optional cells, palettes, decoder call count, and exact same-bounds multi-use layout.
+
+- [x] **Step 2: Write failing Core recolor tests**
 
 Move the configured source-ramp cases out of CLI-only assertions. Given `AssetPackSourceInspection.decoded.paletteColors`, assert missing configured colors produce a deterministic `asset_pack_schema_invalid` error and valid ramps pass for single and multi-color recolor forms.
 
-- [ ] **Step 3: Run focused tests and verify RED**
+  - Added Core cases for missing configured source colors, valid single-color ramps, valid multi-color ramps, and same-bounds incompatible shared geometry.
+
+- [x] **Step 3: Run focused tests and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- png.test.ts
@@ -810,17 +814,23 @@ rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-validation.test.ts asset-p
 
 Expected: FAIL because PNG parity and Core recolor validation are not shared.
 
-- [ ] **Step 4: Implement shared inspection and Node decode**
+  - RED evidence: shared PNG failed with `inspectAssetPackSourceBytes is not a function`; Core recolor failed because the new missing-ramp assertion observed the old CLI-only behavior; the CLI focused suites remained green because existing CLI parity had not yet been rewired. The actual RED was recorded before production implementation as required.
+
+- [x] **Step 4: Implement shared inspection and Node decode**
 
 Use `DataView` for IHDR and CRC preflight. Decode once through the injected port, scan exact geometry cells over RGBA bytes, collect sorted `row:column` non-transparent cells and lowercase `#rrggbb` colors, and return Core's existing inspection shape.
 
 The Node decoder uses `@napi-rs/canvas` and the existing canvas adapter to return one full RGBA buffer. It must not enter the shared package.
 
-- [ ] **Step 5: Move recolor decisions into Core**
+  - Implemented DataView/CRC PNG preflight, injected `AssetPackPngDecoder`, one decode per source, exact geometry scanning, stable cells/colors, and CLI-only full RGBA decoding through `@napi-rs/canvas`.
+
+- [x] **Step 5: Move recolor decisions into Core**
 
 Fold the existing `validateRecolorSourceRamps` behavior into `validateAssetPack` after geometry/source checks. Delete the duplicate CLI helper. CLI validation calls shared source inspection and then the same Core validator used by Web.
 
-- [ ] **Step 6: Verify GREEN**
+  - Moved source-ramp decisions into Core, removed the duplicate CLI helper, and routed CLI directory/payload/partial-snapshot inspection through the shared inspector. The shared `AssetPackSha256` type was also applied at the CLI payload boundary.
+
+- [x] **Step 6: Verify GREEN**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- png.test.ts
@@ -834,7 +844,12 @@ rtk pnpm check:boundaries
 
 Expected: PASS with identical Node validation diagnostics and attributed preview behavior.
 
-- [ ] **Step 7: Commit Task 5**
+  - Focused PASS: `rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- png.test.ts` (13 tests); `rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-validation.test.ts` (16 tests); `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-validation.test.ts asset-pack-inspection.test.ts asset-authoring-e2e.test.ts` (37 tests, including attributed authoring preview).
+  - Type/boundary PASS: all three listed package typechecks and `rtk pnpm check:boundaries`.
+  - Review regression PASS: same-bounds `slash`/`watering` tests now require exact geometry signatures in shared inspection and Core recolor gating.
+  - Repository gate PASS: `rtk pnpm verify` passed after a sandbox EPERM on the first attempt; the formal escalated rerun completed all asset-pin, docs-policy, plugin, typecheck, and workspace test stages. Existing test stderr diagnostics were expected fixture logs; process exit was 0.
+
+- [x] **Step 7: Commit Task 5**
 
 ```sh
 rtk git add packages/asset-pack-format/src packages/asset-pack-format/test/png.test.ts packages/core/src/asset-pack-validation.ts packages/core/test/asset-pack-validation.test.ts packages/cli/src/asset-pack-node-runtime.ts packages/cli/src/asset-pack-validation.ts packages/cli/test/asset-pack-validation.test.ts packages/cli/test/asset-pack-inspection.test.ts
@@ -842,6 +857,23 @@ rtk git commit -m "refactor(asset-pack): share PNG validation"
 ```
 
 Record the full hash and PASS evidence, then commit the plan record separately.
+
+  - Product Commit: `2ec8fd734f289ea6ec7b251085466a4d3b209afe` (`refactor(asset-pack): share PNG validation`)
+  - Review Fix Commit: `c6cf930ba73ad1e5a05ef586096c7584589755a6` (`fix(asset-pack): require exact PNG geometry`)
+  - Review package: `.superpowers/sdd/review-task-5-web-workbench-4ff7716..c6cf930.diff`
+  - Independent review: Spec compliant; Task quality Approved; no Critical, Important, or Minor findings remain.
+  - CLI documentation impact reassessment:
+
+```text
+help: N/A — no command, flag, help text, or output contract changed.
+cli-readme: N/A — validation internals changed, not the public CLI workflow.
+root-readme: N/A — no top-level workflow or quick start changed.
+landing: N/A — no landing page or checked-in landing artifacts changed.
+architecture: N/A — boundaries follow the existing shared-format/Core/CLI design.
+engineering: N/A — no verification command or CI mapping changed.
+releasing: N/A — no release or publication flow changed.
+plugin: N/A — no plugin contract or workflow changed.
+```
 
 ---
 
