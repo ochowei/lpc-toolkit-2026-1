@@ -1281,7 +1281,7 @@ Record the full hash and PASS evidence, then commit the plan record separately.
 - Consumes: Task 8 Worker protocol and revisions.
 - Produces: one testable Worker client, pure reducer, form/advanced projections, exact acknowledgement mutation, formal gate, and React orchestration hook.
 
-- [ ] **Step 1: Write failing reducer and stale-result tests**
+- [x] **Step 1: Write failing reducer and stale-result tests**
 
 Define these phases:
 
@@ -1304,7 +1304,9 @@ immutable accepted-edit log. Retry creates a fresh Worker, replays `open` and
 those exact revisioned edits, reaches the same current revision, and ignores
 all replies from the terminated Worker.
 
-- [ ] **Step 2: Write failing editor-projection and governance tests**
+  - RED: the five requested suites initially failed with missing Task 9 modules. Added phase/revision/stale-response, crash/retry, immutable File/edit-log, and reset/navigation/progress coverage.
+
+- [x] **Step 2: Write failing editor-projection and governance tests**
 
 Define:
 
@@ -1320,13 +1322,17 @@ Prove overview owns ID/displayName/version/compatibility, Credits owns top-level
 
 `acknowledgeWarning(source, candidate, reason)` trims the reason, rejects blank text, replaces only an exact code/subject/content-digest match, and removes stale acknowledgements before returning a new source.
 
-- [ ] **Step 3: Write failing release-gate tests**
+  - Added disjoint Overview/Credits/Advanced projections, unknown/common-field rejection, exact acknowledgement binding, reason trimming, and stale-record tests.
+
+- [x] **Step 3: Write failing release-gate tests**
 
 Cover every `AssetPackFormalBlocker`. Assert next-patch suggestions for stable/prerelease SemVer; no suggestion for invalid original version; greater custom versions accepted; draft upload always requires increase; changed release fingerprint requires increase; and unchanged formal upload may retain version only when candidate and original archive digests match.
 
 Apply a required version change before enabling acknowledgement submission, because the existing content digest includes version and a later version edit would correctly invalidate prior acknowledgements.
 
-- [ ] **Step 4: Run focused tests and verify RED**
+  - Added coverage for every formal blocker, SemVer suggestions, draft/formal status, archive/release fingerprint changes, candidate/original digest matching, and version-before-ack ordering.
+
+- [x] **Step 4: Run focused tests and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-worker-client.test.ts asset-pack-manifest-editor.test.ts asset-pack-workbench.test.ts asset-pack-release.test.ts use-asset-pack-workbench.test.ts
@@ -1334,7 +1340,9 @@ rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-worker-client.test.ts asse
 
 Expected: FAIL because workbench state/orchestration does not exist.
 
-- [ ] **Step 5: Implement Worker client and reducer**
+  - RED confirmed after the known sandbox tsx IPC restriction was bypassed with the exact command: 5 suites failed and 0 tests collected.
+
+- [x] **Step 5: Implement Worker client and reducer**
 
 Inject a minimal Worker port for tests:
 
@@ -1362,13 +1370,17 @@ editor state visible, mark validation failed, and make `retry` construct a new
 client and replay the ordered accepted requests. Clear the replay log on Reset
 or a newly accepted upload.
 
-- [ ] **Step 6: Implement pure edits and release gate**
+  - Implemented latest-only Worker client, request/revision tracking, disposal, pure reducer, crash recovery, contiguous accepted-edit replay, and no decoded byte maps in hook state.
+
+- [x] **Step 6: Implement pure edits and release gate**
 
 All editor paths reconstruct one manifest text and send that exact text to the Worker. Preserve existing acknowledgements unless the dedicated governance helper removes/replaces them. Never let a form and JSON editor retain separate manifest copies.
 
 Calculate formal blockers in stable UI order. `ready` is exactly `blockers.length === 0`; do not hide a blocker after the user clicks download.
 
-- [ ] **Step 7: Verify GREEN**
+  - Implemented single-manifest editor projections, exact governance helper, authoritative formal gate, blocker transitions for empty/opening/retry/unsafe/failed states, and terminal assembly transitions.
+
+- [x] **Step 7: Verify GREEN**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-worker-client.test.ts asset-pack-manifest-editor.test.ts asset-pack-workbench.test.ts asset-pack-release.test.ts use-asset-pack-workbench.test.ts
@@ -1377,7 +1389,9 @@ rtk pnpm --filter @lpc-toolkit/web run typecheck
 
 Expected: PASS, including stale response and acknowledgement/version ordering.
 
-- [ ] **Step 8: Commit Task 9**
+  - PASS: Task 9 focused suites (5 files, 32 tests), Task 8 regression suites (3 files, 24 tests), Web typecheck, `rtk pnpm check:boundaries`, and diff checks.
+
+- [x] **Step 8: Commit Task 9**
 
 ```sh
 rtk git add packages/web/src/lib/asset-pack-worker-client.ts packages/web/src/lib/asset-pack-manifest-editor.ts packages/web/src/slice/asset-pack-workbench.ts packages/web/src/slice/asset-pack-release.ts packages/web/src/hooks/use-asset-pack-workbench.ts packages/web/test/asset-pack-worker-client.test.ts packages/web/test/asset-pack-manifest-editor.test.ts packages/web/test/asset-pack-workbench.test.ts packages/web/test/asset-pack-release.test.ts packages/web/test/use-asset-pack-workbench.test.ts
@@ -1385,6 +1399,10 @@ rtk git commit -m "feat(web): model asset pack workbench state"
 ```
 
 Record the full hash and PASS evidence, then commit the plan record separately.
+
+  - Product Commits: `7b04cba00054a3949cefeabd3ee3780fe2b8fcd3` (`feat(web): model asset pack workbench state`), `de67f40fe0791d4e2611fad5b3ca9d47a3df7dc8` (`fix(web): enforce workbench release governance`), `747af08b309d5cef5aafcaf822bb94f7a1b03a02` (`fix(web): close Task 9 workbench review findings`), `ccaf745e950224eddfc45d113a45415a1edc95cb` (`fix(web): block formal assembly after worker failure`), and `43eba4eae3a9908ebbe3c263d29e299c429edcd1` (`fix(web): close remaining Task 9 workbench gates`).
+  - Evidence Commits: `074bf1debd6897eaddb8f64370bd5a83f705f779`, `f9afe0d55008a9f133993a0551c00a179cd43c31`, `37a59d1af3165e4574b234fad2b969414933fc3c`, `a8125f7272e14437daf3c9ce88f8d38b3f64ab7c`, and `1d36018fa68cd969ba47ebe2fc99aa066714d4a1`.
+  - Independent final Luna review: product findings resolved; no Critical or remaining product Important findings. The separate plan-record commit follows this update.
 
 ---
 
