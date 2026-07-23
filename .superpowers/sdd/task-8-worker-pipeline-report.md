@@ -160,3 +160,57 @@ The package-level test command remains blocked before Vitest by the existing
 sandbox `tsx` IPC restriction; the direct Vitest command exercises the same
 focused suites. No Task 9 files, dependencies, assets, caches, artist
 workspaces, or `upstream/` content changed.
+
+## Task 8 final Important finding fix — 2026-07-23
+
+### Finding addressed
+
+Ordinary source edits could invalidate an acknowledgement candidate while draft
+and formal archive assembly still serialized the stale record from the raw
+manifest. Assembly now preserves the current manifest fields and replaces only
+the acknowledgement array with the exact current candidate projection in both
+paths.
+
+### RED evidence
+
+Added a regression that creates an optional-frame warning, acknowledges it
+through the governed acknowledgement workflow, changes the source bytes so the
+warning disappears, and inspects both assembled ZIP manifests. Before the fix:
+
+```text
+rtk pnpm --filter @lpc-toolkit/web exec vitest run test/asset-pack-worker-session.test.ts test/asset-pack-worker-protocol.test.ts test/asset-pack-baseline.test.ts
+FAIL — 1 test failed: draft assembly retained the stale acknowledgement record
+```
+
+### GREEN evidence
+
+Product commit:
+
+```text
+d4fa2ab0f352a2f01c5dafea9601f0b7d54e9956 fix(web): invalidate stale acknowledgements
+```
+
+Exact verification after the fix:
+
+```text
+rtk pnpm --filter @lpc-toolkit/web exec vitest run test/asset-pack-worker-session.test.ts test/asset-pack-worker-protocol.test.ts test/asset-pack-baseline.test.ts
+PASS — 3 files, 23 tests
+
+rtk pnpm --filter @lpc-toolkit/web exec vitest run
+PASS — 84 files, 740 tests
+
+rtk pnpm --filter @lpc-toolkit/web run typecheck
+PASS
+
+rtk pnpm check:boundaries
+PASS — Architecture boundary check passed.
+
+rtk git diff --check
+PASS
+```
+
+The full Web suite continues to print pre-existing asset/catalog warning
+diagnostics from integration coverage, but exits with all tests passing. No
+Task 9 files, dependencies, `any`, assets, caches, artist workspaces, or
+`upstream/` content changed. The report update is a separate documentation
+commit.
