@@ -323,10 +323,14 @@ metadata and TXT/CSV credits come from one frozen composed credit manifest,
 retaining both inherited base credits and pack contributions through install,
 upgrade, and removal.
 
-Browser upload, Web validation/editing, acknowledgement UI, temporary browser
-overlays, and corrected-pack download remain deferred to Phase 3; the current
-Web editor is not an asset-pack authoring surface and does not define another
-manifest format.
+The Web Workbench repairs an existing `.lpc-assets.zip` in memory: it previews
+the official base plus pack credits, accepts governed manifest/source edits,
+and downloads attributed draft or formal archives. A draft archive carries
+`status: "draft"`; `asset inspect` reports it with exit code 1 and
+`asset install` refuses it with `asset_pack_draft` before changing workspace
+state. Use the CLI for package creation, inspection, installation, upgrades,
+removal, and lifecycle diagnosis; it does not require a browser or repository
+clone.
 
 ### Codex Plugin
 

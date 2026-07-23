@@ -142,7 +142,7 @@ describe('package scripts', () => {
       'pnpm prepare-assets && pnpm verify-upstream-pin',
     );
     expect(packageJson.scripts?.['pretest:e2e']).toBe(
-      'pnpm prepare-assets && pnpm verify-upstream-pin',
+      'pnpm prepare-assets && pnpm verify-upstream-pin && pnpm --filter @lpc-toolkit/cli build',
     );
     expect(packageJson.scripts?.['pretest:e2e:parity']).toBe(
       'pnpm prepare-assets && pnpm verify-upstream-pin && pnpm verify-upstream-parity',

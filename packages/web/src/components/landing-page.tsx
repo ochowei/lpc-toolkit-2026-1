@@ -179,7 +179,9 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             The browser can inspect, validate, repair, and assemble an uploaded
             asset pack locally. The CLI owns package inspection, install,
             upgrade, removal, and lifecycle diagnosis; Web edits happen
-            in-memory and do not write an artist workspace.
+            in-memory and do not write an artist workspace. Browser drafts carry
+            <code>status: "draft"</code> and the CLI refuses to install them
+            until a formal release is downloaded.
           </p>
         </section>
 

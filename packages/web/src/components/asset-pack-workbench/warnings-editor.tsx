@@ -36,7 +36,7 @@ export function WarningsEditor({ warnings, acknowledgementRecords, diagnostics =
             <div><dt className="inline font-semibold">Scope: </dt><dd className="inline">warning</dd></div>
             <div><dt className="inline font-semibold">Content digest: </dt><dd className="inline font-mono">{warning.contentDigest}</dd></div>
           </dl>
-          <label className="mt-3 block text-sm text-text">Reason<input name={`reason-${key}`} value={reason} onChange={(event) => setReasons((current) => ({ ...current, [key]: event.currentTarget.value }))} className="mt-1 w-full rounded border border-border bg-surface px-2 py-1" /></label>
+          <label className="mt-3 block text-sm text-text">Reason<input name={`reason-${key}`} value={reason} onChange={(event) => { const value = event.currentTarget.value; setReasons((current) => ({ ...current, [key]: value })); }} className="mt-1 w-full rounded border border-border bg-surface px-2 py-1" /></label>
           {confirmed && <p className="mt-2 text-xs text-green-700">Confirmed</p>}
           {versionBlocked && <p className="mt-2 text-xs text-red-700">Set the release version first before confirming this warning.</p>}
           <button type="button" disabled={versionBlocked || confirmed || reason.trim().length === 0} className="mt-3 rounded bg-accent px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50" onClick={() => onAcknowledge(warning, reason)}>Confirm</button>

@@ -90,6 +90,23 @@ export function acknowledgeWarning(
   };
 }
 
+/** Replace a same-binding acknowledgement after a governed manifest change refreshed its digest. */
+export function acknowledgeCurrentWarning(
+  source: AssetPackSource,
+  candidate: AssetPackAcknowledgement,
+  reason: string,
+): AssetPackSource {
+  const trimmed = reason.trim();
+  if (trimmed.length === 0) throw new Error('A warning acknowledgement reason is required.');
+  const acknowledgements = source.acknowledgements ?? [];
+  return {
+    ...source,
+    acknowledgements: acknowledgements
+      .filter((acknowledgement) => !sameWarningBinding(acknowledgement, candidate))
+      .concat({ ...candidate, reason: trimmed }),
+  };
+}
+
 export function removeStaleAcknowledgements(
   source: AssetPackSource,
   candidates: readonly AssetPackAcknowledgement[],

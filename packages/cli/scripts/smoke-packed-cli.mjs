@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
@@ -57,6 +58,36 @@ function writeWalkPng(filePath) {
   context.fillRect(0, 0, canvas.width, canvas.height);
   mkdirSync(path.dirname(filePath), { recursive: true });
   writeFileSync(filePath, canvas.toBuffer('image/png'));
+}
+
+async function writeDraftArchive(formalArchivePath, draftArchivePath) {
+  const archive = await JSZip.loadAsync(readFileSync(formalArchivePath));
+  const files = new Map();
+  for (const entry of Object.values(archive.files)) {
+    const normalizedEntryName = entry.name.replace(/\/\.$/u, '/');
+    if (
+      entry.dir
+      || entry.name.endsWith('/')
+      || entry.name.endsWith('/.')
+      || normalizedEntryName.endsWith('/')
+      || entry.name === 'checksums.json'
+    ) continue;
+    files.set(entry.name, Buffer.from(await entry.async('nodebuffer')));
+  }
+  const manifest = JSON.parse(files.get('asset-pack.json').toString('utf8'));
+  files.set('asset-pack.json', Buffer.from(JSON.stringify({ ...manifest, status: 'draft' })));
+  const checksums = {
+    schema: 'lpc-toolkit.asset-pack-checksums.v1',
+    files: [...files].sort(([left], [right]) => left.localeCompare(right)).map(([entryPath, bytes]) => ({
+      path: entryPath,
+      size: bytes.byteLength,
+      sha256: `sha256:${createHash('sha256').update(bytes).digest('hex')}`,
+    })),
+  };
+  const output = new JSZip();
+  for (const [entryPath, bytes] of files) output.file(entryPath, bytes, { createFolders: false });
+  output.file('checksums.json', JSON.stringify(checksums));
+  writeFileSync(draftArchivePath, await output.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' }));
 }
 
 function parseViewerData(viewerHtml) {
@@ -410,6 +441,21 @@ try {
     return JSON.parse(runInstalled([...args, '--json'], cwd));
   }
 
+  function runInstalledResult(args, cwd = emptyCwd) {
+    const invocation = installedCliInvocation({
+      platform: process.platform,
+      nodePath: process.execPath,
+      shimPath: installedBinPath,
+      targetPath: installedBinTargetPath,
+      args: [...args, '--json'],
+    });
+    return spawnSync(invocation.command, invocation.args, {
+      cwd,
+      encoding: 'utf8',
+      env: { ...process.env, LPC_TOOLKIT_CACHE_DIR: cacheRoot },
+    });
+  }
+
   runInstalled(['character', 'create', 'packed-hero', '--preset', 'farmer']);
   const searchOutput = runInstalled([
     'character', 'search', 'packed-hero', '--type', 'hair', '--query', 'braid',
@@ -488,11 +534,30 @@ try {
     'packed archive must stay below the author workspace',
   );
 
+  const draftArchivePath = path.join(emptyCwd, 'smoke.packed-hair-1.0.0.draft.lpc-assets.zip');
+  await writeDraftArchive(archivePath, draftArchivePath);
+
   const installedWorkspaceRoot = path.join(emptyCwd, 'installed-lifecycle');
   const installedWorkspaceOutput = runInstalledJson([
     'asset', 'workspace', 'init', installedWorkspaceRoot,
   ]);
   assert.equal(installedWorkspaceOutput.data?.root, installedWorkspaceRoot);
+  const draftInspection = runInstalledResult(['asset', 'inspect', draftArchivePath], installedWorkspaceRoot);
+  assert.equal(draftInspection.status, 1, draftInspection.stderr);
+  const draftInspectionOutput = JSON.parse(draftInspection.stdout);
+  assert.equal(draftInspectionOutput.data?.status, 'draft', draftInspection.stdout);
+  assert.equal(draftInspectionOutput.data?.valid, false);
+  const workspaceConfigBeforeDraftInstall = readFileSync(
+    path.join(installedWorkspaceRoot, 'lpc-asset-workspace.json'),
+    'utf8',
+  );
+  const draftInstall = runInstalledResult(['asset', 'install', draftArchivePath], installedWorkspaceRoot);
+  assert.equal(draftInstall.status, 1, draftInstall.stderr);
+  assert.match(draftInstall.stdout, /asset_pack_draft/u);
+  assert.equal(
+    readFileSync(path.join(installedWorkspaceRoot, 'lpc-asset-workspace.json'), 'utf8'),
+    workspaceConfigBeforeDraftInstall,
+  );
   const inspectionOutput = runInstalledJson([
     'asset', 'inspect', archivePath,
   ], installedWorkspaceRoot);

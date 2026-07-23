@@ -179,4 +179,17 @@ describe('asset-pack preview model', () => {
     expect(isOfficialPath('spritesheets/body/male/not-in-catalog.png')).toBe(false);
     expect(isOfficialPath('spritesheets/packages/acme.demo/hair/foreground/male/walk.png')).toBe(false);
   });
+
+  it('uses the canonical animation defaults for legacy baseline definitions', () => {
+    const legacyDefinition = {
+      name: 'Legacy Body',
+      type_name: 'body',
+      credits: [baseCredit],
+      layer_1: { zPos: 0, male: 'body/male/' },
+    } as unknown as ItemDefinition;
+    const legacyCatalog = createCatalog({ 'body/legacy.json': legacyDefinition }).catalog;
+    const isOfficialPath = createOfficialAssetPackPreviewPathAuthorizer(legacyCatalog, plan);
+
+    expect(isOfficialPath('spritesheets/body/male/walk.png')).toBe(true);
+  });
 });

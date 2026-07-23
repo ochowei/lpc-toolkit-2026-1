@@ -165,8 +165,12 @@ semantics.
 
 Installed packs participate in catalog audit, character preview, and render;
 their TXT/CSV attribution retains inherited base credits and pack contributions.
-Web asset-pack authoring remains deferred to Phase 3, and the browser editor
-does not edit or download corrected asset-pack manifests.
+The browser Asset Pack Workbench uploads an existing archive, preserves
+matching attribution, validates and repairs it in memory, and downloads draft
+or formal corrected archives. Draft archives retain `status: "draft"` and are
+rejected by CLI installation until the release gates are satisfied. The CLI
+continues to own pack creation, inspection, installation, upgrades, removal,
+and lifecycle diagnosis; neither workflow requires cloning this repository.
 
 Catalog and character searches return 20 items by default. Use `--limit 20`
 to set a bounded page size, `--offset 20` (or the returned `page.nextOffset`)

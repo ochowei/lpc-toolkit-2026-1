@@ -52,6 +52,15 @@ describe('asset-pack formal release gates', () => {
     expect(assetPackFormalBlockers({ workbench: changed, originalReleaseFingerprint: digest('o') }).some(({ code }) => code === 'version-increase-required')).toBe(true);
     expect(assetPackFormalBlockers({ workbench: { ...changed, manifestText: changed.manifestText.replace('1.2.3', '2.0.0') }, originalReleaseFingerprint: digest('o') }).some(({ code }) => code === 'version-increase-required')).toBe(false);
     expect(assetPackFormalBlockers({ workbench: { ...workbench(), uploadMetadata: { ...workbench().uploadMetadata, uploadedStatus: 'draft' } }, originalReleaseFingerprint: digest('r') }).some(({ code }) => code === 'version-increase-required')).toBe(true);
+    const repairedDraft = workbench({
+      manifestText: workbench().manifestText.replace('"1.2.3"', '"1.2.4"'),
+      uploadMetadata: { ...workbench().uploadMetadata, uploadedStatus: 'draft' },
+      formalCandidate: { ...workbench().formalCandidate!, version: '1.2.4', uploadMetadata: { ...workbench().formalCandidate!.uploadMetadata, uploadedStatus: 'draft' } },
+    });
+    expect(assetPackFormalBlockers({ workbench: repairedDraft, originalReleaseFingerprint: digest('r') }).map(({ code }) => code))
+      .not.toContain('draft-status');
+    expect(assetPackFormalBlockers({ workbench: repairedDraft, originalReleaseFingerprint: digest('r') }).map(({ code }) => code))
+      .not.toContain('version-increase-required');
   });
 
   it('allows unchanged formal upload to retain its version only when candidate bytes match', () => {

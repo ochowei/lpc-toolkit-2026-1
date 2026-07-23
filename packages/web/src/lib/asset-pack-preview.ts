@@ -8,6 +8,7 @@ import {
   createCatalog,
   getCredits,
   importSelectionDocument,
+  itemAnimationCapabilities,
   selectionJsonFromCore,
   type AssetPackCompilePlan,
   type Catalog,
@@ -63,6 +64,7 @@ export function createOfficialAssetPackPreviewPathAuthorizer(
 ): (path: string) => boolean {
   const officialPaths = new Set<string>();
   for (const item of baselineCatalog.byItemId.values()) {
+    const animations = itemAnimationCapabilities(item).native;
     const variants = ['', ...(item.variants ?? [])];
     for (let layerNumber = 1; layerNumber < 10; layerNumber += 1) {
       const layer = item[`layer_${layerNumber}`];
@@ -78,7 +80,7 @@ export function createOfficialAssetPackPreviewPathAuthorizer(
           continue;
         }
         for (const folder of Object.keys(ANIMATION_OFFSETS)) {
-          if (!animationsSupportFolder(item.animations, folder)) continue;
+          if (!animationsSupportFolder(animations, folder)) continue;
           for (const variant of variants) {
             const suffix = variant
               ? `${folder}/${variant.replaceAll(' ', '_')}.png`

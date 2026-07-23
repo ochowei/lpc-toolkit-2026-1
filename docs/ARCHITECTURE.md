@@ -561,9 +561,15 @@ freezes one credit manifest; extension credits union inherited base credits
 with the pack contribution, and all publication formats preserve that complete
 attribution.
 
-Browser upload, validation/editing, acknowledgement UI, temporary browser
-overlays, and pack download remain deferred to Phase 3. The Web must reuse the
-Core schema and must not introduce an alternate manifest format.
+The browser Asset Pack Workbench uploads a bounded archive into a Worker-owned
+in-memory session. Shared `asset-pack-format` ports inspect safe, repairable,
+and verified results; the baseline loader supplies pinned catalog, palette,
+credit, and CLI-version data; the preview overlays compiled pack sprites only
+over official paths; and release fingerprints/formal candidates gate exact
+revision downloads. Draft output adds `status: "draft"`; formal output must
+clear it and preserve governed acknowledgements. Attribution remains attached
+to preview, draft, formal, and CLI lifecycle paths. The Web reuses the Core
+schema and does not introduce an alternate manifest format.
 
 Production asset resolution uses the local tree or pinned managed cache.
 `upstream/` is an optional read-only provenance dormant gitlink that preserves source

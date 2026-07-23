@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { parseAssetPackSource, type AssetPackSource } from '@lpc-toolkit/core';
 import {
-  acknowledgeWarning,
+  acknowledgeCurrentWarning,
   applyAssetPackAdvancedProjection,
   projectAssetPackAdvanced,
   projectAssetPackCredits,
@@ -107,7 +107,7 @@ export function WorkbenchEditor({ state, onReplaceManifest, onReplaceSource, onR
       {state.activePanel === 'sources' && <SourceList summaries={workbench.sourceSummaries} diagnostics={diagnostics.filter((diagnostic) => diagnostic.scope === 'source')} onReplace={(path, file) => onReplaceSource?.(path, file)} onRemove={(path) => onRemoveSource?.(path)} />}
       {state.activePanel === 'warnings' && (source ? <WarningsEditor revision={workbench.revision} warnings={warningCandidates} acknowledgementRecords={workbench.acknowledgementRecords} diagnostics={diagnostics.filter((diagnostic) => diagnostic.scope === 'warning')} versionBlocked={versionBlocked} onAcknowledge={(candidate, reason) => {
         try {
-          submitSource(acknowledgeWarning(source, candidate, reason), 'acknowledgement');
+          submitSource(acknowledgeCurrentWarning(source, candidate, reason), 'acknowledgement');
         } catch (error) {
           setEditError(workbenchEditorErrorMessage(error));
         }

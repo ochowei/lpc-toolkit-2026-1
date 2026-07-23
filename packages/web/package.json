@@ -20,7 +20,7 @@
     "gen-i18n": "tsx scripts/gen-i18n-data.ts",
     "pretest": "pnpm prepare-assets && pnpm verify-upstream-pin",
     "test": "vitest run",
-    "pretest:e2e": "pnpm prepare-assets && pnpm verify-upstream-pin",
+    "pretest:e2e": "pnpm prepare-assets && pnpm verify-upstream-pin && pnpm --filter @lpc-toolkit/cli build",
     "test:e2e": "playwright test",
     "pretest:e2e:parity": "pnpm prepare-assets && pnpm verify-upstream-pin && pnpm verify-upstream-parity",
     "test:e2e:parity": "playwright test -c playwright.parity.config.ts",

@@ -258,8 +258,10 @@ export function useAssetPackWorkbench(options: AssetPackWorkbenchControllerOptio
     controllerRef.current = new AssetPackWorkbenchController(options);
   }
   const controller = controllerRef.current;
-  controller.setOnState(() => setStateVersion((version) => version + 1));
-  useEffect(() => () => controller.dispose(), [controller]);
+  useEffect(() => {
+    controller.setOnState(() => setStateVersion((version) => version + 1));
+    return () => controller.dispose();
+  }, [controller]);
   return {
     state: controller.state,
     upload: (file: File) => controller.upload(file),

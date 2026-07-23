@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AssetPackAcknowledgement, AssetPackSource } from '@lpc-toolkit/core';
 import {
+  acknowledgeCurrentWarning,
   acknowledgeWarning,
   applyAssetPackAdvancedProjection,
   projectAssetPackAdvanced,
@@ -66,5 +67,11 @@ describe('asset-pack manifest editor projections', () => {
     expect(acknowledgeWarning(source, candidate, 'reason').acknowledgements).toEqual([{ ...candidate, reason: 'reason' }]);
     expect(() => acknowledgeWarning(source, candidate, '   ')).toThrow();
     expect(() => acknowledgeWarning({ ...source, acknowledgements: [stale] }, candidate, 'reason')).toThrow();
+  });
+
+  it('replaces a stale same-binding record when the current warning candidate is explicitly confirmed', () => {
+    const stale: AssetPackAcknowledgement = { ...candidate, contentDigest: `sha256:${'b'.repeat(64)}`, reason: 'old' };
+    expect(acknowledgeCurrentWarning({ ...source, acknowledgements: [stale] }, candidate, 'reason').acknowledgements)
+      .toEqual([{ ...candidate, reason: 'reason' }]);
   });
 });

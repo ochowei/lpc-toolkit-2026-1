@@ -90,5 +90,7 @@ describe('LandingPage', () => {
     expect(html).toContain('browser can inspect, validate, repair, and assemble');
     expect(html).toContain('CLI owns package inspection, install, upgrade, removal, and lifecycle diagnosis');
     expect(html).toContain('Web edits happen in-memory');
+    expect(html).toContain('status: "draft"');
+    expect(html).toContain('CLI refuses to install them');
   });
 });

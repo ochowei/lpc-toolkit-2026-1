@@ -60,7 +60,7 @@ export function assetPackFormalBlockers(
   } else if (workbench.formalCandidate.revision !== workbench.revision) {
     blockers.push({ code: 'candidate-revision-stale', message: 'The formal archive candidate belongs to an older revision.' });
   }
-  if (document?.status === 'draft' || workbench.uploadMetadata.uploadedStatus === 'draft') {
+  if (document?.status === 'draft') {
     blockers.push({ code: 'draft-status', message: 'Formal output must omit draft status.' });
   }
   if (!workbench.draftSerializable) {

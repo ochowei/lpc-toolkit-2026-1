@@ -95,6 +95,16 @@ rtk pnpm --filter @lpc-toolkit/web test:e2e
 Ordinary `test:e2e` uses the toolkit only. It does not initialize or run the
 tracked upstream submodule.
 
+The focused browser-to-CLI acceptance is:
+
+```sh
+rtk pnpm --filter @lpc-toolkit/web test:e2e -- asset-pack-workbench.spec.ts
+```
+
+`pretest:e2e` builds the CLI so this test exercises the public entrypoint. It
+covers attributed formal/draft downloads, draft inspect/install rejection
+without workspace mutation, formal install, and doctor containment.
+
 ### CLI
 
 ```sh
@@ -103,6 +113,11 @@ rtk pnpm --filter @lpc-toolkit/cli test
 rtk pnpm --filter @lpc-toolkit/cli build
 rtk pnpm --filter @lpc-toolkit/cli test:package
 ```
+
+The packed smoke also creates a checked archive with `status: "draft"` and
+asserts that inspect exits 1 and install reports `asset_pack_draft` without
+mutating the consumer workspace. This is the package-level counterpart to the
+browser acceptance.
 
 #### Artist asset-pack authoring and lifecycle
 

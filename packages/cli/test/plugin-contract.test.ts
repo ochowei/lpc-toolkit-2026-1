@@ -34,6 +34,11 @@ const workflowPath = path.resolve(
   '../../../plugins/lpc-toolkit/skills/character-authoring/references/cli-workflow.md',
 );
 const workflow = readFileSync(workflowPath, 'utf8');
+const auditWorkflowPath = path.resolve(
+  here,
+  '../../../plugins/lpc-toolkit/skills/animation-asset-audit/references/audit-workflow.md',
+);
+const auditWorkflow = readFileSync(auditWorkflowPath, 'utf8');
 
 describe('Codex plugin CLI contract', () => {
   it('uses the versioned character contract schema', () => {
@@ -95,5 +100,12 @@ describe('Codex plugin CLI contract', () => {
     expect(workflow).toContain('.viewer.html');
     expect(workflowCommands.length).toBeGreaterThan(0);
     expect(workflowCommands.every((command) => contractCommands.has(command))).toBe(true);
+  });
+
+  it('documents the CLI and Web handoff for audited asset work', () => {
+    expect(auditWorkflow).toContain('asset init --from-audit');
+    expect(auditWorkflow).toContain('Web Asset Pack Workbench');
+    expect(auditWorkflow).toContain('status: "draft"');
+    expect(auditWorkflow).toContain('cannot be installed by the CLI');
   });
 });
