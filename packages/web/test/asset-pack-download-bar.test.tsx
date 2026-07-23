@@ -28,7 +28,7 @@ function state() {
       formalCandidate: candidate,
       draftSerializable: true,
     },
-    diagnostics: [],
+    diagnostics: [{ code: 'warning', severity: 'warning' as const, message: 'Review this warning', scope: 'warning' as const }],
     formalBlockers: [],
   };
 }
@@ -54,5 +54,19 @@ describe('AssetPackDownloadBar', () => {
     const html = renderToStaticMarkup(<AssetPackDownloadBar state={{ ...state(), phase: 'assembling', progress: { requestId: 2, revision: 0, stage: 'assembling-archive' } }} onDownload={vi.fn()} />);
     expect(html).toContain('aria-live="polite"');
     expect(html).toContain('Assembling archive');
+  });
+
+  it('shows current reducer diagnostics when the visible workbench snapshot is stale', () => {
+    const current = 'Current Worker error';
+    const stale = 'Stale workbench warning';
+    const base = state();
+    const html = renderToStaticMarkup(<AssetPackDownloadBar state={{
+      ...base,
+      diagnostics: [{ code: 'current', severity: 'error', message: current, scope: 'release' }],
+      workbench: { ...base.workbench!, diagnostics: [{ code: 'stale', severity: 'warning', message: stale, scope: 'warning' }] },
+    }} onDownload={vi.fn()} />);
+
+    expect(html).toContain(current);
+    expect(html).not.toContain(stale);
   });
 });

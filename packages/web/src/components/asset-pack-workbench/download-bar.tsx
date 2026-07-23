@@ -38,7 +38,7 @@ export function draftDiagnosticConfirmationMessage(
 
 export function AssetPackDownloadBar({ state, onDownload, confirmDraft }: AssetPackDownloadBarProps) {
   const workbench = state.workbench;
-  const diagnostics = (workbench?.diagnostics ?? state.diagnostics)
+  const diagnostics = state.diagnostics
     .filter(({ severity }) => severity === 'error' || severity === 'warning');
   const assembling = state.phase === 'assembling';
   const draftEnabled = Boolean(workbench?.draftSerializable) && !assembling;

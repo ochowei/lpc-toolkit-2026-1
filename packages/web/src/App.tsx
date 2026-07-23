@@ -50,35 +50,52 @@ declare global {
 
 export interface AppNavigationOwnerOptions {
   readonly initialPathname: string;
-  readonly pushState: (path: string) => void;
+  readonly initialHistoryIndex?: number;
+  readonly pushState: (path: string, historyIndex: number) => void;
   readonly setPathname: (path: string) => void;
+  readonly restorePopState?: (delta: number) => void;
+  readonly replaceState?: (path: string, historyIndex: number) => void;
   readonly blocker?: NavigationBlocker;
 }
 
 export interface AppNavigationOwner {
   readonly pathname: string;
   readonly navigate: (path: AppPath) => boolean;
-  readonly handlePopState: (path: string) => boolean;
+  readonly handlePopState: (path: string, nextHistoryIndex?: number) => boolean;
 }
 
 export function createAppNavigationOwner(options: AppNavigationOwnerOptions): AppNavigationOwner {
   let pathname = options.initialPathname;
+  let historyIndex = options.initialHistoryIndex ?? 0;
+  let restoringPopState = false;
   const canLeave = () => options.blocker?.() ?? true;
   const navigate = (path: AppPath): boolean => {
     if (pathname === path) return true;
     if (!canLeave()) return false;
-    options.pushState(path);
+    historyIndex += 1;
+    options.pushState(path, historyIndex);
     pathname = path;
     options.setPathname(path);
     return true;
   };
-  const handlePopState = (path: string): boolean => {
+  const handlePopState = (path: string, nextHistoryIndex?: number): boolean => {
+    if (restoringPopState && path === pathname && nextHistoryIndex === historyIndex) {
+      restoringPopState = false;
+      return true;
+    }
     if (pathname === path) return true;
     if (!canLeave()) {
-      options.pushState(pathname);
+      const delta = nextHistoryIndex === undefined ? 0 : nextHistoryIndex - historyIndex;
+      if (delta !== 0 && options.restorePopState) {
+        restoringPopState = true;
+        options.restorePopState(-delta);
+      } else {
+        options.replaceState?.(pathname, historyIndex);
+      }
       options.setPathname(pathname);
       return false;
     }
+    if (nextHistoryIndex !== undefined) historyIndex = nextHistoryIndex;
     pathname = path;
     options.setPathname(path);
     return true;
@@ -90,22 +107,41 @@ export function createAppNavigationOwner(options: AppNavigationOwnerOptions): Ap
   };
 }
 
+const appHistoryIndexKey = '__lpcToolkitHistoryIndex';
+
+function readAppHistoryIndex(value: unknown): number | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const index = (value as { readonly [appHistoryIndexKey]?: unknown })[appHistoryIndexKey];
+  return typeof index === 'number' && Number.isSafeInteger(index) && index >= 0 ? index : undefined;
+}
+
+function appHistoryState(historyIndex: number): { readonly [appHistoryIndexKey]: number } {
+  return { [appHistoryIndexKey]: historyIndex };
+}
+
 function useAppPathname(): [string, (path: AppPath) => void, (blocker: NavigationBlocker) => () => void] {
   const [pathname, setPathname] = useState(() => window.location.pathname);
   const blockerRef = useRef<NavigationBlocker>();
   const ownerRef = useRef<AppNavigationOwner>();
   if (!ownerRef.current) {
+    const initialHistoryIndex = readAppHistoryIndex(window.history.state) ?? 0;
+    if (readAppHistoryIndex(window.history.state) === undefined && typeof window.history.replaceState === 'function') {
+      window.history.replaceState(appHistoryState(initialHistoryIndex), '', window.location.pathname);
+    }
     ownerRef.current = createAppNavigationOwner({
       initialPathname: pathname,
-      pushState: (path) => window.history.pushState(null, '', path),
+      initialHistoryIndex,
+      pushState: (path, historyIndex) => window.history.pushState(appHistoryState(historyIndex), '', path),
       setPathname,
+      restorePopState: (delta) => window.history.go(delta),
+      replaceState: (path, historyIndex) => window.history.replaceState(appHistoryState(historyIndex), '', path),
       blocker: () => blockerRef.current?.() ?? true,
     });
   }
   const owner = ownerRef.current;
 
   useEffect(() => {
-    const handlePopState = () => owner.handlePopState(window.location.pathname);
+    const handlePopState = () => owner.handlePopState(window.location.pathname, readAppHistoryIndex(window.history.state));
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, [owner]);

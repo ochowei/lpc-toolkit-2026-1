@@ -159,20 +159,24 @@ describe('App shell routing', () => {
     expect(mocks.loadBrowserAssetPackBaseline).not.toHaveBeenCalled();
   });
 
-  it('uses one injected blocker for programmatic and browser-back navigation', () => {
+  it('uses one injected blocker for programmatic and browser-back navigation without growing history', () => {
     const confirm: (message: string) => boolean = vi.fn(() => false);
     const updates: string[] = [];
     const pushed: string[] = [];
+    const restored: number[] = [];
     const owner = createAppNavigationOwner({
       initialPathname: '/asset-packs',
       pushState: (path) => pushed.push(path),
       setPathname: (path) => updates.push(path),
       blocker: () => confirm('Leave the asset pack workbench?'),
+      initialHistoryIndex: 8,
+      restorePopState: (delta) => restored.push(delta),
     });
 
     expect(owner.navigate('/')).toBe(false);
-    expect(owner.handlePopState('/compose')).toBe(false);
-    expect(pushed).toEqual(['/asset-packs']);
+    expect(owner.handlePopState('/compose', 7)).toBe(false);
+    expect(pushed).toEqual([]);
+    expect(restored).toEqual([1]);
     expect(updates).toEqual(['/asset-packs']);
     expect(confirm).toHaveBeenCalledTimes(2);
   });
