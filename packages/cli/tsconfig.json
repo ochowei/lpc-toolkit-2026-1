@@ -7,6 +7,7 @@
     "lib": ["ES2022"],
     "baseUrl": ".",
     "paths": {
+      "@lpc-toolkit/asset-pack-format": ["../asset-pack-format/src/index.ts"],
       "@lpc-toolkit/core": ["../core/src/index.ts"],
       "@lpc-toolkit/presets": ["../presets/src/index.ts"]
     }

@@ -278,16 +278,16 @@ async function validateSnapshot(options: {
   };
 }
 
-function loadPayloadDirectory(options: {
+async function loadPayloadDirectory(options: {
   readonly kind: 'linked' | 'installed';
   readonly sourceDirectory: string;
   readonly archiveDigest?: string;
   readonly entry?: RegistrySourceEntry;
   readonly sourceFileOps?: AssetPackDirectoryFileOps;
-}): LinkedAssetPackCandidateResult {
-  let loaded: ReturnType<typeof loadAssetPackFiles>;
+}): Promise<LinkedAssetPackCandidateResult> {
+  let loaded: Awaited<ReturnType<typeof loadAssetPackFiles>>;
   try {
-    loaded = loadAssetPackFiles(options.sourceDirectory, options.sourceFileOps);
+    loaded = await loadAssetPackFiles(options.sourceDirectory, options.sourceFileOps);
   } catch (error) {
     const missing = isNodeError(error) && ['ENOENT', 'ENOTDIR'].includes(error.code ?? '');
     return candidateFailure([{
@@ -333,7 +333,7 @@ export async function loadLinkedAssetPackCandidate(options: {
       path: path.resolve(options.packDirectory),
     }]);
   }
-  const loaded = loadPayloadDirectory({
+  const loaded = await loadPayloadDirectory({
     kind: 'linked',
     sourceDirectory,
     ...(options.sourceFileOps ? { sourceFileOps: options.sourceFileOps } : {}),
@@ -367,7 +367,7 @@ async function loadRegistryEntry(options: {
       packId: options.entry.packId,
     }]);
   }
-  const loaded = loadPayloadDirectory({
+  const loaded = await loadPayloadDirectory({
     kind: options.entry.kind,
     sourceDirectory,
     ...(options.entry.kind === 'installed' ? { archiveDigest: options.entry.archiveDigest } : {}),
@@ -423,7 +423,7 @@ async function loadInstalledCandidate(options: {
     }]);
   }
 
-  const loaded = loadPayloadDirectory({
+  const loaded = await loadPayloadDirectory({
     kind: 'installed',
     sourceDirectory,
     archiveDigest: candidate.archiveDigest,

@@ -409,14 +409,14 @@ function writeRegistry(workspace: AssetWorkspace, document: AssetPackRegistryDoc
   writeFileSync(workspace.registryPath, assetPackRegistryBytes(document));
 }
 
-function refreshLinkedSourceSnapshot(workspace: AssetWorkspace, packId: string): void {
+async function refreshLinkedSourceSnapshot(workspace: AssetWorkspace, packId: string): Promise<void> {
   const document = readRegistry(workspace);
   const linked = document.entries.find(
     (entry): entry is LinkedAssetPackRegistryEntry =>
       entry.kind === 'linked' && entry.packId === packId,
   );
   if (!linked) throw new Error(`Missing linked registry entry: ${packId}`);
-  const loaded = loadAssetPackFiles(linked.sourceDirectory);
+  const loaded = await loadAssetPackFiles(linked.sourceDirectory);
   if (!loaded.ok) throw new Error(loaded.diagnostics.map((entry) => entry.message).join(' | '));
   const entries = document.entries.map((entry): AssetPackRegistryEntry =>
     entry.packId === packId
@@ -1531,7 +1531,7 @@ describe('doctorAssetPacks registry, source, output, compiler, and attribution a
         })),
       }],
     });
-    refreshLinkedSourceSnapshot(fixture.workspace, 'bravo.extension');
+    await refreshLinkedSourceSnapshot(fixture.workspace, 'bravo.extension');
 
     await expectDoctorReadOnlyFailure(fixture, 'asset_path_conflict');
   });

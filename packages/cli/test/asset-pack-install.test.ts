@@ -550,11 +550,15 @@ describe('installAssetPack lifecycle policy', () => {
       runtime: fixture.runtime,
     })).action).toBe('installed');
 
+    const repackedSource = {
+      ...source,
+      credits: { ...source.credits, notes: 'Repacked manifest.' },
+    };
     const repacked = await createArchive(
       fixture,
-      source,
+      repackedSource,
       'repacked',
-      Buffer.from(JSON.stringify(source)),
+      Buffer.from(JSON.stringify(repackedSource)),
     );
     expect(repacked.digest).not.toBe(first.digest);
     const before = snapshotTree(fixture.workspace.stateRoot);
@@ -777,7 +781,7 @@ describe('installAssetPack staging and receipts', () => {
     const archive = await createArchive(fixture, source, 'receipt', rawManifest);
     const archiveBefore = readFileSync(archive.path);
     const sentinels = immutableSentinels(fixture);
-    const inspected = readAssetPackArchive({
+    const inspected = await readAssetPackArchive({
       archivePath: archive.path,
       archiveBytes: archive.bytes,
     });

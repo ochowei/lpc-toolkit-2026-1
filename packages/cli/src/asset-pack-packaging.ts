@@ -262,7 +262,7 @@ export async function packAssetPack(options: {
   const packDirectory = path.resolve(options.packDirectory);
   let snapshot;
   try {
-    snapshot = loadAssetPackFiles(packDirectory, options.sourceFileOps);
+    snapshot = await loadAssetPackFiles(packDirectory, options.sourceFileOps);
   } catch (error) {
     return failure(
       'asset_pack_load_failed',

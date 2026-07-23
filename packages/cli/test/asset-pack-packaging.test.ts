@@ -218,8 +218,8 @@ function sha256(bytes: Buffer): string {
   return `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
 }
 
-function archiveOk(archivePath: string) {
-  const archive = readAssetPackArchive({ archivePath });
+async function archiveOk(archivePath: string) {
+  const archive = await readAssetPackArchive({ archivePath });
   expect(archive.ok).toBe(true);
   if (!archive.ok) throw new Error(`Expected archive: ${JSON.stringify(archive.diagnostics)}`);
   return archive.snapshot;
@@ -484,23 +484,26 @@ describe('packAssetPack', () => {
       expect(readFileSync(sentinelPath)).toEqual(sentinelBytes[index]);
     });
 
-    const archive = archiveOk(first.archivePath);
+    const archive = await archiveOk(first.archivePath);
     expect(archive.manifestBytes).not.toEqual(sourceManifestBytes);
     expect(JSON.parse(archive.manifestBytes.toString('utf8'))).toEqual(
       assetPackSourceFromNormalized(normalizeAssetPack(sourceFixture())),
     );
-    expect(archive.checksums).toEqual([
-      {
-        path: 'asset-pack.json',
-        size: archive.manifestBytes.byteLength,
-        sha256: sha256(archive.manifestBytes),
-      },
-      {
-        path: 'sprites/wind-braid/walk.png',
-        size: sourcePngBytes.byteLength,
-        sha256: sha256(sourcePngBytes),
-      },
-    ]);
+    expect(JSON.parse(archive.checksumsBytes.toString('utf8'))).toEqual({
+      schema: 'lpc-toolkit.asset-pack-checksums.v1',
+      files: [
+        {
+          path: 'asset-pack.json',
+          size: archive.manifestBytes.byteLength,
+          sha256: sha256(archive.manifestBytes),
+        },
+        {
+          path: 'sprites/wind-braid/walk.png',
+          size: sourcePngBytes.byteLength,
+          sha256: sha256(sourcePngBytes),
+        },
+      ],
+    });
     expect(first.contentDigest).toBe(archive.payload.contentDigest);
     expect(first.archiveDigest).toBe(archive.archiveDigest);
     expect(first.archiveDigest).toBe(sha256(archive.archiveBytes));
@@ -544,7 +547,7 @@ describe('packAssetPack', () => {
         return collator.compare(String(this), compareString);
       };
       const result = packOk(await packAssetPack({ packDirectory, workspace, runtime }));
-      const snapshot = archiveOk(result.archivePath);
+      const snapshot = await archiveOk(result.archivePath);
       return { result, snapshot, archiveBytes: readFileSync(result.archivePath) };
     }
 
@@ -559,7 +562,10 @@ describe('packAssetPack', () => {
       expect(english.snapshot.checksumsBytes).toEqual(swedish.snapshot.checksumsBytes);
       expect(english.archiveBytes).toEqual(swedish.archiveBytes);
       expect(english.result.archiveDigest).toBe(swedish.result.archiveDigest);
-      expect(english.snapshot.checksums).toEqual(swedish.snapshot.checksums);
+      expect(english.snapshot.entryCount).toBe(swedish.snapshot.entryCount);
+      expect(english.snapshot.totalUncompressedBytes).toBe(
+        swedish.snapshot.totalUncompressedBytes,
+      );
       expect(english.result.contentDigest).toBe(english.snapshot.payload.contentDigest);
       expect(swedish.result.contentDigest).toBe(swedish.snapshot.payload.contentDigest);
 
@@ -649,7 +655,7 @@ describe('packAssetPack', () => {
 
     const accepted = packOk(await packAssetPack({ packDirectory, workspace, runtime }));
     const acceptedArchiveBytes = readFileSync(accepted.archivePath);
-    const archived = archiveOk(accepted.archivePath);
+    const archived = await archiveOk(accepted.archivePath);
     const archivedManifest = JSON.parse(archived.manifestBytes.toString('utf8')) as AssetPackSource;
     expect(archivedManifest.credits).toEqual(PACK_CREDITS);
     expect(archivedManifest.creditOverrides).toEqual(

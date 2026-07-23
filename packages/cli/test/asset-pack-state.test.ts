@@ -372,7 +372,7 @@ async function linkedCandidate(
   _fixture: StateFixture,
   packRoot: string,
 ): Promise<ValidatedActiveAssetPack> {
-  const loaded = loadAssetPackFiles(packRoot);
+  const loaded = await loadAssetPackFiles(packRoot);
   if (!loaded.ok) throw new Error(loaded.diagnostics.map((diagnostic) => diagnostic.message).join(' | '));
   return {
     kind: 'linked',
@@ -382,11 +382,11 @@ async function linkedCandidate(
   };
 }
 
-function installedCandidate(
+async function installedCandidate(
   fixture: StateFixture,
   installedDirectory: string,
-): InstalledCandidateFixture {
-  const loaded = loadAssetPackFiles(installedDirectory);
+): Promise<InstalledCandidateFixture> {
+  const loaded = await loadAssetPackFiles(installedDirectory);
   if (!loaded.ok) {
     throw new Error(loaded.diagnostics.map((diagnostic) => diagnostic.message).join(' | '));
   }
@@ -608,7 +608,7 @@ describe('prepareAssetPackDesiredState', () => {
     writePack(installedDirectory, newItemSource({
       packId: 'acme.direct', localId: 'direct', author: 'Direct Artist', color: '#aa5500',
     }), {});
-    const installed = installedCandidate(fixture, installedDirectory);
+    const installed = await installedCandidate(fixture, installedDirectory);
 
     const result = await prepareAssetPackDesiredState({
       workspace: fixture.workspace,
@@ -635,7 +635,7 @@ describe('prepareAssetPackDesiredState', () => {
     writePack(outsideDirectory, newItemSource({
       packId: 'acme.outside', localId: 'outside', author: 'Outside Artist', color: '#aa5500',
     }), {});
-    const installed = installedCandidate(fixture, outsideDirectory);
+    const installed = await installedCandidate(fixture, outsideDirectory);
 
     await expectInstalledCandidateRejectedWithoutPublication(
       fixture,
@@ -650,7 +650,7 @@ describe('prepareAssetPackDesiredState', () => {
     writePack(outsideDirectory, newItemSource({
       packId: 'acme.symlink', localId: 'symlink', author: 'Symlink Artist', color: '#aa5500',
     }), {});
-    const installed = installedCandidate(fixture, outsideDirectory);
+    const installed = await installedCandidate(fixture, outsideDirectory);
     const installedRoot = path.join(fixture.workspace.stateRoot, 'installed');
     const linkedDirectory = path.join(installedRoot, 'acme.symlink');
     mkdirSync(installedRoot, { recursive: true });
@@ -681,7 +681,7 @@ describe('prepareAssetPackDesiredState', () => {
         author: 'Receipt Artist',
         color: '#aa5500',
       }), {});
-      const installed = installedCandidate(fixture, installedDirectory);
+      const installed = await installedCandidate(fixture, installedDirectory);
       if (scenario === 'missing') {
         rmSync(installed.receiptPath);
       } else {
@@ -723,7 +723,7 @@ describe('prepareAssetPackDesiredState', () => {
         author: 'Tamper Artist',
         color: '#aa5500',
       }), {});
-      const installed = installedCandidate(fixture, installedDirectory);
+      const installed = await installedCandidate(fixture, installedDirectory);
       if (payload === 'manifest') {
         writeFileSync(path.join(installedDirectory, 'asset-pack.json'), '{}\n');
       } else {

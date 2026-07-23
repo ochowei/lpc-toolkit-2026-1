@@ -42,24 +42,13 @@ function lifecycleArchiveDiagnostic(
   };
 }
 
-function archiveEntryCount(snapshot: AssetPackArchiveSnapshot): number {
-  return snapshot.checksums.length + 1;
-}
-
-function totalUncompressedBytes(snapshot: AssetPackArchiveSnapshot): number {
-  return snapshot.checksums.reduce(
-    (total, checksum) => total + checksum.size,
-    snapshot.checksumsBytes.byteLength,
-  );
-}
-
 export async function inspectAssetPackArchive(options: {
   readonly archivePath: string;
   readonly archiveBytes?: Buffer;
   readonly runtime: RuntimeAssets;
   readonly workspace?: AssetWorkspace;
 }): Promise<AssetPackInspectionResult> {
-  const archive = readAssetPackArchive({
+  const archive = await readAssetPackArchive({
     archivePath: options.archivePath,
     ...(options.archiveBytes !== undefined ? { archiveBytes: options.archiveBytes } : {}),
   });
@@ -91,8 +80,8 @@ export async function inspectAssetPackArchive(options: {
     version: archive.snapshot.payload.pack.version,
     contentDigest: archive.snapshot.payload.contentDigest,
     valid: validation.valid,
-    entryCount: archiveEntryCount(archive.snapshot),
-    totalUncompressedBytes: totalUncompressedBytes(archive.snapshot),
+    entryCount: archive.snapshot.entryCount,
+    totalUncompressedBytes: archive.snapshot.totalUncompressedBytes,
     diagnostics: validation.diagnostics,
     acknowledgementRecords: validation.acknowledgementRecords,
   };

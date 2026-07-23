@@ -338,10 +338,11 @@ function pngCrc32(bytes: Buffer): number {
   return (crc ^ 0xffff_ffff) >>> 0;
 }
 
-function readPngIhdrGeometry(bytes: Buffer): {
+function readPngIhdrGeometry(rawBytes: Uint8Array): {
   readonly width: number;
   readonly height: number;
 } | undefined {
+  const bytes = Buffer.from(rawBytes);
   if (
     bytes.byteLength < PNG_IHDR_END
     || !bytes.subarray(0, PNG_SIGNATURE.byteLength).equals(PNG_SIGNATURE)
@@ -923,7 +924,7 @@ export async function validateAssetPackDirectory(options: {
   readonly fileOps?: AssetPackDirectoryFileOps;
 }): Promise<AssetPackValidationReport> {
   const absoluteRoot = path.resolve(options.packDirectory);
-  const snapshot = options.snapshot ?? loadAssetPackFiles(
+  const snapshot = options.snapshot ?? await loadAssetPackFiles(
     absoluteRoot,
     options.fileOps,
   );

@@ -66,15 +66,15 @@ function writePack(
   }
 }
 
-function parsePayloadOk(input: Parameters<typeof parseAssetPackPayload>[0]) {
-  const result = parseAssetPackPayload(input);
+async function parsePayloadOk(input: Parameters<typeof parseAssetPackPayload>[0]) {
+  const result = await parseAssetPackPayload(input);
   expect(result.ok).toBe(true);
   if (!result.ok) throw new Error('Expected payload parsing to succeed.');
   return result;
 }
 
-function loadFilesOk(root: string) {
-  const result = loadAssetPackFiles(root);
+async function loadFilesOk(root: string) {
+  const result = await loadAssetPackFiles(root);
   expect(result.ok).toBe(true);
   if (!result.ok) throw new Error('Expected directory loading to succeed.');
   return result;
@@ -87,7 +87,7 @@ afterEach(() => {
 });
 
 describe('parseAssetPackPayload', () => {
-  it('matches directory snapshots with sorted source digests and independent byte copies', () => {
+  it('matches directory snapshots with sorted source digests and independent byte copies', async () => {
     const root = createDirectory('lpc-asset-pack-payload-parity-');
     const manifestBytes = Buffer.from(`${JSON.stringify(packFixture(), null, 2)}\n`);
     const sourceBytes = new Map<string, Buffer>([
@@ -96,8 +96,8 @@ describe('parseAssetPackPayload', () => {
     ]);
     writePack(root, manifestBytes, sourceBytes);
 
-    const direct = parsePayloadOk({ manifestBytes, sourceBytes });
-    const directory = loadFilesOk(root);
+    const direct = await parsePayloadOk({ manifestBytes, sourceBytes });
+    const directory = await loadFilesOk(root);
 
     expect(direct.pack).toEqual(directory.pack);
     expect([...direct.sourceDigests]).toEqual([...directory.sourceDigests]);
@@ -117,8 +117,8 @@ describe('parseAssetPackPayload', () => {
     expect(direct.sourceBytes.has('sprites/ignored.png')).toBe(false);
   });
 
-  it('surfaces schema, missing-source, and unexpected-source diagnostics', () => {
-    const invalidSchema = parseAssetPackPayload({
+  it('surfaces schema, missing-source, and unexpected-source diagnostics', async () => {
+    const invalidSchema = await parseAssetPackPayload({
       manifestBytes: Buffer.from(JSON.stringify({ ...packFixture(), schema: 'lpc-toolkit.asset-pack.v2' })),
       sourceBytes: new Map(),
     });
@@ -128,7 +128,7 @@ describe('parseAssetPackPayload', () => {
       expect.objectContaining({ code: 'asset_pack_schema_invalid' }),
     ]));
 
-    const missingAndExtra = parseAssetPackPayload({
+    const missingAndExtra = await parseAssetPackPayload({
       manifestBytes: Buffer.from(JSON.stringify(packFixture())),
       sourceBytes: new Map([
         ['sprites/wind-braid/foreground/walk.png', Buffer.from('walk')],
@@ -149,16 +149,16 @@ describe('parseAssetPackPayload', () => {
     ]));
   });
 
-  it('keeps the content digest stable for acknowledgement-only manifest changes', () => {
+  it('keeps the content digest stable for acknowledgement-only manifest changes', async () => {
     const sourceBytes = new Map<string, Buffer>([
       ['sprites/wind-braid/foreground/walk.png', Buffer.from('walk')],
       ['sprites/wind-braid/foreground/climb.png', Buffer.from('climb')],
     ]);
-    const base = parsePayloadOk({
+    const base = await parsePayloadOk({
       manifestBytes: Buffer.from(JSON.stringify(packFixture())),
       sourceBytes,
     });
-    const acknowledged = parsePayloadOk({
+    const acknowledged = await parsePayloadOk({
       manifestBytes: Buffer.from(JSON.stringify(packFixture({
         acknowledgements: [{
           code: 'asset_path_inferred',

@@ -33,7 +33,7 @@
     "character-generator"
   ],
   "scripts": {
-    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && pnpm --filter @lpc-toolkit/core build && pnpm --filter @lpc-toolkit/presets build && pnpm --filter @lpc-toolkit/web build:embedded && tsc -p tsconfig.build.json && node scripts/copy-web-dist.mjs && node scripts/copy-token-decode-metadata.mjs && node scripts/vendor-workspace-deps.mjs && node scripts/copy-release-config.mjs",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && pnpm --filter @lpc-toolkit/core build && pnpm --filter @lpc-toolkit/presets build && pnpm --filter @lpc-toolkit/asset-pack-format build && pnpm --filter @lpc-toolkit/web build:embedded && tsc -p tsconfig.build.json && node scripts/copy-web-dist.mjs && node scripts/copy-token-decode-metadata.mjs && node scripts/vendor-workspace-deps.mjs && node scripts/copy-release-config.mjs",
     "prepack": "pnpm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
@@ -47,6 +47,7 @@
     "jszip": "^3.10.1"
   },
   "devDependencies": {
+    "@lpc-toolkit/asset-pack-format": "workspace:*",
     "@lpc-toolkit/core": "workspace:*",
     "@lpc-toolkit/presets": "workspace:*",
     "@types/node": "^25.8.0",

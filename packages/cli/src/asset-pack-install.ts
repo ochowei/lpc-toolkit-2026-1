@@ -209,17 +209,17 @@ function writeNewRegularFile(filePath: string, bytes: Buffer): void {
   }
 }
 
-function stageInstalledPayload(options: {
+async function stageInstalledPayload(options: {
   readonly stagingRoot: AssetPackInstallStagingRoot;
   readonly snapshot: NonNullable<Awaited<ReturnType<typeof inspectAssetPackArchive>>['snapshot']>;
   readonly workspaceId: string;
   readonly now: () => Date;
-}): { readonly sourceDirectory: string; readonly loaded: AssetPackPayloadSuccess } {
+}): Promise<{ readonly sourceDirectory: string; readonly loaded: AssetPackPayloadSuccess }> {
   const sourceDirectory = options.stagingRoot.path;
   const canonicalSourceDirectory = options.stagingRoot.canonicalPath;
 
   const manifestBytes = normalizedManifestBytes(options.snapshot.payload.pack);
-  const parsed = parseAssetPackPayload({
+  const parsed = await parseAssetPackPayload({
     manifestBytes,
     sourceBytes: options.snapshot.payload.sourceBytes,
   });
@@ -653,7 +653,7 @@ async function installUnderClaim(options: {
   );
   let preserveForRecovery = false;
   try {
-    const staged = stageInstalledPayload({
+    const staged = await stageInstalledPayload({
       stagingRoot,
       snapshot,
       workspaceId: current.registry.workspaceId,

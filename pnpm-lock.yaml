@@ -33,6 +33,9 @@ importers:
         specifier: ^3.10.1
         version: 3.10.1
     devDependencies:
+      '@lpc-toolkit/asset-pack-format':
+        specifier: workspace:*
+        version: link:../asset-pack-format
       '@lpc-toolkit/core':
         specifier: workspace:*
         version: link:../core

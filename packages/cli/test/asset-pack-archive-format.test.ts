@@ -346,11 +346,11 @@ function archiveFixture(options: {
   })));
 }
 
-function expectFailure(
+async function expectFailure(
   archiveBytes: Buffer,
   code: AssetPackArchiveDiagnostic['code'],
-): Extract<AssetPackArchiveReadResult, { readonly ok: false }> {
-  const result = readAssetPackArchive({ archivePath: '/fixtures/pack.lpc-assets.zip', archiveBytes });
+): Promise<Extract<AssetPackArchiveReadResult, { readonly ok: false }>> {
+  const result = await readAssetPackArchive({ archivePath: '/fixtures/pack.lpc-assets.zip', archiveBytes });
   expect(result.ok).toBe(false);
   if (result.ok) throw new Error('Expected archive reading to fail.');
   expect(result.diagnostics).toEqual(expect.arrayContaining([expect.objectContaining({ code })]));
@@ -411,7 +411,7 @@ describe('readAssetPackArchive descriptor bounds', () => {
     fileSystemInterception.archivePath = archivePath;
     fileSystemInterception.rejectPathRead = true;
 
-    const result = readAssetPackArchive({ archivePath });
+    const result = await readAssetPackArchive({ archivePath });
 
     expect(result.ok).toBe(true);
     const descriptor = fileSystemInterception.archiveDescriptor;
@@ -420,11 +420,11 @@ describe('readAssetPackArchive descriptor bounds', () => {
     expect(() => fstatSync(descriptor)).toThrow();
   });
 
-  it('rejects a non-regular path and closes its descriptor', () => {
+  it('rejects a non-regular path and closes its descriptor', async () => {
     const archivePath = createDirectory('lpc-asset-pack-non-file-');
     fileSystemInterception.archivePath = archivePath;
 
-    const result = readAssetPackArchive({ archivePath });
+    const result = await readAssetPackArchive({ archivePath });
 
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error('Expected a directory archive path to be rejected.');
@@ -437,14 +437,14 @@ describe('readAssetPackArchive descriptor bounds', () => {
     expect(() => fstatSync(descriptor)).toThrow();
   });
 
-  it('rejects an oversized sparse file and closes its descriptor', () => {
+  it('rejects an oversized sparse file and closes its descriptor', async () => {
     const root = createDirectory('lpc-asset-pack-oversized-');
     const archivePath = path.join(root, 'oversized.lpc-assets.zip');
     writeFileSync(archivePath, Buffer.alloc(0));
     truncateSync(archivePath, ASSET_PACK_ARCHIVE_LIMITS.archiveBytes + 1);
     fileSystemInterception.archivePath = archivePath;
 
-    const result = readAssetPackArchive({ archivePath });
+    const result = await readAssetPackArchive({ archivePath });
 
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error('Expected an oversized archive path to be rejected.');
@@ -480,18 +480,18 @@ describe('readAssetPackArchive path and central-directory safety', () => {
     ['dot segment', 'sprites/./a.png'],
     ['parent segment', 'sprites/../a.png'],
     ['directory suffix', 'sprites/a/'],
-  ])('rejects %s paths', (_label, unsafePath) => {
-    expectFailure(buildRawZip([{ name: unsafePath, data: Buffer.alloc(0) }]), 'asset_archive_unsafe');
+  ])('rejects %s paths', async (_label, unsafePath) => {
+    await expectFailure(buildRawZip([{ name: unsafePath, data: Buffer.alloc(0) }]), 'asset_archive_unsafe');
   });
 
-  it('rejects NUL names', () => {
-    expectFailure(buildRawZip([{
+  it('rejects NUL names', async () => {
+    await expectFailure(buildRawZip([{
       name: Buffer.from('sprites/a\0.png'),
       data: Buffer.alloc(0),
     }]), 'asset_archive_unsafe');
   });
 
-  it('rejects exact duplicates, ASCII-case collisions, and Unicode NFC collisions', () => {
+  it('rejects exact duplicates, ASCII-case collisions, and Unicode NFC collisions', async () => {
     const exact = buildRawZip([
       { name: 'sprites/a.png', data: Buffer.from('a') },
       { name: 'sprites/a.png', data: Buffer.from('b') },
@@ -505,9 +505,9 @@ describe('readAssetPackArchive path and central-directory safety', () => {
       { name: 'sprites/cafe\u0301.png', data: Buffer.from('b') },
     ]);
 
-    expectFailure(exact, 'asset_archive_unsafe');
-    expectFailure(asciiCase, 'asset_archive_unsafe');
-    expectFailure(unicode, 'asset_archive_unsafe');
+    await expectFailure(exact, 'asset_archive_unsafe');
+    await expectFailure(asciiCase, 'asset_archive_unsafe');
+    await expectFailure(unicode, 'asset_archive_unsafe');
   });
 
   it.each([
@@ -515,16 +515,16 @@ describe('readAssetPackArchive path and central-directory safety', () => {
     ['symlink mode', 0o120777],
     ['FIFO mode', 0o010644],
     ['socket mode', 0o140644],
-  ])('rejects UNIX %s entries', (_label, unixMode) => {
-    expectFailure(buildRawZip([{
+  ])('rejects UNIX %s entries', async (_label, unixMode) => {
+    await expectFailure(buildRawZip([{
       name: 'sprites/a.png',
       data: Buffer.alloc(0),
       externalAttributes: (unixMode * 0x1_0000) >>> 0,
     }]), 'asset_archive_unsafe');
   });
 
-  it('rejects DOS directory entries', () => {
-    expectFailure(buildRawZip([{
+  it('rejects DOS directory entries', async () => {
+    await expectFailure(buildRawZip([{
       name: 'sprites/a.png',
       data: Buffer.alloc(0),
       creatorPlatform: 0,
@@ -535,8 +535,8 @@ describe('readAssetPackArchive path and central-directory safety', () => {
   it.each([
     ['traditional encryption', 0x0001],
     ['strong encryption', 0x0040],
-  ])('rejects %s flags', (_label, flag) => {
-    expectFailure(buildRawZip([{
+  ])('rejects %s flags', async (_label, flag) => {
+    await expectFailure(buildRawZip([{
       name: 'sprites/a.png',
       data: Buffer.from('a'),
       flags: UTF8_FLAG | flag,
@@ -544,15 +544,15 @@ describe('readAssetPackArchive path and central-directory safety', () => {
     }]), 'asset_archive_unsafe');
   });
 
-  it('rejects unsupported compression methods and data descriptors', () => {
-    expectFailure(buildRawZip([{
+  it('rejects unsupported compression methods and data descriptors', async () => {
+    await expectFailure(buildRawZip([{
       name: 'sprites/a.png',
       data: Buffer.from('a'),
       method: 12,
       localMethod: 12,
       compressedData: Buffer.from('a'),
     }]), 'asset_archive_unsafe');
-    expectFailure(buildRawZip([{
+    await expectFailure(buildRawZip([{
       name: 'sprites/a.png',
       data: Buffer.from('a'),
       flags: UTF8_FLAG | 0x0008,
@@ -560,8 +560,8 @@ describe('readAssetPackArchive path and central-directory safety', () => {
     }]), 'asset_archive_unsafe');
   });
 
-  it('rejects DEFLATE-specific flags on stored entries', () => {
-    expectFailure(buildRawZip([{
+  it('rejects DEFLATE-specific flags on stored entries', async () => {
+    await expectFailure(buildRawZip([{
       name: 'sprites/a.png',
       data: Buffer.from('a'),
       method: 0,
@@ -571,20 +571,20 @@ describe('readAssetPackArchive path and central-directory safety', () => {
     }]), 'asset_archive_unsafe');
   });
 
-  it('rejects invalid UTF-8 when flagged and non-printable or non-ASCII legacy names', () => {
-    expectFailure(buildRawZip([{
+  it('rejects invalid UTF-8 when flagged and non-printable or non-ASCII legacy names', async () => {
+    await expectFailure(buildRawZip([{
       name: Buffer.from([0x73, 0x70, 0x72, 0x69, 0x74, 0x65, 0x73, 0x2f, 0xc3, 0x28]),
       data: Buffer.alloc(0),
       flags: UTF8_FLAG,
       localFlags: UTF8_FLAG,
     }]), 'asset_archive_unsafe');
-    expectFailure(buildRawZip([{
+    await expectFailure(buildRawZip([{
       name: Buffer.from([0x73, 0x70, 0x72, 0x69, 0x74, 0x65, 0x73, 0x2f, 0x80]),
       data: Buffer.alloc(0),
       flags: 0,
       localFlags: 0,
     }]), 'asset_archive_unsafe');
-    expectFailure(buildRawZip([{
+    await expectFailure(buildRawZip([{
       name: Buffer.from('sprites/a\u001f.png'),
       data: Buffer.alloc(0),
       flags: 0,
@@ -592,7 +592,7 @@ describe('readAssetPackArchive path and central-directory safety', () => {
     }]), 'asset_archive_unsafe');
   });
 
-  it('rejects central/local filename and metadata mismatches', () => {
+  it('rejects central/local filename and metadata mismatches', async () => {
     const cases: RawZipEntry[] = [
       { name: 'sprites/a.png', localName: 'sprites/b.png', data: Buffer.from('a') },
       { name: 'sprites/a.png', data: Buffer.from('a'), localFlags: 0 },
@@ -602,17 +602,17 @@ describe('readAssetPackArchive path and central-directory safety', () => {
       { name: 'sprites/a.png', data: Buffer.from('a'), localUncompressedSize: 2 },
     ];
     for (const entry of cases) {
-      expectFailure(buildRawZip([entry]), 'asset_archive_invalid');
+      await expectFailure(buildRawZip([entry]), 'asset_archive_invalid');
     }
   });
 
-  it('rejects invalid central/local offsets and lengths', () => {
-    expectFailure(buildRawZip([{
+  it('rejects invalid central/local offsets and lengths', async () => {
+    await expectFailure(buildRawZip([{
       name: 'sprites/a.png',
       data: Buffer.alloc(0),
       centralLocalOffset: 0xffff_ff00,
     }]), 'asset_archive_invalid');
-    expectFailure(buildRawZip([{
+    await expectFailure(buildRawZip([{
       name: 'sprites/a.png',
       compressedData: Buffer.alloc(0),
       compressedSize: 16,
@@ -620,15 +620,15 @@ describe('readAssetPackArchive path and central-directory safety', () => {
       uncompressedSize: 16,
       localUncompressedSize: 16,
     }]), 'asset_archive_invalid');
-    expectFailure(buildRawZip([{ name: 'sprites/a.png', data: Buffer.alloc(0) }], {
+    await expectFailure(buildRawZip([{ name: 'sprites/a.png', data: Buffer.alloc(0) }], {
       eocdCentralSize: 1,
     }), 'asset_archive_invalid');
-    expectFailure(buildRawZip([{ name: 'sprites/a.png', data: Buffer.alloc(0) }], {
+    await expectFailure(buildRawZip([{ name: 'sprites/a.png', data: Buffer.alloc(0) }], {
       eocdCentralOffset: 1,
     }), 'asset_archive_invalid');
   });
 
-  it('rejects overlapping local entry data ranges', () => {
+  it('rejects overlapping local entry data ranges', async () => {
     const embedded = prepareRawEntry({ name: 'sprites/b.png', data: Buffer.from('b'), method: 0 });
     const embeddedRecord = localRecord(embedded);
     const firstNameLength = Buffer.byteLength('sprites/a.png');
@@ -642,14 +642,14 @@ describe('readAssetPackArchive path and central-directory safety', () => {
         centralLocalOffset: embeddedOffset,
       },
     ]);
-    expectFailure(archive, 'asset_archive_invalid');
+    await expectFailure(archive, 'asset_archive_invalid');
   });
 
-  it('rejects ZIP64 EOCD and entry markers', () => {
-    expectFailure(buildRawZip([{ name: 'sprites/a.png', data: Buffer.alloc(0) }], {
+  it('rejects ZIP64 EOCD and entry markers', async () => {
+    await expectFailure(buildRawZip([{ name: 'sprites/a.png', data: Buffer.alloc(0) }], {
       eocdEntryCount: 0xffff,
     }), 'asset_archive_unsafe');
-    expectFailure(buildRawZip([{
+    await expectFailure(buildRawZip([{
       name: 'sprites/a.png',
       compressedData: Buffer.alloc(0),
       compressedSize: 0xffff_ffff,
@@ -657,30 +657,30 @@ describe('readAssetPackArchive path and central-directory safety', () => {
       uncompressedSize: 0xffff_ffff,
       localUncompressedSize: 0xffff_ffff,
     }]), 'asset_archive_unsafe');
-    expectFailure(buildRawZip([{
+    await expectFailure(buildRawZip([{
       name: 'sprites/a.png',
       data: Buffer.alloc(0),
       centralExtra: Buffer.from([0x01, 0x00, 0x00, 0x00]),
     }]), 'asset_archive_unsafe');
   });
 
-  it('rejects more than 4,096 entries before reading payload data', () => {
+  it('rejects more than 4,096 entries before reading payload data', async () => {
     const entries = Array.from({ length: ASSET_PACK_ARCHIVE_LIMITS.entries + 1 }, (_, index) => ({
       name: `sprites/file-${String(index).padStart(4, '0')}.png`,
       compressedData: Buffer.alloc(0),
       uncompressedSize: 1,
       localUncompressedSize: 1,
     }));
-    const result = expectFailure(buildRawZip(entries), 'asset_archive_limit_exceeded');
+    const result = await expectFailure(buildRawZip(entries), 'asset_archive_limit_exceeded');
     expect(result.diagnostics.every((diagnostic) => diagnostic.code === 'asset_archive_limit_exceeded'))
       .toBe(true);
   });
 });
 
 describe('readAssetPackArchive bounds and checksums', () => {
-  it('accepts an exact 1 MiB manifest and rejects 1 MiB + 1 before inflation', () => {
+  it('accepts an exact 1 MiB manifest and rejects 1 MiB + 1 before inflation', async () => {
     const exactManifest = manifestBytesOfLength(ASSET_PACK_ARCHIVE_LIMITS.manifestBytes);
-    const accepted = readAssetPackArchive({
+    const accepted = await readAssetPackArchive({
       archivePath: '/fixtures/exact-manifest.lpc-assets.zip',
       archiveBytes: archiveFixture({ manifestBytes: exactManifest }),
     });
@@ -694,14 +694,14 @@ describe('readAssetPackArchive bounds and checksums', () => {
       uncompressedSize: ASSET_PACK_ARCHIVE_LIMITS.manifestBytes + 1,
       localUncompressedSize: ASSET_PACK_ARCHIVE_LIMITS.manifestBytes + 1,
     }]);
-    const rejected = expectFailure(tooLarge, 'asset_archive_limit_exceeded');
+    const rejected = await expectFailure(tooLarge, 'asset_archive_limit_exceeded');
     expect(rejected.diagnostics.every((diagnostic) => diagnostic.code === 'asset_archive_limit_exceeded'))
       .toBe(true);
   });
 
-  it('accepts an exact 64 MiB entry and rejects 64 MiB + 1 before inflation', { timeout: 30_000 }, () => {
+  it('accepts an exact 64 MiB entry and rejects 64 MiB + 1 before inflation', { timeout: 30_000 }, async () => {
     const exactBytes = Buffer.alloc(ASSET_PACK_ARCHIVE_LIMITS.entryBytes);
-    const accepted = readAssetPackArchive({
+    const accepted = await readAssetPackArchive({
       archivePath: '/fixtures/exact-entry.lpc-assets.zip',
       archiveBytes: archiveFixture({ sourceBytes: new Map([[SOURCE_PATH, exactBytes]]) }),
     });
@@ -718,12 +718,12 @@ describe('readAssetPackArchive bounds and checksums', () => {
       uncompressedSize: ASSET_PACK_ARCHIVE_LIMITS.entryBytes + 1,
       localUncompressedSize: ASSET_PACK_ARCHIVE_LIMITS.entryBytes + 1,
     }]);
-    const rejected = expectFailure(tooLarge, 'asset_archive_limit_exceeded');
+    const rejected = await expectFailure(tooLarge, 'asset_archive_limit_exceeded');
     expect(rejected.diagnostics.every((diagnostic) => diagnostic.code === 'asset_archive_limit_exceeded'))
       .toBe(true);
   });
 
-  it('rejects a declared total of 512 MiB + 1 before inflation', () => {
+  it('rejects a declared total of 512 MiB + 1 before inflation', async () => {
     const entries: RawZipEntry[] = Array.from({ length: 8 }, (_, index) => ({
       name: `sprites/large-${String(index)}.png`,
       compressedData: Buffer.alloc(0),
@@ -736,14 +736,14 @@ describe('readAssetPackArchive bounds and checksums', () => {
       uncompressedSize: 1,
       localUncompressedSize: 1,
     });
-    const result = expectFailure(buildRawZip(entries), 'asset_archive_limit_exceeded');
+    const result = await expectFailure(buildRawZip(entries), 'asset_archive_limit_exceeded');
     expect(result.diagnostics.every((diagnostic) => diagnostic.code === 'asset_archive_limit_exceeded'))
       .toBe(true);
   });
 
-  it('rejects inflater output that exceeds the declared length', () => {
+  it('rejects inflater output that exceeds the declared length', async () => {
     const actual = Buffer.from('too long');
-    expectFailure(buildRawZip([{
+    await expectFailure(buildRawZip([{
       name: 'asset-pack.json',
       compressedData: deflateRawSync(actual),
       crc32: crc32(actual),
@@ -753,7 +753,7 @@ describe('readAssetPackArchive bounds and checksums', () => {
     }]), 'asset_archive_invalid');
   });
 
-  it('rejects oversized encoded entries before inflation and DEFLATE trailing bytes', () => {
+  it('rejects oversized encoded entries before inflation and DEFLATE trailing bytes', async () => {
     const encodedTooLarge = buildRawZip([{
       name: 'sprites/encoded-too-large.png',
       compressedData: Buffer.alloc(0),
@@ -762,10 +762,10 @@ describe('readAssetPackArchive bounds and checksums', () => {
       uncompressedSize: 0,
       localUncompressedSize: 0,
     }]);
-    expectFailure(encodedTooLarge, 'asset_archive_limit_exceeded');
+    await expectFailure(encodedTooLarge, 'asset_archive_limit_exceeded');
 
     const data = Buffer.from('verified bytes');
-    expectFailure(buildRawZip([{
+    await expectFailure(buildRawZip([{
       name: 'sprites/trailing-deflate.png',
       data,
       compressedData: Buffer.concat([deflateRawSync(data), Buffer.from([0xde, 0xad])]),
@@ -788,11 +788,11 @@ describe('readAssetPackArchive bounds and checksums', () => {
       schema: ASSET_PACK_CHECKSUMS_SCHEMA,
       files: [{ path: 'asset-pack.json', size: 1, sha256: `sha256:${'A'.repeat(64)}` }],
     }))],
-  ])('rejects checksum %s', (_label, invalidChecksums) => {
-    expectFailure(archiveFixture({ checksumsBytes: invalidChecksums }), 'asset_checksum_invalid');
+  ])('rejects checksum %s', async (_label, invalidChecksums) => {
+    await expectFailure(archiveFixture({ checksumsBytes: invalidChecksums }), 'asset_checksum_invalid');
   });
 
-  it('rejects checksum rows that are not strictly path-sorted', () => {
+  it('rejects checksum rows that are not strictly path-sorted', async () => {
     const manifest = manifestBytesOfLength();
     const sprite = Buffer.from('walk-pixels');
     const checksums = Buffer.from(JSON.stringify({
@@ -802,23 +802,23 @@ describe('readAssetPackArchive bounds and checksums', () => {
         { path: 'asset-pack.json', size: manifest.byteLength, sha256: sha256(manifest) },
       ],
     }));
-    expectFailure(archiveFixture({ manifestBytes: manifest, checksumsBytes: checksums }), 'asset_checksum_invalid');
+    await expectFailure(archiveFixture({ manifestBytes: manifest, checksumsBytes: checksums }), 'asset_checksum_invalid');
   });
 
-  it('rejects missing and extra checksum rows', () => {
+  it('rejects missing and extra checksum rows', async () => {
     const manifest = manifestBytesOfLength();
     const missing = checksumBytes(new Map([['asset-pack.json', manifest]]));
-    expectFailure(archiveFixture({ manifestBytes: manifest, checksumsBytes: missing }), 'asset_checksum_invalid');
+    await expectFailure(archiveFixture({ manifestBytes: manifest, checksumsBytes: missing }), 'asset_checksum_invalid');
 
     const files = new Map<string, Buffer>([
       ['asset-pack.json', manifest],
       [SOURCE_PATH, Buffer.from('walk-pixels')],
       ['sprites/extra.png', Buffer.from('extra')],
     ]);
-    expectFailure(archiveFixture({ manifestBytes: manifest, checksumsBytes: checksumBytes(files) }), 'asset_checksum_invalid');
+    await expectFailure(archiveFixture({ manifestBytes: manifest, checksumsBytes: checksumBytes(files) }), 'asset_checksum_invalid');
   });
 
-  it('rejects checksum size and digest mismatches', () => {
+  it('rejects checksum size and digest mismatches', async () => {
     const manifest = manifestBytesOfLength();
     const sprite = Buffer.from('walk-pixels');
     const manifestRow = {
@@ -833,18 +833,18 @@ describe('readAssetPackArchive bounds and checksums', () => {
     };
     const bytes = (rows: readonly { readonly path: string; readonly size: number; readonly sha256: string }[]) =>
       Buffer.from(JSON.stringify({ schema: ASSET_PACK_CHECKSUMS_SCHEMA, files: rows }));
-    expectFailure(archiveFixture({
+    await expectFailure(archiveFixture({
       manifestBytes: manifest,
       checksumsBytes: bytes([{ ...manifestRow, size: manifest.byteLength + 1 }, spriteRow]),
     }), 'asset_digest_mismatch');
-    expectFailure(archiveFixture({
+    await expectFailure(archiveFixture({
       manifestBytes: manifest,
       checksumsBytes: bytes([manifestRow, { ...spriteRow, sha256: `sha256:${'0'.repeat(64)}` }]),
     }), 'asset_digest_mismatch');
   });
 
-  it('rejects unexpected roots and a checksum attempting to cover itself', () => {
-    expectFailure(buildRawZip([{ name: 'other/file.png', data: Buffer.from('x') }]), 'asset_archive_unsafe');
+  it('rejects unexpected roots and a checksum attempting to cover itself', async () => {
+    await expectFailure(buildRawZip([{ name: 'other/file.png', data: Buffer.from('x') }]), 'asset_archive_unsafe');
 
     const manifest = manifestBytesOfLength();
     const sprite = Buffer.from('walk-pixels');
@@ -856,30 +856,30 @@ describe('readAssetPackArchive bounds and checksums', () => {
         { path: SOURCE_PATH, size: sprite.byteLength, sha256: sha256(sprite) },
       ],
     }));
-    expectFailure(archiveFixture({ manifestBytes: manifest, checksumsBytes: checksums }), 'asset_checksum_invalid');
+    await expectFailure(archiveFixture({ manifestBytes: manifest, checksumsBytes: checksums }), 'asset_checksum_invalid');
   });
 
-  it('rejects a checksummed but unreferenced sprite', () => {
+  it('rejects a checksummed but unreferenced sprite', async () => {
     const manifest = manifestBytesOfLength();
     const sourceBytes = new Map([
       [SOURCE_PATH, Buffer.from('walk-pixels')],
       ['sprites/unreferenced.png', Buffer.from('extra')],
     ]);
     const payloadFiles = new Map<string, Buffer>([['asset-pack.json', manifest], ...sourceBytes]);
-    expectFailure(archiveFixture({
+    await expectFailure(archiveFixture({
       manifestBytes: manifest,
       sourceBytes,
       checksumsBytes: checksumBytes(payloadFiles),
     }), 'asset_archive_invalid');
   });
 
-  it('rejects missing manifest and missing checksums entries', () => {
+  it('rejects missing manifest and missing checksums entries', async () => {
     const sprite = Buffer.from('walk-pixels');
-    expectFailure(buildRawZip([
+    await expectFailure(buildRawZip([
       { name: 'checksums.json', data: checksumBytes(new Map([[SOURCE_PATH, sprite]])) },
       { name: SOURCE_PATH, data: sprite },
     ]), 'asset_archive_invalid');
-    expectFailure(buildRawZip([
+    await expectFailure(buildRawZip([
       { name: 'asset-pack.json', data: manifestBytesOfLength() },
       { name: SOURCE_PATH, data: sprite },
     ]), 'asset_archive_invalid');
@@ -938,16 +938,17 @@ describe('createDeterministicAssetPackArchive', () => {
       expect(entry.path.endsWith('/')).toBe(false);
     }
 
-    const parsed = readAssetPackArchive({ archivePath: '/fixtures/deterministic.zip', archiveBytes: first });
+    const parsed = await readAssetPackArchive({ archivePath: '/fixtures/deterministic.zip', archiveBytes: first });
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) throw new Error('Expected deterministic archive to read successfully.');
     expect(parsed.snapshot.archiveDigest).toBe(sha256(first));
-    expect(parsed.snapshot.checksums.map((entry) => entry.path)).toEqual([
-      'asset-pack.json',
-      SECOND_SOURCE_PATH,
-      SOURCE_PATH,
-    ]);
-    expect(parsed.snapshot.checksums.some((entry) => entry.path === 'checksums.json')).toBe(false);
+    expect(parsed.snapshot.entryCount).toBe(4);
+    expect(parsed.snapshot.totalUncompressedBytes).toBe(
+      parsed.snapshot.manifestBytes.byteLength
+      + parsed.snapshot.checksumsBytes.byteLength
+      + Buffer.byteLength('slash-pixels')
+      + Buffer.byteLength('walk-pixels'),
+    );
   });
 
   it('conforms between old CLI writer and shared format writer', async () => {
@@ -972,7 +973,7 @@ describe('createDeterministicAssetPackArchive', () => {
 
     const sharedResult = await createAssetPackArchive({
       kind: 'formal',
-      manifestDocument: manifest,
+      manifestDocument: { ...manifest },
       sourceBytes: sourceMap,
       runtime: nodeTestRuntime,
     });
@@ -993,7 +994,7 @@ describe('extractVerifiedAssetPackPayload', () => {
       manifestBytes: manifest,
       sourceBytes: new Map([[SOURCE_PATH, sprite]]),
     });
-    const read = readAssetPackArchive({ archivePath: '/fixtures/verified.zip', archiveBytes: archive });
+    const read = await readAssetPackArchive({ archivePath: '/fixtures/verified.zip', archiveBytes: archive });
     expect(read.ok).toBe(true);
     if (!read.ok) throw new Error('Expected archive to verify.');
     const stagingRoot = createDirectory('lpc-asset-pack-extract-');
@@ -1001,7 +1002,7 @@ describe('extractVerifiedAssetPackPayload', () => {
 
     extractVerifiedAssetPackPayload({ snapshot: read.snapshot, targetDirectory: target });
 
-    expect(readFileSync(path.join(target, 'asset-pack.json'))).toEqual(manifest);
+    expect(readFileSync(path.join(target, 'asset-pack.json'))).toEqual(read.snapshot.manifestBytes);
     expect(readFileSync(path.join(target, SOURCE_PATH))).toEqual(sprite);
     expect(lstatSync(path.join(target, 'checksums.json'), { throwIfNoEntry: false })).toBeUndefined();
     expect(statSync(path.join(target, 'asset-pack.json')).mode & 0o777).toBe(0o600);
@@ -1013,7 +1014,7 @@ describe('extractVerifiedAssetPackPayload', () => {
       manifestBytes: manifestBytesOfLength(),
       sourceBytes: new Map([[SOURCE_PATH, Buffer.from('walk-pixels')]]),
     });
-    const read = readAssetPackArchive({ archivePath: '/fixtures/verified.zip', archiveBytes: archive });
+    const read = await readAssetPackArchive({ archivePath: '/fixtures/verified.zip', archiveBytes: archive });
     expect(read.ok).toBe(true);
     if (!read.ok) throw new Error('Expected archive to verify.');
     const root = createDirectory('lpc-asset-pack-extract-safety-');
@@ -1045,7 +1046,7 @@ describe('extractVerifiedAssetPackPayload', () => {
       manifestBytes: manifestBytesOfLength(),
       sourceBytes: new Map([[SOURCE_PATH, Buffer.from('walk-pixels')]]),
     });
-    const read = readAssetPackArchive({ archivePath: '/fixtures/verified.zip', archiveBytes: archive });
+    const read = await readAssetPackArchive({ archivePath: '/fixtures/verified.zip', archiveBytes: archive });
     expect(read.ok).toBe(true);
     if (!read.ok) throw new Error('Expected archive to verify.');
     const stagingRoot = createDirectory('lpc-asset-pack-public-staging-');
@@ -1062,7 +1063,7 @@ describe('extractVerifiedAssetPackPayload', () => {
       manifestBytes: manifestBytesOfLength(),
       sourceBytes: new Map([[SOURCE_PATH, Buffer.from('walk-pixels')]]),
     });
-    const read = readAssetPackArchive({ archivePath: '/fixtures/verified.zip', archiveBytes: archive });
+    const read = await readAssetPackArchive({ archivePath: '/fixtures/verified.zip', archiveBytes: archive });
     expect(read.ok).toBe(true);
     if (!read.ok) throw new Error('Expected archive to verify.');
     const stagingRoot = createDirectory('lpc-asset-pack-pinned-staging-');
@@ -1089,7 +1090,7 @@ describe('extractVerifiedAssetPackPayload', () => {
       manifestBytes: manifestBytesOfLength(),
       sourceBytes: new Map([[SOURCE_PATH, Buffer.from('walk-pixels')]]),
     });
-    const read = readAssetPackArchive({ archivePath: '/fixtures/verified.zip', archiveBytes: archive });
+    const read = await readAssetPackArchive({ archivePath: '/fixtures/verified.zip', archiveBytes: archive });
     expect(read.ok).toBe(true);
     if (!read.ok) throw new Error('Expected archive to verify.');
     const stagingRoot = createDirectory('lpc-asset-pack-rebound-staging-');

@@ -8,7 +8,7 @@ export function canonicalizeJsonValue(value: unknown): unknown {
   }
 
   const record = value as Record<string, unknown>;
-  const keys = Object.keys(record).sort((a, b) => a.localeCompare(b));
+  const keys = Object.keys(record).sort();
   const result: Record<string, unknown> = {};
   for (const key of keys) {
     const val = record[key];

@@ -265,9 +265,9 @@ async function validateLinkedPack(
     }]);
   }
 
-  let loaded: ReturnType<typeof loadAssetPackFiles>;
+  let loaded: Awaited<ReturnType<typeof loadAssetPackFiles>>;
   try {
-    loaded = loadAssetPackFiles(sourceDirectory);
+    loaded = await loadAssetPackFiles(sourceDirectory);
   } catch (error) {
     const missing = isNodeError(error) && ['ENOENT', 'ENOTDIR'].includes(error.code ?? '');
     return syncFailure([{

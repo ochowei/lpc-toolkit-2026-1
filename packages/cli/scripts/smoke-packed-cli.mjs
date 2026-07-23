@@ -129,6 +129,8 @@ try {
     'package/dist/vendor/@lpc-toolkit/core/package.json',
     'package/dist/vendor/@lpc-toolkit/presets/dist/index.js',
     'package/dist/vendor/@lpc-toolkit/presets/package.json',
+    'package/dist/vendor/@lpc-toolkit/asset-pack-format/dist/index.js',
+    'package/dist/vendor/@lpc-toolkit/asset-pack-format/package.json',
     'package/README.md',
     'package/LICENSE',
     'package/package.json',

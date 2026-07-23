@@ -468,10 +468,10 @@ function inspectSources(
   return { diagnostics, sourceBytes, capturedSources };
 }
 
-export function loadAssetPackFiles(
+export async function loadAssetPackFiles(
   root: string,
   fileOps: AssetPackDirectoryFileOps = DEFAULT_DIRECTORY_FILE_OPS,
-): AssetPackFilesResult {
+): Promise<AssetPackFilesResult> {
   const absoluteRoot = path.resolve(root);
   const manifestPath = path.join(absoluteRoot, MANIFEST_FILE);
   let pinnedRoot: PinnedPackRoot;
@@ -549,7 +549,7 @@ export function loadAssetPackFiles(
     };
   }
 
-  const payload = parseAssetPackPayload({ manifestBytes, sourceBytes: inspected.sourceBytes });
+  const payload = await parseAssetPackPayload({ manifestBytes, sourceBytes: inspected.sourceBytes });
   if (!payload.ok) return payload;
 
   return {

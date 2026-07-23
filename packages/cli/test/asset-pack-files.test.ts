@@ -86,15 +86,15 @@ function writePack(
   return manifestPath;
 }
 
-function requireFailure(root: string) {
-  const result = loadAssetPackFiles(root);
+async function requireFailure(root: string) {
+  const result = await loadAssetPackFiles(root);
   expect(result.ok).toBe(false);
   if (result.ok) throw new Error('Expected asset-pack load to fail.');
   return result.diagnostics;
 }
 
-function requireSuccess(root: string) {
-  const result = loadAssetPackFiles(root);
+async function requireSuccess(root: string) {
+  const result = await loadAssetPackFiles(root);
   expect(result.ok).toBe(true);
   if (!result.ok) throw new Error('Expected asset-pack load to succeed.');
   return result;
@@ -186,20 +186,20 @@ afterEach(() => {
 });
 
 describe('loadAssetPackFiles', () => {
-  it('rejects a symlinked supplied pack root before reading its manifest', () => {
+  it('rejects a symlinked supplied pack root before reading its manifest', async () => {
     const parent = createDirectory('lpc-asset-pack-files-root-link-');
     const outside = createDirectory('lpc-asset-pack-files-root-target-');
     writeFileSync(path.join(outside, 'asset-pack.json'), '{"schema":');
     const linkedRoot = path.join(parent, 'linked-pack');
     symlinkSync(outside, linkedRoot, process.platform === 'win32' ? 'junction' : 'dir');
 
-    expect(requireFailure(linkedRoot)).toEqual([expect.objectContaining({
+    expect(await requireFailure(linkedRoot)).toEqual([expect.objectContaining({
       code: 'asset_source_symlink',
       path: linkedRoot,
     })]);
   });
 
-  it('reports manifest JSON parse failures without mutating the manifest file', () => {
+  it('reports manifest JSON parse failures without mutating the manifest file', async () => {
     const root = createDirectory('lpc-asset-pack-files-json-');
     mkdirSync(root, { recursive: true });
     const manifestPath = path.join(root, 'asset-pack.json');
@@ -207,7 +207,7 @@ describe('loadAssetPackFiles', () => {
     const beforeBytes = readFileSync(manifestPath);
     const beforeMtimeMs = lstatSync(manifestPath).mtimeMs;
 
-    expect(requireFailure(root)).toEqual([
+    expect(await requireFailure(root)).toEqual([
       expect.objectContaining({
         code: 'asset_pack_manifest_json_invalid',
         path: manifestPath,
@@ -217,7 +217,7 @@ describe('loadAssetPackFiles', () => {
     expect(lstatSync(manifestPath).mtimeMs).toBe(beforeMtimeMs);
   });
 
-  it('rejects manifest symlinks before parsing external bytes', () => {
+  it('rejects manifest symlinks before parsing external bytes', async () => {
     const root = createDirectory('lpc-asset-pack-files-manifest-symlink-');
     const outside = createDirectory('lpc-asset-pack-files-manifest-outside-');
     const manifestPath = path.join(root, 'asset-pack.json');
@@ -225,7 +225,7 @@ describe('loadAssetPackFiles', () => {
     writeFileSync(outsideManifestPath, '{"schema":');
     symlinkSync(outsideManifestPath, manifestPath);
 
-    expect(requireFailure(root)).toEqual([{
+    expect(await requireFailure(root)).toEqual([{
       code: 'asset_source_symlink',
       message: 'Invalid asset-pack source: asset-pack.json',
       path: manifestPath,
@@ -233,7 +233,7 @@ describe('loadAssetPackFiles', () => {
     }]);
   });
 
-  it('surfaces core schema diagnostics for invalid manifests', () => {
+  it('surfaces core schema diagnostics for invalid manifests', async () => {
     const root = createDirectory('lpc-asset-pack-files-schema-');
     writePack(root, {
       ...packFixture(),
@@ -243,7 +243,7 @@ describe('loadAssetPackFiles', () => {
       'sprites/wind-braid/foreground/climb.png': 'climb',
     });
 
-    expect(requireFailure(root)).toEqual(
+    expect(await requireFailure(root)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           code: 'asset_pack_schema_invalid',
@@ -255,7 +255,7 @@ describe('loadAssetPackFiles', () => {
     );
   });
 
-  it('rejects missing, escaping, non-regular, and duplicate-canonical source paths', () => {
+  it('rejects missing, escaping, non-regular, and duplicate-canonical source paths', async () => {
     const root = createDirectory('lpc-asset-pack-files-safety-');
     const outside = createDirectory('lpc-asset-pack-files-outside-');
     const duplicateTarget = path.join(root, 'sprites/shared/source.png');
@@ -317,7 +317,7 @@ describe('loadAssetPackFiles', () => {
       path.join(root, 'sprites/wind-braid/foreground/duplicate-link.png'),
     );
 
-    expect(requireFailure(root)).toEqual(
+    expect(await requireFailure(root)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           code: 'asset_source_missing',
@@ -339,7 +339,7 @@ describe('loadAssetPackFiles', () => {
     );
   });
 
-  it('rejects in-pack symlink source entries even when they resolve to regular files inside the pack', () => {
+  it('rejects in-pack symlink source entries even when they resolve to regular files inside the pack', async () => {
     const root = createDirectory('lpc-asset-pack-files-symlink-');
     writePack(root, packFixture({
       assets: [{
@@ -365,7 +365,7 @@ describe('loadAssetPackFiles', () => {
       path.join(root, 'sprites/wind-braid/foreground/link.png'),
     );
 
-    expect(requireFailure(root)).toEqual([
+    expect(await requireFailure(root)).toEqual([
       expect.objectContaining({
         code: 'asset_source_symlink',
         sourcePath: 'sprites/wind-braid/foreground/link.png',
@@ -373,7 +373,7 @@ describe('loadAssetPackFiles', () => {
     ]);
   });
 
-  it('rejects source paths that pass through symlinked parent directories inside the pack', () => {
+  it('rejects source paths that pass through symlinked parent directories inside the pack', async () => {
     const root = createDirectory('lpc-asset-pack-files-parent-symlink-');
     writePack(root, packFixture({
       assets: [{
@@ -401,7 +401,7 @@ describe('loadAssetPackFiles', () => {
       'dir',
     );
 
-    expect(requireFailure(root)).toEqual([
+    expect(await requireFailure(root)).toEqual([
       expect.objectContaining({
         code: 'asset_source_symlink',
         sourcePath: 'sprites/wind-braid/foreground/walk.png',
@@ -411,7 +411,7 @@ describe('loadAssetPackFiles', () => {
 
   it.each(['manifest', 'source'] as const)(
     'rejects deterministic %s replacement during descriptor capture',
-    (targetKind) => {
+    async (targetKind) => {
       const root = createDirectory(`lpc-asset-pack-files-${targetKind}-replacement-`);
       writePack(root, packFixture(), {
         'sprites/wind-braid/foreground/walk.png': 'walk',
@@ -425,7 +425,7 @@ describe('loadAssetPackFiles', () => {
         replacementBytes: readFileSync(targetPath),
       });
 
-      const result = loadAssetPackFiles(root, capture.fileOps);
+      const result = await loadAssetPackFiles(root, capture.fileOps);
 
       expect(capture.replaced()).toBe(true);
       expect(result.ok).toBe(false);
@@ -439,7 +439,7 @@ describe('loadAssetPackFiles', () => {
 
   it.each(['root', 'source-parent'] as const)(
     'rejects deterministic %s directory replacement during capture',
-    (targetKind) => {
+    async (targetKind) => {
       const parent = createDirectory(`lpc-asset-pack-files-${targetKind}-directory-race-`);
       const root = path.join(parent, 'pack');
       const replacementRoot = path.join(parent, 'replacement-pack');
@@ -470,7 +470,7 @@ describe('loadAssetPackFiles', () => {
         },
       });
 
-      const result = loadAssetPackFiles(root, capture.fileOps);
+      const result = await loadAssetPackFiles(root, capture.fileOps);
 
       expect(capture.replaced()).toBe(true);
       expect(result.ok).toBe(false);
@@ -482,7 +482,7 @@ describe('loadAssetPackFiles', () => {
     },
   );
 
-  it('rejects a whole-pack generation switch between manifest and source capture', () => {
+  it('rejects a whole-pack generation switch between manifest and source capture', async () => {
     const root = createDirectory('lpc-asset-pack-files-generation-switch-');
     const manifestPath = writePack(root, packFixture(), {
       'sprites/wind-braid/foreground/walk.png': 'walk-old',
@@ -500,7 +500,7 @@ describe('loadAssetPackFiles', () => {
       ]),
     });
 
-    const result = loadAssetPackFiles(root, capture.fileOps);
+    const result = await loadAssetPackFiles(root, capture.fileOps);
 
     expect(capture.switched()).toBe(true);
     expect(result.ok).toBe(false);
@@ -511,7 +511,7 @@ describe('loadAssetPackFiles', () => {
     }));
   });
 
-  it('keeps the content digest stable across manifest property order changes and acknowledgement-only edits', () => {
+  it('keeps the content digest stable across manifest property order changes and acknowledgement-only edits', async () => {
     const firstRoot = createDirectory('lpc-asset-pack-files-digest-a-');
     const secondRoot = createDirectory('lpc-asset-pack-files-digest-b-');
     const thirdRoot = createDirectory('lpc-asset-pack-files-digest-c-');
@@ -551,15 +551,15 @@ describe('loadAssetPackFiles', () => {
       }],
     }, sources);
 
-    const first = requireSuccess(firstRoot);
-    const second = requireSuccess(secondRoot);
-    const third = requireSuccess(thirdRoot);
+    const first = await requireSuccess(firstRoot);
+    const second = await requireSuccess(secondRoot);
+    const third = await requireSuccess(thirdRoot);
 
     expect(first.contentDigest).toBe(second.contentDigest);
     expect(first.contentDigest).toBe(third.contentDigest);
   });
 
-  it('changes the content digest after a substantive manifest edit or source PNG edit', () => {
+  it('changes the content digest after a substantive manifest edit or source PNG edit', async () => {
     const baseRoot = createDirectory('lpc-asset-pack-files-change-a-');
     const manifestChangedRoot = createDirectory('lpc-asset-pack-files-change-b-');
     const sourceChangedRoot = createDirectory('lpc-asset-pack-files-change-c-');
@@ -580,15 +580,15 @@ describe('loadAssetPackFiles', () => {
       'sprites/wind-braid/foreground/climb.png': 'climb',
     });
 
-    const base = requireSuccess(baseRoot);
-    const manifestChanged = requireSuccess(manifestChangedRoot);
-    const sourceChanged = requireSuccess(sourceChangedRoot);
+    const base = await requireSuccess(baseRoot);
+    const manifestChanged = await requireSuccess(manifestChangedRoot);
+    const sourceChanged = await requireSuccess(sourceChangedRoot);
 
     expect(manifestChanged.contentDigest).not.toBe(base.contentDigest);
     expect(sourceChanged.contentDigest).not.toBe(base.contentDigest);
   });
 
-  it('does not change manifest bytes or mtime during validate-style loads', () => {
+  it('does not change manifest bytes or mtime during validate-style loads', async () => {
     const root = createDirectory('lpc-asset-pack-files-readonly-');
     const manifestPath = writePack(root, packFixture(), {
       'sprites/wind-braid/foreground/walk.png': 'walk',
@@ -600,21 +600,21 @@ describe('loadAssetPackFiles', () => {
     utimesSync(manifestPath, pinnedMtime, pinnedMtime);
     const expectedMtimeMs = lstatSync(manifestPath).mtimeMs;
 
-    const result = requireSuccess(root);
+    const result = await requireSuccess(root);
 
     expect(result.manifestBytes).toEqual(beforeBytes);
     expect(readFileSync(manifestPath)).toEqual(beforeBytes);
     expect(lstatSync(manifestPath).mtimeMs).toBe(expectedMtimeMs);
   });
 
-  it('retains captured source bytes after the on-disk source changes', () => {
+  it('retains captured source bytes after the on-disk source changes', async () => {
     const root = createDirectory('lpc-asset-pack-files-snapshot-');
     writePack(root, packFixture(), {
       'sprites/wind-braid/foreground/walk.png': 'walk',
       'sprites/wind-braid/foreground/climb.png': 'climb',
     });
 
-    const loaded = requireSuccess(root);
+    const loaded = await requireSuccess(root);
     writeFileSync(path.join(root, 'sprites/wind-braid/foreground/walk.png'), 'changed');
 
     expect(loaded.sourceBytes.get('sprites/wind-braid/foreground/walk.png')?.toString())

@@ -437,10 +437,6 @@ describe('inspectAssetPackArchive report and captured-byte validation', () => {
 
     expect(result.snapshot).toBeDefined();
     if (!result.snapshot) throw new Error('Expected a verified archive snapshot.');
-    const expectedTotal = result.snapshot.checksums.reduce(
-      (total, checksum) => total + checksum.size,
-      result.snapshot.checksumsBytes.byteLength,
-    );
     expect(result.report).toEqual({
       schema: 'lpc-toolkit.asset-pack-inspection.v1',
       archivePath: ARCHIVE_PATH,
@@ -449,8 +445,8 @@ describe('inspectAssetPackArchive report and captured-byte validation', () => {
       version: '1.0.0',
       contentDigest: result.snapshot.payload.contentDigest,
       valid: true,
-      entryCount: result.snapshot.checksums.length + 1,
-      totalUncompressedBytes: expectedTotal,
+      entryCount: result.snapshot.entryCount,
+      totalUncompressedBytes: result.snapshot.totalUncompressedBytes,
       diagnostics: [],
       acknowledgementRecords: [],
     });

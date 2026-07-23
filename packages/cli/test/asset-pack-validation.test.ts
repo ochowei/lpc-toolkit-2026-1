@@ -729,7 +729,7 @@ describe('validateAssetPackDirectory', () => {
     { label: 'huge', width: 0x7fff_ffff, height: 0x7fff_ffff },
   ])('rejects $label captured IHDR geometry before canvas decode', async ({ width, height }) => {
     const sourcePath = 'sprites/wind-braid/climb.png';
-    const payload = parseAssetPackPayload({
+    const payload = await parseAssetPackPayload({
       manifestBytes: Buffer.from(JSON.stringify(newItemSource([
         { animation: 'climb', source: sourcePath },
       ]))),
@@ -759,7 +759,7 @@ describe('validateAssetPackDirectory', () => {
   it('rejects a truncated captured IHDR before canvas decode', async () => {
     const sourcePath = 'sprites/wind-braid/climb.png';
     const truncated = sheetPng('climb', {}).subarray(0, 32);
-    const payload = parseAssetPackPayload({
+    const payload = await parseAssetPackPayload({
       manifestBytes: Buffer.from(JSON.stringify(newItemSource([
         { animation: 'climb', source: sourcePath },
       ]))),
@@ -799,7 +799,7 @@ describe('validateAssetPackDirectory', () => {
     ));
     malformed[offset] = value;
     rewriteIhdrCrc(malformed);
-    const payload = parseAssetPackPayload({
+    const payload = await parseAssetPackPayload({
       manifestBytes: Buffer.from(JSON.stringify(newItemSource([
         { animation: 'climb', source: sourcePath },
       ]))),
@@ -833,7 +833,7 @@ describe('validateAssetPackDirectory', () => {
 
     for (const [bytes, expectedValid] of [[exact, true], [corruptCrc, false]] as const) {
       canvasLoadImage.mockClear();
-      const payload = parseAssetPackPayload({
+      const payload = await parseAssetPackPayload({
         manifestBytes: Buffer.from(JSON.stringify(newItemSource([
           { animation: 'climb', source: sourcePath },
         ]))),
@@ -869,7 +869,7 @@ describe('validateAssetPackDirectory', () => {
     const runtime = createRuntimeFixture().runtime;
     const packRoot = createDirectory('lpc-asset-pack-validation-recolor-');
     writePack(packRoot, source, { [sourcePath]: sourceBytes });
-    const loaded = loadAssetPackFiles(packRoot);
+    const loaded = await loadAssetPackFiles(packRoot);
     expect(loaded.ok).toBe(true);
     if (!loaded.ok) throw new Error('Expected asset-pack files to load.');
 
@@ -898,7 +898,7 @@ describe('validateAssetPackDirectory', () => {
   it('validates captured payload PNG bytes without a pack directory', async () => {
     const sourcePath = 'sprites/wind-braid/climb.png';
     const source = newItemSource([{ animation: 'climb', source: sourcePath }]);
-    const payload = parseAssetPackPayload({
+    const payload = await parseAssetPackPayload({
       manifestBytes: Buffer.from(JSON.stringify(source)),
       sourceBytes: new Map([[
         sourcePath,
@@ -1095,7 +1095,7 @@ describe('validateAssetPackDirectory', () => {
     });
 
     const directoryReport = await validateAssetPackDirectory({ packDirectory: packRoot, runtime });
-    const loaded = loadAssetPackFiles(packRoot);
+    const loaded = await loadAssetPackFiles(packRoot);
     expect(loaded.ok).toBe(true);
     if (!loaded.ok) throw new Error('Expected asset-pack files to load.');
     const payloadReport = await validateAssetPackPayload({

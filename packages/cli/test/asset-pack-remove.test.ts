@@ -328,14 +328,14 @@ function readRegistry(workspace: AssetWorkspace): AssetPackRegistryDocument {
   return readJson<AssetPackRegistryDocument>(workspace.registryPath);
 }
 
-function refreshLinkedRegistrySnapshot(workspace: AssetWorkspace, packId: string): void {
+async function refreshLinkedRegistrySnapshot(workspace: AssetWorkspace, packId: string): Promise<void> {
   const document = readRegistry(workspace);
   const entry = document.entries.find(
     (candidate): candidate is LinkedAssetPackRegistryEntry =>
       candidate.kind === 'linked' && candidate.packId === packId,
   );
   if (!entry) throw new Error(`Missing linked registry entry: ${packId}`);
-  const loaded = loadAssetPackFiles(entry.sourceDirectory);
+  const loaded = await loadAssetPackFiles(entry.sourceDirectory);
   if (!loaded.ok) {
     throw new Error(loaded.diagnostics.map((diagnostic) => diagnostic.message).join(' | '));
   }
@@ -736,7 +736,7 @@ describe('removeAssetPack', () => {
       sourcePath: 'sprites/charlie/climb.png',
       destinationPath: 'spritesheets/hair/braid/zz-bravo/climb.png',
     }));
-    refreshLinkedRegistrySnapshot(fixture.workspace, 'charlie.retained');
+    await refreshLinkedRegistrySnapshot(fixture.workspace, 'charlie.retained');
     const outputBefore = snapshotTree(fixture.workspace.outputRoot);
     const registryBefore = readFileSync(fixture.workspace.registryPath);
 
