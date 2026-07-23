@@ -1,6 +1,6 @@
 # Artist Asset Pack Web Workbench Design
 
-**Status:** Approved conversational design; awaiting written-spec approval
+**Status:** Approved
 
 **Date:** 2026-07-23
 
