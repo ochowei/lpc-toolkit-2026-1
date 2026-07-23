@@ -25,6 +25,7 @@ export interface AssetPackDownloadBarProps {
   readonly state: AssetPackWorkbenchState;
   readonly onDownload: (kind: AssetPackDownloadKind) => void;
   readonly confirmDraft?: (message: string) => boolean;
+  readonly downloadError?: string;
 }
 
 export function draftDiagnosticConfirmationMessage(
@@ -36,7 +37,7 @@ export function draftDiagnosticConfirmationMessage(
   return `Download the current draft archive?\n\nRemaining diagnostics:\n${details}`;
 }
 
-export function AssetPackDownloadBar({ state, onDownload, confirmDraft }: AssetPackDownloadBarProps) {
+export function AssetPackDownloadBar({ state, onDownload, confirmDraft, downloadError }: AssetPackDownloadBarProps) {
   const workbench = state.workbench;
   const diagnostics = state.diagnostics
     .filter(({ severity }) => severity === 'error' || severity === 'warning');
@@ -59,6 +60,7 @@ export function AssetPackDownloadBar({ state, onDownload, confirmDraft }: AssetP
         <h2 id="asset-pack-download-heading" className="text-lg font-semibold text-text">Download archive</h2>
         <span role="status" aria-live="polite" className="text-xs text-text-mute">{downloadStatusText(state)}</span>
       </div>
+      {downloadError && <p role="alert" className="mt-3 text-sm text-red-300">Download failed: {downloadError} Try again.</p>}
       {diagnostics.length > 0 && <div className="mt-3 text-sm text-text-2">
         <p>Remaining diagnostics before draft confirmation:</p>
         <ul aria-label="Remaining diagnostics" className="mt-1 list-disc pl-5">

@@ -67,4 +67,20 @@ describe('AssetPackWorkbenchShell', () => {
     expect(html).toContain('role="status"');
     expect(html).toContain('aria-live="polite"');
   });
+
+  it('shows a retryable alert when an archive download is rejected', () => {
+    const props: AssetPackWorkbenchShellProps = {
+      state: createAssetPackWorkbenchState(),
+      onUpload: vi.fn(),
+      onReset: vi.fn(),
+      onBack: vi.fn(),
+      onNavigate: vi.fn(),
+      downloadError: 'The Worker returned a stale archive.',
+    };
+
+    const html = renderToStaticMarkup(<AssetPackWorkbenchShell {...props} />);
+
+    expect(html).toContain('role="alert"');
+    expect(html).toContain('Download failed: The Worker returned a stale archive. Try again.');
+  });
 });

@@ -42,6 +42,7 @@ export function WorkbenchPreview({
   onReset,
   onBack,
   onDownload,
+  downloadError,
 }: {
   readonly baseline?: BrowserAssetPackBaseline;
   readonly state: AssetPackWorkbenchState;
@@ -49,6 +50,7 @@ export function WorkbenchPreview({
   readonly onReset: () => void;
   readonly onBack: () => void;
   readonly onDownload: (kind: AssetPackDownloadKind) => void;
+  readonly downloadError?: string;
 }) {
   const sourceCount = state.workbench?.sourceSummaries.length ?? 0;
   const diagnosticCount = state.workbench?.diagnostics.length ?? state.diagnostics.length;
@@ -77,7 +79,7 @@ export function WorkbenchPreview({
             onBack={onBack}
           />
         </div>
-        <AssetPackDownloadBar state={state} onDownload={onDownload} />
+        <AssetPackDownloadBar state={state} onDownload={onDownload} {...(downloadError ? { downloadError } : {})} />
         {baseline ? <PackPreviewContent baseline={baseline} state={state} /> : null}
       </div>
     </main>
