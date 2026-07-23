@@ -1523,23 +1523,29 @@ Record the full hash and PASS evidence, then commit the plan record separately.
 - Consumes: Task 9 edit/governance actions and current `AssetPackWorkbenchRevision`.
 - Produces: the complete correction UI without adding another manifest representation.
 
-- [ ] **Step 1: Write failing Overview, JSON, and Credits tests**
+- [x] **Step 1: Write failing Overview, JSON, and Credits tests**
 
 Overview exposes ID, display name, version, minimum CLI, and required capabilities with associated labels and current diagnostic text. Credits exposes repeatable authors/licenses/URLs plus notes and credit override navigation.
 
 Advanced editor shows only `AssetPackAdvancedProjection`, formats two-space JSON with a final newline, reports parse errors without sending an edit, and never exposes acknowledgements/status as writable content. Raw repair mode shows complete manifest text but refuses an acknowledgement-array diff.
 
-- [ ] **Step 2: Write failing source and diagnostic tests**
+  - Implementation: Added RED coverage for Overview/Credits projections, advanced JSON ownership and serialization, raw repair governance, and controlled manifest submission.
+
+- [x] **Step 2: Write failing source and diagnostic tests**
 
 Source rows display path, consumer count, dimensions, digest, state, Replace, and Remove when unreferenced. A JSON-introduced missing path renders an upload slot. Accept only PNG file selection; Worker remains the authority for signature/decode.
 
 Diagnostic rows render severity/code/message/path/scope and a corrective action. Selecting one invokes the exact panel/path navigation target. No diagnostic is represented by color alone.
 
-- [ ] **Step 3: Write failing individual-warning tests**
+  - Implementation: Added RED coverage for PNG-only source replacement/removal governance, missing-source upload slots, diagnostic scope mapping, corrective targets, and focus navigation.
+
+- [x] **Step 3: Write failing individual-warning tests**
 
 Each warning card shows full code, subject JSON, scope, content digest, one reason input, and one Confirm button. Blank/whitespace reason stays disabled. There is no acknowledge-all text or control. Version blockers disable confirmation with a message to set the release version first.
 
-- [ ] **Step 4: Run editor tests and verify RED**
+  - Implementation: Added RED coverage for per-warning subject/digest/reason rendering, blank-reason disabling, acknowledgement governance, and version-gated confirmation.
+
+- [x] **Step 4: Run editor tests and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-overview-editor.test.tsx asset-pack-manifest-json-editor.test.tsx asset-pack-source-list.test.tsx asset-pack-warnings-editor.test.tsx asset-pack-credits-editor.test.tsx asset-pack-diagnostic-list.test.tsx
@@ -1547,19 +1553,25 @@ rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-overview-editor.test.tsx a
 
 Expected: FAIL because detailed editors do not exist.
 
-- [ ] **Step 5: Implement controlled focused editors**
+  - Verification: The exact command first hit the known sandbox `tsx` IPC `listen EPERM`; with approved escalation, all six new suites failed during collection because their editor modules did not exist and collected zero tests.
+
+- [x] **Step 5: Implement controlled focused editors**
 
 Every editor receives immutable values and named callbacks; it owns only transient input text. Submit a complete new manifest through Task 9 helpers. Use stable keys from path or warning binding, never array index for mutable author/license/URL rows.
 
 Source replacement calls `replaceSource(path, file)` and does not create an object URL. Unreferenced removal calls `removeSource(path)` after explicit confirmation.
 
-- [ ] **Step 6: Implement exact diagnostics and warning governance**
+  - Implementation: Added Overview, Credits, Manifest JSON/raw repair, Source, Warning, and Diagnostic editors. They submit complete manifests through existing Task 9 helpers/controller callbacks, keep transient drafts local, use stable keys, enforce PNG-only replacement, and explicitly confirm unreferenced removal.
+
+- [x] **Step 6: Implement exact diagnostics and warning governance**
 
 Map diagnostic scope to Overview/Manifest/Source/Warnings/Credits. On navigation, focus the relevant heading or input using a stable element ID derived from a safe hash, not the raw path.
 
 Warning confirmation calls only `acknowledgeWarning` with the current candidate and reason. Render imported valid acknowledgements as confirmed; render stale acknowledgements only as diagnostics until the Worker removes them from generated output.
 
-- [ ] **Step 7: Verify GREEN**
+  - Implementation: Added hashed diagnostic identities and focus targets, visible projection/acknowledgement errors, invalid-manifest raw repair, Worker-revision conflict protection for all mutable credit fields, and warning reason pruning keyed by revision/candidate digest. No acknowledgement bypass was added.
+
+- [x] **Step 7: Verify GREEN**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-overview-editor.test.tsx asset-pack-manifest-json-editor.test.tsx asset-pack-source-list.test.tsx asset-pack-warnings-editor.test.tsx asset-pack-credits-editor.test.tsx asset-pack-diagnostic-list.test.tsx asset-pack-manifest-editor.test.ts asset-pack-release.test.ts
@@ -1568,7 +1580,9 @@ rtk pnpm --filter @lpc-toolkit/web run typecheck
 
 Expected: PASS with no acknowledgement bypass and no new editor dependency.
 
-- [ ] **Step 8: Commit Task 11**
+  - Verification: Task 11 focused suite PASS (8 files, 23 tests); shell/upload regression PASS (2 files, 7 tests); web typecheck PASS; boundary check PASS; full `rtk pnpm verify` PASS with Web 97 files/794 tests and CLI 55 files/1032 passed plus 1 skipped. The exact focused/shell commands were rerun with approved escalation for the repository's `tsx` IPC hook.
+
+- [x] **Step 8: Commit Task 11**
 
 ```sh
 rtk git add packages/web/src/components/asset-pack-workbench packages/web/test/asset-pack-overview-editor.test.tsx packages/web/test/asset-pack-manifest-json-editor.test.tsx packages/web/test/asset-pack-source-list.test.tsx packages/web/test/asset-pack-warnings-editor.test.tsx packages/web/test/asset-pack-credits-editor.test.tsx packages/web/test/asset-pack-diagnostic-list.test.tsx
@@ -1576,6 +1590,11 @@ rtk git commit -m "feat(web): add asset pack correction editors"
 ```
 
 Record the full hash and PASS evidence, then commit the plan record separately.
+
+  - Product commits: `da793bd0968b72a6a39f1e210081388adf1d02a9` (`feat(web): add asset pack correction editors`), `4eb090ed15f52049678c6c6c4a6cba768a23d8a3` (`fix(web): address Task 11 editor review findings`), and `151a7f022b3464738fc0ffcc236d868471cf3fc2` (`fix(web): protect Task 11 credits and warning drafts`).
+  - Evidence commits: `709a41714b7541d306be2f2d70b33116ca067a1f`, `af7b00ea1185dd8d7e91281c475f26bf0d539c81`, `bb2c6c8d987a1c46e9e3a0e512f1f402be7adc33`, and `5c3f2db300d60f4ca160081bf4e82ae1d03c76e7`.
+  - Independent final Luna review: Approved; no Critical or Important findings. Review packages covered the initial implementation and both fix ranges. Minor note: broader browser event-level interaction coverage remains outside this task's server-rendered test setup.
+  - Scope note: No dependencies, Task 12 files, assets, caches, or `upstream/` content changed. The separate plan-record commit follows this update.
 
 ---
 
