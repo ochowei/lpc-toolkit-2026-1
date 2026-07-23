@@ -65,6 +65,11 @@ describe('package scripts', () => {
     );
   });
 
+  it('activates web and cli CI filters on format package changes', () => {
+    expect(changesJob).toContain("web:\n              - 'packages/web/**'\n              - 'packages/core/**'\n              - 'packages/asset-pack-format/**'");
+    expect(changesJob).toContain("cli:\n              - 'packages/cli/**'\n              - 'packages/core/**'\n              - 'packages/presets/**'\n              - 'packages/asset-pack-format/**'");
+  });
+
   it('prepares release assets before root workspace tests', () => {
     expect(rootPackageJson.scripts?.['verify:upstream-pin']).toBe(
       'pnpm --filter @lpc-toolkit/web verify-upstream-pin',
