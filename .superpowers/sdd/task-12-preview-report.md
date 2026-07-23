@@ -125,3 +125,88 @@ PASS.
 - The official fallback predicate intentionally excludes the compiled
   `spritesheets/packages/` namespace; any future official asset source using
   that namespace would need an explicit ownership rule before being allowed.
+
+## Luna review fixes
+
+Fix product commit:
+
+```text
+fc61503f55169d2574a7d6cd62802209fa03c0b7
+fix(web): close and authorize preview assets
+```
+
+The four Important findings were addressed as follows:
+
+1. `BuildAssetPackPreviewOptions.bodyType` now flows into default and imported
+   `Selections`, and the hook passes its validated body type into the builder.
+   The regression proves Core resolves a different standard path for `female`.
+2. The preview adapter now owns every decoded pack or official image and
+   exposes an idempotent `dispose()` method. The hook calls it in `finally`
+   after composition and extraction, covering success, rejection, and stale
+   completion paths. Tests prove images remain open before disposal and both
+   sources are closed afterward.
+3. Official fallback authorization is now a finite set derived from baseline
+   catalog layer paths, animations, variants, and body-type keys. Compiled
+   destination paths are explicitly excluded; arbitrary `spritesheets/` paths
+   are rejected. The regression covers a known official path, an arbitrary
+   path, and a compiled destination.
+4. Composition completion reads `animationRef.current` through
+   `extractLatestPreviewAnimation`, so an animation change while the promise
+   is pending wins at ready time. Animation-only changes remain outside the
+   composition key and continue to re-extract from the existing sheet.
+
+### Luna fix TDD evidence
+
+Regression RED used the required focused command:
+
+```sh
+rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-preview-canvas-adapter.test.ts asset-pack-preview.test.ts use-asset-pack-preview.test.ts asset-pack-attribution-panel.test.tsx character-document.test.ts
+```
+
+Result before the fixes:
+
+```text
+Test Files  3 failed | 2 passed (5)
+Tests       5 failed | 14 passed (19)
+Failures: adapter dispose (2), body type (1), official authorizer (1), latest animation (1)
+```
+
+Final focused GREEN result:
+
+```text
+Test Files  5 passed (5)
+Tests       19 passed (19)
+```
+
+Final related regression command:
+
+```sh
+rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-workbench-shell.test.tsx asset-pack-workbench.test.ts browser-canvas-adapter.test.ts asset-pack-worker-protocol.test.ts asset-pack-worker-session.test.ts
+```
+
+Result:
+
+```text
+Test Files  6 passed (6)
+Tests       49 passed (49)
+```
+
+Final required checks:
+
+```sh
+rtk pnpm --filter @lpc-toolkit/web run typecheck
+```
+
+PASS — exit code 0.
+
+```sh
+rtk pnpm check:boundaries
+```
+
+PASS — `Architecture boundary check passed.`
+
+```sh
+rtk git diff --check
+```
+
+PASS.
