@@ -127,3 +127,31 @@ TDD and verification:
 Scope check: product commit contains only the Task 9 Web gate/controller and
 regression-test changes. No Task 10 files, plan files, dependencies,
 `upstream/`, checked-in assets, cache, or artist sources were changed.
+
+## Remaining Task 9 formal-gate fix evidence
+
+The final independent review's two remaining Important findings are fixed
+without editing the checked-in Task 9 implementation plan. The initial empty
+workbench now carries a deterministic `missing-candidate` blocker, so
+`ready === (formalBlockers.length === 0)` remains true only for a verified
+current candidate. Formal assembly now also returns the current opening/retry
+blockers before consulting any stale visible workbench candidate. Visible
+editor state and accepted edits remain available while the replacement Worker
+opens, and the exact replay log is sent only after the replacement Worker
+accepts `open`.
+
+Product commit:
+
+- `43eba4eae3a9908ebbe3c263d29e299c429edcd1` — `fix(web): close remaining Task 9 workbench gates`
+
+TDD and verification:
+
+- `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/asset-pack-workbench.test.ts test/use-asset-pack-workbench.test.ts` — RED: 2 intended regression failures (empty state had no blocker; retry formal assembly reached the stale visible candidate gate); GREEN: 2 files, 20 tests passed.
+- `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/asset-pack-worker-client.test.ts test/asset-pack-manifest-editor.test.ts test/asset-pack-workbench.test.ts test/asset-pack-release.test.ts test/use-asset-pack-workbench.test.ts` — PASS: 5 files, 32 tests.
+- `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/asset-pack-worker-protocol.test.ts test/asset-pack-worker-session.test.ts test/asset-pack-format-conformance.test.ts` — PASS: 3 files, 24 Task 8 tests.
+- `rtk pnpm --filter @lpc-toolkit/web run typecheck` — PASS.
+- `rtk pnpm check:boundaries` — PASS (`Architecture boundary check passed.`).
+- `rtk git diff --check` — PASS.
+
+Scope check: no Task 10 files, plan edits, dependencies, lockfiles,
+`upstream/`, checked-in assets, managed cache, or artist sources were changed.
