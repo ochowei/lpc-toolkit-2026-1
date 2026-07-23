@@ -57,3 +57,52 @@ dependencies, assets, caches, artist workspaces, or `upstream/` content changed.
 The Worker entry bootstraps its handler from the first `open` request; the
 main-thread client/orchestration remains Task 9 scope. The report commit is
 separate from the product commit.
+
+## Task 8 Important finding fixes — 2026-07-23
+
+### RED evidence
+
+Added focused regressions for the three Important findings, then ran:
+
+```sh
+rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-worker-session.test.ts asset-pack-worker-protocol.test.ts
+```
+
+The approved rerun reached Vitest and failed as required: 2 files, 19 tests,
+6 failures. The failures reproduced acknowledgement injection from invalid
+state, unrelated acknowledgement-origin edits, same-revision async commits,
+and source reads before oversized, unsafe-path, and source-entry-limit
+rejection.
+
+### GREEN evidence
+
+Product commit:
+
+```text
+5ea8165d2da577539bb04dbfe8a38c9b0ff4db22 fix(web): harden asset pack worker revisions
+```
+
+The fix serializes session mutations, validates acknowledgement-origin edits
+against candidates computed from the current valid state and an acknowledgement-
+only manifest delta, and bounds canonical source paths, `File.size`, entry
+count, and total bytes before reading and before committing source bytes.
+
+Exact verification:
+
+```text
+rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-worker-session.test.ts asset-pack-worker-protocol.test.ts
+PASS — 2 files, 19 tests
+
+rtk pnpm --filter @lpc-toolkit/web run typecheck
+PASS
+
+rtk pnpm check:boundaries
+PASS — Architecture boundary check passed.
+
+rtk git diff --check
+PASS
+```
+
+The report update is intentionally a separate documentation commit. No Task 9
+files, dependencies, plan files, assets, caches, artist workspaces, or
+`upstream/` content changed.
