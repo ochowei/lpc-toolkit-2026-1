@@ -131,3 +131,67 @@ rtk pnpm check:boundaries
 PASS — both commands.
 
 Fix concerns: browser event-level interaction remains outside the repository's server-rendered focused test setup; no known functional blocker remains.
+
+## Task 11 Luna re-review stale draft fixes
+
+Fixed the two remaining Important findings:
+
+- Credits now tracks dirty fields explicitly. Notes changes mark the notes draft dirty just like authors, licenses, and URLs; any newer Worker-approved credits projection preserves the complete active draft and surfaces the existing revision conflict/reload UI instead of silently replacing typed notes.
+- Warning reason state is keyed by revision, warning code, canonical candidate subject, and content digest. On warning/revision changes, local reasons are pruned to current candidates, so a reason from an older digest or revision cannot be displayed or submitted for a newer candidate.
+
+### Fix changed files
+
+Product/test commit: `151a7f022` — `fix(web): protect Task 11 credits and warning drafts`
+
+- `packages/web/src/components/asset-pack-workbench/credits-editor.tsx`
+- `packages/web/src/components/asset-pack-workbench/warnings-editor.tsx`
+- `packages/web/test/asset-pack-credits-editor.test.tsx`
+- `packages/web/test/asset-pack-warnings-editor.test.tsx`
+
+### Fix verification
+
+TDD RED command:
+
+```sh
+rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-overview-editor.test.tsx asset-pack-manifest-json-editor.test.tsx asset-pack-source-list.test.tsx asset-pack-warnings-editor.test.tsx asset-pack-credits-editor.test.tsx asset-pack-diagnostic-list.test.tsx asset-pack-manifest-editor.test.ts asset-pack-release.test.ts
+```
+
+Result: FAIL as expected — 8 files, 6 passed and 2 failed; 23 tests, 2 failed. The failures were the new credits dirty-notes expectation and missing `warningCandidateKey`, confirming the stale-state protections were absent before implementation.
+
+Focused GREEN command:
+
+```sh
+rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-overview-editor.test.tsx asset-pack-manifest-json-editor.test.tsx asset-pack-source-list.test.tsx asset-pack-warnings-editor.test.tsx asset-pack-credits-editor.test.tsx asset-pack-diagnostic-list.test.tsx asset-pack-manifest-editor.test.ts asset-pack-release.test.ts
+```
+
+Exact result: `Test Files  8 passed (8)` and `Tests  23 passed (23)`.
+
+Shell/upload regression command:
+
+```sh
+rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-workbench-shell.test.tsx asset-pack-upload-panel.test.tsx
+```
+
+Exact result: `Test Files  2 passed (2)` and `Tests  7 passed (7)`.
+
+Typecheck:
+
+```sh
+rtk pnpm --filter @lpc-toolkit/web run typecheck
+```
+
+Result: PASS — `tsc -p tsconfig.json --noEmit`.
+
+Boundary check:
+
+```sh
+rtk pnpm check:boundaries
+```
+
+Exact result: `Architecture boundary check passed.`
+
+Additional check: `git diff --check` PASS. No dependencies, `any` types, Task 12 files, upstream/assets/cache files, or unrelated files were changed.
+
+### Fix concerns
+
+No known functional blocker. Browser event-level interaction remains outside the repository's server-rendered focused test setup; the stale-state behavior is covered through pure synchronization helpers.
