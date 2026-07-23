@@ -1617,11 +1617,13 @@ Record the full hash and PASS evidence, then commit the plan record separately.
 - Consumes: Task 8 `AssetPackPreviewPayload`, official baseline, existing browser canvas/ZIP loader, Core composition/credits, canonical character JSON importer.
 - Produces: current-revision composed preview, focused pack selection, optional imported character selection, and visible matched credits.
 
-- [ ] **Step 1: Write failing overlay resolution tests**
+- [x] **Step 1: Write failing overlay resolution tests**
 
 Given a map from compiled destination path to PNG bytes, assert `loadImage` decodes exact pack bytes first and delegates only unmatched official paths to `createBrowserCanvasAdapter`. Assert no arbitrary source path can shadow a base path absent from the compile plan and all created ImageBitmaps are closed or transferred to the composition lifetime.
 
-- [ ] **Step 2: Write failing catalog, selection, and attribution tests**
+  - Implementation: Added RED coverage for destination-authorized pack bytes, finite official fallback paths, source-path shadow rejection, and ImageBitmap disposal lifecycle.
+
+- [x] **Step 2: Write failing catalog, selection, and attribution tests**
 
 Build a preview catalog from official definitions plus compile-plan definitions. Assert:
 
@@ -1633,11 +1635,15 @@ Build a preview catalog from official definitions plus compile-plan definitions.
 - pack and official base credits both appear;
 - missing credit data returns an error and no preview.
 
-- [ ] **Step 3: Write failing freshness tests**
+  - Implementation: Added RED coverage for merged catalogs, new/extend focused selection behavior, body/animation/direction validity, canonical import validation, exact Core credits, pack/base attribution, and missing-credit errors.
+
+- [x] **Step 3: Write failing freshness tests**
 
 Resolve revision `4`, then start revision `5`. The hook must immediately return pending with no image. Resolve revision `4` late and prove it is discarded. Reject revision `5` and prove no prior canvas/image remains. Switch only animation/direction and prove source composition is reused when the validated revision and selection are unchanged.
 
-- [ ] **Step 4: Run preview tests and verify RED**
+  - Implementation: Added RED coverage for latest-only revision clearing/discarding, body type, and pending animation freshness while preserving animation-only reuse.
+
+- [x] **Step 4: Run preview tests and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-preview-canvas-adapter.test.ts asset-pack-preview.test.ts use-asset-pack-preview.test.ts asset-pack-attribution-panel.test.tsx character-document.test.ts
@@ -1645,19 +1651,25 @@ rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-preview-canvas-adapter.tes
 
 Expected: FAIL because preview overlay/catalog ownership does not exist.
 
-- [ ] **Step 5: Implement compiled overlay preview**
+  - Verification: The exact command first hit the known sandbox `tsx` IPC `listen EPERM`; with approved escalation, four new suites failed during collection because preview/attribution modules did not exist, while the existing character-document suite passed.
+
+- [x] **Step 5: Implement compiled overlay preview**
 
 Convert baseline `catalog.byItemId` values and compile-plan definitions into one Core `createCatalog` input. Build a destination-to-source byte map only from compile-plan sprites. Use Task 7 palettes and the existing browser canvas adapter fallback.
 
 Construct the fixed standard character from `pickInitialSelections`, then apply the focused pack asset. Imported character JSON replaces that base selection only after Core import succeeds; the focused pack asset is applied afterward so it remains visible.
 
-- [ ] **Step 6: Implement latest-only hook and attribution panel**
+  - Implementation: Added the destination-authorized overlay canvas adapter, merged official/compiled Core catalog construction, focused new/extend selection application, validated body type and canonical import, exact source-byte identity, and Core-derived credits.
+
+- [x] **Step 6: Implement latest-only hook and attribution panel**
 
 Key composition by validated revision, body type, focused asset, imported selection digest, and pack source-byte identity. On any current error/pending revision, clear canvas/sheet/credits synchronously. Reuse existing animation extraction and player helpers after composition.
 
 Render authors, licenses, URLs, notes, resolved paths, and effective license adjacent to the preview. Show the official base release tag. Do not offer an unattributed image export.
 
-- [ ] **Step 7: Verify GREEN**
+  - Implementation: Added the latest-only preview hook with synchronous pending/error clearing, stale-result disposal, latest animation extraction, and source reuse. Wired body/animation/direction/asset/import controls and an attribution panel showing matched credits plus the official release tag, without an unattributed export path.
+
+- [x] **Step 7: Verify GREEN**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-preview-canvas-adapter.test.ts asset-pack-preview.test.ts use-asset-pack-preview.test.ts asset-pack-attribution-panel.test.tsx character-document.test.ts
@@ -1667,7 +1679,9 @@ rtk pnpm check:boundaries
 
 Expected: PASS, including current-revision clearing and exact base-plus-pack credits.
 
-- [ ] **Step 8: Commit Task 12**
+  - Verification: Focused suite PASS (5 files, 19 tests); related Task 8/workbench regression PASS (6 files, 49 tests); web typecheck PASS; boundary check PASS; full `rtk pnpm verify` PASS with Web 101 files/810 tests and CLI 55 files/1032 passed plus 1 skipped. Exact focused/regression commands were rerun with approved escalation for the `tsx` IPC hook.
+
+- [x] **Step 8: Commit Task 12**
 
 ```sh
 rtk git add packages/web/src/adapter/asset-pack-preview-canvas-adapter.ts packages/web/src/lib/asset-pack-preview.ts packages/web/src/hooks/use-asset-pack-preview.ts packages/web/src/components/asset-pack-workbench/attribution-panel.tsx packages/web/src/components/asset-pack-workbench/workbench-preview.tsx packages/web/src/components/asset-pack-workbench/harness.tsx packages/web/test/asset-pack-preview-canvas-adapter.test.ts packages/web/test/asset-pack-preview.test.ts packages/web/test/use-asset-pack-preview.test.ts packages/web/test/asset-pack-attribution-panel.test.tsx packages/web/test/character-document.test.ts
@@ -1675,6 +1689,11 @@ rtk git commit -m "feat(web): preview attributed asset packs"
 ```
 
 Record the full hash and PASS evidence, then commit the plan record separately.
+
+  - Product commits: `89cd749af4a1a513fc7e80432d9ea9dbeb0bc1a2` (`feat(web): preview attributed asset packs`) and `fc61503f55169d2574a7d6cd62802209fa03c0b7` (`fix(web): close and authorize preview assets`).
+  - Evidence commits: `3c989e95893a9b2d437ace8753433fcc663f79b4` and `7a0cb2f8c1a0f0739f05176732ba4d4594ce355b`.
+  - Independent final Luna review: Approved; no Critical, Important, or Minor findings. The review accepted finite baseline-derived fallback authorization and the conservative exclusion of dynamic official paths.
+  - Scope note: No dependencies, Task 13 files, assets, caches, or `upstream/` content changed. The separate plan-record commit follows this update.
 
 ---
 
