@@ -42,6 +42,10 @@ describe('asset-pack Worker protocol', () => {
       workbench: {
         revision: 0,
         manifestText: '{}',
+        uploadMetadata: {
+          originalArchiveDigest: `sha256:${'0'.repeat(64)}`,
+          baselineReleaseTag: 'test-release',
+        },
         sourceSummaries: [],
         diagnostics: [],
         acknowledgementRecords: [],

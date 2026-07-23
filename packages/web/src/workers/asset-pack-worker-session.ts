@@ -13,9 +13,11 @@ import {
 } from '@lpc-toolkit/core';
 import {
   ASSET_PACK_ARCHIVE_LIMITS,
+  ASSET_PACK_CHECKSUMS_SCHEMA,
   canonicalizeJsonValue,
   checkAssetPackCompatibility,
   createAssetPackArchive,
+  encodeCanonicalJson,
   inspectAssetPackArchiveBytes,
   inspectAssetPackSourceBytes,
   type AssetPackArchiveDiagnostic,
@@ -30,6 +32,7 @@ import type {
   AssetPackWorkerBaseline,
   AssetPackWorkerRequest,
   AssetPackWorkerResponse,
+  AssetPackWorkerUploadMetadata,
   AssetPackWorkbenchDiagnostic,
   AssetPackWorkbenchRevision,
 } from '../lib/asset-pack-worker-protocol';
@@ -64,9 +67,7 @@ interface SessionState {
   sourceBytes: Map<string, Uint8Array>;
   revision: number;
   archiveDiagnostics: readonly AssetPackWorkbenchDiagnostic[];
-  uploadedArchiveDigest: AssetPackSha256;
-  uploadedFormal: boolean;
-  uploadedVersion?: string;
+  uploadMetadata: AssetPackWorkerUploadMetadata;
   formalCandidateBytes?: Uint8Array;
   workbench: AssetPackWorkbenchRevision;
 }
@@ -112,15 +113,20 @@ export async function openAssetPackWorkerSession(
   const manifestText = snapshot.manifestBytes
     ? decodeManifestText(snapshot.manifestBytes)
     : '{}';
+  const uploadMetadata = createUploadMetadata(
+    snapshot.archiveDigest,
+    options.baseline.releaseTag,
+    snapshot.manifestDocument,
+    inspected.kind === 'verified' ? inspected.snapshot.payload.pack.version : undefined,
+    inspected.kind === 'verified' ? inspected.snapshot.payload.pack.status : undefined,
+  );
   const state: SessionState = {
     manifestText,
     sourceBytes: copyBytes(snapshot.sourceBytes),
     revision: 0,
     archiveDiagnostics: inspected.diagnostics.map(archiveDiagnostic),
-    uploadedArchiveDigest: snapshot.archiveDigest,
-    uploadedFormal: inspected.kind === 'verified' && inspected.snapshot.payload.pack.status === undefined,
-    ...(inspected.kind === 'verified' ? { uploadedVersion: inspected.snapshot.payload.pack.version } : {}),
-    workbench: emptyWorkbench(manifestText),
+    uploadMetadata,
+    workbench: emptyWorkbench(manifestText, uploadMetadata),
   };
   const session = createSession(state, options.baseline, runtime, decoder);
   state.workbench = (await session.evaluate(0)).workbench;
@@ -144,15 +150,21 @@ export function createAssetPackWorkerSession(options: {
 } {
   const runtime = options.runtime ?? createBrowserAssetPackFormatRuntime();
   const decoder = options.decoder ?? browserAssetPackPngDecoderDefault;
+  const uploadMetadata = createUploadMetadata(
+    options.archiveDigest ?? 'sha256:'.concat('0'.repeat(64)) as AssetPackSha256,
+    options.baseline.releaseTag,
+    undefined,
+    options.uploadedVersion,
+    undefined,
+    options.uploadedFormal ? 'formal' : undefined,
+  );
   const state: SessionState = {
     manifestText: options.manifestText,
     sourceBytes: copyBytes(options.sourceBytes ?? new Map()),
     revision: 0,
     archiveDiagnostics: [],
-    uploadedArchiveDigest: options.archiveDigest ?? 'sha256:'.concat('0'.repeat(64)) as AssetPackSha256,
-    uploadedFormal: options.uploadedFormal ?? false,
-    ...(options.uploadedVersion ? { uploadedVersion: options.uploadedVersion } : {}),
-    workbench: emptyWorkbench(options.manifestText),
+    uploadMetadata,
+    workbench: emptyWorkbench(options.manifestText, uploadMetadata),
   };
   return createSession(state, options.baseline, runtime, decoder);
 }
@@ -256,7 +268,13 @@ function createSession(
         })];
       }
       const candidateBytes = new Uint8Array(state.formalCandidateBytes);
-      return [assembledResponse(request, candidateBytes, state.workbench.formalCandidate.archiveDigest)];
+      return [assembledResponse(
+        request,
+        candidateBytes,
+        state.workbench.formalCandidate.archiveDigest,
+        state.workbench.formalCandidate.filename,
+        state.workbench.formalCandidate.uploadMetadata,
+      )];
     }
     if (request.revision !== state.revision) {
       return [failedResponse(request.requestId, request.revision, {
@@ -291,7 +309,17 @@ function createSession(
         sourceBytes: state.sourceBytes,
         runtime,
       });
-      return [assembledResponse(request, created.archiveBytes, created.archiveDigest)];
+      return [assembledResponse(
+        request,
+        created.archiveBytes,
+        created.archiveDigest,
+        assetPackArchiveFilename(
+          typeof document.id === 'string' ? document.id : 'asset-pack',
+          typeof document.version === 'string' ? document.version : 'draft',
+          'draft',
+        ),
+        state.uploadMetadata,
+      )];
     } catch (error) {
       return [failedResponse(request.requestId, request.revision, {
         code: 'asset_draft_assembly_failed',
@@ -313,8 +341,8 @@ async function evaluateState(
   decoder: AssetPackPngDecoder,
 ): Promise<Evaluation> {
   const baseDiagnostics = [...state.archiveDiagnostics];
-  const document = parseJsonObject(state.manifestText);
-  if (!document) {
+  const parsedJson = parseJsonValue(state.manifestText);
+  if (!parsedJson.ok) {
     const diagnostics = sortDiagnostics([
       ...baseDiagnostics,
       manifestJsonDiagnostic(state.manifestText),
@@ -323,6 +351,27 @@ async function evaluateState(
       workbench: {
         revision,
         manifestText: state.manifestText,
+        uploadMetadata: state.uploadMetadata,
+        sourceSummaries: summarizeRawSources(state.sourceBytes),
+        diagnostics,
+        acknowledgementRecords: [],
+        draftSerializable: false,
+      },
+    };
+  }
+
+  const document = asJsonObject(parsedJson.value);
+  if (!document) {
+    const parsedManifest = parseAssetPackSource(parsedJson.value);
+    const diagnostics = sortDiagnostics([
+      ...baseDiagnostics,
+      ...(parsedManifest.ok ? [] : parsedManifest.diagnostics.map(coreDiagnostic)),
+    ]);
+    return {
+      workbench: {
+        revision,
+        manifestText: state.manifestText,
+        uploadMetadata: state.uploadMetadata,
         sourceSummaries: summarizeRawSources(state.sourceBytes),
         diagnostics,
         acknowledgementRecords: [],
@@ -333,6 +382,7 @@ async function evaluateState(
 
   const parsed = parseAssetPackSource(document);
   if (!parsed.ok) {
+    const sourceDigests = await digestSources(state.sourceBytes, runtime);
     const diagnostics = sortDiagnostics([
       ...baseDiagnostics,
       ...parsed.diagnostics.map(coreDiagnostic),
@@ -341,10 +391,11 @@ async function evaluateState(
       workbench: {
         revision,
         manifestText: state.manifestText,
+        uploadMetadata: state.uploadMetadata,
         sourceSummaries: summarizeRawSources(state.sourceBytes),
         diagnostics,
         acknowledgementRecords: [],
-        draftSerializable: isSerializableSources(state.sourceBytes, runtime),
+        draftSerializable: await isDraftSerializable(document, state.sourceBytes, sourceDigests, runtime),
       },
     };
   }
@@ -382,7 +433,7 @@ async function evaluateState(
   const sourceSummaries = summarizeSources(sourceUses, state.sourceBytes, sourceDigests, inspections);
   const hasErrors = diagnostics.some((diagnostic) => diagnostic.severity === 'error');
   const currentAcknowledgements = mergeAcknowledgementCandidates(validation.acknowledgementRecords, pack.acknowledgements);
-  const draftSerializable = isSerializableSources(state.sourceBytes, runtime);
+  const draftSerializable = await isDraftSerializable(document, state.sourceBytes, sourceDigests, runtime);
   const preview = hasErrors ? undefined : {
     revision,
     packId: pack.id,
@@ -427,9 +478,11 @@ async function evaluateState(
         formalCandidate = {
           revision,
           archiveDigest: assembled.archiveDigest,
+          filename: assetPackArchiveFilename(pack.id, pack.version, 'formal'),
           version: pack.version,
-          byteIdenticalToUploadedFormal: state.uploadedFormal
-            && assembled.archiveDigest === state.uploadedArchiveDigest,
+          byteIdenticalToUploadedFormal: state.uploadMetadata.uploadedStatus === 'formal'
+            && assembled.archiveDigest === state.uploadMetadata.originalArchiveDigest,
+          uploadMetadata: state.uploadMetadata,
         };
       }
     } catch {
@@ -445,6 +498,7 @@ async function evaluateState(
     workbench: {
       revision,
       manifestText: state.manifestText,
+      uploadMetadata: state.uploadMetadata,
       sourceSummaries,
       diagnostics,
       acknowledgementRecords: currentAcknowledgements,
@@ -657,6 +711,47 @@ function isSerializableSources(
   return true;
 }
 
+function isDraftSerializable(
+  document: Readonly<Record<string, unknown>>,
+  sourceBytes: ReadonlyMap<string, Uint8Array>,
+  sourceDigests: ReadonlyMap<string, AssetPackSha256>,
+  runtime: AssetPackFormatRuntime,
+): boolean {
+  if (sourceBytes.size + 2 > ASSET_PACK_ARCHIVE_LIMITS.entries) return false;
+
+  const manifestBytes = encodeCanonicalJson(
+    { ...document, status: 'draft' },
+    runtime.encodeUtf8,
+  );
+  if (manifestBytes.byteLength > ASSET_PACK_ARCHIVE_LIMITS.manifestBytes
+    || manifestBytes.byteLength > ASSET_PACK_ARCHIVE_LIMITS.entryBytes) {
+    return false;
+  }
+
+  let sourceTotal = 0;
+  const checksumRows: { readonly path: string; readonly size: number; readonly sha256: AssetPackSha256 }[] = [{
+    path: 'asset-pack.json',
+    size: manifestBytes.byteLength,
+    sha256: 'sha256:'.concat('0'.repeat(64)) as AssetPackSha256,
+  }];
+  for (const [path, bytes] of [...sourceBytes].sort(([left], [right]) => left.localeCompare(right))) {
+    if (validateSourcePath(path, runtime) || bytes.byteLength > ASSET_PACK_ARCHIVE_LIMITS.entryBytes) return false;
+    const digest = sourceDigests.get(path);
+    if (!digest) return false;
+    sourceTotal += bytes.byteLength;
+    if (sourceTotal > ASSET_PACK_ARCHIVE_LIMITS.totalBytes) return false;
+    checksumRows.push({ path, size: bytes.byteLength, sha256: digest });
+  }
+
+  const checksumsBytes = encodeCanonicalJson({
+    schema: ASSET_PACK_CHECKSUMS_SCHEMA,
+    files: checksumRows,
+  }, runtime.encodeUtf8);
+  if (checksumsBytes.byteLength > ASSET_PACK_ARCHIVE_LIMITS.entryBytes) return false;
+  return manifestBytes.byteLength + checksumsBytes.byteLength + sourceTotal
+    <= ASSET_PACK_ARCHIVE_LIMITS.totalBytes;
+}
+
 function validateSourcePath(
   sourcePath: string,
   runtime: AssetPackFormatRuntime,
@@ -739,15 +834,23 @@ function sourceTotalLimitDiagnostic(sourcePath: string): AssetPackWorkbenchDiagn
   };
 }
 
-function parseJsonObject(text: string): Readonly<Record<string, unknown>> | undefined {
+function parseJsonValue(text: string): { readonly ok: true; readonly value: unknown } | { readonly ok: false } {
   try {
-    const value = JSON.parse(text) as unknown;
-    return typeof value === 'object' && value !== null && !Array.isArray(value)
-      ? value as Readonly<Record<string, unknown>>
-      : undefined;
+    return { ok: true, value: JSON.parse(text) as unknown };
   } catch {
-    return undefined;
+    return { ok: false };
   }
+}
+
+function asJsonObject(value: unknown): Readonly<Record<string, unknown>> | undefined {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as Readonly<Record<string, unknown>>
+    : undefined;
+}
+
+function parseJsonObject(text: string): Readonly<Record<string, unknown>> | undefined {
+  const parsed = parseJsonValue(text);
+  return parsed.ok ? asJsonObject(parsed.value) : undefined;
 }
 
 function decodeManifestText(bytes: Uint8Array): string {
@@ -762,10 +865,14 @@ function copyBytes(source: ReadonlyMap<string, Uint8Array>): Map<string, Uint8Ar
   return new Map([...source].map(([path, bytes]) => [path, new Uint8Array(bytes)] as const));
 }
 
-function emptyWorkbench(manifestText: string): AssetPackWorkbenchRevision {
+function emptyWorkbench(
+  manifestText: string,
+  uploadMetadata: AssetPackWorkerUploadMetadata,
+): AssetPackWorkbenchRevision {
   return {
     revision: 0,
     manifestText,
+    uploadMetadata,
     sourceSummaries: [],
     diagnostics: [],
     acknowledgementRecords: [],
@@ -860,7 +967,43 @@ function failedResponse(requestId: number, revision: number, diagnostic: AssetPa
   return { type: 'failed', requestId, revision, diagnostic };
 }
 
-function assembledResponse(request: AssembleRequest, bytes: Uint8Array, digest: AssetPackSha256): AssetPackWorkerResponse {
+function createUploadMetadata(
+  archiveDigest: AssetPackSha256,
+  baselineReleaseTag: string,
+  manifestDocument?: Readonly<Record<string, unknown>>,
+  verifiedVersion?: string,
+  verifiedStatus?: 'draft',
+  uploadedStatus?: AssetPackWorkerUploadMetadata['uploadedStatus'],
+): AssetPackWorkerUploadMetadata {
+  const version = verifiedVersion
+    ?? (typeof manifestDocument?.version === 'string' ? manifestDocument.version : undefined);
+  const status = uploadedStatus
+    ?? (verifiedVersion !== undefined
+      ? (verifiedStatus === 'draft' ? 'draft' : 'formal')
+      : manifestDocument?.status === 'draft'
+        ? 'draft'
+        : typeof manifestDocument?.version === 'string'
+          ? 'formal'
+          : undefined);
+  return {
+    originalArchiveDigest: archiveDigest,
+    ...(version ? { uploadedVersion: version } : {}),
+    ...(status ? { uploadedStatus: status } : {}),
+    baselineReleaseTag,
+  };
+}
+
+function assetPackArchiveFilename(packId: string, version: string, kind: 'draft' | 'formal'): string {
+  return `${packId}-${version}${kind === 'draft' ? '.draft' : ''}.lpc-assets.zip`;
+}
+
+function assembledResponse(
+  request: AssembleRequest,
+  bytes: Uint8Array,
+  digest: AssetPackSha256,
+  filename: string,
+  uploadMetadata: AssetPackWorkerUploadMetadata,
+): AssetPackWorkerResponse {
   const copy = new Uint8Array(bytes);
   return {
     type: 'assembled',
@@ -869,5 +1012,7 @@ function assembledResponse(request: AssembleRequest, bytes: Uint8Array, digest: 
     kind: request.kind,
     archiveBytes: copy.buffer,
     archiveDigest: digest,
+    filename,
+    uploadMetadata,
   };
 }

@@ -16,6 +16,13 @@ export interface AssetPackWorkerBaseline {
   readonly creditDigests: ReadonlyMap<ItemId, AssetPackSha256>;
 }
 
+export interface AssetPackWorkerUploadMetadata {
+  readonly originalArchiveDigest: AssetPackSha256;
+  readonly uploadedVersion?: string;
+  readonly uploadedStatus?: 'draft' | 'formal';
+  readonly baselineReleaseTag: string;
+}
+
 export type AssetPackWorkerRequest =
   | {
       readonly type: 'open';
@@ -93,13 +100,16 @@ export interface AssetPackPreviewPayload {
 export interface AssetPackFormalCandidate {
   readonly revision: number;
   readonly archiveDigest: AssetPackSha256;
+  readonly filename: string;
   readonly version: string;
   readonly byteIdenticalToUploadedFormal: boolean;
+  readonly uploadMetadata: AssetPackWorkerUploadMetadata;
 }
 
 export interface AssetPackWorkbenchRevision {
   readonly revision: number;
   readonly manifestText: string;
+  readonly uploadMetadata: AssetPackWorkerUploadMetadata;
   readonly sourceSummaries: readonly AssetPackSourceSummary[];
   readonly diagnostics: readonly AssetPackWorkbenchDiagnostic[];
   readonly acknowledgementRecords: readonly AssetPackAcknowledgement[];
@@ -146,6 +156,8 @@ export type AssetPackWorkerResponse =
       readonly kind: 'draft' | 'formal';
       readonly archiveBytes: ArrayBuffer;
       readonly archiveDigest: AssetPackSha256;
+      readonly filename: string;
+      readonly uploadMetadata: AssetPackWorkerUploadMetadata;
     }
   | {
       readonly type: 'failed';

@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
+import JSZip from 'jszip';
 import {
   ASSET_PACK_ARCHIVE_LIMITS,
+  encodeCanonicalJson,
   createAssetPackArchive,
   type AssetPackFormatRuntime,
   type AssetPackPngDecoder,
@@ -135,6 +137,33 @@ async function archiveFor(
   return file(created.archiveBytes);
 }
 
+async function archiveForManifestText(manifestText: string): Promise<File> {
+  const original = await archiveFor();
+  const zip = await JSZip.loadAsync(await original.arrayBuffer());
+  zip.file('asset-pack.json', new TextEncoder().encode(manifestText));
+  const checksumRows: { readonly path: string; readonly size: number; readonly sha256: string }[] = [];
+  for (const [path, entry] of Object.entries(zip.files)) {
+    if (path === 'checksums.json' || entry.dir) continue;
+    const bytes = await entry.async('uint8array');
+    checksumRows.push({
+      path,
+      size: bytes.byteLength,
+      sha256: await runtime().sha256(bytes),
+    });
+  }
+  zip.file('checksums.json', encodeCanonicalJson({
+    schema: 'lpc-toolkit.asset-pack-checksums.v1',
+    files: checksumRows.sort((left, right) => left.path.localeCompare(right.path)),
+  }, (value) => runtime().encodeUtf8(value)));
+  return file(await zip.generateAsync({
+    type: 'uint8array',
+    platform: 'UNIX',
+    compression: 'DEFLATE',
+    compressionOptions: { level: 9 },
+    streamFiles: false,
+  }));
+}
+
 async function open(
   input: File,
   options?: { readonly decoder?: AssetPackPngDecoder },
@@ -186,27 +215,65 @@ describe('asset-pack Worker session', () => {
     }
   });
 
-  it('preserves uploaded archive digest, version/status, and baseline release tag', async () => {
+  it('preserves uploaded archive metadata through session, candidate, and assembly responses', async () => {
     const formal = await archiveFor();
     const draft = await archiveFor({ ...manifest, status: 'draft' });
-    for (const input of [formal, draft]) {
+    for (const [input, uploadedStatus] of [[formal, 'formal'], [draft, 'draft']] as const) {
       const result = await open(input);
       const response = result.responses.find((candidate) => candidate.type === 'session' && candidate.outcome === 'editing');
       expect(response).toMatchObject({ type: 'session', outcome: 'editing' });
       if (response?.type !== 'session' || response.outcome !== 'editing') continue;
-      expect(response.workbench.manifestText).toContain('1.0.0');
-      expect(response.workbench.diagnostics).not.toEqual(expect.arrayContaining([
-        expect.objectContaining({ code: 'asset_pack_baseline_release_missing' }),
-      ]));
+      const originalArchiveDigest = await runtime().sha256(new Uint8Array(await input.arrayBuffer()));
+      expect(response.workbench.uploadMetadata).toEqual({
+        originalArchiveDigest,
+        uploadedVersion: '1.0.0',
+        uploadedStatus,
+        baselineReleaseTag: 'assets-v2026.06.05-initial',
+      });
+      if (uploadedStatus === 'formal') {
+        expect(response.workbench.formalCandidate?.uploadMetadata).toEqual(response.workbench.uploadMetadata);
+        const assembled = await result.session?.assemble({ requestId: 2, revision: 0, kind: 'formal' });
+        expect(assembled).toContainEqual(expect.objectContaining({
+          type: 'assembled',
+          filename: 'acme.demo-1.0.0.lpc-assets.zip',
+          uploadMetadata: response.workbench.uploadMetadata,
+        }));
+        const assembledResponse = assembled?.find((candidate) => candidate.type === 'assembled');
+        if (assembledResponse?.type === 'assembled') {
+          expect(assembledResponse.archiveDigest).toBe(
+            await runtime().sha256(new Uint8Array(assembledResponse.archiveBytes)),
+          );
+        }
+      }
     }
   });
 
-  it('opens invalid JSON and non-object manifests as raw repair without draft serialization', async () => {
-    const raw = await archiveFor({ ...manifest, status: 'draft' });
-    const bytes = new Uint8Array(await raw.arrayBuffer());
-    const result = await open(file(bytes));
+  it('preserves valid non-object JSON as raw repair with the exact Core schema diagnostic', async () => {
+    const result = await open(await archiveForManifestText('[]'));
     expect(result.session).toBeDefined();
+    const editing = result.responses.find((response) => response.type === 'session' && response.outcome === 'editing');
+    expect(editing).toMatchObject({
+      type: 'session',
+      outcome: 'editing',
+      workbench: {
+        manifestText: '[]',
+        draftSerializable: false,
+        diagnostics: expect.arrayContaining([{
+          code: 'asset_pack_schema_invalid',
+          severity: 'error',
+          message: 'Expected an object at $.',
+          scope: 'manifest',
+          path: '$',
+          details: expect.objectContaining({ path: '$' }),
+        }]),
+      },
+    });
+  });
 
+  it('uses the JSON diagnostic only for parse failures', async () => {
+    const raw = await archiveFor({ ...manifest, status: 'draft' });
+    const result = await open(raw);
+    expect(result.session).toBeDefined();
     const rawResult = await result.session?.replaceManifest({
       requestId: 2,
       revision: 1,
@@ -221,7 +288,32 @@ describe('asset-pack Worker session', () => {
     if (editing?.type === 'session' && editing.outcome === 'editing') {
       expect(editing.workbench.draftSerializable).toBe(false);
       expect(editing.workbench.diagnostics).toContainEqual(expect.objectContaining({ code: 'asset_pack_manifest_json_invalid' }));
+      expect(editing.workbench.diagnostics).not.toContainEqual(expect.objectContaining({ code: 'asset_pack_schema_invalid' }));
     }
+  });
+
+  it('marks drafts non-serializable when canonical manifest or generated checksum metadata exceeds bounds', async () => {
+    const oversizedManifest = JSON.stringify({
+      ...manifest,
+      displayName: 'x'.repeat(ASSET_PACK_ARCHIVE_LIMITS.manifestBytes),
+    });
+    const session = createAssetPackWorkerSession({
+      baseline: baseline(),
+      manifestText: oversizedManifest,
+      sourceBytes: new Map([[SOURCE_PATH, validPngHeader()]]),
+      runtime: runtime(),
+      decoder: decoder(),
+    });
+    const evaluation = await session.evaluate(0);
+    expect(evaluation.workbench.draftSerializable).toBe(false);
+    const assembled = await session.assemble({ requestId: 1, revision: 0, kind: 'draft' });
+    expect(assembled).toContainEqual(expect.objectContaining({
+      type: 'failed',
+      diagnostic: expect.objectContaining({ code: 'asset_draft_not_serializable' }),
+    }));
+    expect(assembled).not.toContainEqual(expect.objectContaining({
+      diagnostic: expect.objectContaining({ code: 'asset_draft_assembly_failed' }),
+    }));
   });
 
   it('accepts only monotonic revisions, copies source bytes, and reports source diagnostics', async () => {
