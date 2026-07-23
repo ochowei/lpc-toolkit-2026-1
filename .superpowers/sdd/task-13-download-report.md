@@ -79,6 +79,28 @@ Review-fix GREEN and gates:
 - `rtk pnpm check:boundaries` — PASS.
 - `rtk git diff --check` — PASS before the review-fix commit.
 
+## Final Luna review fix
+
+- `AssetPackWorkbenchHarness` now catches rejected `workbench.download(kind)` promises, stores only transient in-memory UI error text, and clears it before retry, upload, or reset.
+- `AssetPackDownloadBar` renders the failure as a small `role="alert"` message ending in “Try again.” Download controls remain available, so retry uses the existing exact-revision/gate/marker path unchanged.
+- Added a shell regression covering the rejected-download alert.
+
+Final-fix RED:
+
+```text
+rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-download.test.ts use-unsaved-work-guard.test.ts asset-pack-download-bar.test.tsx app-shell.test.tsx asset-pack-workbench-shell.test.tsx use-asset-pack-workbench.test.ts
+```
+
+FAIL — 6 files, 30 tests collected; the new rejected-download UI regression failed because the harness had no error status.
+
+Final-fix GREEN and requested gates:
+
+- `rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-download.test.ts use-unsaved-work-guard.test.ts asset-pack-download-bar.test.tsx app-shell.test.tsx asset-pack-workbench-shell.test.tsx use-asset-pack-workbench.test.ts` — PASS, 6 files, 30 tests.
+- `rtk pnpm --filter @lpc-toolkit/web run typecheck` — PASS.
+- `rtk pnpm check:boundaries` — PASS.
+- `rtk git diff --check` — PASS before the final-fix product commit.
+- Final-fix product commit: `241b5612469d90994ec44d1ce47a94a8a0bb6fef` — `fix(web): surface asset pack download failures`.
+
 ## Concerns
 
 No concrete implementation blocker remains. Browser-level `beforeunload`/history behavior is covered by the injected navigation-owner and guard tests; the repository’s Vitest environment does not provide a browser DOM harness. Minor review items were intentionally left unchanged.
