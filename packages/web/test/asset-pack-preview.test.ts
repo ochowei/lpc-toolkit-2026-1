@@ -1,5 +1,6 @@
 import {
   createCatalog,
+  getSpritePathsForSelections,
   type AssetPackCompilePlan,
   type Catalog,
   type CreditEntry,
@@ -11,6 +12,7 @@ import type { AssetPackPreviewPayload } from '../src/lib/asset-pack-worker-proto
 import {
   buildAssetPackPreview,
   createAssetPackPreviewCatalog,
+  createOfficialAssetPackPreviewPathAuthorizer,
   previewAnimationOptions,
   previewBodyTypeOptions,
 } from '../src/lib/asset-pack-preview';
@@ -31,6 +33,11 @@ const baseCredit: CreditEntry = {
   notes: 'Official base release.',
 };
 
+const femaleBaseCredit: CreditEntry = {
+  ...baseCredit,
+  file: 'body/female/walk.png',
+};
+
 const definition = (
   name: string,
   typeName: string,
@@ -41,11 +48,15 @@ const definition = (
   type_name: typeName,
   animations: ['walk'],
   credits,
-  layer_1: { zPos: typeName === 'hair' ? 100 : 0, male: path },
+  layer_1: {
+    zPos: typeName === 'hair' ? 100 : 0,
+    male: path,
+    female: path.replace('/male/', '/female/'),
+  },
 });
 
 const baselineCatalog: Catalog = createCatalog({
-  'body/body.json': definition('Body', 'body', 'body/male/', [baseCredit]),
+  'body/body.json': definition('Body', 'body', 'body/male/', [baseCredit, femaleBaseCredit]),
   'head/heads_human_male.json': definition('Head', 'head', 'head/', []),
   'expression/face_neutral.json': definition('Neutral', 'expression', 'expression/', []),
 }).catalog;
@@ -146,5 +157,26 @@ describe('asset-pack preview model', () => {
     expect(previewBodyTypeOptions(catalog)).toContain('male');
     expect(previewBodyTypeOptions(catalog)).not.toContain('invalid');
     expect(previewAnimationOptions(catalog)).toContain('walk');
+  });
+
+  it('passes the selected body type into standard preview selections and paths', () => {
+    const result = buildAssetPackPreview({
+      baselineCatalog,
+      palettes,
+      payload,
+      bodyType: 'female',
+    });
+
+    expect(result.selections.bodyType).toBe('female');
+    expect(getSpritePathsForSelections(result.selections, result.catalog)[0]?.path)
+      .toContain('/female/walk.png');
+  });
+
+  it('authorizes only known official baseline paths and excludes compiled destinations', () => {
+    const isOfficialPath = createOfficialAssetPackPreviewPathAuthorizer(baselineCatalog, plan);
+
+    expect(isOfficialPath('spritesheets/body/male/walk.png')).toBe(true);
+    expect(isOfficialPath('spritesheets/body/male/not-in-catalog.png')).toBe(false);
+    expect(isOfficialPath('spritesheets/packages/acme.demo/hair/foreground/male/walk.png')).toBe(false);
   });
 });

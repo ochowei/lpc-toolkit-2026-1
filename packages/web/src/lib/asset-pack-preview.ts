@@ -1,7 +1,9 @@
 import {
   ANIMATIONS,
+  ANIMATION_OFFSETS,
   BODY_TYPES,
   DIRECTIONS,
+  animationsSupportFolder,
   computeEffectiveLicense,
   createCatalog,
   getCredits,
@@ -31,6 +33,7 @@ export interface BuildAssetPackPreviewOptions {
   readonly palettes: PaletteMetadata;
   readonly payload: AssetPackPreviewPayload;
   readonly focusedAssetId?: ItemId;
+  readonly bodyType?: string;
   readonly importedSelections?: Selections;
 }
 
@@ -49,9 +52,56 @@ export function createAssetPackPreviewCatalog(
   return createCatalog(records).catalog;
 }
 
-/** Official paths have no pack-owned namespace and must use the browser ZIP adapter. */
-export function isOfficialAssetPackPreviewPath(path: string): boolean {
-  return path.startsWith('spritesheets/') && !path.startsWith('spritesheets/packages/');
+/**
+ * Authorize only paths that can be produced by the official baseline catalog.
+ * Pack destinations are removed explicitly even if a baseline path ever uses
+ * the same logical location.
+ */
+export function createOfficialAssetPackPreviewPathAuthorizer(
+  baselineCatalog: Catalog,
+  compilePlan: AssetPackCompilePlan,
+): (path: string) => boolean {
+  const officialPaths = new Set<string>();
+  for (const item of baselineCatalog.byItemId.values()) {
+    const variants = ['', ...(item.variants ?? [])];
+    for (let layerNumber = 1; layerNumber < 10; layerNumber += 1) {
+      const layer = item[`layer_${layerNumber}`];
+      if (!layer) break;
+      for (const [bodyType, rawPath] of Object.entries(layer)) {
+        if (bodyType === 'zPos' || bodyType === 'custom_animation' || typeof rawPath !== 'string') continue;
+        if (rawPath.includes('${')) continue;
+        if (layer.custom_animation) {
+          for (const variant of variants) {
+            if (!variant) continue;
+            officialPaths.add(`spritesheets/${rawPath}${variant.replaceAll(' ', '_')}.png`);
+          }
+          continue;
+        }
+        for (const folder of Object.keys(ANIMATION_OFFSETS)) {
+          if (!animationsSupportFolder(item.animations, folder)) continue;
+          for (const variant of variants) {
+            const suffix = variant
+              ? `${folder}/${variant.replaceAll(' ', '_')}.png`
+              : `${folder}.png`;
+            officialPaths.add(`spritesheets/${rawPath}${suffix}`);
+          }
+        }
+      }
+    }
+  }
+  const compiledDestinations = new Set(
+    compilePlan.sprites.map((sprite) => sprite.destinationPath),
+  );
+  return (path: string) => officialPaths.has(path) && !compiledDestinations.has(path);
+}
+
+/** Baseline-derived official path check for callers that need one decision. */
+export function isOfficialAssetPackPreviewPath(
+  path: string,
+  baselineCatalog: Catalog,
+  compilePlan: AssetPackCompilePlan,
+): boolean {
+  return createOfficialAssetPackPreviewPathAuthorizer(baselineCatalog, compilePlan)(path);
 }
 
 export function previewBodyTypeOptions(catalog: Catalog): readonly string[] {
@@ -82,7 +132,7 @@ export function buildAssetPackPreview(
   );
   const initial = pickInitialSelections(catalog).state;
   let selections = options.importedSelections ?? {
-    bodyType: initial.bodyType,
+    bodyType: options.bodyType ?? initial.bodyType,
     items: initial.selections,
   };
 
@@ -90,10 +140,13 @@ export function buildAssetPackPreview(
   // caller already parsed the document. This keeps imported state on the same
   // validation contract as an uploaded canonical character file.
   if (options.importedSelections) {
-    selections = importSelectionDocument(
+    const imported = importSelectionDocument(
       selectionJsonFromCore(options.importedSelections),
       { catalog, palettes: options.palettes },
     ).parsed.selections;
+    selections = options.bodyType
+      ? { ...imported, bodyType: options.bodyType }
+      : imported;
   }
 
   const focused = options.focusedAssetId

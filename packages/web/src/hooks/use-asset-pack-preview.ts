@@ -4,6 +4,7 @@ import {
   extractAnimation,
   makeResolvePalette,
   type Catalog,
+  type CanvasAdapter,
   type ComposedAnimation,
   type ComposedSheet,
   type CreditsManifest,
@@ -15,7 +16,7 @@ import { createBrowserCanvasAdapter } from '../adapter/browser-canvas-adapter';
 import {
   buildAssetPackPreview,
   createAssetPackPreviewCatalog,
-  isOfficialAssetPackPreviewPath,
+  createOfficialAssetPackPreviewPathAuthorizer,
   previewAnimationOptions,
   previewBodyTypeOptions,
   previewDirectionOptions,
@@ -107,6 +108,14 @@ function animationForSheet(sheet: ComposedSheet, requested: string | undefined):
   return sheet.animations[0] ?? 'walk';
 }
 
+export function extractLatestPreviewAnimation(
+  sheet: ComposedSheet,
+  requested: { readonly current: string | undefined },
+  adapter: CanvasAdapter,
+): ComposedAnimation {
+  return extractAnimation(sheet, animationForSheet(sheet, requested.current), { adapter });
+}
+
 export interface UseAssetPackPreviewOptions {
   readonly baseline: BrowserAssetPackBaseline;
   readonly payload?: AssetPackPreviewPayload;
@@ -123,6 +132,8 @@ export function useAssetPackPreview(options: UseAssetPackPreviewOptions) {
     result: previewResultForKey({ key: null, result: previewErrorResult('') }, null),
   });
   const requestIdRef = useRef(0);
+  const animationRef = useRef(options.animation);
+  animationRef.current = options.animation;
   const payload = options.payload;
   const catalog = payload
     ? createAssetPackPreviewCatalog(options.baseline.catalog, payload.compilePlan)
@@ -156,6 +167,7 @@ export function useAssetPackPreview(options: UseAssetPackPreviewOptions) {
         baselineCatalog: options.baseline.catalog,
         palettes: options.baseline.palettes,
         payload,
+        bodyType,
         ...(options.focusedAssetId ? { focusedAssetId: options.focusedAssetId } : {}),
         ...(importedForBody ? { importedSelections: importedForBody } : {}),
       });
@@ -182,7 +194,10 @@ export function useAssetPackPreview(options: UseAssetPackPreviewOptions) {
     const adapter = createAssetPackPreviewCanvasAdapter({
       payload,
       fallback,
-      isOfficialPath: isOfficialAssetPackPreviewPath,
+      isOfficialPath: createOfficialAssetPackPreviewPathAuthorizer(
+        options.baseline.catalog,
+        payload.compilePlan,
+      ),
     });
     void composeSelections(model.selections, {
       catalog: model.catalog,
@@ -201,7 +216,7 @@ export function useAssetPackPreview(options: UseAssetPackPreviewOptions) {
       },
     }).then((sheet) => {
       if (requestId !== requestIdRef.current || latestKeyRef.current !== key) return;
-      const animation = extractAnimation(sheet, animationForSheet(sheet, options.animation), { adapter });
+      const animation = extractLatestPreviewAnimation(sheet, animationRef, adapter);
       setStored({
         key,
         result: {
@@ -219,7 +234,7 @@ export function useAssetPackPreview(options: UseAssetPackPreviewOptions) {
     }).catch((error: unknown) => {
       if (requestId !== requestIdRef.current || latestKeyRef.current !== key) return;
       setStored({ key, result: previewErrorResult(error) });
-    });
+    }).finally(() => adapter.dispose());
   }, [fallback, importedForBody, key, options.baseline, options.focusedAssetId, payload]);
 
   useEffect(() => {
@@ -229,13 +244,16 @@ export function useAssetPackPreview(options: UseAssetPackPreviewOptions) {
     const adapter = createAssetPackPreviewCanvasAdapter({
       payload: payload!,
       fallback,
-      isOfficialPath: isOfficialAssetPackPreviewPath,
+      isOfficialPath: createOfficialAssetPackPreviewPathAuthorizer(
+        options.baseline.catalog,
+        payload.compilePlan,
+      ),
     });
-    const animation = extractAnimation(current.sheet, animationForSheet(current.sheet, options.animation), { adapter });
+    const animation = extractLatestPreviewAnimation(current.sheet, { current: options.animation }, adapter);
     setStored((latest) => latest.result.sheet === current.sheet
       ? { ...latest, result: { ...latest.result, animation } }
       : latest);
-  }, [fallback, key, options.animation, payload, stored.key]);
+  }, [fallback, key, options.animation, options.baseline.catalog, payload, stored.key]);
 
   const importCharacter = useCallback(async (file: TextJsonFile): Promise<void> => {
     if (!payload) throw new Error('No current asset-pack preview is available.');

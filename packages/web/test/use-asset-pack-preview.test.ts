@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  extractLatestPreviewAnimation,
   previewErrorResult,
   previewResultForKey,
   previewRequestKey,
@@ -46,5 +47,32 @@ describe('use asset-pack preview freshness', () => {
     const first = previewRequestKey({ revision: 4, bodyType: 'male', focusedAssetId: 'hair', importedDigest: 'same', sourceIdentity: 'bytes' });
     const second = previewRequestKey({ revision: 4, bodyType: 'male', focusedAssetId: 'hair', importedDigest: 'same', sourceIdentity: 'bytes' });
     expect(second).toBe(first);
+  });
+
+  it('extracts the latest animation requested while composition is pending', () => {
+    const canvas = {
+      width: 1,
+      height: 1,
+      getContext: () => ({
+        drawImage: () => undefined,
+      }),
+    } as never;
+    const sheet = {
+      canvas,
+      width: 1,
+      height: 1,
+      selections: { bodyType: 'male', items: {} },
+      credits: { entries: [], resolvedPaths: [], licenses: [] },
+      layers: [],
+      animations: ['walk', 'slash'],
+    } as const;
+    const adapter = {
+      createCanvas: () => canvas,
+      loadImage: async () => ({ width: 1, height: 1 }),
+    };
+    const latestAnimation = { current: 'slash' };
+
+    expect(extractLatestPreviewAnimation(sheet, latestAnimation, adapter).animation)
+      .toBe('slash');
   });
 });
