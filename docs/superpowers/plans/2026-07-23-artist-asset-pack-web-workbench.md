@@ -992,7 +992,7 @@ Record the full hash and PASS evidence, then commit the plan record separately.
 - Consumes: shared runtime/PNG interfaces, Core baseline projections, official catalog/palettes, root `asset-release.json`, CLI package version at build time.
 - Produces: `createBrowserAssetPackFormatRuntime`, `browserAssetPackPngDecoder`, and `loadBrowserAssetPackBaseline`.
 
-- [ ] **Step 1: Write failing Web Crypto and bounded-inflate tests**
+- [x] **Step 1: Write failing Web Crypto and bounded-inflate tests**
 
 Assert SHA-256 of `hello`, strict UTF-8 failure, exact UTF-8 round trip,
 successful raw-DEFLATE, declared-size mismatch, and a stream whose second
@@ -1014,7 +1014,9 @@ await expect(runtime.inflateRawBounded({
 
 The implementation must cancel the reader immediately when accumulated output would exceed the bound. Trailing-input detection belongs to the shared Task 3 `inspectRawDeflate` preflight and must run before this adapter is invoked; do not claim `DecompressionStream` itself enforces exact compressed-input consumption.
 
-- [ ] **Step 2: Write failing browser archive conformance tests**
+  - RED coverage included SHA-256/strict UTF-8, raw-DEFLATE bounds, declared-size mismatch, overflow cancellation, and reader cancellation behavior.
+
+- [x] **Step 2: Write failing browser archive conformance tests**
 
 Copy the frozen minimal Phase 2 archive hex and expected snapshots established
 in Task 3 into `asset-pack-format-conformance.test.ts`. Inspect those exact
@@ -1030,15 +1032,21 @@ condition only for this conformance case; adapter capability-error behavior
 remains covered unconditionally by the injected unit tests and browser E2E
 must run the conformance flow without a skip.
 
-- [ ] **Step 3: Write failing worker-safe PNG decoder tests**
+  - Added independent frozen Task 3 archive bytes and expected archive/content/source digests, normalized manifest, diagnostics, unsafe/repairable/stored/no-inflater, declared-size, and Chromium E2E parity vectors.
+
+- [x] **Step 3: Write failing worker-safe PNG decoder tests**
 
 Inject `createImageBitmap` and `OffscreenCanvas` factories. Assert decoded width, height, full RGBA byte order, bitmap close, canvas dimension, and deterministic capability diagnostics when either API is unavailable. Do not use `document`, `HTMLImageElement`, or object URLs in this adapter.
 
-- [ ] **Step 4: Write failing official baseline tests**
+  - RED tests covered decoded dimensions/RGBA bytes, bitmap cleanup, canvas sizing, and missing worker capability diagnostics.
+
+- [x] **Step 4: Write failing official baseline tests**
 
 Build a tiny Catalog with reversed insertion order and assert stable definition/credit digests, palettes, `asset-release.json` tag, and `__LPC_CLI_VERSION__`. The baseline result must match the Node projection hashes for the same definitions.
 
-- [ ] **Step 5: Run focused Web tests and verify RED**
+  - Added reversed-insertion-order stability checks, literal Node projection definition/credit hashes, palettes, release tag, and CLI version metadata assertions.
+
+- [x] **Step 5: Run focused Web tests and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-format-runtime.test.ts asset-pack-format-conformance.test.ts asset-pack-png-decoder.test.ts asset-pack-baseline.test.ts
@@ -1046,7 +1054,9 @@ rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-format-runtime.test.ts ass
 
 Expected: FAIL because browser adapters and build constants do not exist.
 
-- [ ] **Step 6: Implement bounded browser runtime**
+  - RED: the initial focused run failed at module loading with four missing adapter/baseline suites; the existing pretest IPC hook required the approved sandbox-external rerun.
+
+- [x] **Step 6: Implement bounded browser runtime**
 
 `inflateRawBounded` pipes a Blob stream through `DecompressionStream('deflate-raw')`, reads chunks, checks `total + chunk.byteLength` before retaining each chunk, cancels on violation, requires exact declared length, and copies the final bytes. Report unsupported APIs through a typed `AssetPackBrowserCapabilityError` with code `asset_browser_capability_missing`.
 
@@ -1060,7 +1070,9 @@ const hex = [...new Uint8Array(digest)]
 return `sha256:${hex}`;
 ```
 
-- [ ] **Step 7: Implement PNG decoder and baseline loading**
+  - Implemented Web Crypto SHA-256, fatal UTF-8, bounded raw-DEFLATE with pre-retain cancellation and declared-size checks, plus unconditional capability-error tests.
+
+- [x] **Step 7: Implement PNG decoder and baseline loading**
 
 Decode one Blob with `createImageBitmap`, draw it once to `OffscreenCanvas`, copy `getImageData(...).data`, and close the bitmap in `finally`.
 
@@ -1076,7 +1088,9 @@ Declare the constant as `string` in `vite-env.d.ts`. Add
 `@lpc-toolkit/asset-pack-format` as a Web runtime workspace dependency and add
 its aliases to Vite, Vitest, and TypeScript.
 
-- [ ] **Step 8: Verify GREEN**
+  - Implemented worker-safe PNG decoding and canonical Core baseline projections; derived Vite/Vitest CLI version metadata and added the workspace alias/lockfile entry.
+
+- [x] **Step 8: Verify GREEN**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-format-runtime.test.ts asset-pack-format-conformance.test.ts asset-pack-png-decoder.test.ts asset-pack-baseline.test.ts
@@ -1086,7 +1100,9 @@ rtk pnpm check:boundaries
 
 Expected: PASS without reading `upstream/` or fetching a base release.
 
-- [ ] **Step 9: Commit Task 7**
+  - PASS: focused Web suites (5 files, 19 tests), missing-capability simulations (2 skipped platform cases), Web typecheck, `rtk pnpm check:boundaries`, Chromium E2E (1 test, no skip), frozen-lockfile install, and `rtk git diff --check`.
+
+- [x] **Step 9: Commit Task 7**
 
 ```sh
 rtk git add packages/web/src/adapter/asset-pack-format-runtime.ts packages/web/src/adapter/asset-pack-png-decoder.ts packages/web/src/lib/asset-pack-baseline.ts packages/web/src/vite-env.d.ts packages/web/test/asset-pack-format-runtime.test.ts packages/web/test/asset-pack-format-conformance.test.ts packages/web/test/asset-pack-png-decoder.test.ts packages/web/test/asset-pack-baseline.test.ts packages/web/package.json packages/web/tsconfig.json packages/web/vitest.config.ts packages/web/vite.config.ts
@@ -1094,6 +1110,11 @@ rtk git commit -m "feat(web): add safe asset pack browser adapters"
 ```
 
 Record the full hash and PASS evidence, then commit the plan record separately.
+
+  - Product Commit: `7772ae85b46e5e87f7c5edd0d2371534a4d720c2` (`feat(web): add safe asset pack browser adapters`)
+  - Review Fix Commits: `bd30d3e0e6f66dc21091a34711d3c183b80256c9` (`fix(web): complete asset pack adapter parity`) and `247d2c783a26d99bd60f436717696cbce82f2ff1` (`fix(web): skip unsupported archive conformance`).
+  - Evidence Commits: `e2da51281e5069d1bd59c18839976c0e796e157f`, `eda50e6b86b1f135ad601168f8e227828931f61e`, and `760fc00a59e75a3af2a4d9cb54011ded34562244` (Task 7 verification/review-fix reports).
+  - Independent final review: capability skip fixed; no Critical or remaining product Important findings. The separate plan-record commit follows this update.
 
 ---
 
