@@ -21,6 +21,8 @@ describe('asset-pack workbench reducer', () => {
     let state = createAssetPackWorkbenchState();
     state = assetPackWorkbenchReducer(state, { type: 'upload-accepted', file });
     expect(state.phase).toBe('opening');
+    expect(state.formalBlockers.map(({ code }) => code)).toEqual(['missing-candidate']);
+    expect(state.ready).toBe(false);
     state = assetPackWorkbenchReducer(state, { type: 'worker-response', response: response(1, 0) });
     expect(state.phase).toBe('editing');
     state = assetPackWorkbenchReducer(state, { type: 'navigate', panel: 'credits' });
@@ -160,6 +162,15 @@ describe('asset-pack workbench reducer', () => {
     expect(retry.acceptedEdits).toEqual(state.acceptedEdits);
     const reset = assetPackWorkbenchReducer(retry, { type: 'reset' });
     expect(reset).toEqual(createAssetPackWorkbenchState());
+  });
+
+  it('keeps retry opening blocked when the prior state had no formal blockers', () => {
+    let state = assetPackWorkbenchReducer(createAssetPackWorkbenchState(), { type: 'upload-accepted', file });
+    state = assetPackWorkbenchReducer(state, { type: 'formal-blockers', blockers: [] });
+    const retry = assetPackWorkbenchReducer(state, { type: 'retry' });
+    expect(retry.phase).toBe('opening');
+    expect(retry.formalBlockers.map(({ code }) => code)).toEqual(['missing-candidate']);
+    expect(retry.ready).toBe(false);
   });
 
   it('marks unsafe uploads without retaining editable recovery data', () => {

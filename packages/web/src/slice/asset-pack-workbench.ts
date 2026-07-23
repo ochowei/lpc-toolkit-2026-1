@@ -19,6 +19,11 @@ interface AssetPackPendingEdit {
   readonly edit: AssetPackAcceptedEditInput;
 }
 
+const missingCandidateBlocker: AssetPackFormalBlocker = {
+  code: 'missing-candidate',
+  message: 'The current revision has no verified formal archive candidate.',
+};
+
 export interface AssetPackWorkbenchState {
   readonly phase: AssetPackWorkbenchPhase;
   readonly activePanel: AssetPackWorkbenchPanel;
@@ -70,6 +75,7 @@ export function assetPackWorkbenchReducer(
     case 'upload-accepted':
       return withReady({
         ...createAssetPackWorkbenchState(), phase: 'opening', originalFile: action.file,
+        formalBlockers: [missingCandidateBlocker],
       });
     case 'worker-unsafe':
       return withReady({
@@ -119,7 +125,13 @@ export function assetPackWorkbenchReducer(
     }
     case 'retry': {
       const { pendingRequestId: _pendingRequestId, error: _error, progress: _progress, ...withoutTransient } = state;
-      return { ...withoutTransient, phase: 'opening', revision: 0, pendingEdits: [] };
+      return withReady({
+        ...withoutTransient,
+        phase: 'opening',
+        revision: 0,
+        pendingEdits: [],
+        formalBlockers: state.formalBlockers.length > 0 ? state.formalBlockers : [missingCandidateBlocker],
+      });
     }
     case 'navigate':
       return { ...state, activePanel: action.panel };
@@ -144,6 +156,9 @@ function reduceWorkerResponse(state: AssetPackWorkbenchState, response: AssetPac
     return assetPackWorkbenchReducer(state, { type: 'progress', requestId: response.requestId, revision: response.revision, stage: response.stage });
   }
   const openingReplay = state.phase === 'opening' && response.type === 'session' && response.revision === 0;
+  if (response.type === 'session' && response.outcome === 'editing' && response.revision < state.revision) {
+    return recordAcceptedStaleEdit(state, response.revision);
+  }
   if (!openingReplay && state.pendingRequestId !== undefined && response.requestId !== state.pendingRequestId) return state;
   if (!openingReplay && response.revision !== state.revision) return state;
   if (response.type === 'session' && response.outcome === 'unsafe') {
@@ -175,11 +190,25 @@ function reduceWorkerResponse(state: AssetPackWorkbenchState, response: AssetPac
     revision: openingReplay ? state.revision : current.revision,
     ...(originalReleaseFingerprint ? { originalReleaseFingerprint } : {}),
     originalUploadMetadata,
-    pendingEdits: state.pendingEdits.filter((candidate) => candidate.revision > response.revision),
+    pendingEdits: state.pendingEdits.filter((candidate) => candidate.revision !== response.revision),
     acceptedEdits,
     workbench,
     diagnostics: current.diagnostics,
     formalBlockers: blockers,
+  });
+}
+
+function recordAcceptedStaleEdit(
+  state: AssetPackWorkbenchState,
+  revision: number,
+): AssetPackWorkbenchState {
+  const pending = state.pendingEdits.find((candidate) => candidate.revision === revision);
+  if (!pending || state.acceptedEdits.some((candidate) => candidate.revision === revision)) return state;
+  const acceptedEdit = { ...pending.edit, revision } as AssetPackAcceptedEdit;
+  return withReady({
+    ...state,
+    acceptedEdits: [...state.acceptedEdits, acceptedEdit].sort((left, right) => left.revision - right.revision),
+    pendingEdits: state.pendingEdits.filter((candidate) => candidate.revision !== revision),
   });
 }
 

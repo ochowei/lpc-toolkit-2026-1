@@ -19,6 +19,11 @@ export type AssetPackWorkerTerminalResponse = Extract<
   { readonly type: 'session' | 'assembled' | 'failed' }
 >;
 
+export type AssetPackWorkerAcceptedSessionResponse = Extract<
+  AssetPackWorkerResponse,
+  { readonly type: 'session'; readonly outcome: 'editing' }
+>;
+
 export class AssetPackWorkerStaleResponseError extends Error {
   override readonly name = 'AssetPackWorkerStaleResponseError';
 
@@ -52,6 +57,7 @@ export interface AssetPackWorkerClient {
 export interface CreateAssetPackWorkerClientOptions {
   readonly port: AssetPackWorkerPort;
   readonly onResponse?: (response: AssetPackWorkerResponse) => void;
+  readonly onStaleAcceptedResponse?: (response: AssetPackWorkerAcceptedSessionResponse) => void;
   readonly onError?: (error: Error) => void;
 }
 
@@ -83,6 +89,9 @@ export function createAssetPackWorkerClient(
       && response.revision === 0;
     if (expectedRequestId !== response.requestId || (response.revision !== currentRevision && !isOpenResponse)) {
       const stale = pending.get(response.requestId);
+      if (stale && response.type === 'session' && response.outcome === 'editing') {
+        options.onStaleAcceptedResponse?.(response);
+      }
       if (stale) {
         pending.delete(response.requestId);
         stale.reject(new AssetPackWorkerStaleResponseError(response.requestId, response.revision));

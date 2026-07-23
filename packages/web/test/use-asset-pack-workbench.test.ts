@@ -59,6 +59,47 @@ const editingWithError = (requestId: number): AssetPackWorkerResponse => ({
 });
 
 describe('useAssetPackWorkbench orchestration', () => {
+  it('keeps opening non-ready and refuses formal assembly before the first Worker revision', async () => {
+    const workers = workerFactory();
+    const controller = new AssetPackWorkbenchController({ baseline, workerFactory: workers.factory });
+    const upload = controller.upload(new File(['zip'], 'original.zip'));
+
+    expect(controller.state.phase).toBe('opening');
+    expect(controller.state.formalBlockers.map(({ code }) => code)).toEqual(['missing-candidate']);
+    expect(controller.state.ready).toBe(false);
+    await expect(controller.assemble('formal')).rejects.toMatchObject({
+      name: 'AssetPackFormalAssemblyBlockedError',
+      blockers: [{ code: 'missing-candidate' }],
+    });
+    expect(workers.workers[0]!.messages).toHaveLength(1);
+    controller.dispose();
+    await expect(upload).rejects.toThrow('disposed');
+  });
+
+  it('preserves the unsafe blocker when formal assembly is attempted', async () => {
+    const workers = workerFactory();
+    const controller = new AssetPackWorkbenchController({ baseline, workerFactory: workers.factory });
+    const upload = controller.upload(new File(['zip'], 'unsafe.zip'));
+    workers.workers[0]!.emit({
+      type: 'session',
+      requestId: 1,
+      revision: 0,
+      outcome: 'unsafe',
+      diagnostics: [{ code: 'unsafe_zip', severity: 'error', message: 'unsafe', scope: 'archive' }],
+    });
+    await upload;
+
+    const messageCount = workers.workers[0]!.messages.length;
+    await expect(controller.assemble('formal')).rejects.toMatchObject({
+      name: 'AssetPackFormalAssemblyBlockedError',
+      blockers: [{ code: 'unsafe-archive' }],
+    });
+    expect(controller.state.formalBlockers.map(({ code }) => code)).toEqual(['unsafe-archive']);
+    expect(controller.state.ready).toBe(false);
+    expect(workers.workers[0]!.messages).toHaveLength(messageCount);
+    controller.dispose();
+  });
+
   it('computes authoritative formal blockers and refuses formal assembly while not ready', async () => {
     const workers = workerFactory();
     const controller = new AssetPackWorkbenchController({ baseline, workerFactory: workers.factory });
@@ -173,6 +214,49 @@ describe('useAssetPackWorkbench orchestration', () => {
     expect(controller.state.originalFile).toBe(original);
     controller.dispose();
     expect(workers.workers[1]!.terminate).toHaveBeenCalledTimes(1);
+  });
+
+  it('retains every accepted concurrent edit for contiguous retry replay after stale replies', async () => {
+    const workers = workerFactory();
+    const controller = new AssetPackWorkbenchController({ baseline, workerFactory: workers.factory });
+    const original = new File(['zip'], 'original.zip');
+    const opened = controller.upload(original);
+    workers.workers[0]!.emit(editing(1, 0));
+    await opened;
+
+    const manifest = controller.replaceManifest('{"version":"2.0.0"}', 'advanced-json');
+    const source = controller.replaceSource('sprites/a.png', new File(['a'], 'a.png'));
+    const remove = controller.removeSource('sprites/b.png');
+    const requests = workers.workers[0]!.messages.slice(1) as Array<{ readonly requestId: number; readonly revision: number; readonly type: string }>;
+    expect(requests.map(({ type, revision }) => [type, revision])).toEqual([
+      ['replace-manifest', 1],
+      ['replace-source', 2],
+      ['remove-source', 3],
+    ]);
+
+    workers.workers[0]!.emit(editing(requests[2]!.requestId, 3));
+    workers.workers[0]!.emit(editing(requests[1]!.requestId, 2));
+    workers.workers[0]!.emit(editing(requests[0]!.requestId, 1));
+    await Promise.allSettled([manifest, source, remove]);
+
+    expect(controller.state.acceptedEdits.map(({ revision }) => revision)).toEqual([1, 2, 3]);
+    controller.workerFailed(new Error('crashed'));
+    const retry = controller.retry();
+    expect(workers.factory).toHaveBeenCalledTimes(2);
+    workers.workers[1]!.emit(editing(1, 0));
+    for (const expectedRevision of [1, 2, 3]) {
+      await Promise.resolve();
+      const message = workers.workers[1]!.messages.at(-1) as { readonly requestId: number; readonly revision: number; readonly type: string };
+      expect(message).toMatchObject({ type: expectedRevision === 1 ? 'replace-manifest' : expectedRevision === 2 ? 'replace-source' : 'remove-source', revision: expectedRevision });
+      workers.workers[1]!.emit(editing(message.requestId, expectedRevision));
+    }
+    await retry;
+
+    expect(controller.state.revision).toBe(3);
+    expect(controller.state.workbench?.revision).toBe(3);
+    expect(controller.state.acceptedEdits.map(({ revision }) => revision)).toEqual([1, 2, 3]);
+    expect((workers.workers[1]!.messages.slice(1) as Array<{ readonly revision: number }>).map(({ revision }) => revision)).toEqual([1, 2, 3]);
+    controller.dispose();
   });
 
   it('resets and replaces clients on a new upload while retaining no decoded byte maps', async () => {

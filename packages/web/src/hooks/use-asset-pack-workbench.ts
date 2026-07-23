@@ -161,6 +161,7 @@ export class AssetPackWorkbenchController {
     const client = createAssetPackWorkerClient({
       port: this.workerFactory(),
       onResponse: (response) => this.handleResponse(response),
+      onStaleAcceptedResponse: (response) => this.handleResponse(response),
       onError: (error) => this.workerFailed(error),
     });
     this.currentClient = client;
@@ -169,22 +170,14 @@ export class AssetPackWorkbenchController {
 
   private handleResponse(response: AssetPackWorkerResponse): void {
     this.dispatch({ type: 'worker-response', response });
-    if (response.type === 'session' && response.outcome === 'editing') {
-      const blockers = assetPackFormalBlockers({
-        workbench: response.workbench,
-        ...(this.currentState.originalReleaseFingerprint ?? response.workbench.releaseFingerprint
-          ? { originalReleaseFingerprint: this.currentState.originalReleaseFingerprint ?? response.workbench.releaseFingerprint }
-          : {}),
-        originalUploadMetadata: this.currentState.originalUploadMetadata ?? response.workbench.uploadMetadata,
-      });
-      this.dispatch({ type: 'formal-blockers', blockers });
-    }
   }
 
   private currentFormalBlockers(): readonly AssetPackFormalBlocker[] {
     const workbench = this.currentState.workbench;
     if (!workbench) {
-      return [{ code: 'missing-candidate', message: 'The current revision has no verified formal archive candidate.' }];
+      return this.currentState.formalBlockers.length > 0
+        ? this.currentState.formalBlockers
+        : [{ code: 'missing-candidate', message: 'The current revision has no verified formal archive candidate.' }];
     }
     const currentRevisionWorkbench = workbench.revision === this.currentState.revision
       ? workbench
