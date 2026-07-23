@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import type { AssetPackOverviewProjection } from '../src/lib/asset-pack-manifest-editor';
-import { OverviewEditor } from '../src/components/asset-pack-workbench/overview-editor';
+import { OverviewEditor, synchronizeOverviewDraft } from '../src/components/asset-pack-workbench/overview-editor';
 
 const projection: AssetPackOverviewProjection = {
   id: 'acme.demo',
@@ -11,6 +11,13 @@ const projection: AssetPackOverviewProjection = {
 };
 
 describe('OverviewEditor', () => {
+  it('synchronizes Worker-approved revisions without overwriting an actively edited field', () => {
+    expect(synchronizeOverviewDraft({ id: 'old', displayName: 'old', version: '1.0.0', minimumCliVersion: '', requiredCapabilities: '' }, projection, new Set())).toEqual({
+      id: 'acme.demo', displayName: 'Demo pack', version: '1.2.3', minimumCliVersion: '2.0.0', requiredCapabilities: 'sprites, recolor',
+    });
+    expect(synchronizeOverviewDraft({ id: 'typed', displayName: 'old', version: '1.0.0', minimumCliVersion: '', requiredCapabilities: '' }, projection, new Set(['id']))).toMatchObject({ id: 'typed', displayName: 'Demo pack', version: '1.2.3' });
+  });
+
   it('labels every overview field and renders current diagnostic text', () => {
     const html = renderToStaticMarkup(<OverviewEditor
       projection={projection}

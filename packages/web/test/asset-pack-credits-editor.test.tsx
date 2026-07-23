@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import type { AssetPackCreditsProjection } from '../src/lib/asset-pack-manifest-editor';
-import { CreditsEditor } from '../src/components/asset-pack-workbench/credits-editor';
+import { CreditsEditor, synchronizeCreditsDraft } from '../src/components/asset-pack-workbench/credits-editor';
 
 const credits: AssetPackCreditsProjection = {
   authors: ['Artist One'],
@@ -11,6 +11,11 @@ const credits: AssetPackCreditsProjection = {
 };
 
 describe('CreditsEditor', () => {
+  it('synchronizes clean credit projections and reports a conflict for active typing', () => {
+    expect(synchronizeCreditsDraft({ credits, dirty: false }, { ...credits, notes: 'Updated' })).toEqual({ credits: { ...credits, notes: 'Updated' }, conflict: false });
+    expect(synchronizeCreditsDraft({ credits: { ...credits, notes: 'Typing' }, dirty: true }, { ...credits, notes: 'Updated' })).toEqual({ credits: { ...credits, notes: 'Typing' }, conflict: true });
+  });
+
   it('renders repeatable credit fields, notes, and credit override navigation', () => {
     const html = renderToStaticMarkup(<CreditsEditor
       credits={credits}

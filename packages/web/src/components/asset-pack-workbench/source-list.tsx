@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { ChangeEvent } from 'react';
 import type { AssetPackSourceSummary } from '../../lib/asset-pack-worker-protocol';
 import type { AssetPackWorkbenchDiagnostic } from '../../lib/asset-pack-worker-protocol';
-import { diagnosticTargetId } from './diagnostic-list';
+import { diagnosticTargetId, DiagnosticTarget } from './diagnostic-list';
 
 export interface SourceListProps {
   readonly summaries: readonly AssetPackSourceSummary[];
@@ -34,8 +34,9 @@ export function SourceList({ summaries, diagnostics = [], onReplace, onRemove }:
       {error && <p role="alert" className="mt-2 text-sm text-red-700">{error}</p>}
       <div className="mt-4 space-y-3">{summaries.map((summary) => {
         const canRemove = !summary.referenced && summary.consumerCount === 0;
-        const diagnostic = diagnostics.find((entry) => entry.path === summary.path);
-        return <article id={diagnostic ? diagnosticTargetId(diagnostic) : undefined} key={summary.path} className="rounded border border-border bg-surface-2 p-3">
+        const sourceDiagnostics = diagnostics.filter((entry) => entry.path === summary.path);
+        return <article key={summary.path} className="rounded border border-border bg-surface-2 p-3">
+          {sourceDiagnostics.map((diagnostic) => <DiagnosticTarget key={diagnosticTargetId(diagnostic)} diagnostic={diagnostic}><span className="sr-only">{diagnostic.message}</span></DiagnosticTarget>)}
           <h4 className="break-all font-mono text-sm text-text">{summary.path}</h4>
           <p className="mt-1 text-xs text-text-2">{summary.consumerCount} consumers · {summary.width !== undefined && summary.height !== undefined ? `${String(summary.width)} × ${String(summary.height)}` : 'dimensions pending'} · {summary.digest ?? 'digest pending'}</p>
           <p className="mt-1 text-xs text-text-mute">State: {summary.state}</p>
@@ -47,7 +48,9 @@ export function SourceList({ summaries, diagnostics = [], onReplace, onRemove }:
               : <button type="button" className="rounded border border-border px-2 py-1 text-xs text-text" onClick={() => setConfirmingPath(summary.path)}>Remove</button>)}
           </div>
         </article>;
-      })}</div>
+      })}
+      {diagnostics.filter((diagnostic) => !summaries.some((summary) => summary.path === diagnostic.path)).map((diagnostic) => <DiagnosticTarget key={diagnosticTargetId(diagnostic)} diagnostic={diagnostic}><span className="sr-only">{diagnostic.message}</span></DiagnosticTarget>)}
+      </div>
     </section>
   );
 }

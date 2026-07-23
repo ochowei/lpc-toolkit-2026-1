@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import type { AssetPackAcknowledgement } from '@lpc-toolkit/core';
 import type { AssetPackWorkbenchDiagnostic } from '../../lib/asset-pack-worker-protocol';
-import { diagnosticTargetId } from './diagnostic-list';
+import { diagnosticTargetId, DiagnosticTarget } from './diagnostic-list';
 
 export interface WarningsEditorProps {
   readonly warnings: readonly AssetPackAcknowledgement[];
   readonly acknowledgementRecords: readonly AssetPackAcknowledgement[];
   readonly diagnostics?: readonly AssetPackWorkbenchDiagnostic[] | undefined;
+  readonly revision?: number | undefined;
   readonly versionBlocked: boolean;
   readonly onAcknowledge: (candidate: AssetPackAcknowledgement, reason: string) => void;
 }
@@ -22,8 +23,9 @@ export function WarningsEditor({ warnings, acknowledgementRecords, diagnostics =
         const imported = acknowledgementRecords.find((record) => acknowledgementKey(record) === acknowledgementKey(warning));
         const reason = reasons[key] ?? imported?.reason ?? '';
         const confirmed = imported !== undefined && imported.reason.trim().length !== 0;
-        const diagnostic = diagnostics.find((entry) => entry.code === warning.code && canonical(entry.subject) === canonical(warning.subject));
-        return <article id={diagnostic ? diagnosticTargetId(diagnostic) : undefined} key={key} className="rounded border border-border bg-surface-2 p-3">
+        const warningDiagnostics = diagnostics.filter((entry) => entry.code === warning.code && canonical(entry.subject) === canonical(warning.subject));
+        return <article key={key} className="rounded border border-border bg-surface-2 p-3">
+          {warningDiagnostics.map((diagnostic) => <DiagnosticTarget key={diagnosticTargetId(diagnostic)} diagnostic={diagnostic}><span className="sr-only">{diagnostic.message}</span></DiagnosticTarget>)}
           <h4 className="font-mono text-sm font-semibold text-text">{warning.code}</h4>
           <dl className="mt-2 space-y-1 text-xs text-text-2">
             <div><dt className="inline font-semibold">Subject: </dt><dd className="inline font-mono">{JSON.stringify(warning.subject)}</dd></div>
@@ -35,7 +37,9 @@ export function WarningsEditor({ warnings, acknowledgementRecords, diagnostics =
           {versionBlocked && <p className="mt-2 text-xs text-red-700">Set the release version first before confirming this warning.</p>}
           <button type="button" disabled={versionBlocked || confirmed || reason.trim().length === 0} className="mt-3 rounded bg-accent px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50" onClick={() => onAcknowledge(warning, reason)}>Confirm</button>
         </article>;
-      })}</div>
+      })}
+      {diagnostics.filter((diagnostic) => !warnings.some((warning) => warning.code === diagnostic.code && canonical(warning.subject) === canonical(diagnostic.subject))).map((diagnostic) => <DiagnosticTarget key={diagnosticTargetId(diagnostic)} diagnostic={diagnostic}><span className="sr-only">{diagnostic.message}</span></DiagnosticTarget>)}
+      </div>
     </section>
   );
 }
