@@ -34,6 +34,103 @@ describe('asset-pack workbench reducer', () => {
     expect(state.latestDownloadedRevision).toBe(1);
   });
 
+  it('commits an edit to the replay log only after the matching Worker revision is accepted', () => {
+    let state = createAssetPackWorkbenchState();
+    state = assetPackWorkbenchReducer(state, { type: 'upload-accepted', file });
+    state = assetPackWorkbenchReducer(state, { type: 'worker-response', response: response(1, 0) });
+    state = assetPackWorkbenchReducer(state, {
+      type: 'edit-requested',
+      revision: 1,
+      edit: { kind: 'replace-manifest', manifestText: '{"version":"2.0.0"}', origin: 'advanced-json' },
+    });
+    expect(state.acceptedEdits).toEqual([]);
+    expect(state.revision).toBe(1);
+
+    state = assetPackWorkbenchReducer(state, {
+      type: 'worker-response',
+      response: response(2, 1),
+    });
+    expect(state.acceptedEdits).toEqual([{
+      kind: 'replace-manifest',
+      manifestText: '{"version":"2.0.0"}',
+      origin: 'advanced-json',
+      revision: 1,
+    }]);
+  });
+
+  it('removes a rejected current-revision edit without making it replayable', () => {
+    let state = createAssetPackWorkbenchState();
+    state = assetPackWorkbenchReducer(state, { type: 'upload-accepted', file });
+    state = assetPackWorkbenchReducer(state, { type: 'worker-response', response: response(1, 0) });
+    state = assetPackWorkbenchReducer(state, {
+      type: 'edit-requested',
+      revision: 1,
+      edit: { kind: 'remove-source', path: 'sprites/a.png' },
+    });
+    state = assetPackWorkbenchReducer(state, {
+      type: 'worker-response',
+      response: {
+        type: 'failed',
+        requestId: 2,
+        revision: 1,
+        diagnostic: { code: 'asset_acknowledgement_edit_forbidden', severity: 'error', message: 'rejected', scope: 'warning' },
+      },
+    });
+    expect(state.acceptedEdits).toEqual([]);
+    expect(state.phase).toBe('failed');
+  });
+
+  it('recomputes formal blockers when a new revision is requested and when Worker governance rejects it', () => {
+    let state = createAssetPackWorkbenchState();
+    state = assetPackWorkbenchReducer(state, { type: 'upload-accepted', file });
+    state = assetPackWorkbenchReducer(state, { type: 'worker-response', response: response(1, 0) });
+    state = assetPackWorkbenchReducer(state, {
+      type: 'edit-requested',
+      revision: 1,
+      edit: { kind: 'remove-source', path: 'sprites/a.png' },
+    });
+    expect(state.formalBlockers.some(({ code }) => code === 'missing-candidate')).toBe(true);
+    expect(state.ready).toBe(false);
+
+    state = assetPackWorkbenchReducer(state, {
+      type: 'worker-response',
+      response: {
+        type: 'failed',
+        requestId: 2,
+        revision: 1,
+        diagnostic: { code: 'asset_acknowledgement_edit_forbidden', severity: 'error', message: 'rejected', scope: 'warning' },
+      },
+    });
+    expect(state.formalBlockers.some(({ code }) => code === 'validation-error')).toBe(true);
+    expect(state.ready).toBe(false);
+  });
+
+  it('clears assembly transient state before recording the matching downloaded revision', () => {
+    let state = createAssetPackWorkbenchState();
+    state = assetPackWorkbenchReducer(state, { type: 'upload-accepted', file });
+    state = assetPackWorkbenchReducer(state, { type: 'worker-response', response: response(1, 0) });
+    state = assetPackWorkbenchReducer(state, { type: 'request-started', requestId: 2, revision: 0 });
+    state = assetPackWorkbenchReducer(state, { type: 'progress', requestId: 2, revision: 0, stage: 'assembling-archive' });
+    const assembled = assetPackWorkbenchReducer(state, {
+      type: 'worker-response',
+      response: {
+        type: 'assembled',
+        requestId: 2,
+        revision: 0,
+        kind: 'draft',
+        archiveBytes: new ArrayBuffer(0),
+        archiveDigest: `sha256:${'1'.repeat(64)}`,
+        filename: 'asset-pack.draft.lpc-assets.zip',
+        uploadMetadata: revision.uploadMetadata,
+      },
+    });
+    expect(assembled.phase).toBe('editing');
+    expect(assembled.pendingRequestId).toBeUndefined();
+    expect(assembled.progress).toBeUndefined();
+    const downloaded = assetPackWorkbenchReducer(assembled, { type: 'downloaded', revision: 0 });
+    expect(downloaded.latestDownloadedRevision).toBe(0);
+  });
+
   it('rejects reverse stale responses by request ID and revision', () => {
     let state = createAssetPackWorkbenchState();
     state = assetPackWorkbenchReducer(state, { type: 'upload-accepted', file });

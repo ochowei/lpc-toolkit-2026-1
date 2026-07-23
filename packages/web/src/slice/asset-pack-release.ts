@@ -3,7 +3,10 @@ import {
   parseAssetPackSemver,
   type AssetPackAcknowledgement,
 } from '@lpc-toolkit/core';
-import type { AssetPackWorkbenchRevision } from '../lib/asset-pack-worker-protocol';
+import type {
+  AssetPackWorkerUploadMetadata,
+  AssetPackWorkbenchRevision,
+} from '../lib/asset-pack-worker-protocol';
 
 export type AssetPackFormalBlockerCode =
   | 'unsafe-archive'
@@ -24,6 +27,7 @@ export interface AssetPackFormalBlocker {
 export interface AssetPackFormalGateInput {
   readonly workbench: AssetPackWorkbenchRevision;
   readonly originalReleaseFingerprint?: string;
+  readonly originalUploadMetadata?: AssetPackWorkerUploadMetadata;
   readonly unsafe?: boolean;
 }
 
@@ -71,15 +75,16 @@ export function assetPackFormalBlockers(
   return blockers;
 
   function requiresVersionIncrease(gate: AssetPackFormalGateInput): boolean {
-    const uploaded = gate.workbench.uploadMetadata.uploadedVersion;
+    const originalUpload = gate.originalUploadMetadata ?? gate.workbench.uploadMetadata;
+    const uploaded = originalUpload.uploadedVersion;
     if (!uploaded || !parseAssetPackSemver(uploaded) || !currentVersion) return false;
     const releaseChanged = gate.originalReleaseFingerprint !== undefined
       && gate.workbench.releaseFingerprint !== undefined
       && gate.originalReleaseFingerprint !== gate.workbench.releaseFingerprint;
     const formalBytesChanged = gate.workbench.formalCandidate !== undefined
       && (gate.workbench.formalCandidate.byteIdenticalToUploadedFormal === false
-        || gate.workbench.formalCandidate.archiveDigest !== gate.workbench.uploadMetadata.originalArchiveDigest);
-    const draftUpload = gate.workbench.uploadMetadata.uploadedStatus === 'draft';
+        || gate.workbench.formalCandidate.archiveDigest !== originalUpload.originalArchiveDigest);
+    const draftUpload = originalUpload.uploadedStatus === 'draft';
     return (releaseChanged || formalBytesChanged || draftUpload)
       && compareAssetPackVersions(currentVersion, uploaded) <= 0;
   }

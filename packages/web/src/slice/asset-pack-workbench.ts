@@ -1,5 +1,5 @@
 import type { AssetPackWorkerProgressStage, AssetPackWorkerResponse, AssetPackWorkbenchRevision } from '../lib/asset-pack-worker-protocol';
-import type { AssetPackFormalBlocker } from './asset-pack-release';
+import { assetPackFormalBlockers, type AssetPackFormalBlocker } from './asset-pack-release';
 
 export type AssetPackWorkbenchPhase = 'empty' | 'opening' | 'unsafe' | 'editing' | 'validating' | 'assembling' | 'failed';
 export type AssetPackWorkbenchPanel = 'overview' | 'manifest' | 'sources' | 'warnings' | 'credits';
@@ -14,12 +14,20 @@ export type AssetPackAcceptedEditInput =
   | { readonly kind: 'replace-source'; readonly path: string; readonly file: File }
   | { readonly kind: 'remove-source'; readonly path: string };
 
+interface AssetPackPendingEdit {
+  readonly revision: number;
+  readonly edit: AssetPackAcceptedEditInput;
+}
+
 export interface AssetPackWorkbenchState {
   readonly phase: AssetPackWorkbenchPhase;
   readonly activePanel: AssetPackWorkbenchPanel;
   readonly revision: number;
   readonly originalFile?: File;
+  readonly originalUploadMetadata?: AssetPackWorkbenchRevision['uploadMetadata'];
+  readonly originalReleaseFingerprint?: string;
   readonly acceptedEdits: readonly AssetPackAcceptedEdit[];
+  readonly pendingEdits: readonly AssetPackPendingEdit[];
   readonly workbench?: AssetPackWorkbenchRevision;
   readonly diagnostics: readonly AssetPackWorkbenchRevision['diagnostics'][number][];
   readonly progress?: { readonly requestId: number; readonly revision: number; readonly stage: AssetPackWorkerProgressStage };
@@ -35,9 +43,12 @@ export type AssetPackWorkbenchAction =
   | { readonly type: 'worker-response'; readonly response: AssetPackWorkerResponse }
   | { readonly type: 'worker-unsafe'; readonly diagnostics: AssetPackWorkbenchState['diagnostics'] }
   | { readonly type: 'request-started'; readonly requestId: number; readonly revision: number }
+  | { readonly type: 'edit-requested'; readonly revision: number; readonly edit: AssetPackAcceptedEditInput }
+  | { readonly type: 'replay-requested'; readonly revision: number }
   | { readonly type: 'edit-accepted'; readonly edit: AssetPackAcceptedEditInput }
+  | { readonly type: 'edit-rejected'; readonly revision: number }
   | { readonly type: 'progress'; readonly requestId: number; readonly revision: number; readonly stage: AssetPackWorkerProgressStage }
-  | { readonly type: 'worker-failed'; readonly message: string }
+  | { readonly type: 'worker-failed'; readonly message: string; readonly diagnostic?: AssetPackWorkbenchState['diagnostics'][number] }
   | { readonly type: 'retry' }
   | { readonly type: 'navigate'; readonly panel: AssetPackWorkbenchPanel }
   | { readonly type: 'downloaded'; readonly revision: number }
@@ -46,7 +57,7 @@ export type AssetPackWorkbenchAction =
 
 export function createAssetPackWorkbenchState(): AssetPackWorkbenchState {
   return withReady({
-    phase: 'empty', activePanel: 'overview', revision: 0, acceptedEdits: [],
+    phase: 'empty', activePanel: 'overview', revision: 0, acceptedEdits: [], pendingEdits: [],
     diagnostics: [], formalBlockers: [],
   });
 }
@@ -63,11 +74,27 @@ export function assetPackWorkbenchReducer(
     case 'worker-unsafe':
       return withReady({
         ...createAssetPackWorkbenchState(), phase: 'unsafe', diagnostics: action.diagnostics,
+        formalBlockers: [{ code: 'unsafe-archive', message: 'The uploaded archive is unsafe and cannot be formalized.' }],
       });
     case 'request-started':
       return { ...state, pendingRequestId: action.requestId };
     case 'worker-response':
       return reduceWorkerResponse(state, action.response);
+    case 'edit-requested': {
+      const { progress: _progress, error: _error, pendingRequestId: _pendingRequestId, ...withoutTransient } = state;
+      const blockers = currentRevisionBlockers(state, action.revision);
+      return withReady({
+        ...withoutTransient,
+        phase: 'validating',
+        revision: action.revision,
+        pendingEdits: [...state.pendingEdits, { revision: action.revision, edit: action.edit }],
+        formalBlockers: blockers,
+      });
+    }
+    case 'replay-requested': {
+      const { progress: _progress, error: _error, pendingRequestId: _pendingRequestId, ...withoutTransient } = state;
+      return withReady({ ...withoutTransient, phase: 'validating', revision: action.revision });
+    }
     case 'edit-accepted': {
       const revision = state.revision + 1;
       const edit = { ...action.edit, revision } as AssetPackAcceptedEdit;
@@ -76,21 +103,33 @@ export function assetPackWorkbenchReducer(
         ...withoutTransient, phase: 'validating', revision, acceptedEdits: [...state.acceptedEdits, edit],
       });
     }
+    case 'edit-rejected':
+      return withReady({
+        ...state,
+        pendingEdits: state.pendingEdits.filter((pending) => pending.revision !== action.revision),
+      });
     case 'progress':
       if (!matchesCurrentRequest(state, action.requestId, action.revision)) return state;
       return { ...state, phase: action.stage === 'assembling-archive' ? 'assembling' : 'validating', progress: action };
     case 'worker-failed': {
-      const { progress: _progress, ...withoutProgress } = state;
-      return { ...withoutProgress, phase: 'failed', error: action.message };
+      const { progress: _progress, pendingEdits: _pendingEdits, ...withoutProgress } = state;
+      const diagnostics = action.diagnostic ? [...state.diagnostics, action.diagnostic] : state.diagnostics;
+      const blockers = action.diagnostic ? currentRevisionBlockers({ ...state, diagnostics }, state.revision, action.diagnostic) : state.formalBlockers;
+      return withReady({ ...withoutProgress, phase: 'failed', pendingEdits: [], diagnostics, formalBlockers: blockers, error: action.message });
     }
     case 'retry': {
       const { pendingRequestId: _pendingRequestId, error: _error, progress: _progress, ...withoutTransient } = state;
-      return { ...withoutTransient, phase: 'opening' };
+      return { ...withoutTransient, phase: 'opening', revision: 0, pendingEdits: [] };
     }
     case 'navigate':
       return { ...state, activePanel: action.panel };
     case 'downloaded':
-      return action.revision === state.revision ? { ...state, latestDownloadedRevision: action.revision } : state;
+      if (action.revision !== state.revision) return state;
+      return withReady({
+        ...withoutAssemblyTransient(state),
+        phase: 'editing',
+        latestDownloadedRevision: action.revision,
+      });
     case 'formal-blockers':
       return withReady({ ...state, formalBlockers: [...action.blockers] });
     case 'reset':
@@ -111,17 +150,61 @@ function reduceWorkerResponse(state: AssetPackWorkbenchState, response: AssetPac
     return assetPackWorkbenchReducer(state, { type: 'worker-unsafe', diagnostics: response.diagnostics });
   }
   if (response.type === 'failed') {
-    return assetPackWorkbenchReducer(state, { type: 'worker-failed', message: response.diagnostic.message });
+    return assetPackWorkbenchReducer(state, { type: 'worker-failed', message: response.diagnostic.message, diagnostic: response.diagnostic });
   }
-  if (response.type === 'assembled') return state;
+  if (response.type === 'assembled') {
+    return withReady({ ...withoutAssemblyTransient(state), phase: 'editing' });
+  }
   const current = response.workbench;
+  const workbench = openingReplay ? { ...current, revision: state.revision } : current;
+  const originalReleaseFingerprint = state.originalReleaseFingerprint ?? current.releaseFingerprint;
+  const originalUploadMetadata = state.originalUploadMetadata ?? current.uploadMetadata;
+  const pending = state.pendingEdits.find((candidate) => candidate.revision === response.revision);
+  const acceptedEdits = pending
+    ? [...state.acceptedEdits, { ...pending.edit, revision: response.revision } as AssetPackAcceptedEdit]
+    : state.acceptedEdits;
+  const blockers = assetPackFormalBlockers({
+    workbench,
+    ...(originalReleaseFingerprint ? { originalReleaseFingerprint } : {}),
+    originalUploadMetadata,
+  });
   const { pendingRequestId: _pendingRequestId, progress: _progress, error: _error, ...withoutTransient } = state;
   return withReady({
     ...withoutTransient,
     phase: 'editing',
     revision: openingReplay ? state.revision : current.revision,
-    workbench: openingReplay ? { ...current, revision: state.revision } : current,
+    ...(originalReleaseFingerprint ? { originalReleaseFingerprint } : {}),
+    originalUploadMetadata,
+    pendingEdits: state.pendingEdits.filter((candidate) => candidate.revision > response.revision),
+    acceptedEdits,
+    workbench,
     diagnostics: current.diagnostics,
+    formalBlockers: blockers,
+  });
+}
+
+function withoutAssemblyTransient(
+  state: AssetPackWorkbenchState,
+): Omit<AssetPackWorkbenchState, 'ready'> {
+  const { pendingRequestId: _pendingRequestId, progress: _progress, error: _error, ...withoutTransient } = state;
+  return withoutTransient;
+}
+
+function currentRevisionBlockers(
+  state: AssetPackWorkbenchState,
+  revision: number,
+  diagnostic?: AssetPackWorkbenchState['diagnostics'][number],
+): readonly AssetPackFormalBlocker[] {
+  if (!state.workbench) return state.formalBlockers;
+  const workbench = {
+    ...state.workbench,
+    revision,
+    ...(diagnostic ? { diagnostics: [...state.workbench.diagnostics, diagnostic] } : {}),
+  };
+  return assetPackFormalBlockers({
+    workbench,
+    ...(state.originalReleaseFingerprint ? { originalReleaseFingerprint: state.originalReleaseFingerprint } : {}),
+    ...(state.originalUploadMetadata ? { originalUploadMetadata: state.originalUploadMetadata } : {}),
   });
 }
 

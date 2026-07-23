@@ -62,6 +62,20 @@ describe('asset-pack formal release gates', () => {
     expect(assetPackFormalBlockers({ workbench: forgedIdentity, originalReleaseFingerprint: digest('r') }).some(({ code }) => code === 'version-increase-required')).toBe(true);
   });
 
+  it('uses the preserved original upload metadata for version and archive comparisons', () => {
+    const currentMetadata = { originalArchiveDigest: digest('z'), uploadedVersion: '1.2.3', uploadedStatus: 'formal' as const, baselineReleaseTag: 'test' };
+    const originalMetadata = workbench().uploadMetadata;
+    const current = workbench({
+      uploadMetadata: currentMetadata,
+      formalCandidate: { ...workbench().formalCandidate!, archiveDigest: originalMetadata.originalArchiveDigest, byteIdenticalToUploadedFormal: true },
+    });
+    expect(assetPackFormalBlockers({
+      workbench: current,
+      originalReleaseFingerprint: digest('r'),
+      originalUploadMetadata: originalMetadata,
+    })).toEqual([]);
+  });
+
   it('requires the version gate before acknowledgement submission', () => {
     const warning = { code: 'asset_path_inferred' as const, subject: { path: 'x' }, contentDigest: digest('c'), reason: '' };
     expect(canAcknowledgeAssetPackWarning({ workbench: workbench({ acknowledgementRecords: [warning] }), originalReleaseFingerprint: digest('o') }, warning)).toBe(false);

@@ -4,6 +4,7 @@ import {
   createAssetPackWorkerClient,
   type AssetPackWorkerClient,
   type AssetPackWorkerFactory,
+  type AssetPackWorkerTerminalResponse,
 } from '../lib/asset-pack-worker-client';
 import {
   assetPackWorkbenchReducer,
@@ -14,11 +15,20 @@ import {
   type AssetPackWorkbenchPanel,
   type AssetPackWorkbenchState,
 } from '../slice/asset-pack-workbench';
+import { assetPackFormalBlockers, type AssetPackFormalBlocker } from '../slice/asset-pack-release';
 
 export interface AssetPackWorkbenchControllerOptions {
   readonly baseline: AssetPackWorkerBaseline;
   readonly workerFactory: AssetPackWorkerFactory;
   readonly onState?: (state: AssetPackWorkbenchState) => void;
+}
+
+export class AssetPackFormalAssemblyBlockedError extends Error {
+  override readonly name = 'AssetPackFormalAssemblyBlockedError';
+
+  constructor(readonly blockers: readonly AssetPackFormalBlocker[]) {
+    super('Formal asset-pack assembly is blocked by the current release gate.');
+  }
 }
 
 export class AssetPackWorkbenchController {
@@ -27,7 +37,6 @@ export class AssetPackWorkbenchController {
   private readonly baseline: AssetPackWorkerBaseline;
   private readonly workerFactory: AssetPackWorkerFactory;
   private onState: ((state: AssetPackWorkbenchState) => void) | undefined;
-  private originalReleaseFingerprint: string | undefined;
 
   constructor(options: AssetPackWorkbenchControllerOptions) {
     this.baseline = options.baseline;
@@ -45,7 +54,6 @@ export class AssetPackWorkbenchController {
 
   async upload(file: File): Promise<void> {
     this.disposeClient();
-    this.originalReleaseFingerprint = undefined;
     this.dispatch({ type: 'upload-accepted', file });
     const client = this.createClient();
     const result = client.open(file, this.baseline);
@@ -57,33 +65,37 @@ export class AssetPackWorkbenchController {
     manifestText: string,
     origin: Extract<AssetPackAcceptedEditInput, { readonly kind: 'replace-manifest' }>['origin'],
   ): Promise<void> {
-    this.dispatch({ type: 'edit-accepted', edit: { kind: 'replace-manifest', manifestText, origin } });
     const client = this.requireClient();
-    const result = client.replaceManifest(manifestText, origin);
-    this.dispatch({ type: 'request-started', requestId: client.latestRequestId, revision: client.currentRevision });
-    await result;
+    const revision = this.currentState.revision + 1;
+    this.dispatch({ type: 'edit-requested', revision, edit: { kind: 'replace-manifest', manifestText, origin } });
+    return this.awaitEdit(client.replaceManifest(manifestText, origin), client, revision);
   }
 
   async replaceSource(path: string, file: File): Promise<void> {
-    this.dispatch({ type: 'edit-accepted', edit: { kind: 'replace-source', path, file } });
     const client = this.requireClient();
-    const result = client.replaceSource(path, file);
-    this.dispatch({ type: 'request-started', requestId: client.latestRequestId, revision: client.currentRevision });
-    await result;
+    const revision = this.currentState.revision + 1;
+    this.dispatch({ type: 'edit-requested', revision, edit: { kind: 'replace-source', path, file } });
+    return this.awaitEdit(client.replaceSource(path, file), client, revision);
   }
 
   async removeSource(path: string): Promise<void> {
-    this.dispatch({ type: 'edit-accepted', edit: { kind: 'remove-source', path } });
     const client = this.requireClient();
-    const result = client.removeSource(path);
-    this.dispatch({ type: 'request-started', requestId: client.latestRequestId, revision: client.currentRevision });
-    await result;
+    const revision = this.currentState.revision + 1;
+    this.dispatch({ type: 'edit-requested', revision, edit: { kind: 'remove-source', path } });
+    return this.awaitEdit(client.removeSource(path), client, revision);
   }
 
   async assemble(kind: 'draft' | 'formal'): Promise<AssetPackWorkerResponse> {
+    if (kind === 'formal') {
+      const blockers = this.currentFormalBlockers();
+      this.dispatch({ type: 'formal-blockers', blockers });
+      if (blockers.length > 0) throw new AssetPackFormalAssemblyBlockedError(blockers);
+    }
     const client = this.requireClient();
+    const resultPromise = client.assemble(kind);
+    this.dispatch({ type: 'request-started', requestId: client.latestRequestId, revision: this.currentState.revision });
     this.dispatch({ type: 'progress', requestId: client.latestRequestId, revision: this.currentState.revision, stage: 'assembling-archive' });
-    const result = await client.assemble(kind);
+    const result = await resultPromise;
     if (result.type === 'assembled') this.dispatch({ type: 'downloaded', revision: result.revision });
     return result;
   }
@@ -94,7 +106,6 @@ export class AssetPackWorkbenchController {
 
   reset(): void {
     this.disposeClient();
-    this.originalReleaseFingerprint = undefined;
     this.dispatch({ type: 'reset' });
   }
 
@@ -114,6 +125,7 @@ export class AssetPackWorkbenchController {
     this.dispatch({ type: 'request-started', requestId: client.latestRequestId, revision: 0 });
     await open;
     for (const edit of edits) {
+      this.dispatch({ type: 'replay-requested', revision: edit.revision });
       const result = this.replayEdit(client, edit);
       this.dispatch({ type: 'request-started', requestId: client.latestRequestId, revision: client.currentRevision });
       await result;
@@ -131,6 +143,20 @@ export class AssetPackWorkbenchController {
     return client.removeSource(edit.path);
   }
 
+  private async awaitEdit(
+    result: Promise<AssetPackWorkerTerminalResponse>,
+    client: AssetPackWorkerClient,
+    revision: number,
+  ): Promise<void> {
+    this.dispatch({ type: 'request-started', requestId: client.latestRequestId, revision });
+    try {
+      await result;
+    } catch (error) {
+      this.dispatch({ type: 'edit-rejected', revision });
+      throw error;
+    }
+  }
+
   private createClient(): AssetPackWorkerClient {
     const client = createAssetPackWorkerClient({
       port: this.workerFactory(),
@@ -142,10 +168,36 @@ export class AssetPackWorkbenchController {
   }
 
   private handleResponse(response: AssetPackWorkerResponse): void {
-    if (response.type === 'session' && response.outcome === 'editing' && response.revision === 0 && !this.originalReleaseFingerprint && response.workbench.releaseFingerprint !== undefined) {
-      this.originalReleaseFingerprint = response.workbench.releaseFingerprint;
-    }
     this.dispatch({ type: 'worker-response', response });
+    if (response.type === 'session' && response.outcome === 'editing') {
+      const blockers = assetPackFormalBlockers({
+        workbench: response.workbench,
+        ...(this.currentState.originalReleaseFingerprint ?? response.workbench.releaseFingerprint
+          ? { originalReleaseFingerprint: this.currentState.originalReleaseFingerprint ?? response.workbench.releaseFingerprint }
+          : {}),
+        originalUploadMetadata: this.currentState.originalUploadMetadata ?? response.workbench.uploadMetadata,
+      });
+      this.dispatch({ type: 'formal-blockers', blockers });
+    }
+  }
+
+  private currentFormalBlockers(): readonly AssetPackFormalBlocker[] {
+    const workbench = this.currentState.workbench;
+    if (!workbench) {
+      return [{ code: 'missing-candidate', message: 'The current revision has no verified formal archive candidate.' }];
+    }
+    const currentRevisionWorkbench = workbench.revision === this.currentState.revision
+      ? workbench
+      : { ...workbench, revision: this.currentState.revision };
+    return assetPackFormalBlockers({
+      workbench: currentRevisionWorkbench,
+      ...(this.currentState.originalReleaseFingerprint
+        ? { originalReleaseFingerprint: this.currentState.originalReleaseFingerprint }
+        : {}),
+      ...(this.currentState.originalUploadMetadata
+        ? { originalUploadMetadata: this.currentState.originalUploadMetadata }
+        : {}),
+    });
   }
 
   private requireClient(): AssetPackWorkerClient {
