@@ -7,7 +7,6 @@ import {
   type AssetPackSourceInspection,
   type NormalizedAssetPack,
 } from '@lpc-toolkit/core';
-import { canonicalizeJsonValue } from './canonical-json.js';
 import type { AssetPackFormatRuntime, AssetPackSha256 } from './runtime.js';
 
 export interface AssetPackPayloadDiagnostic {
@@ -138,10 +137,11 @@ export async function parseAssetPackPayload(options: {
     sources: [...sourceDigests].map(([sourcePath, digest]) => ({ sourcePath, digest })),
   };
 
-  const canonicalBytes = runtime.encodeUtf8(
-    JSON.stringify(canonicalizeJsonValue(contentProjection)),
+  // Keep the pre-shared-format JSON projection byte-for-byte stable: installed
+  // registries compare this persisted digest exactly.
+  const contentDigest = await runtime.sha256(
+    runtime.encodeUtf8(JSON.stringify(contentProjection)),
   );
-  const contentDigest = await runtime.sha256(canonicalBytes);
 
   return {
     ok: true,

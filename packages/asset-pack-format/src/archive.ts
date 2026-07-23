@@ -232,7 +232,10 @@ function decodeEntryName(
   return { ok: true, value: str };
 }
 
-function validateArchivePath(entryPath: string): Checked<string> {
+function validateArchivePath(
+  entryPath: string,
+  runtime: AssetPackFormatRuntime,
+): Checked<string> {
   if (
     entryPath.length === 0 ||
     entryPath.startsWith('/') ||
@@ -264,7 +267,7 @@ function validateArchivePath(entryPath: string): Checked<string> {
       entryPath,
     );
   }
-  const pathByteLength = new TextEncoder().encode(entryPath).byteLength;
+  const pathByteLength = runtime.encodeUtf8(entryPath).byteLength;
   if (pathByteLength > ASSET_PACK_ARCHIVE_LIMITS.pathBytes) {
     return rejected(
       'asset_archive_limit_exceeded',
@@ -460,7 +463,7 @@ function parseArchiveMetadata(
     const rawName = bytes.subarray(nameStart, nameStart + nameLength);
     const decoded = decodeEntryName(rawName, flags, runtime);
     if (!decoded.ok) return decoded;
-    const validatedPath = validateArchivePath(decoded.value);
+    const validatedPath = validateArchivePath(decoded.value, runtime);
     if (!validatedPath.ok) return validatedPath;
     const entryPath = validatedPath.value;
     const collisionPath = entryPath.normalize('NFC').toLowerCase();
@@ -769,7 +772,7 @@ function parseChecksums(
         'checksums.json',
       );
     }
-    const validatedPath = validateArchivePath(value['path']);
+    const validatedPath = validateArchivePath(value['path'], runtime);
     if (!validatedPath.ok || value['path'] === 'checksums.json') {
       return rejected(
         'asset_checksum_invalid',
@@ -1019,7 +1022,7 @@ export async function createAssetPackArchive(options: {
 
   const sourceBytesCopy = new Map<string, Uint8Array>();
   for (const [k, v] of options.sourceBytes) {
-    const validated = validateArchivePath(k);
+    const validated = validateArchivePath(k, options.runtime);
     if (!validated.ok) {
       throw new Error(`Unsafe archive path: ${k}`);
     }

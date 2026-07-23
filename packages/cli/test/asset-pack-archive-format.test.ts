@@ -29,6 +29,7 @@ import {
   type AssetPackArchiveDiagnostic,
   type AssetPackArchiveReadResult,
 } from '../src/asset-pack-archive-format.js';
+import { nodeAssetPackFormatRuntime } from '../src/asset-pack-node-runtime.js';
 
 const fileSystemInterception = vi.hoisted(() => ({
   archivePath: undefined as string | undefined,
@@ -592,6 +593,17 @@ describe('readAssetPackArchive path and central-directory safety', () => {
     }]), 'asset_archive_unsafe');
   });
 
+  it('measures UTF-8 archive paths against the byte limit', async () => {
+    const prefix = 'sprites/';
+    const entryPath = `${prefix}${'é'.repeat(Math.ceil((ASSET_PACK_ARCHIVE_LIMITS.pathBytes - Buffer.byteLength(prefix) + 1) / 2))}`;
+
+    expect(Buffer.byteLength(entryPath)).toBeGreaterThan(ASSET_PACK_ARCHIVE_LIMITS.pathBytes);
+    await expectFailure(buildRawZip([{
+      name: entryPath,
+      data: Buffer.alloc(0),
+    }]), 'asset_archive_limit_exceeded');
+  });
+
   it('rejects central/local filename and metadata mismatches', async () => {
     const cases: RawZipEntry[] = [
       { name: 'sprites/a.png', localName: 'sprites/b.png', data: Buffer.from('a') },
@@ -953,21 +965,6 @@ describe('createDeterministicAssetPackArchive', () => {
 
   it('conforms between old CLI writer and shared format writer', async () => {
     const { createAssetPackArchive } = await import('../../asset-pack-format/src/index.js');
-    const { inflateRawSync } = await import('node:zlib');
-    const nodeTestRuntime = {
-      sha256: async (bytes: Uint8Array) => `sha256:${createHash('sha256').update(bytes).digest('hex')}` as const,
-      decodeUtf8Fatal: (bytes: Uint8Array) => new TextDecoder('utf-8', { fatal: true }).decode(bytes),
-      encodeUtf8: (str: string) => new TextEncoder().encode(str),
-      inflateRawBounded: async ({ compressed, declaredSize, maximumSize }: { compressed: Uint8Array; declaredSize: number; maximumSize: number }) => {
-        const limit = Math.min(declaredSize, maximumSize);
-        const output = inflateRawSync(compressed, { maxOutputLength: Math.max(limit, 1) });
-        if (output.byteLength !== declaredSize) {
-          throw new Error('Raw DEFLATE output length does not match declaration');
-        }
-        return new Uint8Array(output);
-      },
-    };
-
     const manifest = packFixture();
     const sourceMap = new Map([[SOURCE_PATH, Buffer.from('walk-pixels')]]);
 
@@ -975,14 +972,20 @@ describe('createDeterministicAssetPackArchive', () => {
       kind: 'formal',
       manifestDocument: { ...manifest },
       sourceBytes: sourceMap,
-      runtime: nodeTestRuntime,
+      runtime: nodeAssetPackFormatRuntime,
     });
 
     expect(sharedResult.inspection.kind).toBe('verified');
     if (sharedResult.inspection.kind !== 'verified') throw new Error('Expected verified');
-    expect(sharedResult.inspection.snapshot.payload.pack.id).toBe('acme.wind-braid');
-    expect(sharedResult.inspection.snapshot.payload.sourceDigests.get(SOURCE_PATH))
-      .toBe('sha256:657887e347c8392b6023fddf211f80adf632d6e209aceb1931727b4b799f513e');
+    expect({
+      archiveHex: Buffer.from(sharedResult.archiveBytes).toString('hex'),
+      archiveDigest: sharedResult.archiveDigest,
+      manifestHex: Buffer.from(sharedResult.inspection.snapshot.manifestBytes).toString('hex'),
+    }).toEqual({
+      archiveHex: '504b03040a0000000800000021006c6044c96f0100004c0300000f00000061737365742d7061636b2e6a736f6e6553cb6ec32010bce72b10e71827554fb925510f3df421b5525555396c3089913120c049d328ff5ec04e1de805997dccce0ee3f304210cd63267f1027df91b42e77886b8e42d38aee4988bf12388060fd7cdf45abd55d5e9fda45956dc8260783ade772c46feb557dc6a01a767689907c01f5c56686580577fcdb8f1b19093ec5870c7da31e31b9949079fffbe7c9ec7be9d326c6f5427ab1b423e6bb5f170697b0e910a12d0a20ad3bcc4aaced0b8c1805a1e3deb621b3629470265e8265aee710270b9b96d128e3faf2a109cdfcd2679f1a8a15014c463dc759c3aaae4fceb5cf5ad819b7e76808910981a56f168847e730c9dab55a22b5e0a4e87d71be6e2109136d10fafd7c5eab3785ba27b324baba5eaa5c62f86efb90481025514a992812bee8c48e06ae7b45d9425fb86560b46a86a4bb861e2cf4b5c2173d172fdf480322b0d6600da3292a9842dadbd3d435a685a38a544c31d89ff47a18136e430ef0b0fde6e830fe6641676bc4c7e01504b03040a000000080000002100ce9265fbf8000000930100000e000000636865636b73756d732e6a736f6e7d50d16e83300c7ce72b10cf05e22424a4bf32ed21899dc2a080085da555fdf78556d3266ddacbc9be3bd967dfb23c2f423f522c8ef94b6af2fcf6c0442f76eb125bd818692b17eb87ea2dce5371f832c4cef246ed966775d481a470601420c756a546310f0d03cfb841ee381a2111b569b4050744c6390d2190078b40f2c7e8fe83d2e056ca07733ffc1d2d2e6bbf51acaffd84a55b6d8f7598573aadf365c2fa6ac7a15aa6d33f8955a3db569390dab7c270a7181701317080d0328b41098e8a3833d653ba4c80e6da49a78d090d08fa9518e01938e1ebae15d17774b6fbca71f1e536cfe3d06fd5f74fcba4fb215eceb17a8722bb679f504b03040a000000080000002100bb92d4640d0000000b00000026000000737072697465732f77696e642d62726169642f666f726567726f756e642f77616c6b2e706e672b4fccc9d62dc8ac48cd290600504b01021e030a0000000800000021006c6044c96f0100004c0300000f0000000000000000000000a4810000000061737365742d7061636b2e6a736f6e504b01021e030a000000080000002100ce9265fbf8000000930100000e0000000000000000000000a4819c010000636865636b73756d732e6a736f6e504b01021e030a000000080000002100bb92d4640d0000000b000000260000000000000000000000a481c0020000737072697465732f77696e642d62726169642f666f726567726f756e642f77616c6b2e706e67504b05060000000003000300cd000000110300000000',
+      archiveDigest: 'sha256:fa9795d2924c7e88a1553caaf583d25f246f1398070af20ebdc7f5e83818dee0',
+      manifestHex: '7b0a202022617373657473223a205b0a202020207b0a20202020202022616e696d6174696f6e73223a205b0a20202020202020202277616c6b220a2020202020205d2c0a20202020202022626f64795479706573223a205b0a2020202020202020226d616c65222c0a20202020202020202266656d616c65220a2020202020205d2c0a20202020202022646973706c61794e616d65223a202257696e64204272616964222c0a202020202020226b696e64223a20226e65772d6974656d222c0a202020202020226c6179657273223a205b0a20202020202020207b0a20202020202020202020226964223a2022666f726567726f756e64222c0a202020202020202020202273707269746573223a205b0a2020202020202020202020207b0a202020202020202020202020202022616e696d6174696f6e223a202277616c6b222c0a202020202020202020202020202022736f75726365223a2022737072697465732f77696e642d62726169642f666f726567726f756e642f77616c6b2e706e67220a2020202020202020202020207d0a202020202020202020205d2c0a20202020202020202020227a506f73223a203132300a20202020202020207d0a2020202020205d2c0a202020202020226c6f63616c4964223a202277696e642d6272616964222c0a20202020202022747970654e616d65223a202268616972220a202020207d0a20205d2c0a20202263726564697473223a207b0a2020202022617574686f7273223a205b0a20202020202022416c696365220a202020205d2c0a20202020226c6963656e736573223a205b0a2020202020202243432d42592d534120342e30220a202020205d2c0a20202020226e6f746573223a20224f726967696e616c2077696e642062726169642e222c0a202020202275726c73223a205b0a2020202020202268747470733a2f2f6578616d706c652e636f6d2f616c696365220a202020205d0a20207d2c0a202022646973706c61794e616d65223a202241434d452057696e64204272616964222c0a2020226964223a202261636d652e77696e642d6272616964222c0a202022736368656d61223a20226c70632d746f6f6c6b69742e61737365742d7061636b2e7631222c0a20202276657273696f6e223a2022312e302e30220a7d0a',
+    });
   });
 });
 

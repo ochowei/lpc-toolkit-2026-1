@@ -1,6 +1,10 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { ASSET_PACK_SCHEMA, type AssetPackSource } from '@lpc-toolkit/core';
+import {
+  ASSET_PACK_SCHEMA,
+  assetPackContentProjection,
+  type AssetPackSource,
+} from '@lpc-toolkit/core';
 import type { AssetPackFormatRuntime } from '../src/runtime.js';
 import { parseAssetPackPayload } from '../src/payload.js';
 
@@ -191,5 +195,30 @@ describe('parseAssetPackPayload', () => {
     });
 
     expect(versionChanged.contentDigest).not.toBe(base.contentDigest);
+  });
+
+  it('preserves the legacy JSON digest for Unicode credit-override paths', async () => {
+    const encoder = new TextEncoder();
+    const sourceBytes = new Map<string, Uint8Array>([
+      ['sprites/wind-braid/foreground/walk.png', encoder.encode('walk')],
+      ['sprites/wind-braid/foreground/climb.png', encoder.encode('climb')],
+    ]);
+    const result = await parsePayloadOk({
+      manifestBytes: encoder.encode(JSON.stringify(packFixture({
+        creditOverrides: {
+          'sprites/éclair/foreground/walk.png': PACK_CREDITS,
+          'sprites/zebra/foreground/walk.png': PACK_CREDITS,
+        },
+      }))),
+      sourceBytes,
+    });
+
+    const legacyDigest = `sha256:${createHash('sha256').update(JSON.stringify({
+      manifest: assetPackContentProjection(result.pack),
+      sources: [...result.sourceDigests].map(([sourcePath, digest]) => ({ sourcePath, digest })),
+    })).digest('hex')}`;
+
+    expect(legacyDigest).toBe('sha256:55f76683fbbf0da3faae69c479a4ed64e289fcac5348f867d6cabd404dee3aec');
+    expect(result.contentDigest).toBe(legacyDigest);
   });
 });

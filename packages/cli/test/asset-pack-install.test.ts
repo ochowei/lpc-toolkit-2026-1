@@ -19,6 +19,7 @@ import {
 import os from 'node:os';
 import path from 'node:path';
 import { createCanvas } from '@napi-rs/canvas';
+import JSZip from 'jszip';
 import {
   ASSET_PACK_SCHEMA,
   assetPackSourceFromNormalized,
@@ -352,6 +353,43 @@ async function createArchive(
   return { path: archivePath, bytes, digest: sha256(bytes), source };
 }
 
+async function createRawRepackedArchive(
+  fixture: Fixture,
+  source: AssetPackSource,
+  name: string,
+): Promise<ArchiveFixture> {
+  const manifestBytes = Buffer.from(JSON.stringify(source));
+  const files = new Map<string, Buffer>([
+    ['asset-pack.json', manifestBytes],
+    ...payloadFiles(source),
+  ]);
+  const checksumsBytes = Buffer.from(JSON.stringify({
+    schema: 'lpc-toolkit.asset-pack-checksums.v1',
+    files: [...files]
+      .map(([filePath, bytes]) => ({
+        path: filePath,
+        size: bytes.byteLength,
+        sha256: sha256(bytes),
+      }))
+      .sort((left, right) => left.path.localeCompare(right.path)),
+  }));
+  const zip = new JSZip();
+  zip.file('asset-pack.json', manifestBytes, { date: FIXED_NOW, unixPermissions: 0o100644, createFolders: false });
+  zip.file('checksums.json', checksumsBytes, { date: FIXED_NOW, unixPermissions: 0o100644, createFolders: false });
+  for (const [filePath, bytes] of payloadFiles(source)) {
+    zip.file(filePath, bytes, { date: FIXED_NOW, unixPermissions: 0o100644, createFolders: false });
+  }
+  const bytes = Buffer.from(await zip.generateAsync({
+    type: 'nodebuffer',
+    compression: 'DEFLATE',
+    compressionOptions: { level: 1 },
+    platform: 'UNIX',
+  }));
+  const archivePath = path.join(fixture.archiveRoot, `${name}.lpc-assets.zip`);
+  writeFileSync(archivePath, bytes);
+  return { path: archivePath, bytes, digest: sha256(bytes), source };
+}
+
 function writeLinkedPack(root: string, source: AssetPackSource): void {
   writeJson(path.join(root, 'asset-pack.json'), source);
   for (const [sourcePath, bytes] of payloadFiles(source)) {
@@ -550,17 +588,14 @@ describe('installAssetPack lifecycle policy', () => {
       runtime: fixture.runtime,
     })).action).toBe('installed');
 
-    const repackedSource = {
-      ...source,
-      credits: { ...source.credits, notes: 'Repacked manifest.' },
-    };
-    const repacked = await createArchive(
-      fixture,
-      repackedSource,
-      'repacked',
-      Buffer.from(JSON.stringify(repackedSource)),
-    );
+    const repacked = await createRawRepackedArchive(fixture, source, 'repacked');
     expect(repacked.digest).not.toBe(first.digest);
+    const firstRead = await readAssetPackArchive({ archivePath: first.path, archiveBytes: first.bytes });
+    const repackedRead = await readAssetPackArchive({ archivePath: repacked.path, archiveBytes: repacked.bytes });
+    expect(firstRead.ok).toBe(true);
+    expect(repackedRead.ok).toBe(true);
+    if (!firstRead.ok || !repackedRead.ok) throw new Error('Expected raw repacked archive to verify.');
+    expect(repackedRead.snapshot.payload.contentDigest).toBe(firstRead.snapshot.payload.contentDigest);
     const before = snapshotTree(fixture.workspace.stateRoot);
     const diagnostics = expectFailure(await installAssetPack({
       archivePath: repacked.path,
