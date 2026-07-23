@@ -1132,7 +1132,7 @@ Record the full hash and PASS evidence, then commit the plan record separately.
 - Consumes: Task 7 browser ports/baseline, shared archive/payload/PNG/compatibility, Core validate/compile.
 - Produces: the Stable Interfaces Worker protocol, one in-memory Worker session, current-revision diagnostics, preview payloads, release fingerprints, cached formal candidates, and draft/formal archive responses.
 
-- [ ] **Step 1: Write failing open-outcome and size-gate tests**
+- [x] **Step 1: Write failing open-outcome and size-gate tests**
 
 Use a fake runtime and decoder. Cover:
 
@@ -1142,7 +1142,9 @@ Use a fake runtime and decoder. Cover:
 - Valid formal and valid draft uploads retain original archive digest, original version/status, and baseline release tag.
 - A safely decoded non-object or invalid-JSON manifest opens editable raw-manifest repair with exact diagnostics and `draftSerializable: false`; unsafe ZIP metadata still creates no session.
 
-- [ ] **Step 2: Write failing edit, revision, and acknowledgement tests**
+  - RED: the Worker suites initially failed to load because the protocol/session modules did not exist. Added size-gate, unsafe/no-session, repair/raw-manifest, formal/draft metadata, and exact Core diagnostic coverage.
+
+- [x] **Step 2: Write failing edit, revision, and acknowledgement tests**
 
 Open revision `0`; send manifest/source/remove edits at revisions `1`, `2`, and `3`. Assert exact monotonic acceptance, stale request rejection, copied source bytes, missing/unreferenced diagnostics, content digest changes, exact acknowledgement candidates, and acknowledgement invalidation after PNG or version changes.
 
@@ -1156,7 +1158,9 @@ expect(result.diagnostics).toContainEqual(
 
 Only `replace-manifest` with `origin: 'acknowledgement'`, produced by the governance helper, may change acknowledgements. It must carry exactly the current candidate subjects and one non-empty reason per selected warning. Requests from `advanced-json` or `raw-repair` that add, remove, or alter acknowledgement records return `asset_acknowledgement_edit_forbidden`; ordinary overview/credit edits preserve records only while their candidate digest remains current.
 
-- [ ] **Step 3: Write failing validation, preview, and candidate tests**
+  - Added monotonic/stale revision, copied source, source removal, acknowledgement governance/invalidation, atomic async mutation, source-bound, and stale-acknowledgement draft/formal assembly regressions.
+
+- [x] **Step 3: Write failing validation, preview, and candidate tests**
 
 Cover PNG preflight/decode, Core geometry/frame/recolor/credit validation, compatibility, compile diagnostics, and base identity. Assert:
 
@@ -1168,7 +1172,9 @@ Cover PNG preflight/decode, Core geometry/frame/recolor/credit validation, compa
 - formal candidate is cached only after validation, acknowledgements, credits, and assembly/read-back pass;
 - draft assembly remains available at the draft serialization threshold.
 
-- [ ] **Step 4: Run Worker tests and verify RED**
+  - Added validation/preview/source-byte mapping, compile-credit, release-fingerprint, formal read-back candidate, bounded draft serialization, upload/assembly metadata, and acknowledgement assembly assertions.
+
+- [x] **Step 4: Run Worker tests and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-worker-session.test.ts asset-pack-worker-protocol.test.ts
@@ -1176,7 +1182,9 @@ rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-worker-session.test.ts ass
 
 Expected: FAIL because the protocol and session do not exist.
 
-- [ ] **Step 5: Implement serializable protocol and session ownership**
+  - RED was confirmed after the known sandbox tsx IPC restriction was bypassed with the exact command; both suites failed at module loading with 0 tests.
+
+- [x] **Step 5: Implement serializable protocol and session ownership**
 
 Every request and response carries `requestId` and `revision`. Keep archive/source bytes only in the Worker session. Main-thread responses contain source summaries and copies needed for the current preview or download, never the complete unreferenced byte map.
 
@@ -1201,7 +1209,9 @@ export interface AssetPackWorkbenchDiagnostic {
 
 Sort by severity, code, path, and stable serialized subject. Preserve shared/Core diagnostic codes.
 
-- [ ] **Step 6: Implement validation and release calculations**
+  - Implemented serializable protocol, private session-owned bytes, deterministic diagnostics, request/revision propagation, governance validation, atomic session queueing, and bounded source replacement.
+
+- [x] **Step 6: Implement validation and release calculations**
 
 For each accepted edit:
 
@@ -1217,11 +1227,15 @@ For each accepted edit:
 
 Do not filter a diagnostic merely to enable preview or download.
 
-- [ ] **Step 7: Implement draft/formal assembly messages**
+  - Implemented Core/PNG/compatibility/credit validation, zero-error preview gating and source maps, release fingerprint calculation, attribution checks, and revision-bound formal candidate caching/read-back.
+
+- [x] **Step 7: Implement draft/formal assembly messages**
 
 Draft requests accept repairable domain state but require one JSON object and safe bounded sources. Formal requests require the cached candidate to belong to the exact revision and return `candidate-not-verified` otherwise. Transfer only the final archive `ArrayBuffer` to the main thread and retain enough immutable metadata to report its digest and filename.
 
-- [ ] **Step 8: Wire the Worker entry and verify GREEN**
+  - Implemented bounded draft/formal assembly, final digest/filename reporting, original upload metadata and baseline release tag retention, and stale acknowledgement filtering in both archive paths.
+
+- [x] **Step 8: Wire the Worker entry and verify GREEN**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-worker-session.test.ts asset-pack-worker-protocol.test.ts
@@ -1231,7 +1245,9 @@ rtk pnpm check:boundaries
 
 Expected: PASS. The Worker source imports no React component or Node module.
 
-- [ ] **Step 9: Commit Task 8**
+  - PASS: focused Worker suites (2 files, 22 tests), baseline plus Worker suites (3 files, 23 tests), full Web Vitest (84 files, 740 tests), Web typecheck, `rtk pnpm check:boundaries`, and repository `rtk pnpm verify` (55 CLI files, 1032 tests plus 1 skipped; Web 84 files, 740 tests).
+
+- [x] **Step 9: Commit Task 8**
 
 ```sh
 rtk git add packages/web/src/lib/asset-pack-worker-protocol.ts packages/web/src/workers/asset-pack-worker-session.ts packages/web/src/workers/asset-pack-worker.ts packages/web/src/lib/asset-pack-baseline.ts packages/web/test/asset-pack-worker-session.test.ts packages/web/test/asset-pack-worker-protocol.test.ts
@@ -1239,6 +1255,11 @@ rtk git commit -m "feat(web): validate asset packs in a worker"
 ```
 
 Record the full hash and PASS evidence, then commit the plan record separately.
+
+  - Product Commit: `ef58af4c8e3676ab549360801c6322bbc840c598` (`feat(web): validate asset packs in a worker`).
+  - Review Fix Commits: `5ea8165d2da577539bb04dbfe8a38c9b0ff4db22` (`fix(web): harden asset pack worker revisions`), `50ab2ff87ac9f19cbca0716b9fdec08504a006d4` (`fix(web): preserve asset pack worker metadata`), and `d4fa2ab0f352a2f01c5dafea9601f0b7d54e9956` (`fix(web): invalidate stale acknowledgements`).
+  - Evidence Commits: `cbefad0111745f96d5c514451e565ea6681b8a52`, `b6eecbdfc495557b67389dfd6141d1eaa6b1ef2a`, `35bcd90fb494d25ffef42aa803adb6135a1d6bca`, and `1e588018a6cee7dca1e5831637a3d12d73b55694`.
+  - Independent final Luna review: Approved; no Critical or Important findings remain. The separate plan-record commit follows this update.
 
 ---
 
