@@ -31,6 +31,7 @@
   },
   "dependencies": {
     "@lpc-toolkit/core": "workspace:*",
+    "@lpc-toolkit/asset-pack-format": "workspace:*",
     "@lpc-toolkit/presets": "workspace:*",
     "@radix-ui/react-slot": "^1.1.1",
     "class-variance-authority": "^0.7.1",
