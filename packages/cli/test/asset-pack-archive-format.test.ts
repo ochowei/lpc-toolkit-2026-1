@@ -949,6 +949,40 @@ describe('createDeterministicAssetPackArchive', () => {
     ]);
     expect(parsed.snapshot.checksums.some((entry) => entry.path === 'checksums.json')).toBe(false);
   });
+
+  it('conforms between old CLI writer and shared format writer', async () => {
+    const { createAssetPackArchive } = await import('../../asset-pack-format/src/index.js');
+    const { inflateRawSync } = await import('node:zlib');
+    const nodeTestRuntime = {
+      sha256: async (bytes: Uint8Array) => `sha256:${createHash('sha256').update(bytes).digest('hex')}` as const,
+      decodeUtf8Fatal: (bytes: Uint8Array) => new TextDecoder('utf-8', { fatal: true }).decode(bytes),
+      encodeUtf8: (str: string) => new TextEncoder().encode(str),
+      inflateRawBounded: async ({ compressed, declaredSize, maximumSize }: { compressed: Uint8Array; declaredSize: number; maximumSize: number }) => {
+        const limit = Math.min(declaredSize, maximumSize);
+        const output = inflateRawSync(compressed, { maxOutputLength: Math.max(limit, 1) });
+        if (output.byteLength !== declaredSize) {
+          throw new Error('Raw DEFLATE output length does not match declaration');
+        }
+        return new Uint8Array(output);
+      },
+    };
+
+    const manifest = packFixture();
+    const sourceMap = new Map([[SOURCE_PATH, Buffer.from('walk-pixels')]]);
+
+    const sharedResult = await createAssetPackArchive({
+      kind: 'formal',
+      manifestDocument: manifest,
+      sourceBytes: sourceMap,
+      runtime: nodeTestRuntime,
+    });
+
+    expect(sharedResult.inspection.kind).toBe('verified');
+    if (sharedResult.inspection.kind !== 'verified') throw new Error('Expected verified');
+    expect(sharedResult.inspection.snapshot.payload.pack.id).toBe('acme.wind-braid');
+    expect(sharedResult.inspection.snapshot.payload.sourceDigests.get(SOURCE_PATH))
+      .toBe('sha256:657887e347c8392b6023fddf211f80adf632d6e209aceb1931727b4b799f513e');
+  });
 });
 
 describe('extractVerifiedAssetPackPayload', () => {
