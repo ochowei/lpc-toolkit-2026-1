@@ -1833,7 +1833,7 @@ Record the full hash and PASS evidence, then commit the plan record separately.
 - Consumes: complete Tasks 1–13 implementation and public CLI build.
 - Produces: exact browser workflow acceptance, CLI install acceptance for downloaded bytes, packed-package draft behavior, and all eight documentation surfaces.
 
-- [ ] **Step 1: Write the failing Playwright workflow**
+- [x] **Step 1: Write the failing Playwright workflow**
 
 Generate a deterministic, attributed new-item fixture in the E2E helper using shared archive writing and `@napi-rs/canvas`. Fill every required walk cell, use male body coverage to create a known warning, and retain exact authors/licenses/URLs.
 
@@ -1851,7 +1851,9 @@ Drive this sequence:
 10. invoke built CLI `asset inspect` and `asset install` on that exact Playwright download in a clean temporary workspace from repository root;
 11. assert formal install succeeds, draft install exits `1` with `asset_pack_draft`, doctor is healthy after formal install, and all temp writes stay under the workspace.
 
-- [ ] **Step 2: Run E2E and verify RED**
+  - Implementation: added the deterministic attributed fixture and full browser-to-CLI workflow in `packages/web/e2e/`.
+
+- [x] **Step 2: Run E2E and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/web test:e2e -- asset-pack-workbench.spec.ts
@@ -1859,7 +1861,9 @@ rtk pnpm --filter @lpc-toolkit/web test:e2e -- asset-pack-workbench.spec.ts
 
 Expected: FAIL until the E2E script builds CLI and the final UX/CLI handoff is complete.
 
-- [ ] **Step 3: Make E2E and packed CLI execute the public contracts**
+  - Verification: RED observed during the first E2E iterations; the failing run exposed the missing CLI build, StrictMode disposal, legacy animation authorization, pooled warning input, stale acknowledgement, and draft re-upload gate issues.
+
+- [x] **Step 3: Make E2E and packed CLI execute the public contracts**
 
 Extend Web `pretest:e2e` to prepare/verify assets and build CLI so `packages/cli/dist/index.js` is available to Playwright. Keep ordinary E2E independent of `upstream/` and network.
 
@@ -1881,7 +1885,9 @@ assert.match(draftInstall.stdout, /asset_pack_draft/u);
 
 Assert no installed state changed after draft rejection.
 
-- [ ] **Step 4: Update all documentation surfaces**
+  - Implementation: `pretest:e2e` now builds CLI; packed smoke creates a safe draft ZIP and asserts status-1 inspection/install plus unchanged workspace state.
+
+- [x] **Step 4: Update all documentation surfaces**
 
 Apply the matrix exactly:
 
@@ -1896,7 +1902,9 @@ Apply the matrix exactly:
 
 Update tests so every claim is executable or asserted.
 
-- [ ] **Step 5: Verify E2E, package smoke, docs, and plugin**
+  - Documentation impact: `help: update`; `cli-readme: update`; `root-readme: update`; `landing: update`; `architecture: update`; `engineering: update`; `releasing: update`; `plugin: update`.
+
+- [x] **Step 5: Verify E2E, package smoke, docs, and plugin**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx package-scripts.test.ts
@@ -1909,7 +1917,9 @@ rtk pnpm --filter @lpc-toolkit/cli test:package
 
 Expected: PASS. The exact formal browser download installs; the exact draft does not.
 
-- [ ] **Step 6: Commit Task 14**
+  - Verification: focused Web 38 tests PASS; focused CLI 60 tests PASS; plugin 40 tests PASS; browser E2E 1 passed; CLI build PASS; packed CLI smoke PASS; repository `rtk pnpm verify` PASS after the fixture typing correction.
+
+- [x] **Step 6: Commit Task 14**
 
 ```sh
 rtk git add packages/web/e2e packages/web/package.json packages/web/test/package-scripts.test.ts packages/cli/scripts/smoke-packed-cli.mjs packages/cli/test/plugin-contract.test.ts packages/cli/README.md README.md packages/web/src/components/landing-page.tsx packages/web/test/landing-page.test.tsx docs/ARCHITECTURE.md docs/ENGINEERING.md docs/RELEASING.md plugins/lpc-toolkit/skills/animation-asset-audit/references/audit-workflow.md plugins/lpc-toolkit/test/animation-asset-audit.test.mjs
@@ -1917,6 +1927,9 @@ rtk git commit -m "docs(asset-pack): publish browser correction workflow"
 ```
 
 Record the full hash and PASS evidence, then commit the plan record separately.
+
+  - Product commit: `368794d4458740c9e6896d63824e0e868ad2f196` (`docs(asset-pack): publish browser correction workflow`).
+  - Evidence: `.superpowers/sdd/task-14-e2e-report.md`; plan/evidence commit follows this update.
 
 ---
 
