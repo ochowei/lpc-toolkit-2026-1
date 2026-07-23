@@ -101,3 +101,29 @@ TDD and verification:
 Scope check: product commit contains only the five requested Web source/test
 files. No Task 10 files, plan files, dependencies, `upstream/`, checked-in
 assets, cache, or artist sources were changed.
+
+## Undiagnosed Worker failure formal-gate fix evidence
+
+The remaining Important finding is fixed without editing the checked-in Task 9
+implementation plan. A Worker `error` event without a diagnostic now moves a
+ready session into `failed` with a deterministic `worker-failed` formal blocker;
+the controller honors that failed-state blocker before attempting formal
+assembly. Diagnostic failures still retain their existing diagnostics, and
+retry continues to replay the preserved accepted edits.
+
+Product commit:
+
+- `ccaf745e950224eddfc45d113a45415a1edc95cb` — `fix(web): block formal assembly after worker failure`
+
+TDD and verification:
+
+- `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/use-asset-pack-workbench.test.ts` — RED: 1 intended regression failure (`formalBlockers` remained empty after the undiagnosed Worker error); final GREEN: 1 file, 9 tests.
+- `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/asset-pack-worker-client.test.ts test/asset-pack-manifest-editor.test.ts test/asset-pack-workbench.test.ts test/asset-pack-release.test.ts test/use-asset-pack-workbench.test.ts` — PASS: 5 files, 31 tests.
+- `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/asset-pack-worker-protocol.test.ts test/asset-pack-worker-session.test.ts test/asset-pack-format-conformance.test.ts` — PASS: 3 files, 24 Task 8 regression tests.
+- `rtk pnpm --filter @lpc-toolkit/web run typecheck` — PASS.
+- `rtk pnpm check:boundaries` — PASS.
+- `rtk git diff --check` — PASS.
+
+Scope check: product commit contains only the Task 9 Web gate/controller and
+regression-test changes. No Task 10 files, plan files, dependencies,
+`upstream/`, checked-in assets, cache, or artist sources were changed.
