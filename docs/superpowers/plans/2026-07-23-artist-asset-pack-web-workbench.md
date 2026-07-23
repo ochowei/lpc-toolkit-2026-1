@@ -1427,7 +1427,7 @@ Record the full hash and PASS evidence, then commit the plan record separately.
 - Consumes: Task 7 baseline loader and Task 9 hook/state.
 - Produces: navigable `/asset-packs`, lazy baseline initialization, upload/drop entry, and the three stable layout responsibilities.
 
-- [ ] **Step 1: Write failing route and lazy-load tests**
+- [x] **Step 1: Write failing route and lazy-load tests**
 
 Assert:
 
@@ -1438,11 +1438,15 @@ expect(pathForRoute('asset-packs')).toBe('/asset-packs');
 
 Render `/`, `/compose`, `/asset-packs`, and an unknown route. Composer loaders run only on `/compose`; workbench baseline loaders run only on `/asset-packs`; neither initializes on landing/404.
 
-- [ ] **Step 2: Write failing upload and shell tests**
+  - Implementation: Added the route/path contract and route-local lazy baseline assertions covering landing, composer, workbench, and unknown-route loader ownership.
+
+- [x] **Step 2: Write failing upload and shell tests**
 
 Static markup must include one file input accepting `.lpc-assets.zip,.draft.lpc-assets.zip`, a labeled drop zone, size/help text, an accessible progress live region, and Reset/Back actions. Editing markup must contain left navigation, center preview, and right editor landmarks with stable labels and tabs for narrow screens.
 
-- [ ] **Step 3: Run focused tests and verify RED**
+  - Implementation: Added focused upload-panel and workbench-shell tests for the constrained input/drop entry, declared-size gate, explicit actions, progress/status semantics, desktop landmarks, and narrow-screen tabs.
+
+- [x] **Step 3: Run focused tests and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/web test -- app-route.test.ts app-shell.test.tsx landing-page.test.tsx asset-pack-upload-panel.test.tsx asset-pack-workbench-shell.test.tsx
@@ -1450,19 +1454,25 @@ rtk pnpm --filter @lpc-toolkit/web test -- app-route.test.ts app-shell.test.tsx 
 
 Expected: FAIL because the route and components do not exist.
 
-- [ ] **Step 4: Implement lazy route ownership**
+  - Verification: The exact focused command failed before implementation as expected: 5 test files failed; 5 tests failed and 7 passed. The sandbox-only attempt stopped earlier at the known `tsx` IPC `listen EPERM` hook, so RED was rerun with the approved local IPC escalation.
+
+- [x] **Step 4: Implement lazy route ownership**
 
 Add `asset-packs` to `AppRoute`, `NavigableAppRoute`, and `AppPath`. Create an `AssetPackApp` child that calls `loadBrowserAssetPackBaseline()` once and renders the harness. Do not place baseline loading in root `App`.
 
 Add a landing CTA labeled `Repair an Asset Pack` and replace the Phase 3 deferral text with the actual browser capability plus the CLI/Web distinction.
 
-- [ ] **Step 5: Implement upload and three-region shell**
+  - Implementation: Added `asset-packs` routing and an `AssetPackApp` child whose baseline loader is route-local; Composer remains `/compose`-owned. Updated the landing CTA and Phase 3 CLI/Web capability copy.
+
+- [x] **Step 5: Implement upload and three-region shell**
 
 The upload panel sends one selected/dropped File to the hook after the declared-size gate. The desktop shell uses named `nav`, `main`, and `aside` regions; narrow screens switch the same region state through tabs. Do not render all detailed editors in this task.
 
 Use text plus icon for status counts and `role="status" aria-live="polite"` for Worker progress. Keep Reset explicit; never silently replace the current pack after a second drop.
 
-- [ ] **Step 6: Verify GREEN and build**
+  - Implementation: Added the upload panel and responsive workbench harness/nav/editor/preview regions with explicit reset/back controls, guarded second-drop behavior, status icon/count text, and polite Worker progress announcements.
+
+- [x] **Step 6: Verify GREEN and build**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/web test -- app-route.test.ts app-shell.test.tsx landing-page.test.tsx asset-pack-upload-panel.test.tsx asset-pack-workbench-shell.test.tsx
@@ -1472,7 +1482,9 @@ rtk pnpm --filter @lpc-toolkit/web build
 
 Expected: PASS. Landing and 404 do not initialize composer or workbench data.
 
-- [ ] **Step 7: Commit Task 10**
+  - Verification: Focused suite PASS (5 files, 18 tests), web typecheck PASS, web build PASS, boundary check PASS, and `rtk git diff --check` PASS. Full `rtk pnpm verify` also PASS: Web 91 files/781 tests; CLI 55 files/1032 passed plus 1 skipped. Sandboxed prepare-assets/build/verify attempts hit the known `tsx` IPC `listen EPERM`; the exact commands passed with approved escalation. Build emitted only existing Vite chunk-size/dynamic-import warnings.
+
+- [x] **Step 7: Commit Task 10**
 
 ```sh
 rtk git add packages/web/src/lib/app-route.ts packages/web/src/App.tsx packages/web/src/components/landing-page.tsx packages/web/src/components/asset-pack-workbench packages/web/test/app-route.test.ts packages/web/test/app-shell.test.tsx packages/web/test/landing-page.test.tsx packages/web/test/asset-pack-upload-panel.test.tsx packages/web/test/asset-pack-workbench-shell.test.tsx
@@ -1480,6 +1492,11 @@ rtk git commit -m "feat(web): add asset pack workbench route"
 ```
 
 Record the full hash and PASS evidence, then commit the plan record separately.
+
+  - Commit: `4a54af2ff5b9f3a7ea035b2a39c5ac7fe7dd3651` — `feat(web): add asset pack workbench route`
+  - Evidence report: `459640004767aff0a3777a883b1163bc9790d116`
+  - Independent final Luna review: Approved; no Critical or Important findings. Review package: `.superpowers/sdd/review-task-10-route-shell-d491a5..4a54af2.diff`.
+  - Scope note: No Task 11 files, dependencies, assets, caches, or `upstream/` content changed. The separate plan-record commit follows this update.
 
 ---
 
