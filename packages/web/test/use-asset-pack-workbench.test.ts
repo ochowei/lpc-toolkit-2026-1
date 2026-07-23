@@ -265,7 +265,7 @@ describe('useAssetPackWorkbench orchestration', () => {
     ]);
   });
 
-  it('returns from assembling to editing and records the latest downloaded revision', async () => {
+  it('returns from assembling to editing without recording a download before handoff', async () => {
     const workers = workerFactory();
     const controller = new AssetPackWorkbenchController({ baseline, workerFactory: workers.factory });
     const opened = controller.upload(new File(['zip'], 'original.zip'));
@@ -288,7 +288,7 @@ describe('useAssetPackWorkbench orchestration', () => {
     expect(controller.state.phase).toBe('editing');
     expect(controller.state.pendingRequestId).toBeUndefined();
     expect(controller.state.progress).toBeUndefined();
-    expect(controller.state.latestDownloadedRevision).toBe(0);
+    expect(controller.state.latestDownloadedRevision).toBeUndefined();
   });
 
   it('replaces a crashed Worker, replays the original File and exact accepted edits, and ignores old replies', async () => {

@@ -16,11 +16,19 @@ import {
   type AssetPackWorkbenchState,
 } from '../slice/asset-pack-workbench';
 import { assetPackFormalBlockers, type AssetPackFormalBlocker } from '../slice/asset-pack-release';
+import {
+  assertAssetPackDownloadMetadata,
+  downloadAssetPackArchive,
+  type AssetPackAssembledResponse,
+  type AssetPackDownloadKind,
+} from '../lib/asset-pack-download';
+import { downloadBlob } from '../lib/download';
 
 export interface AssetPackWorkbenchControllerOptions {
   readonly baseline: AssetPackWorkerBaseline;
   readonly workerFactory: AssetPackWorkerFactory;
   readonly onState?: (state: AssetPackWorkbenchState) => void;
+  readonly downloadBlob?: (blob: Blob, filename: string) => void;
 }
 
 export class AssetPackFormalAssemblyBlockedError extends Error {
@@ -37,11 +45,13 @@ export class AssetPackWorkbenchController {
   private readonly baseline: AssetPackWorkerBaseline;
   private readonly workerFactory: AssetPackWorkerFactory;
   private onState: ((state: AssetPackWorkbenchState) => void) | undefined;
+  private readonly download: (blob: Blob, filename: string) => void;
 
   constructor(options: AssetPackWorkbenchControllerOptions) {
     this.baseline = options.baseline;
     this.workerFactory = options.workerFactory;
     this.onState = options.onState;
+    this.download = options.downloadBlob ?? downloadBlob;
   }
 
   get state(): AssetPackWorkbenchState {
@@ -95,8 +105,34 @@ export class AssetPackWorkbenchController {
     const resultPromise = client.assemble(kind);
     this.dispatch({ type: 'request-started', requestId: client.latestRequestId, revision: this.currentState.revision });
     this.dispatch({ type: 'progress', requestId: client.latestRequestId, revision: this.currentState.revision, stage: 'assembling-archive' });
-    const result = await resultPromise;
-    if (result.type === 'assembled') this.dispatch({ type: 'downloaded', revision: result.revision });
+    return resultPromise;
+  }
+
+  async downloadArchive(kind: AssetPackDownloadKind): Promise<AssetPackAssembledResponse> {
+    const requestedRevision = this.currentState.revision;
+    const result = await this.assemble(kind);
+    if (result.type !== 'assembled') throw new Error('The Worker did not return an assembled archive.');
+    if (result.revision !== requestedRevision || result.revision !== this.currentState.revision) {
+      throw new Error('The Worker returned an archive for a stale revision.');
+    }
+    if (kind === 'formal') {
+      const blockers = this.currentFormalBlockers();
+      this.dispatch({ type: 'formal-blockers', blockers });
+      if (blockers.length > 0) throw new AssetPackFormalAssemblyBlockedError(blockers);
+      const candidate = this.currentState.workbench?.formalCandidate;
+      if (!candidate || candidate.revision !== this.currentState.revision) {
+        throw new Error('The current revision has no verified formal archive candidate.');
+      }
+      assertAssetPackDownloadMetadata(result, {
+        revision: this.currentState.revision,
+        kind,
+        archiveDigest: candidate.archiveDigest,
+      });
+    } else {
+      assertAssetPackDownloadMetadata(result, { revision: this.currentState.revision, kind });
+    }
+    downloadAssetPackArchive(result, this.download);
+    this.dispatch({ type: 'downloaded', revision: result.revision });
     return result;
   }
 
@@ -231,6 +267,7 @@ export function useAssetPackWorkbench(options: AssetPackWorkbenchControllerOptio
     replaceSource: (path: string, file: File) => controller.replaceSource(path, file),
     removeSource: (path: string) => controller.removeSource(path),
     assemble: (kind: 'draft' | 'formal') => controller.assemble(kind),
+    download: (kind: AssetPackDownloadKind) => controller.downloadArchive(kind),
     retry: () => controller.retry(),
     reset: () => controller.reset(),
     navigate: (panel: AssetPackWorkbenchPanel) => controller.navigate(panel),

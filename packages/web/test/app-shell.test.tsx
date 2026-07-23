@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import App from '../src/App';
+import App, { createAppNavigationOwner } from '../src/App';
 
 const mocks = vi.hoisted(() => ({
   loadCatalogFromUpstream: vi.fn(),
@@ -157,6 +157,39 @@ describe('App shell routing', () => {
     expect(mocks.loadCatalogFromUpstream).not.toHaveBeenCalled();
     expect(mocks.loadPalettesFromUpstream).not.toHaveBeenCalled();
     expect(mocks.loadBrowserAssetPackBaseline).not.toHaveBeenCalled();
+  });
+
+  it('uses one injected blocker for programmatic and browser-back navigation', () => {
+    const confirm: (message: string) => boolean = vi.fn(() => false);
+    const updates: string[] = [];
+    const pushed: string[] = [];
+    const owner = createAppNavigationOwner({
+      initialPathname: '/asset-packs',
+      pushState: (path) => pushed.push(path),
+      setPathname: (path) => updates.push(path),
+      blocker: () => confirm('Leave the asset pack workbench?'),
+    });
+
+    expect(owner.navigate('/')).toBe(false);
+    expect(owner.handlePopState('/compose')).toBe(false);
+    expect(pushed).toEqual(['/asset-packs']);
+    expect(updates).toEqual(['/asset-packs']);
+    expect(confirm).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps pathname and workbench route state unchanged when navigation is canceled', () => {
+    const owner = createAppNavigationOwner({
+      initialPathname: '/asset-packs',
+      pushState: vi.fn(),
+      setPathname: vi.fn(),
+      blocker: () => false,
+    });
+
+    expect(owner.pathname).toBe('/asset-packs');
+    expect(owner.navigate('/')).toBe(false);
+    expect(owner.pathname).toBe('/asset-packs');
+    expect(owner.handlePopState('/')).toBe(false);
+    expect(owner.pathname).toBe('/asset-packs');
   });
 
 });

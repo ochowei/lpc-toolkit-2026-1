@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { loadCatalogFromUpstream } from './catalog/load-catalog';
 import { loadPalettesFromUpstream } from './catalog/load-palettes';
 import {
@@ -31,6 +31,7 @@ import {
   type AppPath,
   type NavigableAppRoute,
 } from './lib/app-route';
+import type { NavigationBlocker } from './hooks/use-unsaved-work-guard';
 
 interface LpcAssetPackConformanceProbe {
   readonly status: 'verified' | 'error';
@@ -47,23 +48,80 @@ declare global {
   }
 }
 
-function useAppPathname(): [string, (path: AppPath) => void] {
+export interface AppNavigationOwnerOptions {
+  readonly initialPathname: string;
+  readonly pushState: (path: string) => void;
+  readonly setPathname: (path: string) => void;
+  readonly blocker?: NavigationBlocker;
+}
+
+export interface AppNavigationOwner {
+  readonly pathname: string;
+  readonly navigate: (path: AppPath) => boolean;
+  readonly handlePopState: (path: string) => boolean;
+}
+
+export function createAppNavigationOwner(options: AppNavigationOwnerOptions): AppNavigationOwner {
+  let pathname = options.initialPathname;
+  const canLeave = () => options.blocker?.() ?? true;
+  const navigate = (path: AppPath): boolean => {
+    if (pathname === path) return true;
+    if (!canLeave()) return false;
+    options.pushState(path);
+    pathname = path;
+    options.setPathname(path);
+    return true;
+  };
+  const handlePopState = (path: string): boolean => {
+    if (pathname === path) return true;
+    if (!canLeave()) {
+      options.pushState(pathname);
+      options.setPathname(pathname);
+      return false;
+    }
+    pathname = path;
+    options.setPathname(path);
+    return true;
+  };
+  return {
+    get pathname() { return pathname; },
+    navigate,
+    handlePopState,
+  };
+}
+
+function useAppPathname(): [string, (path: AppPath) => void, (blocker: NavigationBlocker) => () => void] {
   const [pathname, setPathname] = useState(() => window.location.pathname);
+  const blockerRef = useRef<NavigationBlocker>();
+  const ownerRef = useRef<AppNavigationOwner>();
+  if (!ownerRef.current) {
+    ownerRef.current = createAppNavigationOwner({
+      initialPathname: pathname,
+      pushState: (path) => window.history.pushState(null, '', path),
+      setPathname,
+      blocker: () => blockerRef.current?.() ?? true,
+    });
+  }
+  const owner = ownerRef.current;
 
   useEffect(() => {
-    const handlePopState = () => setPathname(window.location.pathname);
+    const handlePopState = () => owner.handlePopState(window.location.pathname);
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+  }, [owner]);
 
   const navigate = useCallback((path: AppPath) => {
-    if (window.location.pathname !== path) {
-      window.history.pushState(null, '', path);
-    }
-    setPathname(window.location.pathname);
+    owner.navigate(path);
+  }, [owner]);
+
+  const registerBlocker = useCallback((blocker: NavigationBlocker) => {
+    blockerRef.current = blocker;
+    return () => {
+      if (blockerRef.current === blocker) blockerRef.current = undefined;
+    };
   }, []);
 
-  return [pathname, navigate];
+  return [pathname, navigate, registerBlocker];
 }
 
 function ComposerApp({ onNavigateHome }: { onNavigateHome: () => void }) {
@@ -118,7 +176,15 @@ function ComposerApp({ onNavigateHome }: { onNavigateHome: () => void }) {
   );
 }
 
-function AssetPackApp({ onNavigateHome }: { onNavigateHome: () => void }) {
+function AssetPackApp({
+  onNavigateHome,
+  registerNavigationBlocker,
+  confirmNavigation,
+}: {
+  readonly onNavigateHome: () => void;
+  readonly registerNavigationBlocker: (blocker: NavigationBlocker) => () => void;
+  readonly confirmNavigation: (message: string) => boolean;
+}) {
   const baselinePromise = useMemo(() => loadBrowserAssetPackBaseline(), []);
   const [baseline, setBaseline] = useState<BrowserAssetPackBaseline>();
   const [error, setError] = useState<string>();
@@ -163,12 +229,23 @@ function AssetPackApp({ onNavigateHome }: { onNavigateHome: () => void }) {
     );
   }
 
-  return <AssetPackWorkbenchHarness baseline={baseline} onNavigateBack={onNavigateHome} />;
+  return <AssetPackWorkbenchHarness
+    baseline={baseline}
+    onNavigateBack={onNavigateHome}
+    registerNavigationBlocker={registerNavigationBlocker}
+    confirmNavigation={confirmNavigation}
+  />;
 }
 
 /** Root application shell that routes between landing, composer, and 404 pages. */
-export default function App() {
-  const [pathname, navigate] = useAppPathname();
+export interface AppProps {
+  readonly confirmNavigation?: (message: string) => boolean;
+}
+
+export default function App({ confirmNavigation }: AppProps = {}) {
+  const defaultConfirmNavigation = useCallback((message: string) => window.confirm(message), []);
+  const activeConfirmNavigation = confirmNavigation ?? defaultConfirmNavigation;
+  const [pathname, navigate, registerNavigationBlocker] = useAppPathname();
   const route = routeFromPathname(pathname);
 
   useEffect(() => {
@@ -200,7 +277,11 @@ export default function App() {
   }
 
   if (route === 'asset-packs') {
-    return <AssetPackApp onNavigateHome={() => navigateToRoute('landing')} />;
+    return <AssetPackApp
+      onNavigateHome={() => navigateToRoute('landing')}
+      registerNavigationBlocker={registerNavigationBlocker}
+      confirmNavigation={activeConfirmNavigation}
+    />;
   }
 
   if (route === 'not-found') {

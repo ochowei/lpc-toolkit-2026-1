@@ -7,6 +7,8 @@ import { useAssetPackPreview } from '../../hooks/use-asset-pack-preview';
 import type { AssetPackWorkbenchState } from '../../slice/asset-pack-workbench';
 import { AttributionPanel } from './attribution-panel';
 import { AssetPackUploadPanel } from './upload-panel';
+import { AssetPackDownloadBar } from './download-bar';
+import type { AssetPackDownloadKind } from '../../lib/asset-pack-download';
 
 const progressLabels: Readonly<Record<NonNullable<AssetPackWorkbenchState['progress']>['stage'], string>> = {
   'reading-archive': 'Reading archive',
@@ -39,12 +41,14 @@ export function WorkbenchPreview({
   onUpload,
   onReset,
   onBack,
+  onDownload,
 }: {
   readonly baseline?: BrowserAssetPackBaseline;
   readonly state: AssetPackWorkbenchState;
   readonly onUpload: (file: File) => void;
   readonly onReset: () => void;
   readonly onBack: () => void;
+  readonly onDownload: (kind: AssetPackDownloadKind) => void;
 }) {
   const sourceCount = state.workbench?.sourceSummaries.length ?? 0;
   const diagnosticCount = state.workbench?.diagnostics.length ?? state.diagnostics.length;
@@ -73,6 +77,7 @@ export function WorkbenchPreview({
             onBack={onBack}
           />
         </div>
+        <AssetPackDownloadBar state={state} onDownload={onDownload} />
         {baseline ? <PackPreviewContent baseline={baseline} state={state} /> : null}
       </div>
     </main>
