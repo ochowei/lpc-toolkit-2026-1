@@ -899,7 +899,7 @@ plugin: N/A — no plugin contract or workflow changed.
 - Consumes: Core draft status and shared formal/draft archive recognition.
 - Produces: stable `asset_pack_draft` lifecycle diagnostic, inspect reporting, install pre-staging rejection, doctor unhealthy state, and formal CLI pack refusal.
 
-- [ ] **Step 1: Write failing draft lifecycle tests**
+- [x] **Step 1: Write failing draft lifecycle tests**
 
 Generate a checksum-valid archive with `status: "draft"` and otherwise valid content. Assert:
 
@@ -913,11 +913,11 @@ expect((await inspectAssetPackArchive(options)).report).toMatchObject({
 
 Assert install returns the same code without creating staging, registry, installed source, journal, or output. Seed a managed-state fixture containing a draft and assert doctor is unhealthy. Assert `asset pack` refuses a draft source rather than silently stripping the marker.
 
-- [ ] **Step 2: Write failing help and human/JSON presentation tests**
+- [x] **Step 2: Write failing help and human/JSON presentation tests**
 
 Require `asset inspect --help` to say it reports draft status and `asset install --help` to say draft archives are rejected. Human inspect output must label `DRAFT`; JSON report gains optional `status: "draft"` without changing existing formal report keys.
 
-- [ ] **Step 3: Run focused CLI tests and verify RED**
+- [x] **Step 3: Run focused CLI tests and verify RED**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-packaging.test.ts asset-pack-inspection.test.ts asset-pack-install.test.ts asset-pack-doctor.test.ts command-spec.test.ts main-human.test.ts main-json.test.ts
@@ -925,7 +925,7 @@ rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-packaging.test.ts asset-pa
 
 Expected: FAIL because draft is currently treated as an ordinary valid v1 pack.
 
-- [ ] **Step 4: Add one lifecycle diagnostic and fail before mutation**
+- [x] **Step 4: Add one lifecycle diagnostic and fail before mutation**
 
 Keep draft out of Core validation errors so Web can preview a draft. Add the lifecycle diagnostic only in CLI packaging/inspection/state:
 
@@ -943,11 +943,11 @@ export function draftAssetPackDiagnostic(packId: string): AssetPackLifecycleDiag
 
 Inspection reports identity and counts but no installable snapshot. Install receives no verified inspection snapshot and therefore fails before transaction staging. Doctor reports any impossible legacy/tampered draft state as unhealthy.
 
-- [ ] **Step 5: Update help with the exact public contract**
+- [x] **Step 5: Update help with the exact public contract**
 
 Change only command descriptions/examples required for draft behavior. Do not add `--force`, `--ignore-warnings`, or an install override. Keep existing exit code `1` for invalid inspection/install.
 
-- [ ] **Step 6: Verify GREEN and lifecycle non-mutation**
+- [x] **Step 6: Verify GREEN and lifecycle non-mutation**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-packaging.test.ts asset-pack-inspection.test.ts asset-pack-install.test.ts asset-pack-doctor.test.ts command-spec.test.ts main-human.test.ts main-json.test.ts asset-lifecycle-e2e.test.ts
@@ -956,7 +956,7 @@ rtk pnpm --filter @lpc-toolkit/cli run typecheck
 
 Expected: PASS. Existing formal install/no-op/upgrade/downgrade behavior remains unchanged.
 
-- [ ] **Step 7: Commit Task 6**
+- [x] **Step 7: Commit Task 6**
 
 ```sh
 rtk git add packages/cli/src packages/cli/test
@@ -964,6 +964,11 @@ rtk git commit -m "feat(cli): reject draft asset pack archives"
 ```
 
 Record the full hash and PASS evidence, then commit the plan record separately.
+
+  - Product Commit: `b3bdb942cc1ff9723041c1bbf004846bd6190a96` (`feat(cli): reject draft asset pack archives`)
+  - RED: lifecycle/help tests failed for draft archives before CLI policy implementation; GREEN: focused Task 6 suite plus lifecycle E2E passed (210 tests), CLI typecheck passed, and `rtk pnpm verify` passed after the required sandbox-external IPC rerun.
+  - Independent review: Spec compliant; Task quality Approved; no Critical, Important, or Minor findings.
+  - CLI docs: help update; cli-readme, root-readme, landing, architecture, engineering, releasing, plugin N/A — internal lifecycle policy/no owned contract change.
 
 ---
 
