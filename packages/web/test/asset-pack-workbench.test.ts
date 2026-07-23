@@ -183,7 +183,8 @@ describe('asset-pack workbench reducer', () => {
 
   it('exposes ready exactly when formal blockers are empty', () => {
     let state = createAssetPackWorkbenchState();
-    expect(state.ready).toBe(true);
+    expect(state.formalBlockers.map(({ code }) => code)).toEqual(['missing-candidate']);
+    expect(state.ready).toBe(false);
     state = assetPackWorkbenchReducer(state, { type: 'formal-blockers', blockers: [{ code: 'missing-candidate', message: 'missing' }] });
     expect(state.ready).toBe(false);
     state = assetPackWorkbenchReducer(state, { type: 'downloaded', revision: 0 });

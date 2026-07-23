@@ -67,7 +67,7 @@ export type AssetPackWorkbenchAction =
 export function createAssetPackWorkbenchState(): AssetPackWorkbenchState {
   return withReady({
     phase: 'empty', activePanel: 'overview', revision: 0, acceptedEdits: [], pendingEdits: [],
-    diagnostics: [], formalBlockers: [],
+    diagnostics: [], formalBlockers: [missingCandidateBlocker],
   });
 }
 

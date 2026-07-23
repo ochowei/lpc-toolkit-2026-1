@@ -173,6 +173,11 @@ export class AssetPackWorkbenchController {
   }
 
   private currentFormalBlockers(): readonly AssetPackFormalBlocker[] {
+    if (this.currentState.phase === 'opening') {
+      return this.currentState.formalBlockers.length > 0
+        ? this.currentState.formalBlockers
+        : [{ code: 'missing-candidate', message: 'The current revision has no verified formal archive candidate.' }];
+    }
     if (this.currentState.phase === 'failed') return this.currentState.formalBlockers;
     const workbench = this.currentState.workbench;
     if (!workbench) {

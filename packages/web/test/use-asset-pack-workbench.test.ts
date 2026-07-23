@@ -65,13 +65,13 @@ const editingWithError = (requestId: number): AssetPackWorkerResponse => ({
   },
 });
 
-const readyEditing = (requestId: number): AssetPackWorkerResponse => ({
+const readyEditing = (requestId: number, revision = 0): AssetPackWorkerResponse => ({
   type: 'session',
   requestId,
-  revision: 0,
+  revision,
   outcome: 'editing',
   workbench: {
-    revision: 0,
+    revision,
     manifestText: JSON.stringify({
       schema: 'lpc-toolkit.asset-pack.v1',
       id: 'acme.demo',
@@ -92,7 +92,7 @@ const readyEditing = (requestId: number): AssetPackWorkerResponse => ({
     contentDigest: `sha256:${'c'.repeat(64)}`,
     releaseFingerprint: `sha256:${'r'.repeat(64)}`,
     formalCandidate: {
-      revision: 0,
+      revision,
       archiveDigest: `sha256:${'a'.repeat(64)}`,
       filename: 'acme.demo-1.2.3.lpc-assets.zip',
       version: '1.2.3',
@@ -170,6 +170,50 @@ describe('useAssetPackWorkbench orchestration', () => {
       name: 'AssetPackFormalAssemblyBlockedError',
     });
     expect(controller.state.formalBlockers.length).toBeGreaterThan(0);
+  });
+
+  it('blocks formal assembly during retry until the replacement Worker accepts open, while retaining state and replaying edits', async () => {
+    const workers = workerFactory();
+    const controller = new AssetPackWorkbenchController({ baseline, workerFactory: workers.factory });
+    const original = new File(['zip'], 'ready.zip');
+    const opened = controller.upload(original);
+    workers.workers[0]!.emit(readyEditing(1));
+    await opened;
+
+    const edit = controller.replaceManifest('{"version":"1.2.3"}', 'advanced-json');
+    workers.workers[0]!.emit(readyEditing(2, 1));
+    await edit;
+    const visibleWorkbench = controller.state.workbench;
+    const visibleEdits = controller.state.acceptedEdits;
+
+    controller.workerFailed(new Error('crashed'));
+    const retry = controller.retry();
+    expect(controller.state.phase).toBe('opening');
+    expect(controller.state.workbench).toBe(visibleWorkbench);
+    expect(controller.state.acceptedEdits).toEqual(visibleEdits);
+
+    await expect(controller.assemble('formal')).rejects.toMatchObject({
+      name: 'AssetPackFormalAssemblyBlockedError',
+      blockers: expect.arrayContaining([
+        expect.objectContaining({ code: expect.any(String), message: expect.any(String) }),
+      ]),
+    });
+    expect(workers.workers[1]!.messages).toEqual([
+      expect.objectContaining({ type: 'open', revision: 0, file: original }),
+    ]);
+
+    workers.workers[1]!.emit(readyEditing(1));
+    await Promise.resolve();
+    expect(workers.workers[1]!.messages).toEqual([
+      expect.objectContaining({ type: 'open', revision: 0, file: original }),
+      expect.objectContaining({ type: 'replace-manifest', revision: 1, manifestText: '{"version":"1.2.3"}' }),
+    ]);
+    workers.workers[1]!.emit(readyEditing(2, 1));
+    await retry;
+    expect(controller.state.phase).toBe('editing');
+    expect(controller.state.revision).toBe(1);
+    expect(controller.state.acceptedEdits).toEqual(visibleEdits);
+    controller.dispose();
   });
 
   it('computes authoritative formal blockers and refuses formal assembly while not ready', async () => {
