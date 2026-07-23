@@ -466,90 +466,33 @@ export interface AssetPackFormalGate {
 - Consumes: existing strict v1 parser, normalized source reconstruction, acknowledgement content projection, `ItemDefinition`.
 - Produces: `AssetPackStatus`, normalized optional `status`, unchanged existing content projection, `assetPackDefinitionProjection`, and `assetPackCreditProjection`.
 
-- [ ] **Step 1: Write failing strict-status and content-projection tests**
+- [x] **Step 1: Write failing strict-status and content-projection tests**
+  - Added strict draft status and content projection equivalence tests to `packages/core/test/asset-pack-schema.test.ts`.
+  - Added test proving draft status change preserves existing acknowledgements while version or substantive field change invalidates them in `packages/core/test/asset-pack-validation.test.ts`.
 
-Add exact cases:
+- [x] **Step 2: Write failing baseline-projection tests**
+  - Created `packages/core/test/asset-pack-baseline.test.ts` testing `assetPackDefinitionProjection` (omitting `credits`, `itemId`, `sourcePath`) and `assetPackCreditProjection`, with key-order independence.
 
-```ts
-const draft = parseAssetPackSource({ ...validSource(), status: 'draft' });
-expect(draft.ok && draft.source.status).toBe('draft');
-expect(parseAssetPackSource({ ...validSource(), status: 'ready' })).toMatchObject({
-  ok: false,
-});
+- [x] **Step 3: Run Core tests and verify RED**
+  - Command: `rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-schema.test.ts asset-pack-validation.test.ts asset-pack-baseline.test.ts`
+  - Output: RED (FAIL - `asset-pack-baseline.js` missing; `status` parsing failure on draft test case).
 
-const formal = normalizeAssetPack(validSource());
-const draftNormalized = normalizeAssetPack({ ...validSource(), status: 'draft' });
-expect(assetPackContentProjection(draftNormalized)).toEqual(
-  assetPackContentProjection(formal),
-);
-expect(assetPackSourceFromNormalized(draftNormalized).status).toBe('draft');
-```
+- [x] **Step 4: Implement the minimal pure Core contracts**
+  - Updated `packages/core/src/asset-pack-schema.ts`: added `AssetPackStatus` type (`'draft'`), optional `status` to `AssetPackSource`, schema validation for top-level `status`.
+  - Updated `packages/core/src/asset-pack-model.ts`: added `status` to `NormalizedAssetPack`, updated normalization and source reconstruction without changing `assetPackContentProjection`.
+  - Created `packages/core/src/asset-pack-baseline.ts`: added `assetPackDefinitionProjection` and `assetPackCreditProjection` with recursive key sorting.
+  - Updated `packages/core/src/index.ts`: exported `AssetPackStatus`, `assetPackDefinitionProjection`, and `assetPackCreditProjection`.
 
-Also prove that an existing acknowledgement remains matched after only draft status changes, while changing version or one source-backed substantive field still invalidates it through the existing content digest.
+- [x] **Step 5: Verify GREEN and architecture isolation**
+  - Verification:
+    - `rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-schema.test.ts asset-pack-validation.test.ts asset-pack-baseline.test.ts` PASS (51 tests passed)
+    - `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS
+    - `rtk pnpm check:boundaries` PASS
+    - `rtk pnpm --filter @lpc-toolkit/core test` PASS (334 tests passed)
 
-- [ ] **Step 2: Write failing baseline-projection tests**
+- [x] **Step 6: Commit Task 1**
+  - Product Commit: `138858fd68a1d4beb7fc3f883cf839bc8b2a79f6` (`feat(core): model asset pack draft status`)
 
-Use one `ItemDefinition` with `itemId`, `sourcePath`, and credits. Assert:
-
-```ts
-expect(assetPackDefinitionProjection(item)).not.toHaveProperty('credits');
-expect(assetPackDefinitionProjection(item)).not.toHaveProperty('itemId');
-expect(assetPackDefinitionProjection(item)).not.toHaveProperty('sourcePath');
-expect(assetPackCreditProjection(item)).toEqual(item.credits);
-```
-
-Recursively compare objects produced from reversed key insertion order so runtime hashing receives identical projections.
-
-- [ ] **Step 3: Run Core tests and verify RED**
-
-```sh
-rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-schema.test.ts asset-pack-validation.test.ts asset-pack-baseline.test.ts
-```
-
-Expected: FAIL because `status` and baseline projection exports do not exist.
-
-- [ ] **Step 4: Implement the minimal pure Core contracts**
-
-Add `status` to the exact top-level key list and accept only the literal `draft`. Carry it through `NormalizedAssetPack` and `assetPackSourceFromNormalized`. Do not add it to `assetPackContentProjection`.
-
-Create pure projections:
-
-```ts
-export function assetPackDefinitionProjection(item: ItemDefinition): unknown {
-  const {
-    credits: _credits,
-    itemId: _itemId,
-    sourcePath: _sourcePath,
-    ...definition
-  } = item;
-  return recursivelySortedProjection(definition);
-}
-
-export function assetPackCreditProjection(item: ItemDefinition): unknown {
-  return recursivelySortedProjection(item.credits);
-}
-```
-
-Keep the recursive sorter local and environment-neutral. Export the functions and types from Core's public `index.ts`.
-
-- [ ] **Step 5: Verify GREEN and architecture isolation**
-
-```sh
-rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-schema.test.ts asset-pack-validation.test.ts asset-pack-baseline.test.ts
-rtk pnpm --filter @lpc-toolkit/core run typecheck
-rtk pnpm check:boundaries
-```
-
-Expected: PASS with existing formal source reconstruction and content-digest tests unchanged.
-
-- [ ] **Step 6: Commit Task 1**
-
-```sh
-rtk git add packages/core/src/asset-pack-schema.ts packages/core/src/asset-pack-model.ts packages/core/src/asset-pack-baseline.ts packages/core/src/index.ts packages/core/test/asset-pack-schema.test.ts packages/core/test/asset-pack-validation.test.ts packages/core/test/asset-pack-baseline.test.ts
-rtk git commit -m "feat(core): model asset pack draft status"
-```
-
-Record the full hash and exact PASS commands under Task 1, then commit the plan record separately.
 
 ---
 
