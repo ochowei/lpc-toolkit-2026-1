@@ -539,6 +539,119 @@ describe('asset-pack validation', () => {
     );
   });
 
+  it('rejects a single recolor when its configured source ramp colors are missing from the inspected palette colors', () => {
+    const result = validateSource(newItemSource({
+      assets: [{
+        kind: 'new-item',
+        localId: 'wind-braid',
+        displayName: 'Wind Braid',
+        typeName: 'hair',
+        bodyTypes: ['male', 'female'],
+        animations: ['climb'],
+        recolor: { material: 'hair', palettes: ['ulpc'] },
+        layers: [{
+          id: 'foreground',
+          zPos: 120,
+          sprites: [{ animation: 'climb', source: 'sprites/wind-braid/foreground/climb.png' }],
+        }],
+      }],
+    }), [
+      inspectionFor('sprites/wind-braid/foreground/climb.png', 'climb', {
+        decoded: {
+          width: 384,
+          height: 64,
+          nonTransparentCells: allCells('climb'),
+          paletteColors: ['#111111'],
+        },
+      }),
+    ]);
+
+    expect(result.ok).toBe(false);
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({
+      code: 'asset_pack_schema_invalid',
+      severity: 'error',
+      sourcePath: 'sprites/wind-braid/foreground/climb.png',
+      message: 'Configured recolor source ramp is not present in sprites/wind-braid/foreground/climb.png.',
+      details: {
+        path: '$.assets[0].recolor',
+        material: 'hair',
+        requiredColors: ['#111111', '#222222'],
+        missingColors: ['#222222'],
+      },
+    }));
+  });
+
+  it('accepts a valid single recolor when every configured source-ramp color is present', () => {
+    const result = validateSource(newItemSource({
+      assets: [{
+        kind: 'new-item',
+        localId: 'wind-braid',
+        displayName: 'Wind Braid',
+        typeName: 'hair',
+        bodyTypes: ['male', 'female'],
+        animations: ['climb'],
+        recolor: { material: 'hair', palettes: ['ulpc'] },
+        layers: [{
+          id: 'foreground',
+          zPos: 120,
+          sprites: [{ animation: 'climb', source: 'sprites/wind-braid/foreground/climb.png' }],
+        }],
+      }],
+    }), [
+      inspectionFor('sprites/wind-braid/foreground/climb.png', 'climb', {
+        decoded: {
+          width: 384,
+          height: 64,
+          nonTransparentCells: allCells('climb'),
+          paletteColors: ['#111111', '#222222'],
+        },
+      }),
+    ]);
+
+    expect(result.diagnostics).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'asset_pack_schema_invalid', sourcePath: 'sprites/wind-braid/foreground/climb.png' }),
+    ]));
+  });
+
+  it('accepts valid multi-color recolor forms when each configured source ramp is present', () => {
+    const result = validateSource(newItemSource({
+      assets: [{
+        kind: 'new-item',
+        localId: 'wind-braid',
+        displayName: 'Wind Braid',
+        typeName: 'hair',
+        bodyTypes: ['male', 'female'],
+        animations: ['climb'],
+        recolor: {
+          color_1: { material: 'hair', palettes: ['ulpc'] },
+          color_2: {
+            material: 'hair',
+            palettes: ['ulpc'],
+            source: ['#cc5500', '#ee7700'],
+          },
+        },
+        layers: [{
+          id: 'foreground',
+          zPos: 120,
+          sprites: [{ animation: 'climb', source: 'sprites/wind-braid/foreground/climb.png' }],
+        }],
+      }],
+    }), [
+      inspectionFor('sprites/wind-braid/foreground/climb.png', 'climb', {
+        decoded: {
+          width: 384,
+          height: 64,
+          nonTransparentCells: allCells('climb'),
+          paletteColors: ['#111111', '#222222', '#cc5500', '#ee7700'],
+        },
+      }),
+    ]);
+
+    expect(result.diagnostics).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'asset_pack_schema_invalid', sourcePath: 'sprites/wind-braid/foreground/climb.png' }),
+    ]));
+  });
+
   it('emits partial body and animation coverage warnings', () => {
     const result = validateSource(newItemSource({
       assets: [{
@@ -649,4 +762,3 @@ describe('asset-pack validation', () => {
     expect(versionChangedResult.ok).toBe(false);
   });
 });
-

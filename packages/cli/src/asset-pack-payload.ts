@@ -1,6 +1,7 @@
 import {
   parseAssetPackPayload as parseAssetPackPayloadFormat,
   type AssetPackPayloadDiagnostic,
+  type AssetPackSha256,
 } from '@lpc-toolkit/asset-pack-format';
 import type { AssetPackSourceInspection, NormalizedAssetPack } from '@lpc-toolkit/core';
 import { nodeAssetPackFormatRuntime } from './asset-pack-node-runtime.js';
@@ -12,9 +13,9 @@ export interface AssetPackPayloadSuccess {
   readonly manifestBytes: Buffer;
   readonly pack: NormalizedAssetPack;
   readonly sourceBytes: ReadonlyMap<string, Buffer>;
-  readonly sourceDigests: ReadonlyMap<string, string>;
+  readonly sourceDigests: ReadonlyMap<string, AssetPackSha256>;
   readonly inspections: readonly AssetPackSourceInspection[];
-  readonly contentDigest: string;
+  readonly contentDigest: AssetPackSha256;
 }
 
 export type AssetPackPayloadResult =

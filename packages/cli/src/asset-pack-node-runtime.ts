@@ -1,6 +1,11 @@
 import { createHash } from 'node:crypto';
 import { inflateRawSync } from 'node:zlib';
-import type { AssetPackFormatRuntime } from '@lpc-toolkit/asset-pack-format';
+import { loadImage as loadCanvasImage } from '@napi-rs/canvas';
+import type {
+  AssetPackFormatRuntime,
+  AssetPackPngDecoder,
+} from '@lpc-toolkit/asset-pack-format';
+import { createNodeCanvasAdapter } from './node-canvas-adapter.js';
 
 export const nodeAssetPackFormatRuntime: AssetPackFormatRuntime = {
   sha256: async (bytes) =>
@@ -15,5 +20,21 @@ export const nodeAssetPackFormatRuntime: AssetPackFormatRuntime = {
       throw new Error('Raw DEFLATE output length does not match its declaration.');
     }
     return new Uint8Array(output);
+  },
+};
+
+export const nodeAssetPackPngDecoder: AssetPackPngDecoder = {
+  decode: async (bytes) => {
+    const image = await loadCanvasImage(bytes);
+    const adapter = createNodeCanvasAdapter();
+    const canvas = adapter.createCanvas(image.width, image.height);
+    const context = canvas.getContext('2d');
+    context.drawImage(image, 0, 0);
+    const pixels = context.getImageData(0, 0, image.width, image.height).data;
+    return {
+      width: image.width,
+      height: image.height,
+      pixels: new Uint8ClampedArray(pixels),
+    };
   },
 };

@@ -198,6 +198,12 @@ export function validateAssetPack(
     }
   }
 
+  diagnostics.push(...validateRecolorSourceRamps(
+    options.pack,
+    options.palettes,
+    options.inspections,
+  ));
+
   const sortedDiagnostics = sortDiagnostics(diagnostics);
   const acknowledgementRecords = buildAcknowledgementRecords(
     sortedDiagnostics,
@@ -656,6 +662,30 @@ function collectRecolorEntries(recolor: RawRecolors | undefined): readonly Recol
   return entries.length > 0 ? entries : [recolor as RecolorConfig];
 }
 
+interface RecolorEntry {
+  readonly config: RecolorConfig;
+  readonly path: string;
+}
+
+function collectRecolorEntriesWithPaths(
+  recolor: RawRecolors | undefined,
+  pathValue: string,
+): readonly RecolorEntry[] {
+  if (!recolor) return [];
+  const entries: RecolorEntry[] = [];
+  const multi = recolor as {
+    readonly [key: `color_${number}`]: RecolorConfig | undefined;
+  };
+  for (let index = 1; index < 10; index += 1) {
+    const config = multi[`color_${index}`];
+    if (!config) break;
+    entries.push({ config, path: `${pathValue}.color_${index}` });
+  }
+  return entries.length > 0
+    ? entries
+    : [{ config: recolor as RecolorConfig, path: pathValue }];
+}
+
 function resolvePaletteToken(
   token: string,
   fallbackMaterial: string,
@@ -705,6 +735,142 @@ function optionalCells(geometry: AnimationAuditGeometry): readonly string[] {
 
 function geometrySignature(geometry: AnimationAuditGeometry): string {
   return JSON.stringify(geometry);
+}
+
+function collectSourceUses(pack: NormalizedAssetPack): ReadonlyMap<string, readonly SourceUse[]> {
+  const uses = new Map<string, SourceUse[]>();
+
+  pack.assets.forEach((asset) => {
+    if (asset.kind !== 'new-item') return;
+
+    asset.layers.forEach((layer) => {
+      layer.sprites.forEach((sprite) => {
+        if (!isRegisteredAnimation(sprite.animation)) return;
+        const grouped = uses.get(sprite.source) ?? [];
+        grouped.push({
+          sourcePath: sprite.source,
+          geometry: standardAnimationGeometry(sprite.animation),
+          path: '',
+          assetId: asset.itemId,
+          animation: sprite.animation,
+        });
+        uses.set(sprite.source, grouped);
+      });
+    });
+  });
+
+  return uses;
+}
+
+function normalizedColorRamp(colors: readonly string[]): readonly string[] | undefined {
+  if (colors.length === 0) return undefined;
+  const normalized: string[] = [];
+  for (const color of colors) {
+    const match = /^#?([0-9a-f]{6})$/i.exec(color);
+    if (!match?.[1]) return undefined;
+    normalized.push(`#${match[1].toLowerCase()}`);
+  }
+  return normalized;
+}
+
+function configuredSourceRamp(
+  config: RecolorConfig,
+  palettes: PaletteMetadata,
+): readonly string[] | undefined {
+  if (config.source) return normalizedColorRamp(config.source);
+
+  const material = palettes.materials[config.material];
+  if (!material) return undefined;
+  let base = config.base;
+  if (!base) {
+    if (!material.default || !material.base) return undefined;
+    base = `${material.default}.${material.base}`;
+  } else if (!base.includes('.')) {
+    if (!material.default) return undefined;
+    base = `${material.default}.${base}`;
+  }
+
+  const [version, recolor] = base.split('.');
+  if (!version || !recolor) return undefined;
+  const ramp = material.palettes[version]?.[recolor];
+  return ramp ? normalizedColorRamp(ramp) : undefined;
+}
+
+function geometryForEveryDeclaredUse(
+  uses: readonly SourceUse[],
+  width: number,
+  height: number,
+): AnimationAuditGeometry | undefined {
+  const first = uses[0]?.geometry;
+  if (!first) return undefined;
+  const key = `${width}x${height}`;
+  return uses.every((use) => {
+    const bounds = geometryBounds(use.geometry);
+    return `${bounds.width}x${bounds.height}` === key;
+  })
+    ? first
+    : undefined;
+}
+
+function validateRecolorSourceRamps(
+  pack: NormalizedAssetPack,
+  palettes: PaletteMetadata,
+  inspections: readonly AssetPackSourceInspection[],
+): readonly AssetPackDiagnostic[] {
+  const diagnostics: AssetPackDiagnostic[] = [];
+  const inspectionMap = new Map(inspections.map((inspection) => [
+    inspection.sourcePath,
+    inspection,
+  ]));
+  const uses = collectSourceUses(pack);
+
+  pack.assets.forEach((asset, assetIndex) => {
+    if (asset.kind !== 'new-item' || !asset.recolor) return;
+    const entries = collectRecolorEntriesWithPaths(
+      asset.recolor,
+      `$.assets[${assetIndex}].recolor`,
+    );
+    const sourcePaths = [...new Set(asset.layers.flatMap((layer) =>
+      layer.sprites.map((sprite) => sprite.source),
+    ))].sort((left, right) => left.localeCompare(right));
+
+    for (const sourcePath of sourcePaths) {
+      const inspection = inspectionMap.get(sourcePath);
+      const sourceUses = uses.get(sourcePath) ?? [];
+      if (!inspection?.decoded || inspection.error) continue;
+      const geometry = geometryForEveryDeclaredUse(
+        sourceUses,
+        inspection.decoded.width,
+        inspection.decoded.height,
+      );
+      if (!geometry) continue;
+      const presentCells = new Set(inspection.decoded.nonTransparentCells);
+      if (requiredCells(geometry).some((cell) => !presentCells.has(cell))) continue;
+      const presentColors = new Set(inspection.decoded.paletteColors);
+
+      for (const entry of entries) {
+        const requiredColors = configuredSourceRamp(entry.config, palettes);
+        if (!requiredColors) continue;
+        const missingColors = requiredColors.filter((color) => !presentColors.has(color));
+        if (missingColors.length === 0) continue;
+        diagnostics.push({
+          code: 'asset_pack_schema_invalid',
+          severity: 'error',
+          message: `Configured recolor source ramp is not present in ${sourcePath}.`,
+          assetId: asset.itemId,
+          sourcePath,
+          details: {
+            path: entry.path,
+            material: entry.config.material,
+            requiredColors,
+            missingColors,
+          },
+        });
+      }
+    }
+  });
+
+  return diagnostics;
 }
 
 function warningSubject(
