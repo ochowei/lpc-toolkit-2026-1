@@ -54,8 +54,31 @@ Additional verification:
 ## Commits
 
 - Product: `e7719ca4083a6f9a0973c11a23398a4318300f03` — `feat(web): download governed asset pack archives`
-- Report: recorded in the follow-up commit after this report update.
+- Review-fix product: `ace0983076808266135119cb6c1992a06ddbc7aa` — `fix(web): close Task 13 review findings`
+- Report: recorded in the follow-up report commit after this update.
+
+## Fresh Luna review fixes
+
+- Draft confirmation now derives its error/warning list from the reducer’s current `state.diagnostics`, so a stale `workbench.diagnostics` snapshot cannot hide current Worker diagnostics.
+- App history entries now carry a monotonic internal index. Accepted programmatic navigation pushes the next indexed entry; canceled indexed `popstate` restores with `history.go(-delta)` and never `pushState`s a duplicate. Unknown-entry cancellation uses `replaceState` as a no-growth fallback.
+- Exact-revision assembly, formal gate recheck, response metadata validation, and success-only downloaded markers were not changed.
+- Added focused regressions for stale diagnostic snapshots and canceled back navigation without history growth.
+
+Review-fix RED:
+
+```text
+rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-download.test.ts use-unsaved-work-guard.test.ts asset-pack-download-bar.test.tsx app-shell.test.tsx use-asset-pack-workbench.test.ts
+```
+
+FAIL — 5 files, 26 tests collected; 2 new regressions failed: the current Worker diagnostic was absent from draft confirmation, and canceled popstate called the old-path `pushState` restoration.
+
+Review-fix GREEN and gates:
+
+- `rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-download.test.ts use-unsaved-work-guard.test.ts asset-pack-download-bar.test.tsx app-shell.test.tsx use-asset-pack-workbench.test.ts` — PASS, 5 files, 26 tests.
+- `rtk pnpm --filter @lpc-toolkit/web run typecheck` — PASS.
+- `rtk pnpm check:boundaries` — PASS.
+- `rtk git diff --check` — PASS before the review-fix commit.
 
 ## Concerns
 
-No concrete implementation blocker remains. Browser-level `beforeunload`/history behavior is covered by the injected navigation-owner and guard tests; the repository’s Vitest environment does not provide a browser DOM harness. Full web verification passed, with only the pre-existing warning logs noted above.
+No concrete implementation blocker remains. Browser-level `beforeunload`/history behavior is covered by the injected navigation-owner and guard tests; the repository’s Vitest environment does not provide a browser DOM harness. Minor review items were intentionally left unchanged.
