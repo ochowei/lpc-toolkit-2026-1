@@ -38,7 +38,7 @@ The public contract now distinguishes Web Workbench repair/draft creation from C
 ## Commits
 
 Product commit: `368794d4458740c9e6896d63824e0e868ad2f196` (`docs(asset-pack): publish browser correction workflow`)
-Plan/evidence commit: pending
+Plan/evidence commit: `698e6e6fe0828514c60dcc3b0a3a9f8a2cf99f6a` (`docs(plan): record task 14 implementation evidence`)
 
 ## Concerns
 
