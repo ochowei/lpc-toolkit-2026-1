@@ -305,7 +305,7 @@ function createSession(
     try {
       const created = await createAssetPackArchive({
         kind: 'draft',
-        manifestDocument: document,
+        manifestDocument: assemblyManifestDocument(document, state.workbench.acknowledgementRecords),
         sourceBytes: state.sourceBytes,
         runtime,
       });
@@ -469,7 +469,7 @@ async function evaluateState(
     try {
       const assembled = await createAssetPackArchive({
         kind: 'formal',
-        manifestDocument: document,
+        manifestDocument: assemblyManifestDocument(document, currentAcknowledgements),
         sourceBytes: state.sourceBytes,
         runtime,
       });
@@ -695,6 +695,16 @@ function mergeAcknowledgementCandidates(
     );
     return existing ? { ...candidate, reason: existing.reason } : candidate;
   });
+}
+
+function assemblyManifestDocument(
+  document: Readonly<Record<string, unknown>>,
+  acknowledgements: readonly AssetPackAcknowledgement[],
+): Readonly<Record<string, unknown>> {
+  const { acknowledgements: _staleAcknowledgements, ...withoutAcknowledgements } = document;
+  return acknowledgements.length > 0
+    ? { ...withoutAcknowledgements, acknowledgements }
+    : withoutAcknowledgements;
 }
 
 function isSerializableSources(

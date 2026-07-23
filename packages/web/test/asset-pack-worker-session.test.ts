@@ -7,7 +7,7 @@ import {
   type AssetPackFormatRuntime,
   type AssetPackPngDecoder,
 } from '@lpc-toolkit/asset-pack-format';
-import { createCatalog, createPaletteCatalog } from '@lpc-toolkit/core';
+import { createCatalog, createPaletteCatalog, standardAnimationGeometry } from '@lpc-toolkit/core';
 import { createBrowserAssetPackFormatRuntime } from '../src/adapter/asset-pack-format-runtime';
 import type { AssetPackWorkerBaseline, AssetPackWorkerResponse } from '../src/lib/asset-pack-worker-protocol';
 import {
@@ -54,7 +54,7 @@ function runtime(): AssetPackFormatRuntime {
 }
 
 function decoder(options?: { readonly error?: boolean }): AssetPackPngDecoder {
-    return {
+  return {
     decode: async () => {
       if (options?.error) throw new Error('decode failed');
       return {
@@ -62,6 +62,33 @@ function decoder(options?: { readonly error?: boolean }): AssetPackPngDecoder {
         height: 256,
         pixels: new Uint8ClampedArray(576 * 256 * 4).fill(255),
       };
+    },
+  };
+}
+
+function decoderWithOptionalBlank(): AssetPackPngDecoder {
+  const geometry = standardAnimationGeometry('walk');
+  const frameSize = geometry.frameSize;
+  const width = 576;
+  const height = 256;
+  const sourceLengthWithOpaqueOptionalCells = validPngHeader().byteLength + 1;
+  return {
+    decode: async (bytes) => {
+      const pixels = new Uint8ClampedArray(width * height * 4);
+      const maxColumn = Math.max(...geometry.rows.flatMap((row) => row.cells.map((cell) => cell.sourceColumn)));
+      const columns = bytes.byteLength >= sourceLengthWithOpaqueOptionalCells
+        ? Array.from({ length: maxColumn + 1 }, (_, column) => column)
+        : undefined;
+      for (const row of geometry.rows) {
+        for (const column of columns ?? row.cells.map((cell) => cell.sourceColumn)) {
+          const index = (row.sourceRow * frameSize * width + column * frameSize) * 4;
+          pixels[index] = 255;
+          pixels[index + 1] = 255;
+          pixels[index + 2] = 255;
+          pixels[index + 3] = 255;
+        }
+      }
+      return { width, height, pixels };
     },
   };
 }
@@ -538,6 +565,64 @@ describe('asset-pack Worker session', () => {
     if (badResponse?.type === 'session' && badResponse.outcome === 'editing') {
       expect(badResponse.workbench.preview).toBeUndefined();
       expect(badResponse.workbench.diagnostics.some((diagnostic) => diagnostic.severity === 'error')).toBe(true);
+    }
+  });
+
+  it('removes source-invalidated acknowledgements from draft and formal assemblies', async () => {
+    const result = await open(await archiveFor(), { decoder: decoderWithOptionalBlank() });
+    const session = result.session;
+    expect(session).toBeDefined();
+    if (!session) return;
+
+    const initial = result.responses.find((response) => response.type === 'session' && response.outcome === 'editing');
+    const candidate = initial?.type === 'session' && initial.outcome === 'editing'
+      ? initial.workbench.acknowledgementRecords.find(
+        (record) => record.code === 'asset_optional_frame_blank',
+      )
+      : undefined;
+    expect(candidate).toBeDefined();
+    if (!candidate) throw new Error('Expected an optional-frame acknowledgement candidate.');
+
+    const acknowledged = await session.replaceManifest({
+      requestId: 2,
+      revision: 1,
+      manifestText: JSON.stringify({
+        ...manifest,
+        acknowledgements: [{ ...candidate, reason: 'Reviewed optional padding.' }],
+      }),
+      origin: 'acknowledgement',
+    });
+    expect(acknowledged).toContainEqual(expect.objectContaining({ type: 'session', outcome: 'editing', revision: 1 }));
+
+    const changedSource = new Uint8Array([...validPngHeader(), 1]);
+    const changed = await session.replaceSource({
+      requestId: 3,
+      revision: 2,
+      path: SOURCE_PATH,
+      file: file(changedSource, 'replacement.png'),
+    });
+    const changedResponse = changed.find((response) => response.type === 'session' && response.outcome === 'editing');
+    expect(changedResponse).toMatchObject({
+      type: 'session',
+      outcome: 'editing',
+      revision: 2,
+      workbench: {
+        acknowledgementRecords: [],
+        formalCandidate: expect.objectContaining({ revision: 2 }),
+      },
+    });
+
+    for (const kind of ['draft', 'formal'] as const) {
+      const assembled = await session.assemble({ requestId: kind === 'draft' ? 4 : 5, revision: 2, kind });
+      const response = assembled.find((candidateResponse) => candidateResponse.type === 'assembled');
+      expect(response).toBeDefined();
+      if (response?.type !== 'assembled') continue;
+      const zip = await JSZip.loadAsync(response.archiveBytes);
+      const manifestEntry = zip.file('asset-pack.json');
+      expect(manifestEntry).toBeDefined();
+      if (!manifestEntry) continue;
+      const assembledManifest = JSON.parse(await manifestEntry.async('string')) as { readonly acknowledgements?: unknown };
+      expect(assembledManifest.acknowledgements).toBeUndefined();
     }
   });
 
