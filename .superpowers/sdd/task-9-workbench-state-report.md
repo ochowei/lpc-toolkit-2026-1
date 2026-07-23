@@ -73,3 +73,31 @@ TDD and verification:
 
 Scope check: no Task 10 files, plan files, dependencies, `upstream/`, checked-in
 assets, cache, or artist sources were changed.
+
+## Remaining Task 9 product-finding fix evidence
+
+The final workbench review findings were fixed without editing the checked-in
+Task 9 implementation plan. Opening and retry now expose a non-empty
+`missing-candidate` formal blocker until a current Worker revision exists;
+unsafe uploads retain `unsafe-archive` through formal assembly attempts; and
+`ready` remains exactly equivalent to an empty blocker list. Stale but
+Worker-accepted session replies are retained as ordered replay edits while the
+visible workbench remains latest-only, so concurrent manifest/source/remove
+requests replay contiguously after a crash.
+
+Product commit:
+
+- `747af08b309d5cef5aafcaf822bb94f7a1b03a02` — `fix(web): close Task 9 workbench review findings`
+
+TDD and verification:
+
+- `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/asset-pack-workbench.test.ts test/use-asset-pack-workbench.test.ts` — RED: 5 intended regression failures before the fix; final GREEN: 2 files, 18 tests.
+- `rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-worker-client.test.ts asset-pack-manifest-editor.test.ts asset-pack-workbench.test.ts asset-pack-release.test.ts use-asset-pack-workbench.test.ts` — PASS: 5 files, 30 tests.
+- `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/asset-pack-worker-protocol.test.ts test/asset-pack-worker-session.test.ts test/asset-pack-format-conformance.test.ts` — PASS: 3 files, 24 Task 8 regression tests.
+- `rtk pnpm --filter @lpc-toolkit/web run typecheck` — PASS.
+- `rtk pnpm check:boundaries` — PASS.
+- `rtk git diff --check` — PASS.
+
+Scope check: product commit contains only the five requested Web source/test
+files. No Task 10 files, plan files, dependencies, `upstream/`, checked-in
+assets, cache, or artist sources were changed.
