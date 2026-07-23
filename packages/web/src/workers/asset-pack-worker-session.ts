@@ -8,6 +8,7 @@ import {
   type AssetPackAcknowledgement,
   type AssetPackBaseline,
   type AssetPackDiagnostic,
+  type AssetPackSource,
   type NormalizedAssetPack,
 } from '@lpc-toolkit/core';
 import {
@@ -162,6 +163,13 @@ function createSession(
   runtime: AssetPackFormatRuntime,
   decoder: AssetPackPngDecoder,
 ): AssetPackWorkerSession & { readonly evaluate: (revision: number) => Promise<Evaluation> } {
+  let mutationTail: Promise<void> = Promise.resolve();
+  const enqueue = <T>(operation: () => Promise<T>): Promise<T> => {
+    const result = mutationTail.then(operation, operation);
+    mutationTail = result.then(() => undefined, () => undefined);
+    return result;
+  };
+
   const evaluate = async (revision: number): Promise<Evaluation> => {
     const evaluation = await evaluateState(state, revision, baseline, runtime, decoder);
     state.workbench = evaluation.workbench;
@@ -181,49 +189,61 @@ function createSession(
     })];
   };
 
-  const replaceManifest = async (request: ManifestRequest): Promise<readonly AssetPackWorkerResponse[]> => {
-    const rejected = editGuard(request.requestId, request.revision);
-    if (rejected) return rejected;
-    const governanceError = await validateManifestGovernance(request, state, baseline, runtime, decoder);
-    if (governanceError) return [failedResponse(request.requestId, request.revision, governanceError)];
-    state.manifestText = request.manifestText;
-    state.revision = request.revision;
-    state.archiveDiagnostics = [];
-    const evaluation = await evaluate(request.revision);
-    return [editingResponse(request.requestId, evaluation.workbench)];
-  };
+  const replaceManifest = (request: ManifestRequest): Promise<readonly AssetPackWorkerResponse[]> =>
+    enqueue(async () => {
+      const rejected = editGuard(request.requestId, request.revision);
+      if (rejected) return rejected;
+      const governanceError = await validateManifestGovernance(request, state, baseline, runtime, decoder);
+      if (governanceError) return [failedResponse(request.requestId, request.revision, governanceError)];
+      state.manifestText = request.manifestText;
+      state.revision = request.revision;
+      state.archiveDiagnostics = [];
+      const evaluation = await evaluate(request.revision);
+      return [editingResponse(request.requestId, evaluation.workbench)];
+    });
 
-  const replaceSource = async (request: SourceRequest): Promise<readonly AssetPackWorkerResponse[]> => {
-    const rejected = editGuard(request.requestId, request.revision);
-    if (rejected) return rejected;
-    const bytes = new Uint8Array(await request.file.arrayBuffer());
-    if (bytes.byteLength > ASSET_PACK_ARCHIVE_LIMITS.entryBytes) {
-      return [failedResponse(request.requestId, request.revision, {
-        code: 'asset_archive_limit_exceeded',
-        severity: 'error',
-        message: `Source exceeds the ${String(ASSET_PACK_ARCHIVE_LIMITS.entryBytes)}-byte entry limit.`,
-        scope: 'source',
-        path: request.path,
-      })];
-    }
-    state.sourceBytes.set(request.path, new Uint8Array(bytes));
-    state.revision = request.revision;
-    state.archiveDiagnostics = [];
-    const evaluation = await evaluate(request.revision);
-    return [editingResponse(request.requestId, evaluation.workbench)];
-  };
+  const replaceSource = (request: SourceRequest): Promise<readonly AssetPackWorkerResponse[]> =>
+    enqueue(async () => {
+      const rejected = editGuard(request.requestId, request.revision);
+      if (rejected) return rejected;
+      const pathError = validateSourcePath(request.path, runtime);
+      if (pathError) return [failedResponse(request.requestId, request.revision, pathError)];
+      const preflightError = validateSourceReplacementLimits(
+        state.sourceBytes,
+        request.path,
+        request.file.size,
+        runtime,
+      );
+      if (preflightError) return [failedResponse(request.requestId, request.revision, preflightError)];
 
-  const removeSource = async (request: RemoveRequest): Promise<readonly AssetPackWorkerResponse[]> => {
-    const rejected = editGuard(request.requestId, request.revision);
-    if (rejected) return rejected;
-    state.sourceBytes.delete(request.path);
-    state.revision = request.revision;
-    state.archiveDiagnostics = [];
-    const evaluation = await evaluate(request.revision);
-    return [editingResponse(request.requestId, evaluation.workbench)];
-  };
+      const bytes = new Uint8Array(await request.file.arrayBuffer());
+      if (bytes.byteLength > ASSET_PACK_ARCHIVE_LIMITS.entryBytes) {
+        return [failedResponse(request.requestId, request.revision, sourceEntryLimitDiagnostic(request.path))];
+      }
+      const nextSourceBytes = new Map(state.sourceBytes);
+      nextSourceBytes.set(request.path, new Uint8Array(bytes));
+      if (!isSerializableSources(nextSourceBytes, runtime)) {
+        return [failedResponse(request.requestId, request.revision, sourceTotalLimitDiagnostic(request.path))];
+      }
+      state.sourceBytes = nextSourceBytes;
+      state.revision = request.revision;
+      state.archiveDiagnostics = [];
+      const evaluation = await evaluate(request.revision);
+      return [editingResponse(request.requestId, evaluation.workbench)];
+    });
 
-  const assemble = async (request: AssembleRequest): Promise<readonly AssetPackWorkerResponse[]> => {
+  const removeSource = (request: RemoveRequest): Promise<readonly AssetPackWorkerResponse[]> =>
+    enqueue(async () => {
+      const rejected = editGuard(request.requestId, request.revision);
+      if (rejected) return rejected;
+      state.sourceBytes.delete(request.path);
+      state.revision = request.revision;
+      state.archiveDiagnostics = [];
+      const evaluation = await evaluate(request.revision);
+      return [editingResponse(request.requestId, evaluation.workbench)];
+    });
+
+  const assemble = (request: AssembleRequest): Promise<readonly AssetPackWorkerResponse[]> => enqueue(async () => {
     if (request.kind === 'formal') {
       if (request.revision !== state.revision
         || !state.formalCandidateBytes
@@ -280,7 +300,7 @@ function createSession(
         scope: 'release',
       })];
     }
-  };
+  });
 
   return { replaceManifest, replaceSource, removeSource, assemble, evaluate };
 }
@@ -324,7 +344,7 @@ async function evaluateState(
         sourceSummaries: summarizeRawSources(state.sourceBytes),
         diagnostics,
         acknowledgementRecords: [],
-        draftSerializable: isSerializableSources(state.sourceBytes),
+        draftSerializable: isSerializableSources(state.sourceBytes, runtime),
       },
     };
   }
@@ -362,7 +382,7 @@ async function evaluateState(
   const sourceSummaries = summarizeSources(sourceUses, state.sourceBytes, sourceDigests, inspections);
   const hasErrors = diagnostics.some((diagnostic) => diagnostic.severity === 'error');
   const currentAcknowledgements = mergeAcknowledgementCandidates(validation.acknowledgementRecords, pack.acknowledgements);
-  const draftSerializable = isSerializableSources(state.sourceBytes);
+  const draftSerializable = isSerializableSources(state.sourceBytes, runtime);
   const preview = hasErrors ? undefined : {
     revision,
     packId: pack.id,
@@ -446,10 +466,14 @@ async function validateManifestGovernance(
 ): Promise<AssetPackWorkbenchDiagnostic | undefined> {
   const proposed = parseJsonObject(request.manifestText);
   const current = parseJsonObject(state.manifestText);
-  if (!proposed || !current) return undefined;
-  const proposedAcknowledgements = proposed.acknowledgements;
-  const currentAcknowledgements = current.acknowledgements;
+  const proposedAcknowledgements = proposed?.acknowledgements;
+  const currentAcknowledgements = current?.acknowledgements;
   if (request.origin !== 'acknowledgement') {
+    if ((!proposed || !current)
+      && (hasAcknowledgementValue(proposedAcknowledgements) || hasAcknowledgementValue(currentAcknowledgements))) {
+      return acknowledgementForbidden();
+    }
+    if (!proposed || !current) return undefined;
     if (JSON.stringify(canonicalizeJsonValue(proposedAcknowledgements ?? []))
       !== JSON.stringify(canonicalizeJsonValue(currentAcknowledgements ?? []))) {
       return acknowledgementForbidden();
@@ -457,26 +481,59 @@ async function validateManifestGovernance(
     return undefined;
   }
 
-  const temporary = createAssetPackWorkerSession({
+  if (!proposed || !current) return acknowledgementForbidden();
+
+  const currentSession = createAssetPackWorkerSession({
     baseline,
-    manifestText: request.manifestText,
+    manifestText: state.manifestText,
     sourceBytes: state.sourceBytes,
     runtime,
     decoder,
   });
-  const evaluation = await temporary.evaluate(state.revision);
-  if (!evaluation.pack || !evaluation.workbench.contentDigest) return acknowledgementForbidden();
-  const candidates = evaluation.workbench.acknowledgementRecords;
+  const currentEvaluation = await currentSession.evaluate(state.revision);
+  if (!currentEvaluation.pack || !currentEvaluation.workbench.contentDigest) return acknowledgementForbidden();
+
+  const proposedParsed = parseAssetPackSource(proposed);
+  if (!proposedParsed.ok) return acknowledgementForbidden();
+  const proposedPack = normalizeAssetPack(proposedParsed.source);
+  const currentSource = assetPackSourceFromNormalized(currentEvaluation.pack);
+  const proposedSource = assetPackSourceFromNormalized(proposedPack);
+  if (JSON.stringify(canonicalizeJsonValue(withoutAcknowledgements(currentSource)))
+    !== JSON.stringify(canonicalizeJsonValue(withoutAcknowledgements(proposedSource)))) {
+    return acknowledgementForbidden();
+  }
+
   if (!Array.isArray(proposedAcknowledgements)) return acknowledgementForbidden();
-  for (const acknowledgement of evaluation.pack.acknowledgements) {
-    const candidate = candidates.find((entry) =>
-      entry.code === acknowledgement.code
-      && entry.contentDigest === acknowledgement.contentDigest
-      && JSON.stringify(entry.subject) === JSON.stringify(acknowledgement.subject),
-    );
+  const candidates = currentEvaluation.workbench.acknowledgementRecords;
+  const selected = new Set<string>();
+  for (const acknowledgement of proposedPack.acknowledgements) {
+    const candidate = candidates.find((entry) => acknowledgementKey(entry) === acknowledgementKey(acknowledgement));
     if (!candidate || acknowledgement.reason.trim().length === 0) return acknowledgementForbidden();
+    const key = acknowledgementKey(candidate);
+    if (selected.has(key)) return acknowledgementForbidden();
+    selected.add(key);
   }
   return undefined;
+}
+
+function withoutAcknowledgements(
+  source: AssetPackSource,
+): Readonly<Record<string, unknown>> {
+  const { acknowledgements: _acknowledgements, ...without } = source;
+  return without;
+}
+
+function hasAcknowledgementValue(value: unknown): boolean {
+  return value !== undefined
+    && JSON.stringify(canonicalizeJsonValue(value)) !== JSON.stringify(canonicalizeJsonValue([]));
+}
+
+function acknowledgementKey(acknowledgement: AssetPackAcknowledgement): string {
+  return JSON.stringify(canonicalizeJsonValue({
+    code: acknowledgement.code,
+    subject: acknowledgement.subject,
+    contentDigest: acknowledgement.contentDigest,
+  }));
 }
 
 function collectSourceUses(pack: NormalizedAssetPack): ReadonlyMap<string, number> {
@@ -586,14 +643,100 @@ function mergeAcknowledgementCandidates(
   });
 }
 
-function isSerializableSources(sourceBytes: ReadonlyMap<string, Uint8Array>): boolean {
+function isSerializableSources(
+  sourceBytes: ReadonlyMap<string, Uint8Array>,
+  runtime: AssetPackFormatRuntime,
+): boolean {
+  if (sourceBytes.size > ASSET_PACK_ARCHIVE_LIMITS.entries - 2) return false;
   let total = 0;
   for (const [path, bytes] of sourceBytes) {
-    if (!path.startsWith('sprites/') || bytes.byteLength > ASSET_PACK_ARCHIVE_LIMITS.entryBytes) return false;
+    if (validateSourcePath(path, runtime) || bytes.byteLength > ASSET_PACK_ARCHIVE_LIMITS.entryBytes) return false;
     total += bytes.byteLength;
     if (total > ASSET_PACK_ARCHIVE_LIMITS.totalBytes) return false;
   }
   return true;
+}
+
+function validateSourcePath(
+  sourcePath: string,
+  runtime: AssetPackFormatRuntime,
+): AssetPackWorkbenchDiagnostic | undefined {
+  if (runtime.encodeUtf8(sourcePath).byteLength > ASSET_PACK_ARCHIVE_LIMITS.pathBytes) {
+    return {
+      code: 'asset_archive_limit_exceeded',
+      severity: 'error',
+      message: `Source path exceeds the ${String(ASSET_PACK_ARCHIVE_LIMITS.pathBytes)}-byte limit.`,
+      scope: 'source',
+      path: sourcePath,
+    };
+  }
+  const segments = sourcePath.split('/');
+  const unsafe = sourcePath !== sourcePath.trim()
+    || !sourcePath.startsWith('sprites/')
+    || sourcePath.startsWith('/')
+    || /^[A-Za-z]:/u.test(sourcePath)
+    || sourcePath.includes('\\')
+    || /[\u0000-\u001f\u007f]/u.test(sourcePath)
+    || segments.some((segment) =>
+      segment.length === 0
+      || segment === '.'
+      || segment === '..'
+      || /[<>:"|?*]/u.test(segment)
+      || /[. ]$/u.test(segment)
+      || /^(con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])(?:\..*)?$/iu.test(segment));
+  if (unsafe) {
+    return {
+      code: 'asset_archive_unsafe',
+      severity: 'error',
+      message: `Unsafe source path: ${sourcePath}.`,
+      scope: 'source',
+      path: sourcePath,
+    };
+  }
+  return undefined;
+}
+
+function validateSourceReplacementLimits(
+  sourceBytes: ReadonlyMap<string, Uint8Array>,
+  sourcePath: string,
+  fileSize: number,
+  runtime: AssetPackFormatRuntime,
+): AssetPackWorkbenchDiagnostic | undefined {
+  if (fileSize > ASSET_PACK_ARCHIVE_LIMITS.entryBytes) return sourceEntryLimitDiagnostic(sourcePath);
+  const existingSize = sourceBytes.get(sourcePath)?.byteLength ?? 0;
+  if (!sourceBytes.has(sourcePath) && sourceBytes.size >= ASSET_PACK_ARCHIVE_LIMITS.entries - 2) {
+    return sourceTotalLimitDiagnostic(sourcePath);
+  }
+  if (sourceTotalBytes(sourceBytes) - existingSize + fileSize > ASSET_PACK_ARCHIVE_LIMITS.totalBytes) {
+    return sourceTotalLimitDiagnostic(sourcePath);
+  }
+  return validateSourcePath(sourcePath, runtime);
+}
+
+function sourceTotalBytes(sourceBytes: ReadonlyMap<string, Uint8Array>): number {
+  let total = 0;
+  for (const bytes of sourceBytes.values()) total += bytes.byteLength;
+  return total;
+}
+
+function sourceEntryLimitDiagnostic(sourcePath: string): AssetPackWorkbenchDiagnostic {
+  return {
+    code: 'asset_archive_limit_exceeded',
+    severity: 'error',
+    message: `Source exceeds the ${String(ASSET_PACK_ARCHIVE_LIMITS.entryBytes)}-byte entry limit.`,
+    scope: 'source',
+    path: sourcePath,
+  };
+}
+
+function sourceTotalLimitDiagnostic(sourcePath: string): AssetPackWorkbenchDiagnostic {
+  return {
+    code: 'asset_archive_limit_exceeded',
+    severity: 'error',
+    message: 'Source replacements exceed the asset-pack entry or total byte limits.',
+    scope: 'source',
+    path: sourcePath,
+  };
 }
 
 function parseJsonObject(text: string): Readonly<Record<string, unknown>> | undefined {

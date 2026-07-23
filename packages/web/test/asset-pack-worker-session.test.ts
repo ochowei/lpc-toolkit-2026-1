@@ -9,6 +9,7 @@ import { createCatalog, createPaletteCatalog } from '@lpc-toolkit/core';
 import { createBrowserAssetPackFormatRuntime } from '../src/adapter/asset-pack-format-runtime';
 import type { AssetPackWorkerBaseline, AssetPackWorkerResponse } from '../src/lib/asset-pack-worker-protocol';
 import {
+  createAssetPackWorkerSession,
   openAssetPackWorkerSession,
   type AssetPackWorkerSession,
 } from '../src/workers/asset-pack-worker-session';
@@ -108,6 +109,17 @@ function pngCrc32(bytes: Uint8Array): number {
     for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ ((crc & 1) === 0 ? 0 : 0xedb8_8320);
   }
   return (crc ^ 0xffff_ffff) >>> 0;
+}
+
+function deferred<T>(): {
+  readonly promise: Promise<T>;
+  readonly resolve: (value: T) => void;
+} {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
 }
 
 async function archiveFor(
@@ -254,6 +266,165 @@ describe('asset-pack Worker session', () => {
     }] });
     const forbidden = await session.replaceManifest({ requestId: 2, revision: 1, manifestText, origin: 'advanced-json' });
     expect(forbidden).toContainEqual(expect.objectContaining({ diagnostic: expect.objectContaining({ code: 'asset_acknowledgement_edit_forbidden' }) }));
+  });
+
+  it('rejects acknowledgement injection when the current manifest is invalid', async () => {
+    const result = await open(await archiveFor());
+    const session = result.session;
+    expect(session).toBeDefined();
+    if (!session) return;
+
+    await session.replaceManifest({
+      requestId: 2,
+      revision: 1,
+      manifestText: '{not-json',
+      origin: 'raw-repair',
+    });
+    const injected = await session.replaceManifest({
+      requestId: 3,
+      revision: 2,
+      manifestText: JSON.stringify({
+        ...manifest,
+        acknowledgements: [{
+          code: 'asset_optional_frame_blank',
+          subject: { assetId: 'acme.demo--demo' },
+          contentDigest: sha('forged'),
+          reason: 'forged acknowledgement',
+        }],
+      }),
+      origin: 'advanced-json',
+    });
+
+    expect(injected).toContainEqual(expect.objectContaining({
+      requestId: 3,
+      revision: 2,
+      diagnostic: expect.objectContaining({ code: 'asset_acknowledgement_edit_forbidden' }),
+    }));
+  });
+
+  it('rejects acknowledgement-origin edits that change unrelated manifest fields', async () => {
+    const result = await open(await archiveFor());
+    const session = result.session;
+    expect(session).toBeDefined();
+    if (!session) return;
+
+    const forbidden = await session.replaceManifest({
+      requestId: 2,
+      revision: 1,
+      manifestText: JSON.stringify({ ...manifest, version: '2.0.0', acknowledgements: [] }),
+      origin: 'acknowledgement',
+    });
+
+    expect(forbidden).toContainEqual(expect.objectContaining({
+      requestId: 2,
+      revision: 1,
+      diagnostic: expect.objectContaining({ code: 'asset_acknowledgement_edit_forbidden' }),
+    }));
+  });
+
+  it('serializes same-revision source edits and rejects the later stale request', async () => {
+    const result = await open(await archiveFor());
+    const session = result.session;
+    expect(session).toBeDefined();
+    if (!session) return;
+
+    const gate = deferred<ArrayBuffer>();
+    const first = session.replaceSource({
+      requestId: 2,
+      revision: 1,
+      path: SOURCE_PATH,
+      file: { size: 3, arrayBuffer: () => gate.promise } as unknown as File,
+    });
+    await Promise.resolve();
+    const second = session.replaceSource({
+      requestId: 3,
+      revision: 1,
+      path: SOURCE_PATH,
+      file: file(new Uint8Array([4, 5, 6]), 'replacement.png'),
+    });
+    gate.resolve(new Uint8Array([1, 2, 3]).buffer);
+
+    const [firstResponses, secondResponses] = await Promise.all([first, second]);
+    expect(firstResponses).toContainEqual(expect.objectContaining({
+      type: 'session',
+      requestId: 2,
+      revision: 1,
+    }));
+    expect(secondResponses).toContainEqual(expect.objectContaining({
+      type: 'failed',
+      requestId: 3,
+      revision: 1,
+      diagnostic: expect.objectContaining({ code: 'asset_worker_stale_revision' }),
+    }));
+  });
+
+  it('rejects oversized source files before reading them', async () => {
+    const result = await open(await archiveFor());
+    const session = result.session;
+    expect(session).toBeDefined();
+    if (!session) return;
+
+    const arrayBuffer = vi.fn(async () => new ArrayBuffer(0));
+    const responses = await session.replaceSource({
+      requestId: 2,
+      revision: 1,
+      path: SOURCE_PATH,
+      file: {
+        size: ASSET_PACK_ARCHIVE_LIMITS.entryBytes + 1,
+        arrayBuffer,
+      } as unknown as File,
+    });
+
+    expect(arrayBuffer).not.toHaveBeenCalled();
+    expect(responses).toContainEqual(expect.objectContaining({
+      diagnostic: expect.objectContaining({ code: 'asset_archive_limit_exceeded' }),
+    }));
+  });
+
+  it('rejects unsafe source paths before reading them', async () => {
+    const result = await open(await archiveFor());
+    const session = result.session;
+    expect(session).toBeDefined();
+    if (!session) return;
+
+    const arrayBuffer = vi.fn(async () => new ArrayBuffer(1));
+    const responses = await session.replaceSource({
+      requestId: 2,
+      revision: 1,
+      path: 'sprites/../escape.png',
+      file: { size: 1, arrayBuffer } as unknown as File,
+    });
+
+    expect(arrayBuffer).not.toHaveBeenCalled();
+    expect(responses).toContainEqual(expect.objectContaining({
+      diagnostic: expect.objectContaining({ code: 'asset_archive_unsafe' }),
+    }));
+  });
+
+  it('rejects replacements that would exceed the source entry count before reading them', async () => {
+    const sourceBytes = new Map<string, Uint8Array>();
+    for (let index = 0; index < ASSET_PACK_ARCHIVE_LIMITS.entries - 2; index += 1) {
+      sourceBytes.set(`sprites/fill-${String(index)}.png`, new Uint8Array());
+    }
+    const session = createAssetPackWorkerSession({
+      baseline: baseline(),
+      manifestText: '{not-json',
+      sourceBytes,
+      runtime: runtime(),
+      decoder: decoder(),
+    });
+    const arrayBuffer = vi.fn(async () => new ArrayBuffer(1));
+    const responses = await session.replaceSource({
+      requestId: 1,
+      revision: 1,
+      path: 'sprites/new.png',
+      file: { size: 1, arrayBuffer } as unknown as File,
+    });
+
+    expect(arrayBuffer).not.toHaveBeenCalled();
+    expect(responses).toContainEqual(expect.objectContaining({
+      diagnostic: expect.objectContaining({ code: 'asset_archive_limit_exceeded' }),
+    }));
   });
 
   it('returns previews only without errors, maps every destination to current bytes, and includes release fingerprint credits', async () => {
