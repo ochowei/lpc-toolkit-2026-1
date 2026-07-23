@@ -118,4 +118,4 @@ PASS
 - Browser E2E uses the real Vite/Playwright path and real Chromium Web Crypto/raw `DecompressionStream`; capability absence is not skipped there.
 - No new third-party dependency or `any` was added.
 - Attribution, Core boundaries, and existing Web E2E conventions remain unchanged.
-- Final fix commit: `48a529b4d3d3addf064ccb512c27dff58d6a6a3f` (`fix(web): complete asset pack adapter parity`).
+- Final fix commit: `bd30d3e0e6f66dc21091a34711d3c183b80256c9` (`fix(web): complete asset pack adapter parity`).
