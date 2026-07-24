@@ -45,6 +45,21 @@ const customizationSteps = [
   },
 ] as const;
 
+const artistWorkflowCommands = [
+  'npm install -g @lpc-toolkit/cli',
+  'lpc-toolkit asset workspace init ./my-lpc-art',
+  'cd ./my-lpc-art',
+  'lpc-toolkit asset init --new --pack-id acme.fantasy-hair --asset-id moon-braid --display-name "Moon Braid" --type hair --body-type male --body-type female --animation walk --animation climb --author Alice --license "CC-BY-SA 4.0" --url https://example.com/acme/fantasy-hair',
+  'lpc-toolkit asset validate ./artist-packs/<pack-id>',
+  'lpc-toolkit asset preview ./artist-packs/<pack-id>',
+  'lpc-toolkit asset sync ./artist-packs/<pack-id>',
+  'lpc-toolkit asset pack ./artist-packs/<pack-id>',
+  'lpc-toolkit asset workspace init ../consumer-workspace',
+  'cd ../consumer-workspace',
+  'lpc-toolkit asset install ../my-lpc-art/artist-packs/<pack-id>-<version>.lpc-assets.zip',
+  'lpc-toolkit asset doctor',
+] as const;
+
 const cliReadmeUrl =
   'https://github.com/ochowei/lpc-toolkit-2026-1/blob/main/packages/cli/README.md';
 
@@ -70,6 +85,9 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             <div className="mt-6 flex flex-wrap gap-3">
               <Button variant="primary" onClick={() => onNavigate('compose')}>
                 Open Composer
+              </Button>
+              <Button onClick={() => onNavigate('asset-packs')}>
+                Repair an Asset Pack
               </Button>
               <Button asChild>
                 <a href="#cli-quick-start">Use the CLI</a>
@@ -132,6 +150,38 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           <p className="mt-5 rounded-md border border-border bg-surface-2 p-3 text-sm text-text-2">
             The first asset-dependent command downloads about 205 MB of pinned
             assets once, verifies them, and reuses the local cache afterward.
+          </p>
+        </section>
+
+        <section className="rounded-md border border-border bg-surface p-5">
+          <h2 className="text-2xl font-semibold text-text">
+            Author your own LPC asset pack
+          </h2>
+          <p className="mt-2 max-w-3xl text-sm text-text-2">
+            You do not need to clone this repository. The published CLI creates
+            a standalone artist workspace, validates complete animation PNGs,
+            renders attributed previews, packages a deterministic archive, and
+            installs it into a second standalone workspace.
+          </p>
+          <ol className="mt-5 space-y-3">
+            {artistWorkflowCommands.map((command, index) => (
+              <li key={`${index}-${command}`}>
+                <code className={codeClassName}>{command}</code>
+              </li>
+            ))}
+          </ol>
+          <p className="mt-4 text-sm text-text-2">
+            Put PNGs under <code>artist-packs/&lt;pack-id&gt;/sprites/</code>.
+            Keep the preview metadata and credit files with the generated
+            image.
+          </p>
+          <p className="mt-2 text-sm text-text-2">
+            The browser can inspect, validate, repair, and assemble an uploaded
+            asset pack locally. The CLI owns package inspection, install,
+            upgrade, removal, and lifecycle diagnosis; Web edits happen
+            in-memory and do not write an artist workspace. Browser drafts carry
+            <code>status: "draft"</code> and the CLI refuses to install them
+            until a formal release is downloaded.
           </p>
         </section>
 

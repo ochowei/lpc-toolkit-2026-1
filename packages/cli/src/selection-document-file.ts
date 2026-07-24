@@ -6,9 +6,12 @@ import {
   type ImportedSelectionDocument,
   type SelectionDocumentImportContext,
 } from '@lpc-toolkit/core';
-import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
 import type { CliIssue } from './response.js';
-import type { RuntimeAssets } from './runtime-assets.js';
+import {
+  loadRuntimeCatalog,
+  loadRuntimePalettes,
+  type RuntimeAssets,
+} from './runtime-assets.js';
 
 export interface LoadedSelectionDocument extends ImportedSelectionDocument {
   readonly path: string;
@@ -22,11 +25,8 @@ export interface LoadedSelectionDocumentContext {
 export function loadSelectionDocumentContext(
   runtime: RuntimeAssets,
 ): LoadedSelectionDocumentContext {
-  const catalog = loadCatalogFromRoots(
-    runtime.context.sheetDefinitionsRoot,
-    runtime.context.customSheetDefinitionsRoot,
-  );
-  const palettes = loadPalettesFromRoot(runtime.context.paletteDefinitionsRoot);
+  const catalog = loadRuntimeCatalog(runtime);
+  const palettes = loadRuntimePalettes(runtime);
   return {
     importContext: { catalog: catalog.catalog, palettes: palettes.palettes },
     warnings: [...catalog.warnings, ...palettes.warnings],

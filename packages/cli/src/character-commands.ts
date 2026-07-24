@@ -33,7 +33,6 @@ import {
   type StoredCharacter,
 } from './character-store.js';
 import { SelectionOutputError } from './compose-selection.js';
-import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
 import type { CliIo } from './main.js';
 import { materializePreset, PresetBodyTypeError } from './preset-commands.js';
 import {
@@ -49,7 +48,11 @@ import {
   type CliIssue,
   type CliResponse,
 } from './response.js';
-import type { RuntimeAssets } from './runtime-assets.js';
+import {
+  loadRuntimeCatalog,
+  loadRuntimePalettes,
+  type RuntimeAssets,
+} from './runtime-assets.js';
 import { validateSelections, type ValidationResult } from './validation.js';
 
 export interface CharacterCommandDependencies {
@@ -130,12 +133,8 @@ function requireRuntime(runtime: RuntimeAssets | undefined): RuntimeAssets {
 }
 
 function loadCharacterContext(runtime: RuntimeAssets): LoadedCharacterContext {
-  const context = runtime.context;
-  const catalog = loadCatalogFromRoots(
-    context.sheetDefinitionsRoot,
-    context.customSheetDefinitionsRoot,
-  );
-  const palettes = loadPalettesFromRoot(context.paletteDefinitionsRoot);
+  const catalog = loadRuntimeCatalog(runtime);
+  const palettes = loadRuntimePalettes(runtime);
   return {
     editor: {
       catalog: catalog.catalog,

@@ -39,6 +39,7 @@ async function createFixture(items: Readonly<Record<string, { readonly name: str
       authors: ['Fixture Artist'],
       licenses: ['GPL 3.0'],
       urls: ['https://example.com/lpc-fixture'],
+      notes: 'Fixture contribution.',
     }],
   });
   mkdirSync(path.join(assetsRoot, 'palette_definitions'), { recursive: true });
@@ -95,6 +96,13 @@ describe('renderCharacterPreview', () => {
           txt: path.join(outDir, 'hero.credits.txt'),
           csv: path.join(outDir, 'hero.credits.csv'),
           entries: 1,
+          creditEntries: [{
+            file: 'body/bodies/male',
+            authors: ['Fixture Artist'],
+            licenses: ['GPL 3.0'],
+            urls: ['https://example.com/lpc-fixture'],
+            notes: 'Fixture contribution.',
+          }],
           resolvedPaths: ['body/bodies/male/walk.png'],
         },
       });

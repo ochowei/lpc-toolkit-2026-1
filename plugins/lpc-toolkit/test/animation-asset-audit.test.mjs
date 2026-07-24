@@ -376,5 +376,7 @@ test('documents safe report preservation and finding interpretation', () => {
     'pathConfidence', 'manual-review', 'recolors', 'same target and scope',
     'Exit code zero', 'upstream/', 'user-supplied report path',
     'task-specific temporary directory', 'report that path while it remains available',
+    'asset init --from-audit', 'Web Asset Pack Workbench', 'status: "draft"',
+    'cannot be installed by the CLI',
   ]) assert.equal(workflow.includes(required), true, `missing ${required}`);
 });

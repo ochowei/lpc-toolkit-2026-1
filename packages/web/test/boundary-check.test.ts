@@ -42,6 +42,7 @@ function makeRepoFixture(): string {
   writeFixtureFile(root, 'packages/core/src/types.ts', 'export interface CoreType {}\n');
   writeFixtureFile(root, 'packages/presets/src/index.ts', 'export const preset = {};\n');
   writeFixtureFile(root, 'packages/cli/src/index.ts', 'export const cli = {};\n');
+  writeFixtureFile(root, 'packages/asset-pack-format/src/index.ts', 'export const format = {};\n');
   writeFixtureFile(
     root,
     'packages/web/src/adapter/browser-canvas-adapter.ts',
@@ -879,6 +880,82 @@ export type Types = ComposeA | ComposeB;
       'forbidden web component import',
       expected,
       'packages/web/src/components/leak.tsx',
+    );
+  });
+
+  it('allows web and cli to import @lpc-toolkit/asset-pack-format', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(root, 'packages/web/src/lib/format-import.ts', "import { format } from '@lpc-toolkit/asset-pack-format';\nexport { format };\n");
+    writeFixtureFile(root, 'packages/cli/src/format-import.ts', "import { format } from '@lpc-toolkit/asset-pack-format';\nexport { format };\n");
+
+    expect(runBoundaryCheck(root)).toEqual({
+      ok: true,
+      stdout: 'Architecture boundary check passed.\n',
+    });
+  });
+
+  it('allows format package to import local files, public core, and jszip', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(root, 'packages/asset-pack-format/src/local.ts', 'export const local = 1;\n');
+    writeFixtureFile(
+      root,
+      'packages/asset-pack-format/src/legal-imports.ts',
+      "import type { CanvasAdapter } from '@lpc-toolkit/core';\nimport JSZip from 'jszip';\nimport { local } from './local';\nexport { JSZip, local };\nexport type Adapter = CanvasAdapter;\n",
+    );
+
+    expect(runBoundaryCheck(root)).toEqual({
+      ok: true,
+      stdout: 'Architecture boundary check passed.\n',
+    });
+  });
+
+  it.each([
+    ['Node filesystem', "import { readFileSync } from 'node:fs';", 'node:fs'],
+    ['React', "import React from 'react';", 'react'],
+    ['Web package', "import '@lpc-toolkit/web';", '@lpc-toolkit/web'],
+    ['CLI package', "import '@lpc-toolkit/cli';", '@lpc-toolkit/cli'],
+    ['Internal Core path', "import '../../core/src/index';", '../../core/src/index'],
+    ['Internal Core subpath', "import '@lpc-toolkit/core/internal';", '@lpc-toolkit/core/internal'],
+  ])('rejects format package dependency on %s', (_name, source, expected) => {
+    const root = makeRepoFixture();
+    writeFixtureFile(root, 'packages/asset-pack-format/src/leak.ts', source);
+    expectBoundaryFailure(
+      root,
+      'forbidden asset-pack-format import',
+      expected,
+      'packages/asset-pack-format/src/leak.ts',
+    );
+  });
+
+  it('rejects browser runtime globals in format package source', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(
+      root,
+      'packages/asset-pack-format/src/browser-leak.ts',
+      'export const title = document.title;\n',
+    );
+
+    expectBoundaryFailure(
+      root,
+      'forbidden asset-pack-format runtime global',
+      'document',
+      'packages/asset-pack-format/src/browser-leak.ts',
+    );
+  });
+
+  it('rejects core importing @lpc-toolkit/asset-pack-format', () => {
+    const root = makeRepoFixture();
+    writeFixtureFile(
+      root,
+      'packages/core/src/format-leak.ts',
+      "import { format } from '@lpc-toolkit/asset-pack-format';\nexport { format };\n",
+    );
+
+    expectBoundaryFailure(
+      root,
+      'forbidden core import',
+      '@lpc-toolkit/asset-pack-format',
+      'packages/core/src/format-leak.ts',
     );
   });
 });

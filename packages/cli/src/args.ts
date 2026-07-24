@@ -12,7 +12,20 @@ export interface ParsedArgs {
   readonly positionals: readonly string[];
 }
 
-const BOOLEAN_FLAGS = new Set(['all', 'allow-partial', 'help', 'json', 'no-open']);
+const BOOLEAN_FLAGS = new Set([
+  'advanced',
+  'all',
+  'allow-partial',
+  'help',
+  'json',
+  'new',
+  'no-open',
+]);
+
+function acceptsAnotherCommandToken(command: readonly string[]): boolean {
+  if (command.length < 2) return true;
+  return command.length === 2 && command[0] === 'asset' && command[1] === 'workspace';
+}
 
 function acceptsExplicitEmptyValues(command: readonly string[]): boolean {
   return command[0] === 'catalog' && command[1] === 'audit-animations';
@@ -61,7 +74,7 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
       continue;
     }
 
-    if (!seenFlag && command.length < 2) {
+    if (!seenFlag && acceptsAnotherCommandToken(command)) {
       command.push(token);
     } else {
       positionals.push(token);

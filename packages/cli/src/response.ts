@@ -316,6 +316,349 @@ function formatRender(data: JsonRecord, label = 'Render'): string | undefined {
   return `${label} complete. Artifacts (${artifacts.length})\n${lines.join('\n')}\nMetadata: ${metadataPath}\n`;
 }
 
+function formatAssetWorkspaceInit(data: JsonRecord): string | undefined {
+  const root = stringValue(data, 'root');
+  const configPath = stringValue(data, 'configPath');
+  if (!root || !configPath) return undefined;
+  return `Asset workspace initialized: ${root}\nConfig: ${configPath}\n`;
+}
+
+function formatAssetInit(data: JsonRecord): string | undefined {
+  const packRoot = stringValue(data, 'packRoot');
+  const manifestPath = stringValue(data, 'manifestPath');
+  if (!packRoot || !manifestPath) return undefined;
+  return `Asset pack scaffolded: ${packRoot}\nManifest: ${manifestPath}\n`;
+}
+
+function assetDiagnosticPath(diagnostic: JsonRecord): string | undefined {
+  return stringValue(diagnostic, 'path')
+    ?? stringValue(diagnostic, 'sourcePath')
+    ?? stringValue(diagnostic, 'destinationPath');
+}
+
+function formatAssetDiagnostic(diagnostic: JsonRecord): string {
+  const code = stringValue(diagnostic, 'code') ?? 'asset_pack_diagnostic';
+  const message = stringValue(diagnostic, 'message') ?? 'Asset-pack diagnostic.';
+  const diagnosticPath = assetDiagnosticPath(diagnostic);
+  return `- ${code}: ${message}${diagnosticPath ? ` (${diagnosticPath})` : ''}`;
+}
+
+function formatAssetValidation(data: JsonRecord): string | undefined {
+  const valid = data['valid'];
+  const diagnostics = recordArrayValue(data, 'diagnostics');
+  const acknowledgements = recordArrayValue(data, 'acknowledgementRecords');
+  if (typeof valid !== 'boolean' || !diagnostics || !acknowledgements) return undefined;
+  const errors = diagnostics.filter((diagnostic) => diagnostic['severity'] === 'error');
+  const warnings = diagnostics.filter((diagnostic) => diagnostic['severity'] === 'warning');
+  const lines = [`Asset pack validation: ${valid ? 'valid' : 'invalid'}`];
+  const packDirectory = stringValue(data, 'packDirectory');
+  const contentDigest = stringValue(data, 'contentDigest');
+  if (packDirectory) lines.push(`Pack: ${packDirectory}`);
+  if (contentDigest) lines.push(`Content digest: ${contentDigest}`);
+  if (errors.length > 0) {
+    lines.push(`Errors (${errors.length}):`, ...errors.map(formatAssetDiagnostic));
+  }
+  if (warnings.length > 0) {
+    lines.push(`Warnings (${warnings.length}):`, ...warnings.map(formatAssetDiagnostic));
+  }
+  if (acknowledgements.length > 0) {
+    lines.push(
+      'Acknowledgements (copy exact JSON and add a non-empty reason):',
+      JSON.stringify(acknowledgements, null, 2),
+    );
+  }
+  return `${lines.join('\n')}\n`;
+}
+
+function previewArtifactLabel(type: string): string {
+  switch (type) {
+    case 'preview':
+      return 'Preview';
+    case 'credits_txt':
+      return 'Credits TXT';
+    case 'credits_csv':
+      return 'Credits CSV';
+    case 'metadata':
+      return 'Metadata';
+    default:
+      return type;
+  }
+}
+
+function formatAssetPreview(data: JsonRecord): string | undefined {
+  const packId = stringValue(data, 'packId');
+  const assetId = stringValue(data, 'assetId');
+  const artifacts = recordArrayValue(data, 'artifacts');
+  if (!packId || !assetId || !artifacts) return undefined;
+  const lines = artifacts.flatMap((artifact) => {
+    const type = stringValue(artifact, 'type');
+    const artifactPath = stringValue(artifact, 'path');
+    return type && artifactPath
+      ? [`${previewArtifactLabel(type)}: ${artifactPath}`]
+      : [];
+  });
+  return `Asset preview: ${packId} / ${assetId}\n${lines.join('\n')}\n`;
+}
+
+function formatAssetSync(data: JsonRecord): string | undefined {
+  const packId = stringValue(data, 'packId');
+  const contentDigest = stringValue(data, 'contentDigest');
+  const generatedFileCount = numberValue(data, 'generatedFileCount');
+  const outputPath = stringValue(data, 'outputPath');
+  if (!packId || !contentDigest || generatedFileCount === undefined || !outputPath) {
+    return undefined;
+  }
+  return [
+    `Asset pack synced: ${packId}`,
+    `Content digest: ${contentDigest}`,
+    `Generated files: ${generatedFileCount}`,
+    `Workspace output: ${outputPath}`,
+    '',
+  ].join('\n');
+}
+
+function formatAssetPack(data: JsonRecord): string | undefined {
+  const packId = stringValue(data, 'packId');
+  const version = stringValue(data, 'version');
+  const archivePath = stringValue(data, 'archivePath');
+  const archiveDigest = stringValue(data, 'archiveDigest');
+  const contentDigest = stringValue(data, 'contentDigest');
+  const entryCount = numberValue(data, 'entryCount');
+  if (
+    !packId
+    || !version
+    || !archivePath
+    || !archiveDigest
+    || !contentDigest
+    || entryCount === undefined
+  ) {
+    return undefined;
+  }
+  return [
+    `Asset pack archived: ${packId} ${version}`,
+    `Archive: ${archivePath}`,
+    `Archive digest: ${archiveDigest}`,
+    `Content digest: ${contentDigest}`,
+    `Entries: ${entryCount}`,
+    '',
+  ].join('\n');
+}
+
+type InspectionDiagnosticGroup =
+  | 'Archive'
+  | 'Compatibility'
+  | 'Pixel'
+  | 'Credit'
+  | 'Validation';
+
+function inspectionDiagnosticGroup(diagnostic: JsonRecord): InspectionDiagnosticGroup {
+  const code = stringValue(diagnostic, 'code') ?? '';
+  if (
+    code.startsWith('asset_archive_')
+    || code.startsWith('asset_checksum_')
+    || code.startsWith('asset_digest_')
+  ) {
+    return 'Archive';
+  }
+  if (code === 'asset_cli_version_incompatible' || code === 'asset_capability_unsupported') {
+    return 'Compatibility';
+  }
+  if (code.includes('credit') || code.includes('attribution') || code.includes('license')) {
+    return 'Credit';
+  }
+  if (
+    code.includes('png')
+    || code.includes('frame')
+    || code.includes('pixel')
+    || code.includes('palette')
+    || code.includes('recolor')
+  ) {
+    return 'Pixel';
+  }
+  return 'Validation';
+}
+
+function formatAssetInspect(data: JsonRecord): string | undefined {
+  const valid = data['valid'];
+  const archivePath = stringValue(data, 'archivePath');
+  const entryCount = numberValue(data, 'entryCount');
+  const totalUncompressedBytes = numberValue(data, 'totalUncompressedBytes');
+  const status = stringValue(data, 'status');
+  const diagnostics = recordArrayValue(data, 'diagnostics');
+  const acknowledgements = recordArrayValue(data, 'acknowledgementRecords');
+  if (
+    typeof valid !== 'boolean'
+    || !archivePath
+    || entryCount === undefined
+    || totalUncompressedBytes === undefined
+    || !diagnostics
+    || !acknowledgements
+  ) {
+    return undefined;
+  }
+
+  const lines = [
+    `Asset pack inspection: ${valid ? 'valid' : 'invalid'}`,
+    `Archive: ${archivePath}`,
+  ];
+  const packId = stringValue(data, 'packId');
+  const version = stringValue(data, 'version');
+  const archiveDigest = stringValue(data, 'archiveDigest');
+  const contentDigest = stringValue(data, 'contentDigest');
+  if (packId) {
+    lines.push(
+      `Pack: ${packId}${version ? ` ${version}` : ''}${status === 'draft' ? ' (DRAFT)' : ''}`,
+    );
+  }
+  if (archiveDigest) lines.push(`Archive digest: ${archiveDigest}`);
+  if (contentDigest) lines.push(`Content digest: ${contentDigest}`);
+  lines.push(
+    `Entries: ${entryCount}`,
+    `Uncompressed bytes: ${totalUncompressedBytes}`,
+  );
+
+  for (const group of [
+    'Archive',
+    'Compatibility',
+    'Pixel',
+    'Credit',
+    'Validation',
+  ] as const) {
+    const grouped = diagnostics.filter(
+      (diagnostic) => inspectionDiagnosticGroup(diagnostic) === group,
+    );
+    if (grouped.length > 0) {
+      lines.push(
+        `${group} diagnostics (${grouped.length}):`,
+        ...grouped.map(formatAssetDiagnostic),
+      );
+    }
+  }
+  if (acknowledgements.length > 0) {
+    lines.push(
+      'Acknowledgements (copy exact JSON and add a non-empty reason):',
+      JSON.stringify(acknowledgements, null, 2),
+    );
+  }
+  return `${lines.join('\n')}\n`;
+}
+
+function formatAssetInstall(data: JsonRecord): string | undefined {
+  const action = stringValue(data, 'action');
+  const packId = stringValue(data, 'packId');
+  const version = stringValue(data, 'version');
+  const installedDirectory = stringValue(data, 'installedDirectory');
+  const outputPath = stringValue(data, 'outputPath');
+  const archiveDigest = stringValue(data, 'archiveDigest');
+  const generatedFileCount = numberValue(data, 'generatedFileCount');
+  if (
+    !action
+    || !packId
+    || !version
+    || !installedDirectory
+    || !outputPath
+    || !archiveDigest
+    || generatedFileCount === undefined
+  ) {
+    return undefined;
+  }
+  return [
+    `Asset pack install: ${action} ${packId} ${version}`,
+    `Source: ${installedDirectory}`,
+    `Workspace output: ${outputPath}`,
+    `Archive digest: ${archiveDigest}`,
+    `Generated files: ${generatedFileCount}`,
+    '',
+  ].join('\n');
+}
+
+function formatAssetList(data: JsonRecord): string | undefined {
+  const recovery = stringValue(data, 'recovery');
+  const entries = recordArrayValue(data, 'entries');
+  if (!recovery || !entries) return undefined;
+  const headers = ['PACK ID', 'VERSION', 'KIND', 'SOURCE'] as const;
+  const rows = entries.flatMap((entry) => {
+    const packId = stringValue(entry, 'packId');
+    const version = stringValue(entry, 'version');
+    const kind = stringValue(entry, 'kind');
+    const sourcePath = stringValue(entry, 'sourcePath');
+    return packId && version && kind && sourcePath
+      ? [[packId, version, kind, sourcePath] as const]
+      : [];
+  });
+  if (rows.length !== entries.length) return undefined;
+  const widths = headers.map((header, index) => Math.max(
+    header.length,
+    ...rows.map((row) => row[index]!.length),
+  ));
+  const formatRow = (row: readonly string[]): string => row
+    .map((cell, index) => index === row.length - 1
+      ? cell
+      : cell.padEnd(widths[index] ?? cell.length))
+    .join('  ');
+  return [
+    `Asset packs (${rows.length})`,
+    `Recovery: ${recovery}`,
+    formatRow(headers),
+    ...rows.map(formatRow),
+    '',
+  ].join('\n');
+}
+
+function formatAssetRemove(data: JsonRecord): string | undefined {
+  const packId = stringValue(data, 'packId');
+  const removedKind = stringValue(data, 'removedKind');
+  const remainingPackIds = stringArrayValue(data, 'remainingPackIds');
+  const remainingCount = numberValue(data, 'remainingCount') ?? remainingPackIds?.length;
+  const generatedFileCount = numberValue(data, 'generatedFileCount');
+  if (
+    !packId
+    || !removedKind
+    || !remainingPackIds
+    || remainingCount === undefined
+    || generatedFileCount === undefined
+  ) {
+    return undefined;
+  }
+  return [
+    `Asset pack removed: ${packId} (${removedKind})`,
+    `Remaining packs: ${remainingCount}`,
+    `Generated files: ${generatedFileCount}`,
+    '',
+  ].join('\n');
+}
+
+function formatDoctorCheck(check: JsonRecord): string {
+  const code = stringValue(check, 'code') ?? 'asset_doctor_check';
+  const message = stringValue(check, 'message') ?? 'Asset lifecycle check.';
+  const checkPath = stringValue(check, 'path');
+  const packId = stringValue(check, 'packId');
+  const context = checkPath ?? packId;
+  return `- ${code}: ${message}${context ? ` (${context})` : ''}`;
+}
+
+function formatAssetDoctor(data: JsonRecord): string | undefined {
+  const healthy = data['healthy'];
+  const recovery = stringValue(data, 'recovery');
+  const checks = recordArrayValue(data, 'checks');
+  if (typeof healthy !== 'boolean' || !recovery || !checks) return undefined;
+  const lines = [
+    `Asset pack doctor: ${healthy ? 'healthy' : 'unhealthy'}`,
+    `Recovery: ${recovery}`,
+  ];
+  for (const [status, label] of [
+    ['error', 'Errors'],
+    ['warning', 'Warnings'],
+    ['pass', 'Passed checks'],
+  ] as const) {
+    const grouped = checks.filter((check) => check['status'] === status);
+    if (grouped.length > 0) {
+      lines.push(`${label} (${grouped.length}):`, ...grouped.map(formatDoctorCheck));
+    }
+  }
+  return `${lines.join('\n')}\n`;
+}
+
 function formatAnimationAuditConsumer(consumer: JsonRecord, indent: string): readonly string[] {
   const itemId = stringValue(consumer, 'itemId');
   const typeName = stringValue(consumer, 'typeName');
@@ -469,6 +812,28 @@ function formatHumanData(response: CliResponse<unknown>): string | undefined {
   if (!isRecord(data)) return undefined;
 
   switch (response.command) {
+    case 'asset workspace init':
+      return formatAssetWorkspaceInit(data);
+    case 'asset init':
+      return formatAssetInit(data);
+    case 'asset validate':
+      return formatAssetValidation(data);
+    case 'asset preview':
+      return formatAssetPreview(data);
+    case 'asset sync':
+      return formatAssetSync(data);
+    case 'asset pack':
+      return formatAssetPack(data);
+    case 'asset inspect':
+      return formatAssetInspect(data);
+    case 'asset install':
+      return formatAssetInstall(data);
+    case 'asset list':
+      return formatAssetList(data);
+    case 'asset remove':
+      return formatAssetRemove(data);
+    case 'asset doctor':
+      return formatAssetDoctor(data);
     case 'catalog types':
       return formatCatalogTypes(data);
     case 'catalog items':
@@ -518,7 +883,11 @@ export function formatHumanResponse(
   fallbackSuccess: string,
 ): string {
   if (!response.ok) {
-    return `${response.errors.map(humanIssue).join('\n')}\n`;
+    const errors = response.errors.map(humanIssue).join('\n');
+    const warnings = formatWarnings(response.warnings);
+    if (errors && warnings) return `${errors}\n${warnings.slice(1)}`;
+    if (warnings) return warnings.slice(1);
+    return `${errors}\n`;
   }
 
   return `${formatHumanData(response) ?? fallbackSuccess}${formatWarnings(response.warnings)}`;

@@ -135,9 +135,11 @@ describe('CLI package metadata', () => {
 
     expect(packageJson.dependencies).not.toHaveProperty('@lpc-toolkit/core');
     expect(packageJson.dependencies).not.toHaveProperty('@lpc-toolkit/presets');
+    expect(packageJson.dependencies).not.toHaveProperty('@lpc-toolkit/asset-pack-format');
     expect(packageJson.devDependencies).toMatchObject({
       '@lpc-toolkit/core': 'workspace:*',
       '@lpc-toolkit/presets': 'workspace:*',
+      '@lpc-toolkit/asset-pack-format': 'workspace:*',
     });
   });
 

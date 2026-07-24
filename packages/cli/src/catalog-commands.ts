@@ -21,9 +21,12 @@ import {
   type DiscoveryPagination,
   type DiscoveryResult,
 } from './catalog-discovery.js';
-import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
 import { commandError, commandOk, type CliIssue, type CliResponse } from './response.js';
-import type { RuntimeAssets } from './runtime-assets.js';
+import {
+  loadRuntimeCatalog,
+  loadRuntimePalettes,
+  type RuntimeAssets,
+} from './runtime-assets.js';
 
 export interface CatalogTypesData {
   readonly typeNames: readonly TypeName[];
@@ -178,12 +181,8 @@ export function runCatalogCommand(
   parsed: ParsedArgs,
   runtime: RuntimeAssets,
 ): CliResponse<unknown> {
-  const context = runtime.context;
-  const catalog = loadCatalogFromRoots(
-    context.sheetDefinitionsRoot,
-    context.customSheetDefinitionsRoot,
-  );
-  const palettes = loadPalettesFromRoot(context.paletteDefinitionsRoot);
+  const catalog = loadRuntimeCatalog(runtime);
+  const palettes = loadRuntimePalettes(runtime);
   const warnings = [
     ...catalog.warnings,
     ...palettes.warnings,

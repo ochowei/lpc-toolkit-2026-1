@@ -429,7 +429,7 @@ function addIssue(issues, root, filePath, message) {
   issues.push(`${relativePath(root, filePath)}: ${message}`);
 }
 
-function checkCoreFile({ issues, root, coreSrc, presetsSrc, webSrc, cliSrc, filePath }) {
+function checkCoreFile({ issues, root, coreSrc, presetsSrc, webSrc, cliSrc, formatSrc, filePath }) {
   const source = readFileSync(filePath, 'utf8');
   const sourceFile = parseSource(filePath, source);
 
@@ -440,6 +440,7 @@ function checkCoreFile({ issues, root, coreSrc, presetsSrc, webSrc, cliSrc, file
       isPackageImport(specifier, '@lpc-toolkit/presets') ||
       isPackageImport(specifier, '@lpc-toolkit/web') ||
       isPackageImport(specifier, '@lpc-toolkit/cli') ||
+      isPackageImport(specifier, '@lpc-toolkit/asset-pack-format') ||
       reactImports.has(specifier) ||
       specifier.startsWith('react/') ||
       specifier.startsWith('node:') ||
@@ -448,7 +449,8 @@ function checkCoreFile({ issues, root, coreSrc, presetsSrc, webSrc, cliSrc, file
       (resolved && (
         isInside(resolved, presetsSrc) ||
         isInside(resolved, webSrc) ||
-        isInside(resolved, cliSrc)
+        isInside(resolved, cliSrc) ||
+        (formatSrc && isInside(resolved, formatSrc))
       ))
     ) {
       addIssue(issues, root, filePath, `forbidden core import "${specifier}"`);
@@ -463,6 +465,49 @@ function checkCoreFile({ issues, root, coreSrc, presetsSrc, webSrc, cliSrc, file
         root,
         filePath,
         `forbidden core runtime global "${name}"`,
+      );
+    }
+  }
+}
+
+function checkFormatFile({ issues, root, coreSrc, presetsSrc, webSrc, cliSrc, formatSrc, filePath }) {
+  const source = readFileSync(filePath, 'utf8');
+  const sourceFile = parseSource(filePath, source);
+
+  for (const specifier of importSpecifiers(sourceFile)) {
+    const resolved = resolveImport(filePath, specifier);
+    const bareSpecifier = specifier.replace(/^node:/, '');
+    if (
+      isPackageImport(specifier, '@lpc-toolkit/presets') ||
+      isPackageImport(specifier, '@lpc-toolkit/web') ||
+      isPackageImport(specifier, '@lpc-toolkit/cli') ||
+      specifier.startsWith('@lpc-toolkit/core/') ||
+      specifier.includes('packages/core/src') ||
+      reactImports.has(specifier) ||
+      specifier.startsWith('react/') ||
+      nodeFilesystemImports.has(specifier) ||
+      specifier.startsWith('node:') ||
+      nodeBuiltins.has(bareSpecifier) ||
+      isConcreteCanvasImport(specifier) ||
+      (resolved && (
+        isInside(resolved, presetsSrc) ||
+        isInside(resolved, webSrc) ||
+        isInside(resolved, cliSrc) ||
+        (isInside(resolved, coreSrc) && specifier !== '@lpc-toolkit/core')
+      ))
+    ) {
+      addIssue(issues, root, filePath, `forbidden asset-pack-format import "${specifier}"`);
+    }
+  }
+
+  const words = runtimeWords(sourceFile);
+  for (const name of coreRuntimeGlobals) {
+    if (words.has(name)) {
+      addIssue(
+        issues,
+        root,
+        filePath,
+        `forbidden asset-pack-format runtime global "${name}"`,
       );
     }
   }
@@ -567,14 +612,19 @@ function checkBoundaries(root) {
   const webSrc = path.join(root, 'packages/web/src');
   const webComponents = path.join(webSrc, 'components');
   const cliSrc = path.join(root, 'packages/cli/src');
+  const formatSrc = path.join(root, 'packages/asset-pack-format/src');
   const issues = [];
 
   for (const filePath of sourceFiles(coreSrc)) {
-    checkCoreFile({ issues, root, coreSrc, presetsSrc, webSrc, cliSrc, filePath });
+    checkCoreFile({ issues, root, coreSrc, presetsSrc, webSrc, cliSrc, formatSrc, filePath });
   }
 
   for (const filePath of sourceFiles(presetsSrc)) {
     checkPresetsFile({ issues, root, webSrc, cliSrc, filePath });
+  }
+
+  for (const filePath of sourceFiles(formatSrc)) {
+    checkFormatFile({ issues, root, coreSrc, presetsSrc, webSrc, cliSrc, formatSrc, filePath });
   }
 
   for (const filePath of sourceFiles(webSrc)) {

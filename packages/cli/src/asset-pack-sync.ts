@@ -1,0 +1,661 @@
+import { readFileSync, existsSync, statSync } from 'node:fs';
+import path from 'node:path';
+import {
+  compileAssetPacks,
+  type AssetPackCompilePlan,
+  type AssetPackDiagnostic,
+  type CreditEntry,
+  type NormalizedAssetPack,
+} from '@lpc-toolkit/core';
+import {
+  ASSET_OUTPUT_MARKER_SCHEMA,
+  assertManagedAssetOutput,
+  type AssetWorkspace,
+} from './asset-workspace.js';
+import {
+  assetPackCompileProjectionFromPlan,
+  auditPublishedManagedOutput,
+  readAssetPackRegistry,
+  resolveLinkedAssetPackDirectory,
+  type AssetPackCompileProjection,
+  type LinkedAssetPackRegistryEntry,
+} from './asset-pack-registry.js';
+import {
+  loadLinkedAssetPackCandidate,
+  prepareAssetPackDesiredState,
+} from './asset-pack-state.js';
+import {
+  withAssetPackTransactionClaim,
+  type AssetTransactionFileOps,
+} from './asset-pack-transaction.js';
+import {
+  loadAssetPackFiles,
+  type AssetPackDirectoryFileOps,
+  type AssetPackFileDiagnostic,
+  type AssetPackFilesSuccess,
+} from './asset-pack-files.js';
+import {
+  loadActiveAssetPackBaseline,
+  validateAssetPackDirectory,
+} from './asset-pack-validation.js';
+import type { RuntimeAssets } from './runtime-assets.js';
+
+const OUTPUT_MARKER_FILE = '.lpc-toolkit-managed.json';
+const OUTPUT_MARKER_KEYS = ['schema', 'workspaceId'] as const;
+
+export type { LinkedAssetPackRegistryEntry } from './asset-pack-registry.js';
+
+export interface AssetPackSyncDiagnostic {
+  readonly code: string;
+  readonly message: string;
+  readonly severity: 'error' | 'warning';
+  readonly path?: string;
+  readonly packId?: string;
+  readonly assetId?: string;
+  readonly sourcePath?: string;
+  readonly destinationPath?: string;
+  readonly details?: Readonly<Record<string, unknown>>;
+}
+
+export interface AssetPackSyncSuccess {
+  readonly ok: true;
+  readonly linked: LinkedAssetPackRegistryEntry;
+  readonly registry: readonly LinkedAssetPackRegistryEntry[];
+}
+
+export interface AssetPackSyncFailure {
+  readonly ok: false;
+  readonly diagnostics: readonly AssetPackSyncDiagnostic[];
+}
+
+export type AssetPackSyncResult = AssetPackSyncSuccess | AssetPackSyncFailure;
+
+export type AssetPublicationFileOps = AssetTransactionFileOps;
+
+interface ManagedOutputMarker {
+  readonly schema: typeof ASSET_OUTPUT_MARKER_SCHEMA;
+  readonly workspaceId: string;
+}
+
+export interface ValidatedLinkedAssetPack {
+  readonly sourceDirectory: string;
+  readonly loaded: AssetPackFilesSuccess;
+  readonly diagnostics: readonly AssetPackSyncDiagnostic[];
+}
+
+export interface LinkedAssetPackDesiredState {
+  readonly ok: true;
+  readonly requested: ValidatedLinkedAssetPack;
+  readonly packs: readonly ValidatedLinkedAssetPack[];
+  readonly compilePlan: AssetPackCompilePlan;
+  readonly compileProjection: AssetPackCompileProjection;
+  readonly registry: readonly LinkedAssetPackRegistryEntry[];
+  readonly warnings: readonly AssetPackSyncDiagnostic[];
+  readonly workspaceId: string;
+  readonly markerBytes: Buffer;
+}
+
+export type LinkedAssetPackDesiredStateResult =
+  | LinkedAssetPackDesiredState
+  | AssetPackSyncFailure;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && 'code' in error;
+}
+
+function exactKeys(
+  record: Record<string, unknown>,
+  expectedKeys: readonly string[],
+  label: string,
+): void {
+  const expected = new Set(expectedKeys);
+  const unknown = Object.keys(record).filter((key) => !expected.has(key));
+  if (unknown.length > 0) {
+    throw new Error(`${label} contains unknown keys: ${unknown.join(', ')}`);
+  }
+}
+
+function requireString(
+  record: Record<string, unknown>,
+  key: string,
+  message: string,
+): string {
+  const value = record[key];
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new Error(message);
+  }
+  return value;
+}
+
+function sortRecord(record: Readonly<Record<string, string>>): Readonly<Record<string, string>> {
+  return Object.fromEntries(
+    Object.entries(record).sort(([left], [right]) => left.localeCompare(right)),
+  ) as Readonly<Record<string, string>>;
+}
+
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => canonicalize(entry));
+  }
+  if (isRecord(value)) {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, entry]) => entry !== undefined)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, entry]) => [key, canonicalize(entry)] as const),
+    );
+  }
+  return value;
+}
+
+function toSyncDiagnostic(
+  diagnostic: AssetPackDiagnostic | AssetPackFileDiagnostic,
+): AssetPackSyncDiagnostic {
+  return {
+    code: diagnostic.code,
+    message: diagnostic.message,
+    severity: 'severity' in diagnostic ? diagnostic.severity : 'error',
+    ...('path' in diagnostic && diagnostic.path ? { path: diagnostic.path } : {}),
+    ...('packId' in diagnostic && diagnostic.packId ? { packId: diagnostic.packId } : {}),
+    ...('assetId' in diagnostic && diagnostic.assetId ? { assetId: diagnostic.assetId } : {}),
+    ...('sourcePath' in diagnostic && diagnostic.sourcePath ? { sourcePath: diagnostic.sourcePath } : {}),
+    ...('destinationPath' in diagnostic && diagnostic.destinationPath
+      ? { destinationPath: diagnostic.destinationPath }
+      : {}),
+    ...(diagnostic.details ? { details: diagnostic.details } : {}),
+  };
+}
+
+function syncFailure(
+  diagnostics: readonly AssetPackSyncDiagnostic[],
+): AssetPackSyncFailure {
+  return { ok: false, diagnostics };
+}
+
+function outputMarkerPath(workspace: AssetWorkspace): string {
+  return path.join(workspace.outputRoot, OUTPUT_MARKER_FILE);
+}
+
+function readManagedOutputMarker(workspace: AssetWorkspace): {
+  readonly marker: ManagedOutputMarker;
+  readonly bytes: Buffer;
+} {
+  const markerPath = outputMarkerPath(workspace);
+  const bytes = readFileSync(markerPath);
+  const parsed = JSON.parse(bytes.toString('utf8')) as unknown;
+  if (!isRecord(parsed)) {
+    throw new Error('Asset output marker must be a JSON object.');
+  }
+  exactKeys(parsed, OUTPUT_MARKER_KEYS, 'Asset output marker');
+  const schema = requireString(
+    parsed,
+    'schema',
+    'Asset output marker must include a string schema.',
+  );
+  if (schema !== ASSET_OUTPUT_MARKER_SCHEMA) {
+    throw new Error(`Unknown asset output marker schema: ${schema}`);
+  }
+  return {
+    marker: {
+      schema: ASSET_OUTPUT_MARKER_SCHEMA,
+      workspaceId: requireString(
+        parsed,
+        'workspaceId',
+        'Asset output marker must include a string workspaceId.',
+      ),
+    },
+    bytes,
+  };
+}
+
+function collectBaselineDefinitionDigests(
+  pack: NormalizedAssetPack,
+): Readonly<Record<string, string>> {
+  const entries: Array<readonly [string, string]> = [];
+  pack.assets.forEach((asset) => {
+    if (asset.kind === 'extend-item') {
+      entries.push([asset.itemId, asset.baseDefinitionDigest]);
+    }
+  });
+  return Object.fromEntries(
+    entries.sort(([left], [right]) => left.localeCompare(right)),
+  ) as Readonly<Record<string, string>>;
+}
+
+function collectBaselineCreditDigests(
+  pack: NormalizedAssetPack,
+): Readonly<Record<string, string>> {
+  const entries: Array<readonly [string, string]> = [];
+  pack.assets.forEach((asset) => {
+    if (asset.kind === 'extend-item') {
+      entries.push([asset.itemId, asset.baseCreditDigest]);
+    }
+  });
+  return Object.fromEntries(
+    entries.sort(([left], [right]) => left.localeCompare(right)),
+  ) as Readonly<Record<string, string>>;
+}
+
+async function validateLinkedPack(
+  packDirectory: string,
+  runtime: RuntimeAssets,
+  workspace: AssetWorkspace,
+  expectedPackId?: string,
+): Promise<AssetPackSyncFailure | {
+  readonly ok: true;
+  readonly validated: ValidatedLinkedAssetPack;
+}> {
+  let sourceDirectory: string;
+  try {
+    sourceDirectory = resolveLinkedAssetPackDirectory(workspace, packDirectory);
+  } catch (error) {
+    return syncFailure([{
+      code: 'asset_digest_mismatch',
+      severity: 'error',
+      message: errorMessage(error),
+      path: path.resolve(packDirectory),
+    }]);
+  }
+
+  let loaded: Awaited<ReturnType<typeof loadAssetPackFiles>>;
+  try {
+    loaded = await loadAssetPackFiles(sourceDirectory);
+  } catch (error) {
+    const missing = isNodeError(error) && ['ENOENT', 'ENOTDIR'].includes(error.code ?? '');
+    return syncFailure([{
+      code: missing ? 'asset_source_missing' : 'asset_publish_failed',
+      severity: 'error',
+      message: missing
+        ? `Linked asset-pack source is missing: ${sourceDirectory}`
+        : errorMessage(error),
+      path: sourceDirectory,
+    }]);
+  }
+
+  if (!loaded.ok) {
+    return syncFailure(loaded.diagnostics.map((diagnostic) => toSyncDiagnostic(diagnostic)));
+  }
+  if (expectedPackId !== undefined && loaded.pack.id !== expectedPackId) {
+    return syncFailure([{
+      code: 'asset_digest_mismatch',
+      severity: 'error',
+      message: `Linked asset-pack source changed pack ID from ${expectedPackId} to ${loaded.pack.id}.`,
+      path: sourceDirectory,
+      details: {
+        expectedPackId,
+        actualPackId: loaded.pack.id,
+      },
+    }]);
+  }
+
+  const report = await validateAssetPackDirectory({
+    packDirectory: sourceDirectory,
+    runtime,
+    workspace,
+    snapshot: loaded,
+  });
+  if (!report.valid) {
+    return syncFailure(report.diagnostics.map((diagnostic) => toSyncDiagnostic(diagnostic)));
+  }
+  if (report.contentDigest !== loaded.contentDigest) {
+    return syncFailure([{
+      code: 'asset_digest_mismatch',
+      severity: 'error',
+      message: `Linked asset-pack source changed while it was being validated: ${path.resolve(packDirectory)}`,
+      path: sourceDirectory,
+      details: {
+        validatedContentDigest: report.contentDigest,
+        capturedContentDigest: loaded.contentDigest,
+      },
+    }]);
+  }
+
+  return {
+    ok: true,
+    validated: {
+      sourceDirectory,
+      loaded,
+      diagnostics: report.diagnostics.map((diagnostic) => toSyncDiagnostic(diagnostic)),
+    },
+  };
+}
+
+function preflightPublish(workspace: AssetWorkspace): AssetPackSyncFailure | undefined {
+  try {
+    assertManagedAssetOutput(workspace);
+    if (!statSync(workspace.outputRoot).isDirectory()) {
+      throw new Error(`Managed asset output directory does not exist: ${workspace.outputRoot}`);
+    }
+    if (existsSync(workspace.registryPath) && statSync(workspace.registryPath).isDirectory()) {
+      return syncFailure([{
+        code: 'asset_publish_failed',
+        severity: 'error',
+        message: `Cannot publish linked asset-pack registry over directory: ${workspace.registryPath}`,
+        path: workspace.registryPath,
+      }]);
+    }
+    return undefined;
+  } catch (error) {
+    return syncFailure([{
+      code: 'asset_output_root_unowned',
+      severity: 'error',
+      message: errorMessage(error),
+      path: workspace.outputRoot,
+    }]);
+  }
+}
+
+export async function prepareLinkedAssetPackDesiredState(options: {
+  readonly packDirectory: string;
+  readonly workspace: AssetWorkspace;
+  readonly runtime: RuntimeAssets;
+}): Promise<LinkedAssetPackDesiredStateResult> {
+  const publishFailure = preflightPublish(options.workspace);
+  if (publishFailure) return publishFailure;
+
+  let marker: ManagedOutputMarker;
+  let markerBytes: Buffer;
+  try {
+    const read = readManagedOutputMarker(options.workspace);
+    marker = read.marker;
+    markerBytes = read.bytes;
+  } catch (error) {
+    return syncFailure([{
+      code: 'asset_output_root_unowned',
+      severity: 'error',
+      message: errorMessage(error),
+      path: options.workspace.outputRoot,
+    }]);
+  }
+
+  const requestedResult = await validateLinkedPack(
+    options.packDirectory,
+    options.runtime,
+    options.workspace,
+  );
+  if (!requestedResult.ok) return requestedResult;
+  const requested = requestedResult.validated;
+
+  const registryResult = readAssetPackRegistry({
+    workspace: options.workspace,
+    markerWorkspaceId: marker.workspaceId,
+  });
+  if (!registryResult.ok) return syncFailure(registryResult.diagnostics);
+  const retainedEntries = registryResult.document.entries
+    .filter((entry) => entry.packId !== requested.loaded.pack.id)
+    .sort((left, right) => left.packId.localeCompare(right.packId));
+
+  const retainedValidated: ValidatedLinkedAssetPack[] = [];
+  for (const entry of retainedEntries) {
+    if (entry.kind !== 'linked') {
+      return syncFailure([{
+        code: 'asset_publish_failed',
+        severity: 'error',
+        message: `Phase 1 sync cannot publish an installed registry entry: ${entry.packId}.`,
+        path: options.workspace.registryPath,
+        packId: entry.packId,
+      }]);
+    }
+    const validated = await validateLinkedPack(
+      entry.sourceDirectory,
+      options.runtime,
+      options.workspace,
+      entry.packId,
+    );
+    if (!validated.ok) return validated;
+    if (
+      validated.validated.loaded.contentDigest !== entry.contentDigest ||
+      JSON.stringify(sortRecord(Object.fromEntries(validated.validated.loaded.sourceDigests))) !==
+        JSON.stringify(entry.sourceDigests)
+    ) {
+      return syncFailure([{
+        code: 'asset_digest_mismatch',
+        severity: 'error',
+        message: `Linked asset-pack source differs from the registry snapshot: ${entry.packId}.`,
+        path: entry.sourceDirectory,
+        packId: entry.packId,
+      }]);
+    }
+    retainedValidated.push(validated.validated);
+  }
+
+  const publishedOutputFailure = auditPublishedManagedOutput({
+    workspace: options.workspace,
+    markerBytes,
+    generatedDigests: registryResult.document.generatedDigests,
+  });
+  if (publishedOutputFailure) return syncFailure([publishedOutputFailure]);
+
+  const validatedPacks = [
+    ...retainedValidated,
+    requested,
+  ].sort((left, right) => left.loaded.pack.id.localeCompare(right.loaded.pack.id));
+
+  const baseline = loadActiveAssetPackBaseline({
+    runtime: options.runtime,
+    workspace: options.workspace,
+  });
+  const compilePlan = compileAssetPacks({
+    baseline,
+    packs: validatedPacks.map((pack) => pack.loaded.pack),
+  });
+  const compileErrors = compilePlan.diagnostics.filter((diagnostic) => diagnostic.severity === 'error');
+  if (compileErrors.length > 0) {
+    return syncFailure(compileErrors.map((diagnostic) => toSyncDiagnostic(diagnostic)));
+  }
+
+  let compileProjection: AssetPackCompileProjection;
+  try {
+    compileProjection = assetPackCompileProjectionFromPlan({
+      compilePlan,
+      sourceDigestsByPackId: new Map(
+        validatedPacks.map((pack) => [pack.loaded.pack.id, pack.loaded.sourceDigests] as const),
+      ),
+    });
+  } catch (error) {
+    return syncFailure([{
+      code: 'asset_digest_mismatch',
+      severity: 'error',
+      message: errorMessage(error),
+      path: path.resolve(options.packDirectory),
+    }]);
+  }
+
+  const generatedPathsByPackId = new Map(
+    compilePlan.ownership.map((ownership) => [ownership.packId, ownership.logicalPaths] as const),
+  );
+  const generatedSpritesByPackId = new Map(
+    validatedPacks.map((pack) => [
+      pack.loaded.pack.id,
+      compileProjection.sprites
+        .filter((sprite) => sprite.packId === pack.loaded.pack.id)
+        .map(({ packId: _packId, ...sprite }) => sprite),
+    ] as const),
+  );
+  const logicalDestinationsByPackId = new Map(
+    validatedPacks.map((pack) => [
+      pack.loaded.pack.id,
+      compilePlan.sprites
+        .filter((sprite) => sprite.packId === pack.loaded.pack.id)
+        .map((sprite) => sprite.destinationPath)
+        .sort((left, right) => left.localeCompare(right)),
+    ] as const),
+  );
+  const generatedCreditsByPackId = new Map(
+    compilePlan.ownership.map((ownership) => {
+      const ownedDefinitions = new Set(ownership.logicalPaths.filter((logicalPath) =>
+        logicalPath.startsWith('sheet_definitions/')));
+      const credits = new Map<string, CreditEntry>();
+      for (const definition of compilePlan.definitions) {
+        if (!ownedDefinitions.has(definition.logicalPath)) continue;
+        for (const credit of definition.definition.credits) {
+          const existing = credits.get(credit.file);
+          if (
+            existing !== undefined
+            && JSON.stringify(canonicalize(existing)) !== JSON.stringify(canonicalize(credit))
+          ) {
+            throw new Error(`Compiler definitions disagree on generated credit data: ${credit.file}.`);
+          }
+          credits.set(credit.file, credit);
+        }
+      }
+      return [
+        ownership.packId,
+        [...credits.values()].sort((left, right) => left.file.localeCompare(right.file)),
+      ] as const;
+    }),
+  );
+  const registryEntries = validatedPacks.map((pack): LinkedAssetPackRegistryEntry => ({
+    kind: 'linked',
+    packId: pack.loaded.pack.id,
+    version: pack.loaded.pack.version,
+    displayName: pack.loaded.pack.displayName,
+    sourceDirectory: pack.sourceDirectory,
+    contentDigest: pack.loaded.contentDigest,
+    sourceDigests: sortRecord(Object.fromEntries(
+      [...pack.loaded.sourceDigests.entries()].sort(([left], [right]) => left.localeCompare(right)),
+    )),
+    generatedPaths: [...(generatedPathsByPackId.get(pack.loaded.pack.id) ?? [])]
+      .sort((left, right) => left.localeCompare(right)),
+    logicalDestinations: logicalDestinationsByPackId.get(pack.loaded.pack.id) ?? [],
+    generatedSprites: generatedSpritesByPackId.get(pack.loaded.pack.id) ?? [],
+    replacements: pack.loaded.pack.replacements,
+    acknowledgements: pack.loaded.pack.acknowledgements,
+    baselineDefinitionDigests: collectBaselineDefinitionDigests(pack.loaded.pack),
+    baselineCreditDigests: collectBaselineCreditDigests(pack.loaded.pack),
+    generatedCredits: generatedCreditsByPackId.get(pack.loaded.pack.id) ?? [],
+  })).sort((left, right) => left.packId.localeCompare(right.packId));
+
+  const linked = registryEntries.find((entry) => entry.packId === requested.loaded.pack.id);
+  if (!linked) {
+    return syncFailure([{
+      code: 'asset_publish_failed',
+      severity: 'error',
+      message: 'Requested linked asset-pack registry entry was not generated.',
+      path: path.resolve(options.packDirectory),
+    }]);
+  }
+
+  if (registryResult.document.schema === 'lpc-toolkit.asset-workspace-registry.v1') {
+    for (const retained of retainedEntries) {
+      const compiled = registryEntries.find((entry) => entry.packId === retained.packId);
+      if (
+        compiled === undefined
+        || retained.kind !== 'linked'
+        || retained.packId !== compiled.packId
+        || retained.version !== compiled.version
+        || retained.displayName !== compiled.displayName
+        || path.resolve(retained.sourceDirectory) !== compiled.sourceDirectory
+        || retained.contentDigest !== compiled.contentDigest
+        || JSON.stringify(retained.sourceDigests) !== JSON.stringify(compiled.sourceDigests)
+        || JSON.stringify(retained.generatedPaths) !== JSON.stringify(compiled.generatedPaths)
+        || JSON.stringify(retained.baselineDefinitionDigests)
+          !== JSON.stringify(compiled.baselineDefinitionDigests)
+        || JSON.stringify(retained.baselineCreditDigests)
+          !== JSON.stringify(compiled.baselineCreditDigests)
+      ) {
+        return syncFailure([{
+          code: 'asset_digest_mismatch',
+          severity: 'error',
+          message: `Retained v1 linked asset-pack registry entry does not match the validated compile state: ${retained.packId}.`,
+          path: options.workspace.registryPath,
+          packId: retained.packId,
+        }]);
+      }
+    }
+  }
+
+  return {
+    ok: true,
+    requested,
+    packs: validatedPacks,
+    compilePlan,
+    compileProjection,
+    registry: registryEntries,
+    warnings: [
+      ...validatedPacks.flatMap((pack) => pack.diagnostics),
+      ...compilePlan.diagnostics
+        .filter((diagnostic) => diagnostic.severity === 'warning')
+        .map((diagnostic) => toSyncDiagnostic(diagnostic)),
+    ],
+    workspaceId: marker.workspaceId,
+    markerBytes,
+  };
+}
+
+export async function syncLinkedAssetPack(options: {
+  readonly packDirectory: string;
+  readonly workspace: AssetWorkspace;
+  readonly runtime: RuntimeAssets;
+  readonly fileOps?: AssetPublicationFileOps;
+  readonly sourceFileOps?: AssetPackDirectoryFileOps;
+}): Promise<AssetPackSyncResult> {
+  const claimed = await withAssetPackTransactionClaim({
+    workspace: options.workspace,
+    ...(options.fileOps ? { fileOps: options.fileOps } : {}),
+    action: async (publisher): Promise<AssetPackSyncResult> => {
+      const publishFailure = preflightPublish(options.workspace);
+      if (publishFailure) return publishFailure;
+      const requested = await loadLinkedAssetPackCandidate({
+        packDirectory: options.packDirectory,
+        workspace: options.workspace,
+        runtime: options.runtime,
+        ...(options.sourceFileOps ? { sourceFileOps: options.sourceFileOps } : {}),
+      });
+      if (!requested.ok) return syncFailure(requested.diagnostics);
+      const desiredState = await prepareAssetPackDesiredState({
+        workspace: options.workspace,
+        runtime: options.runtime,
+        mutation: { kind: 'upsert', candidate: requested.candidate },
+      });
+      if (!desiredState.ok) return syncFailure(desiredState.diagnostics);
+
+      const linked = desiredState.registry.entries.find((entry) =>
+        entry.packId === requested.candidate.loaded.pack.id && entry.kind === 'linked',
+      );
+      if (!linked || linked.kind !== 'linked') {
+        return syncFailure([{
+          code: 'asset_publish_failed',
+          severity: 'error',
+          message: 'Requested linked asset-pack registry entry was not generated.',
+          path: path.resolve(options.packDirectory),
+        }]);
+      }
+
+      const publication = await publisher.publish({
+        operation: 'sync',
+        desiredState,
+        cleanupInstalledSources: [],
+      });
+      if (!publication.ok) {
+        const rollback = publisher.recover();
+        return syncFailure([
+          ...publication.diagnostics,
+          ...(!rollback.ok ? rollback.diagnostics : []),
+        ]);
+      }
+
+      return {
+        ok: true,
+        linked,
+        registry: desiredState.registry.entries.filter(
+          (entry): entry is LinkedAssetPackRegistryEntry => entry.kind === 'linked',
+        ),
+      };
+    },
+  });
+  if (claimed.ok) return claimed.value;
+  if (!existsSync(path.join(options.workspace.stateRoot, 'transaction.json'))) {
+    const publishFailure = preflightPublish(options.workspace);
+    if (publishFailure) return publishFailure;
+  }
+  return syncFailure(claimed.diagnostics);
+}

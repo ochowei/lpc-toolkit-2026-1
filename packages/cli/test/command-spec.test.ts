@@ -116,6 +116,156 @@ describe('helpForCommand', () => {
       'lpc-toolkit character search hero --type hair --query braid --limit 20 --json',
     );
   });
+
+  it('renders the complete Phase 2 asset command tree', () => {
+    const rootHelp = helpForCommand(['asset']);
+    expect(rootHelp).toContain(
+      'Author, package, install, inspect, and diagnose attributed artist asset packs.',
+    );
+    expect(rootHelp).toContain('lpc-toolkit asset workspace <command>');
+    expect(rootHelp).toContain('lpc-toolkit asset init');
+    expect(rootHelp).toContain('lpc-toolkit asset validate');
+    expect(rootHelp).toContain('lpc-toolkit asset preview');
+    expect(rootHelp).toContain('lpc-toolkit asset sync');
+    expect(rootHelp).toContain('lpc-toolkit asset pack');
+    expect(rootHelp).toContain('lpc-toolkit asset inspect');
+    expect(rootHelp).toContain('lpc-toolkit asset install');
+    expect(rootHelp).toContain('lpc-toolkit asset list');
+    expect(rootHelp).toContain('lpc-toolkit asset remove');
+    expect(rootHelp).toContain('lpc-toolkit asset doctor');
+    expect(rootHelp).toContain(
+      'lpc-toolkit asset install ./dist/acme.hair-1.0.0.lpc-assets.zip',
+    );
+    expect(rootHelp).toContain('lpc-toolkit asset doctor --json');
+    expect(rootHelp).not.toContain(
+      'Create, validate, preview, and synchronize local artist asset packs.',
+    );
+
+    const workspaceHelp = helpForCommand(['asset', 'workspace']);
+    expect(workspaceHelp).toContain(
+      'lpc-toolkit asset workspace init <directory>',
+    );
+  });
+
+  it('documents every Phase 1 asset leaf', () => {
+    expect(helpForCommand(['asset', 'workspace', 'init'])).toContain(
+      'lpc-toolkit asset workspace init <directory>',
+    );
+
+    const initHelp = helpForCommand(['asset', 'init']);
+    for (const option of [
+      '--workspace <directory>',
+      '--out <directory>',
+      '--pack-id <id>',
+      '--version <semver>',
+      '--display-name <label>',
+      '--author <name>',
+      '--license <license>',
+      '--url <url>',
+      '--notes <text>',
+      '--new',
+      '--asset-id <id>',
+      '--type <type>',
+      '--body-type <type>',
+      '--animation <name>',
+      '--advanced',
+      '--from-audit <report>',
+      '--item <item-id>',
+      '--json',
+      '--help',
+    ]) {
+      expect(initHelp).toContain(option);
+    }
+    expect(initHelp).toContain('Default: 0.1.0');
+    expect(initHelp).toContain('lpc-toolkit asset init --new');
+    expect(initHelp).toContain('lpc-toolkit asset init --from-audit');
+
+    const validateHelp = helpForCommand(['asset', 'validate']);
+    expect(validateHelp).toContain('lpc-toolkit asset validate <pack-directory>');
+    expect(validateHelp).toContain('--workspace <directory>');
+    expect(validateHelp).toContain('--json');
+
+    const previewHelp = helpForCommand(['asset', 'preview']);
+    for (const option of [
+      '--workspace <directory>',
+      '--asset <local-id>',
+      '--animation <name>',
+      '--body-type <type>',
+      '--character <selection.json>',
+      '--json',
+      '--help',
+    ]) {
+      expect(previewHelp).toContain(option);
+    }
+
+    const syncHelp = helpForCommand(['asset', 'sync']);
+    expect(syncHelp).toContain('lpc-toolkit asset sync <pack-directory>');
+    expect(syncHelp).toContain('--workspace <directory>');
+    expect(syncHelp).toContain('--json');
+  });
+
+  it.each([
+    [
+      'pack',
+      'lpc-toolkit asset pack <pack-directory> [--workspace <directory>] [--json]',
+    ],
+    [
+      'inspect',
+      'lpc-toolkit asset inspect <pack.lpc-assets.zip> [--json]',
+    ],
+    [
+      'install',
+      'lpc-toolkit asset install <pack.lpc-assets.zip> [--workspace <directory>] [--json]',
+    ],
+    [
+      'list',
+      'lpc-toolkit asset list [--workspace <directory>] [--json]',
+    ],
+    [
+      'remove',
+      'lpc-toolkit asset remove <pack-id> [--workspace <directory>] [--json]',
+    ],
+    [
+      'doctor',
+      'lpc-toolkit asset doctor [--workspace <directory>] [--json]',
+    ],
+  ])('documents the exact asset %s usage and an example', (command, usage) => {
+    const help = helpForCommand(['asset', command]);
+
+    expect(help).toContain(`Usage:\n  ${usage}`);
+    expect(help).toContain(`Examples:\n  lpc-toolkit asset ${command}`);
+    expect(help).toContain('--json');
+    if (command === 'inspect') {
+      expect(help).not.toContain('--workspace');
+    } else {
+      expect(help).toContain('--workspace <directory>');
+    }
+  });
+
+  it('does not advertise unapproved lifecycle bypass or tuning options', () => {
+    for (const command of ['pack', 'inspect', 'install', 'list', 'remove', 'doctor']) {
+      const help = helpForCommand(['asset', command]);
+      for (const option of [
+        '--force',
+        '--ignore-warnings',
+        '--allow-downgrade',
+        '--repair',
+        '--archive-limit',
+        '--concurrency',
+      ]) {
+        expect(help).not.toContain(option);
+      }
+    }
+  });
+
+  it('documents draft reporting and rejection in inspect and install help', () => {
+    expect(helpForCommand(['asset', 'inspect'])).toContain(
+      'Inspect and validate an asset-pack archive, including draft status, without installing it.',
+    );
+    expect(helpForCommand(['asset', 'install'])).toContain(
+      'Install or update a verified asset-pack archive. Draft archives are rejected.',
+    );
+  });
 });
 
 describe('validateCommandOptions', () => {
@@ -193,6 +343,52 @@ describe('validateCommandOptions', () => {
       code: 'invalid_option',
       path: '--bundle',
       details: { available: ['zip'] },
+    });
+  });
+
+  it('allows repeatable asset scaffold selectors and credits', () => {
+    expect(validateCommandOptions(parseArgs([
+      'asset', 'init', '--from-audit', 'audit.json',
+      '--item', 'hair_braid', '--item', 'hair_bob',
+      '--type', 'hair', '--type', 'hat',
+      '--animation', 'walk', '--animation', 'climb',
+      '--body-type', 'male', '--body-type', 'female',
+      '--author', 'Alice', '--author', 'Bob',
+      '--license', 'CC-BY-SA 4.0', '--license', 'GPL 3.0',
+      '--url', 'https://example.test/one', '--url', 'https://example.test/two',
+    ]))).toBeUndefined();
+  });
+
+  it('rejects a repeated non-repeatable asset scaffold option', () => {
+    expect(validateCommandOptions(parseArgs([
+      'asset', 'init', '--pack-id', 'acme.one', '--pack-id', 'acme.two',
+    ]))).toMatchObject({
+      code: 'invalid_option',
+      path: '--pack-id',
+    });
+  });
+
+  it.each([
+    ['pack', '--force'],
+    ['inspect', '--archive-limit'],
+    ['install', '--allow-downgrade'],
+    ['list', '--concurrency'],
+    ['remove', '--ignore-warnings'],
+    ['doctor', '--repair'],
+  ])('rejects the prohibited asset %s option %s', (command, option) => {
+    const positional = command === 'pack'
+      ? ['pack-directory']
+      : command === 'inspect' || command === 'install'
+        ? ['pack.lpc-assets.zip']
+        : command === 'remove'
+          ? ['acme.pack']
+          : [];
+
+    expect(validateCommandOptions(parseArgs([
+      'asset', command, ...positional, option,
+    ]))).toMatchObject({
+      code: 'unknown_option',
+      path: option,
     });
   });
 });

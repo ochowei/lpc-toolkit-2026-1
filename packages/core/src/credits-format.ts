@@ -62,10 +62,6 @@ export function creditsToTxt(
  * - Header: `filename,notes,authors,licenses,urls`
  * - Rows: `"filename","notes","authors","licenses","urls"`
  * 
- * Note on escaping: Upstream does NOT escape embedded double-quotes — this matches
- * that behavior exactly so byte-for-byte equality holds. Since author/license/URL strings
- * in the LPC upstream database do not contain double-quotes, this is safe and does not cause issues.
- *
  * @param manifest The CreditsManifest containing the resolved attributions.
  * @param anim The active logical animation name (only used for filename fallback path).
  * @returns Serialized CSV table string.
@@ -74,6 +70,7 @@ export function creditsToCsv(
   manifest: CreditsManifest,
   anim: string,
 ): string {
+  const field = (value: string): string => `"${value.replaceAll('"', '""')}"`;
   let out = 'filename,notes,authors,licenses,urls\n';
   manifest.entries.forEach((credit, i) => {
     const fileName = filenameFor(manifest, i, anim);
@@ -81,7 +78,7 @@ export function creditsToCsv(
     const licenses = credit.licenses.join(', ');
     const urls = credit.urls.join(', ');
     const notes = credit.notes || '';
-    out += `"${fileName}","${notes}","${authors}","${licenses}","${urls}"\n`;
+    out += `${[fileName, notes, authors, licenses, urls].map(field).join(',')}\n`;
   });
   return out;
 }

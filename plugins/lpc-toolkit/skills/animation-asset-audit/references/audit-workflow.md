@@ -41,3 +41,8 @@ types, variant, recolors, coordinates, and consumers. Do not add, edit,
 generate, or repair sprite assets. After authorized external work, rerun the
 same target and scope and confirm the intended findings disappear without a
 relevant inspection error.
+
+The CLI `asset init --from-audit` workflow creates a new source pack from an
+authorized worklist. The Web Asset Pack Workbench repairs an existing archive
+in memory; it is not a replacement for CLI creation. Browser draft archives
+carry `status: "draft"` and cannot be installed by the CLI until formalized.

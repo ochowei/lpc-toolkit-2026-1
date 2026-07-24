@@ -50,12 +50,22 @@ const generalPlaywrightConfig = readFileSync(
   path.join(here, '../playwright.config.ts'),
   'utf8',
 );
+const vitestConfig = readFileSync(path.join(here, '../vitest.config.ts'), 'utf8');
+const cliPackage = JSON.parse(
+  readFileSync(path.join(here, '../../cli/package.json'), 'utf8'),
+) as { version?: string };
 const parityPlaywrightConfig = readFileSync(
   path.join(here, '../playwright.parity.config.ts'),
   'utf8',
 );
 
 describe('package scripts', () => {
+  it('derives the Vitest CLI version define from CLI package metadata', () => {
+    expect(vitestConfig).toContain("import cliPackage from '../cli/package.json';");
+    expect(vitestConfig).toContain('__LPC_CLI_VERSION__: JSON.stringify(cliPackage.version)');
+    expect(vitestConfig).not.toContain("JSON.stringify('0.2.0')");
+    expect(cliPackage.version).toBeTypeOf('string');
+  });
   it('detects pull request changes with local git instead of the files API', () => {
     expect(changesJob).toContain(
       '- uses: actions/checkout@v4\n        with:\n          fetch-depth: 0',
@@ -63,6 +73,11 @@ describe('package scripts', () => {
     expect(changesJob).toContain(
       "- uses: dorny/paths-filter@v3\n        id: filter\n        with:\n          token: ''",
     );
+  });
+
+  it('activates web and cli CI filters on format package changes', () => {
+    expect(changesJob).toContain("web:\n              - 'packages/web/**'\n              - 'packages/core/**'\n              - 'packages/asset-pack-format/**'");
+    expect(changesJob).toContain("cli:\n              - 'packages/cli/**'\n              - 'packages/core/**'\n              - 'packages/presets/**'\n              - 'packages/asset-pack-format/**'");
   });
 
   it('prepares release assets before root workspace tests', () => {
@@ -127,7 +142,7 @@ describe('package scripts', () => {
       'pnpm prepare-assets && pnpm verify-upstream-pin',
     );
     expect(packageJson.scripts?.['pretest:e2e']).toBe(
-      'pnpm prepare-assets && pnpm verify-upstream-pin',
+      'pnpm prepare-assets && pnpm verify-upstream-pin && pnpm --filter @lpc-toolkit/cli build',
     );
     expect(packageJson.scripts?.['pretest:e2e:parity']).toBe(
       'pnpm prepare-assets && pnpm verify-upstream-pin && pnpm verify-upstream-parity',

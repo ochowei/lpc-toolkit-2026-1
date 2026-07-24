@@ -9,6 +9,11 @@ const vendorRoot = path.join(distRoot, 'vendor', '@lpc-toolkit');
 
 const workspacePackages = [
   {
+    name: '@lpc-toolkit/asset-pack-format',
+    sourceRoot: path.resolve(packageRoot, '..', 'asset-pack-format'),
+    vendorName: 'asset-pack-format',
+  },
+  {
     name: '@lpc-toolkit/core',
     sourceRoot: path.resolve(packageRoot, '..', 'core'),
     vendorName: 'core',
@@ -52,6 +57,7 @@ function rewriteRuntimeImports(filePath) {
     .join('/');
   const vendorPrefix = relativeVendorRoot.startsWith('.') ? relativeVendorRoot : `./${relativeVendorRoot}`;
   const next = original
+    .replaceAll("from '@lpc-toolkit/asset-pack-format'", `from '${vendorPrefix}/asset-pack-format/dist/index.js'`)
     .replaceAll("from '@lpc-toolkit/core'", `from '${vendorPrefix}/core/dist/index.js'`)
     .replaceAll("from '@lpc-toolkit/presets'", `from '${vendorPrefix}/presets/dist/index.js'`);
 

@@ -79,4 +79,17 @@ describe('character documents', () => {
     await expect(importCharacterDocument({ text: async () => '{' }, context))
       .rejects.toBeInstanceOf(SyntaxError);
   });
+
+  it('rejects canonical JSON when an item is absent from the compiled catalog', async () => {
+    const file = {
+      text: async () => JSON.stringify({
+        schema: 'lpc-toolkit.selection.v1',
+        bodyType: 'male',
+        items: { body: { name: 'Removed by compiled pack catalog' } },
+      }),
+    };
+
+    await expect(importCharacterDocument(file, context))
+      .rejects.toThrow('Unknown canonical item');
+  });
 });

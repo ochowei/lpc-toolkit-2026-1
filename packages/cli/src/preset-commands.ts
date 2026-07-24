@@ -13,9 +13,12 @@ import {
   type SelectionJson,
 } from '@lpc-toolkit/core';
 import { flagString, type ParsedArgs } from './args.js';
-import { loadCatalogFromRoots, loadPalettesFromRoot } from './loaders.js';
 import { commandError, commandOk, type CliResponse } from './response.js';
-import type { RuntimeAssets } from './runtime-assets.js';
+import {
+  loadRuntimeCatalog,
+  loadRuntimePalettes,
+  type RuntimeAssets,
+} from './runtime-assets.js';
 
 export interface PresetSummary {
   readonly id: string;
@@ -145,12 +148,8 @@ export function runPresetCommand(
         message: 'Runtime assets are required to materialize a preset.',
       });
     }
-    const context = runtime.context;
-    const catalog = loadCatalogFromRoots(
-      context.sheetDefinitionsRoot,
-      context.customSheetDefinitionsRoot,
-    );
-    const palettes = loadPalettesFromRoot(context.paletteDefinitionsRoot);
+    const catalog = loadRuntimeCatalog(runtime);
+    const palettes = loadRuntimePalettes(runtime);
     const warnings = [...catalog.warnings, ...palettes.warnings];
     let selection: SelectionJson;
     try {

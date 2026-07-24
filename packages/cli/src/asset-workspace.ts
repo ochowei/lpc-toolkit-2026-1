@@ -1,0 +1,594 @@
+import {
+  chmodSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import type { Stats } from 'node:fs';
+import path from 'node:path';
+import { randomUUID } from 'node:crypto';
+
+export const ASSET_WORKSPACE_SCHEMA = 'lpc-toolkit.asset-workspace.v1' as const;
+export const ASSET_WORKSPACE_REGISTRY_SCHEMA =
+  'lpc-toolkit.asset-workspace-registry.v2' as const;
+export const ASSET_OUTPUT_MARKER_SCHEMA = 'lpc-toolkit.asset-output.v1' as const;
+
+const WORKSPACE_CONFIG_FILE = 'lpc-asset-workspace.json';
+const OUTPUT_MARKER_FILE = '.lpc-toolkit-managed.json';
+const DEFAULT_PACKS_DIRECTORY = 'artist-packs';
+const DEFAULT_OUTPUT_DIRECTORY = 'assets_custom';
+const DEFAULT_STATE_DIRECTORY = '.lpc-toolkit/asset-packs';
+const INSTALL_STAGING_NAME = /^install-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+export interface AssetWorkspace {
+  readonly root: string;
+  readonly configPath: string;
+  readonly packsRoot: string;
+  readonly outputRoot: string;
+  readonly stateRoot: string;
+  readonly installedRoot: string;
+  readonly stagingRoot: string;
+  readonly transactionsRoot: string;
+  readonly registryPath: string;
+}
+
+export interface AssetPackInstallStagingRoot {
+  readonly path: string;
+  readonly canonicalPath: string;
+  readonly device: number;
+  readonly inode: number;
+}
+
+interface AssetWorkspaceConfig {
+  readonly schema: typeof ASSET_WORKSPACE_SCHEMA;
+  readonly packsDirectory: string;
+  readonly outputDirectory: string;
+  readonly stateDirectory: string;
+}
+
+interface AssetOutputMarker {
+  readonly schema: typeof ASSET_OUTPUT_MARKER_SCHEMA;
+  readonly workspaceId: string;
+}
+
+const WORKSPACE_CONFIG_KEYS = [
+  'schema',
+  'packsDirectory',
+  'outputDirectory',
+  'stateDirectory',
+] as const;
+
+const OUTPUT_MARKER_KEYS = ['schema', 'workspaceId'] as const;
+
+class AssetWorkspaceError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AssetWorkspaceError';
+  }
+}
+
+class WorkspaceConfigNotFoundError extends AssetWorkspaceError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'WorkspaceConfigNotFoundError';
+  }
+}
+
+function asObject(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new AssetWorkspaceError('Asset workspace config must be a JSON object.');
+  }
+  return value as Record<string, unknown>;
+}
+
+function readJsonFile(filePath: string): unknown {
+  return JSON.parse(readFileSync(filePath, 'utf8')) as unknown;
+}
+
+function requireString(
+  record: Record<string, unknown>,
+  key: string,
+  message: string,
+): string {
+  const value = record[key];
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new AssetWorkspaceError(message);
+  }
+  return value;
+}
+
+function assertExactKeys(
+  record: Record<string, unknown>,
+  expectedKeys: readonly string[],
+  label: string,
+): void {
+  const expected = new Set(expectedKeys);
+  const unknownKeys = Object.keys(record).filter((key) => !expected.has(key));
+  if (unknownKeys.length > 0) {
+    throw new AssetWorkspaceError(
+      `${label} contains unknown keys: ${unknownKeys.join(', ')}`,
+    );
+  }
+}
+
+function isInsideRoot(root: string, candidate: string): boolean {
+  const relative = path.relative(root, candidate);
+  return (
+    relative === '' ||
+    (relative !== '..' &&
+      !relative.startsWith(`..${path.sep}`) &&
+      !path.isAbsolute(relative))
+  );
+}
+
+function isPortablePathSegment(segment: string): boolean {
+  return segment.length > 0
+    && segment !== '.'
+    && segment !== '..'
+    && !segment.includes('/')
+    && !segment.includes('\\')
+    && !/[\u0000-\u001f\u007f<>:"|?*]/u.test(segment)
+    && !/[. ]$/u.test(segment)
+    && !/^(con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])(?:\..*)?$/iu.test(segment);
+}
+
+function isAllowedRootAliasSymlink(target: string): boolean {
+  if (process.platform !== 'darwin') return false;
+  if (path.dirname(target) !== path.parse(target).root) return false;
+
+  try {
+    return realpathSync.native(target) === path.join('/private', path.basename(target));
+  } catch {
+    return false;
+  }
+}
+
+function assertExistingDirectoryPath(target: string): void {
+  const absoluteTarget = path.resolve(target);
+  let current = absoluteTarget;
+
+  while (true) {
+    if (existsSync(current)) {
+      const stats = lstatSync(current);
+      if (stats.isSymbolicLink()) {
+        if (!isAllowedRootAliasSymlink(current)) {
+          throw new AssetWorkspaceError(
+            `Refusing to initialize through a symlinked workspace path: ${current}`,
+          );
+        }
+      } else if (!stats.isDirectory()) {
+        throw new AssetWorkspaceError(`Workspace path is not a directory: ${current}`);
+      }
+    }
+
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+}
+
+function assertSafeWorkspaceRoot(root: string): string {
+  const absoluteRoot = path.resolve(root);
+  assertExistingDirectoryPath(absoluteRoot);
+  return absoluteRoot;
+}
+
+function ensureWorkspaceRoot(root: string): void {
+  const absoluteRoot = assertSafeWorkspaceRoot(root);
+  mkdirSync(absoluteRoot, { recursive: true });
+}
+
+function ensureDirectoryUnderRoot(root: string, subpath: string): void {
+  const absoluteRoot = assertSafeWorkspaceRoot(root);
+  const absolutePath = path.resolve(absoluteRoot, subpath);
+  if (!isInsideRoot(absoluteRoot, absolutePath)) {
+    throw new AssetWorkspaceError(
+      `Asset workspace path escapes the workspace root: ${subpath}`,
+    );
+  }
+
+  const relative = path.relative(absoluteRoot, absolutePath);
+  if (relative === '') return;
+
+  let current = absoluteRoot;
+  for (const segment of relative.split(path.sep)) {
+    current = path.join(current, segment);
+    if (!existsSync(current)) {
+      mkdirSync(current);
+      continue;
+    }
+    const stats = lstatSync(current);
+    if (stats.isSymbolicLink()) {
+      throw new AssetWorkspaceError(
+        `Refusing to initialize through a symlinked workspace path: ${current}`,
+      );
+    }
+    if (!stats.isDirectory()) {
+      throw new AssetWorkspaceError(
+        `Workspace path is not a directory: ${current}`,
+      );
+    }
+  }
+}
+
+function assertSafeExistingSubpath(root: string, subpath: string): void {
+  const absoluteRoot = assertSafeWorkspaceRoot(root);
+  const absolutePath = path.resolve(absoluteRoot, subpath);
+  if (!isInsideRoot(absoluteRoot, absolutePath)) {
+    throw new AssetWorkspaceError(
+      `Asset workspace path escapes the workspace root: ${subpath}`,
+    );
+  }
+  assertExistingDirectoryPath(absolutePath);
+}
+
+function resolveConfiguredDirectory(root: string, configuredPath: string): string {
+  if (path.isAbsolute(configuredPath)) {
+    throw new AssetWorkspaceError(
+      `Asset workspace path escapes the workspace root: ${configuredPath}`,
+    );
+  }
+  const absoluteRoot = assertSafeWorkspaceRoot(root);
+  const resolved = path.resolve(absoluteRoot, configuredPath);
+  if (!isInsideRoot(absoluteRoot, resolved)) {
+    throw new AssetWorkspaceError(
+      `Asset workspace path escapes the workspace root: ${configuredPath}`,
+    );
+  }
+  assertExistingDirectoryPath(resolved);
+  return resolved;
+}
+
+function createWorkspace(root: string, config: AssetWorkspaceConfig): AssetWorkspace {
+  const absoluteRoot = assertSafeWorkspaceRoot(root);
+  const packsRoot = resolveConfiguredDirectory(absoluteRoot, config.packsDirectory);
+  const outputRoot = resolveConfiguredDirectory(absoluteRoot, config.outputDirectory);
+  const stateRoot = resolveConfiguredDirectory(absoluteRoot, config.stateDirectory);
+
+  return {
+    root: absoluteRoot,
+    configPath: path.join(absoluteRoot, WORKSPACE_CONFIG_FILE),
+    packsRoot,
+    outputRoot,
+    stateRoot,
+    installedRoot: path.join(stateRoot, 'installed'),
+    stagingRoot: path.join(stateRoot, 'staging'),
+    transactionsRoot: path.join(stateRoot, 'transactions'),
+    registryPath: path.join(stateRoot, 'registry.json'),
+  };
+}
+
+function pinRealDirectory(target: string, label: string): {
+  readonly canonicalPath: string;
+  readonly status: Stats;
+} {
+  const before: Stats = lstatSync(target);
+  if (before.isSymbolicLink() || !before.isDirectory()) {
+    throw new AssetWorkspaceError(`${label} is not a real directory: ${target}`);
+  }
+  const canonicalPath = realpathSync.native(target);
+  const status: Stats = lstatSync(target);
+  if (
+    status.isSymbolicLink()
+    || !status.isDirectory()
+    || status.dev !== before.dev
+    || status.ino !== before.ino
+    || realpathSync.native(target) !== canonicalPath
+  ) {
+    throw new AssetWorkspaceError(`${label} identity changed: ${target}`);
+  }
+  return { canonicalPath, status };
+}
+
+export function createAssetPackInstallStagingRoot(
+  workspace: AssetWorkspace,
+  initialize: (targetDirectory: string) => void,
+): AssetPackInstallStagingRoot {
+  assertSafeExistingSubpath(
+    workspace.root,
+    path.relative(workspace.root, workspace.stagingRoot),
+  );
+  const originalParent = pinRealDirectory(workspace.stagingRoot, 'Asset-pack staging root');
+  if ((originalParent.status.mode & 0o077) !== 0) {
+    chmodSync(originalParent.canonicalPath, 0o700);
+  }
+  const parent = pinRealDirectory(workspace.stagingRoot, 'Asset-pack staging root');
+  if (
+    parent.status.dev !== originalParent.status.dev
+    || parent.status.ino !== originalParent.status.ino
+    || parent.canonicalPath !== originalParent.canonicalPath
+  ) {
+    throw new AssetWorkspaceError(
+      `Asset-pack staging root identity changed: ${workspace.stagingRoot}`,
+    );
+  }
+  if ((parent.status.mode & 0o077) !== 0) {
+    throw new AssetWorkspaceError(
+      `Asset-pack staging root is not private: ${workspace.stagingRoot}`,
+    );
+  }
+  const target = path.join(workspace.stagingRoot, `install-${randomUUID()}`);
+  initialize(path.join(parent.canonicalPath, path.basename(target)));
+  const pinned = pinRealDirectory(target, 'Asset-pack install staging root');
+  const confirmedParent = pinRealDirectory(workspace.stagingRoot, 'Asset-pack staging root');
+  if (
+    confirmedParent.status.dev !== parent.status.dev
+    || confirmedParent.status.ino !== parent.status.ino
+    || confirmedParent.canonicalPath !== parent.canonicalPath
+  ) {
+    throw new AssetWorkspaceError(
+      `Asset-pack staging root identity changed: ${workspace.stagingRoot}`,
+    );
+  }
+  const { status } = pinned;
+  if ((status.mode & 0o077) !== 0) {
+    throw new AssetWorkspaceError(
+      `Asset-pack install staging root is not private: ${target}`,
+    );
+  }
+  return {
+    path: target,
+    canonicalPath: pinned.canonicalPath,
+    device: status.dev,
+    inode: status.ino,
+  };
+}
+
+export function removeAssetPackInstallStagingRoot(
+  workspace: AssetWorkspace,
+  staging: AssetPackInstallStagingRoot,
+): void {
+  if (
+    path.dirname(path.resolve(staging.path)) !== path.resolve(workspace.stagingRoot)
+    || !INSTALL_STAGING_NAME.test(path.basename(staging.path))
+  ) {
+    throw new AssetWorkspaceError(
+      `Asset-pack install staging root is outside the managed staging root: ${staging.path}`,
+    );
+  }
+  const status = lstatSync(staging.path, { throwIfNoEntry: false });
+  if (!status) return;
+  if (
+    status.isSymbolicLink()
+    || !status.isDirectory()
+    || status.dev !== staging.device
+    || status.ino !== staging.inode
+    || realpathSync.native(staging.path) !== staging.canonicalPath
+  ) {
+    throw new AssetWorkspaceError(
+      `Asset-pack install staging root identity changed: ${staging.path}`,
+    );
+  }
+  rmSync(staging.path, { recursive: true });
+}
+
+export function assetPackInstalledDirectory(options: {
+  readonly workspace: AssetWorkspace;
+  readonly packId: string;
+  readonly version: string;
+  readonly archiveDigest: string;
+}): string {
+  if (!/^sha256:[0-9a-f]{64}$/.test(options.archiveDigest)) {
+    throw new AssetWorkspaceError('Installed asset-pack archive digest is invalid.');
+  }
+  if (
+    !isPortablePathSegment(options.packId)
+    || !isPortablePathSegment(options.version)
+  ) {
+    throw new AssetWorkspaceError('Installed asset-pack identity contains an unsafe path segment.');
+  }
+  const directory = path.join(
+    options.workspace.installedRoot,
+    options.packId,
+    options.version,
+    options.archiveDigest.slice('sha256:'.length),
+  );
+  if (!isInsideRoot(options.workspace.installedRoot, directory)) {
+    throw new AssetWorkspaceError('Installed asset-pack directory escapes the installed root.');
+  }
+  return directory;
+}
+
+function readWorkspaceConfig(root: string, explicit: boolean): AssetWorkspaceConfig {
+  const configPath = path.join(path.resolve(root), WORKSPACE_CONFIG_FILE);
+  if (!existsSync(configPath)) {
+    if (explicit) {
+      throw new WorkspaceConfigNotFoundError(
+        `Asset workspace config not found at explicit path: ${path.resolve(root)}`,
+      );
+    }
+    throw new WorkspaceConfigNotFoundError(
+      `Asset workspace config not found at ${path.resolve(root)}`,
+    );
+  }
+
+  const record = asObject(readJsonFile(configPath));
+  assertExactKeys(record, WORKSPACE_CONFIG_KEYS, 'Asset workspace config');
+  const schema = requireString(
+    record,
+    'schema',
+    'Asset workspace config must include a string schema.',
+  );
+  if (schema !== ASSET_WORKSPACE_SCHEMA) {
+    throw new AssetWorkspaceError(`Unknown asset workspace schema: ${schema}`);
+  }
+
+  return {
+    schema: ASSET_WORKSPACE_SCHEMA,
+    packsDirectory: requireString(
+      record,
+      'packsDirectory',
+      'Asset workspace config must include a string packsDirectory.',
+    ),
+    outputDirectory: requireString(
+      record,
+      'outputDirectory',
+      'Asset workspace config must include a string outputDirectory.',
+    ),
+    stateDirectory: requireString(
+      record,
+      'stateDirectory',
+      'Asset workspace config must include a string stateDirectory.',
+    ),
+  };
+}
+
+function readOutputMarker(outputRoot: string): AssetOutputMarker | undefined {
+  const markerPath = path.join(outputRoot, OUTPUT_MARKER_FILE);
+  if (!existsSync(markerPath)) return undefined;
+
+  const record = asObject(readJsonFile(markerPath));
+  assertExactKeys(record, OUTPUT_MARKER_KEYS, 'Asset output marker');
+  const schema = requireString(
+    record,
+    'schema',
+    'Asset output marker must include a string schema.',
+  );
+  if (schema !== ASSET_OUTPUT_MARKER_SCHEMA) {
+    throw new AssetWorkspaceError(`Unknown asset output marker schema: ${schema}`);
+  }
+
+  return {
+    schema: ASSET_OUTPUT_MARKER_SCHEMA,
+    workspaceId: requireString(
+      record,
+      'workspaceId',
+      'Asset output marker must include a string workspaceId.',
+    ),
+  };
+}
+
+function writeWorkspaceConfig(root: string): void {
+  writeFileSync(
+    path.join(root, WORKSPACE_CONFIG_FILE),
+    `${JSON.stringify(
+      {
+        schema: ASSET_WORKSPACE_SCHEMA,
+        packsDirectory: DEFAULT_PACKS_DIRECTORY,
+        outputDirectory: DEFAULT_OUTPUT_DIRECTORY,
+        stateDirectory: DEFAULT_STATE_DIRECTORY,
+      },
+      null,
+      2,
+    )}\n`,
+  );
+}
+
+function writeOutputMarker(outputRoot: string): void {
+  writeFileSync(
+    path.join(outputRoot, OUTPUT_MARKER_FILE),
+    `${JSON.stringify(
+      {
+        schema: ASSET_OUTPUT_MARKER_SCHEMA,
+        workspaceId: randomUUID(),
+      },
+      null,
+      2,
+    )}\n`,
+  );
+}
+
+function assertOutputOwnershipCanBeInitialized(outputRoot: string): void {
+  if (!existsSync(outputRoot)) return;
+  const marker = readOutputMarker(outputRoot);
+  if (marker !== undefined) return;
+  const entries = readdirSync(outputRoot);
+  if (entries.length > 0) {
+    throw new AssetWorkspaceError(
+      `Refusing to adopt non-empty unowned asset output: ${outputRoot}`,
+    );
+  }
+}
+
+function defaultWorkspace(root: string): AssetWorkspace {
+  return createWorkspace(root, {
+    schema: ASSET_WORKSPACE_SCHEMA,
+    packsDirectory: DEFAULT_PACKS_DIRECTORY,
+    outputDirectory: DEFAULT_OUTPUT_DIRECTORY,
+    stateDirectory: DEFAULT_STATE_DIRECTORY,
+  });
+}
+
+export function findAssetWorkspace(start: string, explicit?: string): AssetWorkspace {
+  const absoluteStart = path.resolve(start);
+  if (explicit !== undefined) {
+    return createWorkspace(
+      path.resolve(absoluteStart, explicit),
+      readWorkspaceConfig(path.resolve(absoluteStart, explicit), true),
+    );
+  }
+
+  let current = absoluteStart;
+  while (true) {
+    try {
+      return createWorkspace(current, readWorkspaceConfig(current, false));
+    } catch (error) {
+      if (!(error instanceof WorkspaceConfigNotFoundError)) throw error;
+    }
+
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+
+  throw new AssetWorkspaceError(`Asset workspace not found from ${absoluteStart}`);
+}
+
+export function initializeAssetWorkspace(target: string): AssetWorkspace {
+  const root = path.resolve(target);
+  const configPath = path.join(root, WORKSPACE_CONFIG_FILE);
+  if (existsSync(configPath)) {
+    const workspace = createWorkspace(root, readWorkspaceConfig(root, false));
+    assertManagedAssetOutput(workspace);
+    return workspace;
+  }
+
+  const workspace = defaultWorkspace(root);
+  ensureWorkspaceRoot(root);
+  assertSafeExistingSubpath(root, DEFAULT_PACKS_DIRECTORY);
+  assertSafeExistingSubpath(root, DEFAULT_OUTPUT_DIRECTORY);
+  assertSafeExistingSubpath(root, DEFAULT_STATE_DIRECTORY);
+  assertOutputOwnershipCanBeInitialized(workspace.outputRoot);
+
+  ensureDirectoryUnderRoot(root, path.relative(root, workspace.packsRoot));
+  ensureDirectoryUnderRoot(root, path.relative(root, workspace.outputRoot));
+  ensureDirectoryUnderRoot(root, path.relative(root, workspace.stateRoot));
+  ensureDirectoryUnderRoot(
+    root,
+    path.relative(root, workspace.installedRoot),
+  );
+  ensureDirectoryUnderRoot(
+    root,
+    path.relative(root, path.join(workspace.stateRoot, 'validation')),
+  );
+  ensureDirectoryUnderRoot(
+    root,
+    path.relative(root, workspace.stagingRoot),
+  );
+  if (!existsSync(configPath)) writeWorkspaceConfig(root);
+  if (!existsSync(path.join(workspace.outputRoot, OUTPUT_MARKER_FILE))) {
+    writeOutputMarker(workspace.outputRoot);
+  }
+
+  return workspace;
+}
+
+export function assertManagedAssetOutput(workspace: AssetWorkspace): void {
+  assertSafeExistingSubpath(workspace.root, path.relative(workspace.root, workspace.outputRoot));
+  if (!existsSync(workspace.outputRoot) || !lstatSync(workspace.outputRoot).isDirectory()) {
+    throw new AssetWorkspaceError(
+      `Managed asset output directory does not exist: ${workspace.outputRoot}`,
+    );
+  }
+  const marker = readOutputMarker(workspace.outputRoot);
+  if (marker === undefined) {
+    throw new AssetWorkspaceError(
+      `Managed asset output marker not found: ${workspace.outputRoot}`,
+    );
+  }
+}

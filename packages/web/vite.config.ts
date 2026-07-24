@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import JSZip from 'jszip';
+import cliPackage from '../cli/package.json';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const baseDir = resolve(__dirname, '../../assets/spritesheets');
@@ -80,6 +81,7 @@ function localSpritesheetsPlugin(): Plugin {
 // the local `assets/` directory (two levels up from packages/web).
 export default defineConfig(({ mode }) => ({
   plugins: [react(), tailwindcss(), localSpritesheetsPlugin()],
+  define: { __LPC_CLI_VERSION__: JSON.stringify(cliPackage.version) },
   publicDir: mode === 'embedded' ? false : 'public',
   resolve: {
     alias: {
@@ -89,6 +91,9 @@ export default defineConfig(({ mode }) => ({
       ),
       '@lpc-toolkit/presets': fileURLToPath(
         new URL('../presets/src/index.ts', import.meta.url),
+      ),
+      '@lpc-toolkit/asset-pack-format': fileURLToPath(
+        new URL('../asset-pack-format/src/index.ts', import.meta.url),
       ),
     },
   },

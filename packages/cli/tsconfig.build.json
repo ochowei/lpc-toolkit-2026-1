@@ -3,6 +3,7 @@
   "compilerOptions": {
     "rootDir": "./src",
     "paths": {
+      "@lpc-toolkit/asset-pack-format": ["../asset-pack-format/dist/index.d.ts"],
       "@lpc-toolkit/core": ["../core/dist/index.d.ts"],
       "@lpc-toolkit/presets": ["../presets/dist/index.d.ts"]
     }

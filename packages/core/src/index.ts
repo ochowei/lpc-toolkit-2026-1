@@ -64,6 +64,80 @@ export { ok, err, isOk, isErr, unwrapOr } from './result.js';
 export type { CatalogLoadWarning, CreateCatalogResult } from './catalog.js';
 export { createCatalog } from './catalog.js';
 
+export type {
+  AssetPackAcknowledgement,
+  AssetPackAssetSource,
+  AssetPackCompatibilitySource,
+  AssetPackCreditSource,
+  AssetPackDiagnostic,
+  AssetPackDiagnosticCode,
+  AssetPackParseResult,
+  AssetPackReplacementSource,
+  AssetPackSource,
+  AssetPackStatus,
+  ExtendItemAnimationSource,
+  ExtendItemAssetSource,
+  ExtendItemDestinationSource,
+  ExtendItemLayerSource,
+  NewItemAssetSource,
+  NewItemLayerSource,
+  NewItemSpriteSource,
+} from './asset-pack-schema.js';
+export {
+  ASSET_PACK_SCHEMA,
+  parseAssetPackSource,
+} from './asset-pack-schema.js';
+export {
+  assetPackCreditProjection,
+  assetPackDefinitionProjection,
+} from './asset-pack-baseline.js';
+
+export type {
+  AssetPackCreditRecord,
+  NormalizedAssetPack,
+  NormalizedAssetPackAsset,
+  NormalizedAssetPackCompatibility,
+  NormalizedAssetPackReplacement,
+  NormalizedExtendItemAnimation,
+  NormalizedExtendItemAsset,
+  NormalizedExtendItemDestination,
+  NormalizedExtendItemLayer,
+  NormalizedNewItemAsset,
+  NormalizedNewItemLayer,
+  NormalizedNewItemSprite,
+} from './asset-pack-model.js';
+export {
+  assetPackContentProjection,
+  assetPackItemId,
+  assetPackSourceFromNormalized,
+  normalizeAssetPack,
+  warningAcknowledged,
+} from './asset-pack-model.js';
+export type { AssetPackSemver } from './asset-pack-version.js';
+export {
+  assetPackAssetKeys,
+  assetPackLifecycleReplacementAllows,
+  assetPackVersionRangeMatches,
+  compareAssetPackVersions,
+  parseAssetPackSemver,
+} from './asset-pack-version.js';
+export type {
+  AssetPackBaseline,
+  AssetPackSourceInspection,
+  AssetPackValidationResult,
+  ValidateAssetPackOptions,
+} from './asset-pack-validation.js';
+export { validateAssetPack } from './asset-pack-validation.js';
+export type {
+  AssetPackCompilePlan,
+  CompileAssetPacksOptions,
+  CompiledAssetDefinition,
+  CompiledAssetOwnership,
+  CompiledAssetSprite,
+  CompiledAssetSpriteConsumer,
+} from './asset-pack-compile.js';
+export { compileAssetPacks } from './asset-pack-compile.js';
+
 // ==========================================
 // 5. Palette and Color Metadata Catalog
 // ==========================================
@@ -241,4 +315,7 @@ export type {
   UnsupportedAnimationFinding,
   UnsupportedAnimationRequirement,
 } from './asset-animation-audit.js';
-export { planAssetAnimationAudit } from './asset-animation-audit.js';
+export {
+  planAssetAnimationAudit,
+  standardAnimationGeometry,
+} from './asset-animation-audit.js';

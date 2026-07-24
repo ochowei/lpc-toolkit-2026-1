@@ -9,7 +9,8 @@
     "baseUrl": ".",
     "paths": {
       "@lpc-toolkit/core": ["../core/src/index.ts"],
-      "@lpc-toolkit/presets": ["../presets/src/index.ts"]
+      "@lpc-toolkit/presets": ["../presets/src/index.ts"],
+      "@lpc-toolkit/asset-pack-format": ["../asset-pack-format/src/index.ts"]
     }
   },
   "include": ["src", "test", "scripts", "e2e", "vite.config.ts", "vitest.config.ts", "playwright.config.ts"],

@@ -41,11 +41,13 @@ jobs:
             web:
               - 'packages/web/**'
               - 'packages/core/**'
+              - 'packages/asset-pack-format/**'
               - 'pnpm-lock.yaml'
             cli:
               - 'packages/cli/**'
               - 'packages/core/**'
               - 'packages/presets/**'
+              - 'packages/asset-pack-format/**'
               - 'asset-release.json'
               - 'pnpm-lock.yaml'
               - 'plugins/lpc-toolkit/**'

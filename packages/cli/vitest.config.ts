@@ -7,6 +7,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 export default defineConfig({
   resolve: {
     alias: {
+      '@lpc-toolkit/asset-pack-format': path.resolve(here, '../asset-pack-format/src/index.ts'),
       '@lpc-toolkit/core': path.resolve(here, '../core/src/index.ts'),
       '@lpc-toolkit/presets': path.resolve(here, '../presets/src/index.ts'),
     },

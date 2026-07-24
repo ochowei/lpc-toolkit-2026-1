@@ -123,6 +123,55 @@ troubleshooting.
 
 Final render output includes a standalone `<name>.viewer.html` offline animation viewer.
 
+### Artist asset-pack lifecycle
+
+Artists can author, validate, preview, link, and package an asset pack using
+only the public CLI. Git and a repository clone are optional; neither the
+author nor the consumer needs to initialize `upstream/` or create local base
+assets.
+
+```sh
+npm install -g @lpc-toolkit/cli
+lpc-toolkit asset workspace init ./my-lpc-art
+cd ./my-lpc-art
+lpc-toolkit asset init --new --pack-id acme.fantasy-hair --asset-id moon-braid --display-name "Moon Braid" --type hair --body-type male --body-type female --animation walk --animation climb --author Alice --license "CC-BY-SA 4.0" --url https://example.com/acme/fantasy-hair
+lpc-toolkit asset validate ./artist-packs/<pack-id>
+lpc-toolkit asset preview ./artist-packs/<pack-id>
+lpc-toolkit asset sync ./artist-packs/<pack-id>
+lpc-toolkit asset pack ./artist-packs/<pack-id>
+```
+
+Give the resulting `<pack-id>-<version>.lpc-assets.zip` to a consumer. They use
+a separate standalone workspace and run the lifecycle in order:
+
+```sh
+lpc-toolkit asset workspace init ./consumer-workspace
+cd ./consumer-workspace
+lpc-toolkit asset inspect ../my-lpc-art/artist-packs/<pack-id>-<version>.lpc-assets.zip
+lpc-toolkit asset install ../my-lpc-art/artist-packs/<pack-id>-<version>.lpc-assets.zip
+lpc-toolkit asset list
+lpc-toolkit asset doctor
+# When the pack is no longer needed:
+lpc-toolkit asset remove <pack-id>
+```
+
+Put complete animation PNGs under
+`artist-packs/<pack-id>/sprites/`. The detailed
+[CLI asset lifecycle guide](packages/cli/README.md#artist-asset-pack-authoring-and-lifecycle)
+documents audit-derived scaffolds, acknowledgements, deterministic archive
+security and limits, compatibility, install/upgrade/downgrade policy, registry
+and journal recovery, workspace ownership, attribution, output, and exit
+semantics.
+
+Installed packs participate in catalog audit, character preview, and render;
+their TXT/CSV attribution retains inherited base credits and pack contributions.
+The browser Asset Pack Workbench uploads an existing archive, preserves
+matching attribution, validates and repairs it in memory, and downloads draft
+or formal corrected archives. Draft archives retain `status: "draft"` and are
+rejected by CLI installation until the release gates are satisfied. The CLI
+continues to own pack creation, inspection, installation, upgrades, removal,
+and lifecycle diagnosis; neither workflow requires cloning this repository.
+
 Catalog and character searches return 20 items by default. Use `--limit 20`
 to set a bounded page size, `--offset 20` (or the returned `page.nextOffset`)
 to continue the same result set, and `--all` only when an explicit unbounded
@@ -181,7 +230,10 @@ The CLI performs first-time asset preparation from a pinned release download,
 verifies checksums, and stores a platform cache. Later commands rely on
 verified cache reuse. A valid offline cache needs no network; a missing or invalid
 offline cache fails with recovery guidance. A complete working-directory
-`assets/` tree takes precedence, with `assets_custom/` applied as an overlay.
+`assets/` tree takes precedence outside an artist workspace, with
+`assets_custom/` applied as an overlay. Inside an initialized artist workspace,
+asset-dependent commands use the same verified managed-cache baseline as
+lifecycle compilation and activate only an authenticated registry v2 generation.
 
 CLI rendering writes the composed sheet with required metadata and credit
 files, plus optional animation strips, frames, and ZIP bundles. Node-specific

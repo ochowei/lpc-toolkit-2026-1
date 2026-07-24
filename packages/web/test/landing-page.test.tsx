@@ -14,6 +14,7 @@ describe('LandingPage', () => {
     expect(html).toContain('hero.credits.csv');
 
     expect(html.match(/Open Composer/g)).toHaveLength(1);
+    expect(html).toContain('Repair an Asset Pack');
     expect(html).toContain('href="#cli-quick-start"');
     expect(html).toContain('Use the CLI');
     expect(html).toContain('id="cli-quick-start"');
@@ -56,5 +57,40 @@ describe('LandingPage', () => {
     expect(html).not.toContain('page.nextOffset');
     expect(html).not.toContain('lpc-toolkit selection validate');
     expect(html).not.toContain('lpc-toolkit token encode');
+  });
+
+  it('documents the public CLI artist workflow without requiring a repository clone', () => {
+    const html = renderToStaticMarkup(<LandingPage onNavigate={() => {}} />)
+      .replaceAll('&quot;', '"')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>');
+    const commands = [
+      'npm install -g @lpc-toolkit/cli',
+      'lpc-toolkit asset workspace init ./my-lpc-art',
+      'cd ./my-lpc-art',
+      'lpc-toolkit asset init --new --pack-id acme.fantasy-hair --asset-id moon-braid --display-name "Moon Braid" --type hair --body-type male --body-type female --animation walk --animation climb --author Alice --license "CC-BY-SA 4.0" --url https://example.com/acme/fantasy-hair',
+      'lpc-toolkit asset validate ./artist-packs/<pack-id>',
+      'lpc-toolkit asset preview ./artist-packs/<pack-id>',
+      'lpc-toolkit asset sync ./artist-packs/<pack-id>',
+      'lpc-toolkit asset pack ./artist-packs/<pack-id>',
+      'lpc-toolkit asset workspace init ../consumer-workspace',
+      'cd ../consumer-workspace',
+      'lpc-toolkit asset install ../my-lpc-art/artist-packs/<pack-id>-<version>.lpc-assets.zip',
+      'lpc-toolkit asset doctor',
+    ];
+    const positions = commands.map((command) => {
+      expect(html).toContain(command);
+      return html.indexOf(command);
+    });
+
+    expect(positions).toEqual([...positions].sort((left, right) => left - right));
+    expect(html).toContain('artist-packs/<pack-id>/sprites/');
+    expect(html).toContain('You do not need to clone this repository');
+    expect(html).not.toContain('Phase 3');
+    expect(html).toContain('browser can inspect, validate, repair, and assemble');
+    expect(html).toContain('CLI owns package inspection, install, upgrade, removal, and lifecycle diagnosis');
+    expect(html).toContain('Web edits happen in-memory');
+    expect(html).toContain('status: "draft"');
+    expect(html).toContain('CLI refuses to install them');
   });
 });

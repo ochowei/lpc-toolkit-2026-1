@@ -66,6 +66,48 @@ const DISCOVERY_OPTIONS: readonly CommandOptionSpec[] = [
   { name: 'all', kind: 'boolean', description: 'Return all matching items.' },
 ];
 
+const ASSET_WORKSPACE_OPTION: CommandOptionSpec = {
+  name: 'workspace',
+  kind: 'value',
+  valueLabel: 'directory',
+  description: 'Use this asset workspace instead of discovering one.',
+};
+
+const ASSET_SCAFFOLD_OPTIONS: readonly CommandOptionSpec[] = [
+  ASSET_WORKSPACE_OPTION,
+  {
+    name: 'out',
+    kind: 'value',
+    valueLabel: 'directory',
+    description: 'Create the pack in this directory inside artist-packs.',
+  },
+  { name: 'pack-id', kind: 'value', valueLabel: 'id', description: 'Set the asset-pack id.' },
+  {
+    name: 'version',
+    kind: 'value',
+    valueLabel: 'semver',
+    description: 'Set the asset-pack version. Default: 0.1.0.',
+  },
+  {
+    name: 'display-name',
+    kind: 'value',
+    valueLabel: 'label',
+    description: 'Set the artist-facing pack name.',
+  },
+  { name: 'author', kind: 'repeatable', valueLabel: 'name', description: 'Credit an author; may be repeated.' },
+  { name: 'license', kind: 'repeatable', valueLabel: 'license', description: 'Declare a license; may be repeated.' },
+  { name: 'url', kind: 'repeatable', valueLabel: 'url', description: 'Record a credit URL; may be repeated.' },
+  { name: 'notes', kind: 'value', valueLabel: 'text', description: 'Record pack credit notes.' },
+  { name: 'new', kind: 'boolean', description: 'Scaffold a new catalog item.' },
+  { name: 'asset-id', kind: 'value', valueLabel: 'id', description: 'Set the new item local id.' },
+  { name: 'type', kind: 'repeatable', valueLabel: 'type', description: 'Set or select an item type; may be repeated for audit selection.' },
+  { name: 'body-type', kind: 'repeatable', valueLabel: 'type', description: 'Set or narrow body types; may be repeated.' },
+  { name: 'animation', kind: 'repeatable', valueLabel: 'name', description: 'Set or narrow animations; may be repeated.' },
+  { name: 'advanced', kind: 'boolean', description: 'Include advanced new-item guidance.' },
+  { name: 'from-audit', kind: 'value', valueLabel: 'report', description: 'Scaffold from a complete animation audit JSON report.' },
+  { name: 'item', kind: 'repeatable', valueLabel: 'item-id', description: 'Select an audited item; may be repeated.' },
+];
+
 const COMMAND_SPECS: readonly CommandSpec[] = [
   {
     command: [],
@@ -80,6 +122,121 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
       'lpc-toolkit character search hero --type hair --query braid --limit 20 --json',
       'lpc-toolkit catalog item hair_braid --json',
     ],
+  },
+  {
+    command: ['asset'],
+    usage: 'lpc-toolkit asset <command>',
+    description: 'Author, package, install, inspect, and diagnose attributed artist asset packs.',
+    options: [HELP_OPTION],
+    examples: [
+      'lpc-toolkit asset workspace init ./my-lpc-art',
+      'lpc-toolkit asset validate ./artist-packs/acme.hair',
+      'lpc-toolkit asset install ./dist/acme.hair-1.0.0.lpc-assets.zip',
+      'lpc-toolkit asset doctor --json',
+    ],
+  },
+  {
+    command: ['asset', 'workspace'],
+    usage: 'lpc-toolkit asset workspace <command>',
+    description: 'Create and inspect standalone artist workspaces.',
+    options: [HELP_OPTION],
+    examples: ['lpc-toolkit asset workspace init ./my-lpc-art'],
+  },
+  {
+    command: ['asset', 'workspace', 'init'],
+    usage: 'lpc-toolkit asset workspace init <directory>',
+    description: 'Initialize a standalone artist asset workspace without preparing base assets.',
+    options: [HELP_OPTION, JSON_OPTION],
+    examples: ['lpc-toolkit asset workspace init ./my-lpc-art'],
+  },
+  {
+    command: ['asset', 'init'],
+    usage: 'lpc-toolkit asset init (--new | --from-audit <report>) [options]',
+    description: 'Scaffold a new or audit-derived artist asset pack.',
+    options: [HELP_OPTION, JSON_OPTION, ...ASSET_SCAFFOLD_OPTIONS],
+    examples: [
+      'lpc-toolkit asset init --new --pack-id acme.hair --asset-id moon-braid --display-name "ACME Hair" --type hair --body-type male --animation walk --author Alice --license "CC-BY-SA 4.0" --url https://example.com/acme/hair',
+      'lpc-toolkit asset init --from-audit audit.json --item hair_braid --pack-id acme.audit --display-name "ACME Audit" --author Alice --license "CC-BY-SA 4.0" --url https://example.com/acme/audit',
+    ],
+  },
+  {
+    command: ['asset', 'validate'],
+    usage: 'lpc-toolkit asset validate <pack-directory>',
+    description: 'Validate an artist asset pack, its PNGs, and its attribution.',
+    options: [HELP_OPTION, JSON_OPTION, ASSET_WORKSPACE_OPTION],
+    examples: ['lpc-toolkit asset validate ./artist-packs/acme.hair --json'],
+  },
+  {
+    command: ['asset', 'preview'],
+    usage: 'lpc-toolkit asset preview <pack-directory> [options]',
+    description: 'Render an attributed preview without changing active workspace output.',
+    options: [
+      HELP_OPTION,
+      JSON_OPTION,
+      ASSET_WORKSPACE_OPTION,
+      { name: 'asset', kind: 'value', valueLabel: 'local-id', description: 'Preview this pack asset.' },
+      { name: 'animation', kind: 'value', valueLabel: 'name', description: 'Preview this animation.' },
+      { name: 'body-type', kind: 'value', valueLabel: 'type', description: 'Preview this body type.' },
+      { name: 'character', kind: 'value', valueLabel: 'selection.json', description: 'Use this character selection for overlap testing.' },
+    ],
+    examples: [
+      'lpc-toolkit asset preview ./artist-packs/acme.hair --asset moon-braid --animation walk',
+    ],
+  },
+  {
+    command: ['asset', 'sync'],
+    usage: 'lpc-toolkit asset sync <pack-directory>',
+    description: 'Link an artist pack and rebuild the managed workspace overlay.',
+    options: [HELP_OPTION, JSON_OPTION, ASSET_WORKSPACE_OPTION],
+    examples: ['lpc-toolkit asset sync ./artist-packs/acme.hair --json'],
+  },
+  {
+    command: ['asset', 'pack'],
+    usage: 'lpc-toolkit asset pack <pack-directory> [--workspace <directory>] [--json]',
+    description: 'Validate and publish a deterministic asset-pack archive.',
+    options: [HELP_OPTION, JSON_OPTION, ASSET_WORKSPACE_OPTION],
+    examples: [
+      'lpc-toolkit asset pack ./artist-packs/acme.hair --workspace ./my-lpc-art --json',
+    ],
+  },
+  {
+    command: ['asset', 'inspect'],
+    usage: 'lpc-toolkit asset inspect <pack.lpc-assets.zip> [--json]',
+    description: 'Inspect and validate an asset-pack archive, including draft status, without installing it.',
+    options: [HELP_OPTION, JSON_OPTION],
+    examples: [
+      'lpc-toolkit asset inspect ./acme.hair-1.0.0.lpc-assets.zip --json',
+    ],
+  },
+  {
+    command: ['asset', 'install'],
+    usage: 'lpc-toolkit asset install <pack.lpc-assets.zip> [--workspace <directory>] [--json]',
+    description: 'Install or update a verified asset-pack archive. Draft archives are rejected.',
+    options: [HELP_OPTION, JSON_OPTION, ASSET_WORKSPACE_OPTION],
+    examples: [
+      'lpc-toolkit asset install ./acme.hair-1.0.0.lpc-assets.zip --workspace ./my-lpc-art --json',
+    ],
+  },
+  {
+    command: ['asset', 'list'],
+    usage: 'lpc-toolkit asset list [--workspace <directory>] [--json]',
+    description: 'List active linked and installed asset packs.',
+    options: [HELP_OPTION, JSON_OPTION, ASSET_WORKSPACE_OPTION],
+    examples: ['lpc-toolkit asset list --workspace ./my-lpc-art --json'],
+  },
+  {
+    command: ['asset', 'remove'],
+    usage: 'lpc-toolkit asset remove <pack-id> [--workspace <directory>] [--json]',
+    description: 'Deactivate an asset pack and rebuild managed output.',
+    options: [HELP_OPTION, JSON_OPTION, ASSET_WORKSPACE_OPTION],
+    examples: ['lpc-toolkit asset remove acme.hair --workspace ./my-lpc-art --json'],
+  },
+  {
+    command: ['asset', 'doctor'],
+    usage: 'lpc-toolkit asset doctor [--workspace <directory>] [--json]',
+    description: 'Audit asset-pack lifecycle state and narrowly recover interrupted publication.',
+    options: [HELP_OPTION, JSON_OPTION, ASSET_WORKSPACE_OPTION],
+    examples: ['lpc-toolkit asset doctor --workspace ./my-lpc-art --json'],
   },
   {
     command: ['catalog'],

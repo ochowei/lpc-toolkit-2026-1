@@ -51,4 +51,36 @@ describe('parseArgs', () => {
       positionals: ['hero'],
     });
   });
+
+  it('parses only asset workspace init as a three-token command', () => {
+    expect(parseArgs(['asset', 'workspace', 'init', './artist-workspace'])).toEqual({
+      command: ['asset', 'workspace', 'init'],
+      flags: new Map(),
+      positionals: ['./artist-workspace'],
+    });
+
+    expect(parseArgs(['asset', 'validate', './artist-packs/acme.hair'])).toEqual({
+      command: ['asset', 'validate'],
+      flags: new Map(),
+      positionals: ['./artist-packs/acme.hair'],
+    });
+  });
+
+  it('keeps existing two-token commands and their positionals unchanged', () => {
+    expect(parseArgs(['character', 'set', 'hero', '--type', 'hair'])).toEqual({
+      command: ['character', 'set'],
+      flags: new Map([['type', 'hair']]),
+      positionals: ['hero'],
+    });
+  });
+
+  it('parses new and advanced as boolean asset scaffold flags', () => {
+    expect(parseArgs([
+      'asset', 'init', '--new', '--advanced', '--pack-id', 'acme.hair',
+    ]).flags).toEqual(new Map<string, FlagValue>([
+      ['new', true],
+      ['advanced', true],
+      ['pack-id', 'acme.hair'],
+    ]));
+  });
 });

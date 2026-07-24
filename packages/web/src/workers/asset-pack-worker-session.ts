@@ -1,0 +1,1028 @@
+import {
+  assetPackContentProjection,
+  assetPackSourceFromNormalized,
+  compileAssetPacks,
+  normalizeAssetPack,
+  parseAssetPackSource,
+  validateAssetPack,
+  type AssetPackAcknowledgement,
+  type AssetPackBaseline,
+  type AssetPackDiagnostic,
+  type AssetPackSource,
+  type NormalizedAssetPack,
+} from '@lpc-toolkit/core';
+import {
+  ASSET_PACK_ARCHIVE_LIMITS,
+  ASSET_PACK_CHECKSUMS_SCHEMA,
+  canonicalizeJsonValue,
+  checkAssetPackCompatibility,
+  createAssetPackArchive,
+  encodeCanonicalJson,
+  inspectAssetPackArchiveBytes,
+  inspectAssetPackSourceBytes,
+  type AssetPackArchiveDiagnostic,
+  type AssetPackFormatRuntime,
+  type AssetPackPngDecoder,
+  type AssetPackSha256,
+} from '@lpc-toolkit/asset-pack-format';
+import { createBrowserAssetPackFormatRuntime } from '../adapter/asset-pack-format-runtime';
+import { browserAssetPackPngDecoderDefault } from '../adapter/asset-pack-png-decoder';
+import type {
+  AssetPackSourceSummary,
+  AssetPackWorkerBaseline,
+  AssetPackWorkerRequest,
+  AssetPackWorkerResponse,
+  AssetPackWorkerUploadMetadata,
+  AssetPackWorkbenchDiagnostic,
+  AssetPackWorkbenchRevision,
+} from '../lib/asset-pack-worker-protocol';
+
+type ManifestRequest = Omit<Extract<AssetPackWorkerRequest, { readonly type: 'replace-manifest' }>, 'type'>;
+type SourceRequest = Omit<Extract<AssetPackWorkerRequest, { readonly type: 'replace-source' }>, 'type'>;
+type RemoveRequest = Omit<Extract<AssetPackWorkerRequest, { readonly type: 'remove-source' }>, 'type'>;
+type AssembleRequest = Omit<Extract<AssetPackWorkerRequest, { readonly type: 'assemble' }>, 'type'>;
+
+export interface AssetPackWorkerSession {
+  readonly replaceManifest: (request: ManifestRequest) => Promise<readonly AssetPackWorkerResponse[]>;
+  readonly replaceSource: (request: SourceRequest) => Promise<readonly AssetPackWorkerResponse[]>;
+  readonly removeSource: (request: RemoveRequest) => Promise<readonly AssetPackWorkerResponse[]>;
+  readonly assemble: (request: AssembleRequest) => Promise<readonly AssetPackWorkerResponse[]>;
+}
+
+export interface OpenAssetPackWorkerSessionOptions {
+  readonly file: File;
+  readonly baseline: AssetPackWorkerBaseline;
+  readonly runtime?: AssetPackFormatRuntime;
+  readonly decoder?: AssetPackPngDecoder;
+  readonly requestId: number;
+}
+
+export interface OpenAssetPackWorkerSessionResult {
+  readonly session?: AssetPackWorkerSession;
+  readonly responses: readonly AssetPackWorkerResponse[];
+}
+
+interface SessionState {
+  manifestText: string;
+  sourceBytes: Map<string, Uint8Array>;
+  revision: number;
+  archiveDiagnostics: readonly AssetPackWorkbenchDiagnostic[];
+  uploadMetadata: AssetPackWorkerUploadMetadata;
+  formalCandidateBytes?: Uint8Array;
+  workbench: AssetPackWorkbenchRevision;
+}
+
+interface Evaluation {
+  readonly workbench: AssetPackWorkbenchRevision;
+  readonly manifestDocument?: Readonly<Record<string, unknown>>;
+  readonly pack?: NormalizedAssetPack;
+  readonly formalCandidateBytes?: Uint8Array;
+}
+
+const DIAGNOSTIC_SEVERITY_ORDER: Readonly<Record<AssetPackWorkbenchDiagnostic['severity'], number>> = {
+  error: 0,
+  warning: 1,
+  info: 2,
+};
+
+export async function openAssetPackWorkerSession(
+  options: OpenAssetPackWorkerSessionOptions,
+): Promise<OpenAssetPackWorkerSessionResult> {
+  const runtime = options.runtime ?? createBrowserAssetPackFormatRuntime();
+  const decoder = options.decoder ?? browserAssetPackPngDecoderDefault;
+  if (options.file.size > ASSET_PACK_ARCHIVE_LIMITS.archiveBytes) {
+    return {
+      responses: [unsafeResponse(options.requestId, [{
+        code: 'asset_archive_limit_exceeded',
+        severity: 'error',
+        message: `Archive exceeds the ${String(ASSET_PACK_ARCHIVE_LIMITS.archiveBytes)}-byte encoded limit.`,
+        scope: 'archive',
+      }])],
+    };
+  }
+
+  const archiveBytes = new Uint8Array(await options.file.arrayBuffer());
+  const inspected = await inspectAssetPackArchiveBytes({ archiveBytes, runtime });
+  if (inspected.kind === 'unsafe') {
+    return {
+      responses: [unsafeResponse(options.requestId, inspected.diagnostics.map(archiveDiagnostic))],
+    };
+  }
+
+  const snapshot = inspected.snapshot;
+  const manifestText = snapshot.manifestBytes
+    ? decodeManifestText(snapshot.manifestBytes)
+    : '{}';
+  const uploadMetadata = createUploadMetadata(
+    snapshot.archiveDigest,
+    options.baseline.releaseTag,
+    snapshot.manifestDocument,
+    inspected.kind === 'verified' ? inspected.snapshot.payload.pack.version : undefined,
+    inspected.kind === 'verified' ? inspected.snapshot.payload.pack.status : undefined,
+  );
+  const state: SessionState = {
+    manifestText,
+    sourceBytes: copyBytes(snapshot.sourceBytes),
+    revision: 0,
+    archiveDiagnostics: inspected.diagnostics.map(archiveDiagnostic),
+    uploadMetadata,
+    workbench: emptyWorkbench(manifestText, uploadMetadata),
+  };
+  const session = createSession(state, options.baseline, runtime, decoder);
+  state.workbench = (await session.evaluate(0)).workbench;
+  return {
+    session,
+    responses: [editingResponse(options.requestId, state.workbench)],
+  };
+}
+
+export function createAssetPackWorkerSession(options: {
+  readonly baseline: AssetPackWorkerBaseline;
+  readonly manifestText: string;
+  readonly sourceBytes?: ReadonlyMap<string, Uint8Array>;
+  readonly archiveDigest?: AssetPackSha256;
+  readonly uploadedFormal?: boolean;
+  readonly uploadedVersion?: string;
+  readonly runtime?: AssetPackFormatRuntime;
+  readonly decoder?: AssetPackPngDecoder;
+}): AssetPackWorkerSession & {
+  readonly evaluate: (revision: number) => Promise<Evaluation>;
+} {
+  const runtime = options.runtime ?? createBrowserAssetPackFormatRuntime();
+  const decoder = options.decoder ?? browserAssetPackPngDecoderDefault;
+  const uploadMetadata = createUploadMetadata(
+    options.archiveDigest ?? 'sha256:'.concat('0'.repeat(64)) as AssetPackSha256,
+    options.baseline.releaseTag,
+    undefined,
+    options.uploadedVersion,
+    undefined,
+    options.uploadedFormal ? 'formal' : undefined,
+  );
+  const state: SessionState = {
+    manifestText: options.manifestText,
+    sourceBytes: copyBytes(options.sourceBytes ?? new Map()),
+    revision: 0,
+    archiveDiagnostics: [],
+    uploadMetadata,
+    workbench: emptyWorkbench(options.manifestText, uploadMetadata),
+  };
+  return createSession(state, options.baseline, runtime, decoder);
+}
+
+function createSession(
+  state: SessionState,
+  baseline: AssetPackWorkerBaseline,
+  runtime: AssetPackFormatRuntime,
+  decoder: AssetPackPngDecoder,
+): AssetPackWorkerSession & { readonly evaluate: (revision: number) => Promise<Evaluation> } {
+  let mutationTail: Promise<void> = Promise.resolve();
+  const enqueue = <T>(operation: () => Promise<T>): Promise<T> => {
+    const result = mutationTail.then(operation, operation);
+    mutationTail = result.then(() => undefined, () => undefined);
+    return result;
+  };
+
+  const evaluate = async (revision: number): Promise<Evaluation> => {
+    const evaluation = await evaluateState(state, revision, baseline, runtime, decoder);
+    state.workbench = evaluation.workbench;
+    if (evaluation.formalCandidateBytes) state.formalCandidateBytes = evaluation.formalCandidateBytes;
+    else delete state.formalCandidateBytes;
+    return evaluation;
+  };
+
+  const editGuard = (requestId: number, revision: number): readonly AssetPackWorkerResponse[] | undefined => {
+    if (revision === state.revision + 1) return undefined;
+    return [failedResponse(requestId, revision, {
+      code: 'asset_worker_stale_revision',
+      severity: 'error',
+      message: `Stale asset-pack Worker revision ${String(revision)}; current revision is ${String(state.revision)}.`,
+      scope: 'release',
+      details: { currentRevision: state.revision, requestedRevision: revision },
+    })];
+  };
+
+  const replaceManifest = (request: ManifestRequest): Promise<readonly AssetPackWorkerResponse[]> =>
+    enqueue(async () => {
+      const rejected = editGuard(request.requestId, request.revision);
+      if (rejected) return rejected;
+      const governanceError = await validateManifestGovernance(request, state, baseline, runtime, decoder);
+      if (governanceError) return [failedResponse(request.requestId, request.revision, governanceError)];
+      state.manifestText = request.manifestText;
+      state.revision = request.revision;
+      state.archiveDiagnostics = [];
+      const evaluation = await evaluate(request.revision);
+      return [editingResponse(request.requestId, evaluation.workbench)];
+    });
+
+  const replaceSource = (request: SourceRequest): Promise<readonly AssetPackWorkerResponse[]> =>
+    enqueue(async () => {
+      const rejected = editGuard(request.requestId, request.revision);
+      if (rejected) return rejected;
+      const pathError = validateSourcePath(request.path, runtime);
+      if (pathError) return [failedResponse(request.requestId, request.revision, pathError)];
+      const preflightError = validateSourceReplacementLimits(
+        state.sourceBytes,
+        request.path,
+        request.file.size,
+        runtime,
+      );
+      if (preflightError) return [failedResponse(request.requestId, request.revision, preflightError)];
+
+      const bytes = new Uint8Array(await request.file.arrayBuffer());
+      if (bytes.byteLength > ASSET_PACK_ARCHIVE_LIMITS.entryBytes) {
+        return [failedResponse(request.requestId, request.revision, sourceEntryLimitDiagnostic(request.path))];
+      }
+      const nextSourceBytes = new Map(state.sourceBytes);
+      nextSourceBytes.set(request.path, new Uint8Array(bytes));
+      if (!isSerializableSources(nextSourceBytes, runtime)) {
+        return [failedResponse(request.requestId, request.revision, sourceTotalLimitDiagnostic(request.path))];
+      }
+      state.sourceBytes = nextSourceBytes;
+      state.revision = request.revision;
+      state.archiveDiagnostics = [];
+      const evaluation = await evaluate(request.revision);
+      return [editingResponse(request.requestId, evaluation.workbench)];
+    });
+
+  const removeSource = (request: RemoveRequest): Promise<readonly AssetPackWorkerResponse[]> =>
+    enqueue(async () => {
+      const rejected = editGuard(request.requestId, request.revision);
+      if (rejected) return rejected;
+      state.sourceBytes.delete(request.path);
+      state.revision = request.revision;
+      state.archiveDiagnostics = [];
+      const evaluation = await evaluate(request.revision);
+      return [editingResponse(request.requestId, evaluation.workbench)];
+    });
+
+  const assemble = (request: AssembleRequest): Promise<readonly AssetPackWorkerResponse[]> => enqueue(async () => {
+    if (request.kind === 'formal') {
+      if (request.revision !== state.revision
+        || !state.formalCandidateBytes
+        || state.workbench.formalCandidate?.revision !== request.revision) {
+        return [failedResponse(request.requestId, request.revision, {
+          code: 'candidate-not-verified',
+          severity: 'error',
+          message: 'The current revision has no verified formal archive candidate.',
+          scope: 'release',
+        })];
+      }
+      const candidateBytes = new Uint8Array(state.formalCandidateBytes);
+      return [assembledResponse(
+        request,
+        candidateBytes,
+        state.workbench.formalCandidate.archiveDigest,
+        state.workbench.formalCandidate.filename,
+        state.workbench.formalCandidate.uploadMetadata,
+      )];
+    }
+    if (request.revision !== state.revision) {
+      return [failedResponse(request.requestId, request.revision, {
+        code: 'asset_worker_stale_revision',
+        severity: 'error',
+        message: `Cannot assemble stale revision ${String(request.revision)}.`,
+        scope: 'release',
+      })];
+    }
+
+    const document = parseJsonObject(state.manifestText);
+    if (!document) {
+      return [failedResponse(request.requestId, request.revision, {
+        code: 'asset_pack_manifest_json_invalid',
+        severity: 'error',
+        message: 'Draft archives require one JSON object manifest.',
+        scope: 'manifest',
+      })];
+    }
+    if (!state.workbench.draftSerializable) {
+      return [failedResponse(request.requestId, request.revision, {
+        code: 'asset_draft_not_serializable',
+        severity: 'error',
+        message: 'The current draft is not safely serializable.',
+        scope: 'release',
+      })];
+    }
+    try {
+      const created = await createAssetPackArchive({
+        kind: 'draft',
+        manifestDocument: assemblyManifestDocument(document, state.workbench.acknowledgementRecords),
+        sourceBytes: state.sourceBytes,
+        runtime,
+      });
+      return [assembledResponse(
+        request,
+        created.archiveBytes,
+        created.archiveDigest,
+        assetPackArchiveFilename(
+          typeof document.id === 'string' ? document.id : 'asset-pack',
+          typeof document.version === 'string' ? document.version : 'draft',
+          'draft',
+        ),
+        state.uploadMetadata,
+      )];
+    } catch (error) {
+      return [failedResponse(request.requestId, request.revision, {
+        code: 'asset_draft_assembly_failed',
+        severity: 'error',
+        message: error instanceof Error ? error.message : 'Draft archive assembly failed.',
+        scope: 'release',
+      })];
+    }
+  });
+
+  return { replaceManifest, replaceSource, removeSource, assemble, evaluate };
+}
+
+async function evaluateState(
+  state: SessionState,
+  revision: number,
+  baseline: AssetPackWorkerBaseline,
+  runtime: AssetPackFormatRuntime,
+  decoder: AssetPackPngDecoder,
+): Promise<Evaluation> {
+  const baseDiagnostics = [...state.archiveDiagnostics];
+  const parsedJson = parseJsonValue(state.manifestText);
+  if (!parsedJson.ok) {
+    const diagnostics = sortDiagnostics([
+      ...baseDiagnostics,
+      manifestJsonDiagnostic(state.manifestText),
+    ]);
+    return {
+      workbench: {
+        revision,
+        manifestText: state.manifestText,
+        uploadMetadata: state.uploadMetadata,
+        sourceSummaries: summarizeRawSources(state.sourceBytes),
+        diagnostics,
+        acknowledgementRecords: [],
+        draftSerializable: false,
+      },
+    };
+  }
+
+  const document = asJsonObject(parsedJson.value);
+  if (!document) {
+    const parsedManifest = parseAssetPackSource(parsedJson.value);
+    const diagnostics = sortDiagnostics([
+      ...baseDiagnostics,
+      ...(parsedManifest.ok ? [] : parsedManifest.diagnostics.map(coreDiagnostic)),
+    ]);
+    return {
+      workbench: {
+        revision,
+        manifestText: state.manifestText,
+        uploadMetadata: state.uploadMetadata,
+        sourceSummaries: summarizeRawSources(state.sourceBytes),
+        diagnostics,
+        acknowledgementRecords: [],
+        draftSerializable: false,
+      },
+    };
+  }
+
+  const parsed = parseAssetPackSource(document);
+  if (!parsed.ok) {
+    const sourceDigests = await digestSources(state.sourceBytes, runtime);
+    const diagnostics = sortDiagnostics([
+      ...baseDiagnostics,
+      ...parsed.diagnostics.map(coreDiagnostic),
+    ]);
+    return {
+      workbench: {
+        revision,
+        manifestText: state.manifestText,
+        uploadMetadata: state.uploadMetadata,
+        sourceSummaries: summarizeRawSources(state.sourceBytes),
+        diagnostics,
+        acknowledgementRecords: [],
+        draftSerializable: await isDraftSerializable(document, state.sourceBytes, sourceDigests, runtime),
+      },
+    };
+  }
+
+  const pack = normalizeAssetPack(parsed.source);
+  const sourceUses = collectSourceUses(pack);
+  const sourceDigests = await digestSources(state.sourceBytes, runtime);
+  const inspections = await inspectAssetPackSourceBytes({
+    pack,
+    sourceBytes: state.sourceBytes,
+    sourceDigests,
+    decoder,
+  });
+  const contentDigest = await digestContent(pack, sourceDigests, runtime);
+  const validationBaseline: AssetPackBaseline = {
+    catalog: baseline.catalog,
+    definitionDigests: baseline.definitionDigests,
+    creditDigests: baseline.creditDigests,
+  };
+  const validation = validateAssetPack({
+    pack,
+    baseline: validationBaseline,
+    palettes: baseline.palettes,
+    inspections,
+    contentDigest,
+  });
+  const compatibility = checkAssetPackCompatibility(pack, baseline.cliVersion);
+  const compilePlan = compileAssetPacks({ baseline: validationBaseline, packs: [pack] });
+  const diagnostics = sortDiagnostics([
+    ...baseDiagnostics,
+    ...validation.diagnostics.map(coreDiagnostic),
+    ...compatibility.map(compatibilityDiagnostic),
+    ...compilePlan.diagnostics.map(coreDiagnostic),
+  ]);
+  const sourceSummaries = summarizeSources(sourceUses, state.sourceBytes, sourceDigests, inspections);
+  const hasErrors = diagnostics.some((diagnostic) => diagnostic.severity === 'error');
+  const currentAcknowledgements = mergeAcknowledgementCandidates(validation.acknowledgementRecords, pack.acknowledgements);
+  const draftSerializable = await isDraftSerializable(document, state.sourceBytes, sourceDigests, runtime);
+  const preview = hasErrors ? undefined : {
+    revision,
+    packId: pack.id,
+    compilePlan,
+    sources: compilePlan.sprites
+      .map((sprite) => {
+        const bytes = state.sourceBytes.get(sprite.sourcePath);
+        return bytes ? {
+          destinationPath: sprite.destinationPath,
+          sourcePath: sprite.sourcePath,
+          bytes: new Uint8Array(bytes),
+        } : undefined;
+      })
+      .filter((source): source is NonNullable<typeof source> => source !== undefined),
+  };
+  const releaseFingerprint = await digestRelease(pack, sourceDigests, runtime);
+  let formalCandidateBytes: Uint8Array | undefined;
+  let formalCandidate: AssetPackWorkbenchRevision['formalCandidate'];
+  const hasUnacknowledgedWarnings = validation.diagnostics.some((diagnostic) =>
+    diagnostic.severity === 'warning'
+    && !validation.acknowledgementRecords.some((candidate) =>
+      candidate.code === diagnostic.code
+      && JSON.stringify(candidate.subject) === JSON.stringify(diagnostic.subject)
+      && pack.acknowledgements.some((acknowledgement) =>
+        acknowledgement.code === candidate.code
+        && acknowledgement.contentDigest === candidate.contentDigest
+        && acknowledgement.reason.trim().length > 0
+        && JSON.stringify(acknowledgement.subject) === JSON.stringify(candidate.subject),
+      ),
+    ),
+  );
+  if (!hasErrors && !hasUnacknowledgedWarnings && pack.status === undefined && draftSerializable) {
+    try {
+      const assembled = await createAssetPackArchive({
+        kind: 'formal',
+        manifestDocument: assemblyManifestDocument(document, currentAcknowledgements),
+        sourceBytes: state.sourceBytes,
+        runtime,
+      });
+      if (assembled.inspection.kind === 'verified') {
+        formalCandidateBytes = new Uint8Array(assembled.archiveBytes);
+        formalCandidate = {
+          revision,
+          archiveDigest: assembled.archiveDigest,
+          filename: assetPackArchiveFilename(pack.id, pack.version, 'formal'),
+          version: pack.version,
+          byteIdenticalToUploadedFormal: state.uploadMetadata.uploadedStatus === 'formal'
+            && assembled.archiveDigest === state.uploadMetadata.originalArchiveDigest,
+          uploadMetadata: state.uploadMetadata,
+        };
+      }
+    } catch {
+      // Assembly diagnostics are represented by the missing candidate. Formal
+      // requests remain gated by candidate-not-verified.
+    }
+  }
+
+  return {
+    pack,
+    manifestDocument: document,
+    ...(formalCandidateBytes ? { formalCandidateBytes } : {}),
+    workbench: {
+      revision,
+      manifestText: state.manifestText,
+      uploadMetadata: state.uploadMetadata,
+      sourceSummaries,
+      diagnostics,
+      acknowledgementRecords: currentAcknowledgements,
+      contentDigest,
+      releaseFingerprint,
+      ...(preview ? { preview } : {}),
+      ...(formalCandidate ? { formalCandidate } : {}),
+      draftSerializable,
+    },
+  };
+}
+
+async function validateManifestGovernance(
+  request: ManifestRequest,
+  state: SessionState,
+  baseline: AssetPackWorkerBaseline,
+  runtime: AssetPackFormatRuntime,
+  decoder: AssetPackPngDecoder,
+): Promise<AssetPackWorkbenchDiagnostic | undefined> {
+  const proposed = parseJsonObject(request.manifestText);
+  const current = parseJsonObject(state.manifestText);
+  const proposedAcknowledgements = proposed?.acknowledgements;
+  const currentAcknowledgements = current?.acknowledgements;
+  if (request.origin !== 'acknowledgement') {
+    if ((!proposed || !current)
+      && (hasAcknowledgementValue(proposedAcknowledgements) || hasAcknowledgementValue(currentAcknowledgements))) {
+      return acknowledgementForbidden();
+    }
+    if (!proposed || !current) return undefined;
+    if (JSON.stringify(canonicalizeJsonValue(proposedAcknowledgements ?? []))
+      !== JSON.stringify(canonicalizeJsonValue(currentAcknowledgements ?? []))) {
+      return acknowledgementForbidden();
+    }
+    return undefined;
+  }
+
+  if (!proposed || !current) return acknowledgementForbidden();
+
+  const currentSession = createAssetPackWorkerSession({
+    baseline,
+    manifestText: state.manifestText,
+    sourceBytes: state.sourceBytes,
+    runtime,
+    decoder,
+  });
+  const currentEvaluation = await currentSession.evaluate(state.revision);
+  if (!currentEvaluation.pack || !currentEvaluation.workbench.contentDigest) return acknowledgementForbidden();
+
+  const proposedParsed = parseAssetPackSource(proposed);
+  if (!proposedParsed.ok) return acknowledgementForbidden();
+  const proposedPack = normalizeAssetPack(proposedParsed.source);
+  const currentSource = assetPackSourceFromNormalized(currentEvaluation.pack);
+  const proposedSource = assetPackSourceFromNormalized(proposedPack);
+  if (JSON.stringify(canonicalizeJsonValue(withoutAcknowledgements(currentSource)))
+    !== JSON.stringify(canonicalizeJsonValue(withoutAcknowledgements(proposedSource)))) {
+    return acknowledgementForbidden();
+  }
+
+  if (!Array.isArray(proposedAcknowledgements)) return acknowledgementForbidden();
+  const candidates = currentEvaluation.workbench.acknowledgementRecords;
+  const selected = new Set<string>();
+  for (const acknowledgement of proposedPack.acknowledgements) {
+    const candidate = candidates.find((entry) => acknowledgementKey(entry) === acknowledgementKey(acknowledgement));
+    if (!candidate || acknowledgement.reason.trim().length === 0) return acknowledgementForbidden();
+    const key = acknowledgementKey(candidate);
+    if (selected.has(key)) return acknowledgementForbidden();
+    selected.add(key);
+  }
+  return undefined;
+}
+
+function withoutAcknowledgements(
+  source: AssetPackSource,
+): Readonly<Record<string, unknown>> {
+  const { acknowledgements: _acknowledgements, ...without } = source;
+  return without;
+}
+
+function hasAcknowledgementValue(value: unknown): boolean {
+  return value !== undefined
+    && JSON.stringify(canonicalizeJsonValue(value)) !== JSON.stringify(canonicalizeJsonValue([]));
+}
+
+function acknowledgementKey(acknowledgement: AssetPackAcknowledgement): string {
+  return JSON.stringify(canonicalizeJsonValue({
+    code: acknowledgement.code,
+    subject: acknowledgement.subject,
+    contentDigest: acknowledgement.contentDigest,
+  }));
+}
+
+function collectSourceUses(pack: NormalizedAssetPack): ReadonlyMap<string, number> {
+  const uses = new Map<string, number>();
+  for (const asset of pack.assets) {
+    if (asset.kind === 'new-item') {
+      for (const layer of asset.layers) {
+        for (const sprite of layer.sprites) uses.set(sprite.source, (uses.get(sprite.source) ?? 0) + 1);
+      }
+    } else {
+      for (const animation of asset.addAnimations) {
+        for (const layer of animation.layers) uses.set(layer.source, (uses.get(layer.source) ?? 0) + 1);
+      }
+    }
+  }
+  return uses;
+}
+
+async function digestSources(
+  sourceBytes: ReadonlyMap<string, Uint8Array>,
+  runtime: AssetPackFormatRuntime,
+): Promise<ReadonlyMap<string, AssetPackSha256>> {
+  const digests = new Map<string, AssetPackSha256>();
+  for (const path of [...sourceBytes.keys()].sort()) {
+    digests.set(path, await runtime.sha256(sourceBytes.get(path)!));
+  }
+  return digests;
+}
+
+async function digestContent(
+  pack: NormalizedAssetPack,
+  sourceDigests: ReadonlyMap<string, AssetPackSha256>,
+  runtime: AssetPackFormatRuntime,
+): Promise<AssetPackSha256> {
+  return runtime.sha256(runtime.encodeUtf8(JSON.stringify({
+    manifest: assetPackContentProjection(pack),
+    sources: [...sourceDigests].map(([sourcePath, digest]) => ({ sourcePath, digest })),
+  })));
+}
+
+async function digestRelease(
+  pack: NormalizedAssetPack,
+  sourceDigests: ReadonlyMap<string, AssetPackSha256>,
+  runtime: AssetPackFormatRuntime,
+): Promise<AssetPackSha256> {
+  const source = assetPackSourceFromNormalized(pack);
+  const { version: _version, status: _status, ...releaseManifest } = source;
+  return runtime.sha256(runtime.encodeUtf8(JSON.stringify(canonicalizeJsonValue({
+    manifest: releaseManifest,
+    sources: [...sourceDigests].map(([sourcePath, digest]) => ({ sourcePath, digest })),
+  }))));
+}
+
+function summarizeSources(
+  uses: ReadonlyMap<string, number>,
+  sourceBytes: ReadonlyMap<string, Uint8Array>,
+  sourceDigests: ReadonlyMap<string, AssetPackSha256>,
+  inspections: readonly { readonly sourcePath: string; readonly regularFile: boolean; readonly decoded?: { readonly width: number; readonly height: number }; readonly error?: string }[],
+): readonly AssetPackSourceSummary[] {
+  const paths = new Set<string>([...uses.keys(), ...sourceBytes.keys()]);
+  const inspectionMap = new Map(inspections.map((inspection) => [inspection.sourcePath, inspection]));
+  return [...paths].sort().map((path) => {
+    const inspection = inspectionMap.get(path);
+    const bytes = sourceBytes.get(path);
+    const decoded = inspection?.decoded;
+    const referenced = uses.has(path);
+    const state = !referenced
+      ? 'unreferenced'
+      : !bytes
+        ? 'missing'
+        : inspection?.error || !inspection?.regularFile
+          ? 'invalid'
+          : 'ready';
+    return {
+      path,
+      referenced,
+      consumerCount: uses.get(path) ?? 0,
+      ...(bytes ? { byteLength: bytes.byteLength } : {}),
+      ...(sourceDigests.has(path) ? { digest: sourceDigests.get(path)! } : {}),
+      ...(decoded ? { width: decoded.width, height: decoded.height } : {}),
+      state,
+    } satisfies AssetPackSourceSummary;
+  });
+}
+
+function summarizeRawSources(sourceBytes: ReadonlyMap<string, Uint8Array>): readonly AssetPackSourceSummary[] {
+  return [...sourceBytes].sort(([left], [right]) => left.localeCompare(right)).map(([path, bytes]) => ({
+    path,
+    referenced: false,
+    consumerCount: 0,
+    byteLength: bytes.byteLength,
+    state: 'unreferenced',
+  }));
+}
+
+function mergeAcknowledgementCandidates(
+  candidates: readonly AssetPackAcknowledgement[],
+  current: readonly AssetPackAcknowledgement[],
+): readonly AssetPackAcknowledgement[] {
+  return candidates.map((candidate) => {
+    const existing = current.find((acknowledgement) =>
+      acknowledgement.code === candidate.code
+      && acknowledgement.contentDigest === candidate.contentDigest
+      && JSON.stringify(acknowledgement.subject) === JSON.stringify(candidate.subject),
+    );
+    return existing ? { ...candidate, reason: existing.reason } : candidate;
+  });
+}
+
+function assemblyManifestDocument(
+  document: Readonly<Record<string, unknown>>,
+  acknowledgements: readonly AssetPackAcknowledgement[],
+): Readonly<Record<string, unknown>> {
+  const { acknowledgements: _staleAcknowledgements, ...withoutAcknowledgements } = document;
+  return acknowledgements.length > 0
+    ? { ...withoutAcknowledgements, acknowledgements }
+    : withoutAcknowledgements;
+}
+
+function isSerializableSources(
+  sourceBytes: ReadonlyMap<string, Uint8Array>,
+  runtime: AssetPackFormatRuntime,
+): boolean {
+  if (sourceBytes.size > ASSET_PACK_ARCHIVE_LIMITS.entries - 2) return false;
+  let total = 0;
+  for (const [path, bytes] of sourceBytes) {
+    if (validateSourcePath(path, runtime) || bytes.byteLength > ASSET_PACK_ARCHIVE_LIMITS.entryBytes) return false;
+    total += bytes.byteLength;
+    if (total > ASSET_PACK_ARCHIVE_LIMITS.totalBytes) return false;
+  }
+  return true;
+}
+
+function isDraftSerializable(
+  document: Readonly<Record<string, unknown>>,
+  sourceBytes: ReadonlyMap<string, Uint8Array>,
+  sourceDigests: ReadonlyMap<string, AssetPackSha256>,
+  runtime: AssetPackFormatRuntime,
+): boolean {
+  if (sourceBytes.size + 2 > ASSET_PACK_ARCHIVE_LIMITS.entries) return false;
+
+  const manifestBytes = encodeCanonicalJson(
+    { ...document, status: 'draft' },
+    runtime.encodeUtf8,
+  );
+  if (manifestBytes.byteLength > ASSET_PACK_ARCHIVE_LIMITS.manifestBytes
+    || manifestBytes.byteLength > ASSET_PACK_ARCHIVE_LIMITS.entryBytes) {
+    return false;
+  }
+
+  let sourceTotal = 0;
+  const checksumRows: { readonly path: string; readonly size: number; readonly sha256: AssetPackSha256 }[] = [{
+    path: 'asset-pack.json',
+    size: manifestBytes.byteLength,
+    sha256: 'sha256:'.concat('0'.repeat(64)) as AssetPackSha256,
+  }];
+  for (const [path, bytes] of [...sourceBytes].sort(([left], [right]) => left.localeCompare(right))) {
+    if (validateSourcePath(path, runtime) || bytes.byteLength > ASSET_PACK_ARCHIVE_LIMITS.entryBytes) return false;
+    const digest = sourceDigests.get(path);
+    if (!digest) return false;
+    sourceTotal += bytes.byteLength;
+    if (sourceTotal > ASSET_PACK_ARCHIVE_LIMITS.totalBytes) return false;
+    checksumRows.push({ path, size: bytes.byteLength, sha256: digest });
+  }
+
+  const checksumsBytes = encodeCanonicalJson({
+    schema: ASSET_PACK_CHECKSUMS_SCHEMA,
+    files: checksumRows,
+  }, runtime.encodeUtf8);
+  if (checksumsBytes.byteLength > ASSET_PACK_ARCHIVE_LIMITS.entryBytes) return false;
+  return manifestBytes.byteLength + checksumsBytes.byteLength + sourceTotal
+    <= ASSET_PACK_ARCHIVE_LIMITS.totalBytes;
+}
+
+function validateSourcePath(
+  sourcePath: string,
+  runtime: AssetPackFormatRuntime,
+): AssetPackWorkbenchDiagnostic | undefined {
+  if (runtime.encodeUtf8(sourcePath).byteLength > ASSET_PACK_ARCHIVE_LIMITS.pathBytes) {
+    return {
+      code: 'asset_archive_limit_exceeded',
+      severity: 'error',
+      message: `Source path exceeds the ${String(ASSET_PACK_ARCHIVE_LIMITS.pathBytes)}-byte limit.`,
+      scope: 'source',
+      path: sourcePath,
+    };
+  }
+  const segments = sourcePath.split('/');
+  const unsafe = sourcePath !== sourcePath.trim()
+    || !sourcePath.startsWith('sprites/')
+    || sourcePath.startsWith('/')
+    || /^[A-Za-z]:/u.test(sourcePath)
+    || sourcePath.includes('\\')
+    || /[\u0000-\u001f\u007f]/u.test(sourcePath)
+    || segments.some((segment) =>
+      segment.length === 0
+      || segment === '.'
+      || segment === '..'
+      || /[<>:"|?*]/u.test(segment)
+      || /[. ]$/u.test(segment)
+      || /^(con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])(?:\..*)?$/iu.test(segment));
+  if (unsafe) {
+    return {
+      code: 'asset_archive_unsafe',
+      severity: 'error',
+      message: `Unsafe source path: ${sourcePath}.`,
+      scope: 'source',
+      path: sourcePath,
+    };
+  }
+  return undefined;
+}
+
+function validateSourceReplacementLimits(
+  sourceBytes: ReadonlyMap<string, Uint8Array>,
+  sourcePath: string,
+  fileSize: number,
+  runtime: AssetPackFormatRuntime,
+): AssetPackWorkbenchDiagnostic | undefined {
+  if (fileSize > ASSET_PACK_ARCHIVE_LIMITS.entryBytes) return sourceEntryLimitDiagnostic(sourcePath);
+  const existingSize = sourceBytes.get(sourcePath)?.byteLength ?? 0;
+  if (!sourceBytes.has(sourcePath) && sourceBytes.size >= ASSET_PACK_ARCHIVE_LIMITS.entries - 2) {
+    return sourceTotalLimitDiagnostic(sourcePath);
+  }
+  if (sourceTotalBytes(sourceBytes) - existingSize + fileSize > ASSET_PACK_ARCHIVE_LIMITS.totalBytes) {
+    return sourceTotalLimitDiagnostic(sourcePath);
+  }
+  return validateSourcePath(sourcePath, runtime);
+}
+
+function sourceTotalBytes(sourceBytes: ReadonlyMap<string, Uint8Array>): number {
+  let total = 0;
+  for (const bytes of sourceBytes.values()) total += bytes.byteLength;
+  return total;
+}
+
+function sourceEntryLimitDiagnostic(sourcePath: string): AssetPackWorkbenchDiagnostic {
+  return {
+    code: 'asset_archive_limit_exceeded',
+    severity: 'error',
+    message: `Source exceeds the ${String(ASSET_PACK_ARCHIVE_LIMITS.entryBytes)}-byte entry limit.`,
+    scope: 'source',
+    path: sourcePath,
+  };
+}
+
+function sourceTotalLimitDiagnostic(sourcePath: string): AssetPackWorkbenchDiagnostic {
+  return {
+    code: 'asset_archive_limit_exceeded',
+    severity: 'error',
+    message: 'Source replacements exceed the asset-pack entry or total byte limits.',
+    scope: 'source',
+    path: sourcePath,
+  };
+}
+
+function parseJsonValue(text: string): { readonly ok: true; readonly value: unknown } | { readonly ok: false } {
+  try {
+    return { ok: true, value: JSON.parse(text) as unknown };
+  } catch {
+    return { ok: false };
+  }
+}
+
+function asJsonObject(value: unknown): Readonly<Record<string, unknown>> | undefined {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as Readonly<Record<string, unknown>>
+    : undefined;
+}
+
+function parseJsonObject(text: string): Readonly<Record<string, unknown>> | undefined {
+  const parsed = parseJsonValue(text);
+  return parsed.ok ? asJsonObject(parsed.value) : undefined;
+}
+
+function decodeManifestText(bytes: Uint8Array): string {
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    return '';
+  }
+}
+
+function copyBytes(source: ReadonlyMap<string, Uint8Array>): Map<string, Uint8Array> {
+  return new Map([...source].map(([path, bytes]) => [path, new Uint8Array(bytes)] as const));
+}
+
+function emptyWorkbench(
+  manifestText: string,
+  uploadMetadata: AssetPackWorkerUploadMetadata,
+): AssetPackWorkbenchRevision {
+  return {
+    revision: 0,
+    manifestText,
+    uploadMetadata,
+    sourceSummaries: [],
+    diagnostics: [],
+    acknowledgementRecords: [],
+    draftSerializable: false,
+  };
+}
+
+function coreDiagnostic(diagnostic: AssetPackDiagnostic): AssetPackWorkbenchDiagnostic {
+  const scope = diagnostic.severity === 'warning'
+    ? 'warning'
+    : diagnostic.code.includes('credit') || diagnostic.code.includes('license')
+      ? 'credit'
+      : diagnostic.code.includes('source') || diagnostic.code.includes('png') || diagnostic.code.includes('geometry')
+        ? 'source'
+        : 'manifest';
+  return {
+    code: diagnostic.code,
+    severity: diagnostic.severity,
+    message: diagnostic.message,
+    scope,
+    ...(diagnostic.details?.path && typeof diagnostic.details.path === 'string' ? { path: diagnostic.details.path } : {}),
+    ...(diagnostic.subject ? { subject: diagnostic.subject } : {}),
+    details: {
+      ...(diagnostic.packId ? { packId: diagnostic.packId } : {}),
+      ...(diagnostic.assetId ? { assetId: diagnostic.assetId } : {}),
+      ...(diagnostic.sourcePath ? { sourcePath: diagnostic.sourcePath } : {}),
+      ...(diagnostic.destinationPath ? { destinationPath: diagnostic.destinationPath } : {}),
+      ...(diagnostic.details ?? {}),
+    },
+  };
+}
+
+function compatibilityDiagnostic(diagnostic: { readonly code: string; readonly severity: 'error' | 'warning'; readonly message: string; readonly details?: Readonly<Record<string, unknown>> }): AssetPackWorkbenchDiagnostic {
+  return {
+    code: diagnostic.code,
+    severity: diagnostic.severity,
+    message: diagnostic.message,
+    scope: 'release',
+    ...(diagnostic.details ? { details: diagnostic.details } : {}),
+  };
+}
+
+function archiveDiagnostic(diagnostic: AssetPackArchiveDiagnostic): AssetPackWorkbenchDiagnostic {
+  return {
+    code: diagnostic.code,
+    severity: 'error',
+    message: diagnostic.message,
+    scope: 'archive',
+    ...(diagnostic.path ? { path: diagnostic.path } : {}),
+    ...(diagnostic.details ? { details: diagnostic.details } : {}),
+  };
+}
+
+function manifestJsonDiagnostic(text: string): AssetPackWorkbenchDiagnostic {
+  let message = 'Asset-pack manifest is not valid JSON.';
+  try {
+    JSON.parse(text);
+  } catch (error) {
+    message = error instanceof Error ? error.message : message;
+  }
+  return { code: 'asset_pack_manifest_json_invalid', severity: 'error', message, scope: 'manifest', path: 'asset-pack.json' };
+}
+
+function sortDiagnostics(diagnostics: readonly AssetPackWorkbenchDiagnostic[]): readonly AssetPackWorkbenchDiagnostic[] {
+  return [...diagnostics].sort((left, right) =>
+    DIAGNOSTIC_SEVERITY_ORDER[left.severity] - DIAGNOSTIC_SEVERITY_ORDER[right.severity]
+    || left.code.localeCompare(right.code)
+    || (left.path ?? '').localeCompare(right.path ?? '')
+    || JSON.stringify(left.subject ?? {}).localeCompare(JSON.stringify(right.subject ?? {}))
+    || left.message.localeCompare(right.message),
+  );
+}
+
+function acknowledgementForbidden(): AssetPackWorkbenchDiagnostic {
+  return {
+    code: 'asset_acknowledgement_edit_forbidden',
+    severity: 'error',
+    message: 'Acknowledgements may only be changed through governed warning acknowledgement edits.',
+    scope: 'warning',
+  };
+}
+
+function unsafeResponse(requestId: number, diagnostics: readonly AssetPackWorkbenchDiagnostic[]): AssetPackWorkerResponse {
+  return { type: 'session', requestId, revision: 0, outcome: 'unsafe', diagnostics: sortDiagnostics(diagnostics) };
+}
+
+function editingResponse(requestId: number, workbench: AssetPackWorkbenchRevision): AssetPackWorkerResponse {
+  return { type: 'session', requestId, revision: workbench.revision, outcome: 'editing', workbench };
+}
+
+function failedResponse(requestId: number, revision: number, diagnostic: AssetPackWorkbenchDiagnostic): AssetPackWorkerResponse {
+  return { type: 'failed', requestId, revision, diagnostic };
+}
+
+function createUploadMetadata(
+  archiveDigest: AssetPackSha256,
+  baselineReleaseTag: string,
+  manifestDocument?: Readonly<Record<string, unknown>>,
+  verifiedVersion?: string,
+  verifiedStatus?: 'draft',
+  uploadedStatus?: AssetPackWorkerUploadMetadata['uploadedStatus'],
+): AssetPackWorkerUploadMetadata {
+  const version = verifiedVersion
+    ?? (typeof manifestDocument?.version === 'string' ? manifestDocument.version : undefined);
+  const status = uploadedStatus
+    ?? (verifiedVersion !== undefined
+      ? (verifiedStatus === 'draft' ? 'draft' : 'formal')
+      : manifestDocument?.status === 'draft'
+        ? 'draft'
+        : typeof manifestDocument?.version === 'string'
+          ? 'formal'
+          : undefined);
+  return {
+    originalArchiveDigest: archiveDigest,
+    ...(version ? { uploadedVersion: version } : {}),
+    ...(status ? { uploadedStatus: status } : {}),
+    baselineReleaseTag,
+  };
+}
+
+function assetPackArchiveFilename(packId: string, version: string, kind: 'draft' | 'formal'): string {
+  return `${packId}-${version}${kind === 'draft' ? '.draft' : ''}.lpc-assets.zip`;
+}
+
+function assembledResponse(
+  request: AssembleRequest,
+  bytes: Uint8Array,
+  digest: AssetPackSha256,
+  filename: string,
+  uploadMetadata: AssetPackWorkerUploadMetadata,
+): AssetPackWorkerResponse {
+  const copy = new Uint8Array(bytes);
+  return {
+    type: 'assembled',
+    requestId: request.requestId,
+    revision: request.revision,
+    kind: request.kind,
+    archiveBytes: copy.buffer,
+    archiveDigest: digest,
+    filename,
+    uploadMetadata,
+  };
+}

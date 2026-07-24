@@ -5,6 +5,10 @@ import { createCanvas } from '@napi-rs/canvas';
 import { describe, expect, it } from 'vitest';
 import { runCli } from '../src/main.js';
 import { formatHumanResponse } from '../src/response.js';
+import {
+  acknowledgeWarning,
+  createWarningAssetCommandFixture,
+} from './asset-command-warning-fixture.js';
 
 function makeCatalogCwd(): string {
   const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-human-'));
@@ -169,6 +173,413 @@ async function runHumanError(argv: readonly string[], cwd: string): Promise<stri
 }
 
 describe('human-readable CLI output', () => {
+  it('prints warning-only preview blocks and typed available values after acknowledgement', async () => {
+    const fixture = createWarningAssetCommandFixture();
+    const runPreview = async () => {
+      const stdout: string[] = [];
+      const stderr: string[] = [];
+      const code = await runCli([
+        'asset', 'preview', fixture.packRoot,
+        '--asset', 'missing',
+        '--workspace', fixture.workspace.root,
+      ], {
+        cwd: fixture.workspace.root,
+        stdout: (text) => stdout.push(text),
+        stderr: (text) => stderr.push(text),
+      }, {
+        prepareRuntimeAssets: async () => fixture.runtime,
+      });
+      return { code, stdout, stderr: stderr.join('') };
+    };
+
+    const blocked = await runPreview();
+    expect(blocked.code).toBe(1);
+    expect(blocked.stdout).toEqual([]);
+    expect(blocked.stderr).toContain('Warnings (1):');
+    expect(blocked.stderr).toContain('asset_path_inferred');
+
+    await acknowledgeWarning(fixture);
+    const acknowledged = await runPreview();
+    expect(acknowledged.code).toBe(1);
+    expect(acknowledged.stdout).toEqual([]);
+    expect(acknowledged.stderr).toContain('asset_preview_asset_not_found');
+    expect(acknowledged.stderr).toContain('Available: braid');
+  });
+
+  it('prints unavailable asset preview animation details', async () => {
+    const fixture = createWarningAssetCommandFixture();
+    await acknowledgeWarning(fixture);
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+
+    const code = await runCli([
+      'asset', 'preview', fixture.packRoot,
+      '--animation', 'run',
+      '--workspace', fixture.workspace.root,
+    ], {
+      cwd: fixture.workspace.root,
+      stdout: (text) => stdout.push(text),
+      stderr: (text) => stderr.push(text),
+    }, {
+      prepareRuntimeAssets: async () => fixture.runtime,
+    });
+
+    expect(code).toBe(1);
+    expect(stdout).toEqual([]);
+    expect(stderr.join('')).toBe(
+      'preview_animation_unavailable: The requested preview animation is unavailable. (run)\n'
+      + 'Available: walk, climb\n',
+    );
+  });
+
+  it('prints workspace and scaffold paths', () => {
+    expect(formatHumanResponse({
+      ok: true,
+      command: 'asset workspace init',
+      data: {
+        root: '/workspace',
+        configPath: '/workspace/lpc-asset-workspace.json',
+        packsRoot: '/workspace/artist-packs',
+        outputRoot: '/workspace/assets_custom',
+        stateRoot: '/workspace/.lpc-toolkit/asset-packs',
+        registryPath: '/workspace/.lpc-toolkit/asset-packs/registry.json',
+      },
+      warnings: [],
+      errors: [],
+    }, 'fallback\n')).toContain('Asset workspace initialized: /workspace');
+
+    const scaffold = formatHumanResponse({
+      ok: true,
+      command: 'asset init',
+      data: {
+        packRoot: '/workspace/artist-packs/acme.hair',
+        manifestPath: '/workspace/artist-packs/acme.hair/asset-pack.json',
+      },
+      warnings: [],
+      errors: [],
+    }, 'fallback\n');
+    expect(scaffold).toContain('Asset pack scaffolded: /workspace/artist-packs/acme.hair');
+    expect(scaffold).toContain(
+      'Manifest: /workspace/artist-packs/acme.hair/asset-pack.json',
+    );
+  });
+
+  it('groups asset validation errors and warnings with exact acknowledgement JSON', () => {
+    const acknowledgement = {
+      code: 'asset_path_inferred',
+      subject: {
+        assetId: 'hair_braid',
+        animation: 'climb',
+        bodyTypes: ['male'],
+      },
+      contentDigest: `sha256:${'a'.repeat(64)}`,
+      reason: '',
+    };
+    const output = formatHumanResponse({
+      ok: true,
+      command: 'asset validate',
+      data: {
+        schema: 'lpc-toolkit.asset-pack-validation.v1',
+        packId: 'acme.hair',
+        packDirectory: '/workspace/artist-packs/acme.hair',
+        contentDigest: `sha256:${'a'.repeat(64)}`,
+        valid: false,
+        diagnostics: [
+          {
+            code: 'asset_source_missing',
+            severity: 'error',
+            message: 'Source PNG is missing.',
+            sourcePath: 'sprites/hair/walk.png',
+          },
+          {
+            code: 'asset_path_inferred',
+            severity: 'warning',
+            message: 'Confirm the inferred destination.',
+            destinationPath: 'spritesheets/hair/braid/climb.png',
+          },
+        ],
+        acknowledgementRecords: [acknowledgement],
+      },
+      warnings: [],
+      errors: [],
+    }, 'fallback\n');
+
+    expect(output).toContain('Asset pack validation: invalid');
+    expect(output).toContain('Errors (1):');
+    expect(output).toContain(
+      '- asset_source_missing: Source PNG is missing. (sprites/hair/walk.png)',
+    );
+    expect(output).toContain('Warnings (1):');
+    expect(output).toContain(
+      '- asset_path_inferred: Confirm the inferred destination. (spritesheets/hair/braid/climb.png)',
+    );
+    expect(output).toContain('Acknowledgements (copy exact JSON and add a non-empty reason):');
+    expect(output).toContain(JSON.stringify([acknowledgement], null, 2));
+  });
+
+  it('prints attributed asset preview artifact and credit paths', () => {
+    const output = formatHumanResponse({
+      ok: true,
+      command: 'asset preview',
+      data: {
+        packId: 'acme.hair',
+        assetId: 'moon-braid',
+        artifacts: [
+          { type: 'preview', path: '/pack/previews/moon-braid.preview.png' },
+          { type: 'credits_txt', path: '/pack/previews/moon-braid.credits.txt' },
+          { type: 'credits_csv', path: '/pack/previews/moon-braid.credits.csv' },
+          { type: 'metadata', path: '/pack/previews/moon-braid.metadata.json' },
+        ],
+        warnings: [],
+        metadataPath: '/pack/previews/moon-braid.metadata.json',
+        outDir: '/pack/previews',
+      },
+      warnings: [],
+      errors: [],
+    }, 'fallback\n');
+
+    expect(output).toContain('Asset preview: acme.hair / moon-braid');
+    expect(output).toContain('Preview: /pack/previews/moon-braid.preview.png');
+    expect(output).toContain('Credits TXT: /pack/previews/moon-braid.credits.txt');
+    expect(output).toContain('Credits CSV: /pack/previews/moon-braid.credits.csv');
+    expect(output).toContain('Metadata: /pack/previews/moon-braid.metadata.json');
+  });
+
+  it('prints the linked pack digest, generated-file count, and workspace output', () => {
+    const output = formatHumanResponse({
+      ok: true,
+      command: 'asset sync',
+      data: {
+        packId: 'acme.hair',
+        contentDigest: `sha256:${'b'.repeat(64)}`,
+        generatedFileCount: 7,
+        outputPath: '/workspace/assets_custom',
+      },
+      warnings: [],
+      errors: [],
+    }, 'fallback\n');
+
+    expect(output).toContain('Asset pack synced: acme.hair');
+    expect(output).toContain(`Content digest: sha256:${'b'.repeat(64)}`);
+    expect(output).toContain('Generated files: 7');
+    expect(output).toContain('Workspace output: /workspace/assets_custom');
+  });
+
+  it('prints packaged archive identity, digests, and path', () => {
+    const output = formatHumanResponse({
+      ok: true,
+      command: 'asset pack',
+      data: {
+        packId: 'acme.hair',
+        version: '1.0.0',
+        archivePath: '/workspace/artist-packs/acme.hair-1.0.0.lpc-assets.zip',
+        archiveDigest: `sha256:${'a'.repeat(64)}`,
+        contentDigest: `sha256:${'b'.repeat(64)}`,
+        entryCount: 4,
+      },
+      warnings: [],
+      errors: [],
+    }, 'fallback\n');
+
+    expect(output).toContain('Asset pack archived: acme.hair 1.0.0');
+    expect(output).toContain(
+      'Archive: /workspace/artist-packs/acme.hair-1.0.0.lpc-assets.zip',
+    );
+    expect(output).toContain(`Archive digest: sha256:${'a'.repeat(64)}`);
+    expect(output).toContain(`Content digest: sha256:${'b'.repeat(64)}`);
+  });
+
+  it('groups inspection diagnostics and prints exact acknowledgement JSON', () => {
+    const acknowledgement = {
+      code: 'asset_optional_frame_blank',
+      subject: { assetId: 'moon-braid', animation: 'walk' },
+      contentDigest: `sha256:${'c'.repeat(64)}`,
+      reason: '',
+    };
+    const output = formatHumanResponse({
+      ok: true,
+      command: 'asset inspect',
+      data: {
+        schema: 'lpc-toolkit.asset-pack-inspection.v1',
+        archivePath: '/packs/acme.hair.lpc-assets.zip',
+        archiveDigest: `sha256:${'a'.repeat(64)}`,
+        packId: 'acme.hair',
+        version: '1.0.0',
+        status: 'draft',
+        contentDigest: `sha256:${'b'.repeat(64)}`,
+        valid: false,
+        entryCount: 4,
+        totalUncompressedBytes: 2048,
+        diagnostics: [
+          {
+            code: 'asset_checksum_invalid',
+            severity: 'error',
+            message: 'Checksum coverage is invalid.',
+            path: 'checksums.json',
+          },
+          {
+            code: 'asset_cli_version_incompatible',
+            severity: 'error',
+            message: 'CLI version is too old.',
+          },
+          {
+            code: 'asset_required_frame_blank',
+            severity: 'error',
+            message: 'A required frame is blank.',
+            path: 'sprites/moon-braid/walk.png',
+          },
+          {
+            code: 'asset_base_credit_changed',
+            severity: 'error',
+            message: 'Baseline credit changed.',
+          },
+        ],
+        acknowledgementRecords: [acknowledgement],
+      },
+      warnings: [],
+      errors: [],
+    }, 'fallback\n');
+
+    expect(output).toContain('Asset pack inspection: invalid');
+    expect(output).toContain('DRAFT');
+    expect(output).toContain('Archive diagnostics (1):');
+    expect(output).toContain('Compatibility diagnostics (1):');
+    expect(output).toContain('Pixel diagnostics (1):');
+    expect(output).toContain('Credit diagnostics (1):');
+    expect(output).toContain('Acknowledgements (copy exact JSON and add a non-empty reason):');
+    expect(output).toContain(JSON.stringify([acknowledgement], null, 2));
+  });
+
+  it('prints install action, source, and generated output', () => {
+    const output = formatHumanResponse({
+      ok: true,
+      command: 'asset install',
+      data: {
+        action: 'upgraded',
+        packId: 'acme.hair',
+        version: '2.0.0',
+        archiveDigest: `sha256:${'a'.repeat(64)}`,
+        installedDirectory: '/workspace/.lpc-toolkit/asset-packs/installed/acme.hair/2.0.0/digest',
+        outputPath: '/workspace/assets_custom',
+        generatedFileCount: 7,
+      },
+      warnings: [],
+      errors: [],
+    }, 'fallback\n');
+
+    expect(output).toContain('Asset pack install: upgraded acme.hair 2.0.0');
+    expect(output).toContain(
+      'Source: /workspace/.lpc-toolkit/asset-packs/installed/acme.hair/2.0.0/digest',
+    );
+    expect(output).toContain('Workspace output: /workspace/assets_custom');
+  });
+
+  it('prints stable asset list columns', () => {
+    const output = formatHumanResponse({
+      ok: true,
+      command: 'asset list',
+      data: {
+        recovery: 'none',
+        entries: [
+          {
+            packId: 'acme.hair',
+            version: '1.0.0',
+            displayName: 'ACME Hair',
+            kind: 'linked',
+            sourcePath: '/workspace/artist-packs/acme.hair',
+            contentDigest: `sha256:${'a'.repeat(64)}`,
+          },
+          {
+            packId: 'acme.hats',
+            version: '2.0.0',
+            displayName: 'ACME Hats',
+            kind: 'installed',
+            sourcePath: '/workspace/.lpc-toolkit/asset-packs/installed/acme.hats',
+            contentDigest: `sha256:${'b'.repeat(64)}`,
+            archiveDigest: `sha256:${'c'.repeat(64)}`,
+          },
+        ],
+      },
+      warnings: [],
+      errors: [],
+    }, 'fallback\n');
+
+    expect(output).toContain('PACK ID');
+    expect(output).toContain('VERSION');
+    expect(output).toContain('KIND');
+    expect(output).toContain('SOURCE');
+    expect(output).toContain('acme.hair');
+    expect(output).toContain('linked');
+    expect(output).toContain('/workspace/artist-packs/acme.hair');
+    expect(output).toContain('acme.hats');
+    expect(output).toContain('installed');
+  });
+
+  it('prints removed kind and remaining count', () => {
+    const output = formatHumanResponse({
+      ok: true,
+      command: 'asset remove',
+      data: {
+        packId: 'acme.hair',
+        removedKind: 'linked',
+        remainingPackIds: ['acme.hats'],
+        remainingCount: 1,
+        generatedFileCount: 3,
+      },
+      warnings: [],
+      errors: [],
+    }, 'fallback\n');
+
+    expect(output).toContain('Asset pack removed: acme.hair (linked)');
+    expect(output).toContain('Remaining packs: 1');
+  });
+
+  it('prints doctor recovery and grouped checks without broad repair guidance', () => {
+    const output = formatHumanResponse({
+      ok: true,
+      command: 'asset doctor',
+      data: {
+        schema: 'lpc-toolkit.asset-pack-doctor.v1',
+        healthy: false,
+        recovery: 'rolled-back',
+        checks: [
+          { code: 'asset_output_root_unowned', status: 'error', message: 'Output is unowned.' },
+          { code: 'asset_registry_migration_required', status: 'warning', message: 'Migration is required.' },
+          { code: 'asset_transaction_recovery', status: 'pass', message: 'Transaction rolled back.' },
+        ],
+        packs: [],
+      },
+      warnings: [],
+      errors: [],
+    }, 'fallback\n');
+
+    expect(output).toContain('Asset pack doctor: unhealthy');
+    expect(output).toContain('Recovery: rolled-back');
+    expect(output).toContain('Errors (1):');
+    expect(output).toContain('Warnings (1):');
+    expect(output).toContain('Passed checks (1):');
+    expect(output).not.toContain('--force');
+    expect(output).not.toContain('--repair');
+  });
+
+  it('prints warnings when they are the only reason an asset sync is blocked', () => {
+    const output = formatHumanResponse({
+      ok: false,
+      command: 'asset sync',
+      data: null,
+      warnings: [{
+        code: 'asset_path_inferred',
+        message: 'Persist the exact acknowledgement before synchronizing.',
+        path: 'spritesheets/hair/braid/climb.png',
+      }],
+      errors: [],
+    }, 'fallback\n');
+
+    expect(output).toContain('Warnings (1):');
+    expect(output).toContain('asset_path_inferred');
+    expect(output).toContain('Persist the exact acknowledgement before synchronizing.');
+  });
+
   it('uses singular item summary labels for a one-item animation audit', () => {
     const output = formatHumanResponse({
       ok: true,
