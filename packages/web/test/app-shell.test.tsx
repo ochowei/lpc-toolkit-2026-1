@@ -45,22 +45,37 @@ vi.mock('../src/components/asset-pack-workbench/harness', () => ({
 interface MockWindow {
   location: {
     pathname: string;
+    search: string;
     hash: string;
   };
   history: {
+    state: unknown;
     pushState: ReturnType<typeof vi.fn>;
+    replaceState: ReturnType<typeof vi.fn>;
+    go: ReturnType<typeof vi.fn>;
   };
   addEventListener: ReturnType<typeof vi.fn>;
   removeEventListener: ReturnType<typeof vi.fn>;
 }
 
-function setLocation(pathname: string): void {
+function setLocation(pathname: string, search = '', hash = ''): MockWindow {
   const mockWindow: MockWindow = {
-    location: { pathname, hash: '' },
+    location: { pathname, search, hash },
     history: {
+      state: undefined,
       pushState: vi.fn((_state: unknown, _title: string, path: string) => {
         mockWindow.location.pathname = path;
       }),
+      replaceState: vi.fn((state: unknown, _title: string, path?: string) => {
+        mockWindow.history.state = state;
+        if (path !== undefined) {
+          const url = new URL(path, 'http://localhost');
+          mockWindow.location.pathname = url.pathname;
+          mockWindow.location.search = url.search;
+          mockWindow.location.hash = url.hash;
+        }
+      }),
+      go: vi.fn(),
     },
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
@@ -68,6 +83,7 @@ function setLocation(pathname: string): void {
 
   vi.stubGlobal('window', mockWindow);
   vi.stubGlobal('document', { documentElement: { className: '' } });
+  return mockWindow;
 }
 
 describe('App shell routing', () => {
@@ -133,6 +149,22 @@ describe('App shell routing', () => {
     expect(mocks.loadPalettesFromUpstream).toHaveBeenCalledTimes(1);
     expect(mocks.bootstrapStateFromHash).toHaveBeenCalledTimes(1);
     expect(mocks.loadBrowserAssetPackBaseline).not.toHaveBeenCalled();
+  });
+
+  it('preserves the initial composer query and hash when tagging history state', () => {
+    const mockWindow = setLocation(
+      '/compose',
+      '?assetSource=zip&e2eProbe=1',
+      '#sex=male&body=Body_Color_light',
+    );
+
+    renderToStaticMarkup(<App />);
+
+    expect(mockWindow.location).toEqual({
+      pathname: '/compose',
+      search: '?assetSource=zip&e2eProbe=1',
+      hash: '#sex=male&body=Body_Color_light',
+    });
   });
 
   it('renders the asset-pack workbench and initializes only its baseline on /asset-packs', () => {

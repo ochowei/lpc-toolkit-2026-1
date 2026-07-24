@@ -126,7 +126,7 @@ function useAppPathname(): [string, (path: AppPath) => void, (blocker: Navigatio
   if (!ownerRef.current) {
     const initialHistoryIndex = readAppHistoryIndex(window.history.state) ?? 0;
     if (readAppHistoryIndex(window.history.state) === undefined && typeof window.history.replaceState === 'function') {
-      window.history.replaceState(appHistoryState(initialHistoryIndex), '', window.location.pathname);
+      window.history.replaceState(appHistoryState(initialHistoryIndex), '');
     }
     ownerRef.current = createAppNavigationOwner({
       initialPathname: pathname,
