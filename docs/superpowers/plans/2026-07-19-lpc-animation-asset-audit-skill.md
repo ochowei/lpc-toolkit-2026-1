@@ -1117,7 +1117,7 @@ must be `0.2.1`.
 
   - Product commits verified: `de309c83e50c5b71f6c18cbbe6cbf4ade017d537` (`feat(plugin): add bounded animation audit reader`), `bea40726feeac3d0cae0404536b39a969762c716` (`feat(plugin): add animation asset audit skill`), and `0e1b649687f3d8eff56c3ed6fbb5518e1afaee23` (`docs(plugin): publish animation audit workflow`). Their implementation notes and red/green command records are retained in Tasks 1–3 above.
   - Implementation: Reassessed the complete plugin, documentation impact, version references, and forbidden scope; no scoped defect required a product change.
-  - Final report: `.superpowers/sdd/task-4-report.md`.
+  - Final report: consolidated into this plan's Task 4 record.
 
 Update every completed checkbox in this plan. For each product task, record its
 full product commit hash, implementation note, and exact PASS/FAIL commands.

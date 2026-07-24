@@ -1343,7 +1343,7 @@ Expected: PASS.
 - [x] **Step 8: Commit product code**
 
   - Product/fix commits: `e9dea41eb6c6ada2ba71704bfb19b59169778e8c`, `2749644b3c937bcc54b04d87d37eba0a50d5ae0c`, `a41d2c1ad768f301463b6422449af5cc49f83acf`, `e1cf1a0ff92de2c2bdab6a0fef2aabdd59d5b4e5`, `a9d00ee85dece0da8f9820541edff3e6fb011dc4`, `19a0352c39870934cfc042785ffd012edc89df5c`, `b62539cc8dce1d35948e8a89b33e97c435194d7c`, `a6b4ec87fdcc844693a17df51c84ea5e14be2704`.
-  - Review: Final fresh reviewer APPROVED with no Critical, Important, or Minor findings in `.superpowers/sdd/task-8-review-final-7.md`.
+  - Review: Final fresh reviewer APPROVED with no Critical, Important, or Minor findings; the detailed review evidence is consolidated in this Task 8 record.
 
 ```sh
 rtk git add packages/cli/src/asset-pack-transaction.ts packages/cli/src/asset-pack-sync.ts packages/cli/test/asset-pack-transaction.test.ts packages/cli/test/asset-pack-sync.test.ts
@@ -1463,7 +1463,7 @@ Expected: PASS.
 
   - Product/fix commits: `4dd3def267dffbb866fd36c0e56416404200c58c`, `aa4ddb54fac919bbbe268643e1688c337b6185de`.
   - Documentation impact: No Task 9 public command surface changed; the plan's help/README/landing/architecture/engineering updates remain scheduled for the public CLI integration and final reassessment.
-  - Review: Final fresh reviewer APPROVED with no Critical, Important, or Minor findings in `.superpowers/sdd/task-9-review-final.md`.
+  - Review: Final fresh reviewer APPROVED with no Critical, Important, or Minor findings; the detailed review evidence is consolidated in this Task 9 record.
 
 ```sh
 rtk git add packages/cli/src/asset-pack-install.ts packages/cli/src/asset-workspace.ts packages/cli/test/asset-pack-install.test.ts
@@ -1567,7 +1567,7 @@ Expected: PASS.
 
   - Product/fix commits: `7384d437b6e495e3d56abd78915f7ac68189c7df`, `489c408650c2ba78d8a4207844d0d5e6c4c8b624`.
   - Documentation impact: No Task 10 public command surface changed; the plan's public CLI documentation updates remain scheduled for Task 11 and final reassessment.
-  - Review: Final fresh reviewer APPROVED with no Critical, Important, or Minor findings in `.superpowers/sdd/task-10-review-final.md`.
+  - Review: Final fresh reviewer APPROVED with no Critical, Important, or Minor findings; the detailed review evidence is consolidated in this Task 10 record.
 
 ```sh
 rtk git add packages/cli/src/asset-pack-remove.ts packages/cli/test/asset-pack-remove.test.ts
@@ -1660,7 +1660,7 @@ rtk git commit -m "feat(cli): diagnose asset lifecycle integrity"
 
 Then update this task's plan record and commit it separately.
 
-Product commits: `2f6da1f94f91366aa2b32ea982ab51d6f6cbe73f`, `dad7e6d64dc1267c4aacd14d9b2f14943c1af259`, `5408f1359eca0ade9ad09efb9e5fe6fde66f9133`, `a51c4fe933f0a01a659752ced2bd224762972d9a`, `52ca0071b1d1cdc9f88610fa773fc6b2a0ffcec5`, and `026b42331e2cc5ad896892ddbad2aec6ce3b2d5f`. Final independent review: `.superpowers/sdd/task-11-review-final-5.md` APPROVED with no findings.
+Product commits: `2f6da1f94f91366aa2b32ea982ab51d6f6cbe73f`, `dad7e6d64dc1267c4aacd14d9b2f14943c1af259`, `5408f1359eca0ade9ad09efb9e5fe6fde66f9133`, `a51c4fe933f0a01a659752ced2bd224762972d9a`, `52ca0071b1d1cdc9f88610fa773fc6b2a0ffcec5`, and `026b42331e2cc5ad896892ddbad2aec6ce3b2d5f`. Final independent review: APPROVED with no findings; the detailed review evidence is consolidated in this Task 11 record.
 
 CLI documentation impact: `help`, `cli-readme`, `root-readme`, `landing`, `architecture`, `engineering`, `releasing`, and `plugin` are N/A for this internal doctor service; Task 12 exposes and documents the public command surface.
 
@@ -1781,7 +1781,7 @@ rtk git commit -m "feat(cli): expose asset package lifecycle"
 
 Then update this task's plan record and commit it separately.
 
-Product commit: `1553474c20b109334bee5a5f555737e1712e1a08`. Final independent review: `.superpowers/sdd/task-12-review.md` APPROVED with no findings.
+Product commit: `1553474c20b109334bee5a5f555737e1712e1a08`. Final independent review: APPROVED with no findings; the detailed review evidence is consolidated in this Task 12 record.
 
 CLI documentation impact: `help` updated in this task; `cli-readme` and `root-readme` are deferred to Task 13's public lifecycle documentation; `landing`, `architecture`, `engineering`, `releasing`, and `plugin` are N/A because this task does not change those owned contracts or workflows.
 
@@ -2184,7 +2184,7 @@ plugin: N/A — no plugin contract or skill behavior changed
   - Plan-record-inclusive range after this separate record commit will contain
     66 commits and 69 changed paths, with 27,860 insertions and 1,678 deletions.
   - Review status: final fresh whole-branch reviewer APPROVED with no Critical
-    or Important findings in `.superpowers/sdd/final-whole-branch-review-5.md`.
+    or Important findings in the final whole-branch review record consolidated here.
     One Minor hardening note remains: output-marker ownership preflight follows
     a final symlink before the later managed-output audit rejects it; this is
     not an activation or publication bypass and is deferred as non-blocking.
@@ -2217,3 +2217,12 @@ Before claiming Phase 2 complete, the implementation handoff must include:
 - proof installed preview/render retains complete base and pack TXT/CSV attribution;
 - confirmation of no dependency/lockfile/`any`/`upstream/`/checked-in-assets/base-cache mutation;
 - Phase 3 Web authoring and all unrelated deferred work restated as not implemented.
+
+## Consolidated SDD Evidence
+
+The tracked `task-5-report.md` and `task-6-report.md` are consolidated into their Task records
+above. The merged evidence preserves the report-specific details: archive inspection's native
+decoder/PNG geometry boundary, attribution and source-ramp enforcement; and registry v2's
+canonical path, symlink, receipt, manifest-coverage, ownership, digest, acknowledgement, and
+credit-integrity hardening. Their focused test counts, typechecks, diff checks, product commits,
+and final-review outcomes remain recorded in the corresponding Task records.

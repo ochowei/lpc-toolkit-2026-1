@@ -1183,7 +1183,7 @@ Expected: PASS.
     Node-based static invariant parsing PASS — the 5,740-byte Credits TXT equals the embedded
     viewer credits exactly; all four artifact references are relative basenames; no
     POSIX/Windows absolute local path, `file://`, external resource tag, network API, external
-    script, or external stylesheet is present. `.superpowers/sdd/task-6-report.md` preserves the
+    script, or external stylesheet is present. The consolidated Task 6 plan record preserves the
     asserted invariant results and artifact hashes; it does not claim to preserve the complete
     inline assertion source or every expanded per-entry command.
   - Warnings: Both validate and render reported the same 35 existing `catalog_warning` items:
@@ -1244,7 +1244,8 @@ collapsed details, complete credits, and no network requests. Do not use
   - Implementation: Reassessed every Task 6 and handoff item, recording the environment-only
     Browser Use limitation separately from passing product evidence; no production file changed.
   - Verification: `rtk git diff --check` PASS; `rtk git status --short` PASS — only this
-    intentional plan-record update remained before commit (`.superpowers/sdd/task-6-report.md`
+    intentional plan-record update remained before commit (now consolidated in this plan's Task 6
+    record)
     is ignored handoff evidence).
   - Commit: f410bc41a60ab9ce9a474ac05e6a330fbbb50c8c (verified implementation base);
     073fe66048c0b7a6d5b9284a7335b5477574aace (initial Task 6 evidence plan);
@@ -1380,3 +1381,11 @@ engineering: N/A — verification commands and CI mapping do not change
 releasing: update
 plugin: update
 ```
+
+## Consolidated SDD Evidence
+
+The former `finalfix-version-report.md` is consolidated into the 0.2.0 alignment record above.
+That record preserves the release-audit result (`v0.2.0` absent, next candidate
+`v0.2.0-rc.1`), the `>=0.2.0 <0.3.0` CLI/plugin compatibility contract, the packed-CLI and
+plugin validation results, and the externally managed detached-HEAD blocker. No separate SDD
+report is required for this evidence.
