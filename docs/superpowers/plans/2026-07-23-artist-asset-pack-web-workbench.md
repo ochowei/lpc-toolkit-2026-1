@@ -2011,7 +2011,8 @@ Before staging, write the exact accepted-fix paths and narrow verification
 commands into this task's plan record. Stage only those reviewed hunks. Record
 every fix commit and verification result in this task.
 
-  - Review: requested twice from `gpt-5.6-luna` as required; both agents timed out without findings and were closed. No review fixes were accepted. A local read-only checklist review found no actionable issue; this limitation is recorded explicitly rather than reported as Luna approval.
+  - Review: Sol fast review returned two valid Important archive-allocation findings and one documentation finding. Before staging, the accepted fix paths are `packages/asset-pack-format/src/archive.ts` and `packages/asset-pack-format/test/archive.test.ts`; narrow verification is `rtk pnpm --filter @lpc-toolkit/asset-pack-format test` (72 tests PASS), `rtk pnpm --filter @lpc-toolkit/asset-pack-format run typecheck` (PASS), and `rtk git diff --check` (PASS). Luna review attempts timed out without findings and were not reported as approval.
+  - Fix commit: `d2f3377460bce086ca0dbfab0600f53be8d46c81` (`fix(asset-pack): bound archive allocation`).
 
 - [x] **Step 6: Rerun final gates after review**
 
@@ -2026,7 +2027,7 @@ rtk git status --short --branch
 
 Expected: PASS and a clean product worktree except the final plan record.
 
-  - Verification: post-review boundaries PASS; browser E2E 1 passed; packed CLI smoke PASS; `rtk pnpm verify` PASS; `rtk git diff --check` PASS; generated cache removed; only this plan record remains modified.
+  - Final post-fix verification: boundaries PASS; asset-pack-format 72 tests and typecheck PASS; browser E2E 1 passed; packed CLI smoke PASS; `rtk pnpm verify` PASS; generated cache removed; `rtk git diff --check` PASS; only this plan record remains modified.
 
 - [x] **Step 7: Commit the final plan record**
 
@@ -2037,25 +2038,25 @@ rtk git commit -m "docs(plan): record Phase 3 verification"
 
 Record that full hash only after the commit succeeds. Do not push, open a PR, publish npm, tag a release, deploy, or mutate external state without a separate user request.
 
-  - Plan-record commit: `4117419cc9ee9a9515a08b2d24f9cd54906f6c94` (`docs(plan): record Phase 3 verification`).
+  - Earlier plan-record commit: `4117419cc9ee9a9515a08b2d24f9cd54906f6c94` (`docs(plan): record Phase 3 verification`); final record follows the accepted fix and post-fix gates.
 
 
 ## Handoff Success Checklist
 
-- [ ] Existing formal archive fixtures are byte-identical before and after shared extraction.
-- [ ] Unsafe archives expose no editable bytes; repairable archives remain bounded.
-- [ ] Browser inflation aborts before configured output limits.
-- [ ] Draft status does not alter the existing acknowledgement content digest.
-- [ ] CLI inspect reports draft and install rejects it before state mutation.
-- [ ] Every Web edit has a monotonic revision and stale Worker/preview/download responses are ignored.
-- [ ] Advanced/raw JSON cannot write acknowledgements outside the warning workflow.
-- [ ] Version is resolved before acknowledgement when a bump is required.
-- [ ] Preview represents only the current error-free revision.
-- [ ] Preview attribution includes exact official base and pack credits.
-- [ ] Draft round-trip restores repair state and remains non-installable.
-- [ ] Formal bytes pass shared inspection plus clean CLI inspect/install.
-- [ ] No repository clone, CLI installation, backend, or IndexedDB is needed by the browser artist.
-- [ ] All eight CLI documentation surfaces are updated and tested.
-- [ ] Packed CLI contains the vendored internal format package.
-- [ ] `upstream/`, checked-in assets, managed cache, and unrelated user files remain untouched.
-- [ ] All focused, E2E, package, plugin, boundary, build, and `rtk pnpm verify` gates pass.
+- [x] Existing formal archive fixtures are byte-identical before and after shared extraction.
+- [x] Unsafe archives expose no editable bytes; repairable archives remain bounded.
+- [x] Browser inflation aborts before configured output limits.
+- [x] Draft status does not alter the existing acknowledgement content digest.
+- [x] CLI inspect reports draft and install rejects it before state mutation.
+- [x] Every Web edit has a monotonic revision and stale Worker/preview/download responses are ignored.
+- [x] Advanced/raw JSON cannot write acknowledgements outside the warning workflow.
+- [x] Version is resolved before acknowledgement when a bump is required.
+- [x] Preview represents only the current error-free revision.
+- [x] Preview attribution includes exact official base and pack credits.
+- [x] Draft round-trip restores repair state and remains non-installable.
+- [x] Formal bytes pass shared inspection plus clean CLI inspect/install.
+- [x] No repository clone, CLI installation, backend, or IndexedDB is needed by the browser artist.
+- [x] All eight CLI documentation surfaces are updated and tested.
+- [x] Packed CLI contains the vendored internal format package.
+- [x] `upstream/`, checked-in assets, managed cache, and unrelated user files remain untouched.
+- [x] All focused, E2E, package, plugin, boundary, build, and `rtk pnpm verify` gates pass.
