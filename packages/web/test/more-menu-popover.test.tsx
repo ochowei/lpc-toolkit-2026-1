@@ -48,8 +48,11 @@ describe('MoreMenuPopover asset editor action', () => {
 
     expect(setOpen).toHaveBeenCalledWith(false);
     expect(onNavigateAssetPacks).toHaveBeenCalledOnce();
-    expect(setOpen.mock.invocationCallOrder[0]).toBeLessThan(
-      onNavigateAssetPacks.mock.invocationCallOrder[0],
-    );
+    const setOpenCallOrder = setOpen.mock.invocationCallOrder[0];
+    const navigateCallOrder = onNavigateAssetPacks.mock.invocationCallOrder[0];
+
+    expect(setOpenCallOrder).toBeDefined();
+    expect(navigateCallOrder).toBeDefined();
+    expect(setOpenCallOrder!).toBeLessThan(navigateCallOrder!);
   });
 });
