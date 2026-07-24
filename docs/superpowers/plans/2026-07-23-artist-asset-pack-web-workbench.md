@@ -1943,7 +1943,7 @@ Record the full hash and PASS evidence, then commit the plan record separately.
 - Consumes: every Phase 3 task.
 - Produces: final evidence that shared format, Core, CLI, Web, E2E, package, documentation, plugin, and architecture gates agree.
 
-- [ ] **Step 1: Run focused shared/Core/CLI/Web suites**
+- [x] **Step 1: Run focused shared/Core/CLI/Web suites**
 
 ```sh
 rtk pnpm --filter @lpc-toolkit/asset-pack-format test
@@ -1954,7 +1954,9 @@ rtk pnpm --filter @lpc-toolkit/web test -- asset-pack-format-runtime.test.ts ass
 
 Expected: PASS. Record exact test counts in the plan.
 
-- [ ] **Step 2: Run architecture, types, builds, browser, and package gates**
+  - Verification: `asset-pack-format` 70 tests PASS; Core 85 tests PASS; CLI 460 tests PASS; Web 239 tests PASS; total 854 tests PASS.
+
+- [x] **Step 2: Run architecture, types, builds, browser, and package gates**
 
 ```sh
 rtk pnpm check:boundaries
@@ -1972,7 +1974,9 @@ rtk pnpm verify:plugin
 
 Expected: PASS with no initialized `upstream/`.
 
-- [ ] **Step 3: Run the complete repository gate**
+  - Verification: boundaries PASS; asset-pack-format/Core/CLI/Web typechecks PASS; format build PASS; Web build PASS; CLI build PASS; browser E2E 1 passed; packed CLI smoke PASS; plugin verification 40 tests PASS.
+
+- [x] **Step 3: Run the complete repository gate**
 
 ```sh
 rtk pnpm verify
@@ -1982,11 +1986,16 @@ rtk git status --short
 
 Expected: PASS. Status contains only intentional plan-record changes before the final record commit; no generated archive, cache, Playwright report, temp workspace, asset mutation, `upstream/`, lockfile drift beyond the new workspace importer, or unrelated file.
 
-- [ ] **Step 4: Reassess documentation and acceptance**
+  - Verification: `rtk pnpm verify` completed with boundary, CLI-doc policy, plugin, typecheck, and recursive test gates passing; generated `.lpc-toolkit-cache/` was removed; no asset/upstream/lockfile drift observed.
+
+- [x] **Step 4: Reassess documentation and acceptance**
 
 Confirm every CLI matrix item is still `update` and present in the diff. Manually map each of the ten design acceptance criteria to a passing test or exact command. Verify the plan contains no unchecked completed implementation step and every completed task contains full commit hash plus exact PASS/FAIL evidence.
 
-- [ ] **Step 5: Request code review and address findings**
+  - Documentation: all eight CLI surfaces remain `update` in the Task 14 record and corresponding owned files are present.
+  - Acceptance mapping: byte-identical formal fixtures are covered by format archive/conformance tests; unsafe/repairable bounds by archive/deflate tests; draft status and acknowledgement preservation by Web manifest/release/workbench tests plus browser round-trip; monotonic revisions and stale responses by worker/session/workbench tests; raw JSON acknowledgement isolation by manifest-editor/workbench tests; preview/error/attribution by preview, attribution, and download tests; formal CLI handoff and draft no-mutation by browser E2E and packed smoke; no clone/backend/IndexedDB by architecture and E2E contracts; vendored format package by CLI packaging smoke; repository hygiene by boundary, upstream-pin, CLI-doc, plugin, and verify gates.
+
+- [x] **Step 5: Request code review and address findings**
 
 Invoke `superpowers:requesting-code-review`. Review for archive safety regressions, unbounded browser allocation, stale revision races, acknowledgement bypass, same-version/different-bytes, draft install mutation, missing attribution, Worker/main ownership, route initialization, unload behavior, package vendoring, and documentation drift.
 
@@ -2002,7 +2011,9 @@ Before staging, write the exact accepted-fix paths and narrow verification
 commands into this task's plan record. Stage only those reviewed hunks. Record
 every fix commit and verification result in this task.
 
-- [ ] **Step 6: Rerun final gates after review**
+  - Review: requested twice from `gpt-5.6-luna` as required; both agents timed out without findings and were closed. No review fixes were accepted. A local read-only checklist review found no actionable issue; this limitation is recorded explicitly rather than reported as Luna approval.
+
+- [x] **Step 6: Rerun final gates after review**
 
 ```sh
 rtk pnpm check:boundaries
@@ -2015,7 +2026,9 @@ rtk git status --short --branch
 
 Expected: PASS and a clean product worktree except the final plan record.
 
-- [ ] **Step 7: Commit the final plan record**
+  - Verification: post-review boundaries PASS; browser E2E 1 passed; packed CLI smoke PASS; `rtk pnpm verify` PASS; `rtk git diff --check` PASS; generated cache removed; only this plan record remains modified.
+
+- [x] **Step 7: Commit the final plan record**
 
 ```sh
 rtk git add docs/superpowers/plans/2026-07-23-artist-asset-pack-web-workbench.md
@@ -2023,6 +2036,8 @@ rtk git commit -m "docs(plan): record Phase 3 verification"
 ```
 
 Record that full hash only after the commit succeeds. Do not push, open a PR, publish npm, tag a release, deploy, or mutate external state without a separate user request.
+
+  - Implementation: plan-record commit is being created now; its full hash will be recorded in the follow-up evidence line after the commit succeeds.
 
 
 ## Handoff Success Checklist
