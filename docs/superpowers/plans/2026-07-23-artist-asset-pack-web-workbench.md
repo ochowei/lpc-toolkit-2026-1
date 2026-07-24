@@ -2038,7 +2038,8 @@ rtk git commit -m "docs(plan): record Phase 3 verification"
 
 Record that full hash only after the commit succeeds. Do not push, open a PR, publish npm, tag a release, deploy, or mutate external state without a separate user request.
 
-  - Earlier plan-record commit: `4117419cc9ee9a9515a08b2d24f9cd54906f6c94` (`docs(plan): record Phase 3 verification`); final record follows the accepted fix and post-fix gates.
+  - Earlier plan-record commit: `4117419cc9ee9a9515a08b2d24f9cd54906f6c94` (`docs(plan): record Phase 3 verification`).
+  - Final verification record commit: `fce75f984679a28ce2527d47f328870db38555d4` (`docs(plan): record Sol review fix and final verification`); this hash is recorded by the follow-up finalization commit.
 
 
 ## Handoff Success Checklist
