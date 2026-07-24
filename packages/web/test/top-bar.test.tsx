@@ -41,7 +41,6 @@ describe('TopBar', () => {
       loadingProgress: null,
       upstreamHref: 'https://example.com/upstream',
       onNavigateHome,
-      onNavigateAssetPacks: vi.fn(),
     });
     const html = renderToStaticMarkup(tree);
 
@@ -61,29 +60,15 @@ describe('TopBar', () => {
     expect(onNavigateHome).toHaveBeenCalledOnce();
   });
 
-  it('renders an asset-pack editor action and emits navigation intent', () => {
-    const onNavigateAssetPacks = vi.fn();
+  it('does not render the asset-pack editor action', () => {
     const tree = TopBar({
       t: createTranslator('en'),
       loadingProgress: null,
       upstreamHref: 'https://example.com/upstream',
       onNavigateHome: vi.fn(),
-      onNavigateAssetPacks,
     });
     const html = renderToStaticMarkup(tree);
 
-    const homeActionIndex = html.indexOf('← Back to home');
-    const assetPackActionIndex = html.indexOf('Repair an Asset Pack');
-    const brandIndex = html.indexOf('LPC');
-
-    expect(assetPackActionIndex).toBeGreaterThan(homeActionIndex);
-    expect(brandIndex).toBeGreaterThan(assetPackActionIndex);
-
-    const action = findAction(tree, 'Repair an Asset Pack');
-    expect(action).toBeDefined();
-    expect(action?.props.variant).toBe('ghost');
-    expect(action?.props.size).toBe('sm');
-    action?.props.onClick?.();
-    expect(onNavigateAssetPacks).toHaveBeenCalledOnce();
+    expect(html).not.toContain('Repair an Asset Pack');
   });
 });
