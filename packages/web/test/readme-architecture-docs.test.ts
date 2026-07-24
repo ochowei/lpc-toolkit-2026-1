@@ -86,7 +86,7 @@ describe('README architecture contract', () => {
     expect(readme).toContain('[`docs/RELEASING.md`](docs/RELEASING.md)');
     expect(contributing).toContain('[Engineering guide](docs/ENGINEERING.md)');
     expect(contributing).toContain('[onboarding guide](docs/ONBOARDING.md)');
-    expect(engineering).toContain('`rtk pnpm verify`');
+    expect(engineering).toContain('`pnpm verify`');
     expect(releasing).toContain('CLI Release Candidate');
     expect(releasing).toContain('npm OIDC');
     expect(readme).not.toContain('Maintainers: RC validation');
@@ -210,7 +210,7 @@ describe('Codex plugin documentation contract', () => {
     ]) expect(architecture).toContain(phrase);
 
     for (const phrase of [
-      '`rtk pnpm verify:plugin`',
+      '`pnpm verify:plugin`',
       'Codex plugin structure and skill contracts',
     ]) expect(engineering).toContain(phrase);
   });
@@ -233,8 +233,8 @@ describe('onboarding and engineering ownership contract', () => {
   it('provides a runnable first-day path for all active packages', () => {
     for (const phrase of [
       'Node.js 22',
-      '`rtk pnpm install --frozen-lockfile`',
-      '`rtk pnpm verify`',
+      '`pnpm install --frozen-lockfile`',
+      '`pnpm verify`',
       '`packages/core/`',
       '`packages/presets/`',
       '`packages/web/`',
@@ -257,17 +257,17 @@ describe('onboarding and engineering ownership contract', () => {
     expect(engineering).toContain('CI unit job');
   });
 
-  it('uses RTK-safe explicit run forms for standalone typechecks', () => {
-    expect(engineering).toContain('`rtk pnpm run typecheck`');
+  it('uses explicit run forms for standalone typechecks', () => {
+    expect(engineering).toContain('`pnpm run typecheck`');
     for (const packageName of ['core', 'presets', 'web', 'cli']) {
       expect(engineering).toContain(
-        `rtk pnpm --filter @lpc-toolkit/${packageName} run typecheck`,
+        `pnpm --filter @lpc-toolkit/${packageName} run typecheck`,
       );
       expect(engineering).not.toContain(
-        `rtk pnpm --filter @lpc-toolkit/${packageName} typecheck`,
+        `pnpm --filter @lpc-toolkit/${packageName} typecheck`,
       );
     }
-    expect(engineering).not.toContain('`rtk pnpm typecheck`');
+    expect(engineering).not.toContain('`pnpm typecheck`');
     expect(agents).toContain(
       'Verification: `rtk pnpm run typecheck` PASS',
     );
@@ -382,7 +382,7 @@ describe('architecture ownership contract', () => {
   });
 
   it('documents boundary CI and isolated parity ownership', () => {
-    expect(architecture).toContain('`rtk pnpm check:boundaries`');
+    expect(architecture).toContain('`pnpm check:boundaries`');
     expect(engineering).toContain('CI unit job');
     expect(architecture).toContain('read-only provenance');
     expect(architecture).toContain('separate isolated checkout');

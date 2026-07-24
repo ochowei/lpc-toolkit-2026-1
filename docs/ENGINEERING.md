@@ -13,7 +13,7 @@ scope, and the relationship between local checks and GitHub Actions. See
 Install the locked workspace dependencies from the repository root:
 
 ```sh
-rtk pnpm install --frozen-lockfile
+pnpm install --frozen-lockfile
 ```
 
 Normal setup does not initialize the optional `upstream/` submodule.
@@ -23,7 +23,7 @@ Normal setup does not initialize the optional `upstream/` submodule.
 Run the common pre-PR gate from the repository root:
 
 ```sh
-rtk pnpm verify
+pnpm verify
 ```
 
 The command runs these stages in order:
@@ -44,41 +44,41 @@ package validation, or npm publication.
 
 | Command | Purpose |
 | --- | --- |
-| `rtk pnpm install --frozen-lockfile` | Install exactly the locked workspace dependencies. |
-| `rtk pnpm verify` | Run the common asset, boundary, type, and unit-test gate. |
-| `rtk pnpm verify:cli-docs-policy` | Test the CLI documentation-impact parser and path policy. |
-| `rtk pnpm check:cli-docs-impact -- --base <sha> --head <sha> --body-file <file>` | Reproduce the live pull-request documentation-impact check. |
-| `rtk pnpm verify:plugin` | Validate Codex plugin structure and skill contracts. |
-| `rtk pnpm build` | Build core, presets, web assets/Vite output, and the CLI package. |
-| `rtk pnpm check:boundaries` | Enforce the executable dependency policy. |
-| `rtk pnpm run typecheck` | Typecheck all workspace packages. |
-| `rtk pnpm test` | Run the root test lifecycle and all workspace tests. |
+| `pnpm install --frozen-lockfile` | Install exactly the locked workspace dependencies. |
+| `pnpm verify` | Run the common asset, boundary, type, and unit-test gate. |
+| `pnpm verify:cli-docs-policy` | Test the CLI documentation-impact parser and path policy. |
+| `pnpm check:cli-docs-impact -- --base <sha> --head <sha> --body-file <file>` | Reproduce the live pull-request documentation-impact check. |
+| `pnpm verify:plugin` | Validate Codex plugin structure and skill contracts. |
+| `pnpm build` | Build core, presets, web assets/Vite output, and the CLI package. |
+| `pnpm check:boundaries` | Enforce the executable dependency policy. |
+| `pnpm run typecheck` | Typecheck all workspace packages. |
+| `pnpm test` | Run the root test lifecycle and all workspace tests. |
 
 Use the narrowest package command while iterating, then run the common gate
 before handing off a repository-wide change.
 
-Use the explicit `run` form for standalone typechecks. This avoids RTK's
-pnpm-to-tsc shortcut, which does not preserve root workspace or leading
-`--filter` context when the script name is used as shorthand.
+Use the explicit `run` form for standalone typechecks. The same command can be
+prefixed with `rtk` when executed by an AI agent; the proxy does not change the
+underlying pnpm command or its root workspace and `--filter` context.
 
 ## Change-Specific Checks
 
 ### Core
 
 ```sh
-rtk pnpm --filter @lpc-toolkit/core run typecheck
-rtk pnpm --filter @lpc-toolkit/core test
+pnpm --filter @lpc-toolkit/core run typecheck
+pnpm --filter @lpc-toolkit/core test
 ```
 
-Core changes must also run `rtk pnpm check:boundaries` because runtime source
+Core changes must also run `pnpm check:boundaries` because runtime source
 cannot import browser, Node, React, CLI, web, presets, ZIP, or concrete canvas
 implementations.
 
 ### Presets
 
 ```sh
-rtk pnpm --filter @lpc-toolkit/presets run typecheck
-rtk pnpm --filter @lpc-toolkit/presets test
+pnpm --filter @lpc-toolkit/presets run typecheck
+pnpm --filter @lpc-toolkit/presets test
 ```
 
 When preset behavior changes, verify at least one consuming web or CLI path in
@@ -87,9 +87,9 @@ addition to the package tests.
 ### Web
 
 ```sh
-rtk pnpm --filter @lpc-toolkit/web run typecheck
-rtk pnpm --filter @lpc-toolkit/web test
-rtk pnpm --filter @lpc-toolkit/web test:e2e
+pnpm --filter @lpc-toolkit/web run typecheck
+pnpm --filter @lpc-toolkit/web test
+pnpm --filter @lpc-toolkit/web test:e2e
 ```
 
 Ordinary `test:e2e` uses the toolkit only. It does not initialize or run the
@@ -98,7 +98,7 @@ tracked upstream submodule.
 The focused browser-to-CLI acceptance is:
 
 ```sh
-rtk pnpm --filter @lpc-toolkit/web test:e2e -- asset-pack-workbench.spec.ts
+pnpm --filter @lpc-toolkit/web test:e2e -- asset-pack-workbench.spec.ts
 ```
 
 `pretest:e2e` builds the CLI so this test exercises the public entrypoint. It
@@ -108,10 +108,10 @@ without workspace mutation, formal install, and doctor containment.
 ### CLI
 
 ```sh
-rtk pnpm --filter @lpc-toolkit/cli run typecheck
-rtk pnpm --filter @lpc-toolkit/cli test
-rtk pnpm --filter @lpc-toolkit/cli build
-rtk pnpm --filter @lpc-toolkit/cli test:package
+pnpm --filter @lpc-toolkit/cli run typecheck
+pnpm --filter @lpc-toolkit/cli test
+pnpm --filter @lpc-toolkit/cli build
+pnpm --filter @lpc-toolkit/cli test:package
 ```
 
 The packed smoke also creates a checked archive with `status: "draft"` and
@@ -125,7 +125,7 @@ Run the focused Core lifecycle modules whenever compatibility, semantic
 version/replacement, source schema, or compile decisions change:
 
 ```sh
-rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-version.test.ts asset-pack-schema.test.ts asset-pack-compile.test.ts
+pnpm --filter @lpc-toolkit/core test -- asset-pack-version.test.ts asset-pack-schema.test.ts asset-pack-compile.test.ts
 ```
 
 The seven focused CLI authoring modules cover workspace ownership, safe source
@@ -133,7 +133,7 @@ reads, scaffolding, PNG/baseline validation, authorized overlay loading, linked
 sync/publication, and attributed preview:
 
 ```sh
-rtk pnpm --filter @lpc-toolkit/cli test -- asset-workspace.test.ts asset-pack-files.test.ts asset-pack-scaffold.test.ts asset-pack-validation.test.ts asset-overlay-store.test.ts asset-pack-sync.test.ts asset-pack-preview.test.ts
+pnpm --filter @lpc-toolkit/cli test -- asset-workspace.test.ts asset-pack-files.test.ts asset-pack-scaffold.test.ts asset-pack-validation.test.ts asset-overlay-store.test.ts asset-pack-sync.test.ts asset-pack-preview.test.ts
 ```
 
 The no-repository acceptance runs the Phase 1 workflow through `runCli` with an
@@ -143,7 +143,7 @@ compiled-overlay rendering with base/custom credits, and the same-scope audit
 closure:
 
 ```sh
-rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-e2e.test.ts
+pnpm --filter @lpc-toolkit/cli test -- asset-authoring-e2e.test.ts
 ```
 
 Phase 2 archive and lifecycle coverage is intentionally split by trust
@@ -152,7 +152,7 @@ parsing/checksums, deterministic packaging, inspection, strict registry/source
 state, crash recovery, install policy, cleanup, and doctor non-repair behavior:
 
 ```sh
-rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-payload.test.ts asset-pack-archive-format.test.ts asset-pack-packaging.test.ts asset-pack-inspection.test.ts asset-pack-registry.test.ts asset-pack-state.test.ts asset-pack-transaction.test.ts asset-pack-install.test.ts asset-pack-remove.test.ts asset-pack-doctor.test.ts
+pnpm --filter @lpc-toolkit/cli test -- asset-pack-payload.test.ts asset-pack-archive-format.test.ts asset-pack-packaging.test.ts asset-pack-inspection.test.ts asset-pack-registry.test.ts asset-pack-state.test.ts asset-pack-transaction.test.ts asset-pack-install.test.ts asset-pack-remove.test.ts asset-pack-doctor.test.ts
 ```
 
 Runtime activation has its own integrity boundary. This focused suite proves
@@ -161,7 +161,7 @@ selection, immutable definition/sprite snapshots, and claim retention through
 lazy consumption:
 
 ```sh
-rtk pnpm --filter @lpc-toolkit/cli test -- runtime-asset-pack-activation.test.ts
+pnpm --filter @lpc-toolkit/cli test -- runtime-asset-pack-activation.test.ts
 ```
 
 The two-workspace acceptance drives the public CLI from clean author and
@@ -172,17 +172,17 @@ remaining extension credits, doctor health, write containment, and untouched
 base-cache sentinel:
 
 ```sh
-rtk pnpm --filter @lpc-toolkit/cli test -- asset-lifecycle-e2e.test.ts
+pnpm --filter @lpc-toolkit/cli test -- asset-lifecycle-e2e.test.ts
 ```
 
 Landing documentation and its checked-in attributed artifacts are verified
 together:
 
 ```sh
-rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifacts.test.ts
+pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifacts.test.ts
 ```
 
-Run `rtk pnpm check:boundaries` for every asset-pack architecture change. Run
+Run `pnpm check:boundaries` for every asset-pack architecture change. Run
 the packed CLI smoke conditionally whenever CLI package metadata, build output,
 or `packages/cli/scripts/` changes; it installs the produced tarball in a clean
 consumer directory. After preparing one pinned cache, it proves no-repository
@@ -191,33 +191,33 @@ inspection/install/list, installed attributed preview/render, doctor, and
 removal through the installed package without `upstream/`:
 
 ```sh
-rtk pnpm --filter @lpc-toolkit/cli test:package
+pnpm --filter @lpc-toolkit/cli test:package
 ```
 
 The complete Task 13 focused handoff gate is:
 
 ```sh
-rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-version.test.ts asset-pack-schema.test.ts asset-pack-compile.test.ts
-rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-payload.test.ts asset-pack-archive-format.test.ts asset-pack-packaging.test.ts asset-pack-inspection.test.ts asset-pack-registry.test.ts asset-pack-state.test.ts asset-pack-transaction.test.ts asset-pack-install.test.ts asset-pack-remove.test.ts asset-pack-doctor.test.ts asset-lifecycle-e2e.test.ts
-rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifacts.test.ts
-rtk pnpm --filter @lpc-toolkit/cli test:package
+pnpm --filter @lpc-toolkit/core test -- asset-pack-version.test.ts asset-pack-schema.test.ts asset-pack-compile.test.ts
+pnpm --filter @lpc-toolkit/cli test -- asset-pack-payload.test.ts asset-pack-archive-format.test.ts asset-pack-packaging.test.ts asset-pack-inspection.test.ts asset-pack-registry.test.ts asset-pack-state.test.ts asset-pack-transaction.test.ts asset-pack-install.test.ts asset-pack-remove.test.ts asset-pack-doctor.test.ts asset-lifecycle-e2e.test.ts
+pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifacts.test.ts
+pnpm --filter @lpc-toolkit/cli test:package
 ```
 
-Before handoff, run the complete Task 13 mapping below. `rtk pnpm verify`
+Before handoff, run the complete Task 13 mapping below. `pnpm verify`
 repeats the shared asset-pin, boundary, CLI documentation policy, plugin,
 workspace typecheck, and workspace Vitest stages; it does not replace the
 explicit CLI build/package smoke.
 
 ```sh
-rtk pnpm check:boundaries
-rtk pnpm --filter @lpc-toolkit/core run typecheck
-rtk pnpm --filter @lpc-toolkit/core test
-rtk pnpm --filter @lpc-toolkit/cli run typecheck
-rtk pnpm --filter @lpc-toolkit/cli test
-rtk pnpm --filter @lpc-toolkit/cli build
-rtk pnpm --filter @lpc-toolkit/cli test:package
-rtk pnpm --filter @lpc-toolkit/web test
-rtk pnpm verify
+pnpm check:boundaries
+pnpm --filter @lpc-toolkit/core run typecheck
+pnpm --filter @lpc-toolkit/core test
+pnpm --filter @lpc-toolkit/cli run typecheck
+pnpm --filter @lpc-toolkit/cli test
+pnpm --filter @lpc-toolkit/cli build
+pnpm --filter @lpc-toolkit/cli test:package
+pnpm --filter @lpc-toolkit/web test
+pnpm verify
 ```
 
 These checks require no initialized `upstream/`. The package smoke may require
@@ -227,8 +227,8 @@ preparation; valid existing caches are reusable offline.
 ### Codex plugin
 
 ```sh
-rtk pnpm verify:plugin
-rtk pnpm --filter @lpc-toolkit/cli test -- plugin-contract.test.ts
+pnpm verify:plugin
+pnpm --filter @lpc-toolkit/cli test -- plugin-contract.test.ts
 ```
 
 #### CLI documentation synchronization
@@ -288,7 +288,7 @@ documentation-only diffs do not activate it by themselves. To reproduce a PR
 failure locally, save the PR description to a file and run:
 
 ```sh
-rtk pnpm check:cli-docs-impact -- --base <base-sha> --head <head-sha> --body-file <pr-body-file>
+pnpm check:cli-docs-impact -- --base <base-sha> --head <head-sha> --body-file <pr-body-file>
 ```
 
 Editing the pull request body creates a fresh documentation-impact check. That
@@ -303,8 +303,8 @@ surface that ought to have been declared.
 ### Asset tooling
 
 ```sh
-rtk pnpm --filter @lpc-toolkit/web validate-assets
-rtk pnpm --filter @lpc-toolkit/web audit:thumbnail-bounds
+pnpm --filter @lpc-toolkit/web validate-assets
+pnpm --filter @lpc-toolkit/web audit:thumbnail-bounds
 ```
 
 Asset changes must preserve the active source's `CREDITS.csv` and source-pin
@@ -317,7 +317,7 @@ agreement.
 pinned by `asset-release.json`. After provisioning that checkout, run:
 
 ```sh
-rtk pnpm --filter @lpc-toolkit/web test:e2e:parity
+pnpm --filter @lpc-toolkit/web test:e2e:parity
 ```
 
 Never point this variable at the repository's tracked `upstream/` directory.

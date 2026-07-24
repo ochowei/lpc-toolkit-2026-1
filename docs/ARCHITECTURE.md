@@ -616,10 +616,13 @@ into `packages/core/src/**`.
 
 ## Executable Architecture Gate
 
-`rtk pnpm check:boundaries` enforces core isolation, presets purity,
+`pnpm check:boundaries` enforces core isolation, presets purity,
 public-core import ownership, and component workflow boundaries. The main CI
 unit gate invokes it through `pnpm verify`; the publish workflow also runs it
 before packaging or publication.
+
+AI agents should prefix this command with `rtk`; human contributors may run it
+directly.
 
 See the [Engineering guide](ENGINEERING.md) for the canonical command matrix,
 package-scoped checks, CI mapping, and isolated parity procedure.
