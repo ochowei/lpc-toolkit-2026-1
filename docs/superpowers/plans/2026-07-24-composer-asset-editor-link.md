@@ -114,7 +114,7 @@ Expected: FAIL in the new TopBar test because the new action is absent and the r
 
 Implementation note: tightened the landing-page assertion to forbid the asset-pack entry and added a TopBar navigation test that specified the exact button label, placement, and click intent before implementation.
 Commit: `73ef4da729d38c99a8cc482a6f8cd6aeb989757c`
-Verification: `rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx top-bar.test.tsx` PASS (RED: landing assertion and new TopBar action test failed before implementation)
+Verification: `rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx top-bar.test.tsx` FAIL (expected RED: the landing assertion failed while the old header action remained, and the new TopBar action test failed before the button existed)
 Task review: review clean
 
 Run:
@@ -131,6 +131,7 @@ rtk git commit -m "test(web): move asset editor entry to composer"
 - Modify: `packages/web/src/components/layer-stack/top-bar.tsx`
 - Modify: `packages/web/src/components/layer-stack/harness.tsx`
 - Modify: `packages/web/src/App.tsx`
+- Modify: `packages/web/src/components/landing-page.tsx`
 - Modify: `packages/web/test/landing-page.test.tsx`
 
 **Interfaces:**
@@ -289,7 +290,7 @@ Under each completed task, add a short implementation note, the full commit hash
 Implementation note: recorded durable evidence for Tasks 1-3 only; no runtime source, route behavior, or workbench logic changed in this task.
 Verification: `rtk pnpm verify` PASS
 Verification: `rtk git diff --check` PASS
-Verification: `rtk git status --short` PASS (`?? docs/superpowers/plans/2026-07-24-composer-asset-editor-link.md` before the plan-evidence commit)
+Verification: `rtk git status --short` PASS (`rtk git status --short` completed successfully; pre-commit output was the expected uncommitted plan file, and post-commit output was clean)
 
 Run:
 
@@ -307,3 +308,5 @@ rtk git commit -m "docs(plan): record composer asset editor link verification"
 - Focused web tests, web typecheck, and `rtk pnpm verify` all PASS.
 
 Acceptance evidence: satisfied. The `/asset-packs` route remains App-owned, the Asset Pack Workbench baseline and safeguards were preserved, and this Task 3 update did not change workbench behavior.
+
+Final review correction: added an `app-shell.test.tsx` regression test that captures the first `LayerStackHarness` props and proves `onNavigateAssetPacks()` pushes the App-owned `/asset-packs` route; corrected the Task 1 RED evidence and the Task 3 git-status evidence; focused verification to rerun before handoff is `rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx top-bar.test.tsx app-shell.test.tsx` plus `rtk pnpm --filter @lpc-toolkit/web run typecheck`; the final fix commit hash is recorded in `.superpowers/sdd/final-fix-report.md`.

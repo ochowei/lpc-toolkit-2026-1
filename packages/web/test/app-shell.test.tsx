@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   sliceReducer: vi.fn(),
   bootstrapStateFromHash: vi.fn(),
   readWindowHash: vi.fn(),
+  LayerStackHarness: vi.fn(() => <div>Composer Harness</div>),
 }));
 
 vi.mock('../src/catalog/load-catalog', () => ({
@@ -35,7 +36,7 @@ vi.mock('../src/lib/url-hash-sync', () => ({
 }));
 
 vi.mock('../src/components/layer-stack/harness', () => ({
-  LayerStackHarness: () => <div>Composer Harness</div>,
+  LayerStackHarness: mocks.LayerStackHarness,
 }));
 
 vi.mock('../src/components/asset-pack-workbench/harness', () => ({
@@ -149,6 +150,27 @@ describe('App shell routing', () => {
     expect(mocks.loadPalettesFromUpstream).toHaveBeenCalledTimes(1);
     expect(mocks.bootstrapStateFromHash).toHaveBeenCalledTimes(1);
     expect(mocks.loadBrowserAssetPackBaseline).not.toHaveBeenCalled();
+  });
+
+  it('passes an asset-pack navigation callback that pushes the app-owned route', () => {
+    const mockWindow = setLocation('/compose');
+
+    renderToStaticMarkup(<App />);
+
+    const harnessCall = mocks.LayerStackHarness.mock.calls as unknown as
+      ReadonlyArray<readonly [unknown]>;
+    const harnessProps = harnessCall[0]?.[0] as
+      | { readonly onNavigateAssetPacks: () => void }
+      | undefined;
+
+    expect(harnessProps).toBeDefined();
+    harnessProps?.onNavigateAssetPacks();
+
+    expect(mockWindow.history.pushState).toHaveBeenCalledWith(
+      expect.any(Object),
+      '',
+      '/asset-packs',
+    );
   });
 
   it('preserves the initial composer query and hash when tagging history state', () => {
