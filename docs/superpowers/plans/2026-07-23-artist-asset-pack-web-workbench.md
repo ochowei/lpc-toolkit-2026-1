@@ -860,7 +860,7 @@ Record the full hash and PASS evidence, then commit the plan record separately.
 
   - Product Commit: `2ec8fd734f289ea6ec7b251085466a4d3b209afe` (`refactor(asset-pack): share PNG validation`)
   - Review Fix Commit: `c6cf930ba73ad1e5a05ef586096c7584589755a6` (`fix(asset-pack): require exact PNG geometry`)
-  - Review package: `.superpowers/sdd/review-task-5-web-workbench-4ff7716..c6cf930.diff`
+  - Review package evidence is consolidated in this Task 5 record; no Critical, Important, or Minor findings remain.
   - Independent review: Spec compliant; Task quality Approved; no Critical, Important, or Minor findings remain.
   - CLI documentation impact reassessment:
 
@@ -1113,7 +1113,7 @@ Record the full hash and PASS evidence, then commit the plan record separately.
 
   - Product Commit: `7772ae85b46e5e87f7c5edd0d2371534a4d720c2` (`feat(web): add safe asset pack browser adapters`)
   - Review Fix Commits: `bd30d3e0e6f66dc21091a34711d3c183b80256c9` (`fix(web): complete asset pack adapter parity`) and `247d2c783a26d99bd60f436717696cbce82f2ff1` (`fix(web): skip unsupported archive conformance`).
-  - Evidence Commits: `e2da51281e5069d1bd59c18839976c0e796e157f`, `eda50e6b86b1f135ad601168f8e227828931f61e`, and `760fc00a59e75a3af2a4d9cb54011ded34562244` (Task 7 verification/review-fix reports).
+  - Evidence Commits: `e2da51281e5069d1bd59c18839976c0e796e157f`, `eda50e6b86b1f135ad601168f8e227828931f61e`, and `760fc00a59e75a3af2a4d9cb54011ded34562244` (Task 7 verification/review-fix evidence, consolidated in this Task 7 record).
   - Independent final review: capability skip fixed; no Critical or remaining product Important findings. The separate plan-record commit follows this update.
 
 ---
@@ -1495,7 +1495,7 @@ Record the full hash and PASS evidence, then commit the plan record separately.
 
   - Commit: `4a54af2ff5b9f3a7ea035b2a39c5ac7fe7dd3651` — `feat(web): add asset pack workbench route`
   - Evidence report: `459640004767aff0a3777a883b1163bc9790d116`
-  - Independent final Luna review: Approved; no Critical or Important findings. Review package: `.superpowers/sdd/review-task-10-route-shell-d491a5..4a54af2.diff`.
+  - Independent final Luna review: Approved; no Critical or Important findings. The review package evidence is consolidated in this Task 10 record.
   - Scope note: No Task 11 files, dependencies, assets, caches, or `upstream/` content changed. The separate plan-record commit follows this update.
 
 ---
@@ -1929,7 +1929,7 @@ rtk git commit -m "docs(asset-pack): publish browser correction workflow"
 Record the full hash and PASS evidence, then commit the plan record separately.
 
   - Product commit: `368794d4458740c9e6896d63824e0e868ad2f196` (`docs(asset-pack): publish browser correction workflow`).
-  - Evidence: `.superpowers/sdd/task-14-e2e-report.md`; plan/evidence commit follows this update.
+  - Evidence: The browser-to-CLI E2E, packed-CLI draft rejection, formal install, attribution, and final `rtk pnpm verify` results are consolidated in this Task 14 record; plan/evidence commit follows this update.
 
 ---
 
@@ -2061,3 +2061,19 @@ Record that full hash only after the commit succeeds. Do not push, open a PR, pu
 - [x] Packed CLI contains the vendored internal format package.
 - [x] `upstream/`, checked-in assets, managed cache, and unrelated user files remain untouched.
 - [x] All focused, E2E, package, plugin, boundary, build, and `rtk pnpm verify` gates pass.
+
+## Consolidated SDD Evidence
+
+The tracked Web Workbench reports are consolidated into the Task records above:
+
+- Task 7: browser-safe archive/PNG/baseline adapters and conformance parity.
+- Task 8: Worker protocol/session validation, latest-only revisions, and recovery behavior.
+- Task 9: immutable edit replay, diagnostics, warning acknowledgement, formal gates, and React orchestration.
+- Task 10: `/asset-packs` routing, upload entry, responsive shell, and focused route/landing/workbench verification.
+- Task 11: manifest, source, diagnostics, warnings, credits editors, hashed focus targets, and acknowledgement governance.
+- Task 12: current-revision preview, canonical character import, focused pack selection, and exact attribution.
+- Task 13: deterministic draft/formal downloads, stale-response protection, downloaded-revision tracking, and unsaved-work navigation guards.
+- Task 14: browser-to-CLI E2E, draft refusal/no-mutation, formal install, packed smoke, and final repository verification.
+
+The corresponding standalone `*-report.md` files are no longer authoritative; their evidence is
+kept in these Task records and the product/plan commit history.
