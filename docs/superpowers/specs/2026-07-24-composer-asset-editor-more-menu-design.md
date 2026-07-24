@@ -83,4 +83,3 @@ rtk pnpm verify
   action keeps the established label `Repair an Asset Pack`.
 - **SPA navigation owner**: the `App`-level navigation logic that updates
   browser history and route state without a full page reload.
-
