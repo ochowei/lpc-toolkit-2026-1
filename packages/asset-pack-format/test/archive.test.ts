@@ -343,6 +343,14 @@ async function expectUnsafe(
 }
 
 describe('inspectAssetPackArchiveBytes security and bounds', () => {
+  it('rejects an oversized input before copying its bytes', async () => {
+    const oversizedInput = {
+      byteLength: ASSET_PACK_ARCHIVE_LIMITS.archiveBytes + 1,
+    } as unknown as Uint8Array;
+
+    await expectUnsafe(oversizedInput, 'asset_archive_limit_exceeded');
+  });
+
   it.each([
     ['absolute POSIX', '/sprites/a.png'],
     ['Windows drive', 'C:/sprites/a.png'],
@@ -638,6 +646,21 @@ describe('inspectAssetPackArchiveBytes repairable vs verified', () => {
 });
 
 describe('createAssetPackArchive formal and draft assembly', () => {
+  it('rejects an oversized source before copying its bytes', async () => {
+    const oversizedSource = {
+      byteLength: ASSET_PACK_ARCHIVE_LIMITS.entryBytes + 1,
+    } as unknown as Uint8Array;
+
+    await expect(
+      createAssetPackArchive({
+        kind: 'draft',
+        manifestDocument: packFixture(),
+        sourceBytes: new Map([[SOURCE_PATH, oversizedSource]]),
+        runtime: testRuntime,
+      }),
+    ).rejects.toThrow('Archive entry exceeds limit');
+  });
+
   it('writes byte-identical archives regardless of map insertion order or process timezone', async () => {
     const manifestDoc = packFixture();
     const source1 = new Map<string, Uint8Array>([

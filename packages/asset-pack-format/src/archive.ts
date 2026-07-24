@@ -845,8 +845,7 @@ export async function inspectAssetPackArchiveBytes(options: {
   readonly archiveBytes: Uint8Array;
   readonly runtime: AssetPackFormatRuntime;
 }): Promise<AssetPackArchiveInspection> {
-  const archiveBytesCopy = new Uint8Array(options.archiveBytes);
-  if (archiveBytesCopy.byteLength > ASSET_PACK_ARCHIVE_LIMITS.archiveBytes) {
+  if (options.archiveBytes.byteLength > ASSET_PACK_ARCHIVE_LIMITS.archiveBytes) {
     return {
       kind: 'unsafe',
       diagnostics: [
@@ -857,6 +856,7 @@ export async function inspectAssetPackArchiveBytes(options: {
       ],
     };
   }
+  const archiveBytesCopy = new Uint8Array(options.archiveBytes);
 
   const metadata = parseArchiveMetadata(archiveBytesCopy, options.runtime);
   if (!metadata.ok) {
@@ -1020,12 +1020,24 @@ export async function createAssetPackArchive(options: {
     );
   }
 
+  if (options.sourceBytes.size + 2 > ASSET_PACK_ARCHIVE_LIMITS.entries) {
+    throw new Error('Exceeds archive entry limit.');
+  }
+
   const sourceBytesCopy = new Map<string, Uint8Array>();
+  let sourceTotalBytes = 0;
   for (const [k, v] of options.sourceBytes) {
     const validated = validateArchivePath(k, options.runtime);
     if (!validated.ok) {
       throw new Error(`Unsafe archive path: ${k}`);
     }
+    if (v.byteLength > ASSET_PACK_ARCHIVE_LIMITS.entryBytes) {
+      throw new Error(`Archive entry exceeds limit: ${k}`);
+    }
+    if (sourceTotalBytes > ASSET_PACK_ARCHIVE_LIMITS.totalBytes - v.byteLength) {
+      throw new Error('Archive source bytes exceed total limit.');
+    }
+    sourceTotalBytes += v.byteLength;
     sourceBytesCopy.set(k, new Uint8Array(v));
   }
 
