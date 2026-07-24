@@ -42,7 +42,8 @@ or `docs: clarify asset setup`. Do not combine unrelated cleanup with the
 requested change.
 
 AI agents must also follow [`AGENTS.md`](AGENTS.md), including its RTK command
-and plan-record requirements.
+and plan-record requirements. Human contributors may run repository commands
+directly without the RTK proxy.
 
 ## Verification
 
@@ -50,7 +51,7 @@ The [Engineering guide](docs/ENGINEERING.md) is the command and CI source of
 truth. The common pre-PR gate is:
 
 ```sh
-rtk pnpm verify
+pnpm verify
 ```
 
 Run the additional change-specific checks listed there for browser E2E, CLI

@@ -1,10 +1,12 @@
 # RTK - Rust Token Killer (Codex CLI)
 
-**Usage**: Token-optimized CLI proxy for shell commands.
+**Usage**: Token-optimized CLI proxy for shell commands run by Codex or other
+AI agents.
 
 ## Rule
 
-Always prefix shell commands with `rtk`.
+AI agents should prefix shell commands with `rtk`. Human contributors may run
+the underlying commands directly without the proxy.
 
 Examples:
 

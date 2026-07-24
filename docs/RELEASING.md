@@ -16,10 +16,10 @@ install verification.
 Before creating an RC tag, exercise the unpublished package:
 
 ```sh
-rtk pnpm --filter @lpc-toolkit/cli build
-rtk node packages/cli/dist/index.js --help
-rtk pnpm --filter @lpc-toolkit/cli test:package
-rtk pnpm --filter @lpc-toolkit/cli pack --pack-destination /tmp
+pnpm --filter @lpc-toolkit/cli build
+node packages/cli/dist/index.js --help
+pnpm --filter @lpc-toolkit/cli test:package
+pnpm --filter @lpc-toolkit/cli pack --pack-destination /tmp
 ```
 
 The CLI build vendors the shared `asset-pack-format` package and the embedded

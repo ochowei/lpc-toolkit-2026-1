@@ -12,6 +12,9 @@ a running editor, and the local CLI. For stable dependency rules, read the
 - Git
 - RTK for terminal commands run by repository Agents
 
+RTK is only required for repository Agents. Human contributors may run the
+commands below directly.
+
 The repository uses strict TypeScript and pnpm workspaces. Do not substitute
 npm, yarn, or bun for repository install, test, typecheck, or build commands.
 
@@ -23,12 +26,12 @@ and is not part of normal setup. Do not initialize `upstream/` for normal setup.
 ```sh
 git clone <repo-url>
 cd lpc-toolkit-2026-1
-rtk pnpm install --frozen-lockfile
-rtk pnpm verify
+pnpm install --frozen-lockfile
+pnpm verify
 ```
 
-`rtk pnpm install --frozen-lockfile` installs exactly the locked workspace.
-`rtk pnpm verify` prepares and verifies the active asset snapshot, checks
+`pnpm install --frozen-lockfile` installs exactly the locked workspace.
+`pnpm verify` prepares and verifies the active asset snapshot, checks
 architecture boundaries, typechecks every package, and runs all workspace unit
 tests.
 
@@ -38,7 +41,7 @@ checked-in or pinned cache-backed asset flow. They do not need the submodule.
 ## Start the Web Editor
 
 ```sh
-rtk pnpm --filter @lpc-toolkit/web dev
+pnpm --filter @lpc-toolkit/web dev
 ```
 
 Open the URL printed by Vite. `/` is the landing page and `/compose` is the
@@ -50,8 +53,8 @@ available while composing, previewing, and exporting a sprite.
 Build the workspace CLI and invoke its local entry point:
 
 ```sh
-rtk pnpm --filter @lpc-toolkit/cli build
-rtk node packages/cli/dist/index.js --help
+pnpm --filter @lpc-toolkit/cli build
+node packages/cli/dist/index.js --help
 ```
 
 These are repository-development commands. The npm/npx installation examples
@@ -100,19 +103,19 @@ The [Engineering guide](ENGINEERING.md) owns the canonical commands and CI
 mapping. Use package-scoped checks while iterating, for example:
 
 ```sh
-rtk pnpm --filter @lpc-toolkit/core test
-rtk pnpm --filter @lpc-toolkit/presets test
-rtk pnpm --filter @lpc-toolkit/web test
-rtk pnpm --filter @lpc-toolkit/cli test
+pnpm --filter @lpc-toolkit/core test
+pnpm --filter @lpc-toolkit/presets test
+pnpm --filter @lpc-toolkit/web test
+pnpm --filter @lpc-toolkit/cli test
 ```
 
 Architecture-sensitive changes also run:
 
 ```sh
-rtk pnpm check:boundaries
+pnpm check:boundaries
 ```
 
-Before handoff, run `rtk pnpm verify`. Browser E2E, CLI package validation,
+Before handoff, run `pnpm verify`. Browser E2E, CLI package validation,
 asset audits, and isolated upstream parity are conditional checks; use the
 engineering guide to decide when they apply.
 

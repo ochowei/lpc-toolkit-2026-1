@@ -50,7 +50,9 @@ before handoff. See `docs/ENGINEERING.md` for conditional checks.
 6. **Use pnpm for repository development.** Do not switch workspace workflows
    to npm, yarn, or bun. npm/npx remain valid only for documented public CLI
    consumption or authorized npm publication.
-7. **Prefix terminal commands with RTK.** Follow [RTK.md](RTK.md).
+7. **When operating as an AI Agent, prefix terminal commands with RTK.** Human
+   contributors may run the underlying commands directly. Follow
+   [RTK.md](RTK.md).
 8. **CLI documentation impact is mandatory.** CLI-sensitive work must evaluate
    every owned documentation surface before implementation and again before
    handoff. Record each surface as `update` or `N/A — <reason>`; do not rely on
