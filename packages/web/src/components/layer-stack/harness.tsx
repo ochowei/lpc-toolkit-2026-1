@@ -112,6 +112,7 @@ export interface LayerStackHarnessProps {
   t: Translator;
   tl: LabelTranslator;
   onNavigateHome: () => void;
+  onNavigateAssetPacks: () => void;
   onToggleTheme: () => void;
   onToggleLocale: () => void;
 }
@@ -560,6 +561,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
         loadingProgress={loadingProgress}
         upstreamHref={upstreamHref}
         onNavigateHome={props.onNavigateHome}
+        onNavigateAssetPacks={props.onNavigateAssetPacks}
         rightSlot={
           <MoreMenuPopover
             open={popover === 'more'}

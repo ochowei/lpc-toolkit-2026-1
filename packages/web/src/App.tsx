@@ -160,7 +160,13 @@ function useAppPathname(): [string, (path: AppPath) => void, (blocker: Navigatio
   return [pathname, navigate, registerBlocker];
 }
 
-function ComposerApp({ onNavigateHome }: { onNavigateHome: () => void }) {
+function ComposerApp({
+  onNavigateHome,
+  onNavigateAssetPacks,
+}: {
+  readonly onNavigateHome: () => void;
+  readonly onNavigateAssetPacks: () => void;
+}) {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE);
 
@@ -204,6 +210,7 @@ function ComposerApp({ onNavigateHome }: { onNavigateHome: () => void }) {
       t={t}
       tl={tl}
       onNavigateHome={onNavigateHome}
+      onNavigateAssetPacks={onNavigateAssetPacks}
       onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
       onToggleLocale={() =>
         setLocale((current) => (current === 'en' ? 'zh-TW' : 'en'))
@@ -309,7 +316,12 @@ export default function App({ confirmNavigation }: AppProps = {}) {
   };
 
   if (route === 'compose') {
-    return <ComposerApp onNavigateHome={() => navigateToRoute('landing')} />;
+    return (
+      <ComposerApp
+        onNavigateHome={() => navigateToRoute('landing')}
+        onNavigateAssetPacks={() => navigateToRoute('asset-packs')}
+      />
+    );
   }
 
   if (route === 'asset-packs') {

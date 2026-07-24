@@ -41,6 +41,7 @@ describe('TopBar', () => {
       loadingProgress: null,
       upstreamHref: 'https://example.com/upstream',
       onNavigateHome,
+      onNavigateAssetPacks: vi.fn(),
     });
     const html = renderToStaticMarkup(tree);
 
