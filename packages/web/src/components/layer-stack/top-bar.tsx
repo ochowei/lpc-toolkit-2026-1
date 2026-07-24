@@ -7,7 +7,6 @@ interface Props {
   loadingProgress: number | null;
   upstreamHref: string;
   onNavigateHome: () => void;
-  onNavigateAssetPacks: () => void;
   rightSlot?: ReactNode;
 }
 
@@ -17,7 +16,6 @@ export function TopBar({
   loadingProgress,
   upstreamHref,
   onNavigateHome,
-  onNavigateAssetPacks,
   rightSlot,
   children,
 }: PropsWithChildren<Props>) {
@@ -31,14 +29,6 @@ export function TopBar({
         aria-label={t('topBar.backHome')}
       >
         {t('topBar.backHome')}
-      </Button>
-      <Button
-        size="sm"
-        variant="ghost"
-        onClick={onNavigateAssetPacks}
-        aria-label="Repair an Asset Pack"
-      >
-        Repair an Asset Pack
       </Button>
       <div aria-hidden="true" className="h-6 w-px shrink-0 bg-border" />
       <div className="mr-1 flex min-w-0 flex-col leading-none">

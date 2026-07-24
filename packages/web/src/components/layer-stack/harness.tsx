@@ -561,7 +561,6 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
         loadingProgress={loadingProgress}
         upstreamHref={upstreamHref}
         onNavigateHome={props.onNavigateHome}
-        onNavigateAssetPacks={props.onNavigateAssetPacks}
         rightSlot={
           <MoreMenuPopover
             open={popover === 'more'}
@@ -572,6 +571,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
             attributionCount={attributionSummary.sourceCount}
             attributionIncompatible={attributionSummary.incompatibleAny}
             onSelect={(target) => setPopover(target)}
+            onNavigateAssetPacks={props.onNavigateAssetPacks}
             onToggleLocale={onToggleLocale}
             onToggleTheme={onToggleTheme}
             anchorRefOut={moreMenuAnchorRef}

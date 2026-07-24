@@ -16,10 +16,19 @@ interface Props {
   attributionCount: number;
   attributionIncompatible: boolean;
   onSelect: (target: MoreMenuTarget) => void;
+  onNavigateAssetPacks: () => void;
   onToggleLocale: () => void;
   onToggleTheme: () => void;
   /** Forwarded so other popovers (Share / Import / Attribution) can anchor to the same `⋯` button. */
   anchorRefOut?: RefObject<HTMLButtonElement>;
+}
+
+export function navigateToAssetPacksFromMoreMenu(
+  setOpen: (v: boolean) => void,
+  onNavigateAssetPacks: () => void,
+): void {
+  setOpen(false);
+  onNavigateAssetPacks();
 }
 
 /** Compact overflow menu for language/theme toggles and secondary popovers. */
@@ -32,6 +41,7 @@ export function MoreMenuPopover({
   attributionCount,
   attributionIncompatible,
   onSelect,
+  onNavigateAssetPacks,
   onToggleLocale,
   onToggleTheme,
   anchorRefOut,
@@ -82,6 +92,13 @@ export function MoreMenuPopover({
             <span className="ml-auto font-mono text-[10px] text-text-mute">
               {attributionCount}
             </span>
+          </MenuItem>
+          <MenuItem
+            onClick={() =>
+              navigateToAssetPacksFromMoreMenu(setOpen, onNavigateAssetPacks)
+            }
+          >
+            <span>Repair an Asset Pack</span>
           </MenuItem>
 
           <div className="my-1 border-t border-border" />
