@@ -86,9 +86,6 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               <Button variant="primary" onClick={() => onNavigate('compose')}>
                 Open Composer
               </Button>
-              <Button onClick={() => onNavigate('asset-packs')}>
-                Repair an Asset Pack
-              </Button>
               <Button asChild>
                 <a href="#cli-quick-start">Use the CLI</a>
               </Button>
