@@ -13,6 +13,8 @@ interface ActionProps {
   readonly 'aria-label'?: string;
   readonly children?: ReactNode;
   readonly className?: string;
+  readonly variant?: string;
+  readonly size?: string;
   readonly onClick?: () => void;
 }
 
@@ -56,5 +58,31 @@ describe('TopBar', () => {
     expect(action?.props.className).toContain('hover:bg-accent/20');
     action?.props.onClick?.();
     expect(onNavigateHome).toHaveBeenCalledOnce();
+  });
+
+  it('renders an asset-pack editor action and emits navigation intent', () => {
+    const onNavigateAssetPacks = vi.fn();
+    const tree = TopBar({
+      t: createTranslator('en'),
+      loadingProgress: null,
+      upstreamHref: 'https://example.com/upstream',
+      onNavigateHome: vi.fn(),
+      onNavigateAssetPacks,
+    });
+    const html = renderToStaticMarkup(tree);
+
+    const homeActionIndex = html.indexOf('← Back to home');
+    const assetPackActionIndex = html.indexOf('Repair an Asset Pack');
+    const brandIndex = html.indexOf('LPC');
+
+    expect(assetPackActionIndex).toBeGreaterThan(homeActionIndex);
+    expect(brandIndex).toBeGreaterThan(assetPackActionIndex);
+
+    const action = findAction(tree, 'Repair an Asset Pack');
+    expect(action).toBeDefined();
+    expect(action?.props.variant).toBe('ghost');
+    expect(action?.props.size).toBe('sm');
+    action?.props.onClick?.();
+    expect(onNavigateAssetPacks).toHaveBeenCalledOnce();
   });
 });

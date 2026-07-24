@@ -14,7 +14,7 @@ describe('LandingPage', () => {
     expect(html).toContain('hero.credits.csv');
 
     expect(html.match(/Open Composer/g)).toHaveLength(1);
-    expect(html).toContain('Repair an Asset Pack');
+    expect(html).not.toContain('Repair an Asset Pack');
     expect(html).toContain('href="#cli-quick-start"');
     expect(html).toContain('Use the CLI');
     expect(html).toContain('id="cli-quick-start"');
