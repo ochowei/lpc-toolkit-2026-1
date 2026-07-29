@@ -63,6 +63,9 @@ const artistWorkflowCommands = [
 const cliReadmeUrl =
   'https://github.com/ochowei/lpc-toolkit-2026-1/blob/main/packages/cli/README.md';
 
+const pluginReadmeUrl =
+  'https://github.com/ochowei/lpc-toolkit-2026-1#codex-plugin';
+
 const codeClassName =
   'block overflow-x-auto whitespace-nowrap rounded-md bg-[var(--bg-deep)] px-3 py-2 font-mono text-sm text-text';
 
@@ -147,6 +150,50 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           <p className="mt-5 rounded-md border border-border bg-surface-2 p-3 text-sm text-text-2">
             The first asset-dependent command downloads about 205 MB of pinned
             assets once, verifies them, and reuses the local cache afterward.
+          </p>
+        </section>
+
+        <section
+          id="codex-plugin"
+          className="scroll-mt-6 rounded-md border border-border bg-surface p-5"
+        >
+          <h2 className="text-2xl font-semibold text-text">
+            Install the Codex plugin
+          </h2>
+          <p className="mt-2 max-w-3xl text-sm text-text-2">
+            Give Codex a focused workflow for creating, editing, previewing,
+            and rendering attributed LPC characters. Install the CLI first,
+            then add the beta marketplace and enable the plugin.
+          </p>
+          <ol className="mt-5 grid gap-4 lg:grid-cols-3">
+            {[
+              'npm install -g @lpc-toolkit/cli',
+              'codex plugin marketplace add ochowei/lpc-toolkit-2026-1',
+              'codex plugin add lpc-toolkit@lpc-toolkit',
+            ].map((command, index) => (
+              <li
+                key={command}
+                className="min-w-0 rounded-md border border-border bg-surface-2 p-4"
+              >
+                <p className="text-xs font-semibold uppercase tracking-wide text-text-mute">
+                  Step {index + 1}
+                </p>
+                <code className={`${codeClassName} mt-3`}>{command}</code>
+              </li>
+            ))}
+          </ol>
+          <p className="mt-4 text-sm text-text-2">
+            The plugin requires Node.js 22 or newer and an installed
+            compatible CLI.{' '}
+            <a
+              className="underline hover:text-text"
+              href={pluginReadmeUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Read the plugin details
+            </a>
+            .
           </p>
         </section>
 
