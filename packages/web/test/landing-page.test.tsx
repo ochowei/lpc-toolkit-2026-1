@@ -35,6 +35,13 @@ describe('LandingPage', () => {
     expect(html).toContain('npx @lpc-toolkit/cli --help');
     expect(html).toContain('Node.js 22 or newer');
     expect(html).toContain('about 205 MB');
+    expect(html).toContain('id="codex-plugin"');
+    expect(html).toContain('Install the Codex plugin');
+    expect(html).toContain(
+      'codex plugin marketplace add ochowei/lpc-toolkit-2026-1',
+    );
+    expect(html).toContain('codex plugin add lpc-toolkit@lpc-toolkit');
+    expect(html).toContain('https://github.com/ochowei/lpc-toolkit-2026-1#codex-plugin');
     expect(html).toContain('overflow-x-auto whitespace-nowrap');
     expect(html).toContain('characters/previews/hero/');
     expect(html).toContain('hero.metadata.json');

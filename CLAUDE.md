@@ -15,6 +15,8 @@ focused guide that owns the work before making broad changes:
 - [Onboarding guide](docs/ONBOARDING.md) — first setup and package tour.
 - [Contributing guide](CONTRIBUTING.md) — branch, change, and pull request
   workflow.
+- [Agent retrieval-cost survey](docs/AGENT-RETRIEVAL-COST.md) — discussion notes
+  on documentation navigation, context, token, dependency, and verification cost.
 
 ## Common Commands
 
