@@ -1,8 +1,63 @@
+import { useState } from 'react';
 import heroPreviewUrl from '../landing-artifacts/hero.preview.png';
 import heroCreditsTxtUrl from '../landing-artifacts/hero.credits.txt?url';
 import heroCreditsCsvUrl from '../landing-artifacts/hero.credits.csv?url';
 import type { NavigableAppRoute } from '../lib/app-route';
 import { Button } from './ui/button';
+
+interface CopyCodeProps {
+  readonly children: string;
+  readonly className?: string;
+  readonly multiline?: boolean;
+  readonly showCopy?: boolean;
+}
+
+function CopyCode({
+  children,
+  className,
+  multiline = false,
+  showCopy = true,
+}: CopyCodeProps) {
+  const [copied, setCopied] = useState(false);
+
+  async function copyCode() {
+    try {
+      await navigator.clipboard.writeText(children);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <div
+      className={`${codeClassName.replace('overflow-x-auto', 'overflow-hidden')} min-w-0 max-w-full flex items-center gap-3 ${className ?? ''}`}
+    >
+      <code className={`min-w-0 max-w-full flex-1 ${multiline ? 'whitespace-pre-wrap break-words' : 'whitespace-normal break-words'}`}>
+        {children}
+      </code>
+      {showCopy && (
+        <button
+          type="button"
+          aria-label={copied ? 'Copied' : 'Copy code'}
+          title={copied ? 'Copied' : 'Copy code'}
+          onClick={() => void copyCode()}
+          className="flex size-8 shrink-0 items-center justify-center rounded border border-border-strong text-text-2 transition-colors hover:bg-surface-3 hover:text-text"
+        >
+          {copied ? (
+            <span aria-hidden="true" className="text-sm text-[var(--success)]">✓</span>
+          ) : (
+            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <rect x="9" y="9" width="11" height="11" rx="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
+          )}
+        </button>
+      )}
+    </div>
+  );
+}
 
 interface LandingPageProps {
   readonly onNavigate: (route: NavigableAppRoute) => void;
@@ -67,12 +122,12 @@ const pluginReadmeUrl =
   'https://github.com/ochowei/lpc-toolkit-2026-1#codex-plugin';
 
 const codeClassName =
-  'block overflow-x-auto whitespace-nowrap rounded-md bg-[var(--bg-deep)] px-3 py-2 font-mono text-sm text-text';
+  'block min-h-10 rounded-md border border-border bg-[var(--bg-deep)] px-3 py-2 font-mono text-sm leading-5 text-text';
 
 export function LandingPage({ onNavigate }: LandingPageProps) {
   return (
     <main className="min-h-screen bg-app text-text">
-      <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-8 px-5 py-6 sm:px-8 lg:px-10">
+      <div className="mx-auto flex min-h-screen min-w-0 w-full max-w-6xl flex-col gap-8 overflow-x-hidden px-5 py-6 sm:px-8 lg:px-10">
         <header className="grid items-center gap-8 border-b border-border pb-8 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-mute">
@@ -130,7 +185,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             To inspect the CLI without installing it, run{' '}
             <code>npx @lpc-toolkit/cli --help</code>.
           </p>
-          <ol className="mt-5 grid gap-4 lg:grid-cols-3">
+          <ol className="mt-5 grid min-w-0 gap-4">
             {quickStartSteps.map((step, index) => (
               <li
                 key={step.command}
@@ -143,7 +198,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                   {step.title}
                 </h3>
                 <p className="mt-1 text-sm text-text-2">{step.description}</p>
-                <code className={`${codeClassName} mt-4`}>{step.command}</code>
+                <CopyCode className="mt-4" children={step.command} />
               </li>
             ))}
           </ol>
@@ -165,7 +220,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             and rendering attributed LPC characters. Install the CLI first,
             then add the beta marketplace and enable the plugin.
           </p>
-          <ol className="mt-5 grid gap-4 lg:grid-cols-3">
+          <ol className="mt-5 grid min-w-0 gap-4">
             {[
               'npm install -g @lpc-toolkit/cli',
               'codex plugin marketplace add ochowei/lpc-toolkit-2026-1',
@@ -178,7 +233,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                 <p className="text-xs font-semibold uppercase tracking-wide text-text-mute">
                   Step {index + 1}
                 </p>
-                <code className={`${codeClassName} mt-3`}>{command}</code>
+                <CopyCode className="mt-3" children={command} />
               </li>
             ))}
           </ol>
@@ -210,7 +265,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           <ol className="mt-5 space-y-3">
             {artistWorkflowCommands.map((command, index) => (
               <li key={`${index}-${command}`}>
-                <code className={codeClassName}>{command}</code>
+                <CopyCode children={command} />
               </li>
             ))}
           </ol>
@@ -238,13 +293,11 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               Named previews use a predictable directory and keep attribution
               beside the image.
             </p>
-            <pre className={`${codeClassName} mt-4`}>
-              <code className="whitespace-pre">{`characters/previews/hero/
+            <CopyCode multiline showCopy={false} className="mt-4" children={`characters/previews/hero/
 ├── hero.preview.png
 ├── hero.metadata.json
 ├── hero.credits.txt
-└── hero.credits.csv`}</code>
-            </pre>
+└── hero.credits.csv`} />
           </div>
           <div className="rounded-md border border-border bg-surface p-5">
             <h2 className="text-xl font-semibold text-text">
@@ -283,9 +336,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                     <p className="mt-1 text-sm text-text-2">
                       {step.description}
                     </p>
-                    <code className={`${codeClassName} mt-3`}>
-                      {step.command}
-                    </code>
+                    <CopyCode className="mt-3" children={step.command} />
                   </div>
                 </div>
               </li>
@@ -301,10 +352,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             Export the walk sheet and attributed ZIP after the character looks
             right.
           </p>
-          <code className={`${codeClassName} mt-4`}>
-            lpc-toolkit character render hero --out ./dist/hero --animation walk
-            --bundle zip
-          </code>
+          <CopyCode className="mt-4" children="lpc-toolkit character render hero --out ./dist/hero --animation walk --bundle zip" />
           <p className="mt-4 text-sm text-text-2">
             Render output includes the composed sheet, metadata, TXT and CSV
             credits, and the requested ZIP. Attribution artifacts are required,
