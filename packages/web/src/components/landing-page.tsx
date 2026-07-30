@@ -9,9 +9,15 @@ interface CopyCodeProps {
   readonly children: string;
   readonly className?: string;
   readonly multiline?: boolean;
+  readonly showCopy?: boolean;
 }
 
-function CopyCode({ children, className, multiline = false }: CopyCodeProps) {
+function CopyCode({
+  children,
+  className,
+  multiline = false,
+  showCopy = true,
+}: CopyCodeProps) {
   const [copied, setCopied] = useState(false);
 
   async function copyCode() {
@@ -31,22 +37,24 @@ function CopyCode({ children, className, multiline = false }: CopyCodeProps) {
       <code className={`min-w-0 max-w-full flex-1 ${multiline ? 'whitespace-pre-wrap break-words' : 'whitespace-normal break-words'}`}>
         {children}
       </code>
-      <button
-        type="button"
-        aria-label={copied ? 'Copied' : 'Copy code'}
-        title={copied ? 'Copied' : 'Copy code'}
-        onClick={() => void copyCode()}
-        className="flex size-8 shrink-0 items-center justify-center rounded border border-border-strong text-text-2 transition-colors hover:bg-surface-3 hover:text-text"
-      >
-        {copied ? (
-          <span aria-hidden="true" className="text-sm text-[var(--success)]">✓</span>
-        ) : (
-          <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-            <rect x="9" y="9" width="11" height="11" rx="2" />
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-          </svg>
-        )}
-      </button>
+      {showCopy && (
+        <button
+          type="button"
+          aria-label={copied ? 'Copied' : 'Copy code'}
+          title={copied ? 'Copied' : 'Copy code'}
+          onClick={() => void copyCode()}
+          className="flex size-8 shrink-0 items-center justify-center rounded border border-border-strong text-text-2 transition-colors hover:bg-surface-3 hover:text-text"
+        >
+          {copied ? (
+            <span aria-hidden="true" className="text-sm text-[var(--success)]">✓</span>
+          ) : (
+            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <rect x="9" y="9" width="11" height="11" rx="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
+          )}
+        </button>
+      )}
     </div>
   );
 }
@@ -285,7 +293,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               Named previews use a predictable directory and keep attribution
               beside the image.
             </p>
-            <CopyCode multiline className="mt-4" children={`characters/previews/hero/
+            <CopyCode multiline showCopy={false} className="mt-4" children={`characters/previews/hero/
 ├── hero.preview.png
 ├── hero.metadata.json
 ├── hero.credits.txt
