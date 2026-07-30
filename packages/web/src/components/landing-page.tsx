@@ -26,9 +26,9 @@ function CopyCode({ children, className, multiline = false }: CopyCodeProps) {
 
   return (
     <div
-      className={`${codeClassName} flex items-center gap-3 ${className ?? ''}`}
+      className={`${codeClassName.replace('overflow-x-auto', 'overflow-hidden')} min-w-0 max-w-full flex items-center gap-3 ${className ?? ''}`}
     >
-      <code className={`min-w-0 flex-1 overflow-x-auto ${multiline ? 'whitespace-pre' : 'whitespace-nowrap'}`}>
+      <code className={`min-w-0 max-w-full flex-1 overflow-x-auto ${multiline ? 'whitespace-pre' : 'whitespace-nowrap'}`}>
         {children}
       </code>
       <button
@@ -119,7 +119,7 @@ const codeClassName =
 export function LandingPage({ onNavigate }: LandingPageProps) {
   return (
     <main className="min-h-screen bg-app text-text">
-      <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-8 px-5 py-6 sm:px-8 lg:px-10">
+      <div className="mx-auto flex min-h-screen min-w-0 w-full max-w-6xl flex-col gap-8 overflow-x-hidden px-5 py-6 sm:px-8 lg:px-10">
         <header className="grid items-center gap-8 border-b border-border pb-8 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-mute">
@@ -177,7 +177,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             To inspect the CLI without installing it, run{' '}
             <code>npx @lpc-toolkit/cli --help</code>.
           </p>
-          <ol className="mt-5 grid gap-4 lg:grid-cols-3">
+          <ol className="mt-5 grid min-w-0 gap-4 lg:grid-cols-3">
             {quickStartSteps.map((step, index) => (
               <li
                 key={step.command}
@@ -212,7 +212,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             and rendering attributed LPC characters. Install the CLI first,
             then add the beta marketplace and enable the plugin.
           </p>
-          <ol className="mt-5 grid gap-4 lg:grid-cols-3">
+          <ol className="mt-5 grid min-w-0 gap-4 lg:grid-cols-3">
             {[
               'npm install -g @lpc-toolkit/cli',
               'codex plugin marketplace add ochowei/lpc-toolkit-2026-1',
