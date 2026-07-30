@@ -42,7 +42,8 @@ describe('LandingPage', () => {
     );
     expect(html).toContain('codex plugin add lpc-toolkit@lpc-toolkit');
     expect(html).toContain('https://github.com/ochowei/lpc-toolkit-2026-1#codex-plugin');
-    expect(html).toContain('overflow-x-auto whitespace-nowrap');
+    expect(html).toContain('whitespace-normal break-words');
+    expect(html).not.toContain('overflow-x-auto');
     expect(html).toContain('characters/previews/hero/');
     expect(html).toContain('hero.metadata.json');
     expect(html).toContain('Keep both credit files with the generated sprite.');

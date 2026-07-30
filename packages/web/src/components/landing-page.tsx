@@ -26,9 +26,9 @@ function CopyCode({ children, className, multiline = false }: CopyCodeProps) {
 
   return (
     <div
-      className={`${codeClassName.replace('overflow-x-auto', 'overflow-hidden')} min-w-0 max-w-full flex items-center gap-3 ${className ?? ''}`}
+      className={`${codeClassName.replace('overflow-x-auto', 'overflow-hidden')} min-w-0 max-w-full flex items-start gap-3 ${className ?? ''}`}
     >
-      <code className={`min-w-0 max-w-full flex-1 overflow-x-auto ${multiline ? 'whitespace-pre' : 'whitespace-nowrap'}`}>
+      <code className={`min-w-0 max-w-full flex-1 ${multiline ? 'whitespace-pre-wrap break-words' : 'whitespace-normal break-words'}`}>
         {children}
       </code>
       <button
@@ -114,7 +114,7 @@ const pluginReadmeUrl =
   'https://github.com/ochowei/lpc-toolkit-2026-1#codex-plugin';
 
 const codeClassName =
-  'block overflow-x-auto whitespace-nowrap rounded-md bg-[var(--bg-deep)] px-3 py-2 font-mono text-sm text-text';
+  'block rounded-md bg-[var(--bg-deep)] px-3 py-2 font-mono text-sm text-text';
 
 export function LandingPage({ onNavigate }: LandingPageProps) {
   return (
@@ -177,7 +177,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             To inspect the CLI without installing it, run{' '}
             <code>npx @lpc-toolkit/cli --help</code>.
           </p>
-          <ol className="mt-5 grid min-w-0 gap-4 lg:grid-cols-3">
+          <ol className="mt-5 grid min-w-0 gap-4">
             {quickStartSteps.map((step, index) => (
               <li
                 key={step.command}
@@ -212,7 +212,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             and rendering attributed LPC characters. Install the CLI first,
             then add the beta marketplace and enable the plugin.
           </p>
-          <ol className="mt-5 grid min-w-0 gap-4 lg:grid-cols-3">
+          <ol className="mt-5 grid min-w-0 gap-4">
             {[
               'npm install -g @lpc-toolkit/cli',
               'codex plugin marketplace add ochowei/lpc-toolkit-2026-1',
