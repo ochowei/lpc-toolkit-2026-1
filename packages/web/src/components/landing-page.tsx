@@ -26,7 +26,7 @@ function CopyCode({ children, className, multiline = false }: CopyCodeProps) {
 
   return (
     <div
-      className={`${codeClassName.replace('overflow-x-auto', 'overflow-hidden')} min-w-0 max-w-full flex items-start gap-3 ${className ?? ''}`}
+      className={`${codeClassName.replace('overflow-x-auto', 'overflow-hidden')} min-w-0 max-w-full flex items-center gap-3 ${className ?? ''}`}
     >
       <code className={`min-w-0 max-w-full flex-1 ${multiline ? 'whitespace-pre-wrap break-words' : 'whitespace-normal break-words'}`}>
         {children}
@@ -114,7 +114,7 @@ const pluginReadmeUrl =
   'https://github.com/ochowei/lpc-toolkit-2026-1#codex-plugin';
 
 const codeClassName =
-  'block min-h-10 rounded-md border border-border bg-[var(--bg-deep)] px-3 py-2 font-mono text-sm leading-6 text-text';
+  'block min-h-10 rounded-md border border-border bg-[var(--bg-deep)] px-3 py-2 font-mono text-sm leading-5 text-text';
 
 export function LandingPage({ onNavigate }: LandingPageProps) {
   return (
