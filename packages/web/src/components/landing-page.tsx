@@ -114,7 +114,7 @@ const pluginReadmeUrl =
   'https://github.com/ochowei/lpc-toolkit-2026-1#codex-plugin';
 
 const codeClassName =
-  'block rounded-md bg-[var(--bg-deep)] px-3 py-2 font-mono text-sm text-text';
+  'block min-h-10 rounded-md border border-border bg-[var(--bg-deep)] px-3 py-2 font-mono text-sm leading-6 text-text';
 
 export function LandingPage({ onNavigate }: LandingPageProps) {
   return (
