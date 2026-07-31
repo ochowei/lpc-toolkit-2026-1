@@ -9,6 +9,7 @@ import {
 } from '../src/asset-pack-model.js';
 import {
   ASSET_PACK_SCHEMA,
+  parseAssetPackSource,
   type AssetPackAcknowledgement,
   type AssetPackSource,
 } from '../src/asset-pack-schema.js';
@@ -198,6 +199,64 @@ function diagnosticPaths(result: ReturnType<typeof validateAssetPack>): string[]
 }
 
 describe('asset-pack validation', () => {
+  it('reports deprecated legacy match_body_color input after normalizing its primary link', () => {
+    const source = newItemSource();
+    const firstAsset = source.assets[0];
+    if (!firstAsset || firstAsset.kind !== 'new-item') {
+      throw new Error('Expected a new-item fixture.');
+    }
+    const parsed = parseAssetPackSource({
+      ...source,
+      assets: [{ ...firstAsset, match_body_color: true }],
+    });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) throw new Error('Expected legacy match_body_color to parse.');
+
+    const result = validateSource(parsed.source, [
+      inspectionFor('sprites/wind-braid/foreground/walk.png', 'walk'),
+      inspectionFor('sprites/wind-braid/foreground/climb.png', 'climb'),
+    ]);
+
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({
+      code: 'asset_recolor_link_deprecated',
+      severity: 'warning',
+      details: expect.objectContaining({
+        path: '$.assets[0].match_body_color',
+      }),
+    }));
+  });
+
+  it('rejects a self-link on a body asset channel', () => {
+    const source = newItemSource();
+    const firstAsset = source.assets[0];
+    if (!firstAsset || firstAsset.kind !== 'new-item') {
+      throw new Error('Expected a new-item fixture.');
+    }
+    const result = validateSource({
+      ...source,
+      assets: [{
+        ...firstAsset,
+        typeName: 'body',
+        recolor: {
+          material: 'hair',
+          palettes: ['ulpc'],
+          linked_to: { selection: 'body', channel: 'primary' },
+        },
+      }],
+    }, [
+      inspectionFor('sprites/wind-braid/foreground/walk.png', 'walk'),
+      inspectionFor('sprites/wind-braid/foreground/climb.png', 'climb'),
+    ]);
+
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({
+      code: 'asset_pack_schema_invalid',
+      severity: 'error',
+      details: expect.objectContaining({
+        path: '$.assets[0].recolor.linked_to',
+      }),
+    }));
+  });
+
   it('keeps an acknowledgement stable when only acknowledgements change', () => {
     const acknowledgement: AssetPackAcknowledgement = {
       code: 'asset_path_inferred',

@@ -1,5 +1,6 @@
 import {
   getDefaultColorSelection,
+  getColorChannels,
   getRecolorSwatches,
   type ItemDefinition,
   type PaletteMetadata,
@@ -73,7 +74,9 @@ export function getColorOptions(
       swatch: representative(s.colors),
       label: humanize(s.recolor),
     }));
-    if (item.match_body_color && item.type_name !== 'body') {
+    const primaryLinkedToBody = getColorChannels(item, palettes)[0]
+      ?.linkedTo?.selection === 'body';
+    if ((primaryLinkedToBody || item.match_body_color) && item.type_name !== 'body') {
       const selected = options.find(
         (option) => option.value === context.bodyRecolor,
       );

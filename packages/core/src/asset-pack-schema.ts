@@ -4,6 +4,7 @@ import { BODY_TYPES, LICENSE_GROUP_OF } from './constants.js';
 import type {
   AnimationName,
   BodyType,
+  ColorChannelLink,
   ItemId,
   License,
   RawRecolors,
@@ -32,7 +33,8 @@ export type AssetPackDiagnosticCode =
   | 'asset_path_inferred'
   | 'asset_optional_frame_blank'
   | 'asset_partial_body_coverage'
-  | 'asset_partial_animation_coverage';
+  | 'asset_partial_animation_coverage'
+  | 'asset_recolor_link_deprecated';
 
 export interface AssetPackCreditSource {
   readonly authors: readonly string[];
@@ -83,6 +85,8 @@ export interface NewItemAssetSource {
   readonly layers: readonly NewItemLayerSource[];
   readonly variants?: readonly string[];
   readonly recolor?: RawRecolors;
+  /** @deprecated Use `linked_to` on the affected recolor channel. */
+  readonly match_body_color?: boolean;
 }
 
 export interface ExtendItemDestinationSource {
@@ -174,6 +178,7 @@ const DIAGNOSTIC_CODES = new Set<AssetPackDiagnosticCode>([
   'asset_optional_frame_blank',
   'asset_partial_body_coverage',
   'asset_partial_animation_coverage',
+  'asset_recolor_link_deprecated',
 ]);
 
 const LICENSES = new Set<License>(Object.keys(LICENSE_GROUP_OF) as License[]);
@@ -458,6 +463,7 @@ function parseNewItemAsset(
     'layers',
     'variants',
     'recolor',
+    'match_body_color',
   ], diagnostics);
 
   const localId = readString(record, 'localId', `${path}.localId`, diagnostics);
@@ -494,6 +500,21 @@ function parseNewItemAsset(
     `${path}.recolor`,
     diagnostics,
   );
+  const matchBodyColor = readOptionalBoolean(
+    record,
+    'match_body_color',
+    `${path}.match_body_color`,
+    diagnostics,
+  );
+
+  if (matchBodyColor === true && !recolor) {
+    pushDiagnostic(diagnostics, {
+      code: 'asset_pack_schema_invalid',
+      severity: 'error',
+      message: `Legacy body-color matching at ${path}.match_body_color requires a recolor channel.`,
+      details: { path: `${path}.match_body_color` },
+    });
+  }
 
   if (localId && !LOCAL_ID_PATTERN.test(localId)) {
     pushDiagnostic(diagnostics, {
@@ -519,6 +540,7 @@ function parseNewItemAsset(
     layers,
     ...(variants ? { variants } : {}),
     ...(recolor ? { recolor } : {}),
+    ...(matchBodyColor !== undefined ? { match_body_color: matchBodyColor } : {}),
   };
 }
 
@@ -1330,6 +1352,33 @@ function parseRawRecolors(
     if (parsed) multi[key as `color_${number}`] = parsed;
   });
 
+  const seenChannelIds = new Set<string>();
+  [...parsedEntries.entries()]
+    .sort(([left], [right]) => Number(left.slice(6)) - Number(right.slice(6)))
+    .forEach(([key, config]) => {
+      if (key === 'color_1') return;
+      const typeName = config.type_name;
+      if (!typeName) {
+        pushDiagnostic(diagnostics, {
+          code: 'asset_pack_schema_invalid',
+          severity: 'error',
+          message: `Secondary recolor channel at ${path}.${key} requires type_name.`,
+          details: { path: `${path}.${key}.type_name` },
+        });
+        return;
+      }
+      if (typeName === 'primary' || seenChannelIds.has(typeName)) {
+        pushDiagnostic(diagnostics, {
+          code: 'asset_pack_schema_invalid',
+          severity: 'error',
+          message: `Duplicate recolor channel id "${typeName}" at ${path}.${key}.type_name.`,
+          details: { path: `${path}.${key}.type_name`, value: typeName },
+        });
+        return;
+      }
+      seenChannelIds.add(typeName);
+    });
+
   return multi as RawRecolors;
 }
 
@@ -1341,7 +1390,12 @@ function parseRecolorConfig(
   const record = asRecord(input, path, diagnostics);
   if (!record) return undefined;
 
-  exactKeys(record, path, ['material', 'palettes', 'type_name', 'base', 'source', 'label'], diagnostics);
+  exactKeys(
+    record,
+    path,
+    ['material', 'palettes', 'type_name', 'base', 'source', 'label', 'linked_to'],
+    diagnostics,
+  );
 
   const material = readString(record, 'material', `${path}.material`, diagnostics);
   const palettes = parseStringArray(record.palettes, `${path}.palettes`, diagnostics);
@@ -1349,6 +1403,11 @@ function parseRecolorConfig(
   const base = readOptionalString(record, 'base', `${path}.base`, diagnostics);
   const source = parseOptionalStringArray(record.source, `${path}.source`, diagnostics);
   const label = readOptionalString(record, 'label', `${path}.label`, diagnostics);
+  const linkedTo = parseOptionalColorChannelLink(
+    record.linked_to,
+    `${path}.linked_to`,
+    diagnostics,
+  );
 
   if (!material || !palettes) return undefined;
   return {
@@ -1358,7 +1417,44 @@ function parseRecolorConfig(
     ...(base ? { base } : {}),
     ...(source ? { source } : {}),
     ...(label ? { label } : {}),
+    ...(linkedTo ? { linked_to: linkedTo } : {}),
   };
+}
+
+function parseOptionalColorChannelLink(
+  input: unknown,
+  path: string,
+  diagnostics: AssetPackDiagnostic[],
+): ColorChannelLink | undefined {
+  if (input === undefined) return undefined;
+  const record = asRecord(input, path, diagnostics);
+  if (!record) return undefined;
+  exactKeys(record, path, ['selection', 'channel'], diagnostics);
+
+  const selection = readString(record, 'selection', `${path}.selection`, diagnostics);
+  const channel = readString(record, 'channel', `${path}.channel`, diagnostics);
+  let valid = true;
+  if (selection && selection !== 'body') {
+    pushDiagnostic(diagnostics, {
+      code: 'asset_pack_schema_invalid',
+      severity: 'error',
+      message: `Unsupported linked selection at ${path}.selection.`,
+      details: { path: `${path}.selection`, value: selection },
+    });
+    valid = false;
+  }
+  if (channel && channel !== 'primary') {
+    pushDiagnostic(diagnostics, {
+      code: 'asset_pack_schema_invalid',
+      severity: 'error',
+      message: `Unsupported linked channel at ${path}.channel.`,
+      details: { path: `${path}.channel`, value: channel },
+    });
+    valid = false;
+  }
+  return valid && selection === 'body' && channel === 'primary'
+    ? { selection, channel }
+    : undefined;
 }
 
 function exactKeys(
@@ -1487,6 +1583,16 @@ function readBoolean(
     details: { path, value },
   });
   return undefined;
+}
+
+function readOptionalBoolean(
+  record: UnknownRecord,
+  key: string,
+  path: string,
+  diagnostics: AssetPackDiagnostic[],
+): boolean | undefined {
+  if (record[key] === undefined) return undefined;
+  return readBoolean(record, key, path, diagnostics);
 }
 
 function readInteger(

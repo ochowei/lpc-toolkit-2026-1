@@ -349,8 +349,8 @@ function getBodyColor(
  * selections — the adapted port of upstream `getMultiRecolors`. Our
  * `Selection` has no `subId`; sub-entries bind by `type_name` to the
  * matching selection's `recolor` (semantically what upstream's
- * `recolors[typeName]` keying expresses). `match_body_color` forces the
- * body color (QD).
+ * `recolors[typeName]` keying expresses). An explicit primary `linked_to`
+ * declaration, or the legacy `match_body_color` flag, forces the body color.
  * 
  * Maps each sub-category to its chosen color option, resolving multi-material
  * color overrides and applying body-color synchronization where applicable.
@@ -384,7 +384,9 @@ function getMultiRecolors(
     if (sub?.recolor) recolors[entry.type_name] = sub.recolor;
   }
 
-  if (item.match_body_color) {
+  const primaryLinkedToBody = entries[0]?.linked_to?.selection === 'body'
+    && entries[0]?.linked_to?.channel === 'primary';
+  if (primaryLinkedToBody || item.match_body_color) {
     const bodyColor = getBodyColor(catalog, selections);
     if (bodyColor === undefined) {
       warn?.(

@@ -18,6 +18,7 @@ import type {
   FilePath,
   ItemDefinition,
   PaletteMetadata,
+  RecolorConfig,
   Selections,
 } from '../src/types.js';
 import { createNodeCanvasAdapter } from './helpers/node-canvas-adapter.js';
@@ -134,6 +135,34 @@ describe('makeResolvePalette', () => {
       );
       expect(swap?.target).toEqual(
         palettes.materials.body?.palettes.ulpc?.brown,
+      );
+    });
+
+    it('renders a canonical primary body link identically to the pinned legacy flag', () => {
+      const cat = loadCatalog([
+        'body/body.json',
+        'body/lizard/tail_lizard.json',
+      ]);
+      const legacyTail = cat.byItemId.get('tail_lizard')!;
+      const { match_body_color: _legacyFlag, ...tailWithoutLegacyFlag } = legacyTail;
+      const linkedTail: ItemDefinition = {
+        ...tailWithoutLegacyFlag,
+        recolors: {
+          ...(legacyTail.recolors as RecolorConfig),
+          linked_to: { selection: 'body', channel: 'primary' },
+        },
+      };
+      const selections: Selections = {
+        bodyType: 'male',
+        items: {
+          body: { typeName: 'body', name: 'Body Color', recolor: 'brown' },
+          tail: { typeName: 'tail', name: 'Lizard tail' },
+        },
+      };
+      const resolve = makeResolvePalette(cat, palettes, selections);
+
+      expect(resolve(selections.items.tail!, linkedTail)).toEqual(
+        resolve(selections.items.tail!, legacyTail),
       );
     });
 

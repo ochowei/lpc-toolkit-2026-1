@@ -1,5 +1,5 @@
 import { BODY_TYPES } from './constants.js';
-import type { AnimationName, BodyType, CreditEntry, ItemId, RawRecolors, TypeName } from './types.js';
+import type { AnimationName, BodyType, CreditEntry, ItemId, RawRecolors, RecolorConfig, TypeName } from './types.js';
 import { ASSET_PACK_SCHEMA, type AssetPackAcknowledgement, type AssetPackAssetSource, type AssetPackCompatibilitySource, type AssetPackDiagnostic, type AssetPackReplacementSource, type AssetPackSource, type AssetPackStatus, type ExtendItemAnimationSource, type ExtendItemDestinationSource, type ExtendItemLayerSource, type ExtendItemAssetSource, type NewItemAssetSource, type NewItemLayerSource, type NewItemSpriteSource } from './asset-pack-schema.js';
 
 export type AssetPackCreditRecord = Omit<CreditEntry, 'file'>;
@@ -41,6 +41,7 @@ export interface NormalizedNewItemAsset {
   readonly layers: readonly NormalizedNewItemLayer[];
   readonly variants?: readonly string[];
   readonly recolor?: RawRecolors;
+  readonly legacyMatchBodyColor?: boolean;
 }
 
 export interface NormalizedExtendItemDestination {
@@ -203,6 +204,9 @@ function normalizeNewItem(
   const layers = asset.layers
     .map((layer, index) => normalizeNewItemLayer(layer, index, assetBodyTypes))
     .sort((left, right) => left.zPos - right.zPos || left.sourceIndex - right.sourceIndex);
+  const recolor = asset.match_body_color === true && asset.typeName !== 'body'
+    ? linkPrimaryRecolorToBody(asset.recolor)
+    : asset.recolor;
 
   return {
     kind: 'new-item',
@@ -214,7 +218,30 @@ function normalizeNewItem(
     animations: [...asset.animations],
     layers,
     ...(asset.variants ? { variants: sortStrings(asset.variants) } : {}),
-    ...(asset.recolor ? { recolor: asset.recolor } : {}),
+    ...(recolor ? { recolor } : {}),
+    ...(asset.match_body_color !== undefined
+      ? { legacyMatchBodyColor: asset.match_body_color }
+      : {}),
+  };
+}
+
+function linkPrimaryRecolorToBody(recolor: RawRecolors | undefined): RawRecolors | undefined {
+  if (!recolor) return undefined;
+  const multi = recolor as {
+    readonly [key: `color_${number}`]: RecolorConfig | undefined;
+  };
+  if (multi.color_1) {
+    return {
+      ...multi,
+      color_1: {
+        ...multi.color_1,
+        linked_to: { selection: 'body', channel: 'primary' },
+      },
+    };
+  }
+  return {
+    ...(recolor as RecolorConfig),
+    linked_to: { selection: 'body', channel: 'primary' },
   };
 }
 

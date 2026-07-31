@@ -45,11 +45,21 @@ const recolorAndVariantItem: ItemDefinition = {
 const linkedRecolorItem: ItemDefinition = {
   ...recolorItem,
   name: 'Linked Thing',
+  recolors: {
+    material: 'm',
+    palettes: ['v1'],
+    linked_to: { selection: 'body', channel: 'primary' },
+  },
+};
+
+const legacyLinkedRecolorItem: ItemDefinition = {
+  ...recolorItem,
+  name: 'Legacy Linked Thing',
   match_body_color: true,
 };
 
 const bodyRecolorItem: ItemDefinition = {
-  ...linkedRecolorItem,
+  ...recolorItem,
   name: 'Body Color',
   type_name: 'body',
 };
@@ -82,6 +92,15 @@ describe('getColorOptions', () => {
       mode: 'linked-recolor',
       recolor: 'red',
       swatch: '#ee0000',
+    });
+  });
+
+  it('keeps the legacy match flag readable during pinned-release migration', () => {
+    expect(
+      getColorOptions(legacyLinkedRecolorItem, palettes, { bodyRecolor: 'red' }),
+    ).toMatchObject({
+      mode: 'linked-recolor',
+      recolor: 'red',
     });
   });
 

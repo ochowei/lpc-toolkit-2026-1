@@ -274,6 +274,34 @@ function validateNewItem(
     diagnostics,
   );
 
+  if (asset.legacyMatchBodyColor !== undefined) {
+    diagnostics.push({
+      code: 'asset_recolor_link_deprecated',
+      severity: 'warning',
+      message: 'match_body_color is deprecated; use linked_to on the affected recolor channel.',
+      assetId: asset.itemId,
+      subject: {
+        assetId: asset.itemId,
+        field: 'match_body_color',
+      },
+      details: { path: `$.assets[${assetIndex}].match_body_color` },
+    });
+  }
+
+  if (asset.typeName === 'body') {
+    collectRecolorEntriesWithPaths(
+      asset.recolor,
+      `$.assets[${assetIndex}].recolor`,
+    ).forEach((entry) => {
+      if (!entry.config.linked_to) return;
+      diagnostics.push(schemaDiagnostic(
+        `${entry.path}.linked_to`,
+        'A body asset cannot link a color channel to its own selected body source.',
+        asset.itemId,
+      ));
+    });
+  }
+
   asset.layers.forEach((layer, layerIndex) => {
     validateNewItemLayer(
       asset,
