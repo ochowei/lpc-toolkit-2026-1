@@ -348,8 +348,8 @@ function getBodyColor(
  * Build the per-channel chosen-recolor map for one selected asset. Independent
  * secondary values come only from that selection's `channelRecolors`; an
  * explicit `linked_to` declaration resolves from the selected body primary.
- * The legacy `match_body_color` flag remains a primary-channel fallback until
- * the pinned built-in assets publish their explicit links.
+ * The legacy `match_body_color` flag remains a primary-channel fallback for
+ * external legacy definitions; pinned built-in assets use explicit links.
  * 
  * Maps each sub-category to its chosen color option, resolving multi-material
  * color overrides and applying body-color synchronization where applicable.

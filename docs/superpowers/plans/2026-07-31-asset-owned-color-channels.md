@@ -54,11 +54,10 @@ the language in [`CONTEXT.md`](../../../CONTEXT.md).
 - Selection v1 imports without visual change and the next save emits v2.
 - Invalid canonical v2 input fails with an exact field path; invalid v2
   hash/token channel input produces a warning and falls back to asset default.
-- The next pinned asset release migrates all 79 `match_body_color` definitions
-  with render/credit parity: 78 follower assets receive primary-channel
-  `linked_to` declarations, while the sole `body` source drops the legacy flag
-  without a self-link. Until that release exists, the current verified pin
-  remains readable through the legacy runtime fallback.
+- Pinned release `assets-v2026.08.01-color-links-v1` migrates all 79
+  `match_body_color` definitions with render/credit parity: 78 follower assets
+  receive primary-channel `linked_to` declarations, while the sole `body`
+  source drops the legacy flag without a self-link.
 - External legacy artist packs remain readable with a deprecation warning.
 - Upstream links contain only upstream-compatible parameters, open the selected
   assets, and disclose when private channels require a lossy projection.
@@ -96,9 +95,9 @@ interface RecolorConfig {
 ```
 
 The first version accepts only `body/primary`. `match_body_color` is accepted
-at the external legacy-pack boundary and by the verified pinned-release
-fallback, and is normalized with a deprecation warning when authoring a pack.
-The next canonical asset release uses `linked_to` exclusively.
+at the external legacy-pack boundary and is normalized with a deprecation
+warning when authoring a pack. The pinned canonical asset release uses
+`linked_to` exclusively.
 
 ### Selection v2
 
@@ -308,12 +307,12 @@ plugin: update
   legacy `match_body_color` deprecation normalization.
 - [x] Implement the schema and compile normalization without weakening strict
   artist-pack validation.
-- [ ] In the next pinned asset release, mechanically migrate every follower
+- [x] In the next pinned asset release, mechanically migrate every follower
   definition with
   `match_body_color: true` to `linked_to` on its primary recolor entry; remove
   the flag without adding a self-link on the sole `body` source; fail and list
   any definition that lacks a resolvable primary entry.
-- [ ] Assert no definition in that release retains `match_body_color` and the
+- [x] Assert no definition in that release retains `match_body_color` and the
   migration count matches the pre-change inventory (79 unless the active asset
   snapshot changed; if changed, record and explain the new audited count).
 - [x] Verify catalog, layer, animation, pixel-render, and credit-manifest parity
@@ -327,20 +326,26 @@ plugin: update
     channels through normalization, rejects duplicate/missing secondary IDs
     and body self-links, and converts legacy `match_body_color` input to a
     canonical primary link with an acknowledgeable deprecation warning. Core
-    rendering and Web presentation accept both the canonical declaration and
-    the current pinned release's legacy flag.
+    rendering and Web presentation accept the canonical declaration while
+    retaining deprecated compatibility for external legacy definitions.
   - Commit: `1ecd7fe5c1a2fdd08bbea808ffa20710698315b3`
   - Asset inventory: the current ignored, materialized release cache contains
     79 legacy flags: 78 followers and one `body` source. A trial mechanical
     migration confirmed `legacy=0`, `primaryBodyLinks=78`, and no body
     self-link, then the cache was restored because `assets/` is not a
     versionable source in this repository.
-  - Release prerequisite: the two source-migration checkboxes above remain
-    open. Updating them requires a new externally published asset tarball and
-    matching `asset-release.json` manifest/tarball digests. Editing the ignored
-    cache, dormant `upstream/` gitlink, or catalog objects under the existing
-    pin would respectively be unreproducible, violate repository rules, or
-    change artist-pack baseline digests without a release transition.
+  - Release completion: `assets-v2026.08.01-color-links-v1` publishes source
+    SHA `9c190fb596f855d1adc253454786536993829b84`, a migration report, an immutable
+    manifest, and a runtime tarball. The repository pin, dormant gitlink
+    pointer, and fixture provenance moved atomically in
+    `b98a00ef2923067275d6ef0dbfaf1f23ab69a20b`.
+  - Release inventory: the published report and independently inspected
+    materialized definitions agree on `legacy=0`, `primaryBodyLinks=78`, no
+    body self-links, no unsupported targets, and 79 changed definition files.
+    The downloaded manifest SHA-256 is
+    `4e039fa8b48e1f1e2ed37b5c8b8037d1f058d5c33234ac82bcf7dd41c7004fcc`;
+    the runtime tarball SHA-256 is
+    `c9f13a5f2b39306bae29e4fd8d3aa019dd0da4caa8ecda6daa00803660cc6a92`.
   - Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-schema.test.ts asset-pack-validation.test.ts`
     FAILed as expected before implementation (6 failed, 53 passed), then the
     expanded focused Core set PASSed (97 passed).
@@ -363,6 +368,23 @@ plugin: update
     N/A for this partial commit because it adds no CLI command or documented
     authoring example; the complete public channel workflow remains assigned
     to Tasks 10 and 11.
+  - Release-transition verification: `rtk pnpm verify` PASS (Core 370,
+    Presets 8, Web 852, CLI 1048 passed plus 1 skipped); `rtk pnpm build` PASS;
+    Web E2E PASS (33); packed CLI install smoke PASS; four-way pin verification
+    PASS for 17 fixtures at `9c190fb596f855d1adc253454786536993829b84`.
+  - Release-transition CLI documentation impact:
+    - `help`: N/A — command syntax and behavior did not change.
+    - `cli-readme`: N/A — the documented asset preparation contract is
+      unchanged; only its immutable pin advanced.
+    - `root-readme`: N/A — the documented pinned-cache workflow is unchanged.
+    - `landing`: N/A — no user-facing workflow or command changed.
+    - `architecture`: N/A — the existing four-way pin and explicit-link
+      contracts were fulfilled without changing their design.
+    - `engineering`: N/A — verification commands and CI mapping are unchanged.
+    - `releasing`: N/A — CLI versioning and npm publication procedure did not
+      change.
+    - `plugin`: N/A — plugin command and compatibility contracts did not
+      change.
 
 ### Task 5: Introduce canonical selection v2 and strict v1 migration
 
@@ -827,8 +849,9 @@ Task 12 record:
 - Verification: `rtk pnpm verify` PASS after rerunning outside the filesystem
   sandbox because `tsx` requires a local IPC socket; `rtk pnpm build` PASS.
 - Parity: `LPC_UPSTREAM_PARITY_DIR` is not provisioned, so
-  `test:e2e:parity` was not run. The dormant `upstream/` gitlink was not
-  initialized or modified; the pin-aware verification passed instead.
+  `test:e2e:parity` was not run. The initial audit did not initialize or use
+  `upstream/`; the later authorized release transition advanced only its
+  recorded gitlink pointer, and pin-aware verification passed at the new SHA.
 - Hygiene: `rtk git diff --check` PASS. The generated untracked
   `.lpc-toolkit-cache/` directory was removed; the final pre-commit status
   contains only this intended plan evidence update.
@@ -837,3 +860,7 @@ Task 12 record:
   `4ffbd1adce9e1bc41f539a804eba0c3fc10a5468`, and
   `59432c01af2cd0961ddb519b99be166de3ad8f8a`; earlier task records above retain
   their corresponding full hashes and verification evidence.
+- Asset-release closure: the two previously deferred source-migration items in
+  Task 4 are complete in `assets-v2026.08.01-color-links-v1`; pin transition
+  commit `b98a00ef2923067275d6ef0dbfaf1f23ab69a20b` passed the same full repository,
+  E2E, package, attribution, and four-way provenance gates recorded above.
