@@ -1,4 +1,4 @@
-import { getRecolorSwatches, type Catalog, type ItemDefinition, type PaletteMetadata, type TypeName } from '@lpc-toolkit/core';
+import { type Catalog, type ItemDefinition, type PaletteMetadata, type TypeName } from '@lpc-toolkit/core';
 import type { SliceState, SliceAction } from '../../slice/selection';
 import type { LabelTranslator, Translator } from '../../i18n';
 import { type LicenseFilter } from '../../slice/license-filter';
@@ -6,6 +6,7 @@ import { type AnimationFilter } from '../../slice/animation-filter';
 import type { ReplacementCardDisplayMode } from '../../lib/replacement-card-display-mode';
 import { ItemThumbnail } from './item-thumbnail';
 import { TypeItemPicker } from './type-item-picker';
+import { getColorSummarySwatches } from '../../slice/color-options';
 
 interface Props {
   disabled: boolean;
@@ -87,22 +88,37 @@ export function LayerRow({
                   <span>{tl.variant(selection.variant)}</span>
                 </>
               )}
-              {selection.recolor && item && (() => {
-                const swatches =
-                  getRecolorSwatches(item, palettes).find(
-                    (s) => s.recolor === selection.recolor,
-                  )?.colors ?? [];
+              {item && (() => {
+                const swatches = getColorSummarySwatches(
+                  item,
+                  selection,
+                  palettes,
+                  state.selections.body?.recolor === undefined
+                    ? {}
+                    : { bodyRecolor: state.selections.body.recolor },
+                );
                 if (swatches.length === 0) return null;
                 return (
                   <>
                     <span>·</span>
-                    <span className="inline-flex gap-px">
-                      {swatches.map((c, i) => (
+                    <span className="inline-flex items-center gap-1">
+                      {swatches.map((channel) => (
                         <span
-                          key={i}
-                          className="h-1 w-1 rounded-sm"
-                          style={{ backgroundColor: c }}
-                        />
+                          key={channel.channelId}
+                          data-summary-channel={channel.channelId}
+                          className="inline-flex gap-px"
+                          title={channel.recolor
+                            ? `${tl.channel(channel.channelId)}: ${tl.color(channel.recolor)}`
+                            : tl.channel(channel.channelId)}
+                        >
+                          {channel.colors.map((color, index) => (
+                            <span
+                              key={index}
+                              className="h-1 w-1 rounded-sm"
+                              style={{ backgroundColor: color }}
+                            />
+                          ))}
+                        </span>
                       ))}
                     </span>
                   </>

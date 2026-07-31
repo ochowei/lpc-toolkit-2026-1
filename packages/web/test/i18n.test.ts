@@ -164,6 +164,7 @@ describe('label translator', () => {
     expect(en.color('lpcr.brown')).toBe('Brown');
     expect(en.variant('pickaxe')).toBe('Pickaxe');
     expect(en.variant('longsword_alt')).toBe('Longsword alt');
+    expect(en.channel('eyes', 'Eye Color')).toBe('Eye Color');
   });
 
   it('translates category, body type and animation labels for Chinese', () => {
@@ -178,6 +179,9 @@ describe('label translator', () => {
     expect(zh.color('lpcr.brown')).toBe('棕色');
     expect(zh.color('brown')).toBe('棕色');
     expect(zh.color('ivory')).toBe('象牙色');
+    expect(zh.channel('eyes', 'Eye Color')).toBe('眼睛顏色');
+    expect(zh.channel('hairtie')).toBe('髮帶');
+    expect(zh.channel('__custom_channel__')).toBe('Custom channel');
   });
 
   it('translates Tools variants for Chinese', () => {

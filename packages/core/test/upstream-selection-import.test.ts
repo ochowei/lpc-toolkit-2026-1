@@ -16,6 +16,7 @@ const catalogRecords: Record<FilePath, ItemDefinition> = {
     type_name: 'body',
     animations: ['walk'],
     credits: [],
+    match_body_color: true,
     recolors: { material: 'body', palettes: ['ulpc'] },
     layer_1: { zPos: 0, male: 'body/' },
   },

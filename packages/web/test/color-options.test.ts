@@ -2,7 +2,9 @@
 import { describe, expect, it } from 'vitest';
 import { createPaletteCatalog, type ItemDefinition } from '@lpc-toolkit/core';
 import {
+  getColorChannelOptions,
   getColorOptions,
+  getColorSummarySwatches,
   pickDefaults,
   transferChannelRecolors,
 } from '../src/slice/color-options';
@@ -140,6 +142,61 @@ describe('getColorOptions', () => {
 
   it('returns mode "none" for an item with no colors', () => {
     expect(getColorOptions(plainItem, palettes)).toEqual({ mode: 'none' });
+  });
+});
+
+describe('getColorChannelOptions', () => {
+  it('returns ordered editable and linked asset-owned groups', () => {
+    expect(getColorChannelOptions(multiRecolorItem, palettes, {
+      bodyRecolor: 'red',
+    })).toEqual([
+      expect.objectContaining({ id: 'primary', primary: true, mode: 'recolors' }),
+      expect.objectContaining({ id: 'accent', primary: false, mode: 'recolors' }),
+      expect.objectContaining({
+        id: 'skin',
+        primary: false,
+        mode: 'linked-recolor',
+        recolor: 'red',
+        swatch: '#ee0000',
+      }),
+    ]);
+  });
+
+  it('deduplicates repeated recolor IDs without changing source order', () => {
+    const repeatedItem: ItemDefinition = {
+      ...multiRecolorItem,
+      recolors: {
+        material: 'm',
+        palettes: ['v1', 'v1'],
+      },
+    };
+    const [primary] = getColorChannelOptions(repeatedItem, palettes);
+    expect(primary?.mode).toBe('recolors');
+    if (primary?.mode !== 'recolors') return;
+    expect(primary.options.map((option) => option.value)).toEqual(['c0', 'red']);
+  });
+
+  it('summarizes primary plus explicit secondary overrides only', () => {
+    expect(getColorSummarySwatches(
+      multiRecolorItem,
+      {
+        typeName: 't',
+        name: 'Multi Thing',
+        recolor: 'red',
+        channelRecolors: { accent: 'c0' },
+      },
+      palettes,
+      { bodyRecolor: 'red' },
+    )).toEqual([
+      { channelId: 'primary', recolor: 'red', colors: ['#ff0000', '#ee0000'] },
+      { channelId: 'accent', recolor: 'c0', colors: ['#000000', '#111111'] },
+    ]);
+
+    expect(getColorSummarySwatches(
+      multiRecolorItem,
+      { typeName: 't', name: 'Multi Thing', recolor: 'red' },
+      palettes,
+    )).toHaveLength(1);
   });
 });
 

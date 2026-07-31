@@ -872,6 +872,12 @@ export const VARIANT_LABELS_ZH: Readonly<Record<string, string>> = {
   whip: '鞭子',
 };
 
+const CHANNEL_LABELS_ZH: Readonly<Record<string, string>> = {
+  'eye color': '眼睛顏色',
+  'accent color': '強調色',
+  'hair tie': '髮帶',
+};
+
 function humanizeLabel(raw: string): string {
   const tail = raw.includes('.') ? raw.slice(raw.lastIndexOf('.') + 1) : raw;
   const spaced = tail.replace(/_/g, ' ');
@@ -892,6 +898,8 @@ export interface LabelTranslator {
   color(value: string): string;
   /** asset variant key, e.g. "axe", "longsword_alt". */
   variant(value: string): string;
+  /** Asset-owned channel ID with an optional author-facing label. */
+  channel(value: string, authoredLabel?: string): string;
   /** Localised display name by item ID with safe fallbacks. */
   catalogItemName(item: Pick<ItemDefinition, 'name' | 'display_name' | 'itemId'>): string;
 }
@@ -911,6 +919,8 @@ export function createLabelTranslator(locale: Locale): LabelTranslator {
       catalogItemName: (item) => item.display_name ?? item.name,
       color: humanizeLabel,
       variant: humanizeLabel,
+      channel: (value, authoredLabel) =>
+        authoredLabel ?? humanizeLabel(value.replace(/^_+|_+$/g, '')),
     };
   }
   return {
@@ -941,5 +951,14 @@ export function createLabelTranslator(locale: Locale): LabelTranslator {
     },
     variant: (value) =>
       VARIANT_LABELS_ZH[value.toLowerCase()] ?? humanizeLabel(value),
+    channel: (value, authoredLabel) => {
+      const translatedAuthored = authoredLabel
+        ? CHANNEL_LABELS_ZH[authoredLabel.toLowerCase()]
+        : undefined;
+      return translatedAuthored
+        ?? CATEGORY_LABELS_ZH[value.toLowerCase()]
+        ?? authoredLabel
+        ?? humanizeLabel(value.replace(/^_+|_+$/g, ''));
+    },
   };
 }

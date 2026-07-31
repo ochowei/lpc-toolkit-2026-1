@@ -3,6 +3,7 @@ import {
   getColorChannels,
   getRecolorVariantsForType,
   itemSupportsSelectionType,
+  primaryColorFollowsBody,
 } from './recolor-resolve.js';
 import {
   parseSelectionJson,
@@ -159,11 +160,10 @@ function validateSelection(
   }
 
   if (selection.recolor) {
-    const primaryChannel = getColorChannels(item, context.palettes)[0];
     if (
       strictCanonicalV2
       && item.type_name === typeName
-      && (primaryChannel?.linkedTo || item.match_body_color)
+      && primaryColorFollowsBody(item)
     ) {
       throw new SelectionDocumentError(
         'linked_selection_channel_value',
@@ -296,14 +296,11 @@ function clearLegacyLinkedPrimaryValues(
   const itemEntries = Object.entries(selections.items).map(
     ([typeName, selection]) => {
       const item = resolveByName(typeName, selection.name, context.catalog);
-      const primaryChannel = item
-        ? getColorChannels(item, context.palettes)[0]
-        : undefined;
       if (
         !selection.recolor
         || !item
         || item.type_name !== typeName
-        || (!primaryChannel?.linkedTo && !item.match_body_color)
+        || !primaryColorFollowsBody(item)
       ) {
         return [typeName, selection] as const;
       }

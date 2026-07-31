@@ -127,7 +127,10 @@ export function TypeItemPicker({
                 tl.catalogItemName(it)
               }
               onClick={() => {
-                dispatch(pickActionForItem(typeName, it));
+                dispatch(pickActionForItem(typeName, it, {
+                  palettes,
+                  ...(selection ? { previous: selection } : {}),
+                }));
                 const customAnim = customAnimationFor(it);
                 if (customAnim) {
                   dispatch({ type: 'set_anim', anim: customAnim });
@@ -192,10 +195,43 @@ export function TypeItemPicker({
             tl={tl}
             onSelect={(change) => {
               if ('variant' in change) {
-                dispatch({ type: 'pick', typeName, name: selectedItem.name, variant: change.variant });
+                dispatch({
+                  type: 'pick',
+                  typeName,
+                  name: selectedItem.name,
+                  variant: change.variant,
+                  ...(selection.recolor ? { recolor: selection.recolor } : {}),
+                  ...(selection.channelRecolors
+                    ? { channelRecolors: selection.channelRecolors }
+                    : {}),
+                });
               } else {
-                dispatch({ type: 'pick', typeName, name: selectedItem.name, recolor: change.recolor });
+                dispatch({
+                  type: 'pick',
+                  typeName,
+                  name: selectedItem.name,
+                  recolor: change.recolor,
+                  ...(selection.variant ? { variant: selection.variant } : {}),
+                  ...(selection.channelRecolors
+                    ? { channelRecolors: selection.channelRecolors }
+                    : {}),
+                });
               }
+            }}
+            onSetChannel={(channelId, recolor) => {
+              dispatch({
+                type: 'set_channel_recolor',
+                typeName,
+                channelId,
+                recolor,
+              });
+            }}
+            onClearChannel={(channelId) => {
+              dispatch({
+                type: 'clear_channel_recolor',
+                typeName,
+                channelId,
+              });
             }}
           />
         </div>

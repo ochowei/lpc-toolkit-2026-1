@@ -40,6 +40,31 @@ export type ColorOptions =
   | { readonly mode: 'variants'; readonly options: readonly VariantColorOption[] }
   | { readonly mode: 'none' };
 
+interface ColorChannelOptionBase {
+  readonly id: 'primary' | TypeName;
+  readonly typeName: TypeName;
+  readonly primary: boolean;
+  readonly label?: string;
+  readonly defaultSwatch?: string;
+}
+
+export type ColorChannelOptions =
+  | (ColorChannelOptionBase & {
+      readonly mode: 'recolors';
+      readonly options: readonly RecolorColorOption[];
+    })
+  | (ColorChannelOptionBase & {
+      readonly mode: 'linked-recolor';
+      readonly recolor?: string;
+      readonly swatch?: string;
+    });
+
+export interface ColorSummarySwatch {
+  readonly channelId: 'primary' | TypeName;
+  readonly recolor?: string;
+  readonly colors: readonly string[];
+}
+
 /**
  * Display label for a color key: "fur_black" -> "Fur black"; "lpcr.tan" ->
  * "Tan". The material/version prefix is intentionally dropped for brevity,
@@ -55,6 +80,94 @@ function humanize(raw: string): string {
 /** A recognizable single color from a dark-to-light ramp: the entry at floor(len/2) (upper-mid). */
 function representative(colors: readonly string[]): string {
   return colors[Math.floor(colors.length / 2)] ?? colors[0] ?? '#000000';
+}
+
+function recolorOptions(
+  swatches: ReturnType<typeof getColorChannels>[number]['swatches'],
+): readonly RecolorColorOption[] {
+  const options = new Map<string, RecolorColorOption>();
+  for (const swatch of swatches) {
+    if (options.has(swatch.recolor)) continue;
+    options.set(swatch.recolor, {
+      kind: 'recolor',
+      value: swatch.recolor,
+      swatch: representative(swatch.colors),
+      label: humanize(swatch.recolor),
+    });
+  }
+  return [...options.values()];
+}
+
+/** Ordered UI groups for every valid color channel owned by one asset. */
+export function getColorChannelOptions(
+  item: ItemDefinition,
+  palettes: PaletteMetadata,
+  context: ColorOptionContext = {},
+): readonly ColorChannelOptions[] {
+  return getColorChannels(item, palettes).map((channel) => {
+    const base = {
+      id: channel.id,
+      typeName: channel.typeName,
+      primary: channel.primary,
+      ...(channel.label !== undefined ? { label: channel.label } : {}),
+      ...(channel.defaultColors.length > 0
+        ? { defaultSwatch: representative(channel.defaultColors) }
+        : {}),
+    };
+    const linked = channel.linkedTo
+      || (channel.primary && primaryColorFollowsBody(item));
+    if (linked) {
+      const selected = channel.swatches.find(
+        (swatch) => swatch.recolor === context.bodyRecolor,
+      );
+      return {
+        ...base,
+        mode: 'linked-recolor' as const,
+        ...(context.bodyRecolor !== undefined
+          ? { recolor: context.bodyRecolor }
+          : {}),
+        ...(selected
+          ? { swatch: representative(selected.colors) }
+          : base.defaultSwatch
+            ? { swatch: base.defaultSwatch }
+            : {}),
+      };
+    }
+    return {
+      ...base,
+      mode: 'recolors' as const,
+      options: recolorOptions(channel.swatches),
+    };
+  });
+}
+
+/** Primary plus explicit independent-secondary swatches for a collapsed row. */
+export function getColorSummarySwatches(
+  item: ItemDefinition,
+  selection: Selection,
+  palettes: PaletteMetadata,
+  context: ColorOptionContext = {},
+): readonly ColorSummarySwatch[] {
+  const summary: ColorSummarySwatch[] = [];
+  for (const channel of getColorChannels(item, palettes)) {
+    if (!channel.primary && channel.linkedTo) continue;
+    const recolor = channel.primary
+      ? (channel.linkedTo || primaryColorFollowsBody(item)
+          ? context.bodyRecolor
+          : selection.recolor)
+      : selection.channelRecolors?.[channel.id];
+    if (!channel.primary && recolor === undefined) continue;
+    const colors = recolor === undefined
+      ? channel.defaultColors
+      : channel.swatches.find((swatch) => swatch.recolor === recolor)?.colors;
+    if (!colors || colors.length === 0) continue;
+    summary.push({
+      channelId: channel.id,
+      ...(recolor !== undefined ? { recolor } : {}),
+      colors,
+    });
+  }
+  return summary;
 }
 
 /**
