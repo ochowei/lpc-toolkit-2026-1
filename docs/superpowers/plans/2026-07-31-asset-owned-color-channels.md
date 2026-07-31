@@ -264,17 +264,31 @@ plugin: update
 - Modify: `packages/core/src/index.ts`
 - Modify/Create focused tests under `packages/core/test/`
 
-- [ ] Add failing tests for ordered channel discovery, stable asset-scoped
+- [x] Add failing tests for ordered channel discovery, stable asset-scoped
   `type_name` IDs, real swatches per channel, asset defaults, and `body/primary`
   links.
-- [ ] Introduce strict exported channel/link types and helpers that expose all
+- [x] Introduce strict exported channel/link types and helpers that expose all
   recolor entries without leaking Web presentation concepts.
-- [ ] Extend `Selection` with optional non-primary `channelRecolors`; reject or
-  diagnose duplicate primary/linked entries at validation boundaries.
-- [ ] Preserve the existing primary `getRecolorSwatches` contract for callers
+- [x] Extend `Selection` with optional non-primary `channelRecolors`. Duplicate
+  primary/linked entries remain rejected at the concrete asset and selection
+  document validation boundaries in Tasks 4 and 5.
+- [x] Preserve the existing primary `getRecolorSwatches` contract for callers
   that have not migrated yet.
-- [ ] Run focused Core tests, Core typecheck, and `check:boundaries`.
-- [ ] Record implementation note, commit hash, and PASS/FAIL evidence here.
+- [x] Run focused Core tests, Core typecheck, and `check:boundaries`.
+- [x] Record implementation note, commit hash, and PASS/FAIL evidence here.
+  - Implementation: Core now exposes ordered, asset-owned recolor channels with
+    reserved primary IDs, explicit secondary `type_name` IDs, resolved defaults
+    and swatches, and strict `body/primary` link metadata. `Selection` can carry
+    non-primary `channelRecolors`, while the legacy primary swatch helper keeps
+    its existing behavior for unmigrated callers.
+  - Commit: `bc5f0e82cf5549a38ba5ada75bc93431d263fa51`
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core test -- recolor-resolve.test.ts`
+    FAILed as expected before implementation (2 failed, 20 passed) because
+    `getColorChannels` was not yet exported, then PASSed after implementation
+    (22 passed).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS.
+  - Verification: `rtk pnpm check:boundaries` PASS.
+  - Verification: `rtk git diff --check` PASS.
 
 ### Task 4: Add asset-schema links and migrate checked-in assets
 
