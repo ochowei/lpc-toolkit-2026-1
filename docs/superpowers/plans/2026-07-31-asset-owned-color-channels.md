@@ -227,12 +227,29 @@ plugin: update
 
 ### Phase 1 handoff gate
 
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/core test`
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/web test`
-- [ ] Run: `rtk pnpm verify`
-- [ ] Manually verify body color changes update body/head/expression together,
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/core test`
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/web test`
+- [x] Run: `rtk pnpm verify`
+- [x] Manually verify body color changes update body/head/expression together,
   body remains editable, and expression exposes no ineffective button.
-- [ ] Reassess documentation impact for the Phase 1-only diff and record it.
+- [x] Reassess documentation impact for the Phase 1-only diff and record it.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core test` PASS (25 files,
+    340 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web test` PASS (105 files,
+    835 tests). Expected missing-optional-asset diagnostics remained non-fatal.
+  - Verification: `rtk pnpm verify` PASS, including asset/source pins,
+    boundaries, CLI docs policy, plugin validation, all workspace typechecks,
+    and all workspace unit tests.
+  - Manual verification: local Composer initially showed
+    `Follows body · Light` for expression with no color buttons; body retained
+    editable swatches; selecting Brown changed the expression status to
+    `Follows body · Brown`.
+  - Phase 1 CLI documentation impact:
+    `help`, `cli-readme`, `root-readme`, `landing`, `architecture`,
+    `engineering`, `releasing`, and `plugin` are all N/A because Phase 1 changes
+    only Core body-source resolution and Web presentation; no CLI command,
+    persistence, package, release, plugin, or documented primary workflow
+    contract changes.
 
 ---
 
