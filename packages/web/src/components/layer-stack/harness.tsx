@@ -388,9 +388,18 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     [props.state.bodyType, props.state.selections],
   );
 
-  const upstreamHref = useMemo(
-    () => buildUpstreamUrl(canonicalHash),
-    [canonicalHash],
+  const upstreamLink = useMemo(
+    () => buildUpstreamUrl(
+      toSelections(props.state),
+      props.catalog,
+      props.palettes,
+    ),
+    [
+      props.catalog,
+      props.palettes,
+      props.state.bodyType,
+      props.state.selections,
+    ],
   );
 
   useEffect(() => {
@@ -559,7 +568,8 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
       <TopBar
         t={t}
         loadingProgress={loadingProgress}
-        upstreamHref={upstreamHref}
+        upstreamHref={upstreamLink.href}
+        upstreamLossCount={upstreamLink.losses.length}
         onNavigateHome={props.onNavigateHome}
         rightSlot={
           <MoreMenuPopover

@@ -704,7 +704,7 @@ describe('human-readable CLI output', () => {
 
     const output = await runHuman(['token', 'encode', '--selection', 'selection.json'], cwd);
 
-    expect(output).toMatch(/^v1\./);
+    expect(output).toMatch(/^v2\./);
   });
 
   it('prints decoded selections without --json when no output file is requested', async () => {

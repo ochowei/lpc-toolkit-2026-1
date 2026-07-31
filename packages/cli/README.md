@@ -448,6 +448,10 @@ lpc-toolkit render --selection selection.json --out ./rendered \
   --animation walk --frames all --bundle zip
 ```
 
+Token encoding writes deterministic `v2.` tokens, including asset-owned color
+channels. Token decoding remains compatible with `v1.` and `v2.` tokens as well
+as legacy upstream-style hashes.
+
 Catalog and `character search` discovery return a deterministic 20-item page by
 default. Use `--limit 20` to choose a bounded page size, `--offset 20` (or the
 returned `page.nextOffset`) to continue an unchanged result set, and `--all`

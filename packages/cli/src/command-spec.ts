@@ -326,7 +326,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
     usage: 'lpc-toolkit token <command>',
     description: 'Encode or decode selection tokens.',
     options: [HELP_OPTION],
-    examples: ['lpc-toolkit token encode --selection hero.json', 'lpc-toolkit token decode --token v1.example'],
+    examples: ['lpc-toolkit token encode --selection hero.json', 'lpc-toolkit token decode --token v2.example'],
   },
   {
     command: ['token', 'encode'],
@@ -345,7 +345,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
       { name: 'token', kind: 'value', valueLabel: 'hash-or-token', description: 'Token to decode.' },
       { name: 'out', kind: 'value', valueLabel: 'file', description: 'Write the decoded selection to a file.' },
     ],
-    examples: ['lpc-toolkit token decode --token v1.example --out hero.json'],
+    examples: ['lpc-toolkit token decode --token v2.example --out hero.json'],
   },
   {
     command: ['preset'],

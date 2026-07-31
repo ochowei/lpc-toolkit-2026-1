@@ -1,19 +1,47 @@
 import { describe, expect, it } from 'vitest';
+import { createCatalog, createPaletteCatalog } from '@lpc-toolkit/core';
 import { UPSTREAM_URL, buildUpstreamUrl } from '../src/lib/upstream-url';
 
 describe('buildUpstreamUrl', () => {
-  it('returns the bare upstream URL when hash is empty', () => {
-    expect(buildUpstreamUrl('')).toBe(UPSTREAM_URL);
+  const catalog = createCatalog({}).catalog;
+  const palettes = createPaletteCatalog({}).palettes;
+
+  it('builds an upstream-compatible legacy hash from selections', () => {
+    expect(
+      buildUpstreamUrl(
+        { bodyType: 'male', items: {} },
+        catalog,
+        palettes,
+      ),
+    ).toEqual({
+      href: `${UPSTREAM_URL}#sex=male`,
+      losses: [],
+    });
   });
 
-  it('appends #<hash> when hash is non-empty', () => {
-    expect(buildUpstreamUrl('sex=male')).toBe(`${UPSTREAM_URL}#sex=male`);
-  });
+  it('never forwards canonical v2 fields', () => {
+    const result = buildUpstreamUrl(
+      {
+        bodyType: 'male',
+        items: {
+          hair: {
+            typeName: 'hair',
+            name: 'Plain',
+            variant: 'v01',
+            recolor: 'black',
+            channelRecolors: { tie: 'red' },
+          },
+        },
+      },
+      catalog,
+      palettes,
+    );
 
-  it('does not re-encode an already-encoded hash', () => {
-    // serializeHash already percent-encodes values; verify pass-through.
-    const hash = 'sex=male&hair=Plain_v01%7Cblack';
-    expect(buildUpstreamUrl(hash)).toBe(`${UPSTREAM_URL}#${hash}`);
+    expect(result.href).toBe(
+      `${UPSTREAM_URL}#sex=male&hair=Plain_v01%7Cblack`,
+    );
+    expect(result.href).not.toContain('v=2');
+    expect(result.href).not.toContain('color.');
   });
 
   it('points at the canonical upstream URL', () => {

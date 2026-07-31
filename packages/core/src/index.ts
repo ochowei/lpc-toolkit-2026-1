@@ -207,12 +207,19 @@ export {
   importSelectionDocument,
   SelectionDocumentError,
 } from './upstream-selection-import.js';
-export type { HashWarning, ParseHashResult } from './hash.js';
+export type {
+  HashWarning,
+  ParseHashResult,
+  UpstreamHashResult,
+  UpstreamProjectionLoss,
+} from './hash.js';
 export {
   decodeSelectionToken,
   encodeSelectionToken,
   parseHash,
   serializeHash,
+  serializeLegacyHash,
+  serializeUpstreamHash,
 } from './hash.js';
 
 // ==========================================

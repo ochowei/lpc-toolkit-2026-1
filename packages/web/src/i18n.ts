@@ -9,6 +9,8 @@ export const TRANSLATIONS = {
     'topBar.backHome': '← Back to home',
     'topBar.upstreamLink':
       'Open this character in the upstream Universal LPC Sprite Sheet Character Generator',
+    'topBar.upstreamLossy':
+      'Some independent colors cannot be shown exactly upstream',
     'source.project':
       'Based on Universal LPC Spritesheet Character Generator',
     'theme.light': 'Light',
@@ -193,6 +195,7 @@ export const TRANSLATIONS = {
     'topBar.backHome': '← 返回首頁',
     'topBar.upstreamLink':
       '在原始 Universal LPC Sprite Sheet Character Generator 開啟此角色',
+    'topBar.upstreamLossy': '部分獨立顏色無法在 upstream 完整呈現',
     'source.project':
       '本專案源自 Universal LPC Spritesheet Character Generator',
     'theme.light': '淺色',

@@ -71,4 +71,18 @@ describe('TopBar', () => {
 
     expect(html).not.toContain('Repair an Asset Pack');
   });
+
+  it('keeps a lossy upstream link usable and explains the warning', () => {
+    const html = renderToStaticMarkup(TopBar({
+      t: createTranslator('en'),
+      loadingProgress: null,
+      upstreamHref: 'https://example.com/upstream',
+      upstreamLossCount: 1,
+      onNavigateHome: vi.fn(),
+    }));
+
+    expect(html).toContain('href="https://example.com/upstream"');
+    expect(html).toContain('Some independent colors cannot be shown exactly upstream');
+    expect(html).toContain('⚠');
+  });
 });

@@ -50,7 +50,7 @@ function decodeTokenOrHash(
   palettes?: PaletteMetadata,
 ): ParseHashResult {
   const trimmed = tokenOrHash.trim();
-  return trimmed.startsWith('v1.')
+  return trimmed.startsWith('v1.') || trimmed.startsWith('v2.')
     ? decodeSelectionToken(trimmed, catalog, palettes)
     : parseHash(trimmed, catalog, palettes);
 }

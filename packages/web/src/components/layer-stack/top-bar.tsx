@@ -6,6 +6,7 @@ interface Props {
   t: Translator;
   loadingProgress: number | null;
   upstreamHref: string;
+  upstreamLossCount?: number;
   onNavigateHome: () => void;
   rightSlot?: ReactNode;
 }
@@ -15,6 +16,7 @@ export function TopBar({
   t,
   loadingProgress,
   upstreamHref,
+  upstreamLossCount = 0,
   onNavigateHome,
   rightSlot,
   children,
@@ -43,9 +45,21 @@ export function TopBar({
             target="_blank"
             rel="noopener noreferrer"
             className="underline-offset-2 hover:text-text-mute hover:underline"
-            title={t('topBar.upstreamLink')}
+            title={
+              upstreamLossCount > 0
+                ? `${t('topBar.upstreamLink')} — ${t('topBar.upstreamLossy')}`
+                : t('topBar.upstreamLink')
+            }
           >
             upstream
+            {upstreamLossCount > 0 && (
+              <span
+                className="ml-1 text-warning"
+                aria-label={t('topBar.upstreamLossy')}
+              >
+                ⚠
+              </span>
+            )}
           </a>
         </span>
       </div>

@@ -89,6 +89,25 @@ describe('bootstrapStateFromHash', () => {
       recolor: 'red',
     });
   });
+
+  it('restores a v2 multi-recolor value inside its owning asset', () => {
+    const result = bootstrapStateFromHash({
+      rawHash:
+        'v=2&sex=male&hair=Long_tied_black&color.hair.hair_tie=red',
+      catalog,
+      palettes,
+      defaults,
+    });
+
+    expect(result.warnings).toEqual([]);
+    expect(result.state.selections.hair).toMatchObject({
+      typeName: 'hair',
+      name: 'Long tied',
+      recolor: 'black',
+      channelRecolors: { hair_tie: 'red' },
+    });
+    expect(result.state.selections.hair_tie).toBeUndefined();
+  });
 });
 
 describe('computeHashWrite', () => {
@@ -148,6 +167,7 @@ describe('effectiveHash', () => {
     };
     const result = effectiveHash(modified, defaultsHash);
     expect(result).not.toBe('');
+    expect(result).toMatch(/^v=2&/);
     expect(result).toContain('body=');
   });
 });

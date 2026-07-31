@@ -1,4 +1,5 @@
 import {
+  getColorChannels,
   getRecolorVariantsForType,
   itemSupportsSelectionType,
 } from './recolor-resolve.js';
@@ -28,6 +29,9 @@ export interface HashWarning {
     | 'unknown_item'
     | 'unknown_variant'
     | 'unknown_recolor'
+    | 'unknown_channel'
+    | 'unknown_channel_recolor'
+    | 'linked_channel_value'
     | 'malformed';
 }
 
@@ -43,11 +47,29 @@ export interface ParseHashResult {
   readonly unknownKeys: readonly TypeName[];
 }
 
+/** A canonical color choice that cannot be represented exactly upstream. */
+export interface UpstreamProjectionLoss {
+  readonly reason: 'channel_collision';
+  /** Legacy global channel key shared by the colliding assets. */
+  readonly channelId: TypeName;
+  /** Selected asset whose value remains visible in the projected link. */
+  readonly keptSlot: TypeName;
+  /** Selected assets whose independent values cannot be forwarded. */
+  readonly omittedSlots: readonly TypeName[];
+}
+
+/** Legacy-compatible hash plus any known fidelity loss. */
+export interface UpstreamHashResult {
+  readonly hash: string;
+  readonly losses: readonly UpstreamProjectionLoss[];
+}
+
 /** The default body archetype applied when sex or bodyType parameters are absent. */
 const DEFAULT_BODY_TYPE: BodyType = 'male';
 
 /** The version header prefix prepended to packed base64url selection tokens. */
-const SELECTION_TOKEN_PREFIX = 'v1.';
+const SELECTION_TOKEN_V1_PREFIX = 'v1.';
+const SELECTION_TOKEN_V2_PREFIX = 'v2.';
 
 /**
  * Custom URL-safe Base64 alphabet used for token packing/unpacking.
@@ -247,6 +269,7 @@ function buildSelection(
   matchedVariant: string,
   matchedRecolor: string,
   palettes?: PaletteMetadata,
+  applyDefaults = true,
 ): Selection {
   const variant =
     matchedVariant ||
@@ -257,7 +280,12 @@ function buildSelection(
     );
   
   let recolor = matchedRecolor;
-  if (!recolor && (!item.variants || item.variants.length === 0) && palettes) {
+  if (
+    applyDefaults
+    && !recolor
+    && (!item.variants || item.variants.length === 0)
+    && palettes
+  ) {
     const recolorVariants = getRecolorVariantsForType(
       item,
       palettes,
@@ -320,6 +348,7 @@ export function parseHash(
 ): ParseHashResult {
   const raw = stripHashPrefix(hash);
   const params = parseQueryString(raw);
+  const version2 = params.some(([key, value]) => key === 'v' && value === '2');
 
   const warnings: HashWarning[] = [];
   const unknownKeys: TypeName[] = [];
@@ -327,6 +356,7 @@ export function parseHash(
   let bodyType: BodyType = DEFAULT_BODY_TYPE;
 
   for (let [key, value] of params) {
+    if (key === 'v' || key.startsWith('color.')) continue;
     if (key === 'bodyType' || key === 'sex') {
       bodyType = value;
       continue;
@@ -346,7 +376,11 @@ export function parseHash(
     }
 
     if (
-      itemsForSelectionType(typeName, catalog, palettes !== undefined)
+      itemsForSelectionType(
+        typeName,
+        catalog,
+        palettes !== undefined && !version2,
+      )
         .length === 0
     ) {
       warnings.push({ key, value, reason: 'unknown_type_name' });
@@ -373,11 +407,52 @@ export function parseHash(
         matchedVariant,
         matchedRecolor,
         palettes,
+        !version2,
       ),
     ]);
   }
 
-  const items = Object.fromEntries(itemEntries);
+  const items: Record<TypeName, Selection> = Object.fromEntries(itemEntries);
+  if (version2) {
+    for (const [key, value] of params) {
+      if (!key.startsWith('color.')) continue;
+      const parts = key.split('.');
+      const slot = parts[1] ?? '';
+      const channelId = parts[2] ?? '';
+      if (parts.length !== 3 || !slot || !channelId || !palettes) {
+        warnings.push({ key, value, reason: 'malformed' });
+        continue;
+      }
+      const owner = items[slot];
+      const item = owner
+        ? (catalog.byTypeName.get(slot) ?? [])
+          .find((candidate) => candidate.name === owner.name)
+        : undefined;
+      const channel = item
+        ? getColorChannels(item, palettes)
+          .find((candidate) => candidate.id === channelId && !candidate.primary)
+        : undefined;
+      if (!owner || !item || !channel) {
+        warnings.push({ key, value, reason: 'unknown_channel' });
+        continue;
+      }
+      if (channel.linkedTo) {
+        warnings.push({ key, value, reason: 'linked_channel_value' });
+        continue;
+      }
+      if (!channel.swatches.some((swatch) => swatch.recolor === value)) {
+        warnings.push({ key, value, reason: 'unknown_channel_recolor' });
+        continue;
+      }
+      items[slot] = {
+        ...owner,
+        channelRecolors: {
+          ...owner.channelRecolors,
+          [channelId]: value,
+        },
+      };
+    }
+  }
 
   // Q2 (Step 4.3): the recolor-variant match is now folded into
   // `resolveHashParam` (gated on `palettes`), using `getRecolorVariants`
@@ -404,6 +479,33 @@ export function parseHash(
  * @returns The serialized URL parameter string.
  */
 export function serializeHash(selections: Selections): string {
+  const parts: string[] = ['v=2'];
+  parts.push(`sex=${encodeURIComponent(selections.bodyType)}`);
+  for (const [typeName, sel] of Object.entries(selections.items)
+    .sort(([left], [right]) => left.localeCompare(right))) {
+    const namePart = sel.name.replaceAll(' ', '_');
+    const variantPart = sel.variant ?? '';
+    const recolorPart = sel.recolor ?? '';
+    const uscore = variantPart || recolorPart ? '_' : '';
+    const split = variantPart && recolorPart ? '|' : '';
+    const value = namePart + uscore + variantPart + split + recolorPart;
+    parts.push(`${encodeURIComponent(typeName)}=${encodeURIComponent(value)}`);
+  }
+  for (const [typeName, sel] of Object.entries(selections.items)
+    .sort(([left], [right]) => left.localeCompare(right))) {
+    for (const [channelId, recolor] of Object.entries(
+      sel.channelRecolors ?? {},
+    ).sort(([left], [right]) => left.localeCompare(right))) {
+      parts.push(
+        `color.${encodeURIComponent(typeName)}.${encodeURIComponent(channelId)}=${encodeURIComponent(recolor)}`,
+      );
+    }
+  }
+  return parts.join('&');
+}
+
+/** Serialize the legacy upstream-compatible global selection shape. */
+export function serializeLegacyHash(selections: Selections): string {
   const parts: string[] = [];
   parts.push(`sex=${encodeURIComponent(selections.bodyType)}`);
   for (const [typeName, sel] of Object.entries(selections.items)) {
@@ -416,6 +518,126 @@ export function serializeHash(selections: Selections): string {
     parts.push(`${encodeURIComponent(typeName)}=${encodeURIComponent(value)}`);
   }
   return parts.join('&');
+}
+
+interface UpstreamChannelCandidate {
+  readonly channelId: TypeName;
+  readonly slot: TypeName;
+  readonly value: string;
+  readonly zPos: number;
+}
+
+interface UpstreamPrimaryParam {
+  readonly slot: TypeName;
+  readonly value: string;
+  readonly zPos: number;
+}
+
+function serializeSelectionValue(selection: Selection): string {
+  const namePart = selection.name.replaceAll(' ', '_');
+  const variantPart = selection.variant ?? '';
+  const recolorPart = selection.recolor ?? '';
+  const uscore = variantPart || recolorPart ? '_' : '';
+  const split = variantPart && recolorPart ? '|' : '';
+  return namePart + uscore + variantPart + split + recolorPart;
+}
+
+function highestLayerZPos(item: ItemDefinition): number {
+  let highest = Number.NEGATIVE_INFINITY;
+  for (const [key, value] of Object.entries(item)) {
+    if (!/^layer_\d+$/.test(key) || typeof value !== 'object' || !value) {
+      continue;
+    }
+    if ('zPos' in value && typeof value.zPos === 'number') {
+      highest = Math.max(highest, value.zPos);
+    }
+  }
+  return highest;
+}
+
+/**
+ * Project canonical asset-owned colors into upstream's legacy global slots.
+ * Independent values that collide on one global slot are inherently lossy;
+ * the selected asset with the highest rendered layer wins, with slot name as
+ * a deterministic tie-breaker.
+ */
+export function serializeUpstreamHash(
+  selections: Selections,
+  catalog: Catalog,
+  palettes: PaletteMetadata,
+): UpstreamHashResult {
+  const primaryParams: UpstreamPrimaryParam[] = [];
+  const candidates = new Map<TypeName, UpstreamChannelCandidate[]>();
+
+  for (const [slot, selection] of Object.entries(selections.items)
+    .sort(([left], [right]) => left.localeCompare(right))) {
+    const item = (catalog.byTypeName.get(slot) ?? [])
+      .find((candidate) => candidate.name === selection.name);
+    primaryParams.push({
+      slot,
+      value: serializeSelectionValue(selection),
+      zPos: item ? highestLayerZPos(item) : Number.NEGATIVE_INFINITY,
+    });
+    if (!item) continue;
+    const channels = getColorChannels(item, palettes);
+    for (const [channelId, recolor] of Object.entries(
+      selection.channelRecolors ?? {},
+    ).sort(([left], [right]) => left.localeCompare(right))) {
+      const channel = channels.find(
+        (candidate) => candidate.id === channelId && !candidate.primary,
+      );
+      if (
+        !channel
+        || channel.linkedTo
+        || !channel.swatches.some((swatch) => swatch.recolor === recolor)
+      ) {
+        continue;
+      }
+      const values = candidates.get(channel.typeName) ?? [];
+      values.push({
+        channelId: channel.typeName,
+        slot,
+        value: `${item.name.replaceAll(' ', '_')}_${recolor}`,
+        zPos: highestLayerZPos(item),
+      });
+      candidates.set(channel.typeName, values);
+    }
+  }
+
+  const losses: UpstreamProjectionLoss[] = [];
+  const channelParams: Array<readonly [TypeName, string]> = [];
+  for (const [channelId, values] of candidates) {
+    values.sort((left, right) =>
+      right.zPos - left.zPos || left.slot.localeCompare(right.slot),
+    );
+    const winner = values[0];
+    if (!winner) continue;
+    channelParams.push([channelId, winner.value]);
+    if (values.length > 1) {
+      losses.push({
+        reason: 'channel_collision',
+        channelId,
+        keptSlot: winner.slot,
+        omittedSlots: values.slice(1).map(({ slot }) => slot),
+      });
+    }
+  }
+
+  losses.sort((left, right) => left.channelId.localeCompare(right.channelId));
+  primaryParams.sort((left, right) =>
+    right.zPos - left.zPos || left.slot.localeCompare(right.slot),
+  );
+  channelParams.sort(([left], [right]) => left.localeCompare(right));
+  const hash = [
+    ['sex', selections.bodyType] as const,
+    ...primaryParams.map(({ slot, value }) => [slot, value] as const),
+    ...channelParams,
+  ]
+    .map(([key, value]) =>
+      `${encodeURIComponent(key)}=${encodeURIComponent(value)}`,
+    )
+    .join('&');
+  return { hash, losses };
 }
 
 /**
@@ -503,13 +725,13 @@ function decodeBase64UrlAscii(s: string): string {
 
 /**
  * Compiles a Selections configuration into a compact, shareable, URL-safe Base64 selection token.
- * Prepends the version prefix `v1.` to ensure future protocol extensibility.
+ * Prepends the version prefix `v2.` to distinguish asset-owned channel state.
  * 
  * @param selections - The character selections configuration.
  * @returns The formatted packed selection token.
  */
 export function encodeSelectionToken(selections: Selections): string {
-  return `${SELECTION_TOKEN_PREFIX}${encodeBase64UrlAscii(
+  return `${SELECTION_TOKEN_V2_PREFIX}${encodeBase64UrlAscii(
     serializeHash(selections),
   )}`;
 }
@@ -518,7 +740,7 @@ export function encodeSelectionToken(selections: Selections): string {
  * Decodes a shareable selection token back into fully resolved character selections.
  * 
  * Decoding Workflow:
- * 1. Trim whitespace and verify the presence of the `v1.` version prefix header.
+ * 1. Trim whitespace and verify a supported `v1.` or `v2.` version prefix.
  * 2. Extract and decode the packed Base64 URL-safe ASCII segment.
  * 3. Validate that the decoded ASCII query string contains key-value parameters ('=').
  * 4. Delegate to `parseHash` to locate items and assign selections.
@@ -534,10 +756,15 @@ export function decodeSelectionToken(
   palettes?: PaletteMetadata,
 ): ParseHashResult {
   const trimmed = token.trim();
-  if (!trimmed.startsWith(SELECTION_TOKEN_PREFIX)) {
+  const prefix = trimmed.startsWith(SELECTION_TOKEN_V2_PREFIX)
+    ? SELECTION_TOKEN_V2_PREFIX
+    : trimmed.startsWith(SELECTION_TOKEN_V1_PREFIX)
+      ? SELECTION_TOKEN_V1_PREFIX
+      : undefined;
+  if (!prefix) {
     throw new Error('Unsupported selection token version');
   }
-  const hash = decodeBase64UrlAscii(trimmed.slice(SELECTION_TOKEN_PREFIX.length));
+  const hash = decodeBase64UrlAscii(trimmed.slice(prefix.length));
   if (!hash.includes('=')) throw new Error('Malformed selection token');
   return parseHash(hash, catalog, palettes);
 }
