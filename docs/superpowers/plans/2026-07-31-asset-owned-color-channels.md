@@ -439,18 +439,59 @@ Task 5 record:
 - Modify: `packages/web/test/selection.test.ts`
 - Modify: `packages/web/test/color-options.test.ts`
 
-- [ ] Add failing tests proving head/expression same-name channels remain
+- [x] Add failing tests proving head/expression same-name channels remain
   independent, linked skin derives from body, absent values use base/default,
   clear restores default, and item replacement transfers only valid same-name
   values.
-- [ ] Replace the current synthetic cross-selection sub-recolor lookup with the
+- [x] Replace the current synthetic cross-selection sub-recolor lookup with the
   selected asset's own `channelRecolors` plus explicit link resolution.
-- [ ] Keep primary selection/default behavior unchanged; do not make the first
+- [x] Keep primary selection/default behavior unchanged; do not make the first
   secondary swatch an implicit default.
-- [ ] Add reducer actions for set/clear secondary channel intent without adding
+- [x] Add reducer actions for set/clear secondary channel intent without adding
   React or browser behavior to the pure slice.
-- [ ] Run focused Core/Web tests, package typechecks, and boundaries.
-- [ ] Record implementation note, commit hash, and PASS/FAIL evidence here.
+- [x] Run focused Core/Web tests, package typechecks, and boundaries.
+- [x] Record implementation note, commit hash, and PASS/FAIL evidence here.
+
+Task 6 record:
+
+- Implementation: replaced the cross-selection secondary lookup with
+  asset-scoped `Selection.channelRecolors`; every explicit `linked_to`
+  channel resolves from the selected body primary, while the pinned legacy
+  primary flag remains readable. Missing independent values continue to use the
+  authored base/default ramp. Added pure set/clear reducer actions, composition
+  locking for those actions, and a replacement helper that transfers only
+  valid same-name independent values. Linked primaries no longer receive local
+  defaults, including the initial Web head/expression selections, so direct v2
+  saves cannot persist ignored linked values.
+- Commit: `b2bfaa3444f91e85218a1ebcde1dfe57f13abd37`.
+- Initial RED verification:
+  `rtk pnpm --filter @lpc-toolkit/core test -- recolor-resolve.test.ts`
+  FAIL as expected (3 failed, 22 passed).
+- Initial RED verification:
+  `rtk pnpm --filter @lpc-toolkit/web test -- selection.test.ts color-options.test.ts`
+  FAIL as expected (5 failed, 49 passed) after the required escalated rerun for
+  the `tsx` IPC sandbox restriction.
+- Verification:
+  `rtk pnpm --filter @lpc-toolkit/core test -- recolor-resolve.test.ts`
+  PASS (25 passed).
+- Verification:
+  `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/selection.test.ts test/color-options.test.ts test/composition-lock.test.ts`
+  PASS (69 passed).
+- Verification: `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS.
+- Verification: `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS.
+- Verification: `rtk pnpm check:boundaries` PASS.
+- Verification: `rtk pnpm --filter @lpc-toolkit/core test` PASS (364 passed).
+- Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run` PASS
+  (843 passed).
+- Verification: `rtk pnpm verify` PASS, including pin, architecture, CLI
+  documentation policy, plugin, all workspace typechecks, Core tests, Web tests
+  (843 passed), and CLI tests (1034 passed, 1 platform-specific skip).
+- Verification: `rtk git diff --check` PASS.
+- Task 6 CLI documentation impact: `help`, `cli-readme`, `root-readme`,
+  `landing`, `architecture`, `engineering`, `releasing`, and `plugin`
+  are all N/A because this task changes Core/Web in-memory resolution and pure
+  reducer behavior only; public serialization was documented in Task 5 and
+  public CLI authoring remains assigned to Task 10.
 
 ### Task 7: Add deterministic v2 hash/token and upstream projection
 
