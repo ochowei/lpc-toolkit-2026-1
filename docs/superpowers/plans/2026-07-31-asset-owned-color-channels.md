@@ -693,18 +693,37 @@ Task 7 record:
 - Modify: `packages/web/src/components/landing-page.tsx`
 - Modify: `plugins/lpc-toolkit/skills/**`
 
-- [ ] Add failing public-command tests for setting and clearing a named channel,
+- [x] Add failing public-command tests for setting and clearing a named channel,
   unknown/invalid colors, linked-channel refusal, v1 migration warnings, atomic
   writes, human output, and `--json` response envelopes.
-- [ ] Add a focused public CLI interface equivalent to:
+- [x] Add a focused public CLI interface equivalent to:
   `character set-color --type <slot> --channel <id> (--color <id> | --default)`.
-- [ ] Preserve existing primary `character set --recolor` behavior.
-- [ ] Ensure Agent/plugin guidance uses the command rather than manual JSON
+- [x] Preserve existing primary `character set --recolor` behavior.
+- [x] Ensure Agent/plugin guidance uses the command rather than manual JSON
   mutation.
-- [ ] Update every documentation surface marked `update` in the matrix.
-- [ ] Run focused CLI tests, CLI typecheck/build, plugin verification, and
+- [x] Update every documentation surface marked `update` in the matrix.
+- [x] Run focused CLI tests, CLI typecheck/build, plugin verification, and
   landing documentation tests.
-- [ ] Record implementation note, commit hash, and PASS/FAIL evidence here.
+- [x] Record implementation note, commit hash, and PASS/FAIL evidence here.
+  - Implementation: added `character set-color` with exact-one-of
+    `--color`/`--default`, catalog-derived primary and secondary validation,
+    linked-channel refusal, atomic v2 persistence, migration warnings, and
+    focused human/JSON responses. Existing `character set --recolor` remains
+    supported. Root/CLI/landing/help/plugin guidance now uses the public
+    command; architecture and engineering ownership were completed with Task
+    11 as assigned by this plan.
+  - Commit: `4ffbd1adce9e1bc41f539a804eba0c3fc10a5468`.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- character-commands.test.ts command-spec.test.ts`
+    FAIL as expected before implementation (10 failed, 70 passed), then the
+    final focused command/contract set PASS (101 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli build` PASS.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx`
+    PASS (2 tests) after rerunning outside the sandbox because the first
+    attempt could not create the `tsx` IPC socket (`EPERM`).
+  - Verification: `rtk pnpm verify:plugin` PASS (40 tests and structure check).
+  - Verification: `rtk pnpm check:boundaries` PASS.
+  - Verification: `rtk git diff --check` PASS.
 
 ### Task 11: Integration, attribution, migration, and package acceptance
 
@@ -713,15 +732,40 @@ Task 7 record:
 - Modify: `docs/ARCHITECTURE.md`
 - Modify: `docs/ENGINEERING.md`
 
-- [ ] Add cross-package fixtures covering v1→v2→render, v2 Web↔CLI round trip,
+- [x] Add cross-package fixtures covering v1→v2→render, v2 Web↔CLI round trip,
   custom legacy pack normalization, linked body changes, independent channels,
   default clearing, upstream lossy diagnostics, and malformed input.
-- [ ] Prove every render/export path retains matching credit metadata and
+- [x] Prove every render/export path retains matching credit metadata and
   transactional publication behavior.
-- [ ] Prove existing presets/random profiles retain their pre-change output.
-- [ ] Run CLI package smoke when production CLI/package output changes.
-- [ ] Update architecture and engineering ownership/verification documentation.
-- [ ] Record implementation note, commit hash, and PASS/FAIL evidence here.
+- [x] Prove existing presets/random profiles retain their pre-change output.
+- [x] Run CLI package smoke when production CLI/package output changes.
+- [x] Update architecture and engineering ownership/verification documentation.
+- [x] Record implementation note, commit hash, and PASS/FAIL evidence here.
+  - Implementation: the distributed integration fixtures from Tasks 3–10
+    already cover migration, strict malformed input, independent/default/linked
+    resolution, Web interchange, legacy pack normalization, lossy upstream
+    projection, credits, transactional render/export, and random/preset
+    stability. The packed smoke exposed one remaining writer defect: presets
+    emitted a stored recolor for a linked primary. Preset materialization now
+    omits that illegal redundant value while preserving the same body-linked
+    pixels, with a focused regression. Architecture and Engineering now record
+    the ownership boundaries and complete focused acceptance map.
+  - Commit: `59432c01af2cd0961ddb519b99be166de3ad8f8a`.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/presets test -- presets.test.ts`
+    FAIL as expected before implementation (1 failed, 7 passed), then PASS
+    (8 tests); preset typecheck PASS.
+  - Verification: focused Core integration map PASS (202 tests), focused
+    Presets map PASS (7 tests before the added regression), focused CLI map
+    PASS (134 tests), and focused Web map PASS (127 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web test:e2e -- character-json-interchange.spec.ts color-channels.spec.ts`
+    PASS (2 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- preset-commands.test.ts character-commands.test.ts`
+    PASS (46 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test:package` first
+    FAIL with `linked_selection_channel_value` for `head/Human Male`, then PASS
+    after the preset writer fix.
+  - Verification: `rtk pnpm check:boundaries` PASS.
+  - Verification: `rtk git diff --check` PASS.
 
 ### Task 12: Final audit and handoff
 
