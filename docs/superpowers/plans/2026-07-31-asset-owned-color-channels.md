@@ -374,16 +374,60 @@ plugin: update
 - Modify: `packages/core/test/upstream-selection-import.test.ts`
 - Modify: CLI/Web document boundary tests as required
 
-- [ ] Add failing tests for strict v2 parsing, v1 in-memory migration, v2-only
+- [x] Add failing tests for strict v2 parsing, v1 in-memory migration, v2-only
   serialization, absent secondary defaults, invalid channel paths, linked-value
   rejection, and visual round-trip preservation.
-- [ ] Keep `lpc-toolkit.selection.v1` as accepted input and introduce
+- [x] Keep `lpc-toolkit.selection.v1` as accepted input and introduce
   `lpc-toolkit.selection.v2` as the only output discriminator.
-- [ ] Ensure upstream v1/v2 import adapters populate asset-owned channels where
-  unambiguous and issue structured warnings for lossy mappings.
-- [ ] Ensure failed imports and read-only CLI operations never rewrite files.
-- [ ] Run focused Core, CLI file-boundary, and Web document tests.
-- [ ] Record implementation note, commit hash, and PASS/FAIL evidence here.
+- [x] Ensure upstream v1/v2 import adapters populate asset-owned channels where
+  unambiguous, reject ambiguous or lossy mappings at exact paths, and warn when
+  a mutating CLI operation normalizes a successfully imported legacy format.
+- [x] Ensure failed imports and read-only CLI operations never rewrite files.
+- [x] Run focused Core, CLI file-boundary, and Web document tests.
+- [x] Record implementation note, commit hash, and PASS/FAIL evidence here.
+
+Task 5 record:
+
+- Implementation: added strict canonical selection v2 parsing and v2-only
+  serialization while retaining tolerant v1 reads; nested independent secondary
+  values now live in `channelRecolors`. Canonical v1 and upstream v1/v2
+  secondary selections migrate to their selected owner asset when the mapping is
+  unambiguous. Ambiguous, invalid, or linked-value inputs fail with stable codes
+  and exact paths instead of continuing with a lossy result. Legacy primary
+  values that were already ignored because the channel follows body are removed
+  during migration, preserving the rendered result while producing valid v2.
+  Mutating CLI operations warn when they rewrite a legacy format; read-only and
+  failed operations leave source files unchanged.
+- Commit: `2be3c999f85f886500060c9b2b28c62bf9a3a228`.
+- Initial RED verification:
+  `rtk pnpm --filter @lpc-toolkit/core test -- selection-document.test.ts`
+  FAIL as expected (13 failed, 12 passed) before implementation.
+- Verification:
+  `rtk pnpm --filter @lpc-toolkit/core test -- upstream-selection-import.test.ts selection-document.test.ts`
+  PASS (65 passed).
+- Verification:
+  `rtk pnpm --filter @lpc-toolkit/cli test -- main-human.test.ts character-editor.test.ts preset-commands.test.ts selection-document-file.test.ts character-commands.test.ts character-store.test.ts token-commands.test.ts`
+  PASS (103 passed).
+- Verification: focused Web character-document and documentation contract tests
+  PASS (26 passed).
+- Verification: `rtk pnpm -r typecheck` PASS.
+- Verification: `rtk pnpm verify` PASS, including asset preparation and pin
+  verification, architecture and CLI documentation policy gates, plugin checks,
+  every workspace typecheck, Core tests, Web tests (836 passed), and CLI tests
+  (1034 passed, 1 platform-specific skip).
+- Verification: `rtk git diff --check` PASS.
+- Task 5 CLI documentation impact:
+  - `help`: N/A — no command, option, or help text changed.
+  - `cli-readme`: update — documented v2 writes, v1/v2 reads, and
+    `channelRecolors`.
+  - `root-readme`: update — documented the canonical v2 interchange contract.
+  - `landing`: N/A — the landing page has no owned selection-schema literal or
+    channel document example.
+  - `architecture`: update — recorded schema ownership, migration, and strict
+    channel validation.
+  - `engineering`: N/A — development and verification commands are unchanged.
+  - `releasing`: N/A — release and publication procedures are unchanged.
+  - `plugin`: N/A — plugin command workflows and contracts are unchanged.
 
 ### Task 6: Resolve, clear, and transfer independent channels
 
