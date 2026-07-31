@@ -193,3 +193,20 @@ Example:
   unrelated user work, and remove only orphans created by the change.
 - **Work toward evidence:** define observable success, start with a focused
   failing test for behavior changes, and loop until the relevant checks pass.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs are tracked in this repository's GitHub Issues. See
+`docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Triage uses the five canonical labels with their default names. See
+`docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This repository uses a single-context domain-doc layout. See
+`docs/agents/domain.md`.
