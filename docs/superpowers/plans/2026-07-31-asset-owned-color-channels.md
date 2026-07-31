@@ -585,14 +585,47 @@ Task 7 record:
 - Modify: `packages/presets/test/presets.test.ts`
 - Modify: consuming Web/CLI preset tests
 
-- [ ] Add failing tests for optional non-primary channel values, linked-channel
+- [x] Add failing tests for optional non-primary channel values, linked-channel
   rejection, valid transfer on replacement, and unchanged snapshots for every
   existing preset.
-- [ ] Extend preset item types/application with optional channel values; do not
+- [x] Extend preset item types/application with optional channel values; do not
   add secondary values to existing presets.
-- [ ] Keep random outfit/profile logic from randomizing secondary channels.
-- [ ] Run presets typecheck/tests plus Web and CLI preset consumer tests.
-- [ ] Record implementation note, commit hash, and PASS/FAIL evidence here.
+- [x] Keep random outfit/profile logic from randomizing secondary channels.
+- [x] Run presets typecheck/tests plus Web and CLI preset consumer tests.
+- [x] Record implementation note, commit hash, and PASS/FAIL evidence here.
+  - Implementation: preset items may provide strict, catalog-validated values
+    for independent non-primary channels. Replacement transfers only still-valid
+    values with the same channel ID; an explicit unknown, primary, linked, or
+    invalid value skips that preset item. All six built-in presets remain exact
+    primary-only snapshots, and random outfit selection remains primary-only.
+  - Product commit: `14a1b4613ea697e56ab545baef7bc9080fc51f81`
+  - RED: `rtk pnpm --filter @lpc-toolkit/presets test -- presets.test.ts`
+    FAIL as expected (3 failed, 4 passed before implementation).
+  - GREEN: `rtk pnpm --filter @lpc-toolkit/presets test -- presets.test.ts`
+    PASS (7 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/presets run typecheck` PASS.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/presets-apply.test.ts test/presets.test.ts test/random-outfit.test.ts`
+    PASS (69 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/preset-commands.test.ts`
+    PASS (8 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web run typecheck && rtk pnpm --filter @lpc-toolkit/cli run typecheck`
+    PASS.
+  - Verification: `rtk pnpm check:boundaries` PASS.
+  - Verification: `rtk pnpm verify` PASS (Core 370, asset-pack-format 72,
+    Presets 7, Web 846, CLI 1036 passed and 1 skipped).
+  - Verification: `rtk git diff --check` PASS.
+  - CLI documentation impact reassessment:
+
+    ```text
+    help: N/A — no command, option, argument, output, or help behavior changed
+    cli-readme: N/A — every existing built-in preset materializes unchanged
+    root-readme: N/A — the documented CLI and preset workflows are unchanged
+    landing: N/A — the existing landing preset and rendered output are unchanged
+    architecture: N/A — presets retain pure application ownership and CLI only materializes the shared result
+    engineering: N/A — development commands, verification gates, and ownership are unchanged
+    releasing: N/A — package publication and release behavior are unchanged
+    plugin: N/A — no plugin command or character-authoring contract exposes preset channel authoring
+    ```
 
 ### Task 9: Build grouped multi-channel Web controls
 
