@@ -163,18 +163,28 @@ plugin: update
 - Modify: `packages/core/src/recolor-resolve.ts`
 - Modify: `packages/core/test/recolor-resolve.test.ts`
 
-- [ ] Add failing tests proving the selected `body` primary recolor is the sole
+- [x] Add failing tests proving the selected `body` primary recolor is the sole
   source, non-body `match_body_color` assets follow it, object insertion order
   cannot change the result, and a missing body produces the existing raw/default
   fallback plus a diagnostic warning.
-- [ ] Replace the iteration-based body-color lookup with an explicit `body`
+- [x] Replace the iteration-based body-color lookup with an explicit `body`
   selection lookup; keep the body asset itself editable.
-- [ ] Run:
+- [x] Run:
   `rtk pnpm --filter @lpc-toolkit/core test -- recolor-resolve.test.ts`
-- [ ] Run:
+- [x] Run:
   `rtk pnpm --filter @lpc-toolkit/core run typecheck`
-- [ ] Run: `rtk pnpm check:boundaries`
-- [ ] Record implementation note, commit hash, and PASS/FAIL evidence here.
+- [x] Run: `rtk pnpm check:boundaries`
+- [x] Record implementation note, commit hash, and PASS/FAIL evidence here.
+  - Implementation: body color now resolves only through the validated `body`
+    selection; linked assets warn and draw raw/default when that source is
+    missing. Regression coverage proves insertion order cannot let expression
+    color override body color and that the body remains editable.
+  - Commit: `8bbe1c6ce8ad75eeae6be3bfaf3e08bab35bee23`
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core test -- recolor-resolve.test.ts`
+    FAIL as expected before implementation (2 failed, 18 passed), then PASS
+    after implementation (20 passed).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS.
+  - Verification: `rtk pnpm check:boundaries` PASS.
 
 ### Task 2: Render followed primary color as read-only in Web
 
@@ -441,4 +451,3 @@ plugin: update
   was not run without initializing `upstream/`.
 - [ ] Confirm `rtk git status --short` contains only intended changes and record
   the final verification evidence and commit hashes.
-
