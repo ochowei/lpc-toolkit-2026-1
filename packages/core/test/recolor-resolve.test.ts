@@ -136,6 +136,62 @@ describe('makeResolvePalette', () => {
       );
     });
 
+    it('uses the body selection as the sole body-color source regardless of insertion order', () => {
+      const cat = loadCatalog([
+        'body/body.json',
+        'head/faces/face_neutral.json',
+      ]);
+      const body = cat.byItemId.get('body')!;
+      const expression = cat.byItemId.get('face_neutral')!;
+      const selections: Selections = {
+        bodyType: 'male',
+        items: {
+          expression: {
+            typeName: 'expression',
+            name: 'Neutral',
+            recolor: 'light',
+          },
+          body: {
+            typeName: 'body',
+            name: 'Body Color',
+            recolor: 'brown',
+          },
+        },
+      };
+      const resolve = makeResolvePalette(cat, palettes, selections);
+
+      const bodyRamp = palettes.materials.body?.palettes.ulpc?.brown ?? [];
+      expect(
+        resolve(selections.items.expression!, expression)?.target.slice(
+          0,
+          bodyRamp.length,
+        ),
+      ).toEqual(bodyRamp);
+      expect(resolve(selections.items.body!, body)?.target).toEqual(
+        palettes.materials.body?.palettes.ulpc?.brown,
+      );
+    });
+
+    it('warns and draws a followed asset raw when the body selection is missing', () => {
+      const cat = loadCatalog(['body/lizard/tail_lizard.json']);
+      const tail = cat.byItemId.get('tail_lizard')!;
+      const warnings: string[] = [];
+      const selections: Selections = {
+        bodyType: 'male',
+        items: {
+          tail: { typeName: 'tail', name: 'Lizard tail' },
+        },
+      };
+      const resolve = makeResolvePalette(cat, palettes, selections, {
+        onWarn: (message) => warnings.push(message),
+      });
+
+      expect(resolve(selections.items.tail!, tail)).toBeUndefined();
+      expect(warnings).toEqual([
+        'recolor: "Lizard tail" follows body color but no body selection is available',
+      ]);
+    });
+
     it('returns undefined when no recolor is chosen (draw raw)', () => {
       const selections: Selections = {
         bodyType: 'male',

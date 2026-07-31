@@ -321,26 +321,26 @@ function findItem(
 }
 
 /**
- * Port of upstream `getBodyColor`: the recolor chosen on whichever
- * selected item is itself `match_body_color` (the body skin tone all
- * other body-colored accessories inherit).
+ * Resolve the primary recolor chosen on the selected body asset. The body
+ * selection is the sole skin-color source for linked assets.
  * 
- * Crawls through the active selections to retrieve the skin tone chosen for
- * the character's base body archetype.
+ * Looks up the active body slot and verifies that its selected item exists in
+ * the catalog before returning its primary color choice.
  * 
  * @param catalog - The compiled asset Catalog.
  * @param selections - Currently selected items configuration.
- * @returns The body skin tone recolor string, or null if none is selected.
+ * @returns The chosen body recolor, `null` when the body uses its authored
+ * default, or `undefined` when no valid body selection is available.
  */
 function getBodyColor(
   catalog: Catalog,
   selections: Selections,
-): string | null {
-  for (const sel of Object.values(selections.items)) {
-    const def = findItem(catalog, sel.typeName, sel.name);
-    if (def?.match_body_color && sel.recolor) return sel.recolor;
-  }
-  return null;
+): string | null | undefined {
+  const selection = selections.items.body;
+  if (!selection || selection.typeName !== 'body') return undefined;
+  const item = findItem(catalog, 'body', selection.name);
+  if (!item) return undefined;
+  return selection.recolor ?? null;
 }
 
 /**
@@ -359,6 +359,7 @@ function getBodyColor(
  * @param entries - List of recolor configurations for this item's layers.
  * @param catalog - Compiled asset Catalog.
  * @param selections - Complete character selections record.
+ * @param warn - Optional callback for missing linked-color sources.
  * @returns A dictionary mapping slot type names to their selected recolor string keys.
  */
 function getMultiRecolors(
@@ -367,6 +368,7 @@ function getMultiRecolors(
   entries: readonly RecolorConfig[],
   catalog: Catalog,
   selections: Selections,
+  warn?: (message: string) => void,
 ): Record<string, string> {
   const recolors: Record<string, string> = {};
 
@@ -383,7 +385,13 @@ function getMultiRecolors(
 
   if (item.match_body_color) {
     const bodyColor = getBodyColor(catalog, selections);
-    if (bodyColor) recolors[primaryKey] = bodyColor;
+    if (bodyColor === undefined) {
+      warn?.(
+        `recolor: "${item.name}" follows body color but no body selection is available`,
+      );
+    } else if (bodyColor !== null) {
+      recolors[primaryKey] = bodyColor;
+    }
   }
 
   return recolors;
@@ -457,6 +465,7 @@ export function makeResolvePalette(
       entries,
       catalog,
       selections,
+      warn,
     );
     if (Object.keys(chosen).length === 0) return undefined;
 
