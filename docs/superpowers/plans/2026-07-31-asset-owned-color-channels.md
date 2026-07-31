@@ -54,8 +54,11 @@ the language in [`CONTEXT.md`](../../../CONTEXT.md).
 - Selection v1 imports without visual change and the next save emits v2.
 - Invalid canonical v2 input fails with an exact field path; invalid v2
   hash/token channel input produces a warning and falls back to asset default.
-- All 79 checked-in `match_body_color` definitions migrate mechanically to
-  primary-channel `linked_to` declarations with render/credit parity.
+- The next pinned asset release migrates all 79 `match_body_color` definitions
+  with render/credit parity: 78 follower assets receive primary-channel
+  `linked_to` declarations, while the sole `body` source drops the legacy flag
+  without a self-link. Until that release exists, the current verified pin
+  remains readable through the legacy runtime fallback.
 - External legacy artist packs remain readable with a deprecation warning.
 - Upstream links contain only upstream-compatible parameters, open the selected
   assets, and disclose when private channels require a lossy projection.
@@ -300,21 +303,66 @@ plugin: update
 - Modify: all applicable JSON under `assets/sheet_definitions/`
 - Modify: asset generation/validation snapshots only when mechanically required
 
-- [ ] Add failing schema/validation tests for valid `body/primary` links,
+- [x] Add failing schema/validation tests for valid `body/primary` links,
   unsupported targets, linked secondary values, duplicate channel IDs, and
   legacy `match_body_color` deprecation normalization.
-- [ ] Implement the schema and compile normalization without weakening strict
+- [x] Implement the schema and compile normalization without weakening strict
   artist-pack validation.
-- [ ] Mechanically migrate every checked-in `match_body_color: true` definition
-  to `linked_to` on its primary recolor entry; fail and list any definition that
-  lacks a resolvable primary entry.
-- [ ] Assert no checked-in sheet definition retains `match_body_color` and the
+- [ ] In the next pinned asset release, mechanically migrate every follower
+  definition with
+  `match_body_color: true` to `linked_to` on its primary recolor entry; remove
+  the flag without adding a self-link on the sole `body` source; fail and list
+  any definition that lacks a resolvable primary entry.
+- [ ] Assert no definition in that release retains `match_body_color` and the
   migration count matches the pre-change inventory (79 unless the active asset
   snapshot changed; if changed, record and explain the new audited count).
-- [ ] Verify catalog, layer, animation, pixel-render, and credit-manifest parity
+- [x] Verify catalog, layer, animation, pixel-render, and credit-manifest parity
   for representative single- and multi-channel assets.
-- [ ] Run Web asset validation and focused Core asset-pack tests.
-- [ ] Record implementation note, commit hash, and PASS/FAIL evidence here.
+- [x] Run Web asset validation when a full directory asset tree is available;
+  otherwise verify the compressed asset pin and record why the directory-only
+  validator is not applicable.
+- [x] Record implementation note, commit hash, and PASS/FAIL evidence here.
+  - Implementation: strict artist-pack parsing now accepts only explicit
+    `body/primary` link targets, preserves linked primary and secondary
+    channels through normalization, rejects duplicate/missing secondary IDs
+    and body self-links, and converts legacy `match_body_color` input to a
+    canonical primary link with an acknowledgeable deprecation warning. Core
+    rendering and Web presentation accept both the canonical declaration and
+    the current pinned release's legacy flag.
+  - Commit: `1ecd7fe5c1a2fdd08bbea808ffa20710698315b3`
+  - Asset inventory: the current ignored, materialized release cache contains
+    79 legacy flags: 78 followers and one `body` source. A trial mechanical
+    migration confirmed `legacy=0`, `primaryBodyLinks=78`, and no body
+    self-link, then the cache was restored because `assets/` is not a
+    versionable source in this repository.
+  - Release prerequisite: the two source-migration checkboxes above remain
+    open. Updating them requires a new externally published asset tarball and
+    matching `asset-release.json` manifest/tarball digests. Editing the ignored
+    cache, dormant `upstream/` gitlink, or catalog objects under the existing
+    pin would respectively be unreproducible, violate repository rules, or
+    change artist-pack baseline digests without a release transition.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-schema.test.ts asset-pack-validation.test.ts`
+    FAILed as expected before implementation (6 failed, 53 passed), then the
+    expanded focused Core set PASSed (97 passed).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core test` PASS (25 files,
+    350 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web test -- color-options.test.ts`
+    could not start in the sandbox because `tsx` IPC creation returned EPERM;
+    the escalated rerun PASSed (11 passed).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web validate-assets` N/A for
+    the active compressed snapshot: the directory-only script correctly
+    reported that `assets/spritesheets/` is absent. The pin-aware replacement
+    evidence, `rtk pnpm verify`, PASSed, including cache preparation, pin and
+    fixture verification, all workspace typechecks, and all unit tests.
+  - Verification: `rtk pnpm check:boundaries` PASS.
+  - Verification: `rtk git diff --check` PASS.
+  - Task 4 CLI documentation impact: `help`, `cli-readme`, `root-readme`,
+    `landing`, `architecture`, `engineering`, `releasing`, and `plugin` are all
+    N/A for this partial commit because it adds no CLI command or documented
+    authoring example; the complete public channel workflow remains assigned
+    to Tasks 10 and 11.
 
 ### Task 5: Introduce canonical selection v2 and strict v1 migration
 
