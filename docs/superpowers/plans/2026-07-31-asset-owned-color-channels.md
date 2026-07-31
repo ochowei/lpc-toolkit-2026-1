@@ -505,20 +505,78 @@ Task 6 record:
 - Modify: `packages/web/test/upstream-url.test.ts`
 - Modify: CLI token commands/tests
 
-- [ ] Add failing tests for legacy hash/`v1.` token reads, deterministic v2
+- [x] Add failing tests for legacy hash/`v1.` token reads, deterministic v2
   writes, `color.<slot>.<channel>` parsing, invalid-channel warnings, and exact
   token round trips.
-- [ ] Add a versioned v2 serializer/parser and `v2.` token codec while keeping
+- [x] Add a versioned v2 serializer/parser and `v2.` token codec while keeping
   legacy decoders.
-- [ ] Implement a dedicated upstream serializer that never forwards `v=2` or
+- [x] Implement a dedicated upstream serializer that never forwards `v=2` or
   `color.*`, preserves representable selections/colors, chooses a deterministic
   visibly dominant value for collisions, and returns loss diagnostics.
-- [ ] Surface the upstream-loss warning in Web tooltip/status while leaving the
+- [x] Surface the upstream-loss warning in Web tooltip/status while leaving the
   link usable.
-- [ ] Verify sample upstream URLs syntactically against the public upstream
+- [x] Verify sample upstream URLs syntactically against the public upstream
   contract without requiring `upstream/` initialization.
-- [ ] Run focused Core/Web/CLI token and URL tests.
-- [ ] Record implementation note, commit hash, and PASS/FAIL evidence here.
+- [x] Run focused Core/Web/CLI token and URL tests.
+- [x] Record implementation note, commit hash, and PASS/FAIL evidence here.
+
+Task 7 record:
+
+- Implementation: added deterministic canonical `v=2` hashes with sorted
+  asset-owned `color.<slot>.<channel>` fields, `v2.` tokens, and backward reads
+  for legacy hashes and `v1.` tokens. The Core upstream projection emits only
+  the public legacy contract, orders selected assets by highest layer so the
+  intended visibly dominant sub-selection wins upstream's first-match lookup,
+  and reports every global-channel collision. Web keeps the projected link
+  usable while displaying a localized warning glyph and tooltip when fidelity
+  is lost. CLI encode now emits `v2.`; decode accepts both token versions and
+  its help/README describe that contract.
+- Commit: `adf45606860fd9220f644ed8885d01e566f32057`.
+- Initial RED verification:
+  `rtk pnpm --filter @lpc-toolkit/core test -- hash.test.ts` FAIL as expected
+  (2 failed, 32 passed: canonical v2 expectation and missing upstream
+  projection).
+- Initial RED verification:
+  `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/upstream-url.test.ts test/top-bar.test.tsx test/url-hash-sync.test.ts test/share-import-popover.test.ts`
+  FAIL as expected (3 failed, 27 passed: projection result and loss warning not
+  implemented).
+- Initial RED verification:
+  `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/token-commands.test.ts test/main-human.test.ts`
+  FAIL as expected (2 failed, 39 passed: CLI routed `v2.` input as a raw hash).
+- Verification:
+  `rtk pnpm --filter @lpc-toolkit/core test -- hash.test.ts` PASS (34 passed).
+- Verification:
+  `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/upstream-url.test.ts test/top-bar.test.tsx test/url-hash-sync.test.ts test/share-import-popover.test.ts`
+  PASS (30 passed).
+- Verification:
+  `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/token-commands.test.ts test/main-human.test.ts`
+  PASS (41 passed).
+- Verification: `rtk pnpm --filter @lpc-toolkit/core test` PASS (370 passed).
+- Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run` PASS.
+- Verification: `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS.
+- Verification: `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS.
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+- Verification: `rtk pnpm check:boundaries` PASS.
+- Verification: `rtk pnpm verify` PASS, including source pins, architecture,
+  CLI documentation policy, plugin verification, all workspace typechecks, and
+  all workspace unit tests. The loopback-dependent CLI web-server tests were
+  run with the required sandbox escalation.
+- Verification: `rtk git diff --check` PASS.
+- Public upstream verification: compared the projection with public upstream
+  `sources/state/hash.ts` and `sources/state/resolve-hash-param.ts` at Git tree
+  `0f898bb675a1abe16ce430e82e3bf9daed278690`, without initializing the dormant
+  gitlink. A live projected URL loaded `Neutral`, `Human Male`, `Body Color`,
+  and `Eye Color (red)` and rendered non-empty 256×64 animation and 832×3456
+  full-sheet canvases.
+- Task 7 CLI documentation impact:
+  `help: update`; `cli-readme: update`; `root-readme: N/A — token versioning is
+  not a primary root quick-start workflow`; `landing: N/A — the landing page
+  mentions tokens generically and owns no wire-format contract`;
+  `architecture: N/A — Core already owns hash/token compatibility and accepted
+  ADR-0004/0006 own this format decision`; `engineering: N/A — commands, gates,
+  and CI mapping are unchanged`; `releasing: N/A — package publication and
+  release verification are unchanged`; `plugin: N/A — installed skills do not
+  expose the token workflow`.
 
 ### Task 8: Extend presets without changing existing outputs
 
