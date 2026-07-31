@@ -150,10 +150,16 @@ function loadCharacterContext(runtime: RuntimeAssets): LoadedCharacterContext {
 }
 
 function normalizationWarnings(stored: StoredCharacter): readonly CliIssue[] {
-  if (stored.source === 'canonical') return [];
+  if (
+    stored.source === 'canonical'
+    && stored.inputSchema === SELECTION_SCHEMA
+  ) return [];
+  const source = stored.source === 'canonical'
+    ? stored.inputSchema ?? stored.source
+    : stored.source;
   return [{
     code: 'selection_format_normalized',
-    message: `Updated ${stored.source} input was written as ${SELECTION_SCHEMA}.`,
+    message: `Updated ${source} input was written as ${SELECTION_SCHEMA}.`,
     path: stored.path,
   }];
 }

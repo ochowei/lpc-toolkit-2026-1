@@ -629,8 +629,7 @@ export function getColorChannels(
     if (!primary && !entry.type_name) continue;
     const normalized = normalizeRecolor(entry, palettes.materials);
     if (!normalized) continue;
-    const defaultColors = getBasePalette(normalized, palettes.materials);
-    if (!defaultColors) continue;
+    const defaultColors = getBasePalette(normalized, palettes.materials) ?? [];
     channels.push({
       id: primary ? 'primary' : entry.type_name!,
       typeName: entry.type_name ?? item.type_name,

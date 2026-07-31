@@ -359,7 +359,7 @@ describe('public CLI no-repository artist workflow', () => {
 
     const characterPath = path.join(workspaceRoot, 'artist-character.json');
     const character: SelectionJson = {
-      schema: 'lpc-toolkit.selection.v1',
+      schema: 'lpc-toolkit.selection.v2',
       name: 'artist-character',
       bodyType: 'male',
       items: {

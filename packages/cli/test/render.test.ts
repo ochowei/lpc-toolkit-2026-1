@@ -170,7 +170,7 @@ async function createManagedRuntime(missingBody = false): Promise<RuntimeAssets>
 }
 
 const bodyOnlySelection = {
-  schema: 'lpc-toolkit.selection.v1',
+  schema: 'lpc-toolkit.selection.v2',
   name: 'body-only',
   bodyType: 'male',
   items: {

@@ -51,6 +51,7 @@ export interface StoredCharacter {
   readonly selection: SelectionJson;
   readonly parsed: ParsedSelectionJson;
   readonly source: SelectionDocumentSource;
+  readonly inputSchema?: ParsedSelectionJson['metadata']['schema'];
 }
 
 export type CharacterListEntry =
@@ -124,6 +125,7 @@ export function readCharacter(
         selection: loaded.selection,
         parsed: loaded.parsed,
         source: loaded.source,
+        ...(loaded.inputSchema ? { inputSchema: loaded.inputSchema } : {}),
       };
     } catch (error) {
       if (error instanceof SelectionDocumentError) throw error;
@@ -171,6 +173,7 @@ export function readCharacter(
       selection: selectionJsonFromCore(parsed.selections, parsed.metadata.name),
       parsed,
       source: 'canonical',
+      inputSchema: parsed.metadata.schema,
     };
   } catch (error) {
     throw new CharacterStoreError(

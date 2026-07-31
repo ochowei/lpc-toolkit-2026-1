@@ -36,7 +36,7 @@ describe('preset commands', () => {
   it('materializes a preset to selection json', () => {
     const selection = materializePreset('farmer');
 
-    expect(selection.schema).toBe('lpc-toolkit.selection.v1');
+    expect(selection.schema).toBe('lpc-toolkit.selection.v2');
     expect(selection.name).toBe('farmer');
     expect(selection.items.body?.name).toBe('Body Color');
   });

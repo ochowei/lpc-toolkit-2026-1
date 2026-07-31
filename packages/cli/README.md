@@ -383,12 +383,14 @@ Character rendering is strict by default. Use `--allow-partial` only when
 attributed partial animation output is acceptable; missing paths are reported
 in warnings and metadata rather than silently credited.
 
-`lpc-toolkit.selection.v1` is the canonical saved selection format. Wherever
-`--selection` reads an existing file, the CLI also accepts upstream version 1
-and version 2 selection JSON. Read-only commands import these documents in
-memory without rewriting the source. A successful `character set` or
-`character remove` mutation of upstream input atomically rewrites that file in
-the canonical format and emits the `selection_format_normalized` warning.
+`lpc-toolkit.selection.v2` is the canonical saved selection format. It retains
+the primary `recolor` field and stores independent secondary colors under the
+selected asset's `channelRecolors`. Wherever `--selection` reads an existing
+file, the CLI accepts Toolkit selection v1 and v2 plus upstream version 1 and
+version 2 selection JSON. Read-only commands migrate these documents in memory
+without rewriting the source. A successful `character set` or `character
+remove` mutation of non-v2 input atomically rewrites that file as Toolkit v2
+and emits the `selection_format_normalized` warning.
 `character create --selection <file>` remains an output destination for the
 new character rather than an input file.
 

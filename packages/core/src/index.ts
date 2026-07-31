@@ -184,12 +184,16 @@ export { creditsToTxt, creditsToCsv } from './credits-format.js';
 // ==========================================
 export type {
   ParsedSelectionJson,
+  SelectionSchema,
   SelectionJson,
   SelectionJsonItem,
 } from './selection-document.js';
 export {
   parseSelectionJson,
+  SelectionJsonError,
   SELECTION_SCHEMA,
+  SELECTION_SCHEMA_V1,
+  SELECTION_SCHEMA_V2,
   selectionJsonFromCore,
 } from './selection-document.js';
 export type {

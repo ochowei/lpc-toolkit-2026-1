@@ -1,13 +1,17 @@
 import { parseHash } from './hash.js';
 import {
+  getColorChannels,
   getRecolorVariantsForType,
   itemSupportsSelectionType,
 } from './recolor-resolve.js';
 import {
   parseSelectionJson,
-  SELECTION_SCHEMA,
+  SelectionJsonError,
+  SELECTION_SCHEMA_V1,
+  SELECTION_SCHEMA_V2,
   selectionJsonFromCore,
   type ParsedSelectionJson,
+  type SelectionSchema,
   type SelectionJson,
 } from './selection-document.js';
 import type {
@@ -31,6 +35,7 @@ export interface SelectionDocumentImportContext {
 
 export interface ImportedSelectionDocument {
   readonly source: SelectionDocumentSource;
+  readonly inputSchema?: SelectionSchema;
   readonly selection: SelectionJson;
   readonly parsed: ParsedSelectionJson;
 }
@@ -44,7 +49,10 @@ export type SelectionDocumentErrorCode =
   | 'invalid_upstream_selection'
   | 'unknown_upstream_item'
   | 'invalid_selection_variant'
-  | 'invalid_selection_recolor';
+  | 'invalid_selection_recolor'
+  | 'invalid_selection_channel'
+  | 'invalid_selection_channel_recolor'
+  | 'linked_selection_channel_value';
 
 export class SelectionDocumentError extends Error {
   constructor(
@@ -119,6 +127,7 @@ function validateSelection(
   bodyType: string,
   context: SelectionDocumentImportContext,
   source: SelectionDocumentSource,
+  strictCanonicalV2 = false,
 ): void {
   const path = selectionPath(source, typeName);
   const item = resolveByName(typeName, selection.name, context.catalog);
@@ -126,6 +135,14 @@ function validateSelection(
     throw new SelectionDocumentError(
       'unknown_upstream_item',
       `Unknown ${source} item "${selection.name}" for type "${typeName}".`,
+      path,
+    );
+  }
+
+  if (strictCanonicalV2 && item.type_name !== typeName) {
+    throw new SelectionDocumentError(
+      'invalid_selection_channel',
+      `Canonical v2 secondary channel "${typeName}" must be nested under its selected asset.`,
       path,
     );
   }
@@ -142,6 +159,18 @@ function validateSelection(
   }
 
   if (selection.recolor) {
+    const primaryChannel = getColorChannels(item, context.palettes)[0];
+    if (
+      strictCanonicalV2
+      && item.type_name === typeName
+      && (primaryChannel?.linkedTo || item.match_body_color)
+    ) {
+      throw new SelectionDocumentError(
+        'linked_selection_channel_value',
+        `Linked primary channel for "${typeName}/${item.name}" cannot store a recolor value.`,
+        `${path}.recolor`,
+      );
+    }
     const recolors = getRecolorVariantsForType(
       item,
       context.palettes,
@@ -152,6 +181,35 @@ function validateSelection(
         'invalid_selection_recolor',
         `Invalid recolor "${selection.recolor}" for "${typeName}/${item.name}".`,
         `${path}.recolor`,
+      );
+    }
+  }
+
+  for (const [channelId, recolor] of Object.entries(
+    selection.channelRecolors ?? {},
+  )) {
+    const channelPath = `${path}.channelRecolors.${channelId}`;
+    const channel = getColorChannels(item, context.palettes)
+      .find((candidate) => candidate.id === channelId && !candidate.primary);
+    if (!channel) {
+      throw new SelectionDocumentError(
+        'invalid_selection_channel',
+        `Unknown color channel "${channelId}" for "${typeName}/${item.name}".`,
+        channelPath,
+      );
+    }
+    if (channel.linkedTo) {
+      throw new SelectionDocumentError(
+        'linked_selection_channel_value',
+        `Linked color channel "${channelId}" cannot store a recolor value.`,
+        channelPath,
+      );
+    }
+    if (!channel.swatches.some((swatch) => swatch.recolor === recolor)) {
+      throw new SelectionDocumentError(
+        'invalid_selection_channel_recolor',
+        `Invalid recolor "${recolor}" for channel "${typeName}/${item.name}/${channelId}".`,
+        channelPath,
       );
     }
   }
@@ -172,6 +230,7 @@ function validateSelections(
   selections: Selections,
   context: SelectionDocumentImportContext,
   source: SelectionDocumentSource,
+  strictCanonicalV2 = false,
 ): void {
   for (const [typeName, selection] of Object.entries(selections.items)) {
     validateSelection(
@@ -180,8 +239,79 @@ function validateSelections(
       selections.bodyType,
       context,
       source,
+      strictCanonicalV2,
     );
   }
+}
+
+function migrateSecondarySelections(
+  selections: Selections,
+  context: SelectionDocumentImportContext,
+  source: SelectionDocumentSource,
+): Selections {
+  const primaryEntries: Array<readonly [TypeName, Selection]> = [];
+  const secondaryEntries: Array<readonly [TypeName, Selection, ItemDefinition]> = [];
+  for (const [typeName, selection] of Object.entries(selections.items)) {
+    const item = resolveByName(typeName, selection.name, context.catalog);
+    if (!item || item.type_name === typeName) {
+      primaryEntries.push([typeName, selection]);
+    } else {
+      secondaryEntries.push([typeName, selection, item]);
+    }
+  }
+
+  const items: Record<TypeName, Selection> = Object.fromEntries(primaryEntries);
+  for (const [channelId, secondary, item] of secondaryEntries) {
+    const owner = items[item.type_name];
+    const path = selectionPath(source, channelId);
+    if (!owner || owner.name !== item.name || !secondary.recolor) {
+      throw new SelectionDocumentError(
+        'invalid_selection_channel',
+        `Secondary selection "${channelId}" has no matching selected owner asset.`,
+        path,
+      );
+    }
+    if (owner.channelRecolors?.[channelId] !== undefined) {
+      throw new SelectionDocumentError(
+        'invalid_selection_channel',
+        `Duplicate secondary channel value for "${item.type_name}/${channelId}".`,
+        path,
+      );
+    }
+    items[item.type_name] = {
+      ...owner,
+      channelRecolors: {
+        ...owner.channelRecolors,
+        [channelId]: secondary.recolor,
+      },
+    };
+  }
+  return { ...selections, items };
+}
+
+function clearLegacyLinkedPrimaryValues(
+  selections: Selections,
+  context: SelectionDocumentImportContext,
+): Selections {
+  const itemEntries = Object.entries(selections.items).map(
+    ([typeName, selection]) => {
+      const item = resolveByName(typeName, selection.name, context.catalog);
+      const primaryChannel = item
+        ? getColorChannels(item, context.palettes)[0]
+        : undefined;
+      if (
+        !selection.recolor
+        || !item
+        || item.type_name !== typeName
+        || (!primaryChannel?.linkedTo && !item.match_body_color)
+      ) {
+        return [typeName, selection] as const;
+      }
+      const { recolor: _ignoredLinkedRecolor, ...normalized } = selection;
+      return [typeName, normalized] as const;
+    },
+  );
+  return { ...selections, items: Object.fromEntries(itemEntries) };
 }
 
 function importedDocument(
@@ -189,9 +319,17 @@ function importedDocument(
   selections: Selections,
   context: SelectionDocumentImportContext,
   name?: string,
+  strictCanonicalV2 = false,
 ): ImportedSelectionDocument {
-  validateSelections(selections, context, source);
-  const selection = selectionJsonFromCore(selections, name);
+  const legacyNormalized = strictCanonicalV2
+    ? selections
+    : clearLegacyLinkedPrimaryValues(selections, context);
+  validateSelections(legacyNormalized, context, source, strictCanonicalV2);
+  const normalized = strictCanonicalV2
+    ? legacyNormalized
+    : migrateSecondarySelections(legacyNormalized, context, source);
+  validateSelections(normalized, context, source, strictCanonicalV2);
+  const selection = selectionJsonFromCore(normalized, name);
   return {
     source,
     selection,
@@ -455,7 +593,7 @@ function importCanonical(
   record: Record<string, unknown>,
   context: SelectionDocumentImportContext,
 ): ImportedSelectionDocument {
-  if (record.schema !== SELECTION_SCHEMA) {
+  if (record.schema !== SELECTION_SCHEMA_V1 && record.schema !== SELECTION_SCHEMA_V2) {
     throw new SelectionDocumentError(
       'unsupported_selection_schema',
       `Unsupported selection schema: ${String(record.schema)}`,
@@ -470,14 +608,21 @@ function importCanonical(
     throw new SelectionDocumentError(
       'invalid_selection_json',
       error instanceof Error ? error.message : String(error),
+      error instanceof SelectionJsonError
+        ? error.path?.replace(/^\$\.?/, '') || undefined
+        : undefined,
     );
   }
-  return importedDocument(
-    'canonical',
-    parsed.selections,
-    context,
-    parsed.metadata.name,
-  );
+  return {
+    ...importedDocument(
+      'canonical',
+      parsed.selections,
+      context,
+      parsed.metadata.name,
+      record.schema === SELECTION_SCHEMA_V2,
+    ),
+    inputSchema: parsed.metadata.schema,
+  };
 }
 
 export function importSelectionDocument(

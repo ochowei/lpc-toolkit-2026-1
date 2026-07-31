@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   createCatalog,
-  decodeSelectionToken,
-  encodeSelectionToken,
   importSelectionDocument,
   parseHash,
-  serializeHash,
+  parseSelectionJson,
   type FilePath,
   type ItemDefinition,
   type PaletteMetadata,
@@ -107,7 +105,7 @@ describe('importSelectionDocument', () => {
 
     expect(result.source).toBe('upstream-v2');
     expect(result.selection).toEqual({
-      schema: 'lpc-toolkit.selection.v1',
+      schema: 'lpc-toolkit.selection.v2',
       bodyType: 'male',
       items: { body: { name: 'Body Color', recolor: 'ulpc.light' } },
     });
@@ -127,12 +125,15 @@ describe('importSelectionDocument', () => {
     }, context);
 
     expect(result.selection.items).toEqual({
-      coat: { name: 'Coat', recolor: 'ulpc.blue' },
-      trim: { name: 'Coat', recolor: 'ulpc.gold' },
+      coat: {
+        name: 'Coat',
+        recolor: 'ulpc.blue',
+        channelRecolors: { trim: 'ulpc.gold' },
+      },
     });
   });
 
-  it('round-trips imported multi-recolor selections through hashes and tokens', () => {
+  it('round-trips imported multi-recolor selections through canonical v2', () => {
     const imported = importSelectionDocument({
       version: 2,
       bodyType: 'male',
@@ -141,21 +142,9 @@ describe('importSelectionDocument', () => {
         trim: { itemId: 'coat', subId: 1, recolor: 'ulpc.gold' },
       },
     }, context);
-    const expected = imported.parsed.selections;
-
-    const hash = serializeHash(expected);
-    const decodedHash = parseHash(hash, context.catalog, context.palettes);
-    const token = encodeSelectionToken(expected);
-    const decodedToken = decodeSelectionToken(
-      token,
-      context.catalog,
-      context.palettes,
+    expect(parseSelectionJson(imported.selection).selections).toEqual(
+      imported.parsed.selections,
     );
-
-    expect(decodedHash.warnings).toEqual([]);
-    expect(decodedHash.selections).toEqual(expected);
-    expect(decodedToken.warnings).toEqual([]);
-    expect(decodedToken.selections).toEqual(expected);
   });
 
   it.each([
@@ -213,14 +202,126 @@ describe('importSelectionDocument', () => {
 
     expect(result.source).toBe('canonical');
     expect(result.selection).toEqual({
-      schema: 'lpc-toolkit.selection.v1',
+      schema: 'lpc-toolkit.selection.v2',
       name: 'hero',
       bodyType: 'male',
       items: {
-        coat: { name: 'Coat', variant: 'long', recolor: 'ulpc.blue' },
-        trim: { name: 'Coat', recolor: 'ulpc.gold' },
+        coat: {
+          name: 'Coat',
+          variant: 'long',
+          recolor: 'ulpc.blue',
+          channelRecolors: { trim: 'ulpc.gold' },
+        },
       },
     });
+  });
+
+  it('validates canonical v2 channel IDs and colors at exact paths', () => {
+    expect(() => importSelectionDocument({
+      schema: 'lpc-toolkit.selection.v2',
+      bodyType: 'male',
+      items: {
+        coat: {
+          name: 'Coat',
+          channelRecolors: { missing: 'ulpc.gold' },
+        },
+      },
+    }, context)).toThrowError(expect.objectContaining({
+      code: 'invalid_selection_channel',
+      path: 'items.coat.channelRecolors.missing',
+    }));
+
+    expect(() => importSelectionDocument({
+      schema: 'lpc-toolkit.selection.v2',
+      bodyType: 'male',
+      items: {
+        coat: {
+          name: 'Coat',
+          channelRecolors: { trim: 'ulpc.silver' },
+        },
+      },
+    }, context)).toThrowError(expect.objectContaining({
+      code: 'invalid_selection_channel_recolor',
+      path: 'items.coat.channelRecolors.trim',
+    }));
+  });
+
+  it('rejects linked channel values and legacy secondary item paths in canonical v2', () => {
+    const linkedContext: SelectionDocumentImportContext = {
+      catalog: createCatalog({
+        ...catalogRecords,
+        'torso/linked-coat.json': {
+          ...catalogRecords['torso/coat.json']!,
+          name: 'Linked Coat',
+          recolors: {
+            color_1: { material: 'cloth', palettes: ['ulpc'] },
+            color_2: {
+              material: 'metal',
+              palettes: ['ulpc'],
+              type_name: 'trim',
+              linked_to: { selection: 'body', channel: 'primary' },
+            },
+          },
+        },
+        'face/expression.json': {
+          name: 'Expression',
+          type_name: 'expression',
+          animations: ['walk'],
+          credits: [],
+          match_body_color: true,
+          recolors: { material: 'body', palettes: ['ulpc'] },
+          layer_1: { zPos: 30, male: 'face/expression/' },
+        },
+      }).catalog,
+      palettes,
+    };
+
+    expect(() => importSelectionDocument({
+      schema: 'lpc-toolkit.selection.v2',
+      bodyType: 'male',
+      items: {
+        coat: {
+          name: 'Linked Coat',
+          channelRecolors: { trim: 'ulpc.gold' },
+        },
+      },
+    }, linkedContext)).toThrowError(expect.objectContaining({
+      code: 'linked_selection_channel_value',
+      path: 'items.coat.channelRecolors.trim',
+    }));
+
+    expect(importSelectionDocument({
+      schema: 'lpc-toolkit.selection.v1',
+      bodyType: 'male',
+      items: {
+        expression: { name: 'Expression', recolor: 'ulpc.light' },
+      },
+    }, linkedContext).selection.items.expression).toEqual({
+      name: 'Expression',
+    });
+
+    expect(() => importSelectionDocument({
+      schema: 'lpc-toolkit.selection.v2',
+      bodyType: 'male',
+      items: {
+        expression: { name: 'Expression', recolor: 'ulpc.light' },
+      },
+    }, linkedContext)).toThrowError(expect.objectContaining({
+      code: 'linked_selection_channel_value',
+      path: 'items.expression.recolor',
+    }));
+
+    expect(() => importSelectionDocument({
+      schema: 'lpc-toolkit.selection.v2',
+      bodyType: 'male',
+      items: {
+        coat: { name: 'Coat' },
+        trim: { name: 'Coat', recolor: 'ulpc.gold' },
+      },
+    }, context)).toThrowError(expect.objectContaining({
+      code: 'invalid_selection_channel',
+      path: 'items.trim',
+    }));
   });
 
   it('maps a present non-string canonical name to invalid_selection_json', () => {
@@ -232,6 +333,18 @@ describe('importSelectionDocument', () => {
     }, context)).toThrowError(
       expect.objectContaining({ code: 'invalid_selection_json' }),
     );
+  });
+
+  it('maps strict canonical v2 shape errors to their exact document path', () => {
+    expect(() => importSelectionDocument({
+      schema: 'lpc-toolkit.selection.v2',
+      bodyType: 'male',
+      items: {},
+      credits: [],
+    }, context)).toThrowError(expect.objectContaining({
+      code: 'invalid_selection_json',
+      path: 'credits',
+    }));
   });
 
   it('rejects a canonical __proto__ type instead of importing a partial candidate', () => {

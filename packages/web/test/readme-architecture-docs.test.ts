@@ -71,7 +71,8 @@ function parseClosureTableRow(line: string): ClosureTableRow {
 
 describe('README architecture contract', () => {
   it('documents the shared character JSON interchange contract', () => {
-    expect(readme).toContain('lpc-toolkit.selection.v1');
+    expect(readme).toContain('lpc-toolkit.selection.v2');
+    expect(readme).toContain('selection v1 and v2');
     expect(readme).toContain('upstream version 1 and version 2 JSON');
     expect(architecture).toContain('canonical character document');
     expect(architecture).toContain('upstream compatibility adapter');

@@ -491,7 +491,7 @@ describe('previewAssetPack', () => {
     });
     const characterPath = path.join(fixture.cwd, 'selection.json');
     const selection: SelectionJson = {
-      schema: 'lpc-toolkit.selection.v1',
+      schema: 'lpc-toolkit.selection.v2',
       name: 'layer-test',
       bodyType: 'male',
       items: {

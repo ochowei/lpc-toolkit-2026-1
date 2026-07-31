@@ -271,14 +271,16 @@ those packages.
 
 ## Character JSON Interchange
 
-Core owns the canonical character document schema,
-`lpc-toolkit.selection.v1`, plus the pure upstream compatibility adapter that
-imports upstream version 1 and version 2 documents. The adapter identifies its
-source as `canonical`, `upstream-v1`, or `upstream-v2`, validates the resolved
-selection against the current catalog and palettes, and returns a canonical
-selection payload. Imported `credits` and rendered `layers` are not part of the
-selection contract and are ignored; composition recomputes attribution from the
-active asset source.
+Core owns canonical character document v2 (`lpc-toolkit.selection.v2`), strict
+v2 parsing, Toolkit v1-to-v2 in-memory migration, and the pure upstream
+compatibility adapter for upstream version 1 and version 2 documents. Primary
+color remains in `recolor`; independent secondary values are asset-owned in
+`channelRecolors`, and linked channels cannot store values. The adapter
+identifies its source as `canonical`, `upstream-v1`, or `upstream-v2`, validates
+resolved items and channel values against the current catalog and palettes, and
+returns a v2 selection payload. Imported `credits` and rendered `layers` are not
+part of the selection contract and are ignored; composition recomputes
+attribution from the active asset source.
 
 The Web owns browser file-picker and download I/O. Components dispatch import
 and save intent, while hooks and browser helpers read a selected file, call the

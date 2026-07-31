@@ -184,14 +184,15 @@ source, custom overlay, query filters, or character selection.
 
 ### Character JSON interchange
 
-The web editor's **Save character JSON** action and CLI selection outputs share
-the canonical `lpc-toolkit.selection.v1` format. Web import and any CLI option
-that reads an existing `--selection` file also accept
-upstream version 1 and version 2 JSON. Read-only CLI commands perform that
-conversion in memory without rewriting the source file. Successful CLI mutations
-atomically normalize upstream input to the canonical format. Rendered artifacts
-still obtain credits from the active asset source rather than trusting
-attribution embedded in imported JSON.
+The web editor's **Save character JSON** action and CLI selection outputs write
+the canonical `lpc-toolkit.selection.v2` format. It stores independent
+secondary colors in an asset-owned `channelRecolors` map while retaining the
+primary `recolor` field. Web import and CLI `--selection` readers accept Toolkit
+selection v1 and v2 plus upstream version 1 and version 2 JSON. Read-only CLI
+commands migrate these inputs in memory without rewriting the source file.
+Successful CLI mutations atomically normalize imported input to Toolkit v2.
+Rendered artifacts still obtain credits from the active asset source rather
+than trusting attribution embedded in imported JSON.
 
 ### Codex Plugin
 

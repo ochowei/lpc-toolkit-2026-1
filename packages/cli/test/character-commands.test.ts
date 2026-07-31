@@ -114,7 +114,7 @@ describe('character commands', () => {
       ok: true,
       data: {
         selection: {
-          schema: 'lpc-toolkit.selection.v1',
+          schema: 'lpc-toolkit.selection.v2',
           bodyType: 'male',
           items: { body: { name: 'Body Color' } },
         },
@@ -141,7 +141,34 @@ describe('character commands', () => {
     expect(JSON.parse(readFileSync(
       path.join(fixture.cwd, 'saved/upstream.json'),
       'utf8',
-    ))).toMatchObject({ schema: 'lpc-toolkit.selection.v1' });
+    ))).toMatchObject({ schema: 'lpc-toolkit.selection.v2' });
+  });
+
+  it('warns when a successful mutation upgrades Toolkit v1 input to v2', async () => {
+    const fixture = createFixture();
+    const selectionPath = path.join(fixture.cwd, 'saved/legacy.json');
+    mkdirSync(path.dirname(selectionPath), { recursive: true });
+    writeFileSync(selectionPath, JSON.stringify({
+      schema: 'lpc-toolkit.selection.v1',
+      bodyType: 'male',
+      items: { body: { name: 'Body Color' } },
+    }));
+
+    const response = (await run(fixture, [
+      'character', 'set', '--selection', 'saved/legacy.json',
+      '--type', 'hair', '--item', 'braids', '--json',
+    ])).response;
+
+    expect(response).toMatchObject({
+      ok: true,
+      warnings: [expect.objectContaining({
+        code: 'selection_format_normalized',
+        path: selectionPath,
+      })],
+    });
+    expect(JSON.parse(readFileSync(selectionPath, 'utf8'))).toMatchObject({
+      schema: 'lpc-toolkit.selection.v2',
+    });
   });
 
   it('keeps upstream bytes unchanged when import validation fails', async () => {
@@ -315,7 +342,7 @@ describe('character commands', () => {
       runtime: fixture.runtime,
       cwd: fixture.cwd,
       selectionJson: expect.objectContaining({
-        schema: 'lpc-toolkit.selection.v1',
+        schema: 'lpc-toolkit.selection.v2',
         name: 'hero',
       }),
       characterName: 'hero',

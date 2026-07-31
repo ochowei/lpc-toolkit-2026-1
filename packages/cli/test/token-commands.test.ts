@@ -50,7 +50,7 @@ describe('token commands', () => {
 
   it('encodes and decodes selection json through core token helpers', () => {
     const token = encodeSelectionJsonToToken({
-      schema: 'lpc-toolkit.selection.v1',
+      schema: 'lpc-toolkit.selection.v2',
       name: 'hero',
       bodyType: 'male',
       items: { body: { name: 'Body Color' } },
@@ -99,7 +99,7 @@ describe('token commands', () => {
       command: 'token encode',
       data: {
         token: encodeSelectionJsonToToken({
-          schema: 'lpc-toolkit.selection.v1',
+          schema: 'lpc-toolkit.selection.v2',
           bodyType: 'male',
           items: { body: { name: 'Body Color' } },
         }),
