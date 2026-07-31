@@ -393,8 +393,12 @@ describe('makeResolvePalette', () => {
       const selections: Selections = {
         bodyType: 'male',
         items: {
-          weapon: { typeName: 'weapon', name: 'Sword', recolor: 'gold' },
-          grip: { typeName: 'grip', name: 'Grip', recolor: 'blue' },
+          weapon: {
+            typeName: 'weapon',
+            name: 'Sword',
+            recolor: 'gold',
+            channelRecolors: { grip: 'blue' },
+          },
         },
       };
       const swap = makeResolvePalette(cat, multiPalettes, selections)(
@@ -414,6 +418,97 @@ describe('makeResolvePalette', () => {
         '#ccaa00',
         '#0000ff',
         '#0000cc',
+      ]);
+    });
+
+    it('keeps same-name secondary channels independent across selected assets', () => {
+      const multiPalettes = createPaletteCatalog({
+        'm/meta_m.json': { type: 'material', default: 'v1', base: 'c0' },
+        'm/m_v1.json': {
+          c0: ['#000000', '#111111'],
+          red: ['#ff0000', '#ee0000'],
+          blue: ['#0000ff', '#0000cc'],
+        },
+      }).palettes;
+      const makeFaceItem = (
+        name: string,
+        typeName: 'head' | 'expression',
+      ): ItemDefinition => ({
+        name,
+        type_name: typeName,
+        animations: ['walk'],
+        credits: [],
+        recolors: {
+          color_1: { material: 'm', palettes: ['v1'] },
+          color_2: { material: 'm', palettes: ['v1'], type_name: 'eyes' },
+        },
+        layer_1: { zPos: 1, male: `${typeName}/` },
+      });
+      const head = makeFaceItem('Head', 'head');
+      const expression = makeFaceItem('Expression', 'expression');
+      const cat = syntheticCatalog([head, expression]);
+      const selections: Selections = {
+        bodyType: 'male',
+        items: {
+          head: {
+            typeName: 'head',
+            name: 'Head',
+            channelRecolors: { eyes: 'red' },
+          },
+          expression: {
+            typeName: 'expression',
+            name: 'Expression',
+            channelRecolors: { eyes: 'blue' },
+          },
+        },
+      };
+      const resolve = makeResolvePalette(cat, multiPalettes, selections);
+
+      expect(resolve(selections.items.head!, head)?.target.slice(-2))
+        .toEqual(['#ff0000', '#ee0000']);
+      expect(resolve(selections.items.expression!, expression)?.target.slice(-2))
+        .toEqual(['#0000ff', '#0000cc']);
+    });
+
+    it('resolves an explicitly linked secondary channel from body primary', () => {
+      const body: ItemDefinition = {
+        ...item,
+        name: 'Body',
+        type_name: 'body',
+      };
+      const mask: ItemDefinition = {
+        ...item,
+        name: 'Mask',
+        type_name: 'mask',
+        recolors: {
+          color_1: { material: 'm', palettes: ['v1'] },
+          color_2: {
+            material: 'm',
+            palettes: ['v1'],
+            type_name: 'skin',
+            linked_to: { selection: 'body', channel: 'primary' },
+          },
+        },
+      };
+      const cat = syntheticCatalog([body, mask]);
+      const selections: Selections = {
+        bodyType: 'male',
+        items: {
+          body: { typeName: 'body', name: 'Body', recolor: 'red' },
+          mask: { typeName: 'mask', name: 'Mask' },
+        },
+      };
+
+      expect(
+        makeResolvePalette(cat, palettes, selections)(
+          selections.items.mask!,
+          mask,
+        )?.target,
+      ).toEqual([
+        '#000000',
+        '#111111',
+        '#ff0000',
+        '#ee0000',
       ]);
     });
 

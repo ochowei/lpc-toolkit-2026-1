@@ -8,9 +8,10 @@ import {
   type Selection,
   type Selections,
   type TypeName,
+  primaryColorFollowsBody,
 } from '@lpc-toolkit/core';
 import type { CatalogTreeItem } from './catalog-tree';
-import { pickDefaults } from './color-options';
+import { pickDefaults, transferChannelRecolors } from './color-options';
 import { buildShownTypeNamesFromUpstreamGroups } from './upstream-category-groups';
 
 /** Preview zoom bounds used by the reducer and preview controls. */
@@ -47,8 +48,20 @@ export type SliceAction =
       name: string;
       variant?: string;
       recolor?: string;
+      channelRecolors?: Readonly<Record<TypeName, string>>;
     }
   | { type: 'clear'; typeName: TypeName }
+  | {
+      type: 'set_channel_recolor';
+      typeName: TypeName;
+      channelId: TypeName;
+      recolor: string;
+    }
+  | {
+      type: 'clear_channel_recolor';
+      typeName: TypeName;
+      channelId: TypeName;
+    }
   | { type: 'apply_selections'; selections: Selections }
   | {
       type: 'reset';
@@ -76,6 +89,7 @@ export function sliceReducer(s: SliceState, a: SliceAction): SliceState {
             name: a.name,
             ...(a.variant ? { variant: a.variant } : {}),
             ...(a.recolor ? { recolor: a.recolor } : {}),
+            ...(a.channelRecolors ? { channelRecolors: a.channelRecolors } : {}),
           },
         },
       };
@@ -83,6 +97,43 @@ export function sliceReducer(s: SliceState, a: SliceAction): SliceState {
       const next = { ...s.selections };
       delete next[a.typeName];
       return { ...s, selections: next };
+    }
+    case 'set_channel_recolor': {
+      const selected = s.selections[a.typeName];
+      if (!selected || a.channelId === 'primary') return s;
+      return {
+        ...s,
+        selections: {
+          ...s.selections,
+          [a.typeName]: {
+            ...selected,
+            channelRecolors: {
+              ...selected.channelRecolors,
+              [a.channelId]: a.recolor,
+            },
+          },
+        },
+      };
+    }
+    case 'clear_channel_recolor': {
+      const selected = s.selections[a.typeName];
+      if (
+        !selected
+        || a.channelId === 'primary'
+        || selected.channelRecolors?.[a.channelId] === undefined
+      ) return s;
+      const channelRecolors = { ...selected.channelRecolors };
+      delete channelRecolors[a.channelId];
+      const { channelRecolors: _previousChannels, ...withoutChannels } = selected;
+      return {
+        ...s,
+        selections: {
+          ...s.selections,
+          [a.typeName]: Object.keys(channelRecolors).length > 0
+            ? { ...selected, channelRecolors }
+            : withoutChannels,
+        },
+      };
     }
     case 'apply_selections': {
       const selections = Object.fromEntries(
@@ -163,12 +214,20 @@ export function selectionForItem(
 export function pickActionForItem(
   typeName: TypeName,
   item: ItemDefinition,
+  options: {
+    readonly palettes?: PaletteMetadata;
+    readonly previous?: Selection;
+  } = {},
 ): SliceAction {
+  const channelRecolors = options.palettes
+    ? transferChannelRecolors(options.previous, item, options.palettes)
+    : undefined;
   return {
     type: 'pick',
     typeName,
     name: item.name,
     ...(item.variants?.[0] ? { variant: item.variants[0] } : {}),
+    ...(channelRecolors ? { channelRecolors } : {}),
   };
 }
 
@@ -211,9 +270,10 @@ export const COMMON_TYPE_ORDER: readonly TypeName[] = [
 
 /**
  * Build the initial outfit matching the upstream generator's defaults:
- * male body + `heads_human_male` + `face_neutral`, all with the `light`
- * recolor. Items are looked up by stable itemId (the JSON filename), so
- * the result is independent of catalog insertion order.
+ * male body + `heads_human_male` + `face_neutral`. Independent primaries
+ * use the `light` recolor; body-following primaries store no ignored local
+ * value. Items are looked up by stable itemId (the JSON filename), so the
+ * result is independent of catalog insertion order.
  *
  * Throws if any of the three required items is missing from the catalog
  * — that means a real bundling bug, not a runtime fallback case.
@@ -236,7 +296,9 @@ export function pickInitialSelections(catalog: Catalog): {
     selections[typeName] = {
       typeName,
       name: item.name,
-      recolor: DEFAULT_RECOLOR,
+      ...(!primaryColorFollowsBody(item)
+        ? { recolor: DEFAULT_RECOLOR }
+        : {}),
     };
   }
 

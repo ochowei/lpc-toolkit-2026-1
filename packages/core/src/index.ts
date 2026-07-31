@@ -164,6 +164,7 @@ export {
   getRecolorVariantsForType,
   itemSupportsSelectionType,
   makeResolvePalette,
+  primaryColorFollowsBody,
 } from './recolor-resolve.js';
 export { getDefaultColorSelection } from './selection-defaults.js';
 

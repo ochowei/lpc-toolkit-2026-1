@@ -2,8 +2,11 @@ import {
   getDefaultColorSelection,
   getColorChannels,
   getRecolorSwatches,
+  primaryColorFollowsBody,
   type ItemDefinition,
   type PaletteMetadata,
+  type Selection,
+  type TypeName,
 } from '@lpc-toolkit/core';
 
 /** Swatch-backed color option that writes to `Selection.recolor`. */
@@ -74,9 +77,7 @@ export function getColorOptions(
       swatch: representative(s.colors),
       label: humanize(s.recolor),
     }));
-    const primaryLinkedToBody = getColorChannels(item, palettes)[0]
-      ?.linkedTo?.selection === 'body';
-    if ((primaryLinkedToBody || item.match_body_color) && item.type_name !== 'body') {
+    if (primaryColorFollowsBody(item)) {
       const selected = options.find(
         (option) => option.value === context.bodyRecolor,
       );
@@ -109,12 +110,38 @@ export function getColorOptions(
 /**
  * The color fields to set when an item is freshly picked: variant items
  * need `variants[0]` (the sprite path requires a variant folder); recolor
- * items default to their first color so the swatch row has an active
- * choice. Returns `{}` for an item with no colors or a missing item.
+ * independent recolor items default to their first color so the swatch row has
+ * an active choice. Linked primary channels store no local value. Returns
+ * `{}` for an item with no colors or a missing item.
  */
 export function pickDefaults(
   item: ItemDefinition | undefined,
   palettes: PaletteMetadata,
 ): { variant?: string; recolor?: string } {
-  return getDefaultColorSelection(item, palettes);
+  const defaults = getDefaultColorSelection(item, palettes);
+  if (!item || !defaults.recolor || !primaryColorFollowsBody(item)) {
+    return defaults;
+  }
+  return {};
+}
+
+/** Keep only replacement channel values accepted by same-name independent channels. */
+export function transferChannelRecolors(
+  previous: Selection | undefined,
+  replacement: ItemDefinition,
+  palettes: PaletteMetadata,
+): Readonly<Record<TypeName, string>> | undefined {
+  if (!previous?.channelRecolors) return undefined;
+  const entries: Array<readonly [TypeName, string]> = [];
+  for (const channel of getColorChannels(replacement, palettes)) {
+    if (channel.primary || channel.linkedTo) continue;
+    const recolor = previous.channelRecolors[channel.id];
+    if (
+      recolor
+      && channel.swatches.some((swatch) => swatch.recolor === recolor)
+    ) {
+      entries.push([channel.id, recolor]);
+    }
+  }
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }

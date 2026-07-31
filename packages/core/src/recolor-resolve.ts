@@ -345,12 +345,11 @@ function getBodyColor(
 }
 
 /**
- * Build the per-`type_name` chosen-recolor map for an item across the
- * selections — the adapted port of upstream `getMultiRecolors`. Our
- * `Selection` has no `subId`; sub-entries bind by `type_name` to the
- * matching selection's `recolor` (semantically what upstream's
- * `recolors[typeName]` keying expresses). An explicit primary `linked_to`
- * declaration, or the legacy `match_body_color` flag, forces the body color.
+ * Build the per-channel chosen-recolor map for one selected asset. Independent
+ * secondary values come only from that selection's `channelRecolors`; an
+ * explicit `linked_to` declaration resolves from the selected body primary.
+ * The legacy `match_body_color` flag remains a primary-channel fallback until
+ * the pinned built-in assets publish their explicit links.
  * 
  * Maps each sub-category to its chosen color option, resolving multi-material
  * color overrides and applying body-color synchronization where applicable.
@@ -363,7 +362,7 @@ function getBodyColor(
  * @param warn - Optional callback for missing linked-color sources.
  * @returns A dictionary mapping slot type names to their selected recolor string keys.
  */
-function getMultiRecolors(
+function getOwnedRecolors(
   item: ItemDefinition,
   primarySelection: Selection,
   entries: readonly RecolorConfig[],
@@ -373,28 +372,39 @@ function getMultiRecolors(
 ): Record<string, string> {
   const recolors: Record<string, string> = {};
 
-  const primaryKey = item.type_name;
-  if (primarySelection.recolor) {
-    recolors[primaryKey] = primarySelection.recolor;
-  }
-
-  for (const entry of entries) {
-    if (!entry.type_name || entry.type_name === primaryKey) continue;
-    const sub = selections.items[entry.type_name];
-    if (sub?.recolor) recolors[entry.type_name] = sub.recolor;
-  }
-
-  const primaryLinkedToBody = entries[0]?.linked_to?.selection === 'body'
-    && entries[0]?.linked_to?.channel === 'primary';
-  if (primaryLinkedToBody || item.match_body_color) {
-    const bodyColor = getBodyColor(catalog, selections);
-    if (bodyColor === undefined) {
-      warn?.(
-        `recolor: "${item.name}" follows body color but no body selection is available`,
-      );
-    } else if (bodyColor !== null) {
-      recolors[primaryKey] = bodyColor;
+  for (let index = 0; index < entries.length; index++) {
+    const entry = entries[index];
+    if (!entry) continue;
+    const primary = index === 0;
+    const channelId = primary ? 'primary' : entry.type_name;
+    if (!channelId) continue;
+    const key = entry.type_name ?? item.type_name;
+    const linkedToBody = (
+      entry.linked_to?.selection === 'body'
+      && entry.linked_to.channel === 'primary'
+    ) || (
+      primary
+      && item.type_name !== 'body'
+      && item.match_body_color === true
+    );
+    if (linkedToBody) {
+      const bodyColor = getBodyColor(catalog, selections);
+      if (bodyColor === undefined) {
+        warn?.(
+          primary
+            ? `recolor: "${item.name}" follows body color but no body selection is available`
+            : `recolor: "${item.name}" channel "${channelId}" follows body color but no body selection is available`,
+        );
+      } else if (bodyColor !== null) {
+        recolors[key] = bodyColor;
+      }
+      continue;
     }
+
+    const selected = primary
+      ? primarySelection.recolor
+      : primarySelection.channelRecolors?.[channelId];
+    if (selected) recolors[key] = selected;
   }
 
   return recolors;
@@ -462,7 +472,7 @@ export function makeResolvePalette(
     const entries = collectRecolorEntries(item.recolors);
     if (entries.length === 0) return undefined;
 
-    const chosen = getMultiRecolors(
+    const chosen = getOwnedRecolors(
       item,
       selection,
       entries,
@@ -644,6 +654,16 @@ export function getColorChannels(
     });
   }
   return channels;
+}
+
+/** Whether a non-body item's primary channel explicitly or historically follows body. */
+export function primaryColorFollowsBody(item: ItemDefinition): boolean {
+  if (item.type_name === 'body') return false;
+  const primary = collectRecolorEntries(item.recolors)[0];
+  return (
+    primary?.linked_to?.selection === 'body'
+    && primary.linked_to.channel === 'primary'
+  ) || item.match_body_color === true;
 }
 
 /**

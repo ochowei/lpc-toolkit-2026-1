@@ -1,7 +1,11 @@
 /** Verifies item color-option derivation from recolor palettes and variants. */
 import { describe, expect, it } from 'vitest';
 import { createPaletteCatalog, type ItemDefinition } from '@lpc-toolkit/core';
-import { getColorOptions, pickDefaults } from '../src/slice/color-options';
+import {
+  getColorOptions,
+  pickDefaults,
+  transferChannelRecolors,
+} from '../src/slice/color-options';
 
 const palettes = createPaletteCatalog({
   'm/meta_m.json': { type: 'material', default: 'v1', base: 'c0' },
@@ -62,6 +66,25 @@ const bodyRecolorItem: ItemDefinition = {
   ...recolorItem,
   name: 'Body Color',
   type_name: 'body',
+};
+
+const multiRecolorItem: ItemDefinition = {
+  ...recolorItem,
+  name: 'Multi Thing',
+  recolors: {
+    color_1: { material: 'm', palettes: ['v1'] },
+    color_2: {
+      material: 'm',
+      palettes: ['v1'],
+      type_name: 'accent',
+    },
+    color_3: {
+      material: 'm',
+      palettes: ['v1'],
+      type_name: 'skin',
+      linked_to: { selection: 'body', channel: 'primary' },
+    },
+  },
 };
 
 describe('getColorOptions', () => {
@@ -139,5 +162,33 @@ describe('pickDefaults', () => {
 
   it('returns no color fields for a missing item', () => {
     expect(pickDefaults(undefined, palettes)).toEqual({});
+  });
+
+  it('does not invent a local primary value for a followed item', () => {
+    expect(pickDefaults(linkedRecolorItem, palettes)).toEqual({});
+  });
+});
+
+describe('transferChannelRecolors', () => {
+  it('keeps only valid same-name independent channel values', () => {
+    expect(transferChannelRecolors({
+      typeName: 't',
+      name: 'Old Thing',
+      channelRecolors: {
+        accent: 'red',
+        skin: 'red',
+        removed: 'red',
+      },
+    }, multiRecolorItem, palettes)).toEqual({
+      accent: 'red',
+    });
+  });
+
+  it('drops a same-name value that is invalid for the replacement channel', () => {
+    expect(transferChannelRecolors({
+      typeName: 't',
+      name: 'Old Thing',
+      channelRecolors: { accent: 'missing' },
+    }, multiRecolorItem, palettes)).toBeUndefined();
   });
 });
