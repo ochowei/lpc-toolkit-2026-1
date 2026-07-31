@@ -637,18 +637,48 @@ Task 7 record:
 - Modify: `packages/web/src/i18n.ts`
 - Modify: focused Web tests and an E2E spec
 
-- [ ] Add failing UI tests for per-channel headings, translated label fallback,
+- [x] Add failing UI tests for per-channel headings, translated label fallback,
   explicit default buttons, independent selection/clearing, linked read-only
   source/swatch, collapsed summaries, disabled state, keyboard semantics, and
   mobile wrapping/scrolling.
-- [ ] Render all channel groups inside the selected item's picker. Keep
+- [x] Render all channel groups inside the selected item's picker. Keep
   replacement cards compact and free of multi-channel controls.
-- [ ] Show summary swatches for primary and explicit secondary overrides only;
+- [x] Show summary swatches for primary and explicit secondary overrides only;
   omit asset-default secondary values from the collapsed summary.
-- [ ] Add an E2E flow that sets head/expression eyes differently, saves,
+- [x] Add an E2E flow that sets head/expression eyes differently, saves,
   changes state, imports, and observes the exact restored render/state.
-- [ ] Run focused Web tests, Web typecheck, and ordinary Web E2E.
-- [ ] Record implementation note, commit hash, and PASS/FAIL evidence here.
+- [x] Run focused Web tests, Web typecheck, and ordinary Web E2E.
+- [x] Record implementation note, commit hash, and PASS/FAIL evidence here.
+  - Implementation: the selected-item picker now renders ordered primary,
+    independent-secondary, and read-only linked groups. Independent secondary
+    groups expose explicit asset-default clearing, unique accessible labels,
+    native keyboard buttons, disabled semantics, and wrapping/scrolling. Layer
+    summaries show primary plus explicit secondary overrides only, while
+    replacement cards remain compact. Primary/style changes preserve secondary
+    state, and replacement transfers only valid same-name channels.
+  - Regression fix: canonical v2 import now uses
+    `primaryColorFollowsBody()` consistently, so the legacy
+    `match_body_color` flag on the selected `body` source cannot misclassify its
+    legal primary recolor as a linked follower value.
+  - Product commit: `1aaaba9b9c278ed5df3979af19265408b5f2efa2`
+  - RED: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/color-options.test.ts test/color-picker.test.tsx test/i18n.test.ts`
+    FAIL as expected (6 failed, 35 passed before implementation).
+  - RED regression: `rtk pnpm --filter @lpc-toolkit/core exec vitest run test/upstream-selection-import.test.ts`
+    FAIL as expected (1 failed, 39 passed before the body-source fix).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core exec vitest run test/upstream-selection-import.test.ts`
+    PASS (40 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/color-options.test.ts test/color-picker.test.tsx test/i18n.test.ts test/type-item-picker.test.tsx test/layer-row.test.tsx test/selection.test.ts`
+    PASS (80 tests before the final duplicate-ID regression case; final focused
+    color projection/picker rerun PASS with 23 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS.
+  - Verification: `rtk pnpm check:boundaries` PASS.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web test:e2e -- character-json-interchange.spec.ts color-channels.spec.ts`
+    PASS (2 tests), including exact v2 JSON channel payload, hash, and canvas
+    restoration.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web test` PASS (852 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web test:e2e` PASS (33 tests).
+  - Verification: `rtk git diff --check` PASS.
 
 ### Task 10: Add CLI channel authoring and migration responses
 
