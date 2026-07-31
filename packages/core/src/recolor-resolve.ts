@@ -1,6 +1,7 @@
 import type { PaletteSwap } from './recolor.js';
 import type {
   Catalog,
+  ColorChannelLink,
   ItemDefinition,
   PaletteMaterialMeta,
   PaletteMetadata,
@@ -572,6 +573,78 @@ export interface RecolorSwatch {
   readonly colors: readonly string[];
 }
 
+/** One independently colorable region owned by a selected sprite asset. */
+export interface RecolorChannel {
+  /** Asset-scoped channel identifier; `primary` is reserved for the first entry. */
+  readonly id: 'primary' | TypeName;
+  /** Selection type used by legacy sub-recolor compatibility. */
+  readonly typeName: TypeName;
+  /** Whether this is the selected asset's primary channel. */
+  readonly primary: boolean;
+  /** Optional author-facing label from the asset definition. */
+  readonly label?: string;
+  /** Palette material resolved by this channel. */
+  readonly material: string;
+  /** Authored source/base ramp used when no explicit value is stored. */
+  readonly defaultColors: readonly string[];
+  /** Explicit selectable recolor values and their resolved ramps. */
+  readonly swatches: readonly RecolorSwatch[];
+  /** Explicit source when this channel follows another selected asset. */
+  readonly linkedTo?: ColorChannelLink;
+}
+
+function swatchesForNormalized(
+  normalized: NormalizedRecolor,
+  materials: Materials,
+): readonly RecolorSwatch[] {
+  const out: RecolorSwatch[] = [];
+  for (const recolor of normalized.variants) {
+    const colors = getTargetPalette(
+      normalized.material,
+      recolor,
+      materials,
+    );
+    if (colors && colors.length > 0) out.push({ recolor, colors });
+  }
+  return out;
+}
+
+/**
+ * Resolve every valid color channel owned by an item in source declaration
+ * order. The first recolor entry receives the reserved `primary` ID; later
+ * entries require an explicit asset-scoped `type_name` ID.
+ */
+export function getColorChannels(
+  item: ItemDefinition,
+  palettes: PaletteMetadata,
+): readonly RecolorChannel[] {
+  const entries = collectRecolorEntries(item.recolors);
+  const channels: RecolorChannel[] = [];
+  for (let index = 0; index < entries.length; index++) {
+    const entry = entries[index];
+    if (!entry) continue;
+    const primary = index === 0;
+    if (!primary && !entry.type_name) continue;
+    const normalized = normalizeRecolor(entry, palettes.materials);
+    if (!normalized) continue;
+    const defaultColors = getBasePalette(normalized, palettes.materials);
+    if (!defaultColors) continue;
+    channels.push({
+      id: primary ? 'primary' : entry.type_name!,
+      typeName: entry.type_name ?? item.type_name,
+      primary,
+      ...(entry.label !== undefined ? { label: entry.label } : {}),
+      material: normalized.material,
+      defaultColors,
+      swatches: swatchesForNormalized(normalized, palettes.materials),
+      ...(entry.linked_to !== undefined
+        ? { linkedTo: entry.linked_to }
+        : {}),
+    });
+  }
+  return channels;
+}
+
 /**
  * The first recolor entry's palette-expanded variants paired with their
  * resolved color ramps. Shares the expansion path with `getRecolorVariants`
@@ -594,10 +667,5 @@ export function getRecolorSwatches(
   if (!first) return [];
   const nr = normalizeRecolor(first, palettes.materials);
   if (!nr) return [];
-  const out: RecolorSwatch[] = [];
-  for (const recolor of nr.variants) {
-    const colors = getTargetPalette(nr.material, recolor, palettes.materials);
-    if (colors && colors.length > 0) out.push({ recolor, colors });
-  }
-  return out;
+  return swatchesForNormalized(nr, palettes.materials);
 }

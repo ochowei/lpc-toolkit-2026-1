@@ -75,6 +75,14 @@ export interface CreditEntry {
   readonly urls: readonly string[];
 }
 
+/** An explicit dependency from one asset color channel to another selection. */
+export interface ColorChannelLink {
+  /** Selection slot that owns the source channel. */
+  readonly selection: 'body';
+  /** Source channel within the selected body asset. */
+  readonly channel: 'primary';
+}
+
 /**
  * One recolor entry as it appears in a sheet definition. `material` +
  * `palettes` (palette-token refs like `ulpc` / `all.lpcr`) are always
@@ -95,6 +103,8 @@ export interface RecolorConfig {
   readonly source?: readonly string[];
   /** Optional human-readable label for the recolor configuration. */
   readonly label?: string;
+  /** Optional explicit source for a read-only linked color channel. */
+  readonly linked_to?: ColorChannelLink;
 }
 
 /**
@@ -249,6 +259,8 @@ export interface Selection {
   readonly variant?: string;
   /** Optional recolor variant name (e.g. 'red'). */
   readonly recolor?: string;
+  /** Explicit non-primary color choices keyed by this selected asset's channel IDs. */
+  readonly channelRecolors?: Readonly<Record<TypeName, string>>;
 }
 
 /**

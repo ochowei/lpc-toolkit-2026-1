@@ -16,6 +16,7 @@ export type {
   AnimationName,
   BodyType,
   Catalog,
+  ColorChannelLink,
   ComposedAnimation,
   ComposedSheet,
   CreditEntry,
@@ -152,10 +153,12 @@ export { createPaletteCatalog } from './palettes.js';
 // ==========================================
 export type {
   MakeResolvePaletteOptions,
+  RecolorChannel,
   RecolorSwatch,
   ResolvePalette,
 } from './recolor-resolve.js';
 export {
+  getColorChannels,
   getRecolorSwatches,
   getRecolorVariants,
   getRecolorVariantsForType,

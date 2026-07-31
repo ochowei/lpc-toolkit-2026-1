@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { createCatalog } from '../src/catalog.js';
 import { createPaletteCatalog } from '../src/palettes.js';
 import {
+  getColorChannels,
   getRecolorSwatches,
   getRecolorVariantsForType,
   itemSupportsSelectionType,
@@ -511,11 +512,16 @@ describe('type-specific recolor metadata', () => {
     animations: ['walk'],
     credits: [],
     recolors: {
-      color_1: { material: 'cloth', palettes: ['v1'] },
+      color_1: {
+        material: 'cloth',
+        palettes: ['v1'],
+        linked_to: { selection: 'body', channel: 'primary' },
+      },
       color_2: {
         material: 'metal',
         palettes: ['v1'],
         type_name: 'trim',
+        label: 'Trim',
       },
     },
     layer_1: { zPos: 1, male: 'coat/' },
@@ -537,5 +543,57 @@ describe('type-specific recolor metadata', () => {
       'gold',
     ]);
     expect(getRecolorVariantsForType(coat, palettes, 'lining')).toEqual([]);
+  });
+
+  it('returns ordered asset-owned channels with defaults, swatches, and links', () => {
+    expect(getColorChannels(coat, palettes)).toEqual([
+      {
+        id: 'primary',
+        typeName: 'coat',
+        primary: true,
+        material: 'cloth',
+        defaultColors: ['#0000ff'],
+        swatches: [
+          { recolor: 'blue', colors: ['#0000ff'] },
+          { recolor: 'red', colors: ['#ff0000'] },
+        ],
+        linkedTo: { selection: 'body', channel: 'primary' },
+      },
+      {
+        id: 'trim',
+        typeName: 'trim',
+        primary: false,
+        label: 'Trim',
+        material: 'metal',
+        defaultColors: ['#777777'],
+        swatches: [
+          { recolor: 'iron', colors: ['#777777'] },
+          { recolor: 'gold', colors: ['#d4af37'] },
+        ],
+      },
+    ]);
+  });
+
+  it('keeps channel IDs scoped to each owning asset', () => {
+    const expression: ItemDefinition = {
+      ...coat,
+      name: 'Expression',
+      type_name: 'expression',
+      recolors: {
+        color_1: { material: 'cloth', palettes: ['v1'] },
+        color_2: {
+          material: 'metal',
+          palettes: ['v1'],
+          type_name: 'trim',
+        },
+      },
+    };
+
+    expect(getColorChannels(coat, palettes).map((channel) => channel.id))
+      .toEqual(['primary', 'trim']);
+    expect(getColorChannels(expression, palettes).map((channel) => channel.id))
+      .toEqual(['primary', 'trim']);
+    expect(getColorChannels(expression, palettes)[0]?.typeName)
+      .toBe('expression');
   });
 });
