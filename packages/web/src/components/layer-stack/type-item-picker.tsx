@@ -182,8 +182,13 @@ export function TypeItemPicker({
             item={selectedItem}
             selection={selection}
             palettes={palettes}
+            {...(state.selections.body?.recolor !== undefined
+              ? { bodyRecolor: state.selections.body.recolor }
+              : {})}
             colorLabel={t('picker.color')}
             styleLabel={t('picker.style')}
+            linkedColorLabel={t('picker.followsBody')}
+            assetDefaultColorLabel={t('picker.assetDefault')}
             tl={tl}
             onSelect={(change) => {
               if ('variant' in change) {

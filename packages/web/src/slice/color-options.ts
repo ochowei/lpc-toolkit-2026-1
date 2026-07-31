@@ -20,9 +20,19 @@ export interface VariantColorOption {
   readonly label: string; // display text
 }
 
-/** UI-ready color choices for an item: recolor swatches, variant names, or none. */
+/** Selection context used to resolve read-only followed colors. */
+export interface ColorOptionContext {
+  readonly bodyRecolor?: string;
+}
+
+/** UI-ready color choices for an item: editable, linked, variant, or none. */
 export type ColorOptions =
   | { readonly mode: 'recolors'; readonly options: readonly RecolorColorOption[] }
+  | {
+      readonly mode: 'linked-recolor';
+      readonly recolor?: string;
+      readonly swatch?: string;
+    }
   | { readonly mode: 'variants'; readonly options: readonly VariantColorOption[] }
   | { readonly mode: 'none' };
 
@@ -53,17 +63,31 @@ function representative(colors: readonly string[]): string {
 export function getColorOptions(
   item: ItemDefinition,
   palettes: PaletteMetadata,
+  context: ColorOptionContext = {},
 ): ColorOptions {
   const swatches = getRecolorSwatches(item, palettes);
   if (swatches.length > 0) {
+    const options = swatches.map((s) => ({
+      kind: 'recolor' as const,
+      value: s.recolor,
+      swatch: representative(s.colors),
+      label: humanize(s.recolor),
+    }));
+    if (item.match_body_color && item.type_name !== 'body') {
+      const selected = options.find(
+        (option) => option.value === context.bodyRecolor,
+      );
+      return {
+        mode: 'linked-recolor',
+        ...(context.bodyRecolor !== undefined
+          ? { recolor: context.bodyRecolor }
+          : {}),
+        ...(selected ? { swatch: selected.swatch } : {}),
+      };
+    }
     return {
       mode: 'recolors',
-      options: swatches.map((s) => ({
-        kind: 'recolor',
-        value: s.recolor,
-        swatch: representative(s.colors),
-        label: humanize(s.recolor),
-      })),
+      options,
     };
   }
   if (item.variants && item.variants.length > 0) {

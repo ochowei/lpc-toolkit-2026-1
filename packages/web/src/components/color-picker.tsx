@@ -18,8 +18,11 @@ export function ColorPicker({
   item,
   selection,
   palettes,
+  bodyRecolor,
   colorLabel,
   styleLabel,
+  linkedColorLabel,
+  assetDefaultColorLabel,
   onSelect,
   tl,
   disabled = false,
@@ -27,19 +30,50 @@ export function ColorPicker({
   item: ItemDefinition;
   selection: Selection | undefined;
   palettes: PaletteMetadata;
+  bodyRecolor?: string;
   colorLabel: string;
   styleLabel: string;
+  linkedColorLabel: string;
+  assetDefaultColorLabel: string;
   onSelect: (change: { variant: string } | { recolor: string }) => void;
   tl: LabelTranslator;
   disabled?: boolean;
 }) {
   const colors = useMemo(
-    () => getColorOptions(item, palettes),
-    [item, palettes],
+    () => getColorOptions(
+      item,
+      palettes,
+      bodyRecolor === undefined ? {} : { bodyRecolor },
+    ),
+    [bodyRecolor, item, palettes],
   );
   if (colors.mode === 'none') return null;
 
-  const heading = colors.mode === 'recolors' ? colorLabel : styleLabel;
+  const heading = colors.mode === 'variants' ? styleLabel : colorLabel;
+
+  if (colors.mode === 'linked-recolor') {
+    return (
+      <div className="text-xs">
+        <span className="text-text-mute uppercase">{heading}</span>
+        <div className="mt-1 flex items-center gap-1.5 text-text-2" role="status">
+          {colors.swatch && (
+            <span
+              className="h-5 w-5 rounded border border-border"
+              style={{ backgroundColor: colors.swatch }}
+              aria-hidden
+            />
+          )}
+          <span>{linkedColorLabel}</span>
+          <span aria-hidden>·</span>
+          <span>
+            {colors.recolor
+              ? tl.color(colors.recolor)
+              : assetDefaultColorLabel}
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="text-xs">

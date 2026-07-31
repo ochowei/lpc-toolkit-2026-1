@@ -30,6 +30,12 @@ const clothItem: ItemDefinition = {
   layer_1: { zPos: 1, male: 't/' },
 };
 
+const linkedClothItem: ItemDefinition = {
+  ...clothItem,
+  name: 'Linked Cloth',
+  match_body_color: true,
+};
+
 describe('ColorPicker rendering', () => {
   it('renders variants as localized styles', () => {
     const tl = createLabelTranslator('zh-TW');
@@ -40,6 +46,8 @@ describe('ColorPicker rendering', () => {
         palettes={palettes}
         colorLabel="顏色"
         styleLabel="款式"
+        linkedColorLabel="跟隨身體"
+        assetDefaultColorLabel="資產預設色"
         tl={tl}
         onSelect={() => {}}
       />
@@ -63,6 +71,8 @@ describe('ColorPicker rendering', () => {
         palettes={palettes}
         colorLabel="顏色"
         styleLabel="款式"
+        linkedColorLabel="跟隨身體"
+        assetDefaultColorLabel="資產預設色"
         tl={tl}
         onSelect={() => {}}
       />
@@ -76,5 +86,51 @@ describe('ColorPicker rendering', () => {
     expect(html).toContain('紅色');
     expect(html).toContain('title="紅色"');
     expect(html).toContain('aria-label="紅色"');
+  });
+
+  it('renders a followed non-body recolor as read-only without dispatch controls', () => {
+    const tl = createLabelTranslator('zh-TW');
+    const html = renderToStaticMarkup(
+      <ColorPicker
+        item={linkedClothItem}
+        selection={{ typeName: 'armor', name: 'Linked Cloth', recolor: 'c0' }}
+        bodyRecolor="red"
+        palettes={palettes}
+        colorLabel="顏色"
+        styleLabel="款式"
+        linkedColorLabel="跟隨身體"
+        assetDefaultColorLabel="資產預設色"
+        tl={tl}
+        onSelect={() => {
+          throw new Error('read-only followed colors must not dispatch');
+        }}
+      />
+    );
+
+    expect(html).toContain('顏色');
+    expect(html).toContain('跟隨身體');
+    expect(html).toContain('紅色');
+    expect(html).toContain('background-color:#ee0000');
+    expect(html).not.toContain('<button');
+  });
+
+  it('shows the asset default when the body has no explicit recolor', () => {
+    const html = renderToStaticMarkup(
+      <ColorPicker
+        item={linkedClothItem}
+        selection={{ typeName: 'armor', name: 'Linked Cloth' }}
+        palettes={palettes}
+        colorLabel="Color"
+        styleLabel="Style"
+        linkedColorLabel="Follows body"
+        assetDefaultColorLabel="Asset default"
+        tl={createLabelTranslator('en')}
+        onSelect={() => {}}
+      />
+    );
+
+    expect(html).toContain('Follows body');
+    expect(html).toContain('Asset default');
+    expect(html).not.toContain('<button');
   });
 });

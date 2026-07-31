@@ -42,6 +42,18 @@ const recolorAndVariantItem: ItemDefinition = {
   variants: ['black'],
 };
 
+const linkedRecolorItem: ItemDefinition = {
+  ...recolorItem,
+  name: 'Linked Thing',
+  match_body_color: true,
+};
+
+const bodyRecolorItem: ItemDefinition = {
+  ...linkedRecolorItem,
+  name: 'Body Color',
+  type_name: 'body',
+};
+
 describe('getColorOptions', () => {
   it('returns real color swatches for a recolors item', () => {
     expect(getColorOptions(recolorItem, palettes)).toEqual({
@@ -61,6 +73,27 @@ describe('getColorOptions', () => {
         { kind: 'variant', value: 'bright_green', label: 'Bright green' },
       ],
     });
+  });
+
+  it('returns the resolved body color as read-only for a followed non-body item', () => {
+    expect(
+      getColorOptions(linkedRecolorItem, palettes, { bodyRecolor: 'red' }),
+    ).toEqual({
+      mode: 'linked-recolor',
+      recolor: 'red',
+      swatch: '#ee0000',
+    });
+  });
+
+  it('keeps the body primary recolor editable', () => {
+    expect(getColorOptions(bodyRecolorItem, palettes, { bodyRecolor: 'red' }))
+      .toEqual({
+        mode: 'recolors',
+        options: [
+          { kind: 'recolor', value: 'c0', swatch: '#111111', label: 'C0' },
+          { kind: 'recolor', value: 'red', swatch: '#ee0000', label: 'Red' },
+        ],
+      });
   });
 
   it('returns mode "none" for an item with no colors', () => {

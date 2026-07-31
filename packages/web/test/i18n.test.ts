@@ -42,6 +42,10 @@ describe('i18n', () => {
 
     expect(en('picker.style')).toBe('Style');
     expect(zh('picker.style')).toBe('款式');
+    expect(en('picker.followsBody')).toBe('Follows body');
+    expect(zh('picker.followsBody')).toBe('跟隨身體');
+    expect(en('picker.assetDefault')).toBe('Asset default');
+    expect(zh('picker.assetDefault')).toBe('資產預設色');
 
     expect(en('picker.common')).toBe('Common');
     expect(en('picker.advanced')).toBe('Advanced: all upstream assets');
