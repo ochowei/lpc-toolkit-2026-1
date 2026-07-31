@@ -769,27 +769,71 @@ Task 7 record:
 
 ### Task 12: Final audit and handoff
 
-- [ ] Re-read `AGENTS.md`, all six ADRs, `CONTEXT.md`, and this plan; verify the
+- [x] Re-read `AGENTS.md`, all six ADRs, `CONTEXT.md`, and this plan; verify the
   implementation uses canonical terms and does not contradict a decision.
-- [ ] Reassess and record the CLI documentation matrix with final `update` or
+- [x] Reassess and record the CLI documentation matrix with final `update` or
   `N/A — reason` values.
-- [ ] Run: `rtk pnpm check:boundaries`
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/core run typecheck`
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/core test`
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/presets run typecheck`
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/presets test`
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/web run typecheck`
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/web test`
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/web test:e2e`
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/cli run typecheck`
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/cli test`
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/cli build`
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/cli test:package`
-- [ ] Run: `rtk pnpm verify:plugin`
-- [ ] Run: `rtk pnpm verify`
-- [ ] Run: `rtk pnpm build`
-- [ ] If isolated parity infrastructure is already provisioned, run
+- [x] Run: `rtk pnpm check:boundaries`
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/core run typecheck`
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/core test`
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/presets run typecheck`
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/presets test`
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/web run typecheck`
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/web test`
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/web test:e2e`
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/cli run typecheck`
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/cli test`
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/cli build`
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/cli test:package`
+- [x] Run: `rtk pnpm verify:plugin`
+- [x] Run: `rtk pnpm verify`
+- [x] Run: `rtk pnpm build`
+- [x] If isolated parity infrastructure is already provisioned, run
   `rtk pnpm --filter @lpc-toolkit/web test:e2e:parity`; otherwise record why it
   was not run without initializing `upstream/`.
-- [ ] Confirm `rtk git status --short` contains only intended changes and record
+- [x] Confirm `rtk git status --short` contains only intended changes and record
   the final verification evidence and commit hashes.
+
+Task 12 record:
+
+- Audit: repository instructions, context, and all six ADRs agree on
+  asset-owned channel identity, `body/primary` links, canonical selection v2,
+  attribution preservation, and Core/Web/CLI ownership. The audit corrected
+  the plan's pinned-release fallback wording and removed an illegal linked
+  primary value from the canonical v2 example.
+- Audit commit: `4c8b118bf3c723e1d563b2bf343d97dc7589e9b2`.
+- Final CLI documentation impact:
+  - `help`: update — documents `character set-color` syntax and behavior.
+  - `cli-readme`: update — documents channel editing, v2 persistence, and
+    migration behavior.
+  - `root-readme`: update — documents the public asset-owned color workflow.
+  - `landing`: update — exposes the CLI color-channel authoring workflow.
+  - `architecture`: update — records channel, migration, and persistence
+    ownership.
+  - `engineering`: update — records focused color-channel acceptance commands.
+  - `releasing`: N/A — release authorization, package versioning, and
+    publication procedure did not change.
+  - `plugin`: update — the character-authoring contract documents the new
+    command and selection behavior.
+- Verification: `rtk pnpm check:boundaries` PASS.
+- Verification: Core typecheck PASS; full Core tests PASS (25 files, 370
+  tests).
+- Verification: Presets typecheck PASS; full Presets tests PASS (8 tests).
+- Verification: Web typecheck PASS; full Web unit tests PASS (105 files, 852
+  tests); full Web E2E PASS (33 tests).
+- Verification: CLI typecheck PASS; full CLI tests PASS (55 files, 1048 passed,
+  1 skipped); CLI build PASS; packed CLI install smoke test PASS.
+- Verification: `rtk pnpm verify:plugin` PASS (40 tests and structure check).
+- Verification: `rtk pnpm verify` PASS after rerunning outside the filesystem
+  sandbox because `tsx` requires a local IPC socket; `rtk pnpm build` PASS.
+- Parity: `LPC_UPSTREAM_PARITY_DIR` is not provisioned, so
+  `test:e2e:parity` was not run. The dormant `upstream/` gitlink was not
+  initialized or modified; the pin-aware verification passed instead.
+- Hygiene: `rtk git diff --check` PASS. The generated untracked
+  `.lpc-toolkit-cache/` directory was removed; the final pre-commit status
+  contains only this intended plan evidence update.
+- Product commits for the final Web, CLI, and preset phases are
+  `1aaaba9b9c278ed5df3979af19265408b5f2efa2`,
+  `4ffbd1adce9e1bc41f539a804eba0c3fc10a5468`, and
+  `59432c01af2cd0961ddb519b99be166de3ad8f8a`; earlier task records above retain
+  their corresponding full hashes and verification evidence.
