@@ -14,3 +14,13 @@ _Avoid_: Color option, recolor slot
 A color channel whose value explicitly comes from a channel owned by another
 selected asset, such as expression skin following body skin.
 _Avoid_: Disabled color, fixed color
+
+**Body color source**:
+The selected body asset whose primary color channel supplies skin color to
+linked channels. No other selected asset can substitute as this source.
+_Avoid_: First body-colored asset, inferred skin source
+
+**Asset default color**:
+The color channel's authored base appearance when a character stores no
+explicit color choice for that channel.
+_Avoid_: First swatch, missing color
