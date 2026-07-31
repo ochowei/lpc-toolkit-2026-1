@@ -30,6 +30,7 @@ lpc-toolkit character create hero --preset farmer
 lpc-toolkit character search hero --type hair --query braid --limit 20
 lpc-toolkit catalog item hair_braid --json
 lpc-toolkit character set hero --type hair --item hair_braid --recolor lpcr.brown
+lpc-toolkit character set-color hero --type expression --channel eyes --color green
 lpc-toolkit character preview hero
 lpc-toolkit character render hero --out ./dist/hero --animation walk --bundle zip
 ```
@@ -371,6 +372,7 @@ CSV credits.
 | `character show` | Show a stored or explicitly located selection. |
 | `character search` | Find compatible catalog items for one selection type. |
 | `character set` | Set or replace one selected item. |
+| `character set-color` | Set or clear one color channel owned by a selected asset. |
 | `character remove` | Remove one selected item. |
 | `character validate` | Validate the complete selection against the catalog. |
 | `character preview` | Render one attributed animation frame. |
@@ -388,9 +390,14 @@ the primary `recolor` field and stores independent secondary colors under the
 selected asset's `channelRecolors`. Wherever `--selection` reads an existing
 file, the CLI accepts Toolkit selection v1 and v2 plus upstream version 1 and
 version 2 selection JSON. Read-only commands migrate these documents in memory
-without rewriting the source. A successful `character set` or `character
-remove` mutation of non-v2 input atomically rewrites that file as Toolkit v2
-and emits the `selection_format_normalized` warning.
+without rewriting the source. A successful `character set`, `character
+set-color`, or `character remove` mutation of non-v2 input atomically rewrites
+that file as Toolkit v2 and emits the `selection_format_normalized` warning.
+Set an explicit primary or secondary value with `character set-color <locator>
+--type <slot> --channel <id> --color <id>`. Use `--default` instead of `--color`
+to remove the stored value and restore the asset-authored default. Linked
+channels refuse both operations because their value comes from the selected
+body asset.
 `character create --selection <file>` remains an output destination for the
 new character rather than an input file.
 

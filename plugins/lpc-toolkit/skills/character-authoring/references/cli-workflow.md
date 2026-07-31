@@ -24,6 +24,8 @@ lpc-toolkit character search --selection hero.json --type hair --query braid --l
 lpc-toolkit character search --selection hero.json --type hair --query braid --limit 20 --offset <nextOffset> --json
 lpc-toolkit catalog item hair_braid --json
 lpc-toolkit character set --selection hero.json --type hair --item hair_braid --recolor lpcr.brown --json
+lpc-toolkit character set-color --selection hero.json --type expression --channel eyes --color green --json
+lpc-toolkit character set-color --selection hero.json --type expression --channel eyes --default --json
 lpc-toolkit character validate --selection hero.json --json
 ```
 
@@ -37,8 +39,12 @@ The `catalog item` detail preserves native identifiers in `animations` and adds
 as an action the asset can participate in, while retaining the native custom
 name when requesting or describing the actual custom animation output.
 
-Use `character remove` only for a currently selected type. Resolve one
-structured error at a time, using `details.suggestions` and `details.available`.
+Use `character set-color` for every color-channel edit instead of changing
+`recolor` or `channelRecolors` in JSON. `--color <id>` stores an explicit value;
+`--default` clears it. Treat a linked-channel refusal as read-only behavior and
+change its source body color if that matches the user's intent. Use `character
+remove` only for a currently selected type. Resolve one structured error at a
+time, using `details.suggestions` and `details.available`.
 
 ## Preview And Iterate
 

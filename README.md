@@ -111,6 +111,7 @@ lpc-toolkit character create hero --preset farmer
 lpc-toolkit character search hero --type hair --query braid --limit 20
 lpc-toolkit catalog item hair_braid --json
 lpc-toolkit character set hero --type hair --item hair_braid --recolor lpcr.brown
+lpc-toolkit character set-color hero --type expression --channel eyes --color green
 lpc-toolkit character preview hero
 lpc-toolkit character render hero --out ./dist/hero --animation walk --bundle zip
 ```
@@ -191,6 +192,8 @@ primary `recolor` field. Web import and CLI `--selection` readers accept Toolkit
 selection v1 and v2 plus upstream version 1 and version 2 JSON. Read-only CLI
 commands migrate these inputs in memory without rewriting the source file.
 Successful CLI mutations atomically normalize imported input to Toolkit v2.
+Use `character set-color --channel <id> --color <id>` for an explicit
+asset-owned color, or `--default` to clear it; linked channels are read-only.
 Rendered artifacts still obtain credits from the active asset source rather
 than trusting attribution embedded in imported JSON.
 

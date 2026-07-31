@@ -52,6 +52,7 @@ describe('LandingPage', () => {
       'lpc-toolkit character search hero --type hair --query braid',
       'lpc-toolkit catalog item hair_braid',
       'lpc-toolkit character set hero --type hair --item hair_braid --recolor lpcr.brown',
+      'lpc-toolkit character set-color hero --type expression --channel eyes --color green',
       'lpc-toolkit character render hero --out ./dist/hero --animation walk --bundle zip',
     ];
     for (const command of customizationCommands) expect(html).toContain(command);

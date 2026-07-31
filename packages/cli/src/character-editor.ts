@@ -1,6 +1,8 @@
 import {
   BODY_TYPES,
+  getColorChannels,
   getDefaultColorSelection,
+  primaryColorFollowsBody,
   SELECTION_SCHEMA,
   type BodyType,
   type Catalog,
@@ -53,6 +55,18 @@ export interface CharacterSetInput {
 export interface CharacterEditResult {
   readonly selections: Selections;
   readonly replaced: boolean;
+}
+
+export interface CharacterSetColorInput {
+  readonly typeName: TypeName;
+  readonly channelId: string;
+  readonly color?: string;
+}
+
+export interface CharacterColorEditResult {
+  readonly selections: Selections;
+  readonly color: string | null;
+  readonly default: boolean;
 }
 
 export interface CharacterEditErrorDetails {
@@ -229,4 +243,87 @@ export function removeCharacterItem(
   const items = { ...selections.items };
   delete items[typeName];
   return { selections: { bodyType: selections.bodyType, items }, replaced: true };
+}
+
+export function setCharacterColor(
+  selections: Selections,
+  input: CharacterSetColorInput,
+  context: CharacterCatalogContext,
+): CharacterColorEditResult {
+  const selected = selections.items[input.typeName];
+  if (!selected) {
+    throw new CharacterEditError(
+      'selection_type_not_set',
+      `No selection is set for type: ${input.typeName}`,
+      { path: input.typeName },
+    );
+  }
+  const item = context.catalog.byTypeName.get(input.typeName)
+    ?.find((candidate) => candidate.name === selected.name);
+  if (!item) {
+    throw new CharacterEditError(
+      'unknown_item',
+      `Unknown selected item: ${input.typeName}/${selected.name}`,
+      { path: `${input.typeName}/${selected.name}` },
+    );
+  }
+  const channels = getColorChannels(item, context.palettes);
+  const channel = channels.find((candidate) => candidate.id === input.channelId);
+  if (!channel) {
+    throw new CharacterEditError(
+      'unknown_color_channel',
+      `Unknown color channel: ${input.channelId}`,
+      {
+        path: `${input.typeName}/${input.channelId}`,
+        details: { available: channels.map((candidate) => candidate.id) },
+      },
+    );
+  }
+  if (channel.linkedTo || (channel.primary && primaryColorFollowsBody(item))) {
+    throw new CharacterEditError(
+      'linked_color_channel',
+      `Linked color channel cannot be edited: ${input.channelId}`,
+      { path: `${input.typeName}/${input.channelId}` },
+    );
+  }
+  if (
+    input.color !== undefined
+    && !channel.swatches.some((swatch) => swatch.recolor === input.color)
+  ) {
+    throw new CharacterEditError(
+      'invalid_channel_color',
+      `Invalid color "${input.color}" for channel: ${input.channelId}`,
+      {
+        path: `${input.typeName}/${input.channelId}`,
+        details: { available: channel.swatches.map((swatch) => swatch.recolor) },
+      },
+    );
+  }
+
+  let nextSelection;
+  if (channel.primary) {
+    const { recolor: _recolor, ...withoutRecolor } = selected;
+    nextSelection = input.color === undefined
+      ? withoutRecolor
+      : { ...withoutRecolor, recolor: input.color };
+  } else {
+    const channelRecolors = { ...selected.channelRecolors };
+    if (input.color === undefined) delete channelRecolors[input.channelId];
+    else channelRecolors[input.channelId] = input.color;
+    const { channelRecolors: _channelRecolors, ...withoutChannels } = selected;
+    nextSelection = Object.keys(channelRecolors).length === 0
+      ? withoutChannels
+      : { ...withoutChannels, channelRecolors };
+  }
+  const candidate: Selections = {
+    bodyType: selections.bodyType,
+    items: { ...selections.items, [input.typeName]: nextSelection },
+  };
+  const validation = validateSelections(candidate, context);
+  if (!validation.ok) throw editErrorFromValidation(validation);
+  return {
+    selections: candidate,
+    color: input.color ?? null,
+    default: input.color === undefined,
+  };
 }

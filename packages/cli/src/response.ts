@@ -293,6 +293,18 @@ function formatCharacterSet(data: JsonRecord): string | undefined {
     : undefined;
 }
 
+function formatCharacterSetColor(data: JsonRecord): string | undefined {
+  const name = characterDisplayName(data);
+  const typeName = stringValue(data, 'typeName');
+  const channel = stringValue(data, 'channel');
+  const color = data['color'];
+  if (!name || !typeName || !channel) return undefined;
+  if (color === null) return `Updated ${name}: ${typeName}.${channel} = asset default\n`;
+  return typeof color === 'string'
+    ? `Updated ${name}: ${typeName}.${channel} = ${color}\n`
+    : undefined;
+}
+
 function formatCharacterRemove(data: JsonRecord): string | undefined {
   const name = characterDisplayName(data);
   const typeName = stringValue(data, 'typeName');
@@ -860,6 +872,8 @@ function formatHumanData(response: CliResponse<unknown>): string | undefined {
       return formatCharacterSearch(data);
     case 'character set':
       return formatCharacterSet(data);
+    case 'character set-color':
+      return formatCharacterSetColor(data);
     case 'character remove':
       return formatCharacterRemove(data);
     case 'character validate':

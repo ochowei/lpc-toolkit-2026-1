@@ -51,6 +51,7 @@ describe('Codex plugin CLI contract', () => {
       'character-search',
       'catalog-item',
       'character-set',
+      'character-set-color',
       'character-remove',
       'character-validate',
       'character-preview',
