@@ -197,20 +197,33 @@ plugin: update
 - Modify: `packages/web/test/color-picker.test.tsx`
 - Modify: `packages/web/test/i18n.test.ts`
 
-- [ ] Add failing pure/UI tests proving `body` retains clickable swatches while
+- [x] Add failing pure/UI tests proving `body` retains clickable swatches while
   non-body `match_body_color` primary channels show a read-only "follows body"
   label and resolved swatch, with no dispatch on interaction.
-- [ ] Add a presentation-safe linked-primary result to the pure color-options
+- [x] Add a presentation-safe linked-primary result to the pure color-options
   helper; do not teach the component composition policy.
-- [ ] Wire the current body selection into the selected-item picker and render
+- [x] Wire the current body selection into the selected-item picker and render
   the translated read-only state.
-- [ ] Confirm secondary channels remain intentionally unavailable in Phase 1;
+- [x] Confirm secondary channels remain intentionally unavailable in Phase 1;
   do not add partial persistence.
-- [ ] Run:
+- [x] Run:
   `rtk pnpm --filter @lpc-toolkit/web test -- color-options.test.ts color-picker.test.tsx i18n.test.ts`
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/web run typecheck`
-- [ ] Run: `rtk pnpm check:boundaries`
-- [ ] Record implementation note, commit hash, and PASS/FAIL evidence here.
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/web run typecheck`
+- [x] Run: `rtk pnpm check:boundaries`
+- [x] Record implementation note, commit hash, and PASS/FAIL evidence here.
+  - Implementation: non-body `match_body_color` items now derive a read-only
+    linked-primary presentation from the selected body recolor. The body retains
+    editable swatches, missing explicit body color is labeled as the asset
+    default, and TypeItemPicker wiring plus en/zh-TW copy are covered.
+  - Commit: `5dbc74e7ad12cfe116bcad4c27182af56a8f8b52`
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web test -- color-options.test.ts color-picker.test.tsx i18n.test.ts`
+    could not start in the sandbox because `tsx` IPC creation returned EPERM;
+    the escalated rerun then FAILed as expected before implementation (4 failed,
+    29 passed) and PASSed after implementation (33 passed).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web test -- color-options.test.ts color-picker.test.tsx type-item-picker.test.tsx i18n.test.ts`
+    PASS (35 passed).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web run typecheck` PASS.
+  - Verification: `rtk pnpm check:boundaries` PASS.
 
 ### Phase 1 handoff gate
 
