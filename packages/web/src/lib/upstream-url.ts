@@ -11,6 +11,7 @@ export const UPSTREAM_URL =
   'https://liberatedpixelcup.github.io/Universal-LPC-Spritesheet-Character-Generator/';
 
 export interface UpstreamUrlResult {
+  readonly hash: string;
   readonly href: string;
   readonly losses: readonly UpstreamProjectionLoss[];
 }
@@ -23,6 +24,7 @@ export function buildUpstreamUrl(
 ): UpstreamUrlResult {
   const projected = serializeUpstreamHash(selections, catalog, palettes);
   return {
+    hash: projected.hash,
     href: `${UPSTREAM_URL}#${projected.hash}`,
     losses: projected.losses,
   };

@@ -132,9 +132,14 @@ async function compareHashCase(
   hashCase: FixedHashCase | CompareHashCase,
 ): Promise<void> {
   const toolkit = await openToolkitCase(context, hashCase.hash);
-  const upstream = await openUpstreamCase(context, toolkit.snapshot.hash);
+  const upstream = await openUpstreamCase(
+    context,
+    toolkit.snapshot.upstreamHash,
+  );
 
   try {
+    expect(toolkit.snapshot.upstreamHash).not.toContain('v=2');
+    expect(toolkit.snapshot.upstreamHash).not.toContain('color.');
     expect(
       toolkit.errors.length,
       `toolkit captured errors:\n${formatErrorPreview(toolkit.errors)}`,
@@ -193,7 +198,7 @@ function parityDiagnostic(
     `source=${hashCase.source}`,
     `inputHash=${hashCase.hash}`,
     `canonicalHash=${toolkit.hash}`,
-    `toolkitHash=${toolkit.hash}`,
+    `upstreamHash=${toolkit.upstreamHash}`,
     `toolkitBodyType=${toolkit.bodyType}`,
     `toolkitStatus=${toolkit.status}`,
     `toolkitDimensions=${toolkit.rgba.width}x${toolkit.rgba.height}`,

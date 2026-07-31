@@ -14,6 +14,7 @@ describe('buildUpstreamUrl', () => {
         palettes,
       ),
     ).toEqual({
+      hash: 'sex=male',
       href: `${UPSTREAM_URL}#sex=male`,
       losses: [],
     });
@@ -40,6 +41,9 @@ describe('buildUpstreamUrl', () => {
     expect(result.href).toBe(
       `${UPSTREAM_URL}#sex=male&hair=Plain_v01%7Cblack`,
     );
+    expect(result.hash).toBe('sex=male&hair=Plain_v01%7Cblack');
+    expect(result.hash).not.toContain('v=2');
+    expect(result.hash).not.toContain('color.');
     expect(result.href).not.toContain('v=2');
     expect(result.href).not.toContain('color.');
   });

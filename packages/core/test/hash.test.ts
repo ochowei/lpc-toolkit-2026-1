@@ -696,4 +696,28 @@ describe('v2 asset-owned color channels', () => {
     expect(projected.hash).not.toContain('v=2');
     expect(projected.hash).not.toContain('color.');
   });
+
+  it('preserves primary selection order for stable same-z upstream rendering', () => {
+    const projected = serializeUpstreamHash(
+      {
+        bodyType: 'male',
+        items: {
+          expression: {
+            typeName: 'expression',
+            name: 'Smile',
+          },
+          head: {
+            typeName: 'head',
+            name: 'Human Head',
+          },
+        },
+      },
+      catalog,
+      palettes,
+    );
+
+    expect(projected.hash).toBe(
+      'sex=male&expression=Smile&head=Human_Head',
+    );
+  });
 });

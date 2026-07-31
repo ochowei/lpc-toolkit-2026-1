@@ -77,6 +77,7 @@ import {
 
 interface LpcE2eProbe {
   readonly hash: string;
+  readonly upstreamHash: string;
   readonly bodyType: string;
   readonly status: ComposedResult['status'];
   readonly creditsCount: number;
@@ -411,6 +412,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     const sheet = composeResult.sheet;
     window.__LPC_E2E__ = {
       hash: canonicalHash,
+      upstreamHash: upstreamLink.hash,
       bodyType: props.state.bodyType,
       status: composeResult.status,
       creditsCount: sheet?.credits.entries.length ?? 0,
@@ -435,6 +437,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
     composeResult.sheet,
     e2eProbeEnabled,
     props.state.bodyType,
+    upstreamLink.hash,
   ]);
 
   const handleForceReload = () => {

@@ -530,7 +530,6 @@ interface UpstreamChannelCandidate {
 interface UpstreamPrimaryParam {
   readonly slot: TypeName;
   readonly value: string;
-  readonly zPos: number;
 }
 
 function serializeSelectionValue(selection: Selection): string {
@@ -569,14 +568,14 @@ export function serializeUpstreamHash(
   const primaryParams: UpstreamPrimaryParam[] = [];
   const candidates = new Map<TypeName, UpstreamChannelCandidate[]>();
 
-  for (const [slot, selection] of Object.entries(selections.items)
-    .sort(([left], [right]) => left.localeCompare(right))) {
+  // Preserve encounter order: both composers stable-sort equal-z layers, so
+  // reordering primary params can change which same-z pixels remain visible.
+  for (const [slot, selection] of Object.entries(selections.items)) {
     const item = (catalog.byTypeName.get(slot) ?? [])
       .find((candidate) => candidate.name === selection.name);
     primaryParams.push({
       slot,
       value: serializeSelectionValue(selection),
-      zPos: item ? highestLayerZPos(item) : Number.NEGATIVE_INFINITY,
     });
     if (!item) continue;
     const channels = getColorChannels(item, palettes);
@@ -624,9 +623,6 @@ export function serializeUpstreamHash(
   }
 
   losses.sort((left, right) => left.channelId.localeCompare(right.channelId));
-  primaryParams.sort((left, right) =>
-    right.zPos - left.zPos || left.slot.localeCompare(right.slot),
-  );
   channelParams.sort(([left], [right]) => left.localeCompare(right));
   const hash = [
     ['sex', selections.bodyType] as const,

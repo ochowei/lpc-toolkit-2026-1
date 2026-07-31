@@ -14,6 +14,7 @@ export interface RgbaSnapshot {
 /** Local toolkit probe data captured from the test-only browser hook. */
 export interface ToolkitProbeSnapshot {
   readonly hash: string;
+  readonly upstreamHash: string;
   readonly bodyType: string;
   readonly status: string;
   readonly creditsCount: number;
@@ -44,6 +45,7 @@ interface UpstreamCase {
 
 interface ToolkitBrowserProbe {
   readonly hash: string;
+  readonly upstreamHash: string;
   readonly bodyType: string;
   readonly status: string;
   readonly creditsCount: number;
@@ -141,6 +143,7 @@ export async function openToolkitCase(
 
     return {
       hash: probe.hash,
+      upstreamHash: probe.upstreamHash,
       bodyType: probe.bodyType,
       status: probe.status,
       creditsCount: probe.creditsCount,
