@@ -80,6 +80,9 @@ function materializePresetRaw(preset: Preset): SelectionJson {
             name: item.name,
             ...(item.variant ? { variant: item.variant } : {}),
             ...(item.recolor ? { recolor: item.recolor } : {}),
+            ...(item.channelRecolors
+              ? { channelRecolors: item.channelRecolors }
+              : {}),
           },
         ]),
       ),

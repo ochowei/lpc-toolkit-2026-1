@@ -39,6 +39,17 @@ const { catalog } = createCatalog({
     ...defn('Shirt', 'clothes', 'male'),
     recolors: { material: 'cloth', palettes: ['ulpc'] },
   },
+  'coat.json': {
+    ...defn('Multi Coat', 'coat', 'male'),
+    recolors: {
+      color_1: { material: 'cloth', palettes: ['ulpc'] },
+      color_2: {
+        material: 'cloth',
+        palettes: ['ulpc'],
+        type_name: 'accent',
+      },
+    },
+  },
 });
 
 const malePreset: Preset = {
@@ -225,5 +236,36 @@ describe('computePresetSelection', () => {
       palettes,
     );
     expect(bodyType).toBe('female');
+  });
+
+  it('preserves asset-owned channel values through the Web preset adapter', () => {
+    const channelPreset: Preset = {
+      id: 'channels',
+      labelKey: 'preset.farmer',
+      emoji: '',
+      items: [
+        {
+          typeName: 'coat',
+          name: 'Multi Coat',
+          channelRecolors: { accent: 'brown' },
+        },
+      ],
+    };
+
+    const { selections, skipped } = computePresetSelection(
+      channelPreset,
+      {},
+      'male',
+      catalog,
+      palettes,
+    );
+
+    expect(skipped).toEqual([]);
+    expect(selections.coat).toEqual({
+      typeName: 'coat',
+      name: 'Multi Coat',
+      recolor: 'brown',
+      channelRecolors: { accent: 'brown' },
+    });
   });
 });

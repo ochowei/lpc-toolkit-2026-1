@@ -1,4 +1,5 @@
 import { createCatalog, type ItemDefinition, type PaletteMetadata } from '@lpc-toolkit/core';
+import { PRESETS } from '@lpc-toolkit/presets';
 import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -39,6 +40,15 @@ describe('preset commands', () => {
     expect(selection.schema).toBe('lpc-toolkit.selection.v2');
     expect(selection.name).toBe('farmer');
     expect(selection.items.body?.name).toBe('Body Color');
+  });
+
+  it('keeps every existing built-in preset free of secondary channel output', () => {
+    for (const preset of PRESETS) {
+      const selection = materializePreset(preset.id);
+      for (const item of Object.values(selection.items)) {
+        expect(item.channelRecolors).toBeUndefined();
+      }
+    }
   });
 
   it('fills omitted preset color fields from catalog and palette defaults', () => {

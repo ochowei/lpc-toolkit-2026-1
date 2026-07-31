@@ -1,5 +1,6 @@
 import {
   getDefaultColorSelection,
+  getColorChannels,
   type BodyType,
   type Catalog,
   type ItemDefinition,
@@ -17,6 +18,8 @@ export interface PresetItem {
   readonly variant?: string;
   /** Palette recolor; used for recolor-backed items. */
   readonly recolor?: string;
+  /** Explicit independent non-primary values owned by this preset item. */
+  readonly channelRecolors?: Readonly<Record<TypeName, string>>;
 }
 
 /** A themed outfit the user can apply with one click. */
@@ -34,7 +37,7 @@ export interface PresetApplyResult {
   readonly bodyType: BodyType;
   /** Full new selections: personal categories kept, clothing replaced. */
   readonly selections: Record<TypeName, Selection>;
-  /** Preset items dropped - catalog miss or unsupported body type. */
+  /** Preset items dropped - catalog/body mismatch or invalid channel value. */
   readonly skipped: readonly PresetItem[];
 }
 
@@ -177,6 +180,54 @@ function itemSupportsBodyType(
   return typeof item.layer_1?.[bodyType] === 'string';
 }
 
+interface PresetChannelResult {
+  readonly valid: boolean;
+  readonly channelRecolors?: Readonly<Record<TypeName, string>>;
+}
+
+function resolvePresetChannels(
+  presetItem: PresetItem,
+  previous: Selection | undefined,
+  definition: ItemDefinition,
+  palettes: PaletteMetadata,
+): PresetChannelResult {
+  const channels = getColorChannels(definition, palettes);
+  const values = new Map<TypeName, string>();
+
+  for (const channel of channels) {
+    if (channel.primary || channel.linkedTo) continue;
+    const previousValue = previous?.channelRecolors?.[channel.id];
+    if (
+      previousValue
+      && channel.swatches.some((swatch) => swatch.recolor === previousValue)
+    ) {
+      values.set(channel.id, previousValue);
+    }
+  }
+
+  for (const [channelId, recolor] of Object.entries(
+    presetItem.channelRecolors ?? {},
+  )) {
+    const channel = channels.find((candidate) => candidate.id === channelId);
+    if (
+      !channel
+      || channel.primary
+      || channel.linkedTo
+      || !channel.swatches.some((swatch) => swatch.recolor === recolor)
+    ) {
+      return { valid: false };
+    }
+    values.set(channelId, recolor);
+  }
+
+  return {
+    valid: true,
+    ...(values.size > 0
+      ? { channelRecolors: Object.fromEntries(values) }
+      : {}),
+  };
+}
+
 /**
  * Compute the selections after applying `preset`:
  * - every CLOTHING_TYPES entry is removed from `current` (clean slate);
@@ -206,6 +257,16 @@ export function computePresetSelection(
       skipped.push(item);
       continue;
     }
+    const channelResult = resolvePresetChannels(
+      item,
+      current[item.typeName],
+      def,
+      palettes,
+    );
+    if (!channelResult.valid) {
+      skipped.push(item);
+      continue;
+    }
     const colorFields =
       item.variant || item.recolor
         ? {
@@ -217,6 +278,9 @@ export function computePresetSelection(
       typeName: item.typeName,
       name: item.name,
       ...colorFields,
+      ...(channelResult.channelRecolors
+        ? { channelRecolors: channelResult.channelRecolors }
+        : {}),
     };
   }
 
