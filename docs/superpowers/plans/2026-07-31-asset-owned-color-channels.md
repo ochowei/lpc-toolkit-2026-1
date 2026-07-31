@@ -96,8 +96,9 @@ interface RecolorConfig {
 ```
 
 The first version accepts only `body/primary`. `match_body_color` is accepted
-only at the external legacy-pack boundary and normalized with a deprecation
-warning. Checked-in assets use `linked_to` exclusively.
+at the external legacy-pack boundary and by the verified pinned-release
+fallback, and is normalized with a deprecation warning when authoring a pack.
+The next canonical asset release uses `linked_to` exclusively.
 
 ### Selection v2
 
@@ -108,7 +109,6 @@ warning. Checked-in assets use `linked_to` exclusively.
   "items": {
     "expression": {
       "name": "Neutral",
-      "recolor": "light",
       "channelRecolors": { "eyes": "red" }
     }
   }
