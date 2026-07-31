@@ -202,6 +202,30 @@ describe('preset asset-owned color channels', () => {
     expect(result.skipped).toEqual(preset.items);
   });
 
+  it('omits a preset recolor when the primary channel follows body', () => {
+    const linkedHead: ItemDefinition = {
+      ...item('Linked Head', 'head'),
+      recolors: {
+        material: 'cloth',
+        palettes: ['v1'],
+        linked_to: { selection: 'body', channel: 'primary' },
+      },
+    };
+    const linkedCatalog = createCatalog({ 'head/linked.json': linkedHead }).catalog;
+    const result = computePresetSelection({
+      id: 'linked-primary',
+      labelKey: 'preset.linked-primary',
+      emoji: '',
+      items: [{ typeName: 'head', name: 'Linked Head', recolor: 'black' }],
+    }, {}, 'male', linkedCatalog, palettes);
+
+    expect(result.skipped).toEqual([]);
+    expect(result.selections.head).toEqual({
+      typeName: 'head',
+      name: 'Linked Head',
+    });
+  });
+
   it('transfers only valid same-name independent values on replacement', () => {
     const result = computePresetSelection(
       {

@@ -114,6 +114,27 @@ pnpm --filter @lpc-toolkit/cli build
 pnpm --filter @lpc-toolkit/cli test:package
 ```
 
+#### Asset-owned color channels and character interchange
+
+Run this focused cross-package map when channel identity, links, defaults,
+selection migration, hash/token encoding, upstream projection, Web controls,
+CLI authoring, or preset transfer behavior changes:
+
+```sh
+pnpm --filter @lpc-toolkit/core test -- recolor-resolve.test.ts selection-document.test.ts upstream-selection-import.test.ts hash.test.ts asset-pack-schema.test.ts asset-pack-validation.test.ts credits.test.ts
+pnpm --filter @lpc-toolkit/presets test -- presets.test.ts
+pnpm --filter @lpc-toolkit/web test -- color-options.test.ts color-picker.test.tsx selection.test.ts upstream-url.test.ts top-bar.test.tsx spritesheet-export.test.ts random-outfit.test.ts
+pnpm --filter @lpc-toolkit/web test:e2e -- character-json-interchange.spec.ts color-channels.spec.ts
+pnpm --filter @lpc-toolkit/cli test -- character-editor.test.ts character-commands.test.ts selection-document-file.test.ts token-commands.test.ts render.test.ts command-spec.test.ts plugin-contract.test.ts
+```
+
+Together these checks cover v1-to-v2-to-render migration, exact Web JSON/hash
+round trips, independent and linked channels, clearing to authored defaults,
+legacy artist-pack normalization, malformed channel input, lossy upstream-link
+diagnostics, matching credit metadata, transactional render publication, and
+stable preset/random outputs. Run the CLI build and `test:package` whenever
+production CLI output changes, and pair the map with `pnpm check:boundaries`.
+
 The packed smoke also creates a checked archive with `status: "draft"` and
 asserts that inspect exits 1 and install reports `asset_pack_draft` without
 mutating the consumer workspace. This is the package-level counterpart to the

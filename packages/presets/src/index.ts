@@ -1,6 +1,7 @@
 import {
   getDefaultColorSelection,
   getColorChannels,
+  primaryColorFollowsBody,
   type BodyType,
   type Catalog,
   type ItemDefinition,
@@ -267,12 +268,14 @@ export function computePresetSelection(
       skipped.push(item);
       continue;
     }
-    const colorFields =
-      item.variant || item.recolor
-        ? {
-            ...(item.variant ? { variant: item.variant } : {}),
-            ...(item.recolor ? { recolor: item.recolor } : {}),
-          }
+    const primaryIsLinked = primaryColorFollowsBody(def);
+    const colorFields = item.variant || item.recolor
+      ? {
+          ...(item.variant ? { variant: item.variant } : {}),
+          ...(!primaryIsLinked && item.recolor ? { recolor: item.recolor } : {}),
+        }
+      : primaryIsLinked
+        ? {}
         : getDefaultColorSelection(def, palettes);
     selections[item.typeName] = {
       typeName: item.typeName,
