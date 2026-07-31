@@ -864,3 +864,34 @@ Task 12 record:
   Task 4 are complete in `assets-v2026.08.01-color-links-v1`; pin transition
   commit `b98a00ef2923067275d6ef0dbfaf1f23ab69a20b` passed the same full repository,
   E2E, package, attribution, and four-way provenance gates recorded above.
+
+### Task 13: CI follow-up — preserve projected upstream parity
+
+- [x] Route the parity harness through the same upstream compatibility
+  projection used by the public upstream link.
+- [x] Preserve primary selection encounter order so equal-`zPos` layers retain
+  the same stable rendering order in the toolkit and upstream.
+- [x] Add focused regressions for legacy-only upstream hashes and primary
+  selection order.
+- [x] Run the fixed failing case, the complete isolated parity suite, and the
+  repository verification gate.
+  - Implementation: the E2E probe now exposes both canonical v2 and projected
+    upstream hashes, and parity diagnostics report both. The compatibility
+    serializer retains primary selection encounter order while continuing to
+    choose visibly dominant independent-channel collision winners by layer.
+  - Root cause: the parity harness forwarded canonical v2 state, then the
+    compatibility projection independently reordered primary parameters by
+    layer. Both renderers stable-sort equal-`zPos` layers, so that parameter
+    reordering changed same-layer pixel precedence in the complex fixed case.
+  - Commit: `9caad23219fd7680d7274e08453734ffc954e875`.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core test -- hash.test.ts`
+    FAIL as expected before implementation (1 failed, 34 passed), then PASS
+    (35 tests); Core typecheck PASS.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web test -- upstream-url.test.ts`
+    PASS (3 tests); Web typecheck and `rtk pnpm check:boundaries` PASS.
+  - Verification: pinned isolated fixed parity case PASS (1 test), then
+    `LPC_UPSTREAM_PARITY_DIR=<isolated-checkout> rtk pnpm --filter @lpc-toolkit/web test:e2e:parity`
+    PASS (7 tests).
+  - Verification: `rtk pnpm verify` PASS; `rtk git diff --check` PASS.
+  - Documentation: ADR update N/A — this fix restores the already accepted
+    ADR-0006 compatibility projection and does not change its decision.
