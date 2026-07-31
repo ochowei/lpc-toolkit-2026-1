@@ -32,11 +32,14 @@ test('independent head and expression colors survive canonical save and import',
     .locator('[data-channel-id="eyes"]')
     .filter({ visible: true });
   await expect(headEyes.getByText('Eye Color', { exact: true })).toBeVisible();
+  await expect(page.getByText(
+    'Head eye color is currently covered by Expression.',
+    { exact: true },
+  )).toBeVisible();
   await activate(headEyes.getByRole('button', { name: 'Eye Color: Red' }), 'Enter');
   await waitForComposition(page);
 
-  await expandLayer(page, 'Human Male', 'head');
-  await expandLayer(page, 'Neutral', 'expression');
+  await page.getByRole('button', { name: 'Edit Expression eye color' }).click();
   const expressionEyes = page
     .locator('[data-channel-id="eyes"]')
     .filter({ visible: true });

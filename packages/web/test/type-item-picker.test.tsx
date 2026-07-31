@@ -58,6 +58,52 @@ const { catalog: linkedCatalog } = createCatalog({
   'head/faces/face_neutral.json': expressionItem,
 });
 
+const facePalettes = createPaletteCatalog({
+  'body/meta_body.json': { type: 'material', default: 'v1', base: 'light' },
+  'body/body_v1.json': {
+    light: ['#f0d0b0'],
+    brown: ['#704020'],
+  },
+  'eye/meta_eye.json': { type: 'material', default: 'v1', base: 'blue' },
+  'eye/eye_v1.json': {
+    blue: ['#4080d0'],
+    green: ['#40a060'],
+  },
+}).palettes;
+
+const headWithEyes: ItemDefinition = {
+  name: 'Human Male',
+  type_name: 'head',
+  animations: ['walk'],
+  credits: [],
+  recolors: {
+    color_1: {
+      material: 'body',
+      palettes: ['v1'],
+      linked_to: { selection: 'body', channel: 'primary' },
+    },
+    color_2: {
+      type_name: 'eyes',
+      label: 'Eye Color',
+      material: 'eye',
+      palettes: ['v1'],
+    },
+  },
+  layer_1: { zPos: 100, male: 'head/' },
+};
+
+const expressionWithEyes: ItemDefinition = {
+  ...headWithEyes,
+  name: 'Neutral',
+  type_name: 'expression',
+  layer_1: { zPos: 101, male: 'expression/' },
+};
+
+const { catalog: faceCatalog } = createCatalog({
+  'head/heads/human_male.json': headWithEyes,
+  'head/faces/neutral.json': expressionWithEyes,
+});
+
 const state: SliceState = {
   bodyType: 'male',
   selections: {},
@@ -84,6 +130,7 @@ describe('TypeItemPicker Catalog Localized Name Rendering', () => {
         animationFilter={new Set()}
         replacementCardDisplayMode="overlay"
         onReplacementCardDisplayModeChange={() => {}}
+        onNavigateToType={() => {}}
       />
     );
 
@@ -120,11 +167,68 @@ describe('TypeItemPicker Catalog Localized Name Rendering', () => {
         animationFilter={new Set()}
         replacementCardDisplayMode="overlay"
         onReplacementCardDisplayModeChange={() => {}}
+        onNavigateToType={() => {}}
       />
     );
 
     expect(html).toContain('跟隨身體');
     expect(html).toContain('棕色');
     expect(html).toContain('background-color:#704020');
+  });
+
+  it('warns when expression covers the editable head eye color', () => {
+    const html = renderToStaticMarkup(
+      <TypeItemPicker
+        disabled={false}
+        typeName="head"
+        catalog={faceCatalog}
+        palettes={facePalettes}
+        state={{
+          ...state,
+          selections: {
+            head: { typeName: 'head', name: 'Human Male' },
+            expression: { typeName: 'expression', name: 'Neutral' },
+          },
+        }}
+        dispatch={() => {}}
+        tl={createLabelTranslator('en')}
+        t={createTranslator('en')}
+        licenseFilter={ALL_LICENSE_GROUPS}
+        animationFilter={new Set()}
+        replacementCardDisplayMode="overlay"
+        onReplacementCardDisplayModeChange={() => {}}
+        onNavigateToType={() => {}}
+      />
+    );
+
+    expect(html).toContain('Head eye color is currently covered by Expression.');
+    expect(html).toContain('Edit Expression eye color');
+  });
+
+  it('does not warn when no expression is selected over the head', () => {
+    const html = renderToStaticMarkup(
+      <TypeItemPicker
+        disabled={false}
+        typeName="head"
+        catalog={faceCatalog}
+        palettes={facePalettes}
+        state={{
+          ...state,
+          selections: {
+            head: { typeName: 'head', name: 'Human Male' },
+          },
+        }}
+        dispatch={() => {}}
+        tl={createLabelTranslator('en')}
+        t={createTranslator('en')}
+        licenseFilter={ALL_LICENSE_GROUPS}
+        animationFilter={new Set()}
+        replacementCardDisplayMode="overlay"
+        onReplacementCardDisplayModeChange={() => {}}
+        onNavigateToType={() => {}}
+      />
+    );
+
+    expect(html).not.toContain('Head eye color is currently covered');
   });
 });

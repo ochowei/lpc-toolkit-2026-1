@@ -24,6 +24,7 @@ interface Props {
   onToggleSlotType: (typeName: TypeName) => void;
   replacementCardDisplayMode: ReplacementCardDisplayMode;
   onReplacementCardDisplayModeChange: (mode: ReplacementCardDisplayMode) => void;
+  onNavigateToType: (typeName: TypeName) => void;
 }
 
 function selectedItem(args: {
@@ -80,6 +81,7 @@ export function GroupTypeSlotEntries({
   onToggleSlotType,
   replacementCardDisplayMode,
   onReplacementCardDisplayModeChange,
+  onNavigateToType,
 }: Props) {
   if (typeNames.length === 0) return null;
 
@@ -162,6 +164,7 @@ export function GroupTypeSlotEntries({
                       animationFilter={animationFilter}
                       replacementCardDisplayMode={replacementCardDisplayMode}
                       onReplacementCardDisplayModeChange={onReplacementCardDisplayModeChange}
+                      onNavigateToType={onNavigateToType}
                     />
                   </div>
                 )}

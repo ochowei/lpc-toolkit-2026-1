@@ -1,4 +1,5 @@
 import {
+  type Catalog,
   getDefaultColorSelection,
   getColorChannels,
   getRecolorSwatches,
@@ -8,6 +9,47 @@ import {
   type Selection,
   type TypeName,
 } from '@lpc-toolkit/core';
+
+function highestLayerZPos(item: ItemDefinition): number {
+  let highest = Number.NEGATIVE_INFINITY;
+  for (let index = 1; index <= 4; index += 1) {
+    const layer = item[`layer_${index}`];
+    if (layer) highest = Math.max(highest, layer.zPos);
+  }
+  return highest;
+}
+
+/** Whether the selected expression visually supersedes the editable head eye channel. */
+export function isHeadEyeColorCoveredByExpression(args: {
+  readonly head: ItemDefinition;
+  readonly expressionName?: string;
+  readonly catalog: Catalog;
+  readonly palettes: PaletteMetadata;
+}): boolean {
+  if (
+    args.head.type_name !== 'head'
+    || !getColorChannels(args.head, args.palettes).some(
+      (channel) => channel.id === 'eyes',
+    )
+    || args.expressionName === undefined
+  ) {
+    return false;
+  }
+
+  const expression = (args.catalog.byTypeName.get('expression') ?? []).find(
+    (item) => item.name === args.expressionName,
+  );
+  if (
+    !expression
+    || !getColorChannels(expression, args.palettes).some(
+      (channel) => channel.id === 'eyes',
+    )
+  ) {
+    return false;
+  }
+
+  return highestLayerZPos(expression) > highestLayerZPos(args.head);
+}
 
 /** Swatch-backed color option that writes to `Selection.recolor`. */
 export interface RecolorColorOption {

@@ -25,6 +25,7 @@ interface Props {
   onReplacementCardDisplayModeChange?: (
     mode: ReplacementCardDisplayMode,
   ) => void;
+  onNavigateToType?: (typeName: TypeName) => void;
 }
 
 /** Active layer row with thumbnail, color controls, and compatible replacement items. */
@@ -43,6 +44,7 @@ export function LayerRow({
   onToggle,
   replacementCardDisplayMode = 'overlay',
   onReplacementCardDisplayModeChange = () => {},
+  onNavigateToType = () => {},
 }: Props) {
   const selection = state.selections[typeName];
   if (!selection) return null;
@@ -165,6 +167,7 @@ export function LayerRow({
           animationFilter={animationFilter}
           replacementCardDisplayMode={replacementCardDisplayMode}
           onReplacementCardDisplayModeChange={onReplacementCardDisplayModeChange}
+          onNavigateToType={onNavigateToType}
         />
       )}
     </div>

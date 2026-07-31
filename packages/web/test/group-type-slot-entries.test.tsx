@@ -63,6 +63,7 @@ function renderEntries(args: {
       onToggleSlotType={() => {}}
       replacementCardDisplayMode="overlay"
       onReplacementCardDisplayModeChange={() => {}}
+      onNavigateToType={() => {}}
     />,
   );
 }

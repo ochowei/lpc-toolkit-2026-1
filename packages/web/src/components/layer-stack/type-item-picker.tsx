@@ -10,6 +10,7 @@ import {
   REPLACEMENT_CARD_DISPLAY_MODES,
   type ReplacementCardDisplayMode,
 } from '../../lib/replacement-card-display-mode';
+import { isHeadEyeColorCoveredByExpression } from '../../slice/color-options';
 
 const DISPLAY_MODE_ICONS: Record<ReplacementCardDisplayMode, string> = {
   stacked: '\u25A4',
@@ -36,6 +37,7 @@ interface Props {
   animationFilter: AnimationFilter;
   replacementCardDisplayMode: ReplacementCardDisplayMode;
   onReplacementCardDisplayModeChange: (mode: ReplacementCardDisplayMode) => void;
+  onNavigateToType: (typeName: TypeName) => void;
 }
 
 function customAnimationFor(item: ItemDefinition) {
@@ -59,6 +61,7 @@ export function TypeItemPicker({
   animationFilter,
   replacementCardDisplayMode,
   onReplacementCardDisplayModeChange,
+  onNavigateToType,
 }: Props) {
   const items = catalog.byTypeName.get(typeName) ?? [];
   const selection = state.selections[typeName];
@@ -67,6 +70,16 @@ export function TypeItemPicker({
     : undefined;
   const fullHeightThumbnail = replacementCardDisplayMode !== 'stacked';
   const thumbnailSize = fullHeightThumbnail ? 56 : 40;
+  const headEyesCovered = selectedItem
+    ? isHeadEyeColorCoveredByExpression({
+        head: selectedItem,
+        ...(state.selections.expression
+          ? { expressionName: state.selections.expression.name }
+          : {}),
+        catalog,
+        palettes,
+      })
+    : false;
 
   return (
     <div className="px-2 pb-2">
@@ -234,6 +247,22 @@ export function TypeItemPicker({
               });
             }}
           />
+          {headEyesCovered && (
+            <div
+              role="note"
+              className="mt-2 rounded-md border border-warning/50 bg-warning/10 px-2 py-1.5 text-xs text-text-2"
+            >
+              <p>{t('picker.headEyesCovered')}</p>
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => onNavigateToType('expression')}
+                className="mt-1 font-semibold text-accent hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {t('picker.editExpressionEyes')}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

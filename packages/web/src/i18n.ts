@@ -29,6 +29,9 @@ export const TRANSLATIONS = {
     'picker.style': 'Style',
     'picker.followsBody': 'Follows body',
     'picker.assetDefault': 'Asset default',
+    'picker.headEyesCovered':
+      'Head eye color is currently covered by Expression.',
+    'picker.editExpressionEyes': 'Edit Expression eye color',
     'picker.incompatibleBodyType': 'Not available for current body type',
     'picker.incompatibleBodyTypeDetail': 'Not available for current body type: {bodyType}',
     'picker.clickToRemove': 'Click again to remove',
@@ -214,6 +217,8 @@ export const TRANSLATIONS = {
     'picker.style': '款式',
     'picker.followsBody': '跟隨身體',
     'picker.assetDefault': '資產預設色',
+    'picker.headEyesCovered': '頭部眼睛顏色目前被表情圖層覆蓋。',
+    'picker.editExpressionEyes': '編輯表情的眼睛顏色',
     'picker.incompatibleBodyType': '不支援目前身形',
     'picker.incompatibleBodyTypeDetail': '不支援目前身形：{bodyType}',
     'picker.clickToRemove': '再點一次可取消',

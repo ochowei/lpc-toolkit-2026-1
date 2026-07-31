@@ -216,6 +216,7 @@ export function StackPanel({
                     onToggle={() => toggleRowType(tn)}
                     replacementCardDisplayMode={replacementCardDisplayMode}
                     onReplacementCardDisplayModeChange={onReplacementCardDisplayModeChange}
+                    onNavigateToType={expandType}
                   />
                 ))
               )}
@@ -238,6 +239,7 @@ export function StackPanel({
                 onToggleSlotType={toggleSlotType}
                 replacementCardDisplayMode={replacementCardDisplayMode}
                 onReplacementCardDisplayModeChange={onReplacementCardDisplayModeChange}
+                onNavigateToType={expandType}
               />
             </section>
           );
