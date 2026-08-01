@@ -895,3 +895,24 @@ Task 12 record:
   - Verification: `rtk pnpm verify` PASS; `rtk git diff --check` PASS.
   - Documentation: ADR update N/A — this fix restores the already accepted
     ADR-0006 compatibility projection and does not change its decision.
+
+### Task 14: UI follow-up — target Expression eye color precisely
+
+- [x] Carry the `eyes` channel target through selected-type navigation.
+- [x] After expanding Expression, center its Eye Color control inside the layer
+  sidebar and move focus to the labeled channel region.
+- [x] Show a visible focus ring and add browser regression coverage for focus
+  ownership and complete visibility inside the sidebar viewport.
+  - Implementation: `Edit Expression eye color` now navigates to
+    `expression/eyes`, waits for the target picker to render, calls
+    `scrollIntoView` within the layer panel, and focuses the channel group
+    without a second scroll. Generic type-only navigation remains unchanged.
+  - Commit: `3e9e83c9e1878b67aa3351c9bc299b3c6890d77b`.
+  - Verification: focused Playwright regression FAIL as expected before
+    implementation because the Expression Eye Color region did not own focus,
+    then PASS (1 test) after implementation.
+  - Verification: Web typecheck PASS; focused ColorPicker, TypeItemPicker, and
+    StackPanel unit tests PASS (22 tests); `rtk pnpm check:boundaries` PASS.
+  - Verification: `rtk pnpm verify` PASS; `rtk git diff --check` PASS.
+  - Documentation: ADR update N/A — this changes only Web navigation and focus
+    behavior, not color ownership, persistence, or rendering semantics.
