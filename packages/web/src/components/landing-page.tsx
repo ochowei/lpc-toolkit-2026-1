@@ -341,12 +341,6 @@ export function CliPage({ onNavigate }: ProductPageProps) {
 }
 
 export function AgentIntegrationsPage({ onNavigate }: ProductPageProps) {
-  const commands = [
-    'npm install -g @lpc-toolkit/cli',
-    'codex plugin marketplace add ochowei/lpc-toolkit-2026-1',
-    'codex plugin add lpc-toolkit@lpc-toolkit',
-  ] as const;
-
   return (
     <main className="min-h-screen bg-app text-text">
       <ProductNavigation activeRoute="agents" onNavigate={onNavigate} />
@@ -369,21 +363,43 @@ export function AgentIntegrationsPage({ onNavigate }: ProductPageProps) {
             Codex
           </p>
           <h2 className="mt-2 text-2xl font-semibold text-text">
-            Install the Codex plugin
+            Step 1: Install the CLI prerequisite
           </h2>
           <p className="mt-2 max-w-3xl text-sm text-text-2">
-            Give Codex a focused workflow for creating, editing, previewing,
-            and rendering attributed LPC characters. Install the CLI first,
-            then add the beta marketplace and enable the plugin.
+            The Codex plugin uses the <code>lpc-toolkit</code> CLI to perform
+            its character workflows. Install the compatible CLI before
+            installing the plugin.
+          </p>
+          <div className="mt-5 min-w-0 rounded-md border border-border bg-surface-2 p-4">
+            <CopyCode
+              children="npm install -g @lpc-toolkit/cli"
+            />
+          </div>
+        </section>
+
+        <section className="rounded-md border border-border bg-surface p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-mute">
+            Codex plugin
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold text-text">
+            Steps 2–3: Install the Codex plugin
+          </h2>
+          <p className="mt-2 max-w-3xl text-sm text-text-2">
+            With the CLI installed, add the beta marketplace and enable the
+            plugin to give Codex a focused workflow for creating, editing,
+            previewing, and rendering attributed LPC characters.
           </p>
           <ol className="mt-5 grid min-w-0 gap-4">
-            {commands.map((command, index) => (
+            {[
+              'codex plugin marketplace add ochowei/lpc-toolkit-2026-1',
+              'codex plugin add lpc-toolkit@lpc-toolkit',
+            ].map((command, index) => (
               <li
                 key={command}
                 className="min-w-0 rounded-md border border-border bg-surface-2 p-4"
               >
                 <p className="text-xs font-semibold uppercase tracking-wide text-text-mute">
-                  Step {index + 1}
+                  Step {index + 2}
                 </p>
                 <CopyCode className="mt-3" children={command} />
               </li>

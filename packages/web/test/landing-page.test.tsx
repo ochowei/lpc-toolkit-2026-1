@@ -112,7 +112,9 @@ describe('CLI and agent integration pages', () => {
     expect(html).toContain('Agent Integrations');
     expect(html).toContain('aria-current="page"');
     expect(html).toContain('Codex');
-    expect(html).toContain('Install the Codex plugin');
+    expect(html).toContain('Step 1: Install the CLI prerequisite');
+    expect(html).toContain('Steps 2–3: Install the Codex plugin');
+    expect(html).toContain('The Codex plugin uses the');
     expect(html).toContain(
       'codex plugin marketplace add ochowei/lpc-toolkit-2026-1',
     );
