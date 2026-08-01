@@ -46,14 +46,18 @@ describe('i18n', () => {
     expect(zh('picker.followsBody')).toBe('跟隨身體');
     expect(en('picker.assetDefault')).toBe('Asset default');
     expect(zh('picker.assetDefault')).toBe('資產預設色');
+    expect(en('picker.baseEyeColor')).toBe('Base Eye Color');
+    expect(zh('picker.baseEyeColor')).toBe('基礎眼睛顏色');
+    expect(en('picker.editBaseEyeColor')).toBe('Edit base eye color');
+    expect(zh('picker.editBaseEyeColor')).toBe('編輯基礎眼睛顏色');
     expect(en('picker.headEyesCovered')).toBe(
-      'Head eye color is currently covered by Expression.',
+      'The visible eye color is currently controlled by Expression.',
     );
     expect(zh('picker.headEyesCovered')).toBe(
-      '頭部眼睛顏色目前被表情圖層覆蓋。',
+      '目前顯示的眼睛顏色由表情控制。',
     );
-    expect(en('picker.editExpressionEyes')).toBe('Edit Expression eye color');
-    expect(zh('picker.editExpressionEyes')).toBe('編輯表情的眼睛顏色');
+    expect(en('picker.editExpressionEyes')).toBe('Edit visible eye color');
+    expect(zh('picker.editExpressionEyes')).toBe('編輯目前顯示的眼睛顏色');
 
     expect(en('picker.common')).toBe('Common');
     expect(en('picker.advanced')).toBe('Advanced: all upstream assets');

@@ -176,7 +176,7 @@ describe('TypeItemPicker Catalog Localized Name Rendering', () => {
     expect(html).toContain('background-color:#704020');
   });
 
-  it('warns when expression covers the editable head eye color', () => {
+  it('collapses the base eye color when expression controls the visible eyes', () => {
     const html = renderToStaticMarkup(
       <TypeItemPicker
         disabled={false}
@@ -201,8 +201,13 @@ describe('TypeItemPicker Catalog Localized Name Rendering', () => {
       />
     );
 
-    expect(html).toContain('Head eye color is currently covered by Expression.');
-    expect(html).toContain('Edit Expression eye color');
+    expect(html).toContain('Base Eye Color');
+    expect(html).toContain('Edit base eye color');
+    expect(html).not.toContain('aria-label="Base Eye Color: Blue"');
+    expect(html).toContain(
+      'The visible eye color is currently controlled by Expression.',
+    );
+    expect(html).toContain('Edit visible eye color');
   });
 
   it('does not warn when no expression is selected over the head', () => {
@@ -229,6 +234,6 @@ describe('TypeItemPicker Catalog Localized Name Rendering', () => {
       />
     );
 
-    expect(html).not.toContain('Head eye color is currently covered');
+    expect(html).not.toContain('visible eye color is currently controlled');
   });
 });

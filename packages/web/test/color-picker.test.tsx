@@ -205,4 +205,37 @@ describe('ColorPicker rendering', () => {
     expect(html.match(/disabled=""/g)?.length).toBeGreaterThanOrEqual(5);
     expect(html).toContain('aria-pressed="true"');
   });
+
+  it('summarizes a collapsed secondary channel under an overridden label', () => {
+    const html = renderToStaticMarkup(
+      <ColorPicker
+        item={multiChannelItem}
+        selection={{
+          typeName: 'armor',
+          name: 'Multi Cloth',
+          channelRecolors: { accent: 'red' },
+        }}
+        palettes={palettes}
+        colorLabel="Color"
+        styleLabel="Style"
+        linkedColorLabel="Follows body"
+        assetDefaultColorLabel="Asset default"
+        channelPresentation={{
+          id: 'accent',
+          label: 'Base Accent Color',
+          collapsed: true,
+          editLabel: 'Edit base accent color',
+          onEdit: () => {},
+        }}
+        tl={createLabelTranslator('en')}
+        onSelect={() => {}}
+      />
+    );
+
+    expect(html).toContain('aria-label="Base Accent Color"');
+    expect(html).toContain('Edit base accent color');
+    expect(html).toContain('Red');
+    expect(html).toContain('background-color:#ee0000');
+    expect(html).not.toContain('aria-label="Base Accent Color: Red"');
+  });
 });

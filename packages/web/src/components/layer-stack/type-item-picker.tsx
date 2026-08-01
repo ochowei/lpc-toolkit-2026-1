@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Catalog, ItemDefinition, PaletteMetadata, TypeName } from '@lpc-toolkit/core';
 import { pickActionForItem, type SliceAction, type SliceState } from '../../slice/selection';
 import type { LabelTranslator, Translator, TranslationKey } from '../../i18n';
@@ -63,6 +64,9 @@ export function TypeItemPicker({
   onReplacementCardDisplayModeChange,
   onNavigateToType,
 }: Props) {
+  const [expandedBaseEyeColorKey, setExpandedBaseEyeColorKey] = useState<
+    string | undefined
+  >();
   const items = catalog.byTypeName.get(typeName) ?? [];
   const selection = state.selections[typeName];
   const selectedItem = selection
@@ -80,6 +84,9 @@ export function TypeItemPicker({
         palettes,
       })
     : false;
+  const coveredHeadEyeKey = headEyesCovered && selectedItem
+    ? `${selectedItem.name}\u0000${state.selections.expression?.name ?? ''}`
+    : undefined;
 
   return (
     <div className="px-2 pb-2" data-picker-type={typeName}>
@@ -205,6 +212,17 @@ export function TypeItemPicker({
             styleLabel={t('picker.style')}
             linkedColorLabel={t('picker.followsBody')}
             assetDefaultColorLabel={t('picker.assetDefault')}
+            {...(coveredHeadEyeKey
+              ? {
+                  channelPresentation: {
+                    id: 'eyes' as const,
+                    label: t('picker.baseEyeColor'),
+                    collapsed: expandedBaseEyeColorKey !== coveredHeadEyeKey,
+                    editLabel: t('picker.editBaseEyeColor'),
+                    onEdit: () => setExpandedBaseEyeColorKey(coveredHeadEyeKey),
+                  },
+                }
+              : {})}
             tl={tl}
             onSelect={(change) => {
               if ('variant' in change) {

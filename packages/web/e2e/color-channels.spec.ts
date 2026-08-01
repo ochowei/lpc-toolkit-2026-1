@@ -31,15 +31,22 @@ test('independent head and expression colors survive canonical save and import',
   const headEyes = page
     .locator('[data-channel-id="eyes"]')
     .filter({ visible: true });
-  await expect(headEyes.getByText('Eye Color', { exact: true })).toBeVisible();
+  await expect(headEyes.getByText('Base Eye Color', { exact: true })).toBeVisible();
   await expect(page.getByText(
-    'Head eye color is currently covered by Expression.',
+    'The visible eye color is currently controlled by Expression.',
     { exact: true },
   )).toBeVisible();
-  await activate(headEyes.getByRole('button', { name: 'Eye Color: Red' }), 'Enter');
+  await expect(
+    headEyes.getByRole('button', { name: 'Base Eye Color: Red' }),
+  ).toHaveCount(0);
+  await page.getByRole('button', { name: 'Edit base eye color' }).click();
+  await activate(
+    headEyes.getByRole('button', { name: 'Base Eye Color: Red' }),
+    'Enter',
+  );
   await waitForComposition(page);
 
-  await page.getByRole('button', { name: 'Edit Expression eye color' }).click();
+  await page.getByRole('button', { name: 'Edit visible eye color' }).click();
   const expressionEyes = page
     .locator('[data-channel-id="eyes"]')
     .filter({ visible: true });
@@ -90,10 +97,11 @@ test('independent head and expression colors survive canonical save and import',
   await page.keyboard.press('Escape');
   await expandLayer(page, 'Neutral', 'expression');
   await expandLayer(page, 'Human Male', 'head');
+  await page.getByRole('button', { name: 'Edit base eye color' }).click();
   await page
     .locator('[data-channel-id="eyes"]')
     .filter({ visible: true })
-    .getByRole('button', { name: 'Eye Color: Asset default' })
+    .getByRole('button', { name: 'Base Eye Color: Asset default' })
     .click();
   await waitForComposition(page);
   await expect.poll(() => page.evaluate(() => window.location.hash))

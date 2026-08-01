@@ -11,6 +11,14 @@ import {
 } from '../slice/color-options';
 import type { LabelTranslator } from '../i18n';
 
+interface ChannelPresentation {
+  readonly id: TypeName;
+  readonly label: string;
+  readonly collapsed: boolean;
+  readonly editLabel: string;
+  readonly onEdit: () => void;
+}
+
 /**
  * Color swatches / variant chips for one selected item. Renders nothing
  * for an item with no colors. `recolors` items show real color squares;
@@ -27,6 +35,7 @@ export function ColorPicker({
   styleLabel,
   linkedColorLabel,
   assetDefaultColorLabel,
+  channelPresentation,
   onSelect,
   onSetChannel = () => {},
   onClearChannel = () => {},
@@ -41,6 +50,7 @@ export function ColorPicker({
   styleLabel: string;
   linkedColorLabel: string;
   assetDefaultColorLabel: string;
+  channelPresentation?: ChannelPresentation;
   onSelect: (change: { variant: string } | { recolor: string }) => void;
   onSetChannel?: (channelId: TypeName, recolor: string) => void;
   onClearChannel?: (channelId: TypeName) => void;
@@ -91,7 +101,12 @@ export function ColorPicker({
   return (
     <div className="min-w-0 space-y-2 text-xs">
       {channels.map((channel) => {
-        const heading = channel.primary
+        const presentedChannel = channelPresentation?.id === channel.id
+          ? channelPresentation
+          : undefined;
+        const heading = presentedChannel
+          ? presentedChannel.label
+          : channel.primary
           ? colorLabel
           : tl.channel(channel.id, channel.label);
         if (channel.mode === 'linked-recolor') {
@@ -126,6 +141,41 @@ export function ColorPicker({
         const selected = channel.primary
           ? selection?.recolor
           : selection?.channelRecolors?.[channel.id];
+        if (!channel.primary && presentedChannel?.collapsed) {
+          const selectedOption = channel.options.find(
+            (option) => option.value === selected,
+          );
+          const swatch = selectedOption?.swatch ?? channel.defaultSwatch;
+          return (
+            <div
+              key={channel.id}
+              data-channel-id={channel.id}
+              tabIndex={-1}
+              aria-label={heading}
+              className="min-w-0 rounded-sm focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-surface-2"
+            >
+              <span className="text-text-mute uppercase">{heading}</span>
+              <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-text-2">
+                {swatch && (
+                  <span
+                    className="h-5 w-5 shrink-0 rounded border border-border"
+                    style={{ backgroundColor: swatch }}
+                    aria-hidden
+                  />
+                )}
+                <span>{selected ? tl.color(selected) : assetDefaultColorLabel}</span>
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={presentedChannel.onEdit}
+                  className="font-semibold text-accent hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {presentedChannel.editLabel}
+                </button>
+              </div>
+            </div>
+          );
+        }
         const localizedCounts = new Map<string, number>();
         for (const option of channel.options) {
           const localized = tl.color(option.value);
