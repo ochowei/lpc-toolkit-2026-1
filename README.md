@@ -86,9 +86,11 @@ Start the local development server:
 pnpm --filter @lpc-toolkit/web dev
 ```
 
-The web app has three routes: `/`, `/compose`, and the not-found route. The
-landing page is `/`, while the editor is `/compose`. The editor keeps
-attribution reachable while users compose, preview, and export characters.
+The web app exposes three top-level product pages: the editor at `/compose`,
+the CLI guide at `/cli`, and agent integration guidance at `/agents`. The root
+entry `/` currently redirects to `/cli`; it can change independently without
+changing the three stable product URLs. The editor keeps attribution reachable
+while users compose, preview, and export characters.
 
 ## Command-Line Interface
 
