@@ -96,7 +96,13 @@ export function ColorPicker({
           : tl.channel(channel.id, channel.label);
         if (channel.mode === 'linked-recolor') {
           return (
-            <div key={channel.id} data-channel-id={channel.id} className="min-w-0">
+            <div
+              key={channel.id}
+              data-channel-id={channel.id}
+              tabIndex={-1}
+              aria-label={heading}
+              className="min-w-0 rounded-sm focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-surface-2"
+            >
               <span className="text-text-mute uppercase">{heading}</span>
               <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-text-2" role="status">
                 {channel.swatch && (
@@ -129,7 +135,13 @@ export function ColorPicker({
           );
         }
         return (
-          <div key={channel.id} data-channel-id={channel.id} className="min-w-0">
+          <div
+            key={channel.id}
+            data-channel-id={channel.id}
+            tabIndex={-1}
+            aria-label={heading}
+            className="min-w-0 rounded-sm focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-surface-2"
+          >
             <span className="text-text-mute uppercase">{heading}</span>
             <div className="mt-1 flex max-h-28 min-w-0 flex-wrap gap-1 overflow-y-auto">
               {!channel.primary && (

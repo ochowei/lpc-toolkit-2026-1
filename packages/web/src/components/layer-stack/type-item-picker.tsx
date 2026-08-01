@@ -37,7 +37,7 @@ interface Props {
   animationFilter: AnimationFilter;
   replacementCardDisplayMode: ReplacementCardDisplayMode;
   onReplacementCardDisplayModeChange: (mode: ReplacementCardDisplayMode) => void;
-  onNavigateToType: (typeName: TypeName) => void;
+  onNavigateToType: (typeName: TypeName, channelId?: TypeName) => void;
 }
 
 function customAnimationFor(item: ItemDefinition) {
@@ -82,7 +82,7 @@ export function TypeItemPicker({
     : false;
 
   return (
-    <div className="px-2 pb-2">
+    <div className="px-2 pb-2" data-picker-type={typeName}>
       <div className="mb-1 flex flex-wrap items-center gap-1">
         <div className="mr-auto text-xs uppercase tracking-wide text-text-mute">
           {t('layer.swap').replace('{name}', tl.category(typeName))}
@@ -256,7 +256,7 @@ export function TypeItemPicker({
               <button
                 type="button"
                 disabled={disabled}
-                onClick={() => onNavigateToType('expression')}
+                onClick={() => onNavigateToType('expression', 'eyes')}
                 className="mt-1 font-semibold text-accent hover:underline disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {t('picker.editExpressionEyes')}

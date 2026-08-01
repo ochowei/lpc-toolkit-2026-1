@@ -24,7 +24,7 @@ interface Props {
   onToggleSlotType: (typeName: TypeName) => void;
   replacementCardDisplayMode: ReplacementCardDisplayMode;
   onReplacementCardDisplayModeChange: (mode: ReplacementCardDisplayMode) => void;
-  onNavigateToType: (typeName: TypeName) => void;
+  onNavigateToType: (typeName: TypeName, channelId?: TypeName) => void;
 }
 
 function selectedItem(args: {

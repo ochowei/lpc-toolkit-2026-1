@@ -25,7 +25,7 @@ interface Props {
   onReplacementCardDisplayModeChange?: (
     mode: ReplacementCardDisplayMode,
   ) => void;
-  onNavigateToType?: (typeName: TypeName) => void;
+  onNavigateToType?: (typeName: TypeName, channelId?: TypeName) => void;
 }
 
 /** Active layer row with thumbnail, color controls, and compatible replacement items. */

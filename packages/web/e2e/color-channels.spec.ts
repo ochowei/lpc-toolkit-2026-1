@@ -43,6 +43,17 @@ test('independent head and expression colors survive canonical save and import',
   const expressionEyes = page
     .locator('[data-channel-id="eyes"]')
     .filter({ visible: true });
+  await expect.poll(() => expressionEyes.evaluate((element) =>
+    element.contains(document.activeElement),
+  )).toBe(true);
+  await expect.poll(() => expressionEyes.evaluate((element) => {
+    const scrollContainer = element.closest('[data-layer-scroll-container]');
+    if (!scrollContainer) return false;
+    const targetRect = element.getBoundingClientRect();
+    const containerRect = scrollContainer.getBoundingClientRect();
+    return targetRect.top >= containerRect.top
+      && targetRect.bottom <= containerRect.bottom;
+  })).toBe(true);
   await activate(
     expressionEyes.getByRole('button', {
       name: 'Eye Color: Green (green)',
