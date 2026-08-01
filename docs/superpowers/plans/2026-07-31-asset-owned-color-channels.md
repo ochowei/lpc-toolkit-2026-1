@@ -916,3 +916,33 @@ Task 12 record:
   - Verification: `rtk pnpm verify` PASS; `rtk git diff --check` PASS.
   - Documentation: ADR update N/A — this changes only Web navigation and focus
     behavior, not color ownership, persistence, or rendering semantics.
+
+### Task 15: UI follow-up — distinguish base and visible eye colors
+
+- [x] Keep Head and Expression eye colors independent while clarifying which
+  channel currently controls the visible pixels.
+- [x] When Expression covers Head eyes, label the Head channel `Base Eye Color`,
+  show its current value as a compact summary, and collapse its swatches by
+  default behind `Edit base eye color`.
+- [x] Rename the Expression jump action to `Edit visible eye color` while
+  retaining the precise channel focus and sidebar scrolling from Task 14.
+- [x] Update English and Traditional Chinese copy plus unit and browser
+  regression coverage.
+  - Implementation: the Web picker now applies a focused presentation override
+    to the covered Head `eyes` channel. Its independently persisted value is
+    unchanged, but the default UI shows only the value summary until explicitly
+    expanded. The coverage note identifies Expression as the visible controller,
+    and the jump still targets `expression/eyes` exactly.
+  - Commit: `f8ab877e7e14b0eb951699255efaf4c83319dc05`.
+  - Verification: focused i18n, ColorPicker, and TypeItemPicker contracts FAIL
+    as expected before implementation (3 failed, 27 passed), then Web typecheck
+    PASS and the focused unit set PASS (42 tests, including StackPanel).
+  - Verification: `rtk pnpm check:boundaries` PASS.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web test:e2e -- color-channels.spec.ts`
+    PASS (1 test), covering default collapse, explicit base-color expansion,
+    visible-color navigation/focus, canonical save, and JSON import.
+  - Verification: `rtk pnpm verify` PASS; `rtk git diff --check` PASS.
+  - Documentation: ADR update N/A — this changes only Web terminology and
+    disclosure behavior; channel ownership, independent persistence, rendering,
+    and the v2 format remain unchanged. CLI documentation impact N/A because no
+    CLI-sensitive path or public CLI behavior changed.
