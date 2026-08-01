@@ -250,4 +250,21 @@ describe('App shell routing', () => {
     expect(owner.pathname).toBe('/asset-packs');
   });
 
+  it('replaces the root entry without adding a history entry', () => {
+    const replaceState = vi.fn();
+    const setPathname = vi.fn();
+    const owner = createAppNavigationOwner({
+      initialPathname: '/',
+      initialHistoryIndex: 3,
+      pushState: vi.fn(),
+      replaceState,
+      setPathname,
+    });
+
+    expect(owner.replace('/cli')).toBe(true);
+    expect(owner.pathname).toBe('/cli');
+    expect(replaceState).toHaveBeenCalledWith('/cli', 3);
+    expect(setPathname).toHaveBeenCalledWith('/cli');
+  });
+
 });

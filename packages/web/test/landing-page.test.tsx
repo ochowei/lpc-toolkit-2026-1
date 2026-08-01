@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { LandingPage } from '../src/components/landing-page';
+import {
+  AgentIntegrationsPage,
+  CliPage,
+} from '../src/components/landing-page';
 
-describe('LandingPage', () => {
+describe('CLI and agent integration pages', () => {
   it('leads with the product outcome and a three-command CLI success path', () => {
-    const html = renderToStaticMarkup(<LandingPage onNavigate={() => {}} />);
+    const html = renderToStaticMarkup(<CliPage onNavigate={() => {}} />);
 
     expect(html).toContain('LPC Toolkit');
     expect(html).toContain('Create attributed LPC characters');
@@ -13,10 +16,14 @@ describe('LandingPage', () => {
     expect(html).toContain('hero.credits.txt');
     expect(html).toContain('hero.credits.csv');
 
-    expect(html.match(/Open Composer/g)).toHaveLength(1);
+    expect(html).toContain('aria-current="page"');
+    expect(html).toContain('Composer');
+    expect(html).toContain('CLI');
+    expect(html).toContain('Agent Integrations');
+    expect(html).toContain('href="/compose"');
+    expect(html).toContain('href="/cli"');
+    expect(html).toContain('href="/agents"');
     expect(html).not.toContain('Repair an Asset Pack');
-    expect(html).toContain('href="#cli-quick-start"');
-    expect(html).toContain('Use the CLI');
     expect(html).toContain('id="cli-quick-start"');
 
     const quickStartCommands = [
@@ -35,15 +42,9 @@ describe('LandingPage', () => {
     expect(html).toContain('npx @lpc-toolkit/cli --help');
     expect(html).toContain('Node.js 22 or newer');
     expect(html).toContain('about 205 MB');
-    expect(html).toContain('id="codex-plugin"');
-    expect(html).toContain('Install the Codex plugin');
-    expect(html).toContain(
-      'codex plugin marketplace add ochowei/lpc-toolkit-2026-1',
-    );
-    expect(html).toContain('codex plugin add lpc-toolkit@lpc-toolkit');
-    expect(html).toContain('https://github.com/ochowei/lpc-toolkit-2026-1#codex-plugin');
+    expect(html).not.toContain('Install the Codex plugin');
+    expect(html).not.toContain('codex plugin marketplace add');
     expect(html).toContain('whitespace-normal break-words');
-    expect(html).not.toContain('overflow-x-auto');
     expect(html).toContain('characters/previews/hero/');
     expect(html).toContain('hero.metadata.json');
     expect(html).toContain('Keep both credit files with the generated sprite.');
@@ -69,7 +70,7 @@ describe('LandingPage', () => {
   });
 
   it('documents the public CLI artist workflow without requiring a repository clone', () => {
-    const html = renderToStaticMarkup(<LandingPage onNavigate={() => {}} />)
+    const html = renderToStaticMarkup(<CliPage onNavigate={() => {}} />)
       .replaceAll('&quot;', '"')
       .replaceAll('&lt;', '<')
       .replaceAll('&gt;', '>');
@@ -101,5 +102,25 @@ describe('LandingPage', () => {
     expect(html).toContain('Web edits happen in-memory');
     expect(html).toContain('status: "draft"');
     expect(html).toContain('CLI refuses to install them');
+  });
+
+  it('keeps the available Codex workflow on the extensible agent integrations page', () => {
+    const html = renderToStaticMarkup(
+      <AgentIntegrationsPage onNavigate={() => {}} />,
+    );
+
+    expect(html).toContain('Agent Integrations');
+    expect(html).toContain('aria-current="page"');
+    expect(html).toContain('Codex');
+    expect(html).toContain('Install the Codex plugin');
+    expect(html).toContain(
+      'codex plugin marketplace add ochowei/lpc-toolkit-2026-1',
+    );
+    expect(html).toContain('codex plugin add lpc-toolkit@lpc-toolkit');
+    expect(html).toContain(
+      'https://github.com/ochowei/lpc-toolkit-2026-1#codex-plugin',
+    );
+    expect(html).not.toContain('Coming soon');
+    expect(html).not.toContain('Preview your first character');
   });
 });

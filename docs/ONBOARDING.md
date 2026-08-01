@@ -44,9 +44,11 @@ checked-in or pinned cache-backed asset flow. They do not need the submodule.
 pnpm --filter @lpc-toolkit/web dev
 ```
 
-Open the URL printed by Vite. `/` is the landing page and `/compose` is the
-editor. The editor loads the prepared local assets and keeps attribution
-available while composing, previewing, and exporting a sprite.
+Open the URL printed by Vite. `/` currently redirects to the CLI guide at
+`/cli`; `/compose` is the editor, and `/agents` documents agent integrations.
+The shared navigation switches among all three product pages. The editor loads
+the prepared local assets and keeps attribution available while composing,
+previewing, and exporting a sprite.
 
 ## Try the Local CLI
 

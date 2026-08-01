@@ -104,7 +104,10 @@ describe('README architecture contract', () => {
   });
 
   it('documents the current routes and responsive editor regions', () => {
-    expect(readme).toContain('`/`, `/compose`, and the not-found route');
+    expect(readme).toContain('editor at `/compose`');
+    expect(readme).toContain('CLI guide at `/cli`');
+    expect(readme).toContain('agent integration guidance at `/agents`');
+    expect(readme).toContain('entry `/` currently redirects to `/cli`');
     for (const phrase of [
       'sidebar splitter',
       'preview canvas',

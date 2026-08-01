@@ -3,7 +3,7 @@ import heroPreviewUrl from '../landing-artifacts/hero.preview.png';
 import heroCreditsTxtUrl from '../landing-artifacts/hero.credits.txt?url';
 import heroCreditsCsvUrl from '../landing-artifacts/hero.credits.csv?url';
 import type { NavigableAppRoute } from '../lib/app-route';
-import { Button } from './ui/button';
+import { ProductNavigation } from './product-navigation';
 
 interface CopyCodeProps {
   readonly children: string;
@@ -59,7 +59,7 @@ function CopyCode({
   );
 }
 
-interface LandingPageProps {
+interface ProductPageProps {
   readonly onNavigate: (route: NavigableAppRoute) => void;
 }
 
@@ -130,9 +130,10 @@ const pluginReadmeUrl =
 const codeClassName =
   'block min-h-10 rounded-md border border-border bg-[var(--bg-deep)] px-3 py-2 font-mono text-sm leading-5 text-text';
 
-export function LandingPage({ onNavigate }: LandingPageProps) {
+export function CliPage({ onNavigate }: ProductPageProps) {
   return (
     <main className="min-h-screen bg-app text-text">
+      <ProductNavigation activeRoute="cli" onNavigate={onNavigate} />
       <div className="mx-auto flex min-h-screen min-w-0 w-full max-w-6xl flex-col gap-8 overflow-x-hidden px-5 py-6 sm:px-8 lg:px-10">
         <header className="grid items-center gap-8 border-b border-border pb-8 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div>
@@ -140,20 +141,12 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               LPC Toolkit
             </p>
             <h1 className="mt-3 max-w-3xl text-3xl font-semibold text-text sm:text-5xl">
-              Create attributed LPC characters, visually or from the command line.
+              Create attributed LPC characters from the command line.
             </h1>
             <p className="mt-4 max-w-2xl text-base text-text-2">
               Compose game-ready pixel characters, preview the result, and keep
               the matching licenses and credits with every export.
             </p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Button variant="primary" onClick={() => onNavigate('compose')}>
-                Open Composer
-              </Button>
-              <Button asChild>
-                <a href="#cli-quick-start">Use the CLI</a>
-              </Button>
-            </div>
           </div>
 
           <figure className="rounded-md border border-border bg-surface p-5 text-center">
@@ -211,50 +204,6 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           <p className="mt-5 rounded-md border border-border bg-surface-2 p-3 text-sm text-text-2">
             The first asset-dependent command downloads about 205 MB of pinned
             assets once, verifies them, and reuses the local cache afterward.
-          </p>
-        </section>
-
-        <section
-          id="codex-plugin"
-          className="scroll-mt-6 rounded-md border border-border bg-surface p-5"
-        >
-          <h2 className="text-2xl font-semibold text-text">
-            Install the Codex plugin
-          </h2>
-          <p className="mt-2 max-w-3xl text-sm text-text-2">
-            Give Codex a focused workflow for creating, editing, previewing,
-            and rendering attributed LPC characters. Install the CLI first,
-            then add the beta marketplace and enable the plugin.
-          </p>
-          <ol className="mt-5 grid min-w-0 gap-4">
-            {[
-              'npm install -g @lpc-toolkit/cli',
-              'codex plugin marketplace add ochowei/lpc-toolkit-2026-1',
-              'codex plugin add lpc-toolkit@lpc-toolkit',
-            ].map((command, index) => (
-              <li
-                key={command}
-                className="min-w-0 rounded-md border border-border bg-surface-2 p-4"
-              >
-                <p className="text-xs font-semibold uppercase tracking-wide text-text-mute">
-                  Step {index + 1}
-                </p>
-                <CopyCode className="mt-3" children={command} />
-              </li>
-            ))}
-          </ol>
-          <p className="mt-4 text-sm text-text-2">
-            The plugin requires Node.js 22 or newer and an installed
-            compatible CLI.{' '}
-            <a
-              className="underline hover:text-text"
-              href={pluginReadmeUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Read the plugin details
-            </a>
-            .
           </p>
         </section>
 
@@ -384,6 +333,74 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             </a>{' '}
             for selection files, pagination, tokens, cache locations, and
             troubleshooting.
+          </p>
+        </section>
+      </div>
+    </main>
+  );
+}
+
+export function AgentIntegrationsPage({ onNavigate }: ProductPageProps) {
+  const commands = [
+    'npm install -g @lpc-toolkit/cli',
+    'codex plugin marketplace add ochowei/lpc-toolkit-2026-1',
+    'codex plugin add lpc-toolkit@lpc-toolkit',
+  ] as const;
+
+  return (
+    <main className="min-h-screen bg-app text-text">
+      <ProductNavigation activeRoute="agents" onNavigate={onNavigate} />
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-5 py-8 sm:px-8 lg:px-10">
+        <header className="border-b border-border pb-8">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-mute">
+            LPC Toolkit
+          </p>
+          <h1 className="mt-3 text-3xl font-semibold text-text sm:text-5xl">
+            Agent Integrations
+          </h1>
+          <p className="mt-4 max-w-2xl text-base text-text-2">
+            Use platform-specific LPC Toolkit workflows while preserving the
+            same attributed CLI output and credit metadata.
+          </p>
+        </header>
+
+        <section className="rounded-md border border-border bg-surface p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-mute">
+            Codex
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold text-text">
+            Install the Codex plugin
+          </h2>
+          <p className="mt-2 max-w-3xl text-sm text-text-2">
+            Give Codex a focused workflow for creating, editing, previewing,
+            and rendering attributed LPC characters. Install the CLI first,
+            then add the beta marketplace and enable the plugin.
+          </p>
+          <ol className="mt-5 grid min-w-0 gap-4">
+            {commands.map((command, index) => (
+              <li
+                key={command}
+                className="min-w-0 rounded-md border border-border bg-surface-2 p-4"
+              >
+                <p className="text-xs font-semibold uppercase tracking-wide text-text-mute">
+                  Step {index + 1}
+                </p>
+                <CopyCode className="mt-3" children={command} />
+              </li>
+            ))}
+          </ol>
+          <p className="mt-4 text-sm text-text-2">
+            The plugin requires Node.js 22 or newer and an installed compatible
+            CLI.{' '}
+            <a
+              className="underline hover:text-text"
+              href={pluginReadmeUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Read the plugin details
+            </a>
+            .
           </p>
         </section>
       </div>

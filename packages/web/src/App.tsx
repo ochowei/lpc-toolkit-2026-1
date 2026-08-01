@@ -17,7 +17,8 @@ import {
 } from './i18n';
 import { LayerStackHarness } from './components/layer-stack/harness';
 import { runBrowserAssetPackConformance } from './lib/asset-pack-browser-conformance';
-import { LandingPage } from './components/landing-page';
+import { AgentIntegrationsPage, CliPage } from './components/landing-page';
+import { ProductNavigation } from './components/product-navigation';
 import { NotFoundPage } from './components/not-found-page';
 import { AssetPackWorkbenchHarness } from './components/asset-pack-workbench/harness';
 import { Button } from './components/ui/button';
@@ -61,6 +62,7 @@ export interface AppNavigationOwnerOptions {
 export interface AppNavigationOwner {
   readonly pathname: string;
   readonly navigate: (path: AppPath) => boolean;
+  readonly replace: (path: AppPath) => boolean;
   readonly handlePopState: (path: string, nextHistoryIndex?: number) => boolean;
 }
 
@@ -74,6 +76,14 @@ export function createAppNavigationOwner(options: AppNavigationOwnerOptions): Ap
     if (!canLeave()) return false;
     historyIndex += 1;
     options.pushState(path, historyIndex);
+    pathname = path;
+    options.setPathname(path);
+    return true;
+  };
+  const replace = (path: AppPath): boolean => {
+    if (pathname === path) return true;
+    if (!canLeave()) return false;
+    options.replaceState?.(path, historyIndex);
     pathname = path;
     options.setPathname(path);
     return true;
@@ -103,6 +113,7 @@ export function createAppNavigationOwner(options: AppNavigationOwnerOptions): Ap
   return {
     get pathname() { return pathname; },
     navigate,
+    replace,
     handlePopState,
   };
 }
@@ -119,7 +130,7 @@ function appHistoryState(historyIndex: number): { readonly [appHistoryIndexKey]:
   return { [appHistoryIndexKey]: historyIndex };
 }
 
-function useAppPathname(): [string, (path: AppPath) => void, (blocker: NavigationBlocker) => () => void] {
+function useAppPathname(): [string, (path: AppPath) => void, (path: AppPath) => void, (blocker: NavigationBlocker) => () => void] {
   const [pathname, setPathname] = useState(() => window.location.pathname);
   const blockerRef = useRef<NavigationBlocker>();
   const ownerRef = useRef<AppNavigationOwner>();
@@ -150,6 +161,10 @@ function useAppPathname(): [string, (path: AppPath) => void, (blocker: Navigatio
     owner.navigate(path);
   }, [owner]);
 
+  const replace = useCallback((path: AppPath) => {
+    owner.replace(path);
+  }, [owner]);
+
   const registerBlocker = useCallback((blocker: NavigationBlocker) => {
     blockerRef.current = blocker;
     return () => {
@@ -157,15 +172,17 @@ function useAppPathname(): [string, (path: AppPath) => void, (blocker: Navigatio
     };
   }, []);
 
-  return [pathname, navigate, registerBlocker];
+  return [pathname, navigate, replace, registerBlocker];
 }
 
 function ComposerApp({
   onNavigateHome,
   onNavigateAssetPacks,
+  onNavigate,
 }: {
   readonly onNavigateHome: () => void;
   readonly onNavigateAssetPacks: () => void;
+  readonly onNavigate: (route: NavigableAppRoute) => void;
 }) {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE);
@@ -197,8 +214,11 @@ function ComposerApp({
   document.documentElement.className = `lpc ${theme}`;
 
   return (
-    <LayerStackHarness
-      catalog={init.catalog}
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-app text-text">
+      <ProductNavigation activeRoute="compose" onNavigate={onNavigate} compact />
+      <div className="min-h-0 flex-1">
+        <LayerStackHarness
+          catalog={init.catalog}
       palettes={init.palettes}
       shownTypeNames={init.shownTypeNames}
       initialHashWarnings={init.warnings}
@@ -212,10 +232,12 @@ function ComposerApp({
       onNavigateHome={onNavigateHome}
       onNavigateAssetPacks={onNavigateAssetPacks}
       onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
-      onToggleLocale={() =>
-        setLocale((current) => (current === 'en' ? 'zh-TW' : 'en'))
-      }
-    />
+          onToggleLocale={() =>
+            setLocale((current) => (current === 'en' ? 'zh-TW' : 'en'))
+          }
+        />
+      </div>
+    </div>
   );
 }
 
@@ -280,7 +302,7 @@ function AssetPackApp({
   />;
 }
 
-/** Root application shell that routes between landing, composer, and 404 pages. */
+/** Root application shell that routes between product pages, tools, and 404 pages. */
 export interface AppProps {
   readonly confirmNavigation?: (message: string) => boolean;
 }
@@ -288,8 +310,12 @@ export interface AppProps {
 export default function App({ confirmNavigation }: AppProps = {}) {
   const defaultConfirmNavigation = useCallback((message: string) => window.confirm(message), []);
   const activeConfirmNavigation = confirmNavigation ?? defaultConfirmNavigation;
-  const [pathname, navigate, registerNavigationBlocker] = useAppPathname();
+  const [pathname, navigate, replace, registerNavigationBlocker] = useAppPathname();
   const route = routeFromPathname(pathname);
+
+  useEffect(() => {
+    if (route === 'entry') replace(pathForRoute('cli'));
+  }, [replace, route]);
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get('assetPackConformance') !== '1') {
@@ -318,15 +344,16 @@ export default function App({ confirmNavigation }: AppProps = {}) {
   if (route === 'compose') {
     return (
       <ComposerApp
-        onNavigateHome={() => navigateToRoute('landing')}
+        onNavigateHome={() => navigateToRoute('entry')}
         onNavigateAssetPacks={() => navigateToRoute('asset-packs')}
+        onNavigate={navigateToRoute}
       />
     );
   }
 
   if (route === 'asset-packs') {
     return <AssetPackApp
-      onNavigateHome={() => navigateToRoute('landing')}
+      onNavigateHome={() => navigateToRoute('entry')}
       registerNavigationBlocker={registerNavigationBlocker}
       confirmNavigation={activeConfirmNavigation}
     />;
@@ -336,5 +363,9 @@ export default function App({ confirmNavigation }: AppProps = {}) {
     return <NotFoundPage onNavigate={navigate} />;
   }
 
-  return <LandingPage onNavigate={navigateToRoute} />;
+  if (route === 'agents') {
+    return <AgentIntegrationsPage onNavigate={navigateToRoute} />;
+  }
+
+  return <CliPage onNavigate={navigateToRoute} />;
 }

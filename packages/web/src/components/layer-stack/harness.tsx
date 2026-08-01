@@ -567,7 +567,7 @@ export function LayerStackHarness(props: LayerStackHarnessProps) {
   );
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-app text-text">
+    <div className="flex h-full w-full flex-col overflow-hidden bg-app text-text">
       <TopBar
         t={t}
         loadingProgress={loadingProgress}

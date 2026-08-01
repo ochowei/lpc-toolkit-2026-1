@@ -24,3 +24,8 @@ _Avoid_: First body-colored asset, inferred skin source
 The color channel's authored base appearance when a character stores no
 explicit color choice for that channel.
 _Avoid_: First swatch, missing color
+
+**Agent integration**:
+A platform-specific way for an AI coding agent to use LPC Toolkit workflows.
+A plugin is one possible form of agent integration, not a synonym for it.
+_Avoid_: Agent plugin, Codex integration as the cross-platform category
