@@ -8,6 +8,7 @@
     { "id": "character-search", "argv": ["character", "search", "--selection", "hero.json", "--type", "hair", "--query", "braid", "--limit", "20", "--json"], "machineReadable": true },
     { "id": "catalog-item", "argv": ["catalog", "item", "hair_braid", "--json"], "machineReadable": true },
     { "id": "character-set", "argv": ["character", "set", "--selection", "hero.json", "--type", "hair", "--item", "hair_braid", "--recolor", "lpcr.brown", "--json"], "machineReadable": true },
+    { "id": "character-set-color", "argv": ["character", "set-color", "--selection", "hero.json", "--type", "expression", "--channel", "eyes", "--color", "green", "--json"], "machineReadable": true },
     { "id": "character-remove", "argv": ["character", "remove", "--selection", "hero.json", "--type", "hair", "--json"], "machineReadable": true },
     { "id": "character-validate", "argv": ["character", "validate", "--selection", "hero.json", "--json"], "machineReadable": true },
     { "id": "character-preview", "argv": ["character", "preview", "--selection", "hero.json", "--out", "preview", "--json"], "machineReadable": true },

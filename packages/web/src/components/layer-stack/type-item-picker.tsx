@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Catalog, ItemDefinition, PaletteMetadata, TypeName } from '@lpc-toolkit/core';
 import { pickActionForItem, type SliceAction, type SliceState } from '../../slice/selection';
 import type { LabelTranslator, Translator, TranslationKey } from '../../i18n';
@@ -10,6 +11,7 @@ import {
   REPLACEMENT_CARD_DISPLAY_MODES,
   type ReplacementCardDisplayMode,
 } from '../../lib/replacement-card-display-mode';
+import { isHeadEyeColorCoveredByExpression } from '../../slice/color-options';
 
 const DISPLAY_MODE_ICONS: Record<ReplacementCardDisplayMode, string> = {
   stacked: '\u25A4',
@@ -36,6 +38,7 @@ interface Props {
   animationFilter: AnimationFilter;
   replacementCardDisplayMode: ReplacementCardDisplayMode;
   onReplacementCardDisplayModeChange: (mode: ReplacementCardDisplayMode) => void;
+  onNavigateToType: (typeName: TypeName, channelId?: TypeName) => void;
 }
 
 function customAnimationFor(item: ItemDefinition) {
@@ -59,7 +62,11 @@ export function TypeItemPicker({
   animationFilter,
   replacementCardDisplayMode,
   onReplacementCardDisplayModeChange,
+  onNavigateToType,
 }: Props) {
+  const [expandedBaseEyeColorKey, setExpandedBaseEyeColorKey] = useState<
+    string | undefined
+  >();
   const items = catalog.byTypeName.get(typeName) ?? [];
   const selection = state.selections[typeName];
   const selectedItem = selection
@@ -67,9 +74,22 @@ export function TypeItemPicker({
     : undefined;
   const fullHeightThumbnail = replacementCardDisplayMode !== 'stacked';
   const thumbnailSize = fullHeightThumbnail ? 56 : 40;
+  const headEyesCovered = selectedItem
+    ? isHeadEyeColorCoveredByExpression({
+        head: selectedItem,
+        ...(state.selections.expression
+          ? { expressionName: state.selections.expression.name }
+          : {}),
+        catalog,
+        palettes,
+      })
+    : false;
+  const coveredHeadEyeKey = headEyesCovered && selectedItem
+    ? `${selectedItem.name}\u0000${state.selections.expression?.name ?? ''}`
+    : undefined;
 
   return (
-    <div className="px-2 pb-2">
+    <div className="px-2 pb-2" data-picker-type={typeName}>
       <div className="mb-1 flex flex-wrap items-center gap-1">
         <div className="mr-auto text-xs uppercase tracking-wide text-text-mute">
           {t('layer.swap').replace('{name}', tl.category(typeName))}
@@ -127,7 +147,10 @@ export function TypeItemPicker({
                 tl.catalogItemName(it)
               }
               onClick={() => {
-                dispatch(pickActionForItem(typeName, it));
+                dispatch(pickActionForItem(typeName, it, {
+                  palettes,
+                  ...(selection ? { previous: selection } : {}),
+                }));
                 const customAnim = customAnimationFor(it);
                 if (customAnim) {
                   dispatch({ type: 'set_anim', anim: customAnim });
@@ -182,17 +205,82 @@ export function TypeItemPicker({
             item={selectedItem}
             selection={selection}
             palettes={palettes}
+            {...(state.selections.body?.recolor !== undefined
+              ? { bodyRecolor: state.selections.body.recolor }
+              : {})}
             colorLabel={t('picker.color')}
             styleLabel={t('picker.style')}
+            linkedColorLabel={t('picker.followsBody')}
+            assetDefaultColorLabel={t('picker.assetDefault')}
+            {...(coveredHeadEyeKey
+              ? {
+                  channelPresentation: {
+                    id: 'eyes' as const,
+                    label: t('picker.baseEyeColor'),
+                    collapsed: expandedBaseEyeColorKey !== coveredHeadEyeKey,
+                    editLabel: t('picker.editBaseEyeColor'),
+                    onEdit: () => setExpandedBaseEyeColorKey(coveredHeadEyeKey),
+                  },
+                }
+              : {})}
             tl={tl}
             onSelect={(change) => {
               if ('variant' in change) {
-                dispatch({ type: 'pick', typeName, name: selectedItem.name, variant: change.variant });
+                dispatch({
+                  type: 'pick',
+                  typeName,
+                  name: selectedItem.name,
+                  variant: change.variant,
+                  ...(selection.recolor ? { recolor: selection.recolor } : {}),
+                  ...(selection.channelRecolors
+                    ? { channelRecolors: selection.channelRecolors }
+                    : {}),
+                });
               } else {
-                dispatch({ type: 'pick', typeName, name: selectedItem.name, recolor: change.recolor });
+                dispatch({
+                  type: 'pick',
+                  typeName,
+                  name: selectedItem.name,
+                  recolor: change.recolor,
+                  ...(selection.variant ? { variant: selection.variant } : {}),
+                  ...(selection.channelRecolors
+                    ? { channelRecolors: selection.channelRecolors }
+                    : {}),
+                });
               }
             }}
+            onSetChannel={(channelId, recolor) => {
+              dispatch({
+                type: 'set_channel_recolor',
+                typeName,
+                channelId,
+                recolor,
+              });
+            }}
+            onClearChannel={(channelId) => {
+              dispatch({
+                type: 'clear_channel_recolor',
+                typeName,
+                channelId,
+              });
+            }}
           />
+          {headEyesCovered && (
+            <div
+              role="note"
+              className="mt-2 rounded-md border border-warning/50 bg-warning/10 px-2 py-1.5 text-xs text-text-2"
+            >
+              <p>{t('picker.headEyesCovered')}</p>
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => onNavigateToType('expression', 'eyes')}
+                className="mt-1 font-semibold text-accent hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {t('picker.editExpressionEyes')}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

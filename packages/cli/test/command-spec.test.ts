@@ -10,6 +10,7 @@ describe('helpForCommand', () => {
     ['show', ''],
     ['search', ' --type <type> [options]'],
     ['set', ' --type <type> --item <item-id-or-type/name> [options]'],
+    ['set-color', ' --type <type> --channel <id> (--color <id> | --default)'],
     ['remove', ' --type <type> [options]'],
     ['validate', ''],
     ['preview', ' [options]'],
@@ -29,6 +30,17 @@ describe('helpForCommand', () => {
     expect(help).toContain('--item <item-id-or-type/name>');
     expect(help).toContain('--item hair_braid --recolor lpcr.brown');
     expect(help).not.toContain('--item hair/braid --recolor brown');
+  });
+
+  it('documents public asset-owned color editing', () => {
+    const help = helpForCommand(['character', 'set-color']);
+
+    expect(help).toContain('--channel <id>');
+    expect(help).toContain('--color <id>');
+    expect(help).toContain('--default');
+    expect(help).toContain(
+      'character set-color hero --type expression --channel eyes --color green',
+    );
   });
 
   it('renders command-group help for catalog', () => {

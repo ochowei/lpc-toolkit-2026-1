@@ -36,7 +36,7 @@ describe('selection document files', () => {
 
     expect(loaded.source).toBe('upstream-v2');
     expect(loaded.selection).toEqual({
-      schema: 'lpc-toolkit.selection.v1',
+      schema: 'lpc-toolkit.selection.v2',
       bodyType: 'male',
       items: { body: { name: 'Body Color' } },
     });

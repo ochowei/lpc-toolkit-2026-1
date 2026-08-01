@@ -1,7 +1,13 @@
 /** Verifies item color-option derivation from recolor palettes and variants. */
 import { describe, expect, it } from 'vitest';
 import { createPaletteCatalog, type ItemDefinition } from '@lpc-toolkit/core';
-import { getColorOptions, pickDefaults } from '../src/slice/color-options';
+import {
+  getColorChannelOptions,
+  getColorOptions,
+  getColorSummarySwatches,
+  pickDefaults,
+  transferChannelRecolors,
+} from '../src/slice/color-options';
 
 const palettes = createPaletteCatalog({
   'm/meta_m.json': { type: 'material', default: 'v1', base: 'c0' },
@@ -42,6 +48,47 @@ const recolorAndVariantItem: ItemDefinition = {
   variants: ['black'],
 };
 
+const linkedRecolorItem: ItemDefinition = {
+  ...recolorItem,
+  name: 'Linked Thing',
+  recolors: {
+    material: 'm',
+    palettes: ['v1'],
+    linked_to: { selection: 'body', channel: 'primary' },
+  },
+};
+
+const legacyLinkedRecolorItem: ItemDefinition = {
+  ...recolorItem,
+  name: 'Legacy Linked Thing',
+  match_body_color: true,
+};
+
+const bodyRecolorItem: ItemDefinition = {
+  ...recolorItem,
+  name: 'Body Color',
+  type_name: 'body',
+};
+
+const multiRecolorItem: ItemDefinition = {
+  ...recolorItem,
+  name: 'Multi Thing',
+  recolors: {
+    color_1: { material: 'm', palettes: ['v1'] },
+    color_2: {
+      material: 'm',
+      palettes: ['v1'],
+      type_name: 'accent',
+    },
+    color_3: {
+      material: 'm',
+      palettes: ['v1'],
+      type_name: 'skin',
+      linked_to: { selection: 'body', channel: 'primary' },
+    },
+  },
+};
+
 describe('getColorOptions', () => {
   it('returns real color swatches for a recolors item', () => {
     expect(getColorOptions(recolorItem, palettes)).toEqual({
@@ -63,8 +110,93 @@ describe('getColorOptions', () => {
     });
   });
 
+  it('returns the resolved body color as read-only for a followed non-body item', () => {
+    expect(
+      getColorOptions(linkedRecolorItem, palettes, { bodyRecolor: 'red' }),
+    ).toEqual({
+      mode: 'linked-recolor',
+      recolor: 'red',
+      swatch: '#ee0000',
+    });
+  });
+
+  it('keeps the legacy match flag readable during pinned-release migration', () => {
+    expect(
+      getColorOptions(legacyLinkedRecolorItem, palettes, { bodyRecolor: 'red' }),
+    ).toMatchObject({
+      mode: 'linked-recolor',
+      recolor: 'red',
+    });
+  });
+
+  it('keeps the body primary recolor editable', () => {
+    expect(getColorOptions(bodyRecolorItem, palettes, { bodyRecolor: 'red' }))
+      .toEqual({
+        mode: 'recolors',
+        options: [
+          { kind: 'recolor', value: 'c0', swatch: '#111111', label: 'C0' },
+          { kind: 'recolor', value: 'red', swatch: '#ee0000', label: 'Red' },
+        ],
+      });
+  });
+
   it('returns mode "none" for an item with no colors', () => {
     expect(getColorOptions(plainItem, palettes)).toEqual({ mode: 'none' });
+  });
+});
+
+describe('getColorChannelOptions', () => {
+  it('returns ordered editable and linked asset-owned groups', () => {
+    expect(getColorChannelOptions(multiRecolorItem, palettes, {
+      bodyRecolor: 'red',
+    })).toEqual([
+      expect.objectContaining({ id: 'primary', primary: true, mode: 'recolors' }),
+      expect.objectContaining({ id: 'accent', primary: false, mode: 'recolors' }),
+      expect.objectContaining({
+        id: 'skin',
+        primary: false,
+        mode: 'linked-recolor',
+        recolor: 'red',
+        swatch: '#ee0000',
+      }),
+    ]);
+  });
+
+  it('deduplicates repeated recolor IDs without changing source order', () => {
+    const repeatedItem: ItemDefinition = {
+      ...multiRecolorItem,
+      recolors: {
+        material: 'm',
+        palettes: ['v1', 'v1'],
+      },
+    };
+    const [primary] = getColorChannelOptions(repeatedItem, palettes);
+    expect(primary?.mode).toBe('recolors');
+    if (primary?.mode !== 'recolors') return;
+    expect(primary.options.map((option) => option.value)).toEqual(['c0', 'red']);
+  });
+
+  it('summarizes primary plus explicit secondary overrides only', () => {
+    expect(getColorSummarySwatches(
+      multiRecolorItem,
+      {
+        typeName: 't',
+        name: 'Multi Thing',
+        recolor: 'red',
+        channelRecolors: { accent: 'c0' },
+      },
+      palettes,
+      { bodyRecolor: 'red' },
+    )).toEqual([
+      { channelId: 'primary', recolor: 'red', colors: ['#ff0000', '#ee0000'] },
+      { channelId: 'accent', recolor: 'c0', colors: ['#000000', '#111111'] },
+    ]);
+
+    expect(getColorSummarySwatches(
+      multiRecolorItem,
+      { typeName: 't', name: 'Multi Thing', recolor: 'red' },
+      palettes,
+    )).toHaveLength(1);
   });
 });
 
@@ -87,5 +219,33 @@ describe('pickDefaults', () => {
 
   it('returns no color fields for a missing item', () => {
     expect(pickDefaults(undefined, palettes)).toEqual({});
+  });
+
+  it('does not invent a local primary value for a followed item', () => {
+    expect(pickDefaults(linkedRecolorItem, palettes)).toEqual({});
+  });
+});
+
+describe('transferChannelRecolors', () => {
+  it('keeps only valid same-name independent channel values', () => {
+    expect(transferChannelRecolors({
+      typeName: 't',
+      name: 'Old Thing',
+      channelRecolors: {
+        accent: 'red',
+        skin: 'red',
+        removed: 'red',
+      },
+    }, multiRecolorItem, palettes)).toEqual({
+      accent: 'red',
+    });
+  });
+
+  it('drops a same-name value that is invalid for the replacement channel', () => {
+    expect(transferChannelRecolors({
+      typeName: 't',
+      name: 'Old Thing',
+      channelRecolors: { accent: 'missing' },
+    }, multiRecolorItem, palettes)).toBeUndefined();
   });
 });

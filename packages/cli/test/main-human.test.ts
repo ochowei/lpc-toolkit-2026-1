@@ -704,14 +704,14 @@ describe('human-readable CLI output', () => {
 
     const output = await runHuman(['token', 'encode', '--selection', 'selection.json'], cwd);
 
-    expect(output).toMatch(/^v1\./);
+    expect(output).toMatch(/^v2\./);
   });
 
   it('prints decoded selections without --json when no output file is requested', async () => {
     const cwd = makeCatalogCwd();
     const output = await runHuman(['token', 'decode', '--token', 'sex=male&hair=Braids'], cwd);
 
-    expect(output).toContain('"schema": "lpc-toolkit.selection.v1"');
+    expect(output).toContain('"schema": "lpc-toolkit.selection.v2"');
     expect(output).toContain('"hair"');
     expect(output).toContain('"Braids"');
   });
@@ -742,7 +742,7 @@ describe('human-readable CLI output', () => {
       ['preset', 'materialize', 'farmer'],
       makeCatalogCwd(),
     );
-    expect(materializeOutput).toContain('"schema": "lpc-toolkit.selection.v1"');
+    expect(materializeOutput).toContain('"schema": "lpc-toolkit.selection.v2"');
     expect(materializeOutput).toContain('"name": "farmer"');
   });
 
@@ -808,7 +808,7 @@ describe('human-readable CLI output', () => {
     ], cwd);
 
     expect(output).toContain('selection_format_normalized');
-    expect(output).toContain('Updated upstream-v2 input was written as lpc-toolkit.selection.v1.');
+    expect(output).toContain('Updated upstream-v2 input was written as lpc-toolkit.selection.v2.');
     expect(output).toContain(selectionPath);
   });
 

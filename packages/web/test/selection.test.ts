@@ -8,6 +8,7 @@ import {
 } from '@lpc-toolkit/core';
 import {
   orderedSelectionEntries,
+  pickActionForItem,
   pickInitialSelections,
   sliceReducer,
   toSelections,
@@ -32,8 +33,14 @@ function defn(
 function makeFullCatalog() {
   return createCatalog({
     'body/body.json': defn('Body Color', 'body'),
-    'head/heads_human_male.json': defn('Human Male', 'head'),
-    'head/face_neutral.json': defn('Neutral', 'expression'),
+    'head/heads_human_male.json': {
+      ...defn('Human Male', 'head'),
+      match_body_color: true,
+    },
+    'head/face_neutral.json': {
+      ...defn('Neutral', 'expression'),
+      match_body_color: true,
+    },
     'hair/hair_a.json': defn('Hair A', 'hair'),
   }).catalog;
 }
@@ -74,7 +81,7 @@ function decodedPrototypeSelection(): Selections {
 }
 
 describe('pickInitialSelections', () => {
-  it('selects body + heads_human_male + face_neutral with light recolor', () => {
+  it('selects defaults without storing ignored linked primary colors', () => {
     const { state } = pickInitialSelections(makeFullCatalog());
     expect(state.bodyType).toBe('male');
     expect(state.selections['body']).toEqual({
@@ -85,12 +92,10 @@ describe('pickInitialSelections', () => {
     expect(state.selections['head']).toEqual({
       typeName: 'head',
       name: 'Human Male',
-      recolor: 'light',
     });
     expect(state.selections['expression']).toEqual({
       typeName: 'expression',
       name: 'Neutral',
-      recolor: 'light',
     });
     expect(state.anim).toBe('walk');
     expect(state.dir).toBe('down');
@@ -241,6 +246,32 @@ describe('sliceReducer', () => {
     });
     const s2 = sliceReducer(s1, { type: 'clear', typeName: 'hair' });
     expect('hair' in s2.selections).toBe(false);
+  });
+
+  it('sets and clears an asset-owned secondary channel override', () => {
+    const s0: SliceState = {
+      bodyType: 'male',
+      selections: { head: { typeName: 'head', name: 'Head A' } },
+      anim: 'walk',
+      dir: 'down',
+      playing: true,
+      zoom: 4,
+      layout: 'single',
+    };
+    const s1 = sliceReducer(s0, {
+      type: 'set_channel_recolor',
+      typeName: 'head',
+      channelId: 'eyes',
+      recolor: 'red',
+    });
+    expect(s1.selections.head?.channelRecolors).toEqual({ eyes: 'red' });
+
+    const s2 = sliceReducer(s1, {
+      type: 'clear_channel_recolor',
+      typeName: 'head',
+      channelId: 'eyes',
+    });
+    expect(s2.selections.head).toEqual({ typeName: 'head', name: 'Head A' });
   });
 
   it('applies decoded selections without resetting preview controls', () => {
@@ -483,6 +514,42 @@ describe('treeItemAction', () => {
       type: 'pick',
       typeName: 'weapon',
       name: 'Sword',
+    });
+  });
+
+  it('transfers only valid same-name channels to a replacement item', () => {
+    const palettes = createPaletteCatalog({
+      'm/meta_m.json': { type: 'material', default: 'v1', base: 'base' },
+      'm/m_v1.json': {
+        base: ['#000000'],
+        red: ['#ff0000'],
+      },
+    }).palettes;
+    const replacement: ItemDefinition = {
+      ...defn('Sword', 'weapon'),
+      recolors: {
+        color_1: { material: 'm', palettes: ['v1'] },
+        color_2: {
+          material: 'm',
+          palettes: ['v1'],
+          type_name: 'grip',
+        },
+      },
+    };
+    const action = pickActionForItem('weapon', replacement, {
+      palettes,
+      previous: {
+        typeName: 'weapon',
+        name: 'Axe',
+        channelRecolors: { grip: 'red', removed: 'red' },
+      },
+    });
+
+    expect(action).toEqual({
+      type: 'pick',
+      typeName: 'weapon',
+      name: 'Sword',
+      channelRecolors: { grip: 'red' },
     });
   });
 });

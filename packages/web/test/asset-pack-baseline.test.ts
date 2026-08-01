@@ -12,7 +12,7 @@ describe('browser official asset baseline', () => {
     const reversed = await loadBrowserAssetPackBaseline({ catalog: second, palettes: { materials: {}, versions: {} } });
     expect(baseline.definitionDigest).toBe(reversed.definitionDigest);
     expect(baseline.creditDigest).toBe(reversed.creditDigest);
-    expect(baseline.releaseTag).toBe('assets-v2026.06.05-initial');
+    expect(baseline.releaseTag).toBe('assets-v2026.08.01-color-links-v1');
     expect(baseline.cliVersion).toBe(__LPC_CLI_VERSION__);
     expect(Object.fromEntries(baseline.definitionDigests)).toEqual({
       a: 'sha256:e24cfea87a7f813d9f38b2dda156d255045789294caab5a21d2f230d1cbd6e45',

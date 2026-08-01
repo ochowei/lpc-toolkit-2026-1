@@ -9,6 +9,8 @@ export const TRANSLATIONS = {
     'topBar.backHome': '← Back to home',
     'topBar.upstreamLink':
       'Open this character in the upstream Universal LPC Sprite Sheet Character Generator',
+    'topBar.upstreamLossy':
+      'Some independent colors cannot be shown exactly upstream',
     'source.project':
       'Based on Universal LPC Spritesheet Character Generator',
     'theme.light': 'Light',
@@ -25,6 +27,13 @@ export const TRANSLATIONS = {
     'picker.searchAssets': 'Search all assets',
     'picker.color': 'Color',
     'picker.style': 'Style',
+    'picker.followsBody': 'Follows body',
+    'picker.assetDefault': 'Asset default',
+    'picker.baseEyeColor': 'Base Eye Color',
+    'picker.editBaseEyeColor': 'Edit base eye color',
+    'picker.headEyesCovered':
+      'The visible eye color is currently controlled by Expression.',
+    'picker.editExpressionEyes': 'Edit visible eye color',
     'picker.incompatibleBodyType': 'Not available for current body type',
     'picker.incompatibleBodyTypeDetail': 'Not available for current body type: {bodyType}',
     'picker.clickToRemove': 'Click again to remove',
@@ -191,6 +200,7 @@ export const TRANSLATIONS = {
     'topBar.backHome': '← 返回首頁',
     'topBar.upstreamLink':
       '在原始 Universal LPC Sprite Sheet Character Generator 開啟此角色',
+    'topBar.upstreamLossy': '部分獨立顏色無法在 upstream 完整呈現',
     'source.project':
       '本專案源自 Universal LPC Spritesheet Character Generator',
     'theme.light': '淺色',
@@ -207,6 +217,12 @@ export const TRANSLATIONS = {
     'picker.searchAssets': '搜尋所有素材',
     'picker.color': '顏色',
     'picker.style': '款式',
+    'picker.followsBody': '跟隨身體',
+    'picker.assetDefault': '資產預設色',
+    'picker.baseEyeColor': '基礎眼睛顏色',
+    'picker.editBaseEyeColor': '編輯基礎眼睛顏色',
+    'picker.headEyesCovered': '目前顯示的眼睛顏色由表情控制。',
+    'picker.editExpressionEyes': '編輯目前顯示的眼睛顏色',
     'picker.incompatibleBodyType': '不支援目前身形',
     'picker.incompatibleBodyTypeDetail': '不支援目前身形：{bodyType}',
     'picker.clickToRemove': '再點一次可取消',
@@ -865,6 +881,12 @@ export const VARIANT_LABELS_ZH: Readonly<Record<string, string>> = {
   whip: '鞭子',
 };
 
+const CHANNEL_LABELS_ZH: Readonly<Record<string, string>> = {
+  'eye color': '眼睛顏色',
+  'accent color': '強調色',
+  'hair tie': '髮帶',
+};
+
 function humanizeLabel(raw: string): string {
   const tail = raw.includes('.') ? raw.slice(raw.lastIndexOf('.') + 1) : raw;
   const spaced = tail.replace(/_/g, ' ');
@@ -885,6 +907,8 @@ export interface LabelTranslator {
   color(value: string): string;
   /** asset variant key, e.g. "axe", "longsword_alt". */
   variant(value: string): string;
+  /** Asset-owned channel ID with an optional author-facing label. */
+  channel(value: string, authoredLabel?: string): string;
   /** Localised display name by item ID with safe fallbacks. */
   catalogItemName(item: Pick<ItemDefinition, 'name' | 'display_name' | 'itemId'>): string;
 }
@@ -904,6 +928,8 @@ export function createLabelTranslator(locale: Locale): LabelTranslator {
       catalogItemName: (item) => item.display_name ?? item.name,
       color: humanizeLabel,
       variant: humanizeLabel,
+      channel: (value, authoredLabel) =>
+        authoredLabel ?? humanizeLabel(value.replace(/^_+|_+$/g, '')),
     };
   }
   return {
@@ -934,5 +960,14 @@ export function createLabelTranslator(locale: Locale): LabelTranslator {
     },
     variant: (value) =>
       VARIANT_LABELS_ZH[value.toLowerCase()] ?? humanizeLabel(value),
+    channel: (value, authoredLabel) => {
+      const translatedAuthored = authoredLabel
+        ? CHANNEL_LABELS_ZH[authoredLabel.toLowerCase()]
+        : undefined;
+      return translatedAuthored
+        ?? CATEGORY_LABELS_ZH[value.toLowerCase()]
+        ?? authoredLabel
+        ?? humanizeLabel(value.replace(/^_+|_+$/g, ''));
+    },
   };
 }

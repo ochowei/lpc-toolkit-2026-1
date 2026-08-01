@@ -478,7 +478,7 @@ describe('public CLI two-workspace asset-pack lifecycle', () => {
 
     const stableHairIdentity = 'acme.fantasy-hair--moon-braid';
     const installedSelection: SelectionJson = {
-      schema: 'lpc-toolkit.selection.v1',
+      schema: 'lpc-toolkit.selection.v2',
       name: 'installed-hero',
       bodyType: 'male',
       items: {

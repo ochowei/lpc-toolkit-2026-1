@@ -28,9 +28,42 @@ describe('selection document', () => {
     });
   });
 
-  it('serializes a parsed document back to the canonical shape', () => {
+  it('reads v1 but serializes only the canonical v2 shape', () => {
     const parsed = parseSelectionJson(document);
-    expect(selectionJsonFromCore(parsed.selections, parsed.metadata.name)).toEqual(document);
+    expect(selectionJsonFromCore(parsed.selections, parsed.metadata.name)).toEqual({
+      ...document,
+      schema: 'lpc-toolkit.selection.v2',
+    });
+  });
+
+  it('parses v2 channel recolors without inventing absent secondary defaults', () => {
+    expect(parseSelectionJson({
+      schema: 'lpc-toolkit.selection.v2',
+      name: 'hero',
+      bodyType: 'male',
+      items: {
+        coat: {
+          name: 'Coat',
+          recolor: 'ulpc.blue',
+          channelRecolors: { trim: 'ulpc.gold' },
+        },
+        body: { name: 'Body Color' },
+      },
+    })).toEqual({
+      metadata: { schema: 'lpc-toolkit.selection.v2', name: 'hero' },
+      selections: {
+        bodyType: 'male',
+        items: {
+          coat: {
+            typeName: 'coat',
+            name: 'Coat',
+            recolor: 'ulpc.blue',
+            channelRecolors: { trim: 'ulpc.gold' },
+          },
+          body: { typeName: 'body', name: 'Body Color' },
+        },
+      },
+    });
   });
 
   it('omits optional metadata name when the property is absent', () => {
@@ -83,8 +116,76 @@ describe('selection document', () => {
 
       expect(Object.hasOwn(serialized.items, typeName)).toBe(true);
       expect(serialized.items[typeName]).toEqual({ name: 'Injected' });
+      expect(serialized.schema).toBe('lpc-toolkit.selection.v2');
     },
   );
+
+  it.each(['__proto__', 'constructor', 'prototype'])(
+    'preserves the dangerous channel key %s in canonical v2',
+    (channel) => {
+      const parsed = parseSelectionJson(JSON.parse(JSON.stringify({
+        schema: 'lpc-toolkit.selection.v2',
+        bodyType: 'male',
+        items: {
+          coat: {
+            name: 'Coat',
+            channelRecolors: Object.fromEntries([[channel, 'ulpc.gold']]),
+          },
+        },
+      })) as unknown);
+
+      expect(Object.hasOwn(
+        parsed.selections.items.coat?.channelRecolors ?? {},
+        channel,
+      )).toBe(true);
+    },
+  );
+
+  it.each([
+    [
+      {
+        schema: 'lpc-toolkit.selection.v2',
+        bodyType: 'male',
+        items: {},
+        credits: [],
+      },
+      '$.credits',
+    ],
+    [
+      {
+        schema: 'lpc-toolkit.selection.v2',
+        bodyType: 'male',
+        items: { coat: { name: 'Coat', color: 'red' } },
+      },
+      '$.items.coat.color',
+    ],
+    [
+      {
+        schema: 'lpc-toolkit.selection.v2',
+        bodyType: 'male',
+        items: { coat: { name: 'Coat', channelRecolors: [] } },
+      },
+      '$.items.coat.channelRecolors',
+    ],
+    [
+      {
+        schema: 'lpc-toolkit.selection.v2',
+        bodyType: 'male',
+        items: { coat: { name: 'Coat', channelRecolors: { trim: 7 } } },
+      },
+      '$.items.coat.channelRecolors.trim',
+    ],
+    [
+      {
+        schema: 'lpc-toolkit.selection.v2',
+        bodyType: 'male',
+        items: { coat: { name: 'Coat', channelRecolors: { primary: 'red' } } },
+      },
+      '$.items.coat.channelRecolors.primary',
+    ],
+  ])('rejects strict v2 input at its exact field path %#', (value, path) => {
+    expect(() => parseSelectionJson(value)).toThrow(path);
+  });
 
   it.each([
     [{ bodyType: 'male', items: {} }, 'Unsupported selection schema'],

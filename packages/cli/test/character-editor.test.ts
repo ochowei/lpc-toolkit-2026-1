@@ -211,7 +211,7 @@ describe('character editor', () => {
 
   it('creates an empty selection document for a supported body type', () => {
     expect(createEmptyCharacter('hero', 'male')).toEqual({
-      schema: 'lpc-toolkit.selection.v1',
+      schema: 'lpc-toolkit.selection.v2',
       name: 'hero',
       bodyType: 'male',
       items: {},

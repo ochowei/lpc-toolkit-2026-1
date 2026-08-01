@@ -1,9 +1,55 @@
 import {
+  type Catalog,
   getDefaultColorSelection,
+  getColorChannels,
   getRecolorSwatches,
+  primaryColorFollowsBody,
   type ItemDefinition,
   type PaletteMetadata,
+  type Selection,
+  type TypeName,
 } from '@lpc-toolkit/core';
+
+function highestLayerZPos(item: ItemDefinition): number {
+  let highest = Number.NEGATIVE_INFINITY;
+  for (let index = 1; index <= 4; index += 1) {
+    const layer = item[`layer_${index}`];
+    if (layer) highest = Math.max(highest, layer.zPos);
+  }
+  return highest;
+}
+
+/** Whether the selected expression visually supersedes the editable head eye channel. */
+export function isHeadEyeColorCoveredByExpression(args: {
+  readonly head: ItemDefinition;
+  readonly expressionName?: string;
+  readonly catalog: Catalog;
+  readonly palettes: PaletteMetadata;
+}): boolean {
+  if (
+    args.head.type_name !== 'head'
+    || !getColorChannels(args.head, args.palettes).some(
+      (channel) => channel.id === 'eyes',
+    )
+    || args.expressionName === undefined
+  ) {
+    return false;
+  }
+
+  const expression = (args.catalog.byTypeName.get('expression') ?? []).find(
+    (item) => item.name === args.expressionName,
+  );
+  if (
+    !expression
+    || !getColorChannels(expression, args.palettes).some(
+      (channel) => channel.id === 'eyes',
+    )
+  ) {
+    return false;
+  }
+
+  return highestLayerZPos(expression) > highestLayerZPos(args.head);
+}
 
 /** Swatch-backed color option that writes to `Selection.recolor`. */
 export interface RecolorColorOption {
@@ -20,11 +66,46 @@ export interface VariantColorOption {
   readonly label: string; // display text
 }
 
-/** UI-ready color choices for an item: recolor swatches, variant names, or none. */
+/** Selection context used to resolve read-only followed colors. */
+export interface ColorOptionContext {
+  readonly bodyRecolor?: string;
+}
+
+/** UI-ready color choices for an item: editable, linked, variant, or none. */
 export type ColorOptions =
   | { readonly mode: 'recolors'; readonly options: readonly RecolorColorOption[] }
+  | {
+      readonly mode: 'linked-recolor';
+      readonly recolor?: string;
+      readonly swatch?: string;
+    }
   | { readonly mode: 'variants'; readonly options: readonly VariantColorOption[] }
   | { readonly mode: 'none' };
+
+interface ColorChannelOptionBase {
+  readonly id: 'primary' | TypeName;
+  readonly typeName: TypeName;
+  readonly primary: boolean;
+  readonly label?: string;
+  readonly defaultSwatch?: string;
+}
+
+export type ColorChannelOptions =
+  | (ColorChannelOptionBase & {
+      readonly mode: 'recolors';
+      readonly options: readonly RecolorColorOption[];
+    })
+  | (ColorChannelOptionBase & {
+      readonly mode: 'linked-recolor';
+      readonly recolor?: string;
+      readonly swatch?: string;
+    });
+
+export interface ColorSummarySwatch {
+  readonly channelId: 'primary' | TypeName;
+  readonly recolor?: string;
+  readonly colors: readonly string[];
+}
 
 /**
  * Display label for a color key: "fur_black" -> "Fur black"; "lpcr.tan" ->
@@ -43,6 +124,94 @@ function representative(colors: readonly string[]): string {
   return colors[Math.floor(colors.length / 2)] ?? colors[0] ?? '#000000';
 }
 
+function recolorOptions(
+  swatches: ReturnType<typeof getColorChannels>[number]['swatches'],
+): readonly RecolorColorOption[] {
+  const options = new Map<string, RecolorColorOption>();
+  for (const swatch of swatches) {
+    if (options.has(swatch.recolor)) continue;
+    options.set(swatch.recolor, {
+      kind: 'recolor',
+      value: swatch.recolor,
+      swatch: representative(swatch.colors),
+      label: humanize(swatch.recolor),
+    });
+  }
+  return [...options.values()];
+}
+
+/** Ordered UI groups for every valid color channel owned by one asset. */
+export function getColorChannelOptions(
+  item: ItemDefinition,
+  palettes: PaletteMetadata,
+  context: ColorOptionContext = {},
+): readonly ColorChannelOptions[] {
+  return getColorChannels(item, palettes).map((channel) => {
+    const base = {
+      id: channel.id,
+      typeName: channel.typeName,
+      primary: channel.primary,
+      ...(channel.label !== undefined ? { label: channel.label } : {}),
+      ...(channel.defaultColors.length > 0
+        ? { defaultSwatch: representative(channel.defaultColors) }
+        : {}),
+    };
+    const linked = channel.linkedTo
+      || (channel.primary && primaryColorFollowsBody(item));
+    if (linked) {
+      const selected = channel.swatches.find(
+        (swatch) => swatch.recolor === context.bodyRecolor,
+      );
+      return {
+        ...base,
+        mode: 'linked-recolor' as const,
+        ...(context.bodyRecolor !== undefined
+          ? { recolor: context.bodyRecolor }
+          : {}),
+        ...(selected
+          ? { swatch: representative(selected.colors) }
+          : base.defaultSwatch
+            ? { swatch: base.defaultSwatch }
+            : {}),
+      };
+    }
+    return {
+      ...base,
+      mode: 'recolors' as const,
+      options: recolorOptions(channel.swatches),
+    };
+  });
+}
+
+/** Primary plus explicit independent-secondary swatches for a collapsed row. */
+export function getColorSummarySwatches(
+  item: ItemDefinition,
+  selection: Selection,
+  palettes: PaletteMetadata,
+  context: ColorOptionContext = {},
+): readonly ColorSummarySwatch[] {
+  const summary: ColorSummarySwatch[] = [];
+  for (const channel of getColorChannels(item, palettes)) {
+    if (!channel.primary && channel.linkedTo) continue;
+    const recolor = channel.primary
+      ? (channel.linkedTo || primaryColorFollowsBody(item)
+          ? context.bodyRecolor
+          : selection.recolor)
+      : selection.channelRecolors?.[channel.id];
+    if (!channel.primary && recolor === undefined) continue;
+    const colors = recolor === undefined
+      ? channel.defaultColors
+      : channel.swatches.find((swatch) => swatch.recolor === recolor)?.colors;
+    if (!colors || colors.length === 0) continue;
+    summary.push({
+      channelId: channel.id,
+      ...(recolor !== undefined ? { recolor } : {}),
+      colors,
+    });
+  }
+  return summary;
+}
+
 /**
  * The color choices for an item. A `recolors` item yields real color
  * swatches; a `variants` item yields named chips (variant folders carry no
@@ -53,17 +222,31 @@ function representative(colors: readonly string[]): string {
 export function getColorOptions(
   item: ItemDefinition,
   palettes: PaletteMetadata,
+  context: ColorOptionContext = {},
 ): ColorOptions {
   const swatches = getRecolorSwatches(item, palettes);
   if (swatches.length > 0) {
+    const options = swatches.map((s) => ({
+      kind: 'recolor' as const,
+      value: s.recolor,
+      swatch: representative(s.colors),
+      label: humanize(s.recolor),
+    }));
+    if (primaryColorFollowsBody(item)) {
+      const selected = options.find(
+        (option) => option.value === context.bodyRecolor,
+      );
+      return {
+        mode: 'linked-recolor',
+        ...(context.bodyRecolor !== undefined
+          ? { recolor: context.bodyRecolor }
+          : {}),
+        ...(selected ? { swatch: selected.swatch } : {}),
+      };
+    }
     return {
       mode: 'recolors',
-      options: swatches.map((s) => ({
-        kind: 'recolor',
-        value: s.recolor,
-        swatch: representative(s.colors),
-        label: humanize(s.recolor),
-      })),
+      options,
     };
   }
   if (item.variants && item.variants.length > 0) {
@@ -82,12 +265,38 @@ export function getColorOptions(
 /**
  * The color fields to set when an item is freshly picked: variant items
  * need `variants[0]` (the sprite path requires a variant folder); recolor
- * items default to their first color so the swatch row has an active
- * choice. Returns `{}` for an item with no colors or a missing item.
+ * independent recolor items default to their first color so the swatch row has
+ * an active choice. Linked primary channels store no local value. Returns
+ * `{}` for an item with no colors or a missing item.
  */
 export function pickDefaults(
   item: ItemDefinition | undefined,
   palettes: PaletteMetadata,
 ): { variant?: string; recolor?: string } {
-  return getDefaultColorSelection(item, palettes);
+  const defaults = getDefaultColorSelection(item, palettes);
+  if (!item || !defaults.recolor || !primaryColorFollowsBody(item)) {
+    return defaults;
+  }
+  return {};
+}
+
+/** Keep only replacement channel values accepted by same-name independent channels. */
+export function transferChannelRecolors(
+  previous: Selection | undefined,
+  replacement: ItemDefinition,
+  palettes: PaletteMetadata,
+): Readonly<Record<TypeName, string>> | undefined {
+  if (!previous?.channelRecolors) return undefined;
+  const entries: Array<readonly [TypeName, string]> = [];
+  for (const channel of getColorChannels(replacement, palettes)) {
+    if (channel.primary || channel.linkedTo) continue;
+    const recolor = previous.channelRecolors[channel.id];
+    if (
+      recolor
+      && channel.swatches.some((swatch) => swatch.recolor === recolor)
+    ) {
+      entries.push([channel.id, recolor]);
+    }
+  }
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }

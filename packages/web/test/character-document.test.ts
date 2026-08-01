@@ -54,7 +54,7 @@ describe('character documents', () => {
     const blob = download.mock.calls[0]![0];
     expect(blob.type).toBe('application/json');
     expect(JSON.parse(await blob.text())).toEqual({
-      schema: 'lpc-toolkit.selection.v1',
+      schema: 'lpc-toolkit.selection.v2',
       bodyType: 'male',
       items: { body: { name: 'Body Color', recolor: 'ulpc.light' } },
     });

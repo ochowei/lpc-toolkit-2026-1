@@ -42,6 +42,22 @@ describe('i18n', () => {
 
     expect(en('picker.style')).toBe('Style');
     expect(zh('picker.style')).toBe('款式');
+    expect(en('picker.followsBody')).toBe('Follows body');
+    expect(zh('picker.followsBody')).toBe('跟隨身體');
+    expect(en('picker.assetDefault')).toBe('Asset default');
+    expect(zh('picker.assetDefault')).toBe('資產預設色');
+    expect(en('picker.baseEyeColor')).toBe('Base Eye Color');
+    expect(zh('picker.baseEyeColor')).toBe('基礎眼睛顏色');
+    expect(en('picker.editBaseEyeColor')).toBe('Edit base eye color');
+    expect(zh('picker.editBaseEyeColor')).toBe('編輯基礎眼睛顏色');
+    expect(en('picker.headEyesCovered')).toBe(
+      'The visible eye color is currently controlled by Expression.',
+    );
+    expect(zh('picker.headEyesCovered')).toBe(
+      '目前顯示的眼睛顏色由表情控制。',
+    );
+    expect(en('picker.editExpressionEyes')).toBe('Edit visible eye color');
+    expect(zh('picker.editExpressionEyes')).toBe('編輯目前顯示的眼睛顏色');
 
     expect(en('picker.common')).toBe('Common');
     expect(en('picker.advanced')).toBe('Advanced: all upstream assets');
@@ -160,6 +176,7 @@ describe('label translator', () => {
     expect(en.color('lpcr.brown')).toBe('Brown');
     expect(en.variant('pickaxe')).toBe('Pickaxe');
     expect(en.variant('longsword_alt')).toBe('Longsword alt');
+    expect(en.channel('eyes', 'Eye Color')).toBe('Eye Color');
   });
 
   it('translates category, body type and animation labels for Chinese', () => {
@@ -174,6 +191,9 @@ describe('label translator', () => {
     expect(zh.color('lpcr.brown')).toBe('棕色');
     expect(zh.color('brown')).toBe('棕色');
     expect(zh.color('ivory')).toBe('象牙色');
+    expect(zh.channel('eyes', 'Eye Color')).toBe('眼睛顏色');
+    expect(zh.channel('hairtie')).toBe('髮帶');
+    expect(zh.channel('__custom_channel__')).toBe('Custom channel');
   });
 
   it('translates Tools variants for Chinese', () => {

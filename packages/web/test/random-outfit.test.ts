@@ -154,6 +154,37 @@ describe('pickRandomOutfit', () => {
     });
   });
 
+  it('never randomizes non-primary channels on a multi-channel item', () => {
+    const { catalog: multiChannelCatalog } = createCatalog({
+      'body/light.json': makeItem('Light', 'body'),
+      'hair/two-tone.json': {
+        ...makeItem('Two Tone', 'hair'),
+        recolors: {
+          color_1: { material: 'm', palettes: ['v1'] },
+          color_2: {
+            material: 'm',
+            palettes: ['v1'],
+            type_name: 'accent',
+          },
+        },
+      },
+    });
+
+    const selection = pickRandomOutfit({
+      catalog: multiChannelCatalog,
+      palettes,
+      bodyType: 'male',
+      rng: () => 0,
+      optionalProb: 1,
+    });
+
+    expect(selection.items.hair).toMatchObject({
+      typeName: 'hair',
+      name: 'Two Tone',
+    });
+    expect(selection.items.hair?.channelRecolors).toBeUndefined();
+  });
+
   it('respects optionalProb: 0 produces no optional categories', () => {
     const sel = pickRandomOutfit({
       catalog, bodyType: 'male', rng: () => 0.5, optionalProb: 0,

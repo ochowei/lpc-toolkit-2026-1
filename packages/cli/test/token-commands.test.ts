@@ -1,4 +1,4 @@
-import { createCatalog } from '@lpc-toolkit/core';
+import { createCatalog, createPaletteCatalog } from '@lpc-toolkit/core';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -50,16 +50,61 @@ describe('token commands', () => {
 
   it('encodes and decodes selection json through core token helpers', () => {
     const token = encodeSelectionJsonToToken({
-      schema: 'lpc-toolkit.selection.v1',
+      schema: 'lpc-toolkit.selection.v2',
       name: 'hero',
       bodyType: 'male',
       items: { body: { name: 'Body Color' } },
     });
 
+    expect(token).toMatch(/^v2\./);
     expect(decodeTokenToSelectionJson(token, catalog).bodyType).toBe('male');
     expect(decodeTokenToSelectionJson(` ${token}\n`, catalog).items.body?.name).toBe(
       'Body Color',
     );
+  });
+
+  it('round-trips asset-owned channels through the v2 CLI token boundary', () => {
+    const channelCatalog = createCatalog({
+      'head/head.json': {
+        name: 'Head',
+        type_name: 'head',
+        animations: ['walk'],
+        credits: [],
+        recolors: {
+          color_1: { material: 'cloth', palettes: ['v1'] },
+          color_2: {
+            material: 'cloth',
+            palettes: ['v1'],
+            type_name: 'eyes',
+          },
+        },
+      },
+    }).catalog;
+    const channelPalettes = createPaletteCatalog({
+      'cloth/meta_cloth.json': {
+        type: 'material',
+        default: 'v1',
+        base: 'black',
+      },
+      'cloth/cloth_v1.json': {
+        black: ['#000000'],
+        blue: ['#0000ff'],
+      },
+    }).palettes;
+    const source = {
+      schema: 'lpc-toolkit.selection.v2' as const,
+      bodyType: 'male' as const,
+      items: {
+        head: { name: 'Head', channelRecolors: { eyes: 'blue' } },
+      },
+    };
+
+    const token = encodeSelectionJsonToToken(source);
+
+    expect(token).toMatch(/^v2\./);
+    expect(
+      decodeTokenToSelectionJson(token, channelCatalog, channelPalettes),
+    ).toEqual(source);
   });
 
   it('reports malformed selection files as command errors', () => {
@@ -99,7 +144,7 @@ describe('token commands', () => {
       command: 'token encode',
       data: {
         token: encodeSelectionJsonToToken({
-          schema: 'lpc-toolkit.selection.v1',
+          schema: 'lpc-toolkit.selection.v2',
           bodyType: 'male',
           items: { body: { name: 'Body Color' } },
         }),

@@ -16,6 +16,7 @@ export type {
   AnimationName,
   BodyType,
   Catalog,
+  ColorChannelLink,
   ComposedAnimation,
   ComposedSheet,
   CreditEntry,
@@ -152,15 +153,18 @@ export { createPaletteCatalog } from './palettes.js';
 // ==========================================
 export type {
   MakeResolvePaletteOptions,
+  RecolorChannel,
   RecolorSwatch,
   ResolvePalette,
 } from './recolor-resolve.js';
 export {
+  getColorChannels,
   getRecolorSwatches,
   getRecolorVariants,
   getRecolorVariantsForType,
   itemSupportsSelectionType,
   makeResolvePalette,
+  primaryColorFollowsBody,
 } from './recolor-resolve.js';
 export { getDefaultColorSelection } from './selection-defaults.js';
 
@@ -181,12 +185,16 @@ export { creditsToTxt, creditsToCsv } from './credits-format.js';
 // ==========================================
 export type {
   ParsedSelectionJson,
+  SelectionSchema,
   SelectionJson,
   SelectionJsonItem,
 } from './selection-document.js';
 export {
   parseSelectionJson,
+  SelectionJsonError,
   SELECTION_SCHEMA,
+  SELECTION_SCHEMA_V1,
+  SELECTION_SCHEMA_V2,
   selectionJsonFromCore,
 } from './selection-document.js';
 export type {
@@ -199,12 +207,19 @@ export {
   importSelectionDocument,
   SelectionDocumentError,
 } from './upstream-selection-import.js';
-export type { HashWarning, ParseHashResult } from './hash.js';
+export type {
+  HashWarning,
+  ParseHashResult,
+  UpstreamHashResult,
+  UpstreamProjectionLoss,
+} from './hash.js';
 export {
   decodeSelectionToken,
   encodeSelectionToken,
   parseHash,
   serializeHash,
+  serializeLegacyHash,
+  serializeUpstreamHash,
 } from './hash.js';
 
 // ==========================================

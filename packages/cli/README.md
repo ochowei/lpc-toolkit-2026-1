@@ -30,6 +30,7 @@ lpc-toolkit character create hero --preset farmer
 lpc-toolkit character search hero --type hair --query braid --limit 20
 lpc-toolkit catalog item hair_braid --json
 lpc-toolkit character set hero --type hair --item hair_braid --recolor lpcr.brown
+lpc-toolkit character set-color hero --type expression --channel eyes --color green
 lpc-toolkit character preview hero
 lpc-toolkit character render hero --out ./dist/hero --animation walk --bundle zip
 ```
@@ -371,6 +372,7 @@ CSV credits.
 | `character show` | Show a stored or explicitly located selection. |
 | `character search` | Find compatible catalog items for one selection type. |
 | `character set` | Set or replace one selected item. |
+| `character set-color` | Set or clear one color channel owned by a selected asset. |
 | `character remove` | Remove one selected item. |
 | `character validate` | Validate the complete selection against the catalog. |
 | `character preview` | Render one attributed animation frame. |
@@ -383,12 +385,19 @@ Character rendering is strict by default. Use `--allow-partial` only when
 attributed partial animation output is acceptable; missing paths are reported
 in warnings and metadata rather than silently credited.
 
-`lpc-toolkit.selection.v1` is the canonical saved selection format. Wherever
-`--selection` reads an existing file, the CLI also accepts upstream version 1
-and version 2 selection JSON. Read-only commands import these documents in
-memory without rewriting the source. A successful `character set` or
-`character remove` mutation of upstream input atomically rewrites that file in
-the canonical format and emits the `selection_format_normalized` warning.
+`lpc-toolkit.selection.v2` is the canonical saved selection format. It retains
+the primary `recolor` field and stores independent secondary colors under the
+selected asset's `channelRecolors`. Wherever `--selection` reads an existing
+file, the CLI accepts Toolkit selection v1 and v2 plus upstream version 1 and
+version 2 selection JSON. Read-only commands migrate these documents in memory
+without rewriting the source. A successful `character set`, `character
+set-color`, or `character remove` mutation of non-v2 input atomically rewrites
+that file as Toolkit v2 and emits the `selection_format_normalized` warning.
+Set an explicit primary or secondary value with `character set-color <locator>
+--type <slot> --channel <id> --color <id>`. Use `--default` instead of `--color`
+to remove the stored value and restore the asset-authored default. Linked
+channels refuse both operations because their value comes from the selected
+body asset.
 `character create --selection <file>` remains an output destination for the
 new character rather than an input file.
 
@@ -445,6 +454,10 @@ lpc-toolkit preset render farmer --out ./farmer --animation walk
 lpc-toolkit render --selection selection.json --out ./rendered \
   --animation walk --frames all --bundle zip
 ```
+
+Token encoding writes deterministic `v2.` tokens, including asset-owned color
+channels. Token decoding remains compatible with `v1.` and `v2.` tokens as well
+as legacy upstream-style hashes.
 
 Catalog and `character search` discovery return a deterministic 20-item page by
 default. Use `--limit 20` to choose a bounded page size, `--offset 20` (or the

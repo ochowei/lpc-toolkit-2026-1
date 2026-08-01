@@ -9,6 +9,14 @@ import type { ReplacementCardDisplayMode } from '../src/lib/replacement-card-dis
 
 const palettes = createPaletteCatalog({}).palettes;
 
+const channelPalettes = createPaletteCatalog({
+  'm/meta_m.json': { type: 'material', default: 'v1', base: 'c0' },
+  'm/m_v1.json': {
+    c0: ['#000000', '#111111'],
+    red: ['#ff0000', '#ee0000'],
+  },
+}).palettes;
+
 const smashItem: ItemDefinition = {
   name: 'Smash',
   type_name: 'tools',
@@ -27,6 +35,26 @@ const hammerItem: ItemDefinition = {
 const { catalog } = createCatalog({
   'smash.json': smashItem,
   'hammer.json': hammerItem,
+});
+
+const channelItem: ItemDefinition = {
+  name: 'Channel Item',
+  type_name: 'armor',
+  animations: ['walk'],
+  credits: [],
+  recolors: {
+    color_1: { material: 'm', palettes: ['v1'] },
+    color_2: {
+      material: 'm',
+      palettes: ['v1'],
+      type_name: 'accent',
+    },
+  },
+  layer_1: { zPos: 1, male: 't/' },
+};
+
+const { catalog: channelCatalog } = createCatalog({
+  'channel.json': channelItem,
 });
 
 const state: SliceState = {
@@ -96,6 +124,40 @@ describe('LayerRow collapsed summary', () => {
     expect(html).toContain('border-l-4');
     expect(html).toContain('border-l-accent');
     expect(html).toContain('pl-2');
+  });
+
+  it('shows primary and explicit secondary swatches but omits secondary defaults', () => {
+    const render = (channelRecolors?: Readonly<Record<string, string>>) =>
+      renderToStaticMarkup(
+        <LayerRow
+          disabled={false}
+          typeName="armor"
+          catalog={channelCatalog}
+          palettes={channelPalettes}
+          state={{
+            ...state,
+            selections: {
+              armor: {
+                typeName: 'armor',
+                name: 'Channel Item',
+                recolor: 'red',
+                ...(channelRecolors ? { channelRecolors } : {}),
+              },
+            },
+          }}
+          dispatch={() => {}}
+          tl={createLabelTranslator('en')}
+          t={createTranslator('en')}
+          licenseFilter={ALL_LICENSE_GROUPS}
+          animationFilter={new Set()}
+          expanded={false}
+          onToggle={() => {}}
+        />,
+      );
+
+    expect(render()).toContain('data-summary-channel="primary"');
+    expect(render()).not.toContain('data-summary-channel="accent"');
+    expect(render({ accent: 'c0' })).toContain('data-summary-channel="accent"');
   });
 });
 

@@ -25,7 +25,9 @@ until validation and attribution checks are complete.
    to choose an output path. For every other character command, use exactly one
    locator: a name or `--selection`, never both.
 4. Search narrowly by character type and query before selecting an exact item.
-5. Apply one edit, validate, and resolve structured errors before continuing.
+5. Apply one edit through `character set`, `character set-color`, or
+   `character remove`; never hand-edit selection JSON. Validate and resolve
+   structured errors before continuing.
 6. Preview and inspect the returned PNG when visual review is available.
 7. Render only after validation succeeds.
 8. For a final render, verify the sheet, `.viewer.html`, metadata, credits TXT,

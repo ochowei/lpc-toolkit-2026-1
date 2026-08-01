@@ -326,7 +326,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
     usage: 'lpc-toolkit token <command>',
     description: 'Encode or decode selection tokens.',
     options: [HELP_OPTION],
-    examples: ['lpc-toolkit token encode --selection hero.json', 'lpc-toolkit token decode --token v1.example'],
+    examples: ['lpc-toolkit token encode --selection hero.json', 'lpc-toolkit token decode --token v2.example'],
   },
   {
     command: ['token', 'encode'],
@@ -345,7 +345,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
       { name: 'token', kind: 'value', valueLabel: 'hash-or-token', description: 'Token to decode.' },
       { name: 'out', kind: 'value', valueLabel: 'file', description: 'Write the decoded selection to a file.' },
     ],
-    examples: ['lpc-toolkit token decode --token v1.example --out hero.json'],
+    examples: ['lpc-toolkit token decode --token v2.example --out hero.json'],
   },
   {
     command: ['preset'],
@@ -456,6 +456,24 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
     ],
     examples: [
       'lpc-toolkit character set hero --type hair --item hair_braid --recolor lpcr.brown',
+    ],
+  },
+  {
+    command: ['character', 'set-color'],
+    usage: 'lpc-toolkit character set-color (<name> | --selection <file>) --type <type> --channel <id> (--color <id> | --default)',
+    description: 'Set or clear one color channel owned by the selected asset.',
+    options: [
+      HELP_OPTION,
+      JSON_OPTION,
+      SELECTION_OPTION,
+      { name: 'type', kind: 'value', valueLabel: 'type', description: 'Selected asset slot that owns the channel.' },
+      { name: 'channel', kind: 'value', valueLabel: 'id', description: 'Asset-owned channel ID, including primary.' },
+      { name: 'color', kind: 'value', valueLabel: 'id', description: 'Explicit channel color to select.' },
+      { name: 'default', kind: 'boolean', description: 'Clear the stored value and use the asset default.' },
+    ],
+    examples: [
+      'lpc-toolkit character set-color hero --type expression --channel eyes --color green',
+      'lpc-toolkit character set-color hero --type expression --channel eyes --default',
     ],
   },
   {

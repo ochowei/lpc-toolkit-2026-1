@@ -94,9 +94,15 @@ const customizationSteps = [
   },
   {
     title: 'Apply the item',
-    description: 'Select the braid and apply its brown recolor.',
+    description: 'Select the braid and apply its brown primary color.',
     command:
       'lpc-toolkit character set hero --type hair --item hair_braid --recolor lpcr.brown',
+  },
+  {
+    title: 'Set an asset color channel',
+    description: 'Give the selected expression its own eye color.',
+    command:
+      'lpc-toolkit character set-color hero --type expression --channel eyes --color green',
   },
 ] as const;
 

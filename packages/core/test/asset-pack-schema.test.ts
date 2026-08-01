@@ -144,6 +144,125 @@ describe('asset pack schema', () => {
     expect(result).toEqual({ ok: true, source: validPack });
   });
 
+  it('parses and round-trips strict body-primary links on primary and secondary channels', () => {
+    const firstAsset = requireNewItemFixture();
+    const linkedToBody = { selection: 'body', channel: 'primary' } as const;
+    const result = parseAssetPackSource({
+      ...validPack,
+      assets: [{
+        ...firstAsset,
+        recolor: {
+          color_1: {
+            material: 'hair',
+            palettes: ['ulpc'],
+            linked_to: linkedToBody,
+          },
+          color_2: {
+            material: 'hair',
+            palettes: ['ulpc'],
+            type_name: 'trim',
+            linked_to: linkedToBody,
+          },
+        },
+      }],
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      source: {
+        assets: [{
+          recolor: {
+            color_1: { linked_to: linkedToBody },
+            color_2: { type_name: 'trim', linked_to: linkedToBody },
+          },
+        }],
+      },
+    });
+    if (!result.ok) throw new Error('Expected linked recolors to parse.');
+
+    const normalized = normalizeAssetPack(result.source);
+    const reconstructed = assetPackSourceFromNormalized(normalized);
+    expect(reconstructed.assets[0]).toMatchObject({
+      recolor: {
+        color_1: { linked_to: linkedToBody },
+        color_2: { type_name: 'trim', linked_to: linkedToBody },
+      },
+    });
+    expect(normalizeAssetPack(reconstructed)).toEqual(normalized);
+  });
+
+  it.each([
+    ['selection', { selection: 'head', channel: 'primary' }],
+    ['channel', { selection: 'body', channel: 'skin' }],
+  ])('rejects an unsupported linked_to %s target', (field, linkedTo) => {
+    const firstAsset = requireNewItemFixture();
+    const result = parseAssetPackSource({
+      ...validPack,
+      assets: [{
+        ...firstAsset,
+        recolor: {
+          material: 'hair',
+          palettes: ['ulpc'],
+          linked_to: linkedTo,
+        },
+      }],
+    });
+
+    expect(requireDiagnosticPaths(result)).toContain(
+      `$.assets[0].recolor.linked_to.${field}`,
+    );
+  });
+
+  it('rejects duplicate and missing secondary channel IDs', () => {
+    const firstAsset = requireNewItemFixture();
+    const result = parseAssetPackSource({
+      ...validPack,
+      assets: [{
+        ...firstAsset,
+        recolor: {
+          color_1: { material: 'hair', palettes: ['ulpc'] },
+          color_2: { material: 'hair', palettes: ['ulpc'], type_name: 'trim' },
+          color_3: { material: 'hair', palettes: ['ulpc'], type_name: 'trim' },
+          color_4: { material: 'hair', palettes: ['ulpc'] },
+        },
+      }],
+    });
+
+    expect(requireDiagnosticPaths(result)).toEqual([
+      '$.assets[0].recolor.color_3.type_name',
+      '$.assets[0].recolor.color_4.type_name',
+    ]);
+  });
+
+  it('normalizes legacy match_body_color input to a canonical primary link', () => {
+    const firstAsset = requireNewItemFixture();
+    const result = parseAssetPackSource({
+      ...validPack,
+      assets: [{
+        ...firstAsset,
+        match_body_color: true,
+      }],
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('Expected legacy match_body_color to parse.');
+    const normalized = normalizeAssetPack(result.source);
+    expect(normalized.assets[0]).toMatchObject({
+      legacyMatchBodyColor: true,
+      recolor: {
+        linked_to: { selection: 'body', channel: 'primary' },
+      },
+    });
+
+    const reconstructed = assetPackSourceFromNormalized(normalized);
+    expect(reconstructed.assets[0]).not.toHaveProperty('match_body_color');
+    expect(reconstructed.assets[0]).toMatchObject({
+      recolor: {
+        linked_to: { selection: 'body', channel: 'primary' },
+      },
+    });
+  });
+
   it('rejects misspelled v1 fields instead of ignoring them', () => {
     const result = parseAssetPackSource({ ...validPack, displayNmae: 'typo' });
     expect(result).toMatchObject({
@@ -807,4 +926,3 @@ describe('asset pack schema', () => {
     expect(assetPackSourceFromNormalized(formal).status).toBeUndefined();
   });
 });
-

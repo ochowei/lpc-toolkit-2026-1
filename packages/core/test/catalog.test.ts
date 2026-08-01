@@ -276,7 +276,7 @@ describe('createCatalog with synthetic records', () => {
     });
     // Round-trip — alias rewrites to canonical form.
     expect(serializeHash(r.selections)).toBe(
-      'sex=male&belt=Formal_Belt_brown',
+      'v=2&sex=male&belt=Formal_Belt_brown',
     );
   });
 });

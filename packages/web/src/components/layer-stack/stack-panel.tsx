@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { AnimationName, Catalog, LicenseGroup, PaletteMetadata, TypeName } from '@lpc-toolkit/core';
 import type { SliceState, SliceAction } from '../../slice/selection';
 import type { Translator, LabelTranslator } from '../../i18n';
@@ -81,6 +81,11 @@ export function StackPanel({
 }: Props) {
   const [expandedSectionId, setExpandedSectionId] = useState<string | null>(null);
   const [expandedSlotType, setExpandedSlotType] = useState<TypeName | null>(null);
+  const [navigationTarget, setNavigationTarget] = useState<{
+    readonly typeName: TypeName;
+    readonly channelId: TypeName;
+  } | null>(null);
+  const layerScrollRef = useRef<HTMLDivElement>(null);
 
   const active = useMemo(
     () => shownTypeNames.filter((tn) => state.selections[tn] != null),
@@ -109,7 +114,8 @@ export function StackPanel({
     }
   };
 
-  const expandType = (typeName: TypeName) => {
+  const expandType = (typeName: TypeName, channelId?: TypeName) => {
+    setNavigationTarget(channelId ? { typeName, channelId } : null);
     const nextSectionId = sectionIdForTypeNavigation({
       sections,
       state,
@@ -127,6 +133,23 @@ export function StackPanel({
     setExpandedSlotType(typeName);
     setExpandedSectionId(nextSectionId);
   };
+
+  useEffect(() => {
+    if (!navigationTarget) return;
+    const root = layerScrollRef.current;
+    const target = Array.from(
+      root?.querySelectorAll<HTMLElement>('[data-channel-id]') ?? [],
+    ).find((candidate) =>
+      candidate.dataset.channelId === navigationTarget.channelId
+      && candidate.closest<HTMLElement>('[data-picker-type]')
+        ?.dataset.pickerType === navigationTarget.typeName,
+    );
+    if (!target) return;
+
+    target.scrollIntoView({ block: 'center', inline: 'nearest' });
+    target.focus({ preventScroll: true });
+    setNavigationTarget(null);
+  }, [expanded, expandedSectionId, expandedSlotType, navigationTarget]);
 
   // Spec edge case: body-type change can leave `expanded` pointing at a
   // type that no longer has a selection. Reset to null when that happens.
@@ -187,7 +210,11 @@ export function StackPanel({
         </span>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-2">
+      <div
+        ref={layerScrollRef}
+        data-layer-scroll-container="true"
+        className="min-h-0 flex-1 overflow-y-auto px-2"
+      >
         {sections.map((section) => {
           const activeTypeNames = section.typeNames.filter((tn) => active.includes(tn));
           const sectionOpen = expandedSectionId === section.id;
@@ -216,6 +243,7 @@ export function StackPanel({
                     onToggle={() => toggleRowType(tn)}
                     replacementCardDisplayMode={replacementCardDisplayMode}
                     onReplacementCardDisplayModeChange={onReplacementCardDisplayModeChange}
+                    onNavigateToType={expandType}
                   />
                 ))
               )}
@@ -238,6 +266,7 @@ export function StackPanel({
                 onToggleSlotType={toggleSlotType}
                 replacementCardDisplayMode={replacementCardDisplayMode}
                 onReplacementCardDisplayModeChange={onReplacementCardDisplayModeChange}
+                onNavigateToType={expandType}
               />
             </section>
           );

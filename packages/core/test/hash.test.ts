@@ -7,6 +7,8 @@ import {
   encodeSelectionToken,
   parseHash,
   serializeHash,
+  serializeLegacyHash,
+  serializeUpstreamHash,
 } from '../src/hash.js';
 import { createCatalog } from '../src/catalog.js';
 import { createPaletteCatalog } from '../src/palettes.js';
@@ -289,11 +291,12 @@ describe('parseHash with palettes (Step 4.3 — Q2 closed)', () => {
   it('round-trips a recolor selection', () => {
     const cat = realBodyCatalog();
     const palettes = realPalettes();
-    const original = 'sex=male&body=Body_Color_brown';
-    const parsed = parseHash(`#${original}`, cat, palettes);
-    expect(serializeHash(parsed.selections)).toBe(original);
+    const legacy = 'sex=male&body=Body_Color_brown';
+    const canonical = 'v=2&sex=male&body=Body_Color_brown';
+    const parsed = parseHash(`#${legacy}`, cat, palettes);
+    expect(serializeHash(parsed.selections)).toBe(canonical);
     const again = parseHash(`#${serializeHash(parsed.selections)}`, cat, palettes);
-    expect(serializeHash(again.selections)).toBe(original);
+    expect(serializeHash(again.selections)).toBe(canonical);
   });
 
   // Synthetic: an item with BOTH explicit variants and recolors.
@@ -302,6 +305,7 @@ describe('parseHash with palettes (Step 4.3 — Q2 closed)', () => {
     'cloth/cloth_v1.json': {
       c0: ['#000000'],
       crimson: ['#dc143c'],
+      azure: ['#007fff'],
     },
   }).palettes;
   const tunic: ItemDefinition = {
@@ -341,17 +345,7 @@ describe('parseHash with palettes (Step 4.3 — Q2 closed)', () => {
       name: 'Proto Coat',
       recolor: 'crimson',
     });
-    expect(serializeHash(parsed.selections)).toBe(hash);
-
-    const token = encodeSelectionToken(parsed.selections);
-    const decoded = decodeSelectionToken(token, catalog, palettes);
-
-    expect(decoded.warnings).toEqual([]);
-    expect(Object.hasOwn(decoded.selections.items, '__proto__')).toBe(true);
-    expect(decoded.selections.items['__proto__']).toEqual(
-      parsed.selections.items['__proto__'],
-    );
-    expect(serializeHash(decoded.selections)).toBe(hash);
+    expect(serializeLegacyHash(parsed.selections)).toBe(hash);
   });
 
   it('rejects an unknown __proto__ type through hash catalog validation', () => {
@@ -394,7 +388,7 @@ describe('parseHash with palettes (Step 4.3 — Q2 closed)', () => {
 });
 
 describe('serializeHash', () => {
-  it('emits sex first, then selections in insertion order, no leading "#"', () => {
+  it('emits a deterministic v2 hash with selections sorted by slot', () => {
     const out = serializeHash({
       bodyType: 'male',
       items: {
@@ -402,7 +396,9 @@ describe('serializeHash', () => {
         head: { typeName: 'head', name: 'Human male', variant: 'light' },
       },
     });
-    expect(out).toBe('sex=male&shoes=Sandals_blue&head=Human_male_light');
+    expect(out).toBe(
+      'v=2&sex=male&head=Human_male_light&shoes=Sandals_blue',
+    );
   });
 
   it('joins variant and recolor with "|" (percent-encoded as %7C)', () => {
@@ -417,7 +413,7 @@ describe('serializeHash', () => {
         },
       },
     });
-    expect(out).toBe('sex=male&torso=Tunic_red%7Clpcr.crimson');
+    expect(out).toBe('v=2&sex=male&torso=Tunic_red%7Clpcr.crimson');
   });
 
   it('omits variant/recolor markers when both are absent', () => {
@@ -427,22 +423,47 @@ describe('serializeHash', () => {
         shoes: { typeName: 'shoes', name: 'Sandals' },
       },
     });
-    expect(out).toBe('sex=male&shoes=Sandals');
+    expect(out).toBe('v=2&sex=male&shoes=Sandals');
+  });
+
+  it('sorts asset-owned channel values after selections', () => {
+    const out = serializeHash({
+      bodyType: 'male',
+      items: {
+        head: {
+          typeName: 'head',
+          name: 'Human male',
+          channelRecolors: { trim: 'azure', eyes: 'crimson' },
+        },
+        expression: {
+          typeName: 'expression',
+          name: 'Neutral',
+          channelRecolors: { eyes: 'azure' },
+        },
+      },
+    });
+
+    expect(out).toBe(
+      'v=2&sex=male&expression=Neutral&head=Human_male'
+      + '&color.expression.eyes=azure&color.head.eyes=crimson&color.head.trim=azure',
+    );
   });
 });
 
 describe('parseHash ↔ serializeHash round-trip', () => {
   it('is stable for a representative selection', () => {
     const cat = makeCatalog([sandals, humanMale, neutral]);
-    const original =
+    const legacy =
       'sex=male&shoes=Sandals_blue&head=Human_male_light&expression=Neutral_light';
-    const parsed = parseHash(`#${original}`, cat);
+    const canonical =
+      'v=2&sex=male&expression=Neutral_light&head=Human_male_light&shoes=Sandals_blue';
+    const parsed = parseHash(`#${legacy}`, cat);
     const re = serializeHash(parsed.selections);
-    expect(re).toBe(original);
+    expect(re).toBe(canonical);
 
     // Idempotent: re-parse, re-serialize gives the same string.
     const parsedAgain = parseHash(`#${re}`, cat);
-    expect(serializeHash(parsedAgain.selections)).toBe(original);
+    expect(serializeHash(parsedAgain.selections)).toBe(canonical);
   });
 
   it('proves legacy identity remains valid for display-name separated assets', () => {
@@ -477,14 +498,29 @@ describe('selection tokens', () => {
     const token = encodeSelectionToken(selections);
     const decoded = decodeSelectionToken(token, cat);
 
-    expect(token.startsWith('v1.')).toBe(true);
+    expect(token.startsWith('v2.')).toBe(true);
     expect(decoded.warnings).toEqual([]);
     expect(decoded.selections).toEqual(selections);
   });
 
+  it('reads a legacy v1 token and rewrites it as v2', () => {
+    const cat = makeCatalog([sandals]);
+    const legacyToken = 'v1.c2V4PW1hbGUmc2hvZXM9U2FuZGFsc19ibHVl';
+
+    const decoded = decodeSelectionToken(legacyToken, cat);
+
+    expect(decoded.warnings).toEqual([]);
+    expect(decoded.selections.items.shoes).toEqual({
+      typeName: 'shoes',
+      name: 'Sandals',
+      variant: 'blue',
+    });
+    expect(encodeSelectionToken(decoded.selections).startsWith('v2.')).toBe(true);
+  });
+
   it('rejects unsupported token versions', () => {
     const cat = makeCatalog([sandals]);
-    expect(() => decodeSelectionToken('v2.abc', cat)).toThrow(
+    expect(() => decodeSelectionToken('v3.abc', cat)).toThrow(
       'Unsupported selection token version',
     );
   });
@@ -510,5 +546,178 @@ describe('selection tokens', () => {
     expect(decoded.warnings).toEqual([
       { key: 'shoes', value: 'Notashoe', reason: 'unknown_item' },
     ]);
+  });
+});
+
+describe('v2 asset-owned color channels', () => {
+  const palettes = createPaletteCatalog({
+    'cloth/meta_cloth.json': { type: 'material', default: 'v1', base: 'c0' },
+    'cloth/cloth_v1.json': {
+      c0: ['#000000'],
+      crimson: ['#dc143c'],
+      azure: ['#007fff'],
+    },
+  }).palettes;
+  const head: ItemDefinition = {
+    name: 'Human Head',
+    type_name: 'head',
+    animations: ['walk'],
+    credits: [],
+    layer_1: { zPos: 40, male: 'head/' },
+    recolors: {
+      color_1: { material: 'cloth', palettes: ['v1'] },
+      color_2: {
+        material: 'cloth',
+        palettes: ['v1'],
+        type_name: 'eyes',
+      },
+      color_3: {
+        material: 'cloth',
+        palettes: ['v1'],
+        type_name: 'linked',
+        linked_to: { selection: 'body', channel: 'primary' },
+      },
+    },
+  };
+  const expression: ItemDefinition = {
+    ...head,
+    name: 'Smile',
+    type_name: 'expression',
+    layer_1: { zPos: 30, male: 'expression/' },
+  };
+  const catalog = makeCatalog([head, expression]);
+
+  it('parses independent channels into their owning selections', () => {
+    const decoded = parseHash(
+      'v=2&sex=male&head=Human_Head_crimson&expression=Smile'
+      + '&color.head.eyes=azure&color.expression.eyes=crimson',
+      catalog,
+      palettes,
+    );
+
+    expect(decoded.warnings).toEqual([]);
+    expect(decoded.selections.items.head).toEqual({
+      typeName: 'head',
+      name: 'Human Head',
+      recolor: 'crimson',
+      channelRecolors: { eyes: 'azure' },
+    });
+    expect(decoded.selections.items.expression).toEqual({
+      typeName: 'expression',
+      name: 'Smile',
+      channelRecolors: { eyes: 'crimson' },
+    });
+  });
+
+  it('warns and falls back to authored defaults for invalid or linked values', () => {
+    const decoded = parseHash(
+      'v=2&sex=male&head=Human_Head'
+      + '&color.head.missing=azure'
+      + '&color.head.eyes=missing'
+      + '&color.head.linked=azure',
+      catalog,
+      palettes,
+    );
+
+    expect(decoded.selections.items.head?.channelRecolors).toBeUndefined();
+    expect(decoded.warnings).toEqual([
+      {
+        key: 'color.head.missing',
+        value: 'azure',
+        reason: 'unknown_channel',
+      },
+      {
+        key: 'color.head.eyes',
+        value: 'missing',
+        reason: 'unknown_channel_recolor',
+      },
+      {
+        key: 'color.head.linked',
+        value: 'azure',
+        reason: 'linked_channel_value',
+      },
+    ]);
+  });
+
+  it('round-trips exact channel state through a v2 token', () => {
+    const selections = {
+      bodyType: 'male',
+      items: {
+        head: {
+          typeName: 'head',
+          name: 'Human Head',
+          recolor: 'crimson',
+          channelRecolors: { eyes: 'azure' },
+        },
+      },
+    };
+
+    const token = encodeSelectionToken(selections);
+    const decoded = decodeSelectionToken(token, catalog, palettes);
+
+    expect(token.startsWith('v2.')).toBe(true);
+    expect(decoded.warnings).toEqual([]);
+    expect(decoded.selections).toEqual(selections);
+    expect(encodeSelectionToken(decoded.selections)).toBe(token);
+  });
+
+  it('projects collisions to the visibly dominant asset with diagnostics', () => {
+    const projected = serializeUpstreamHash(
+      {
+        bodyType: 'male',
+        items: {
+          head: {
+            typeName: 'head',
+            name: 'Human Head',
+            channelRecolors: { eyes: 'azure' },
+          },
+          expression: {
+            typeName: 'expression',
+            name: 'Smile',
+            channelRecolors: { eyes: 'crimson' },
+          },
+        },
+      },
+      catalog,
+      palettes,
+    );
+
+    expect(projected.hash).toBe(
+      'sex=male&head=Human_Head&expression=Smile&eyes=Human_Head_azure',
+    );
+    expect(projected.losses).toEqual([
+      {
+        reason: 'channel_collision',
+        channelId: 'eyes',
+        keptSlot: 'head',
+        omittedSlots: ['expression'],
+      },
+    ]);
+    expect(projected.hash).not.toContain('v=2');
+    expect(projected.hash).not.toContain('color.');
+  });
+
+  it('preserves primary selection order for stable same-z upstream rendering', () => {
+    const projected = serializeUpstreamHash(
+      {
+        bodyType: 'male',
+        items: {
+          expression: {
+            typeName: 'expression',
+            name: 'Smile',
+          },
+          head: {
+            typeName: 'head',
+            name: 'Human Head',
+          },
+        },
+      },
+      catalog,
+      palettes,
+    );
+
+    expect(projected.hash).toBe(
+      'sex=male&expression=Smile&head=Human_Head',
+    );
   });
 });

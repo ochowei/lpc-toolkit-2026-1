@@ -62,6 +62,44 @@ function createFixture(): {
     }],
     layer_1: { zPos: 50, male: 'hair/bob/' },
   }));
+  writeFileSync(path.join(definitionsRoot, 'hair', 'two-tone.json'), JSON.stringify({
+    name: 'Two Tone',
+    type_name: 'hair',
+    animations: ['walk'],
+    credits: [],
+    recolors: {
+      color_1: { material: 'hair', palettes: ['ulpc'] },
+      color_2: { material: 'eyes', palettes: ['ulpc'], type_name: 'eyes' },
+      color_3: {
+        material: 'skin',
+        palettes: ['ulpc'],
+        type_name: 'skin-shadow',
+        linked_to: { selection: 'body', channel: 'primary' },
+      },
+    },
+    layer_1: { zPos: 50, male: 'hair/two-tone/male/' },
+  }));
+  mkdirSync(path.join(assetsRoot, 'spritesheets', 'hair', 'two-tone', 'male'), {
+    recursive: true,
+  });
+  writeFileSync(
+    path.join(assetsRoot, 'spritesheets', 'hair', 'two-tone', 'male', 'walk.png'),
+    '',
+  );
+  for (const [material, base, colors] of [
+    ['hair', 'black', { black: ['#111111'], red: ['#cc0000'] }],
+    ['eyes', 'blue', { blue: ['#0000cc'], green: ['#00aa00'] }],
+  ] as const) {
+    mkdirSync(path.join(assetsRoot, 'palette_definitions', material), { recursive: true });
+    writeFileSync(
+      path.join(assetsRoot, 'palette_definitions', material, `meta_${material}.json`),
+      JSON.stringify({ type: 'material', default: 'ulpc', base }),
+    );
+    writeFileSync(
+      path.join(assetsRoot, 'palette_definitions', material, `${material}_ulpc.json`),
+      JSON.stringify(colors),
+    );
+  }
   const directoryStore = createDirectoryAssetStore(assetsRoot);
   const runtime: RuntimeAssets = {
     context: createRuntimeContext({ cwd, assetsRoot, spritesheetsBaseUrl: directoryStore.baseUrl }),
@@ -114,7 +152,7 @@ describe('character commands', () => {
       ok: true,
       data: {
         selection: {
-          schema: 'lpc-toolkit.selection.v1',
+          schema: 'lpc-toolkit.selection.v2',
           bodyType: 'male',
           items: { body: { name: 'Body Color' } },
         },
@@ -141,7 +179,235 @@ describe('character commands', () => {
     expect(JSON.parse(readFileSync(
       path.join(fixture.cwd, 'saved/upstream.json'),
       'utf8',
-    ))).toMatchObject({ schema: 'lpc-toolkit.selection.v1' });
+    ))).toMatchObject({ schema: 'lpc-toolkit.selection.v2' });
+  });
+
+  it('warns when a successful mutation upgrades Toolkit v1 input to v2', async () => {
+    const fixture = createFixture();
+    const selectionPath = path.join(fixture.cwd, 'saved/legacy.json');
+    mkdirSync(path.dirname(selectionPath), { recursive: true });
+    writeFileSync(selectionPath, JSON.stringify({
+      schema: 'lpc-toolkit.selection.v1',
+      bodyType: 'male',
+      items: { body: { name: 'Body Color' } },
+    }));
+
+    const response = (await run(fixture, [
+      'character', 'set', '--selection', 'saved/legacy.json',
+      '--type', 'hair', '--item', 'braids', '--json',
+    ])).response;
+
+    expect(response).toMatchObject({
+      ok: true,
+      warnings: [expect.objectContaining({
+        code: 'selection_format_normalized',
+        path: selectionPath,
+      })],
+    });
+    expect(JSON.parse(readFileSync(selectionPath, 'utf8'))).toMatchObject({
+      schema: 'lpc-toolkit.selection.v2',
+    });
+  });
+
+  it('sets and clears an asset-owned color channel through the JSON command', async () => {
+    const fixture = createFixture();
+    expect((await run(fixture, ['character', 'create', 'hero'])).response.ok).toBe(true);
+    expect((await run(fixture, [
+      'character', 'set', 'hero', '--type', 'hair', '--item', 'two-tone',
+    ])).response.ok).toBe(true);
+
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const code = await runCli([
+      'character', 'set-color', 'hero', '--type', 'hair', '--channel', 'eyes',
+      '--color', 'green', '--json',
+    ], {
+      cwd: fixture.cwd,
+      stdout: (text) => stdout.push(text),
+      stderr: (text) => stderr.push(text),
+    });
+    expect(code).toBe(0);
+    expect(stderr).toEqual([]);
+    const setResponse = JSON.parse(stdout.join('')) as CliResponse<unknown>;
+    expect(setResponse).toMatchObject({
+      ok: true,
+      command: 'character set-color',
+      data: {
+        typeName: 'hair',
+        channel: 'eyes',
+        color: 'green',
+        default: false,
+        selection: {
+          schema: 'lpc-toolkit.selection.v2',
+          items: { hair: { name: 'Two Tone', channelRecolors: { eyes: 'green' } } },
+        },
+      },
+      errors: [],
+    });
+
+    const clearResponse = (await run(fixture, [
+      'character', 'set-color', 'hero', '--type', 'hair', '--channel', 'eyes',
+      '--default', '--json',
+    ])).response;
+    expect(clearResponse).toMatchObject({
+      ok: true,
+      command: 'character set-color',
+      data: {
+        channel: 'eyes',
+        color: null,
+        default: true,
+        selection: { items: { hair: { name: 'Two Tone' } } },
+      },
+    });
+    expect(JSON.parse(readFileSync(
+      path.join(fixture.cwd, 'characters/hero.selection.json'),
+      'utf8',
+    )).items.hair).not.toHaveProperty('channelRecolors');
+  });
+
+  it('sets and clears the primary channel without disturbing secondary colors', async () => {
+    const fixture = createFixture();
+    expect((await run(fixture, ['character', 'create', 'hero'])).response.ok).toBe(true);
+    expect((await run(fixture, [
+      'character', 'set', 'hero', '--type', 'hair', '--item', 'two-tone',
+    ])).response.ok).toBe(true);
+    expect((await run(fixture, [
+      'character', 'set-color', 'hero', '--type', 'hair', '--channel', 'eyes',
+      '--color', 'green',
+    ])).response.ok).toBe(true);
+
+    const setPrimary = (await run(fixture, [
+      'character', 'set-color', 'hero', '--type', 'hair', '--channel', 'primary',
+      '--color', 'red',
+    ])).response;
+    expect(setPrimary).toMatchObject({
+      ok: true,
+      data: {
+        selection: {
+          items: { hair: { recolor: 'red', channelRecolors: { eyes: 'green' } } },
+        },
+      },
+    });
+
+    const clearPrimary = (await run(fixture, [
+      'character', 'set-color', 'hero', '--type', 'hair', '--channel', 'primary',
+      '--default',
+    ])).response;
+    expect(clearPrimary).toMatchObject({
+      ok: true,
+      data: {
+        selection: { items: { hair: { channelRecolors: { eyes: 'green' } } } },
+      },
+    });
+    expect(clearPrimary.data).not.toMatchObject({
+      selection: { items: { hair: { recolor: expect.anything() } } },
+    });
+  });
+
+  it.each([
+    [
+      ['--channel', 'missing', '--color', 'green'],
+      { code: 'unknown_color_channel', path: 'hair/missing' },
+    ],
+    [
+      ['--channel', 'eyes', '--color', 'orange'],
+      { code: 'invalid_channel_color', path: 'hair/eyes' },
+    ],
+    [
+      ['--channel', 'skin-shadow', '--color', 'light'],
+      { code: 'linked_color_channel', path: 'hair/skin-shadow' },
+    ],
+    [
+      ['--channel', 'skin-shadow', '--default'],
+      { code: 'linked_color_channel', path: 'hair/skin-shadow' },
+    ],
+  ] as const)('rejects invalid channel edits atomically: %j', async (args, issue) => {
+    const fixture = createFixture();
+    expect((await run(fixture, ['character', 'create', 'hero'])).response.ok).toBe(true);
+    expect((await run(fixture, [
+      'character', 'set', 'hero', '--type', 'hair', '--item', 'two-tone',
+    ])).response.ok).toBe(true);
+    const target = path.join(fixture.cwd, 'characters/hero.selection.json');
+    const before = readFileSync(target, 'utf8');
+
+    const response = (await run(fixture, [
+      'character', 'set-color', 'hero', '--type', 'hair', ...args, '--json',
+    ])).response;
+
+    expect(response).toMatchObject({ ok: false, command: 'character set-color', errors: [issue] });
+    expect(readFileSync(target, 'utf8')).toBe(before);
+  });
+
+  it('requires exactly one color action and leaves the character unchanged', async () => {
+    const fixture = createFixture();
+    expect((await run(fixture, ['character', 'create', 'hero'])).response.ok).toBe(true);
+    expect((await run(fixture, [
+      'character', 'set', 'hero', '--type', 'hair', '--item', 'two-tone',
+    ])).response.ok).toBe(true);
+    const target = path.join(fixture.cwd, 'characters/hero.selection.json');
+    const before = readFileSync(target, 'utf8');
+
+    for (const action of [[], ['--color', 'green', '--default']] as const) {
+      const response = (await run(fixture, [
+        'character', 'set-color', 'hero', '--type', 'hair', '--channel', 'eyes',
+        ...action,
+      ])).response;
+      expect(response.errors[0]).toMatchObject({ code: 'color_action_required' });
+      expect(readFileSync(target, 'utf8')).toBe(before);
+    }
+  });
+
+  it('upgrades v1 after set-color and emits a normalization warning', async () => {
+    const fixture = createFixture();
+    const selectionPath = path.join(fixture.cwd, 'saved/legacy-color.json');
+    mkdirSync(path.dirname(selectionPath), { recursive: true });
+    writeFileSync(selectionPath, JSON.stringify({
+      schema: 'lpc-toolkit.selection.v1',
+      bodyType: 'male',
+      items: { hair: { name: 'Two Tone' } },
+    }));
+
+    const response = (await run(fixture, [
+      'character', 'set-color', '--selection', selectionPath,
+      '--type', 'hair', '--channel', 'eyes', '--color', 'green', '--json',
+    ])).response;
+
+    expect(response).toMatchObject({
+      ok: true,
+      warnings: [expect.objectContaining({
+        code: 'selection_format_normalized',
+        path: selectionPath,
+      })],
+    });
+    expect(JSON.parse(readFileSync(selectionPath, 'utf8'))).toMatchObject({
+      schema: 'lpc-toolkit.selection.v2',
+      items: { hair: { channelRecolors: { eyes: 'green' } } },
+    });
+  });
+
+  it('prints a focused human confirmation for set-color', async () => {
+    const fixture = createFixture();
+    expect((await run(fixture, ['character', 'create', 'hero'])).response.ok).toBe(true);
+    expect((await run(fixture, [
+      'character', 'set', 'hero', '--type', 'hair', '--item', 'two-tone',
+    ])).response.ok).toBe(true);
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+
+    const code = await runCli([
+      'character', 'set-color', 'hero', '--type', 'hair', '--channel', 'eyes',
+      '--color', 'green',
+    ], {
+      cwd: fixture.cwd,
+      stdout: (text) => stdout.push(text),
+      stderr: (text) => stderr.push(text),
+    });
+
+    expect({ code, stderr, stdout }).toEqual({
+      code: 0,
+      stderr: [],
+      stdout: ['Updated hero: hair.eyes = green\n'],
+    });
   });
 
   it('keeps upstream bytes unchanged when import validation fails', async () => {
@@ -315,7 +581,7 @@ describe('character commands', () => {
       runtime: fixture.runtime,
       cwd: fixture.cwd,
       selectionJson: expect.objectContaining({
-        schema: 'lpc-toolkit.selection.v1',
+        schema: 'lpc-toolkit.selection.v2',
         name: 'hero',
       }),
       characterName: 'hero',
@@ -435,7 +701,7 @@ describe('character commands', () => {
       ok: true,
       command: 'character search',
       data: {
-        count: 2,
+        count: 3,
         items: [{
           compatibleBodyType: 'male',
           supportedBodyTypes: ['male'],
@@ -445,7 +711,7 @@ describe('character commands', () => {
           limit: 1,
           offset: 0,
           returned: 1,
-          total: 2,
+          total: 3,
           hasMore: true,
           nextOffset: 1,
         },

@@ -53,7 +53,7 @@ async function createFixture(items: Readonly<Record<string, { readonly name: str
 
   const selectionPath = path.join(cwd, 'saved', 'custom.selection.json');
   const selectionJson: SelectionJson = {
-    schema: 'lpc-toolkit.selection.v1',
+    schema: 'lpc-toolkit.selection.v2',
     name: 'hero',
     bodyType: 'male',
     items,

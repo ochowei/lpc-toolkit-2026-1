@@ -271,14 +271,24 @@ those packages.
 
 ## Character JSON Interchange
 
-Core owns the canonical character document schema,
-`lpc-toolkit.selection.v1`, plus the pure upstream compatibility adapter that
-imports upstream version 1 and version 2 documents. The adapter identifies its
-source as `canonical`, `upstream-v1`, or `upstream-v2`, validates the resolved
-selection against the current catalog and palettes, and returns a canonical
-selection payload. Imported `credits` and rendered `layers` are not part of the
-selection contract and are ignored; composition recomputes attribution from the
-active asset source.
+Core owns canonical character document v2 (`lpc-toolkit.selection.v2`), strict
+v2 parsing, Toolkit v1-to-v2 in-memory migration, and the pure upstream
+compatibility adapter for upstream version 1 and version 2 documents. Primary
+color remains in `recolor`; independent secondary values are asset-owned in
+`channelRecolors`, and linked channels cannot store values. The adapter
+identifies its source as `canonical`, `upstream-v1`, or `upstream-v2`, validates
+resolved items and channel values against the current catalog and palettes, and
+returns a v2 selection payload. Imported `credits` and rendered `layers` are not
+part of the selection contract and are ignored; composition recomputes
+attribution from the active asset source.
+
+Core also owns color-channel discovery, authored defaults, link resolution,
+same-name channel independence across assets, deterministic hash/token v2
+encoding, and the lossy compatibility projection used for upstream links.
+Only an explicit `linked_to` declaration may synchronize a channel; the
+selected `body` asset's primary channel is the sole body-color source. The Web
+may present projection losses, but it must not forward toolkit-only v2 fields
+to upstream or reinterpret which value the Core projection retained.
 
 The Web owns browser file-picker and download I/O. Components dispatch import
 and save intent, while hooks and browser helpers read a selected file, call the
@@ -288,6 +298,12 @@ and normalization warnings. Read-only commands may convert an upstream document
 in memory but never rewrite it. After a successful mutation, the CLI atomically
 normalizes upstream input to the canonical format; failed imports or mutations
 leave the original bytes unchanged.
+
+CLI color edits use the catalog-backed `character set-color` command. CLI
+parses command intent and owns atomic persistence and human/JSON responses;
+Core-derived channel metadata remains the authority for valid IDs, colors,
+defaults, and read-only links. Plugins must invoke this public command instead
+of mutating `recolor` or `channelRecolors` by hand.
 
 The canonical character document is a portable selection payload, not the CLI
 JSON response envelope. CLI `--json` responses continue to wrap command data,

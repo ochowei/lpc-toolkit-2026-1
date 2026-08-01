@@ -72,7 +72,7 @@ describe('selection sharing browser boundary', () => {
     expect(writeText).toHaveBeenNthCalledWith(1, 'token-value');
     expect(writeText).toHaveBeenNthCalledWith(
       2,
-      'https://example.test/compose#sex=female',
+      'https://example.test/compose#v=2&sex=female',
     );
   });
 });

@@ -1,6 +1,7 @@
 import type { PaletteSwap } from './recolor.js';
 import type {
   Catalog,
+  ColorChannelLink,
   ItemDefinition,
   PaletteMaterialMeta,
   PaletteMetadata,
@@ -321,35 +322,34 @@ function findItem(
 }
 
 /**
- * Port of upstream `getBodyColor`: the recolor chosen on whichever
- * selected item is itself `match_body_color` (the body skin tone all
- * other body-colored accessories inherit).
+ * Resolve the primary recolor chosen on the selected body asset. The body
+ * selection is the sole skin-color source for linked assets.
  * 
- * Crawls through the active selections to retrieve the skin tone chosen for
- * the character's base body archetype.
+ * Looks up the active body slot and verifies that its selected item exists in
+ * the catalog before returning its primary color choice.
  * 
  * @param catalog - The compiled asset Catalog.
  * @param selections - Currently selected items configuration.
- * @returns The body skin tone recolor string, or null if none is selected.
+ * @returns The chosen body recolor, `null` when the body uses its authored
+ * default, or `undefined` when no valid body selection is available.
  */
 function getBodyColor(
   catalog: Catalog,
   selections: Selections,
-): string | null {
-  for (const sel of Object.values(selections.items)) {
-    const def = findItem(catalog, sel.typeName, sel.name);
-    if (def?.match_body_color && sel.recolor) return sel.recolor;
-  }
-  return null;
+): string | null | undefined {
+  const selection = selections.items.body;
+  if (!selection || selection.typeName !== 'body') return undefined;
+  const item = findItem(catalog, 'body', selection.name);
+  if (!item) return undefined;
+  return selection.recolor ?? null;
 }
 
 /**
- * Build the per-`type_name` chosen-recolor map for an item across the
- * selections — the adapted port of upstream `getMultiRecolors`. Our
- * `Selection` has no `subId`; sub-entries bind by `type_name` to the
- * matching selection's `recolor` (semantically what upstream's
- * `recolors[typeName]` keying expresses). `match_body_color` forces the
- * body color (QD).
+ * Build the per-channel chosen-recolor map for one selected asset. Independent
+ * secondary values come only from that selection's `channelRecolors`; an
+ * explicit `linked_to` declaration resolves from the selected body primary.
+ * The legacy `match_body_color` flag remains a primary-channel fallback for
+ * external legacy definitions; pinned built-in assets use explicit links.
  * 
  * Maps each sub-category to its chosen color option, resolving multi-material
  * color overrides and applying body-color synchronization where applicable.
@@ -359,31 +359,52 @@ function getBodyColor(
  * @param entries - List of recolor configurations for this item's layers.
  * @param catalog - Compiled asset Catalog.
  * @param selections - Complete character selections record.
+ * @param warn - Optional callback for missing linked-color sources.
  * @returns A dictionary mapping slot type names to their selected recolor string keys.
  */
-function getMultiRecolors(
+function getOwnedRecolors(
   item: ItemDefinition,
   primarySelection: Selection,
   entries: readonly RecolorConfig[],
   catalog: Catalog,
   selections: Selections,
+  warn?: (message: string) => void,
 ): Record<string, string> {
   const recolors: Record<string, string> = {};
 
-  const primaryKey = item.type_name;
-  if (primarySelection.recolor) {
-    recolors[primaryKey] = primarySelection.recolor;
-  }
+  for (let index = 0; index < entries.length; index++) {
+    const entry = entries[index];
+    if (!entry) continue;
+    const primary = index === 0;
+    const channelId = primary ? 'primary' : entry.type_name;
+    if (!channelId) continue;
+    const key = entry.type_name ?? item.type_name;
+    const linkedToBody = (
+      entry.linked_to?.selection === 'body'
+      && entry.linked_to.channel === 'primary'
+    ) || (
+      primary
+      && item.type_name !== 'body'
+      && item.match_body_color === true
+    );
+    if (linkedToBody) {
+      const bodyColor = getBodyColor(catalog, selections);
+      if (bodyColor === undefined) {
+        warn?.(
+          primary
+            ? `recolor: "${item.name}" follows body color but no body selection is available`
+            : `recolor: "${item.name}" channel "${channelId}" follows body color but no body selection is available`,
+        );
+      } else if (bodyColor !== null) {
+        recolors[key] = bodyColor;
+      }
+      continue;
+    }
 
-  for (const entry of entries) {
-    if (!entry.type_name || entry.type_name === primaryKey) continue;
-    const sub = selections.items[entry.type_name];
-    if (sub?.recolor) recolors[entry.type_name] = sub.recolor;
-  }
-
-  if (item.match_body_color) {
-    const bodyColor = getBodyColor(catalog, selections);
-    if (bodyColor) recolors[primaryKey] = bodyColor;
+    const selected = primary
+      ? primarySelection.recolor
+      : primarySelection.channelRecolors?.[channelId];
+    if (selected) recolors[key] = selected;
   }
 
   return recolors;
@@ -451,12 +472,13 @@ export function makeResolvePalette(
     const entries = collectRecolorEntries(item.recolors);
     if (entries.length === 0) return undefined;
 
-    const chosen = getMultiRecolors(
+    const chosen = getOwnedRecolors(
       item,
       selection,
       entries,
       catalog,
       selections,
+      warn,
     );
     if (Object.keys(chosen).length === 0) return undefined;
 
@@ -563,6 +585,87 @@ export interface RecolorSwatch {
   readonly colors: readonly string[];
 }
 
+/** One independently colorable region owned by a selected sprite asset. */
+export interface RecolorChannel {
+  /** Asset-scoped channel identifier; `primary` is reserved for the first entry. */
+  readonly id: 'primary' | TypeName;
+  /** Selection type used by legacy sub-recolor compatibility. */
+  readonly typeName: TypeName;
+  /** Whether this is the selected asset's primary channel. */
+  readonly primary: boolean;
+  /** Optional author-facing label from the asset definition. */
+  readonly label?: string;
+  /** Palette material resolved by this channel. */
+  readonly material: string;
+  /** Authored source/base ramp used when no explicit value is stored. */
+  readonly defaultColors: readonly string[];
+  /** Explicit selectable recolor values and their resolved ramps. */
+  readonly swatches: readonly RecolorSwatch[];
+  /** Explicit source when this channel follows another selected asset. */
+  readonly linkedTo?: ColorChannelLink;
+}
+
+function swatchesForNormalized(
+  normalized: NormalizedRecolor,
+  materials: Materials,
+): readonly RecolorSwatch[] {
+  const out: RecolorSwatch[] = [];
+  for (const recolor of normalized.variants) {
+    const colors = getTargetPalette(
+      normalized.material,
+      recolor,
+      materials,
+    );
+    if (colors && colors.length > 0) out.push({ recolor, colors });
+  }
+  return out;
+}
+
+/**
+ * Resolve every valid color channel owned by an item in source declaration
+ * order. The first recolor entry receives the reserved `primary` ID; later
+ * entries require an explicit asset-scoped `type_name` ID.
+ */
+export function getColorChannels(
+  item: ItemDefinition,
+  palettes: PaletteMetadata,
+): readonly RecolorChannel[] {
+  const entries = collectRecolorEntries(item.recolors);
+  const channels: RecolorChannel[] = [];
+  for (let index = 0; index < entries.length; index++) {
+    const entry = entries[index];
+    if (!entry) continue;
+    const primary = index === 0;
+    if (!primary && !entry.type_name) continue;
+    const normalized = normalizeRecolor(entry, palettes.materials);
+    if (!normalized) continue;
+    const defaultColors = getBasePalette(normalized, palettes.materials) ?? [];
+    channels.push({
+      id: primary ? 'primary' : entry.type_name!,
+      typeName: entry.type_name ?? item.type_name,
+      primary,
+      ...(entry.label !== undefined ? { label: entry.label } : {}),
+      material: normalized.material,
+      defaultColors,
+      swatches: swatchesForNormalized(normalized, palettes.materials),
+      ...(entry.linked_to !== undefined
+        ? { linkedTo: entry.linked_to }
+        : {}),
+    });
+  }
+  return channels;
+}
+
+/** Whether a non-body item's primary channel explicitly or historically follows body. */
+export function primaryColorFollowsBody(item: ItemDefinition): boolean {
+  if (item.type_name === 'body') return false;
+  const primary = collectRecolorEntries(item.recolors)[0];
+  return (
+    primary?.linked_to?.selection === 'body'
+    && primary.linked_to.channel === 'primary'
+  ) || item.match_body_color === true;
+}
+
 /**
  * The first recolor entry's palette-expanded variants paired with their
  * resolved color ramps. Shares the expansion path with `getRecolorVariants`
@@ -585,10 +688,5 @@ export function getRecolorSwatches(
   if (!first) return [];
   const nr = normalizeRecolor(first, palettes.materials);
   if (!nr) return [];
-  const out: RecolorSwatch[] = [];
-  for (const recolor of nr.variants) {
-    const colors = getTargetPalette(nr.material, recolor, palettes.materials);
-    if (colors && colors.length > 0) out.push({ recolor, colors });
-  }
-  return out;
+  return swatchesForNormalized(nr, palettes.materials);
 }

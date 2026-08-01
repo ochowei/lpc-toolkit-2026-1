@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { createCatalog } from '../src/catalog.js';
 import { createPaletteCatalog } from '../src/palettes.js';
 import {
+  getColorChannels,
   getRecolorSwatches,
   getRecolorVariantsForType,
   itemSupportsSelectionType,
@@ -17,6 +18,7 @@ import type {
   FilePath,
   ItemDefinition,
   PaletteMetadata,
+  RecolorConfig,
   Selections,
 } from '../src/types.js';
 import { createNodeCanvasAdapter } from './helpers/node-canvas-adapter.js';
@@ -134,6 +136,90 @@ describe('makeResolvePalette', () => {
       expect(swap?.target).toEqual(
         palettes.materials.body?.palettes.ulpc?.brown,
       );
+    });
+
+    it('renders a canonical primary body link identically to the pinned legacy flag', () => {
+      const cat = loadCatalog([
+        'body/body.json',
+        'body/lizard/tail_lizard.json',
+      ]);
+      const legacyTail = cat.byItemId.get('tail_lizard')!;
+      const { match_body_color: _legacyFlag, ...tailWithoutLegacyFlag } = legacyTail;
+      const linkedTail: ItemDefinition = {
+        ...tailWithoutLegacyFlag,
+        recolors: {
+          ...(legacyTail.recolors as RecolorConfig),
+          linked_to: { selection: 'body', channel: 'primary' },
+        },
+      };
+      const selections: Selections = {
+        bodyType: 'male',
+        items: {
+          body: { typeName: 'body', name: 'Body Color', recolor: 'brown' },
+          tail: { typeName: 'tail', name: 'Lizard tail' },
+        },
+      };
+      const resolve = makeResolvePalette(cat, palettes, selections);
+
+      expect(resolve(selections.items.tail!, linkedTail)).toEqual(
+        resolve(selections.items.tail!, legacyTail),
+      );
+    });
+
+    it('uses the body selection as the sole body-color source regardless of insertion order', () => {
+      const cat = loadCatalog([
+        'body/body.json',
+        'head/faces/face_neutral.json',
+      ]);
+      const body = cat.byItemId.get('body')!;
+      const expression = cat.byItemId.get('face_neutral')!;
+      const selections: Selections = {
+        bodyType: 'male',
+        items: {
+          expression: {
+            typeName: 'expression',
+            name: 'Neutral',
+            recolor: 'light',
+          },
+          body: {
+            typeName: 'body',
+            name: 'Body Color',
+            recolor: 'brown',
+          },
+        },
+      };
+      const resolve = makeResolvePalette(cat, palettes, selections);
+
+      const bodyRamp = palettes.materials.body?.palettes.ulpc?.brown ?? [];
+      expect(
+        resolve(selections.items.expression!, expression)?.target.slice(
+          0,
+          bodyRamp.length,
+        ),
+      ).toEqual(bodyRamp);
+      expect(resolve(selections.items.body!, body)?.target).toEqual(
+        palettes.materials.body?.palettes.ulpc?.brown,
+      );
+    });
+
+    it('warns and draws a followed asset raw when the body selection is missing', () => {
+      const cat = loadCatalog(['body/lizard/tail_lizard.json']);
+      const tail = cat.byItemId.get('tail_lizard')!;
+      const warnings: string[] = [];
+      const selections: Selections = {
+        bodyType: 'male',
+        items: {
+          tail: { typeName: 'tail', name: 'Lizard tail' },
+        },
+      };
+      const resolve = makeResolvePalette(cat, palettes, selections, {
+        onWarn: (message) => warnings.push(message),
+      });
+
+      expect(resolve(selections.items.tail!, tail)).toBeUndefined();
+      expect(warnings).toEqual([
+        'recolor: "Lizard tail" follows body color but no body selection is available',
+      ]);
     });
 
     it('returns undefined when no recolor is chosen (draw raw)', () => {
@@ -307,8 +393,12 @@ describe('makeResolvePalette', () => {
       const selections: Selections = {
         bodyType: 'male',
         items: {
-          weapon: { typeName: 'weapon', name: 'Sword', recolor: 'gold' },
-          grip: { typeName: 'grip', name: 'Grip', recolor: 'blue' },
+          weapon: {
+            typeName: 'weapon',
+            name: 'Sword',
+            recolor: 'gold',
+            channelRecolors: { grip: 'blue' },
+          },
         },
       };
       const swap = makeResolvePalette(cat, multiPalettes, selections)(
@@ -328,6 +418,97 @@ describe('makeResolvePalette', () => {
         '#ccaa00',
         '#0000ff',
         '#0000cc',
+      ]);
+    });
+
+    it('keeps same-name secondary channels independent across selected assets', () => {
+      const multiPalettes = createPaletteCatalog({
+        'm/meta_m.json': { type: 'material', default: 'v1', base: 'c0' },
+        'm/m_v1.json': {
+          c0: ['#000000', '#111111'],
+          red: ['#ff0000', '#ee0000'],
+          blue: ['#0000ff', '#0000cc'],
+        },
+      }).palettes;
+      const makeFaceItem = (
+        name: string,
+        typeName: 'head' | 'expression',
+      ): ItemDefinition => ({
+        name,
+        type_name: typeName,
+        animations: ['walk'],
+        credits: [],
+        recolors: {
+          color_1: { material: 'm', palettes: ['v1'] },
+          color_2: { material: 'm', palettes: ['v1'], type_name: 'eyes' },
+        },
+        layer_1: { zPos: 1, male: `${typeName}/` },
+      });
+      const head = makeFaceItem('Head', 'head');
+      const expression = makeFaceItem('Expression', 'expression');
+      const cat = syntheticCatalog([head, expression]);
+      const selections: Selections = {
+        bodyType: 'male',
+        items: {
+          head: {
+            typeName: 'head',
+            name: 'Head',
+            channelRecolors: { eyes: 'red' },
+          },
+          expression: {
+            typeName: 'expression',
+            name: 'Expression',
+            channelRecolors: { eyes: 'blue' },
+          },
+        },
+      };
+      const resolve = makeResolvePalette(cat, multiPalettes, selections);
+
+      expect(resolve(selections.items.head!, head)?.target.slice(-2))
+        .toEqual(['#ff0000', '#ee0000']);
+      expect(resolve(selections.items.expression!, expression)?.target.slice(-2))
+        .toEqual(['#0000ff', '#0000cc']);
+    });
+
+    it('resolves an explicitly linked secondary channel from body primary', () => {
+      const body: ItemDefinition = {
+        ...item,
+        name: 'Body',
+        type_name: 'body',
+      };
+      const mask: ItemDefinition = {
+        ...item,
+        name: 'Mask',
+        type_name: 'mask',
+        recolors: {
+          color_1: { material: 'm', palettes: ['v1'] },
+          color_2: {
+            material: 'm',
+            palettes: ['v1'],
+            type_name: 'skin',
+            linked_to: { selection: 'body', channel: 'primary' },
+          },
+        },
+      };
+      const cat = syntheticCatalog([body, mask]);
+      const selections: Selections = {
+        bodyType: 'male',
+        items: {
+          body: { typeName: 'body', name: 'Body', recolor: 'red' },
+          mask: { typeName: 'mask', name: 'Mask' },
+        },
+      };
+
+      expect(
+        makeResolvePalette(cat, palettes, selections)(
+          selections.items.mask!,
+          mask,
+        )?.target,
+      ).toEqual([
+        '#000000',
+        '#111111',
+        '#ff0000',
+        '#ee0000',
       ]);
     });
 
@@ -455,11 +636,16 @@ describe('type-specific recolor metadata', () => {
     animations: ['walk'],
     credits: [],
     recolors: {
-      color_1: { material: 'cloth', palettes: ['v1'] },
+      color_1: {
+        material: 'cloth',
+        palettes: ['v1'],
+        linked_to: { selection: 'body', channel: 'primary' },
+      },
       color_2: {
         material: 'metal',
         palettes: ['v1'],
         type_name: 'trim',
+        label: 'Trim',
       },
     },
     layer_1: { zPos: 1, male: 'coat/' },
@@ -481,5 +667,57 @@ describe('type-specific recolor metadata', () => {
       'gold',
     ]);
     expect(getRecolorVariantsForType(coat, palettes, 'lining')).toEqual([]);
+  });
+
+  it('returns ordered asset-owned channels with defaults, swatches, and links', () => {
+    expect(getColorChannels(coat, palettes)).toEqual([
+      {
+        id: 'primary',
+        typeName: 'coat',
+        primary: true,
+        material: 'cloth',
+        defaultColors: ['#0000ff'],
+        swatches: [
+          { recolor: 'blue', colors: ['#0000ff'] },
+          { recolor: 'red', colors: ['#ff0000'] },
+        ],
+        linkedTo: { selection: 'body', channel: 'primary' },
+      },
+      {
+        id: 'trim',
+        typeName: 'trim',
+        primary: false,
+        label: 'Trim',
+        material: 'metal',
+        defaultColors: ['#777777'],
+        swatches: [
+          { recolor: 'iron', colors: ['#777777'] },
+          { recolor: 'gold', colors: ['#d4af37'] },
+        ],
+      },
+    ]);
+  });
+
+  it('keeps channel IDs scoped to each owning asset', () => {
+    const expression: ItemDefinition = {
+      ...coat,
+      name: 'Expression',
+      type_name: 'expression',
+      recolors: {
+        color_1: { material: 'cloth', palettes: ['v1'] },
+        color_2: {
+          material: 'metal',
+          palettes: ['v1'],
+          type_name: 'trim',
+        },
+      },
+    };
+
+    expect(getColorChannels(coat, palettes).map((channel) => channel.id))
+      .toEqual(['primary', 'trim']);
+    expect(getColorChannels(expression, palettes).map((channel) => channel.id))
+      .toEqual(['primary', 'trim']);
+    expect(getColorChannels(expression, palettes)[0]?.typeName)
+      .toBe('expression');
   });
 });

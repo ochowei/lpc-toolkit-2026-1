@@ -22,6 +22,17 @@ describe('isCompositionChangingAction', () => {
     { type: 'pick', typeName: 'hair', name: 'Hair' },
     { type: 'clear', typeName: 'hair' },
     {
+      type: 'set_channel_recolor',
+      typeName: 'head',
+      channelId: 'eyes',
+      recolor: 'red',
+    },
+    {
+      type: 'clear_channel_recolor',
+      typeName: 'head',
+      channelId: 'eyes',
+    },
+    {
       type: 'apply_selections',
       selections: { bodyType: 'male', items: {} },
     },

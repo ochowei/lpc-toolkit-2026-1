@@ -7,6 +7,8 @@ export function isCompositionChangingAction(action: SliceAction): boolean {
     case 'set_body_type':
     case 'pick':
     case 'clear':
+    case 'set_channel_recolor':
+    case 'clear_channel_recolor':
     case 'apply_selections':
       return true;
     case 'reset':

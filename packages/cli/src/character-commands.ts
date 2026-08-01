@@ -19,6 +19,7 @@ import {
   createEmptyCharacter,
   removeCharacterItem,
   searchCharacterItems,
+  setCharacterColor,
   setCharacterItem,
   type CharacterCatalogContext,
 } from './character-editor.js';
@@ -150,10 +151,16 @@ function loadCharacterContext(runtime: RuntimeAssets): LoadedCharacterContext {
 }
 
 function normalizationWarnings(stored: StoredCharacter): readonly CliIssue[] {
-  if (stored.source === 'canonical') return [];
+  if (
+    stored.source === 'canonical'
+    && stored.inputSchema === SELECTION_SCHEMA
+  ) return [];
+  const source = stored.source === 'canonical'
+    ? stored.inputSchema ?? stored.source
+    : stored.source;
   return [{
     code: 'selection_format_normalized',
-    message: `Updated ${stored.source} input was written as ${SELECTION_SCHEMA}.`,
+    message: `Updated ${source} input was written as ${SELECTION_SCHEMA}.`,
     path: stored.path,
   }];
 }
@@ -237,7 +244,8 @@ export function characterCommandNeedsAssets(parsed: ParsedArgs): boolean {
   const subcommand = parsed.command[1];
   if (subcommand === 'list') return false;
   if (subcommand === 'create') return flagString(parsed.flags, 'preset') !== undefined;
-  return subcommand === 'search' || subcommand === 'set' || subcommand === 'remove' ||
+  return subcommand === 'search' || subcommand === 'set' ||
+    subcommand === 'set-color' || subcommand === 'remove' ||
     subcommand === 'show' ||
     subcommand === 'validate' || subcommand === 'preview' || subcommand === 'render';
 }
@@ -365,6 +373,42 @@ export async function runCharacterCommand(
         typeName,
         item: candidate.items[typeName],
         replaced: edited.replaced,
+      }, [...loaded.warnings, ...validation.warnings, ...normalizationWarnings(stored)]);
+    }
+
+    if (subcommand === 'set-color') {
+      const locator = characterLocator(parsed);
+      const loaded = loadCharacterContext(requireRuntime(runtime));
+      const stored = readCharacter(io.cwd, locator, loaded.importContext);
+      const typeName = requiredFlag(parsed, 'type');
+      const channelId = requiredFlag(parsed, 'channel');
+      const color = flagString(parsed.flags, 'color');
+      const useDefault = flagBoolean(parsed.flags, 'default');
+      const hasColor = color !== undefined;
+      if (hasColor === useDefault) {
+        throw usageError(
+          'color_action_required',
+          'Use exactly one of --color <id> or --default.',
+        );
+      }
+      const edited = setCharacterColor(stored.parsed.selections, {
+        typeName,
+        channelId,
+        ...(color === undefined ? {} : { color }),
+      }, loaded.editor);
+      const candidate = selectionJsonFromCore(edited.selections, stored.selection.name);
+      const validation = validateCandidate(candidate, loaded);
+      if (!validation.ok) {
+        return validationFailure('character set-color', validation, loaded.warnings);
+      }
+      writeCharacter(stored.path, candidate, 'replace');
+      return commandOk('character set-color', {
+        path: stored.path,
+        selection: candidate,
+        typeName,
+        channel: channelId,
+        color: edited.color,
+        default: edited.default,
       }, [...loaded.warnings, ...validation.warnings, ...normalizationWarnings(stored)]);
     }
 
