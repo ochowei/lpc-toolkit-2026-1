@@ -44,5 +44,8 @@ describe('agent prompt builders', () => {
     expect(html).toContain('value="fisher"');
     expect(html).toContain('min="1"');
     expect(html).toContain('max="100"');
+    expect(html.match(/data-prompt-input="true"/g)).toHaveLength(12);
+    expect(html).toContain('<mark data-prompt-input="true"');
+    expect(html).toContain('>fisher</mark>');
   });
 });

@@ -25,12 +25,16 @@ interface AnimationAuditFields {
 }
 
 export function buildCreateCharacterPrompt(fields: CreateCharacterFields): string {
-  const start = fields.startingPoint === 'Let the agent choose'
-    ? 'Let the agent choose a suitable starting point'
-    : fields.startingPoint === 'Start without a preset'
-      ? 'Start without a preset'
-      : `Start from the ${fields.startingPoint.replace('Start from ', '')} preset`;
+  const start = createStartingPhrase(fields.startingPoint);
   return `Create an LPC character based on a ${fields.concept.trim()} concept. ${start}, assemble ${fields.details.trim()} from available assets, generate an attributed preview, and help me refine the result.`;
+}
+
+function createStartingPhrase(startingPoint: string): string {
+  return startingPoint === 'Let the agent choose'
+    ? 'Let the agent choose a suitable starting point'
+    : startingPoint === 'Start without a preset'
+      ? 'Start without a preset'
+      : `Start from the ${startingPoint.replace('Start from ', '')} preset`;
 }
 
 export function buildRefineCharacterPrompt(fields: RefineCharacterFields): string {
@@ -51,6 +55,7 @@ function PromptCard({
   title,
   tag,
   prompt,
+  highlights,
   valid,
   onReset,
   children,
@@ -58,6 +63,7 @@ function PromptCard({
   readonly title: string;
   readonly tag: string;
   readonly prompt: string;
+  readonly highlights: readonly string[];
   readonly valid: boolean;
   readonly onReset: () => void;
   readonly children: React.ReactNode;
@@ -87,7 +93,9 @@ function PromptCard({
       <div className="mt-4 grid gap-3">{children}</div>
       <div className="mt-4 rounded-md border border-border bg-[var(--bg-deep)] p-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-text-mute">Prompt preview</p>
-        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-text">{prompt}</p>
+        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-text">
+          <HighlightedPrompt prompt={prompt} highlights={highlights} />
+        </p>
       </div>
       <button
         type="button"
@@ -100,6 +108,38 @@ function PromptCard({
       {!valid && <p className="mt-2 text-xs text-[var(--danger)]">Complete every field to copy this prompt.</p>}
     </article>
   );
+}
+
+function HighlightedPrompt({ prompt, highlights }: { readonly prompt: string; readonly highlights: readonly string[] }) {
+  const usableHighlights = [...new Set(highlights.map((value) => value.trim()).filter(Boolean))]
+    .sort((left, right) => right.length - left.length);
+  const parts: React.ReactNode[] = [];
+  let cursor = 0;
+
+  while (cursor < prompt.length) {
+    const matches = usableHighlights
+      .map((value) => ({ value, index: prompt.indexOf(value, cursor) }))
+      .filter((match) => match.index >= 0)
+      .sort((left, right) => left.index - right.index || right.value.length - left.value.length);
+    const next = matches[0];
+    if (!next) {
+      parts.push(prompt.slice(cursor));
+      break;
+    }
+    if (next.index > cursor) parts.push(prompt.slice(cursor, next.index));
+    parts.push(
+      <mark
+        key={`${next.index}-${next.value}`}
+        data-prompt-input="true"
+        className="rounded border border-accent/40 bg-accent/15 px-1 py-0.5 font-medium text-accent"
+      >
+        {next.value}
+      </mark>,
+    );
+    cursor = next.index + next.value.length;
+  }
+
+  return parts;
 }
 
 function TextField({ label, value, onChange }: { readonly label: string; readonly value: string; readonly onChange: (value: string) => void }) {
@@ -143,7 +183,7 @@ export function AgentPromptBuilders() {
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <PromptCard title="Create a character" tag="Create character" prompt={buildCreateCharacterPrompt(create)} valid={Object.values(create).every((value) => value.trim())} onReset={() => setCreate(createDefaults)}>
+      <PromptCard title="Create a character" tag="Create character" prompt={buildCreateCharacterPrompt(create)} highlights={[create.concept, createStartingPhrase(create.startingPoint), create.details]} valid={Object.values(create).every((value) => value.trim())} onReset={() => setCreate(createDefaults)}>
         <TextField label="Character concept" value={create.concept} onChange={(concept) => setCreate({ ...create, concept })} />
         <label className="text-sm text-text-2">Starting point<select className={fieldClassName} value={create.startingPoint} onChange={(event) => setCreate({ ...create, startingPoint: event.target.value })}>
           {['Let the agent choose', 'Start without a preset', 'Start from farmer', 'Start from villager', 'Start from mage', 'Start from knight', 'Start from ranger', 'Start from noble'].map((option) => <option key={option}>{option}</option>)}
@@ -151,19 +191,19 @@ export function AgentPromptBuilders() {
         <TextField label="Appearance and details" value={create.details} onChange={(details) => setCreate({ ...create, details })} />
       </PromptCard>
 
-      <PromptCard title="Refine a character" tag="Refine" prompt={buildRefineCharacterPrompt(refine)} valid={Object.values(refine).every((value) => value.trim())} onReset={() => setRefine(refineDefaults)}>
+      <PromptCard title="Refine a character" tag="Refine" prompt={buildRefineCharacterPrompt(refine)} highlights={[refine.characterName, refine.part, refine.result]} valid={Object.values(refine).every((value) => value.trim())} onReset={() => setRefine(refineDefaults)}>
         <TextField label="Character name" value={refine.characterName} onChange={(characterName) => setRefine({ ...refine, characterName })} />
         <TextField label="Part to change" value={refine.part} onChange={(part) => setRefine({ ...refine, part })} />
         <TextField label="Desired result" value={refine.result} onChange={(result) => setRefine({ ...refine, result })} />
       </PromptCard>
 
-      <PromptCard title="Preview and export" tag="Export" prompt={buildExportCharacterPrompt({ characterName: exportName, animations: joined(exportAnimations), bundle })} valid={Boolean(exportName.trim() && exportAnimations.length && bundle)} onReset={() => { setExportName('fisher'); setExportAnimations(['walk', 'idle']); setBundle('attributed ZIP bundle'); }}>
+      <PromptCard title="Preview and export" tag="Export" prompt={buildExportCharacterPrompt({ characterName: exportName, animations: joined(exportAnimations), bundle })} highlights={[exportName, joined(exportAnimations), bundle]} valid={Boolean(exportName.trim() && exportAnimations.length && bundle)} onReset={() => { setExportName('fisher'); setExportAnimations(['walk', 'idle']); setBundle('attributed ZIP bundle'); }}>
         <TextField label="Character name" value={exportName} onChange={setExportName} />
         <AnimationChoices selected={exportAnimations} onChange={setExportAnimations} />
         <label className="text-sm text-text-2">Bundle format<select className={fieldClassName} value={bundle} onChange={(event) => setBundle(event.target.value)}><option>attributed ZIP bundle</option><option>attributed render directory</option></select></label>
       </PromptCard>
 
-      <PromptCard title="Audit animation assets" tag="Animation audit" prompt={buildAnimationAuditPrompt({ assetType, animations: joined(auditAnimations), worklistSize })} valid={Boolean(assetType.trim() && auditAnimations.length && Number.isInteger(worklistNumber) && worklistNumber >= 1 && worklistNumber <= 100)} onReset={() => { setAssetType('clothes'); setAuditAnimations(['walk', 'run']); setWorklistSize('20'); }}>
+      <PromptCard title="Audit animation assets" tag="Animation audit" prompt={buildAnimationAuditPrompt({ assetType, animations: joined(auditAnimations), worklistSize })} highlights={[assetType, joined(auditAnimations), worklistSize]} valid={Boolean(assetType.trim() && auditAnimations.length && Number.isInteger(worklistNumber) && worklistNumber >= 1 && worklistNumber <= 100)} onReset={() => { setAssetType('clothes'); setAuditAnimations(['walk', 'run']); setWorklistSize('20'); }}>
         <TextField label="Asset type" value={assetType} onChange={setAssetType} />
         <AnimationChoices selected={auditAnimations} onChange={setAuditAnimations} />
         <label className="text-sm text-text-2">Worklist size<input className={fieldClassName} type="number" min="1" max="100" value={worklistSize} onChange={(event) => setWorklistSize(event.target.value)} /></label>
