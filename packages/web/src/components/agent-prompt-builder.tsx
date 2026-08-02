@@ -131,7 +131,7 @@ function HighlightedPrompt({ prompt, highlights }: { readonly prompt: string; re
       <mark
         key={`${next.index}-${next.value}`}
         data-prompt-input="true"
-        className="rounded border border-accent/40 bg-accent/15 px-1 py-0.5 font-medium text-accent"
+        className="rounded border border-accent/40 bg-accent/15 px-1 font-medium text-accent [box-decoration-break:clone] [-webkit-box-decoration-break:clone]"
       >
         {next.value}
       </mark>,

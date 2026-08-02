@@ -47,5 +47,7 @@ describe('agent prompt builders', () => {
     expect(html.match(/data-prompt-input="true"/g)).toHaveLength(12);
     expect(html).toContain('<mark data-prompt-input="true"');
     expect(html).toContain('>fisher</mark>');
+    expect(html).toContain('[box-decoration-break:clone]');
+    expect(html).toContain('[-webkit-box-decoration-break:clone]');
   });
 });
