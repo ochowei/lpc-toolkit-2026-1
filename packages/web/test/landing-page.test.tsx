@@ -119,6 +119,8 @@ describe('CLI and agent integration pages', () => {
       'codex plugin marketplace add ochowei/lpc-toolkit-2026-1',
     );
     expect(html).toContain('codex plugin add lpc-toolkit@lpc-toolkit');
+    expect(html).toContain('Try it with Codex');
+    expect(html).toContain('Customize a task, then copy the generated prompt into Codex.');
     expect(html).toContain(
       'https://github.com/ochowei/lpc-toolkit-2026-1#codex-plugin',
     );

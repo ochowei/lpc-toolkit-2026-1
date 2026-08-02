@@ -3,6 +3,7 @@ import heroPreviewUrl from '../landing-artifacts/hero.preview.png';
 import heroCreditsTxtUrl from '../landing-artifacts/hero.credits.txt?url';
 import heroCreditsCsvUrl from '../landing-artifacts/hero.credits.csv?url';
 import type { NavigableAppRoute } from '../lib/app-route';
+import { AgentPromptBuilders } from './agent-prompt-builder';
 import { ProductNavigation } from './product-navigation';
 
 interface CopyCodeProps {
@@ -335,6 +336,7 @@ export function CliPage({ onNavigate }: ProductPageProps) {
             troubleshooting.
           </p>
         </section>
+
       </div>
     </main>
   );
@@ -418,6 +420,21 @@ export function AgentIntegrationsPage({ onNavigate }: ProductPageProps) {
             </a>
             .
           </p>
+        </section>
+
+        <section aria-labelledby="agent-prompts-heading">
+          <div className="mb-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-mute">
+              Prompt builders
+            </p>
+            <h2 id="agent-prompts-heading" className="mt-2 text-2xl font-semibold text-text">
+              Try it with Codex
+            </h2>
+            <p className="mt-2 max-w-3xl text-sm text-text-2">
+              Customize a task, then copy the generated prompt into Codex.
+            </p>
+          </div>
+          <AgentPromptBuilders />
         </section>
       </div>
     </main>
