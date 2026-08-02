@@ -29,3 +29,14 @@ _Avoid_: First swatch, missing color
 A platform-specific way for an AI coding agent to use LPC Toolkit workflows.
 A plugin is one possible form of agent integration, not a synonym for it.
 _Avoid_: Agent plugin, Codex integration as the cross-platform category
+
+**Agent prompt example**:
+A natural-language task that a user can copy and give to an agent to invoke an
+agent integration workflow, including the intended outcome when useful.
+_Avoid_: CLI command example, implementation instruction
+
+**Character concept**:
+A user's open-ended description of the character they want to create, such as
+fisher or blacksmith. It may guide asset discovery without being a built-in
+preset.
+_Avoid_: Custom preset, inferred preset
