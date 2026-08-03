@@ -560,27 +560,63 @@ plugin: update
 - Add: legally attributed real PNG/reference fixtures under existing CLI test
   fixture ownership.
 
-- [ ] Write failing tests for deterministic contract JSON, exact target paths,
+- [x] Write failing tests for deterministic contract JSON, exact target paths,
   transparent templates, separate non-importable guides, reference overlays,
   artifact metadata, and absolute returned paths.
-- [ ] Build contracts only through Core's planner and current catalog/baseline
+- [x] Build contracts only through Core's planner and current catalog/baseline
   evidence. Never infer remembered LPC geometry in CLI code.
-- [ ] Use existing image/canvas and PNG preflight capabilities. Add no image
+- [x] Use existing image/canvas and PNG preflight capabilities. Add no image
   dependency or parallel PNG parser.
-- [ ] For blank-frame repair, materialize an attributed, digest-bound working
+- [x] For blank-frame repair, materialize an attributed, digest-bound working
   copy and identify every unchanged cell; do not alter its base source.
-- [ ] Bind every artifact to session ID, stable target ID, and contract digest.
-- [ ] Reject stale planning input; implement explicit `--refresh` that
+- [x] Bind every artifact to session ID, stable target ID, and contract digest.
+- [x] Reject stale planning input; implement explicit `--refresh` that
   invalidates prior candidate/import checkpoints.
-- [ ] Prove guides/reference overlays cannot be mistaken for candidate sprites.
-- [ ] Run:
+- [x] Prove guides/reference overlays cannot be mistaken for candidate sprites.
+- [x] Run:
   `rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-contract.test.ts asset-pack-validation.test.ts`
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/cli run typecheck`
-- [ ] Run: `rtk pnpm check:boundaries`
-- [ ] Commit product changes with a focused conventional commit.
-- [ ] Record fixture author/license/source in the owning fixture metadata.
-- [ ] Record implementation note, full product commit hash, and exact PASS/FAIL
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/cli run typecheck`
+- [x] Run: `rtk pnpm check:boundaries`
+- [x] Commit product changes with a focused conventional commit.
+- [x] Record fixture author/license/source in the owning fixture metadata.
+- [x] Record implementation note, full product commit hash, and exact PASS/FAIL
   verification evidence here; commit the plan record separately.
+
+  - Implementation: Added the strict CLI contract materializer at the existing
+    authoring command seam. It asks Core for registered geometry and cell
+    policies, binds the canonical contract digest to session-owned contract
+    JSON, transparent templates, separate visual guides, and deterministic
+    absolute artifact paths. Blank-frame repair loads the active catalog and
+    attributed base PNG through existing runtime/PNG capabilities, emits an
+    unchanged working copy plus a dimmed reference overlay, records every
+    unchanged cell and attribution in non-importable metadata, and leaves the
+    base source untouched. Contract planning rejects changed source evidence
+    unless `--refresh` explicitly invalidates prior session checkpoints and
+    receipts. The fixture metadata records Fixture Artist, GPL 3.0, and the
+    existing attributed viewer PNG/source; no binary asset was changed.
+  - Product commit: `723e6bd75a28d05cc8287661ee004596581e0f89`
+    (`feat(cli): publish authoring contract artifacts`).
+  - TDD RED verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-contract.test.ts asset-pack-validation.test.ts`
+    FAIL (1 focused file failed with 2 contract tests failing at the deferred
+    contract response; the existing validation file passed 22 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-contract.test.ts asset-pack-validation.test.ts`
+    PASS (2 files, 24 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+  - Verification: `rtk pnpm check:boundaries` PASS.
+  - Additional verification: `rtk pnpm --filter @lpc-toolkit/cli test -- main-assets.test.ts main-json.test.ts asset-authoring-commands.test.ts asset-authoring-session.test.ts`
+    PASS (4 files, 181 tests).
+  - Additional verification: `rtk git diff --check` PASS.
+  - CLI documentation impact reassessment for this artifact-publication task:
+    `help: N/A — the fixed authoring command/help surface was added in Task 3;
+    this task only supplies its deferred implementation`; `cli-readme: N/A —
+    end-to-end workflow prose remains a later plan documentation surface`;
+    `root-readme: N/A — no root workflow copy changed`; `landing: N/A — no
+    public positioning changed`; `architecture: N/A — the existing Core
+    planner/CLI materializer ownership is implemented without changing the
+    documented boundary`; `engineering: N/A — no repository verification
+    policy changed`; `releasing: N/A — no release compatibility contract
+    changed`; `plugin: N/A — no plugin capability or compatibility contract
+    changed`.
 
 ### Task 7: Import candidate sprites through one atomic trust boundary
 
