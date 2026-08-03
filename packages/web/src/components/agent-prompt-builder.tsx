@@ -49,12 +49,30 @@ export function buildAnimationAuditPrompt(fields: AnimationAuditFields): string 
   return `Run a read-only animation audit for ${fields.assetType.trim()} assets covering ${fields.animations.trim()}. Return a bounded drawing worklist of at most ${fields.worklistSize.trim()} items, identify the missing or incomplete animation support, and do not modify source assets.`;
 }
 
+export function buildCreateCharacterResult(concept: string): string {
+  return `Creates or updates the ${concept.trim()}.json character file and writes an attributed .preview.png with .metadata.json, .credits.txt, and .credits.csv files. Codex summarizes the selected assets and asks what to refine next.`;
+}
+
+export function buildRefineCharacterResult(characterName: string): string {
+  return `Updates ${characterName.trim()}.json and writes a fresh attributed .preview.png with metadata and credit files. Codex summarizes the change and its validation result.`;
+}
+
+export function buildExportCharacterResult(characterName: string, bundle: string): string {
+  return `Writes an attributed ${bundle.trim()} for ${characterName.trim()} with a spritesheet PNG, .viewer.html, .metadata.json, .credits.txt, and .credits.csv. Codex reports validation warnings and the artifact paths.`;
+}
+
+export function buildAnimationAuditResult(assetType: string, worklistSize: string): string {
+  return `Codex returns a summary of missing or incomplete animation support for ${assetType.trim()} assets and a bounded ${worklistSize.trim()}-item drawing worklist.`;
+}
+
 const fieldClassName = 'mt-1 w-full rounded-md border border-border-strong bg-surface-2 px-3 py-2 text-sm text-text outline-none focus:border-accent';
 
 function PromptCard({
   title,
   tag,
   prompt,
+  expectedResult,
+  readOnlyResult = false,
   highlights,
   valid,
   onReset,
@@ -63,6 +81,8 @@ function PromptCard({
   readonly title: string;
   readonly tag: string;
   readonly prompt: string;
+  readonly expectedResult: string;
+  readonly readOnlyResult?: boolean;
   readonly highlights: readonly string[];
   readonly valid: boolean;
   readonly onReset: () => void;
@@ -86,7 +106,10 @@ function PromptCard({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-mute">{tag}</p>
-          <h3 className="mt-1 text-lg font-semibold text-text">{title}</h3>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <h3 className="text-lg font-semibold text-text">{title}</h3>
+            <ExpectedResultPopover readOnly={readOnlyResult}>{expectedResult}</ExpectedResultPopover>
+          </div>
         </div>
         <button type="button" onClick={onReset} className="text-sm text-text-2 underline hover:text-text">Reset</button>
       </div>
@@ -107,6 +130,41 @@ function PromptCard({
       </button>
       {!valid && <p className="mt-2 text-xs text-[var(--danger)]">Complete every field to copy this prompt.</p>}
     </article>
+  );
+}
+
+function ExpectedResultPopover({
+  children,
+  readOnly,
+}: {
+  readonly children: React.ReactNode;
+  readonly readOnly: boolean;
+}) {
+  return (
+    <details className="group relative">
+      <summary className="flex cursor-pointer list-none items-center gap-1 rounded-full border border-border-strong bg-surface-2 px-2 py-1 text-xs font-medium text-text-2 outline-none hover:border-accent hover:text-text focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/30 [&::-webkit-details-marker]:hidden">
+        <svg aria-hidden="true" viewBox="0 0 20 20" className="size-3.5 fill-none stroke-current" strokeWidth="1.8">
+          <circle cx="10" cy="10" r="7.5" />
+          <path d="M10 9v5M10 6.25v.5" />
+        </svg>
+        What you’ll get
+      </summary>
+      <div
+        aria-label="Expected result"
+        className="invisible absolute left-0 top-full z-20 mt-2 w-72 max-w-[calc(100vw-3rem)] rounded-md border border-border bg-surface p-3 text-sm leading-5 text-text-2 opacity-0 shadow-lg transition-opacity group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 group-open:visible group-open:opacity-100"
+      >
+        {readOnly && (
+          <p role="note" className="mb-2 flex items-center gap-1.5 rounded border border-accent/40 bg-accent/10 px-2 py-1.5 font-semibold text-accent">
+            <svg aria-hidden="true" viewBox="0 0 20 20" className="size-4 shrink-0 fill-none stroke-current" strokeWidth="1.8">
+              <path d="M10 2.5 16 5v4.25c0 3.7-2.4 6.55-6 8.25-3.6-1.7-6-4.55-6-8.25V5l6-2.5Z" />
+              <path d="m7.25 10 1.75 1.75 3.75-4" />
+            </svg>
+            Read-only — no files are modified.
+          </p>
+        )}
+        <p>{children}</p>
+      </div>
+    </details>
   );
 }
 
@@ -183,7 +241,7 @@ export function AgentPromptBuilders() {
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <PromptCard title="Create a character" tag="Create character" prompt={buildCreateCharacterPrompt(create)} highlights={[create.concept, createStartingPhrase(create.startingPoint), create.details]} valid={Object.values(create).every((value) => value.trim())} onReset={() => setCreate(createDefaults)}>
+      <PromptCard title="Create a character" tag="Create character" prompt={buildCreateCharacterPrompt(create)} expectedResult={buildCreateCharacterResult(create.concept)} highlights={[create.concept, createStartingPhrase(create.startingPoint), create.details]} valid={Object.values(create).every((value) => value.trim())} onReset={() => setCreate(createDefaults)}>
         <TextField label="Character concept" value={create.concept} onChange={(concept) => setCreate({ ...create, concept })} />
         <label className="text-sm text-text-2">Starting point<select className={fieldClassName} value={create.startingPoint} onChange={(event) => setCreate({ ...create, startingPoint: event.target.value })}>
           {['Let the agent choose', 'Start without a preset', 'Start from farmer', 'Start from villager', 'Start from mage', 'Start from knight', 'Start from ranger', 'Start from noble'].map((option) => <option key={option}>{option}</option>)}
@@ -191,19 +249,19 @@ export function AgentPromptBuilders() {
         <TextField label="Appearance and details" value={create.details} onChange={(details) => setCreate({ ...create, details })} />
       </PromptCard>
 
-      <PromptCard title="Refine a character" tag="Refine" prompt={buildRefineCharacterPrompt(refine)} highlights={[refine.characterName, refine.part, refine.result]} valid={Object.values(refine).every((value) => value.trim())} onReset={() => setRefine(refineDefaults)}>
+      <PromptCard title="Refine a character" tag="Refine" prompt={buildRefineCharacterPrompt(refine)} expectedResult={buildRefineCharacterResult(refine.characterName)} highlights={[refine.characterName, refine.part, refine.result]} valid={Object.values(refine).every((value) => value.trim())} onReset={() => setRefine(refineDefaults)}>
         <TextField label="Character name" value={refine.characterName} onChange={(characterName) => setRefine({ ...refine, characterName })} />
         <TextField label="Part to change" value={refine.part} onChange={(part) => setRefine({ ...refine, part })} />
         <TextField label="Desired result" value={refine.result} onChange={(result) => setRefine({ ...refine, result })} />
       </PromptCard>
 
-      <PromptCard title="Preview and export" tag="Export" prompt={buildExportCharacterPrompt({ characterName: exportName, animations: joined(exportAnimations), bundle })} highlights={[exportName, joined(exportAnimations), bundle]} valid={Boolean(exportName.trim() && exportAnimations.length && bundle)} onReset={() => { setExportName('fisher'); setExportAnimations(['walk', 'idle']); setBundle('attributed ZIP bundle'); }}>
+      <PromptCard title="Preview and export" tag="Export" prompt={buildExportCharacterPrompt({ characterName: exportName, animations: joined(exportAnimations), bundle })} expectedResult={buildExportCharacterResult(exportName, bundle)} highlights={[exportName, joined(exportAnimations), bundle]} valid={Boolean(exportName.trim() && exportAnimations.length && bundle)} onReset={() => { setExportName('fisher'); setExportAnimations(['walk', 'idle']); setBundle('attributed ZIP bundle'); }}>
         <TextField label="Character name" value={exportName} onChange={setExportName} />
         <AnimationChoices selected={exportAnimations} onChange={setExportAnimations} />
         <label className="text-sm text-text-2">Bundle format<select className={fieldClassName} value={bundle} onChange={(event) => setBundle(event.target.value)}><option>attributed ZIP bundle</option><option>attributed render directory</option></select></label>
       </PromptCard>
 
-      <PromptCard title="Audit animation assets" tag="Animation audit" prompt={buildAnimationAuditPrompt({ assetType, animations: joined(auditAnimations), worklistSize })} highlights={[assetType, joined(auditAnimations), worklistSize]} valid={Boolean(assetType.trim() && auditAnimations.length && Number.isInteger(worklistNumber) && worklistNumber >= 1 && worklistNumber <= 100)} onReset={() => { setAssetType('clothes'); setAuditAnimations(['walk', 'run']); setWorklistSize('20'); }}>
+      <PromptCard title="Audit animation assets" tag="Animation audit" prompt={buildAnimationAuditPrompt({ assetType, animations: joined(auditAnimations), worklistSize })} expectedResult={buildAnimationAuditResult(assetType, worklistSize)} readOnlyResult highlights={[assetType, joined(auditAnimations), worklistSize]} valid={Boolean(assetType.trim() && auditAnimations.length && Number.isInteger(worklistNumber) && worklistNumber >= 1 && worklistNumber <= 100)} onReset={() => { setAssetType('clothes'); setAuditAnimations(['walk', 'run']); setWorklistSize('20'); }}>
         <TextField label="Asset type" value={assetType} onChange={setAssetType} />
         <AnimationChoices selected={auditAnimations} onChange={setAuditAnimations} />
         <label className="text-sm text-text-2">Worklist size<input className={fieldClassName} type="number" min="1" max="100" value={worklistSize} onChange={(event) => setWorklistSize(event.target.value)} /></label>
