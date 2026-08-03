@@ -294,26 +294,49 @@ plugin: update
 - Modify: `packages/core/src/index.ts`
 - Create: `packages/core/test/sprite-drawing-contract.test.ts`
 
-- [ ] Write failing tests for stable target IDs, complete PNG geometry,
+- [x] Write failing tests for stable target IDs, complete PNG geometry,
   directions, logical-frame/source-cell mappings, body/layer/variant/consumer
   context, and all four cell policies.
-- [ ] Reuse registered standard/custom animation geometry; export the smallest
+- [x] Reuse registered standard/custom animation geometry; export the smallest
   existing pure helper needed instead of duplicating LPC constants.
-- [ ] Cover simple male/female walk and optional idle new-item targets, exact
+- [x] Cover simple male/female walk and optional idle new-item targets, exact
   missing-file extension, and exact blank-frame repair with unchanged-cell
   baseline digests.
-- [ ] Define a deterministic semantic projection whose digest changes for
+- [x] Define a deterministic semantic projection whose digest changes for
   every geometry/source/reference input but not JSON property ordering.
-- [ ] Keep filesystem paths, absolute artifact paths, timestamps, providers,
+- [x] Keep filesystem paths, absolute artifact paths, timestamps, providers,
   and runtime objects out of the pure contract.
-- [ ] Export the drawing contract types/planner through Core.
-- [ ] Run:
+- [x] Export the drawing contract types/planner through Core.
+- [x] Run:
   `rtk pnpm --filter @lpc-toolkit/core test -- sprite-drawing-contract.test.ts asset-animation-audit.test.ts`
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/core run typecheck`
-- [ ] Run: `rtk pnpm check:boundaries`
-- [ ] Commit product changes with a focused conventional commit.
-- [ ] Record implementation note, full product commit hash, and exact PASS/FAIL
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/core run typecheck`
+- [x] Run: `rtk pnpm check:boundaries`
+- [x] Commit product changes with a focused conventional commit.
+- [x] Record implementation note, full product commit hash, and exact PASS/FAIL
   verification evidence here; commit the plan record separately.
+
+  - Implementation: Added the pure Core `lpc-toolkit.sprite-drawing-contract.v1`
+    planner with stable target identities, portable logical target/source paths,
+    complete registered standard/custom PNG geometry, direction and
+    logical-frame mappings, layer/body/variant/consumer context, explicit
+    transparency rules, all four cell policies, audit-derived missing-file and
+    blank-frame repair targets, unchanged-cell baseline digests, and canonical
+    reference/source projection input for caller-owned hashing. Exported the
+    registry-backed standard/custom geometry helpers and kept provider,
+    timestamps, absolute artifact paths, and runtime objects outside the pure
+    contract.
+  - Product commit: `1c62f9c75ca4b88a67ed7c4c74bbd3a317a552b2`
+    (`feat(core): add deterministic sprite drawing contracts`).
+  - TDD RED verification: `rtk pnpm --filter @lpc-toolkit/core test -- sprite-drawing-contract.test.ts`
+    FAIL (6 tests; expected `planSpriteDrawingContract is not a function` before
+    the Task 2 implementation existed).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core test -- sprite-drawing-contract.test.ts asset-animation-audit.test.ts`
+    PASS (2 files, 18 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS.
+  - Verification: `rtk pnpm check:boundaries` PASS.
+  - Additional verification: `rtk pnpm --filter @lpc-toolkit/core test` PASS
+    (27 files, 390 tests).
+  - Additional verification: `rtk git diff --check` PASS.
 
 ---
 
