@@ -627,30 +627,65 @@ plugin: update
 - Modify: `packages/cli/src/asset-pack-files.ts`
 - Create: `packages/cli/test/asset-authoring-import.test.ts`
 
-- [ ] Write a valid real-PNG failing test through the public import application
+- [x] Write a valid real-PNG failing test through the public import application
   seam before implementing success.
-- [ ] Add failure tests for wrong target/digest, stale contract, malformed PNG,
+- [x] Add failure tests for wrong target/digest, stale contract, malformed PNG,
   corrupt CRC, decode/dimension/resource failures, background/alpha policy,
   blank/forbidden cells, changed unchanged-cells, guide/template confusion,
   traversal, symlinks, non-files, and inspection races.
-- [ ] Pin a regular candidate file, bound bytes before decode, reuse existing
+- [x] Pin a regular candidate file, bound bytes before decode, reuse existing
   PNG preflight and Node decode, and verify contract cell policies.
-- [ ] Resolve the destination only through contract target ID; candidate name
+- [x] Resolve the destination only through contract target ID; candidate name
   and metadata grant no destination authority.
-- [ ] Snapshot validated bytes, verify target identity/digest again, publish by
+- [x] Snapshot validated bytes, verify target identity/digest again, publish by
   sibling staging plus atomic replacement, and leave the candidate untouched.
-- [ ] Permit session-owned correction iteration only when the current target
+- [x] Permit session-owned correction iteration only when the current target
   matches its last import receipt.
-- [ ] Require both replacement flag and exact expected digest for any
+- [x] Require both replacement flag and exact expected digest for any
   pre-existing/user-owned target; provide no force or wildcard bypass.
-- [ ] On any failure, prove old target and prior session receipt remain exact.
-- [ ] Run:
+- [x] On any failure, prove old target and prior session receipt remain exact.
+- [x] Run:
   `rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-import.test.ts asset-pack-files.test.ts`
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/cli run typecheck`
-- [ ] Run: `rtk pnpm check:boundaries`
-- [ ] Commit product changes with a focused conventional commit.
-- [ ] Record implementation note, full product commit hash, and exact PASS/FAIL
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/cli run typecheck`
+- [x] Run: `rtk pnpm check:boundaries`
+- [x] Commit product changes with a focused conventional commit.
+- [x] Record implementation note, full product commit hash, and exact PASS/FAIL
   verification evidence here; commit the plan record separately.
+
+  - Implementation: Added the public candidate-import application for one
+    contract target. It validates the session-bound contract and artifact
+    metadata, pins and byte-bounds regular candidate files, reuses the asset
+    pack PNG preflight plus Node RGBA decoder, checks complete PNG chunk CRCs,
+    enforces transparent/blank/forbidden/unchanged cell policies, and ignores
+    candidate names and metadata for destination authority. Target publication
+    uses pinned pack paths, sibling staging, identity/digest rechecks, and
+    atomic replacement; candidates remain untouched. Existing targets require
+    explicit replacement plus their exact digest, while a target matching the
+    session's current import checkpoint may be corrected without force flags.
+    Import receipt/checkpoint updates happen only after successful publication,
+    and failure/race tests prove prior bytes and receipts remain unchanged.
+  - Product commit: `d0e05081212a50228df541efc5ae6292d663624c`
+    (`feat(cli): import contract-bound authoring candidates`).
+  - TDD RED verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-import.test.ts`
+    FAIL (1 test; the valid real-PNG public import case returned exit code 1
+    because import was still at the explicit deferred-command seam).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-import.test.ts asset-pack-files.test.ts`
+    PASS (2 files, 35 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+  - Verification: `rtk pnpm check:boundaries` PASS.
+  - Additional verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-contract.test.ts asset-authoring-commands.test.ts main-json.test.ts main-human.test.ts`
+    PASS (4 files, 86 tests).
+  - Additional verification: `rtk git diff --check` PASS.
+  - CLI documentation impact reassessment for this import/atomicity task:
+    `help: N/A — the fixed import command and options were already documented
+    and unchanged`; `cli-readme: N/A — end-to-end workflow prose remains the
+    planned Task 10 documentation surface`; `root-readme: N/A — no root
+    workflow landing text changed`; `landing: N/A — no public positioning text
+    changed`; `architecture: N/A — the existing Core/CLI ownership boundary was
+    preserved`; `engineering: N/A — focused verification evidence is recorded
+    here and the consolidated verification map remains Task 10`; `releasing:
+    N/A — no release or package compatibility contract changed`; `plugin: N/A
+    — no plugin capability or compatibility contract changed`.
 
 ---
 
