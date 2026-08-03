@@ -250,23 +250,40 @@ plugin: update
 - Modify: `packages/core/src/index.ts`
 - Create: `packages/core/test/asset-authoring-schema.test.ts`
 
-- [ ] Write failing tests for strict schema identity, unknown fields, each
+- [x] Write failing tests for strict schema identity, unknown fields, each
   plan goal, normalized stable ordering, exact audit/remediation evidence,
   missing required intent, optional draft credits, and no partial parse.
-- [ ] Define stable authoring diagnostic codes and strict parse results using
+- [x] Define stable authoring diagnostic codes and strict parse results using
   existing Core conventions; do not add a second generic JSON parser.
-- [ ] Normalize one bounded pack/asset scope and preserve approved consent and
+- [x] Normalize one bounded pack/asset scope and preserve approved consent and
   provider metadata without treating them as execution authority.
-- [ ] Ensure `extend-item` retains full report digest, selected finding,
+- [x] Ensure `extend-item` retains full report digest, selected finding,
   consumer, path confidence, geometry evidence, and source-cell context.
-- [ ] Export the plan contract through Core's public entry point.
-- [ ] Run:
+- [x] Export the plan contract through Core's public entry point.
+- [x] Run:
   `rtk pnpm --filter @lpc-toolkit/core test -- asset-authoring-schema.test.ts`
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/core run typecheck`
-- [ ] Run: `rtk pnpm check:boundaries`
-- [ ] Commit product changes with a focused conventional commit.
-- [ ] Record implementation note, full product commit hash, and exact PASS/FAIL
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/core run typecheck`
+- [x] Run: `rtk pnpm check:boundaries`
+- [x] Commit product changes with a focused conventional commit.
+- [x] Record implementation note, full product commit hash, and exact PASS/FAIL
   verification evidence here; commit the plan record separately.
+
+  - Implementation: Added the strict Core `lpc-toolkit.asset-authoring-plan.v1`
+    parser and normalized plan union for `new-item`, `extend-item`, and
+    `attach-pack`. It rejects unknown fields and invalid schema/intent without
+    returning partial plans, preserves bounded consent/provider metadata and
+    optional draft credits, and retains digest-bound audit/remediation evidence
+    including selected consumers, path confidence, geometry, and source cells.
+  - Product commit: `df9035a3c1c39d968f96690fead47f14b4b987ef`
+    (`feat(core): add asset authoring plan schema`).
+  - TDD RED verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-authoring-schema.test.ts`
+    FAIL (expected: `asset-authoring-schema.ts` did not exist; Vitest loaded 0 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-authoring-schema.test.ts`
+    PASS (12 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS.
+  - Verification: `rtk pnpm check:boundaries` PASS.
+  - Additional verification: `rtk pnpm --filter @lpc-toolkit/core test` PASS
+    (26 files, 383 tests).
 
 ### Task 2: Build deterministic sprite drawing contracts in Core
 
