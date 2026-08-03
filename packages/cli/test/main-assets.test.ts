@@ -108,6 +108,9 @@ describe('asset preparation dispatch', () => {
 
   it.each([
     { argv: ['asset', 'workspace', 'init', 'workspace'], workspace: false, runtime: false },
+    { argv: ['asset', 'authoring', 'start', '--plan', 'plan.json'], workspace: true, runtime: false },
+    { argv: ['asset', 'authoring', 'status', '--session', 'session-id'], workspace: true, runtime: false },
+    { argv: ['asset', 'authoring', 'resume', '--session', 'session-id'], workspace: true, runtime: false },
     { argv: ['asset', 'inspect', 'pack.lpc-assets.zip'], workspace: false, runtime: true },
     { argv: ['asset', 'list'], workspace: true, runtime: false },
     { argv: ['asset', 'init', '--new'], workspace: true, runtime: true },

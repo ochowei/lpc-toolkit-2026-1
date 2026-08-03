@@ -35,8 +35,6 @@ import {
   validateCommandOptions,
 } from './command-spec.js';
 import {
-  AUTHORING_NOT_REACHABLE_CODE,
-  AUTHORING_NOT_REACHABLE_MESSAGE,
   createCapabilityAdvertisement,
 } from './capabilities.js';
 import { materializePreset, runPresetCommand } from './preset-commands.js';
@@ -478,18 +476,6 @@ async function runCliWithRuntime(
       parsed,
       io,
       'Capabilities advertised.\n',
-    );
-  }
-
-  if (parsed.command[0] === 'asset' && parsed.command[1] === 'authoring') {
-    return writeResponse(
-      commandError(parsed.command.join(' '), {
-        code: AUTHORING_NOT_REACHABLE_CODE,
-        message: AUTHORING_NOT_REACHABLE_MESSAGE,
-      }),
-      parsed,
-      io,
-      '',
     );
   }
 

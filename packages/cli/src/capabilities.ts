@@ -29,7 +29,3 @@ export function createCapabilityAdvertisement(
     schemaVersions: [...AUTHORING_SCHEMA_VERSIONS],
   };
 }
-
-export const AUTHORING_NOT_REACHABLE_CODE = 'asset_authoring_not_reachable' as const;
-export const AUTHORING_NOT_REACHABLE_MESSAGE =
-  'Asset authoring session commands are not available yet.' as const;

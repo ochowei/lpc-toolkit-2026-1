@@ -316,29 +316,63 @@ describe('main json behavior', () => {
     });
   });
 
-  it('returns an explicit not-yet-reachable seam instead of mutating for authoring commands', async () => {
-    const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-main-json-authoring-unreachable-'));
+  it('routes a reachable authoring start through the workspace command application', async () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-main-json-authoring-start-'));
+    const workspace = initializeAssetWorkspace(path.join(cwd, 'workspace'));
+    const planPath = path.join(cwd, 'plan.json');
+    writeFileSync(planPath, `${JSON.stringify({
+      schema: 'lpc-toolkit.asset-authoring-plan.v1',
+      goal: 'new-item',
+      pack: {
+        id: 'acme.main-json',
+        version: '1.0.0',
+        displayName: 'ACME Main JSON',
+      },
+      asset: {
+        kind: 'new-item',
+        localId: 'moon-braid',
+        displayName: 'Moon Braid',
+        typeName: 'hair',
+        bodyTypes: ['male'],
+        animations: ['walk'],
+        layers: [{ id: 'foreground', zPos: 120, bodyTypes: ['male'] }],
+      },
+      scope: {
+        packId: 'acme.main-json',
+        assetId: 'moon-braid',
+        bodyTypes: ['male'],
+        animations: ['walk'],
+        paths: ['sprites/moon-braid/foreground/walk.png'],
+      },
+      draftCredits: {
+        authors: ['Alice'],
+        licenses: ['CC-BY-SA 4.0'],
+        urls: ['https://example.test/main-json'],
+        notes: 'Main JSON fixture.',
+      },
+    }, null, 2)}\n`);
     const stdout: string[] = [];
     const stderr: string[] = [];
     const code = await runCli([
-      'asset', 'authoring', 'start', '--plan', 'plan.json', '--json',
+      'asset', 'authoring', 'start', '--plan', planPath,
+      '--workspace', workspace.root, '--json',
     ], {
       cwd,
       stdout: (text) => stdout.push(text),
       stderr: (text) => stderr.push(text),
     });
 
-    expect(code).toBe(1);
+    expect(code).toBe(0);
     expect(stderr).toEqual([]);
-    expect(JSON.parse(stdout.join(''))).toEqual({
-      ok: false,
+    expect(JSON.parse(stdout.join(''))).toMatchObject({
+      ok: true,
       command: 'asset authoring start',
-      data: null,
-      warnings: [],
-      errors: [{
-        code: 'asset_authoring_not_reachable',
-        message: 'Asset authoring session commands are not available yet.',
-      }],
+      data: {
+        schema: 'lpc-toolkit.asset-authoring-response.v1',
+        goal: 'new-item',
+        phase: 'scaffolded',
+        state: 'needs-user-action',
+      },
     });
   });
 

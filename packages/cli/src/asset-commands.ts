@@ -19,6 +19,7 @@ import {
   scaffoldAuditAssetPack,
   scaffoldNewAssetPack,
 } from './asset-pack-scaffold.js';
+import { runAssetAuthoringCommand } from './asset-authoring-commands.js';
 import {
   AssetPackPreviewError,
   previewAssetPack,
@@ -92,6 +93,7 @@ export function assetCommandRequirements(
   if (parsed.command[1] === 'workspace' && parsed.command[2] === 'init') {
     return NO_ASSET_COMMAND_REQUIREMENTS;
   }
+  if (parsed.command[1] === 'authoring') return LIST_REQUIREMENTS;
   if (parsed.command[1] === 'inspect') return INSPECTION_REQUIREMENTS;
   if (parsed.command[1] === 'list') return LIST_REQUIREMENTS;
   if ([
@@ -555,6 +557,14 @@ export async function runAssetCommand(
   const { parsed, cwd } = context;
   const subcommand = parsed.command[1];
   try {
+    if (subcommand === 'authoring') {
+      const workspaceContext = requireWorkspace(context);
+      return runAssetAuthoringCommand({
+        parsed,
+        cwd,
+        workspace: workspaceContext.workspace,
+      });
+    }
     if (subcommand === 'init') return await runInitCommand(context);
     if (subcommand === 'validate') {
       const { workspace, runtime } = requireWorkspaceRuntime(context);

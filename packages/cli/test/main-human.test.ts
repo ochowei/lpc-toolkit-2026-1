@@ -8,6 +8,7 @@ import {
   authoringResponseProjection,
   formatHumanResponse,
 } from '../src/response.js';
+import { initializeAssetWorkspace } from '../src/asset-workspace.js';
 import {
   acknowledgeWarning,
   createWarningAssetCommandFixture,
@@ -176,6 +177,54 @@ async function runHumanError(argv: readonly string[], cwd: string): Promise<stri
 }
 
 describe('human-readable CLI output', () => {
+  it('presents a durable missing-credit pause from authoring start', async () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-human-authoring-start-'));
+    const workspace = initializeAssetWorkspace(path.join(cwd, 'workspace'));
+    const planPath = path.join(cwd, 'plan.json');
+    writeFileSync(planPath, `${JSON.stringify({
+      schema: 'lpc-toolkit.asset-authoring-plan.v1',
+      goal: 'new-item',
+      pack: {
+        id: 'acme.human-output',
+        version: '1.0.0',
+        displayName: 'ACME Human Output',
+      },
+      asset: {
+        kind: 'new-item',
+        localId: 'moon-braid',
+        displayName: 'Moon Braid',
+        typeName: 'hair',
+        bodyTypes: ['male'],
+        animations: ['walk'],
+        layers: [{ id: 'foreground', zPos: 120, bodyTypes: ['male'] }],
+      },
+      scope: {
+        packId: 'acme.human-output',
+        assetId: 'moon-braid',
+        bodyTypes: ['male'],
+        animations: ['walk'],
+        paths: ['sprites/moon-braid/foreground/walk.png'],
+      },
+    }, null, 2)}\n`);
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+
+    const code = await runCli([
+      'asset', 'authoring', 'start', '--plan', planPath,
+      '--workspace', workspace.root,
+    ], {
+      cwd,
+      stdout: (text) => stdout.push(text),
+      stderr: (text) => stderr.push(text),
+    });
+
+    expect(code).toBe(0);
+    expect(stderr).toEqual([]);
+    expect(stdout.join('')).toContain('Workflow state: needs-user-action');
+    expect(stdout.join('')).toContain('Reason: missing-draft-credits');
+    expect(stdout.join('')).toContain('Provide the human attribution author.');
+  });
+
   it('summarizes authoring command success separately from workflow state and next action safety', () => {
     const output = formatHumanResponse({
       ok: true,
