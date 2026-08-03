@@ -772,28 +772,67 @@ plugin: update
 - Modify: `packages/cli/scripts/smoke-packed-cli.mjs`
 - Modify: `packages/cli/test/plugin-contract.test.ts`
 
-- [ ] Add a clean-workspace public-argv E2E that performs capability discovery,
+- [x] Add a clean-workspace public-argv E2E that performs capability discovery,
   session start, contract/template generation, real candidate import,
   validation, attributed preview, interruption, external PNG drift, resume,
   stale receipt detection, correction import, and current preview.
-- [ ] Cover one simple male/female walk new item and one exact blank-frame
+- [x] Cover one simple male/female walk new item and one exact blank-frame
   repair with unchanged-cell and inherited-credit evidence.
-- [ ] Assert JSON next actions and artifact/digest bindings at every boundary;
+- [x] Assert JSON next actions and artifact/digest bindings at every boundary;
   do not call implementation modules directly in this acceptance.
-- [ ] Extend packed CLI smoke so the built tarball proves the same foundation
+- [x] Extend packed CLI smoke so the built tarball proves the same foundation
   works outside the monorepo with no repository checkout.
-- [ ] Assert sentinels for base cache, checked-in assets, generated output,
+- [x] Assert sentinels for base cache, checked-in assets, generated output,
   unowned output, and dormant `upstream/` remain untouched.
-- [ ] Add compatibility contract coverage showing the current plugin does not
+- [x] Add compatibility contract coverage showing the current plugin does not
   claim the new authoring capability and can safely refuse it.
-- [ ] Run:
+- [x] Run:
   `rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-session-e2e.test.ts asset-authoring-e2e.test.ts plugin-contract.test.ts`
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/cli build`
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/cli test:package`
-- [ ] Run: `rtk pnpm check:boundaries`
-- [ ] Commit product changes with a focused conventional commit.
-- [ ] Record implementation note, full product commit hash, and exact PASS/FAIL
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/cli build`
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/cli test:package`
+- [x] Run: `rtk pnpm check:boundaries`
+- [x] Commit product changes with a focused conventional commit.
+- [x] Record implementation note, full product commit hash, and exact PASS/FAIL
   verification evidence here; commit the plan record separately.
+
+Implementation note:
+
+- The public acceptance now covers capability discovery, a male/female walk
+  new-item session, contract/template artifacts, real PNG import, validation
+  acknowledgement/reconciliation, attributed preview, interruption/resume,
+  external PNG drift, exact-digest correction import, stale receipt recovery,
+  and current male/female previews. The blank-frame path asserts unchanged-cell
+  evidence, a non-importable reference overlay, inherited source attribution,
+  and unchanged runtime source bytes.
+- Correction import after `external-png-drift` is allowed only with
+  `--replace-existing` and the exact observed `--expected-target-digest`; every
+  candidate import clears prior validation/preview receipts and exposes
+  `validate-session` as the next action. The packed smoke exercises the same
+  flow from the installed tarball in a repository-free workspace and checks
+  base-cache, checked-in-asset, generated-output, unowned-output, and dormant
+  `upstream/` sentinels.
+- TDD evidence: RED —
+  `rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-session-e2e.test.ts`
+  failed at correction import with `asset_authoring_contract_stale`; GREEN —
+  the same command passed with 2 tests after the minimum recovery and receipt
+  invalidation changes.
+- Product commit:
+  `c99db968dc82bf53bc28b0d421da96135efb1410`
+- Verification:
+  - `rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-session-e2e.test.ts asset-authoring-e2e.test.ts plugin-contract.test.ts` PASS (3 files, 23 tests)
+  - `rtk pnpm --filter @lpc-toolkit/cli build` PASS
+  - `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS (`Packed CLI install smoke test passed.`)
+  - `rtk pnpm check:boundaries` PASS
+  - `rtk pnpm --filter @lpc-toolkit/cli typecheck` PASS
+  - `rtk git diff --check` PASS
+- CLI documentation impact reassessment: `help: N/A — no command or option
+  text changed`; `cli-readme: N/A — end-to-end workflow documentation remains
+  Task 10`; `root-readme: N/A — no root workflow copy changed`; `landing: N/A —
+  no positioning copy changed`; `architecture: N/A — no package boundary or
+  ownership changed`; `engineering: N/A — verification policy is unchanged`;
+  `releasing: N/A — no release metadata or publication contract changed`;
+  `plugin: N/A — compatibility coverage confirms the current plugin refuses
+  the newer capability without claiming it`.
 
 ---
 
