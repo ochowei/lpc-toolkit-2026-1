@@ -705,9 +705,17 @@ export async function importAssetAuthoringCandidate(options: {
   if (options.session.conflict !== null) {
     fail('asset_authoring_manifest_conflict', 'Resolve the session manifest conflict before importing a candidate.');
   }
+  const externalPngCorrection = options.session.reason === 'external-png-drift'
+    && options.session.phase === 'blocked'
+    && options.session.checkpointFreshness === 'stale'
+    && options.replaceExisting
+    && options.expectedTargetDigest !== undefined;
   if (
-    options.session.checkpointFreshness !== 'current'
-    || (options.session.phase !== 'contract-ready' && options.session.phase !== 'imported')
+    !externalPngCorrection
+    && (
+      options.session.checkpointFreshness !== 'current'
+      || (options.session.phase !== 'contract-ready' && options.session.phase !== 'imported')
+    )
   ) {
     fail('asset_authoring_contract_stale', 'The authoring session does not have a current drawing contract.');
   }

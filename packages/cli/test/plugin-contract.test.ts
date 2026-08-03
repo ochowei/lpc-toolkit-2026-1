@@ -109,4 +109,23 @@ describe('Codex plugin CLI contract', () => {
     expect(auditWorkflow).toContain('status: "draft"');
     expect(auditWorkflow).toContain('cannot be installed by the CLI');
   });
+
+  it('does not claim the newer asset-authoring session capability', () => {
+    const pluginCommands = [...characterContract.commands, ...auditContract.commands];
+    expect(pluginCommands.some(({ argv }) => argv.slice(0, 2).join(' ') === 'asset authoring'))
+      .toBe(false);
+    expect(pluginCommands.every(({ argv }) =>
+      !(argv[0] === 'asset' && argv[1] === 'authoring'))).toBe(true);
+    expect(workflow).not.toContain('asset authoring');
+    expect(auditWorkflow).not.toContain('asset authoring');
+
+    const unsupportedAuthoringCommand = parseArgs([
+      'asset', 'authoring', 'start', '--plan', 'plan.json', '--json',
+    ]);
+    expect(
+      pluginCommands.some(({ argv }) =>
+        argv.slice(0, unsupportedAuthoringCommand.command.length).join(' ') ===
+        unsupportedAuthoringCommand.command.join(' ')),
+    ).toBe(false);
+  });
 });

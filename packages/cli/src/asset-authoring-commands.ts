@@ -1096,6 +1096,10 @@ async function importCommand(
       freshness: 'current',
     },
     checkpointFreshness: 'current',
+    receipts: {
+      validation: null,
+      preview: null,
+    },
     checkpoints,
     provenance: appendProvenance(session, {
       kind: 'provider',

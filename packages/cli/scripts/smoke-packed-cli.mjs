@@ -60,6 +60,33 @@ function writeWalkPng(filePath) {
   writeFileSync(filePath, canvas.toBuffer('image/png'));
 }
 
+function sha256(bytes) {
+  return `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+}
+
+function digestFile(filePath) {
+  return sha256(readFileSync(filePath));
+}
+
+function writeAuthoringCandidate(filePath, target, colorOffset = 0) {
+  const canvas = createCanvas(target.geometry.canvasWidth, target.geometry.canvasHeight);
+  const context = canvas.getContext('2d');
+  for (const cell of target.cells) {
+    if (cell.policy !== 'required-drawn') continue;
+    context.fillStyle = `rgb(${48 + cell.sourceRow * 17 + colorOffset}, ${90 + cell.sourceColumn * 13}, 160)`;
+    context.fillRect(
+      cell.sourceColumn * target.geometry.frameWidth + 8,
+      cell.sourceRow * target.geometry.frameHeight + 8,
+      target.geometry.frameWidth - 16,
+      target.geometry.frameHeight - 16,
+    );
+  }
+  mkdirSync(path.dirname(filePath), { recursive: true });
+  const bytes = canvas.toBuffer('image/png');
+  writeFileSync(filePath, bytes);
+  return bytes;
+}
+
 async function writeDraftArchive(formalArchivePath, draftArchivePath) {
   const archive = await JSZip.loadAsync(readFileSync(formalArchivePath));
   const files = new Map();
@@ -433,7 +460,7 @@ try {
       encoding: 'utf8',
       env: { ...process.env, LPC_TOOLKIT_CACHE_DIR: cacheRoot },
     });
-    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.status, 0, `${result.stderr}${result.stdout}`);
     return result.stdout;
   }
 
@@ -494,6 +521,342 @@ try {
 
   const cacheSentinelPath = path.join(cacheRoot, 'packed-smoke-sentinel.txt');
   writeFileSync(cacheSentinelPath, 'prepared pinned cache must stay unchanged\n');
+
+  const generatedOutputRoot = path.join(workspaceRoot, 'assets_custom');
+  const generatedOutputMarkerPath = path.join(generatedOutputRoot, '.lpc-toolkit-managed.json');
+  const generatedOutputBefore = readdirSync(generatedOutputRoot).sort();
+  const generatedOutputMarkerBefore = readFileSync(generatedOutputMarkerPath, 'utf8');
+  const canonicalWorkspaceRoot = realpathSync.native(workspaceRoot);
+  const unownedOutputPath = path.join(workspaceRoot, 'artist-notes', 'unowned.txt');
+  mkdirSync(path.dirname(unownedOutputPath), { recursive: true });
+  writeFileSync(unownedOutputPath, 'user-owned output must remain untouched\n');
+
+  const capabilitiesOutput = runInstalledJson(['capabilities']);
+  assert.equal(capabilitiesOutput.ok, true);
+  assert.equal(capabilitiesOutput.command, 'capabilities');
+  assert.ok(capabilitiesOutput.data?.capabilities.includes('asset-authoring-session.v1'));
+  assert.ok(capabilitiesOutput.data?.capabilities.includes('sprite-drawing-contract.v1'));
+  assert.ok(capabilitiesOutput.data?.schemaVersions.includes('lpc-toolkit.asset-authoring-plan.v1'));
+
+  const authoringPlanPath = path.join(emptyCwd, 'packed-authoring-plan.json');
+  writeJson(authoringPlanPath, {
+    schema: 'lpc-toolkit.asset-authoring-plan.v1',
+    goal: 'new-item',
+    pack: {
+      id: 'smoke.packed-authoring',
+      version: '1.0.0',
+      displayName: 'Packed Authoring Smoke',
+    },
+    asset: {
+      kind: 'new-item',
+      localId: 'moon-braid',
+      displayName: 'Moon Braid',
+      typeName: 'hair',
+      bodyTypes: ['male', 'female'],
+      animations: ['walk'],
+      layers: [{ id: 'foreground', zPos: 120, bodyTypes: ['male', 'female'] }],
+    },
+    scope: {
+      packId: 'smoke.packed-authoring',
+      assetId: 'moon-braid',
+      bodyTypes: ['male', 'female'],
+      animations: ['walk'],
+      paths: ['sprites/moon-braid/foreground/walk.png'],
+    },
+    draftCredits: {
+      authors: ['Packed Authoring Artist'],
+      licenses: ['CC-BY-SA 4.0'],
+      urls: ['https://example.test/packed-authoring'],
+      notes: 'Packed authoring smoke attribution.',
+    },
+  });
+
+  const authoringStart = runInstalledJson([
+    'asset', 'authoring', 'start', '--plan', authoringPlanPath,
+  ], workspaceRoot);
+  assert.equal(authoringStart.ok, true);
+  const authoringStartData = authoringStart.data;
+  assert.equal(authoringStartData?.phase, 'scaffolded');
+  assert.equal(authoringStartData?.reason, 'scaffolded');
+  assert.equal(Array.isArray(authoringStartData?.nextActions), true);
+  assert.deepEqual(authoringStartData?.nextActions.map(({ id }) => id), ['create-contract']);
+  assert.equal(typeof authoringStartData?.sessionId, 'string');
+  const authoringSessionId = authoringStartData.sessionId;
+  const authoringPackRoot = realpathSync.native(path.join(
+    workspaceRoot,
+    'artist-packs',
+    'smoke.packed-authoring',
+  ));
+  const authoringManifestPath = path.join(authoringPackRoot, 'asset-pack.json');
+  assert.equal(authoringStartData?.manifestDigest, digestFile(authoringManifestPath));
+  const startPackArtifact = authoringStartData?.artifacts.find(({ id }) => id === 'pack');
+  assert.equal(startPackArtifact?.path, authoringPackRoot);
+  assert.equal(startPackArtifact?.digest, digestFile(authoringManifestPath));
+  assert.deepEqual(
+    authoringStartData?.nextActions[0]?.preconditionDigests,
+    [authoringStartData.manifestDigest],
+  );
+
+  const authoringContractOutput = runInstalledJson([
+    'asset', 'authoring', 'contract', '--session', authoringSessionId,
+  ], workspaceRoot);
+  assert.equal(authoringContractOutput.ok, true);
+  const authoringContractData = authoringContractOutput.data;
+  assert.equal(authoringContractData?.phase, 'contract-ready');
+  assert.equal(Array.isArray(authoringContractData?.nextActions), true);
+  assert.deepEqual(authoringContractData?.nextActions, []);
+  const authoringContractArtifact = authoringContractData?.artifacts.find(({ id }) => id === 'contract');
+  assert.ok(authoringContractArtifact);
+  assert.equal(digestFile(authoringContractArtifact.path), authoringContractArtifact.digest);
+  assert.equal(authoringContractData.checkpoint?.digest, authoringContractArtifact.digest);
+  const authoringContract = JSON.parse(
+    readFileSync(authoringContractArtifact.path, 'utf8'),
+  );
+  assert.equal(authoringContract.targets.length, 1);
+  const authoringTarget = authoringContract.targets[0];
+  assert.ok(authoringTarget);
+  assert.deepEqual(authoringTarget.bodyTypes, ['male', 'female']);
+  const authoringContractDigest = authoringContractArtifact.digest;
+  const authoringCandidatePath = path.join(
+    canonicalWorkspaceRoot,
+    'authoring-candidates',
+    'walk.png',
+  );
+  writeAuthoringCandidate(authoringCandidatePath, authoringTarget);
+  const authoringCandidateDigest = digestFile(authoringCandidatePath);
+
+  const authoringImportOutput = runInstalledJson([
+    'asset', 'authoring', 'import',
+    '--session', authoringSessionId,
+    '--target', authoringTarget.id,
+    '--candidate', authoringCandidatePath,
+    '--contract-digest', authoringContractDigest,
+  ], workspaceRoot);
+  assert.equal(authoringImportOutput.ok, true);
+  const authoringImportData = authoringImportOutput.data;
+  assert.equal(authoringImportData?.phase, 'imported');
+  assert.equal(authoringImportData?.reason, 'candidate-imported');
+  assert.equal(Array.isArray(authoringImportData?.nextActions), true);
+  assert.deepEqual(authoringImportData?.nextActions.map(({ id }) => id), ['validate-session']);
+  const importedCandidateArtifact = authoringImportData?.artifacts.find(({ id }) => id === 'candidate');
+  const importedTargetArtifact = authoringImportData?.artifacts.find(({ id }) => id === `target:${authoringTarget.id}`);
+  assert.equal(importedCandidateArtifact?.digest, authoringCandidateDigest);
+  assert.ok(importedTargetArtifact);
+  const authoringTargetPath = path.join(authoringPackRoot, ...authoringTarget.path.split('/'));
+  assert.equal(importedTargetArtifact.digest, digestFile(authoringTargetPath));
+  assert.equal(authoringImportData.checkpoint?.digest, importedTargetArtifact.digest);
+
+  let authoringValidationOutput = runInstalledJson([
+    'asset', 'authoring', 'validate', '--session', authoringSessionId,
+  ], workspaceRoot);
+  assert.equal(authoringValidationOutput.ok, true);
+  let authoringValidationData = authoringValidationOutput.data;
+  assert.equal(Array.isArray(authoringValidationData?.nextActions), true);
+  assert.ok(authoringValidationData?.validation);
+  assert.equal(authoringValidationData.validation.sourceDigests?.[0]?.digest, digestFile(authoringTargetPath));
+  assert.equal(authoringValidationData.validation.manifestDigest, digestFile(authoringManifestPath));
+  if (!authoringValidationData.validation.valid) {
+    assert.ok(authoringValidationData.validation.acknowledgementRecords.length > 0);
+    const manifest = JSON.parse(readFileSync(authoringManifestPath, 'utf8'));
+    writeJson(authoringManifestPath, {
+      ...manifest,
+      acknowledgements: authoringValidationData.validation.acknowledgementRecords.map((record) => ({
+        ...record,
+        reason: 'Reviewed the packed public session validation evidence.',
+      })),
+    });
+    const externalManifestDigest = digestFile(authoringManifestPath);
+    const manifestConflict = runInstalledJson([
+      'asset', 'authoring', 'resume', '--session', authoringSessionId,
+    ], workspaceRoot);
+    assert.equal(manifestConflict.ok, true);
+    assert.equal(manifestConflict.data?.reason, 'manifest-conflict');
+    assert.deepEqual(
+      manifestConflict.data?.nextActions.map(({ id }) => id),
+      ['adopt-external-manifest', 'restore-session-manifest'],
+    );
+    const manifestReconciled = runInstalledJson([
+      'asset', 'authoring', 'reconcile-manifest',
+      '--session', authoringSessionId,
+      '--use', 'external',
+      '--expected-external-digest', externalManifestDigest,
+    ], workspaceRoot);
+    assert.equal(manifestReconciled.ok, true);
+    assert.equal(manifestReconciled.data?.reason, 'manifest-adopted');
+    assert.deepEqual(manifestReconciled.data?.nextActions.map(({ id }) => id), ['create-contract']);
+    authoringValidationOutput = runInstalledJson([
+      'asset', 'authoring', 'validate', '--session', authoringSessionId,
+    ], workspaceRoot);
+    authoringValidationData = authoringValidationOutput.data;
+  }
+  assert.equal(authoringValidationData?.validation?.valid, true);
+  assert.equal(authoringValidationData?.phase, 'validated');
+  assert.deepEqual(authoringValidationData?.nextActions.map(({ id }) => id), ['preview-session']);
+  assert.match(authoringValidationData?.checkpoint?.digest ?? '', /^sha256:[0-9a-f]{64}$/u);
+
+  const authoringPreviewOutput = runInstalledJson([
+    'asset', 'authoring', 'preview',
+    '--session', authoringSessionId,
+    '--body-type', 'male',
+    '--animation', 'walk',
+  ], workspaceRoot);
+  assert.equal(authoringPreviewOutput.ok, true);
+  const authoringPreviewData = authoringPreviewOutput.data;
+  assert.equal(authoringPreviewData?.phase, 'previewed');
+  assert.equal(authoringPreviewData?.reason, 'preview-current');
+  assert.deepEqual(authoringPreviewData?.nextActions, []);
+  assert.equal(authoringPreviewData?.preview?.input.bodyType, 'male');
+  assert.equal(authoringPreviewData?.preview?.input.animation, 'walk');
+  assert.equal(authoringPreviewData?.preview?.manifestDigest, authoringValidationData?.validation?.manifestDigest);
+  assert.deepEqual(
+    authoringPreviewData?.preview?.sourceDigests,
+    authoringValidationData?.validation?.sourceDigests,
+  );
+  assert.equal(authoringPreviewData?.preview?.artifacts.length, 4);
+  for (const artifact of authoringPreviewData.preview.artifacts) {
+    assert.equal(digestFile(artifact.path), artifact.digest);
+    assert.ok(artifact.path.startsWith(`${authoringPackRoot}${path.sep}`));
+  }
+  assert.match(
+    readFileSync(
+      authoringPreviewData.preview.artifacts.find(({ id }) => id === 'preview:credits_txt').path,
+      'utf8',
+    ),
+    /Packed Authoring Artist/u,
+  );
+
+  const interruptedAuthoring = runInstalledJson([
+    'asset', 'authoring', 'status', '--session', authoringSessionId,
+  ], workspaceRoot);
+  assert.equal(interruptedAuthoring.ok, true);
+  assert.deepEqual(
+    {
+      phase: interruptedAuthoring.data?.phase,
+      reason: interruptedAuthoring.data?.reason,
+      checkpointFreshness: interruptedAuthoring.data?.checkpointFreshness,
+      nextActions: interruptedAuthoring.data?.nextActions,
+    },
+    {
+      phase: 'previewed',
+      reason: 'preview-current',
+      checkpointFreshness: 'current',
+      nextActions: [],
+    },
+  );
+  const resumedAuthoring = runInstalledJson([
+    'asset', 'authoring', 'resume', '--session', authoringSessionId,
+  ], workspaceRoot);
+  assert.equal(resumedAuthoring.ok, true);
+  assert.equal(resumedAuthoring.data?.reason, 'preview-current');
+  assert.deepEqual(resumedAuthoring.data?.nextActions, []);
+
+  const externalBytes = writeAuthoringCandidate(
+    path.join(canonicalWorkspaceRoot, 'external-authoring.png'),
+    authoringTarget,
+    7,
+  );
+  writeFileSync(authoringTargetPath, externalBytes);
+  const externalTargetDigest = sha256(externalBytes);
+  const driftOutput = runInstalledJson([
+    'asset', 'authoring', 'resume', '--session', authoringSessionId,
+  ], workspaceRoot);
+  assert.equal(driftOutput.ok, true);
+  assert.equal(driftOutput.data?.phase, 'blocked');
+  assert.equal(driftOutput.data?.reason, 'external-png-drift');
+  assert.equal(driftOutput.data?.checkpointFreshness, 'stale');
+  assert.deepEqual(driftOutput.data?.nextActions.map(({ id }) => id), ['review-external-png']);
+  assert.deepEqual(driftOutput.data?.nextActions.map(({ safety }) => safety), ['safe']);
+  assert.ok(driftOutput.data?.sourceDigests.includes(externalTargetDigest));
+
+  const correctionPath = path.join(canonicalWorkspaceRoot, 'authoring-candidates', 'walk-correction.png');
+  writeAuthoringCandidate(correctionPath, authoringTarget, 13);
+  const correctionOutput = runInstalledJson([
+    'asset', 'authoring', 'import',
+    '--session', authoringSessionId,
+    '--target', authoringTarget.id,
+    '--candidate', correctionPath,
+    '--contract-digest', authoringContractDigest,
+    '--replace-existing',
+    '--expected-target-digest', externalTargetDigest,
+  ], workspaceRoot);
+  assert.equal(correctionOutput.ok, true);
+  assert.equal(correctionOutput.data?.phase, 'imported');
+  assert.equal(correctionOutput.data?.reason, 'candidate-imported');
+  assert.deepEqual(correctionOutput.data?.nextActions.map(({ id }) => id), ['validate-session']);
+  const correctionTargetArtifact = correctionOutput.data?.artifacts.find(({ id }) => id === `target:${authoringTarget.id}`);
+  assert.ok(correctionTargetArtifact);
+  assert.equal(correctionTargetArtifact.digest, digestFile(authoringTargetPath));
+  assert.equal(correctionOutput.data.checkpoint?.digest, correctionTargetArtifact.digest);
+
+  let currentValidationOutput = runInstalledJson([
+    'asset', 'authoring', 'validate', '--session', authoringSessionId,
+  ], workspaceRoot);
+  assert.equal(currentValidationOutput.ok, true);
+  let currentValidationData = currentValidationOutput.data;
+  if (!currentValidationData?.validation?.valid) {
+    assert.ok(currentValidationData?.validation?.acknowledgementRecords.length > 0);
+    const manifest = JSON.parse(readFileSync(authoringManifestPath, 'utf8'));
+    writeJson(authoringManifestPath, {
+      ...manifest,
+      acknowledgements: currentValidationData.validation.acknowledgementRecords.map((record) => ({
+        ...record,
+        reason: 'Reviewed the corrected packed session validation evidence.',
+      })),
+    });
+    const externalManifestDigest = digestFile(authoringManifestPath);
+    const manifestConflict = runInstalledJson([
+      'asset', 'authoring', 'resume', '--session', authoringSessionId,
+    ], workspaceRoot);
+    assert.equal(manifestConflict.data?.reason, 'manifest-conflict');
+    const manifestReconciled = runInstalledJson([
+      'asset', 'authoring', 'reconcile-manifest',
+      '--session', authoringSessionId,
+      '--use', 'external',
+      '--expected-external-digest', externalManifestDigest,
+    ], workspaceRoot);
+    assert.equal(manifestReconciled.data?.reason, 'manifest-adopted');
+    currentValidationOutput = runInstalledJson([
+      'asset', 'authoring', 'validate', '--session', authoringSessionId,
+    ], workspaceRoot);
+    currentValidationData = currentValidationOutput.data;
+  }
+  assert.equal(currentValidationData?.validation?.valid, true, JSON.stringify(currentValidationData));
+  assert.equal(currentValidationData?.phase, 'validated');
+  assert.deepEqual(currentValidationData?.nextActions.map(({ id }) => id), ['preview-session']);
+  assert.equal(
+    currentValidationData?.validation?.sourceDigests?.[0]?.digest,
+    digestFile(authoringTargetPath),
+  );
+
+  const currentPreviewOutput = runInstalledJson([
+    'asset', 'authoring', 'preview',
+    '--session', authoringSessionId,
+    '--body-type', 'female',
+    '--animation', 'walk',
+  ], workspaceRoot);
+  assert.equal(currentPreviewOutput.ok, true);
+  const currentPreviewData = currentPreviewOutput.data;
+  assert.equal(currentPreviewData?.phase, 'previewed');
+  assert.equal(currentPreviewData?.reason, 'preview-current');
+  assert.equal(currentPreviewData?.preview?.input.bodyType, 'female');
+  assert.equal(currentPreviewData?.preview?.input.animation, 'walk');
+  assert.equal(currentPreviewData?.preview?.artifacts.length, 4);
+  for (const artifact of currentPreviewData.preview.artifacts) {
+    assert.equal(digestFile(artifact.path), artifact.digest);
+  }
+
+  assert.equal(
+    readFileSync(cacheSentinelPath, 'utf8'),
+    'prepared pinned cache must stay unchanged\n',
+  );
+  assert.deepEqual(readdirSync(generatedOutputRoot).sort(), generatedOutputBefore);
+  assert.equal(readFileSync(generatedOutputMarkerPath, 'utf8'), generatedOutputMarkerBefore);
+  assert.equal(
+    readFileSync(unownedOutputPath, 'utf8'),
+    'user-owned output must remain untouched\n',
+  );
+  assert.equal(existsSync(path.join(emptyCwd, 'assets')), false);
+  assert.equal(existsSync(path.join(emptyCwd, 'upstream')), false);
 
   const scaffoldOutput = runInstalledJson([
     'asset', 'init', '--new',
