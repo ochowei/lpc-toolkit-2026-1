@@ -1,5 +1,8 @@
+import { createHash } from 'node:crypto';
 import {
+  lstatSync,
   mkdirSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -44,6 +47,12 @@ export interface AssetPackPreviewResult {
   readonly warnings: readonly CliIssue[];
   readonly metadataPath: string;
   readonly outDir: string;
+}
+
+export interface AssetPackPreviewArtifactReceipt {
+  readonly type: PreviewArtifact['type'];
+  readonly path: string;
+  readonly digest: string;
 }
 
 export class AssetPackPreviewError extends Error {
@@ -91,6 +100,66 @@ function desiredStateFailure(
     first.details,
     diagnostics,
   );
+}
+
+function readPreviewArtifact(filePath: string): Buffer | undefined {
+  try {
+    const stats = lstatSync(filePath);
+    if (stats.isSymbolicLink() || !stats.isFile()) return undefined;
+    return readFileSync(filePath);
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+export function captureAssetPackPreviewArtifacts(
+  result: AssetPackPreviewResult,
+): readonly AssetPackPreviewArtifactReceipt[] {
+  const requiredTypes: readonly PreviewArtifact['type'][] = [
+    'preview',
+    'metadata',
+    'credits_txt',
+    'credits_csv',
+  ];
+  const seenTypes = new Set<PreviewArtifact['type']>();
+  const artifacts = result.artifacts.map((artifact) => {
+    const bytes = readPreviewArtifact(artifact.path);
+    if (bytes === undefined) {
+      throw previewFailure(
+        'asset_preview_artifact_missing',
+        `Preview artifact is missing: ${artifact.path}.`,
+        artifact.path,
+      );
+    }
+    seenTypes.add(artifact.type);
+    return {
+      type: artifact.type,
+      path: artifact.path,
+      digest: `sha256:${createHash('sha256').update(bytes).digest('hex')}`,
+    };
+  });
+  const missing = requiredTypes.filter((type) => !seenTypes.has(type));
+  const metadataArtifact = result.artifacts.find((artifact) => artifact.type === 'metadata');
+  if (metadataArtifact === undefined || metadataArtifact.path !== result.metadataPath) {
+    throw previewFailure(
+      'asset_preview_artifacts_incomplete',
+      'Attributed preview metadata is missing or does not match the reported metadata path.',
+      result.metadataPath,
+      { available: result.artifacts.map((artifact) => artifact.type) },
+    );
+  }
+  if (missing.length > 0) {
+    throw previewFailure(
+      'asset_preview_artifacts_incomplete',
+      `Attributed preview is incomplete; missing ${missing.join(', ')} artifact(s).`,
+      result.outDir,
+      { available: result.artifacts.map((artifact) => artifact.type) },
+    );
+  }
+  return artifacts;
 }
 
 export function previewValidationDirectoryName(contentDigest: string): string {

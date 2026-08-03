@@ -4,6 +4,7 @@ import {
   AUTHORING_CAPABILITIES,
   AUTHORING_SCHEMA_VERSIONS,
 } from './capabilities.js';
+import type { AssetPackValidationReport } from './asset-pack-validation.js';
 
 export interface CliIssue {
   readonly code: string;
@@ -63,6 +64,28 @@ export interface AuthoringNextAction {
   readonly expectedCheckpoint: AuthoringCheckpoint | null;
 }
 
+export interface AuthoringSourceDigest {
+  readonly path: string;
+  readonly digest: string;
+}
+
+export interface AuthoringPreviewInput {
+  readonly assetId: string | null;
+  readonly animation: string | null;
+  readonly bodyType: string | null;
+  readonly characterPath: string | null;
+  readonly digest: string;
+}
+
+export interface AuthoringPreviewData {
+  readonly input: AuthoringPreviewInput;
+  readonly validationRevision: string;
+  readonly artifacts: readonly AuthoringArtifact[];
+  readonly warnings: readonly CliIssue[];
+  readonly manifestDigest: string;
+  readonly sourceDigests: readonly AuthoringSourceDigest[];
+}
+
 export interface AuthoringResponseProjectionInput {
   readonly sessionId: string;
   readonly goal: AuthoringGoal;
@@ -78,6 +101,8 @@ export interface AuthoringResponseProjectionInput {
   readonly retrySafety: AuthoringActionSafety;
   readonly manifestDigest: string | null;
   readonly sourceDigests: readonly string[];
+  readonly validation?: AssetPackValidationReport;
+  readonly preview?: AuthoringPreviewData;
 }
 
 export interface AuthoringResponseData extends AuthoringResponseProjectionInput {
@@ -98,6 +123,25 @@ export function authoringResponseProjection(
     inputsNeeded: [...input.inputsNeeded],
     nextActions: [...input.nextActions],
     sourceDigests: [...input.sourceDigests],
+    ...(input.validation === undefined ? {} : {
+      validation: {
+        ...input.validation,
+        diagnostics: [...input.validation.diagnostics],
+        acknowledgementRecords: [...input.validation.acknowledgementRecords],
+        ...(input.validation.sourceDigests === undefined ? {} : {
+          sourceDigests: [...input.validation.sourceDigests],
+        }),
+      },
+    }),
+    ...(input.preview === undefined ? {} : {
+      preview: {
+        ...input.preview,
+        input: { ...input.preview.input },
+        artifacts: [...input.preview.artifacts],
+        warnings: [...input.preview.warnings],
+        sourceDigests: [...input.preview.sourceDigests],
+      },
+    }),
     cliVersion: CLI_VERSION,
     capabilities: [...AUTHORING_CAPABILITIES],
     schemaVersions: [...AUTHORING_SCHEMA_VERSIONS],
@@ -313,6 +357,49 @@ function formatAuthoringResponse(
     `Reason: ${reason}`,
     `Checkpoint: ${checkpointFreshness}`,
   ];
+  const validation = data['validation'];
+  if (isRecord(validation) && typeof validation['valid'] === 'boolean') {
+    const diagnostics = recordArrayValue(validation, 'diagnostics') ?? [];
+    const acknowledgements = recordArrayValue(validation, 'acknowledgementRecords') ?? [];
+    lines.push(`Validation: ${validation['valid'] ? 'valid' : 'invalid'}`);
+    if (diagnostics.length > 0) {
+      const errors = diagnostics.filter((diagnostic) => diagnostic['severity'] === 'error');
+      const warnings = diagnostics.filter((diagnostic) => diagnostic['severity'] === 'warning');
+      lines.push(
+        `Validation findings: ${diagnostics.length}`,
+        ...(errors.length > 0 ? [`Validation errors: ${errors.length}`] : []),
+        ...(warnings.length > 0 ? [`Validation warnings: ${warnings.length}`] : []),
+      );
+    }
+    if (acknowledgements.length > 0) {
+      lines.push(
+        'Acknowledgement templates (copy exact JSON and add a non-empty reason):',
+        JSON.stringify(acknowledgements, null, 2),
+      );
+    }
+  }
+  const preview = data['preview'];
+  if (isRecord(preview)) {
+    const artifacts = recordArrayValue(preview, 'artifacts') ?? [];
+    const validationRevision = stringValue(preview, 'validationRevision');
+    const input = isRecord(preview['input']) ? preview['input'] : undefined;
+    const inputDigest = input === undefined ? undefined : stringValue(input, 'digest');
+    if (validationRevision) lines.push(`Validation revision: ${validationRevision}`);
+    if (inputDigest) lines.push(`Preview input: ${inputDigest}`);
+    if (artifacts.length > 0) {
+      lines.push(`Preview artifacts (${artifacts.length}):`);
+      for (const artifact of artifacts) {
+        const artifactId = stringValue(artifact, 'id');
+        const artifactPath = stringValue(artifact, 'path');
+        const artifactDigest = stringValue(artifact, 'digest');
+        if (artifactId && artifactPath) {
+          lines.push(
+            `- ${artifactId}: ${artifactPath}${artifactDigest ? ` (${artifactDigest})` : ''}`,
+          );
+        }
+      }
+    }
+  }
   const inputs = recordArrayValue(data, 'inputsNeeded') ?? [];
   if (inputs.length > 0) {
     lines.push('Inputs needed:');

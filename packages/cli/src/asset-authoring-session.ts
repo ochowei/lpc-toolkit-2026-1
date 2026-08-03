@@ -237,6 +237,8 @@ export interface AssetAuthoringEvidence {
   readonly sourceDigests: readonly AssetAuthoringSourceDigest[];
   readonly validationReceipt: AssetAuthoringValidationReceipt | null;
   readonly previewReceipt: AssetAuthoringPreviewReceipt | null;
+  /** The newly requested preview input, separate from the last receipt. */
+  readonly previewInputDigest?: string | null;
 }
 
 export type AssetAuthoringInvalidationCheckpoint =
@@ -1004,6 +1006,10 @@ export function deriveAuthoringInvalidationDecisions(
     && (
       current.previewReceipt.manifestDigest !== current.manifestDigest
       || !sameSourceDigests(current.previewReceipt.sourceDigests, current.sourceDigests)
+      || (
+        current.previewInputDigest !== undefined
+        && current.previewInputDigest !== current.previewReceipt.inputDigest
+      )
     )
   ) {
     decisions.push({ checkpoint: 'preview', reason: 'preview-receipt-stale' });

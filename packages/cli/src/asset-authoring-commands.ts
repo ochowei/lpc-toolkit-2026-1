@@ -23,12 +23,24 @@ import {
   importAssetAuthoringCandidate,
 } from './asset-authoring-import.js';
 import {
+  AssetPackPreviewError,
+  captureAssetPackPreviewArtifacts,
+  previewAssetPack,
+} from './asset-pack-preview.js';
+import {
+  validateAssetPackDirectory,
+  type AssetPackValidationReport,
+} from './asset-pack-validation.js';
+import { loadAssetPackFiles } from './asset-pack-files.js';
+import { PreviewError } from './preview.js';
+import {
   assetAuthoringSessionPath,
   createAssetAuthoringSessionStore,
   AssetAuthoringSessionError,
   type AssetAuthoringManifestConflict,
   type AssetAuthoringProvenanceEvent,
   type AssetAuthoringSession,
+  type AssetAuthoringSessionReceipts,
   type AssetAuthoringSessionUpdate,
 } from './asset-authoring-session.js';
 import type { AssetWorkspace } from './asset-workspace.js';
@@ -40,6 +52,8 @@ import {
   type AuthoringArtifact,
   type AuthoringInputNeeded,
   type AuthoringNextAction,
+  type AuthoringPreviewData,
+  type AuthoringPreviewInput,
   type AuthoringResponseData,
   type AuthoringResponseProjectionInput,
   type CliIssue,
@@ -78,17 +92,21 @@ interface ResponseOptions {
   readonly diagnostics?: readonly CliIssue[];
   readonly artifacts?: readonly AuthoringArtifact[];
   readonly inputsNeeded?: readonly AuthoringInputNeeded[];
+  readonly validation?: AssetPackValidationReport;
+  readonly preview?: AuthoringPreviewData;
 }
 
 function issue(
   code: string,
   message: string,
   issuePath?: string,
+  details?: CliIssue['details'],
 ): CliIssue {
   return {
     code,
     message,
     ...(issuePath === undefined ? {} : { path: issuePath }),
+    ...(details === undefined ? {} : { details }),
   };
 }
 
@@ -329,6 +347,50 @@ function nextActionsFor(session: AssetAuthoringSession): readonly AuthoringNextA
     )];
   }
 
+  if (
+    session.reason === 'validation-receipt-stale'
+    || session.reason === 'validation-incomplete'
+    || session.reason === 'validation-failed'
+  ) {
+    return [nextAction(
+      'validate-session',
+      'Re-run validation against the current session-owned pack sources.',
+      `asset authoring validate --session ${session.sessionId}`,
+      'safe',
+      session.manifestDigest === null ? [] : [session.manifestDigest],
+    )];
+  }
+
+  if (session.reason === 'preview-receipt-stale') {
+    return [nextAction(
+      'preview-session',
+      'Re-render the attributed preview for the current validation receipt.',
+      `asset authoring preview --session ${session.sessionId}`,
+      'safe',
+      session.manifestDigest === null ? [] : [session.manifestDigest],
+    )];
+  }
+
+  if (session.phase === 'imported' && session.receipts.validation === null) {
+    return [nextAction(
+      'validate-session',
+      'Validate the imported candidate against the current asset-pack sources.',
+      `asset authoring validate --session ${session.sessionId}`,
+      'safe',
+      session.manifestDigest === null ? [] : [session.manifestDigest],
+    )];
+  }
+
+  if (session.phase === 'validated' && session.receipts.validation !== null && session.receipts.preview === null) {
+    return [nextAction(
+      'preview-session',
+      'Create an attributed preview from the current validation receipt.',
+      `asset authoring preview --session ${session.sessionId}`,
+      'safe',
+      session.manifestDigest === null ? [] : [session.manifestDigest],
+    )];
+  }
+
   return [];
 }
 
@@ -358,6 +420,8 @@ function responseFor(
     manifestDigest: session.manifestDigest,
     sourceDigests: session.checkpoints.flatMap((checkpoint) =>
       checkpoint.checkpoint ? [checkpoint.checkpoint.digest] : []),
+    ...(options.validation === undefined ? {} : { validation: options.validation }),
+    ...(options.preview === undefined ? {} : { preview: options.preview }),
   };
   return authoringResponseProjection(input);
 }
@@ -675,6 +739,229 @@ function resumeCommand(
   ));
 }
 
+async function freshSessionValidation(options: {
+  readonly session: AssetAuthoringSession;
+  readonly workspace: AssetWorkspace;
+  readonly runtime: RuntimeAssets;
+}): Promise<AssetPackValidationReport> {
+  const loaded = await loadAssetPackFiles(options.session.packRoot);
+  if (loaded.ok) {
+    return validateAssetPackDirectory({
+      packDirectory: options.session.packRoot,
+      workspace: options.workspace,
+      runtime: options.runtime,
+      snapshot: loaded,
+    });
+  }
+  return validateAssetPackDirectory({
+    packDirectory: options.session.packRoot,
+    workspace: options.workspace,
+    runtime: options.runtime,
+  });
+}
+
+function validationSessionUpdate(
+  session: AssetAuthoringSession,
+  report: AssetPackValidationReport,
+): AssetAuthoringSessionUpdate {
+  const sourceDigests = report.sourceDigests?.map((entry) => ({
+    path: entry.path,
+    digest: entry.digest,
+  })) ?? null;
+  const manifestDigest = report.manifestDigest;
+  const exactEvidence = session.manifestDigest !== null
+    && manifestDigest === session.manifestDigest
+    && sourceDigests !== null;
+  const validationRevision = report.contentDigest ?? manifestDigest;
+  const receipt = exactEvidence && validationRevision !== undefined
+    ? {
+      id: validationRevision,
+      manifestDigest,
+      sourceDigests,
+    }
+    : null;
+  const checkpoint = validationRevision === undefined
+    ? null
+    : {
+      id: 'validation',
+      phase: 'validated' as const,
+      digest: validationRevision,
+      freshness: exactEvidence ? 'current' as const : 'stale' as const,
+    };
+  const reason = report.valid
+    ? exactEvidence ? 'validation-current' : 'validation-incomplete'
+    : 'validation-failed';
+  const receipts: AssetAuthoringSessionReceipts = {
+    validation: receipt,
+    preview: null,
+  };
+  return {
+    state: 'needs-user-action',
+    reason,
+    phase: 'validated',
+    checkpoint,
+    checkpointFreshness: exactEvidence ? 'current' : 'stale',
+    receipts,
+    provenance: appendProvenance(session, {
+      kind: 'provider',
+      occurredAt: new Date().toISOString(),
+      ...(validationRevision === undefined ? {} : { digest: validationRevision }),
+      summary: exactEvidence
+        ? 'Fresh asset-pack validation recorded for the session source set.'
+        : 'Asset-pack validation completed without a complete session evidence set.',
+    }),
+  };
+}
+
+async function validateCommand(
+  context: AuthoringCommandContext,
+  sessionId: string,
+): Promise<CliResponse<AuthoringResponseData>> {
+  if (context.runtime === undefined) {
+    throw new AuthoringCommandError(
+      'The asset authoring validate command requires prepared runtime assets.',
+      { code: 'asset_authoring_runtime_missing' },
+    );
+  }
+  const store = createAssetAuthoringSessionStore(context.workspace);
+  const session = resumeSession(context.workspace, store.read(sessionId));
+  if (session.conflict !== null) {
+    throw new AuthoringCommandError(
+      'The authoring session has an unresolved manifest conflict; reconcile it before validation.',
+      { code: 'asset_authoring_manifest_conflict' },
+    );
+  }
+  const report = await freshSessionValidation({
+    session,
+    workspace: context.workspace,
+    runtime: context.runtime,
+  });
+  const next = store.replace(sessionId, validationSessionUpdate(session, report));
+  return commandOk(
+    'asset authoring validate',
+    responseFor(next, { validation: report }),
+  );
+}
+
+function previewInput(context: AuthoringCommandContext): AuthoringPreviewInput {
+  const characterArgument = flagString(context.parsed.flags, 'character');
+  const inputWithoutDigest = {
+    assetId: flagString(context.parsed.flags, 'asset') ?? null,
+    animation: flagString(context.parsed.flags, 'animation') ?? null,
+    bodyType: flagString(context.parsed.flags, 'body-type') ?? null,
+    characterPath: characterArgument === undefined
+      ? null
+      : absolutePath(context.cwd, characterArgument),
+  };
+  return {
+    ...inputWithoutDigest,
+    digest: sha256(Buffer.from(JSON.stringify(inputWithoutDigest), 'utf8')),
+  };
+}
+
+function previewArtifacts(
+  result: Awaited<ReturnType<typeof previewAssetPack>>,
+): readonly AuthoringArtifact[] {
+  return captureAssetPackPreviewArtifacts(result).map((artifact) => {
+    return {
+      id: `preview:${artifact.type}`,
+      path: artifact.path,
+      digest: artifact.digest,
+    };
+  });
+}
+
+async function previewCommand(
+  context: AuthoringCommandContext,
+  sessionId: string,
+): Promise<CliResponse<AuthoringResponseData>> {
+  if (context.runtime === undefined) {
+    throw new AuthoringCommandError(
+      'The asset authoring preview command requires prepared runtime assets.',
+      { code: 'asset_authoring_runtime_missing' },
+    );
+  }
+  const store = createAssetAuthoringSessionStore(context.workspace);
+  const session = resumeSession(context.workspace, store.read(sessionId));
+  if (session.conflict !== null) {
+    throw new AuthoringCommandError(
+      'The authoring session has an unresolved manifest conflict; reconcile it before previewing.',
+      { code: 'asset_authoring_manifest_conflict' },
+    );
+  }
+  const report = await freshSessionValidation({
+    session,
+    workspace: context.workspace,
+    runtime: context.runtime,
+  });
+  const validated = store.replace(sessionId, validationSessionUpdate(session, report));
+  if (!report.valid || validated.receipts.validation === null) {
+    return commandOk(
+      'asset authoring preview',
+      responseFor(validated, { validation: report }),
+    );
+  }
+
+  const input = previewInput(context);
+  const result = await previewAssetPack({
+    packDirectory: validated.packRoot,
+    workspace: context.workspace,
+    runtime: context.runtime,
+    ...(input.assetId === null ? {} : { assetId: input.assetId }),
+    ...(input.animation === null ? {} : { animation: input.animation }),
+    ...(input.bodyType === null ? {} : { bodyType: input.bodyType }),
+    ...(input.characterPath === null ? {} : { characterPath: input.characterPath }),
+  });
+  const artifacts = previewArtifacts(result);
+  const sourceDigests = validated.receipts.validation.sourceDigests;
+  const previewReceipt = {
+    id: input.digest,
+    manifestDigest: validated.receipts.validation.manifestDigest,
+    sourceDigests,
+    inputDigest: input.digest,
+  };
+  const next = store.replace(sessionId, {
+    state: 'needs-user-action',
+    reason: 'preview-current',
+    phase: 'previewed',
+    checkpoint: {
+      id: 'preview',
+      phase: 'previewed',
+      digest: input.digest,
+      freshness: 'current',
+    },
+    checkpointFreshness: 'current',
+    receipts: {
+      validation: validated.receipts.validation,
+      preview: previewReceipt,
+    },
+    provenance: appendProvenance(validated, {
+      kind: 'provider',
+      occurredAt: new Date().toISOString(),
+      digest: input.digest,
+      summary: 'Attributed preview rendered from the current validation receipt.',
+    }),
+  });
+  const preview: AuthoringPreviewData = {
+    input,
+    validationRevision: validated.receipts.validation.id,
+    artifacts,
+    warnings: result.warnings,
+    manifestDigest: validated.receipts.validation.manifestDigest,
+    sourceDigests,
+  };
+  return commandOk(
+    'asset authoring preview',
+    responseFor(next, {
+      validation: report,
+      artifacts: [manifestArtifact(next), ...artifacts]
+        .filter((artifact): artifact is AuthoringArtifact => artifact !== undefined),
+      preview,
+    }),
+    result.warnings,
+  );
+}
+
 function refreshContractSession(
   session: AssetAuthoringSession,
 ): AssetAuthoringSessionUpdate {
@@ -941,6 +1228,8 @@ export async function runAssetAuthoringCommand(
     }
     if (authoringCommand === 'contract') return await contractCommand(context, sessionId);
     if (authoringCommand === 'import') return await importCommand(context, sessionId);
+    if (authoringCommand === 'validate') return await validateCommand(context, sessionId);
+    if (authoringCommand === 'preview') return await previewCommand(context, sessionId);
     if (authoringCommand === 'status') return statusSession(context.workspace, sessionId);
     if (authoringCommand === 'resume') return resumeCommand(context.workspace, sessionId);
     if (authoringCommand === 'reconcile-manifest') {
@@ -976,6 +1265,23 @@ export async function runAssetAuthoringCommand(
         error.code,
         error.message,
         error.path,
+      ));
+    }
+    if (error instanceof AssetPackPreviewError) {
+      const diagnostic = error.diagnostics.find((entry) => entry.severity === 'error')
+        ?? error.diagnostics[0];
+      return commandError(command, issue(
+        diagnostic?.code ?? error.code,
+        diagnostic?.message ?? error.message,
+        diagnostic?.path ?? error.path,
+      ));
+    }
+    if (error instanceof PreviewError) {
+      return commandError(command, issue(
+        error.code,
+        error.message,
+        error.path,
+        error.details,
       ));
     }
     return commandError(command, issue(

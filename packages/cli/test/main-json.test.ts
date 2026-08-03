@@ -32,6 +32,8 @@ import {
   authoringResponseProjection,
   type AuthoringResponseProjectionInput,
 } from '../src/response.js';
+import type { AssetPackValidationReport } from '../src/asset-pack-validation.js';
+import type { AuthoringPreviewData } from '../src/response.js';
 import type { RuntimeAssets } from '../src/runtime-assets.js';
 import {
   acknowledgeWarning,
@@ -414,6 +416,71 @@ describe('main json behavior', () => {
       nextActions: input.nextActions,
       retrySafety: 'safe',
     });
+  });
+
+  it('keeps validation and preview receipts bounded in the JSON projection', () => {
+    const validation = {
+      schema: 'lpc-toolkit.asset-pack-validation.v1',
+      packDirectory: '/workspace/artist-packs/acme.hair',
+      contentDigest: `sha256:${'a'.repeat(64)}`,
+      manifestDigest: `sha256:${'b'.repeat(64)}`,
+      sourceDigests: [{ path: 'sprites/moon-braid/walk.png', digest: `sha256:${'c'.repeat(64)}` }],
+      valid: false,
+      diagnostics: [{
+        code: 'asset_optional_frame_blank',
+        severity: 'warning',
+        message: 'Optional padding frames are blank.',
+      }],
+      acknowledgementRecords: [{
+        code: 'asset_optional_frame_blank',
+        subject: { sourcePath: 'sprites/moon-braid/walk.png' },
+        contentDigest: `sha256:${'a'.repeat(64)}`,
+        reason: '',
+      }],
+    } as AssetPackValidationReport;
+    const preview = {
+      input: {
+        assetId: 'moon-braid',
+        animation: 'walk',
+        bodyType: 'male',
+        characterPath: null,
+        digest: `sha256:${'d'.repeat(64)}`,
+      },
+      validationRevision: `sha256:${'a'.repeat(64)}`,
+      artifacts: [{
+        id: 'preview:credits_txt',
+        path: '/workspace/artist-packs/acme.hair/previews/moon-braid.credits.txt',
+        digest: `sha256:${'e'.repeat(64)}`,
+      }],
+      warnings: [],
+      manifestDigest: `sha256:${'b'.repeat(64)}`,
+      sourceDigests: [{ path: 'sprites/moon-braid/walk.png', digest: `sha256:${'c'.repeat(64)}` }],
+    } as AuthoringPreviewData;
+
+    const projected = authoringResponseProjection({
+      sessionId: 'session-1',
+      goal: 'new-item',
+      state: 'needs-user-action',
+      reason: 'validation-failed',
+      phase: 'validated',
+      checkpoint: null,
+      checkpointFreshness: 'stale',
+      diagnostics: [],
+      artifacts: [],
+      inputsNeeded: [],
+      nextActions: [],
+      retrySafety: 'safe',
+      manifestDigest: validation.manifestDigest!,
+      sourceDigests: [],
+      validation,
+      preview,
+    });
+
+    expect(projected.validation).toEqual(validation);
+    expect(projected.preview).toEqual(preview);
+    expect(projected).not.toHaveProperty('plan');
+    expect(projected).not.toHaveProperty('provenance');
+    expect(projected).not.toHaveProperty('checkpoints');
   });
 
   it('keeps preview warning blocks in warnings and preserves typed details after acknowledgement', async () => {

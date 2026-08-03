@@ -296,6 +296,80 @@ describe('human-readable CLI output', () => {
     expect(output).toContain('Reason: contract-ready');
   });
 
+  it('presents bounded validation and preview receipt recovery details', () => {
+    const output = formatHumanResponse({
+      ok: true,
+      command: 'asset authoring preview',
+      data: authoringResponseProjection({
+        sessionId: 'session-1',
+        goal: 'new-item',
+        state: 'needs-user-action',
+        reason: 'validation-failed',
+        phase: 'validated',
+        checkpoint: null,
+        checkpointFreshness: 'stale',
+        diagnostics: [],
+        artifacts: [],
+        inputsNeeded: [],
+        nextActions: [{
+          id: 'validate-session',
+          summary: 'Re-run validation against the current session-owned pack sources.',
+          command: 'asset authoring validate --session session-1',
+          safety: 'safe',
+          requiredInputs: [],
+          preconditionDigests: [],
+          expectedCheckpoint: null,
+        }],
+        retrySafety: 'safe',
+        manifestDigest: `sha256:${'b'.repeat(64)}`,
+        sourceDigests: [],
+        validation: {
+          schema: 'lpc-toolkit.asset-pack-validation.v1',
+          packDirectory: '/workspace/artist-packs/acme.hair',
+          contentDigest: `sha256:${'a'.repeat(64)}`,
+          valid: false,
+          diagnostics: [{
+            code: 'asset_source_missing',
+            severity: 'error',
+            message: 'Source PNG is missing.',
+            sourcePath: 'sprites/moon-braid/walk.png',
+          }],
+          acknowledgementRecords: [],
+        },
+        preview: {
+          input: {
+            assetId: 'moon-braid',
+            animation: 'walk',
+            bodyType: 'male',
+            characterPath: null,
+            digest: `sha256:${'d'.repeat(64)}`,
+          },
+          validationRevision: `sha256:${'a'.repeat(64)}`,
+          artifacts: [{
+            id: 'preview:credits_csv',
+            path: '/workspace/artist-packs/acme.hair/previews/moon-braid.credits.csv',
+            digest: `sha256:${'e'.repeat(64)}`,
+          }],
+          warnings: [],
+          manifestDigest: `sha256:${'b'.repeat(64)}`,
+          sourceDigests: [],
+        },
+      }),
+      warnings: [],
+      errors: [],
+    }, 'fallback\n');
+
+    expect(output).toContain('Validation: invalid');
+    expect(output).toContain('Validation errors: 1');
+    expect(output).toContain('Validation revision:');
+    expect(output).toContain('Preview input:');
+    expect(output).toContain(
+      '- preview:credits_csv: /workspace/artist-packs/acme.hair/previews/moon-braid.credits.csv',
+    );
+    expect(output).not.toContain('provenance');
+    expect(output).not.toContain('checkpoints');
+  });
+
   it('prints warning-only preview blocks and typed available values after acknowledgement', async () => {
     const fixture = createWarningAssetCommandFixture();
     const runPreview = async () => {
