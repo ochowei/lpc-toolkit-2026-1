@@ -19,6 +19,10 @@ import {
   materializeAssetAuthoringContract,
 } from './asset-authoring-contract.js';
 import {
+  AssetAuthoringImportError,
+  importAssetAuthoringCandidate,
+} from './asset-authoring-import.js';
+import {
   assetAuthoringSessionPath,
   createAssetAuthoringSessionStore,
   AssetAuthoringSessionError,
@@ -750,6 +754,82 @@ async function contractCommand(
   );
 }
 
+async function importCommand(
+  context: AuthoringCommandContext,
+  sessionId: string,
+): Promise<CliResponse<AuthoringResponseData>> {
+  const targetId = flagString(context.parsed.flags, 'target');
+  const candidateArgument = flagString(context.parsed.flags, 'candidate');
+  const contractDigest = requireDigest(
+    flagString(context.parsed.flags, 'contract-digest'),
+    'contract-digest',
+  );
+  if (targetId === undefined || candidateArgument === undefined) {
+    throw new AuthoringCommandError(
+      'Import requires --target and --candidate.',
+      { code: 'missing_argument' },
+    );
+  }
+  const store = createAssetAuthoringSessionStore(context.workspace);
+  const session = store.read(sessionId);
+  const expectedTargetDigest = flagString(context.parsed.flags, 'expected-target-digest');
+  const result = await importAssetAuthoringCandidate({
+    workspace: context.workspace,
+    session,
+    targetId,
+    candidatePath: absolutePath(context.cwd, candidateArgument),
+    contractDigest,
+    replaceExisting: flagBoolean(context.parsed.flags, 'replace-existing'),
+    ...(expectedTargetDigest === undefined
+      ? {}
+      : {
+        expectedTargetDigest,
+      }),
+  });
+  const checkpoints = session.checkpoints.map((checkpoint) => checkpoint.targetId === result.logicalTargetPath
+    ? {
+      ...checkpoint,
+      freshness: 'current' as const,
+      checkpoint: {
+        id: `import:${targetId}`,
+        phase: 'imported' as const,
+        digest: result.targetDigest,
+        freshness: 'current' as const,
+      },
+    }
+    : checkpoint);
+  const next = store.replace(sessionId, {
+    state: 'needs-user-action',
+    reason: 'candidate-imported',
+    phase: 'imported',
+    checkpoint: {
+      id: 'import',
+      phase: 'imported',
+      digest: result.targetDigest,
+      freshness: 'current',
+    },
+    checkpointFreshness: 'current',
+    checkpoints,
+    provenance: appendProvenance(session, {
+      kind: 'provider',
+      occurredAt: new Date().toISOString(),
+      summary: `Candidate imported for contract target ${result.logicalTargetPath}.`,
+      digest: result.targetDigest,
+    }),
+  });
+  return commandOk(
+    'asset authoring import',
+    responseFor(next, {
+      artifacts: [
+        { id: 'contract', path: result.contractPath, digest: result.contractDigest },
+        { id: 'metadata', path: result.metadataPath, digest: result.metadataDigest },
+        { id: 'candidate', path: result.candidatePath, digest: result.candidateDigest },
+        { id: `target:${targetId}`, path: result.targetPath, digest: result.targetDigest },
+      ],
+    }),
+  );
+}
+
 function requireDigest(value: string | undefined, flag: string): string {
   if (value === undefined || !DIGEST_PATTERN.test(value)) {
     throw new AuthoringCommandError(
@@ -860,6 +940,7 @@ export async function runAssetAuthoringCommand(
       return commandError(command, issue('missing_argument', '--session is required.', '--session'));
     }
     if (authoringCommand === 'contract') return await contractCommand(context, sessionId);
+    if (authoringCommand === 'import') return await importCommand(context, sessionId);
     if (authoringCommand === 'status') return statusSession(context.workspace, sessionId);
     if (authoringCommand === 'resume') return resumeCommand(context.workspace, sessionId);
     if (authoringCommand === 'reconcile-manifest') {
@@ -884,6 +965,13 @@ export async function runAssetAuthoringCommand(
       ));
     }
     if (error instanceof AssetAuthoringContractError) {
+      return commandError(command, issue(
+        error.code,
+        error.message,
+        error.path,
+      ));
+    }
+    if (error instanceof AssetAuthoringImportError) {
       return commandError(command, issue(
         error.code,
         error.message,

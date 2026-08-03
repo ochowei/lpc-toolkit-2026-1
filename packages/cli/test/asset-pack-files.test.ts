@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   closeSync,
   fstatSync,
@@ -19,7 +20,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { AssetPackSource } from '@lpc-toolkit/core';
 import { ASSET_PACK_SCHEMA } from '@lpc-toolkit/core';
 import {
+  AssetPackAtomicReplacementError,
+  atomicallyReplaceAssetPackSource,
   loadAssetPackFiles,
+  type AssetPackAtomicFileOps,
   type AssetPackDirectoryFileOps,
 } from '../src/asset-pack-files.js';
 
@@ -31,6 +35,10 @@ const PACK_CREDITS = {
   urls: ['https://example.com/alice'],
   notes: '',
 } as const;
+
+function sha256(bytes: Buffer): `sha256:${string}` {
+  return `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+}
 
 function createDirectory(prefix: string): string {
   const directory = mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -619,5 +627,51 @@ describe('loadAssetPackFiles', () => {
 
     expect(loaded.sourceBytes.get('sprites/wind-braid/foreground/walk.png')?.toString())
       .toBe('walk');
+  });
+
+  it('refuses an existing-target inspection race before atomic rename', () => {
+    const root = createDirectory('lpc-asset-pack-files-atomic-race-');
+    const targetPath = path.join(root, 'sprites/target.png');
+    mkdirSync(path.dirname(targetPath), { recursive: true });
+    const original = Buffer.from('original-target');
+    const raced = Buffer.from('raced-target');
+    const replacement = Buffer.from('replacement-target');
+    writeFileSync(targetPath, original);
+    let mutated = false;
+    let renamed = false;
+    const mutatingWriteFileSync = ((filePath: Parameters<typeof writeFileSync>[0], data: Parameters<typeof writeFileSync>[1], options: Parameters<typeof writeFileSync>[2]) => {
+      writeFileSync(filePath, data, options);
+      if (!mutated) {
+        mutated = true;
+        writeFileSync(targetPath, raced);
+      }
+    }) as typeof writeFileSync;
+    const fileOps: AssetPackAtomicFileOps = {
+      openSync,
+      closeSync,
+      fstatSync,
+      readFileSync,
+      lstatSync,
+      realpathSync: realpathSync.native,
+      mkdirSync,
+      writeFileSync: mutatingWriteFileSync,
+      renameSync: ((from, to) => {
+        renamed = true;
+        renameSync(from, to);
+      }) as typeof renameSync,
+      rmSync,
+    };
+
+    expect(() => atomicallyReplaceAssetPackSource({
+      root,
+      sourcePath: 'sprites/target.png',
+      bytes: replacement,
+      maximumBytes: 1024,
+      expectedTargetDigest: sha256(original),
+      fileOps,
+    })).toThrow(AssetPackAtomicReplacementError);
+    expect(mutated).toBe(true);
+    expect(renamed).toBe(false);
+    expect(readFileSync(targetPath)).toEqual(raced);
   });
 });
