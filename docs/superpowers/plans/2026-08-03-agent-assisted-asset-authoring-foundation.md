@@ -852,55 +852,132 @@ Implementation note:
 - Modify: plugin compatibility references/tests without adding a skill.
 - Modify: this plan with final reassessment and evidence.
 
-- [ ] Reassess the CLI documentation-impact matrix. Update every owned surface
+- [x] Reassess the CLI documentation-impact matrix. Update every owned surface
   whose command, workflow, architecture, verification, compatibility, or
   release contract changed; record any changed `N/A` with a specific reason.
-- [ ] Document all commands, schema/capability identifiers, state/checkpoint
+- [x] Document all commands, schema/capability identifiers, state/checkpoint
   meanings, candidate replacement policy, attribution requirement, recovery
   flow, and public artifact paths.
-- [ ] Correct CLI README plugin version `0.2.0` to `0.2.1` and add/retain a test
+- [x] Correct CLI README plugin version `0.2.0` to `0.2.1` and add/retain a test
   that compares the documented version with plugin compatibility metadata.
-- [ ] Ensure root and landing copy distinguish character composition, source
+- [x] Ensure root and landing copy distinguish character composition, source
   asset creation, audit handoff, validation, formal archive publication, and
   installation.
-- [ ] Ensure architecture describes shipped behavior only and preserves the
+- [x] Ensure architecture describes shipped behavior only and preserves the
   provider-neutral, read-only audit, Core/CLI, Web, cache, attribution, and
   `upstream/` boundaries.
-- [ ] Add the final focused verification map to Engineering and the capability
+- [x] Add the final focused verification map to Engineering and the capability
   release/post-publication procedure to Releasing.
-- [ ] Run: `rtk pnpm verify:cli-docs-policy`
-- [ ] Run: `rtk pnpm verify:plugin`
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/core run typecheck`
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/core test`
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/asset-pack-format run typecheck`
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/asset-pack-format test`
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/cli run typecheck`
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/cli test`
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/cli build`
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/cli test:package`
-- [ ] Run: `rtk pnpm check:boundaries`
-- [ ] Run: `rtk pnpm verify`
-- [ ] Confirm `rtk git status` contains no unexpected generated or product
+- [x] Run: `rtk pnpm verify:cli-docs-policy`
+- [x] Run: `rtk pnpm verify:plugin`
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/core run typecheck`
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/core test`
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/asset-pack-format run typecheck`
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/asset-pack-format test`
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/cli run typecheck`
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/cli test`
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/cli build`
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/cli test:package`
+- [x] Run: `rtk pnpm check:boundaries`
+- [x] Run: `rtk pnpm verify`
+- [x] Confirm `rtk git status` contains no unexpected generated or product
   files and no change inside `upstream/`.
-- [ ] Commit documentation and verification-contract changes with a focused
+- [x] Commit documentation and verification-contract changes with a focused
   conventional commit.
-- [ ] Record implementation note, full commit hash, exact PASS/FAIL evidence,
+- [x] Record implementation note, full commit hash, exact PASS/FAIL evidence,
   final documentation-impact matrix, and any intentional deferral here; commit
   the final plan record separately.
 
+Implementation note:
+
+- Added the strict authoring-session documentation across the CLI README,
+  architecture, engineering, release, root README, and landing page. The
+  public command table now covers capability discovery, all eight authoring
+  commands, versioned capability/schema identifiers, state/checkpoint meaning,
+  digest-bound candidate replacement, attribution, receipt invalidation,
+  manifest/PNG recovery, contract artifact paths, formal archive boundaries,
+  cache/output/upstream containment, and the current Web/plugin boundaries.
+- Updated the command help description to name strict plans. The existing
+  lightweight Codex plugin remains limited to its two shipped workflows; both
+  compatibility references explicitly refuse `asset-authoring-session.v1` and
+  `sprite-drawing-contract.v1`, with tests covering that boundary and aligning
+  CLI README plugin `0.2.1` with the manifest and compatibility metadata.
+- Root and landing copy now distinguish character composition, read-only audit
+  handoff, source creation, audit-derived scaffolding, validation, formal
+  `asset pack` publication, and separate consumer installation. Engineering
+  contains the final focused verification map; Releasing contains capability
+  release and post-publication checks. No provider invocation, new skill, Web
+  bridge, or formal release orchestration was added.
+- TDD RED evidence:
+  - `rtk node --test scripts/verify-codex-plugin.test.mjs` FAIL — the new
+    assertion reported that CLI README did not document plugin `0.2.1`.
+  - `rtk pnpm --filter @lpc-toolkit/cli test -- command-spec.test.ts plugin-contract.test.ts`
+    FAIL — 2 focused tests failed: strict-plan help wording and plugin
+    authoring-capability boundary.
+  - `rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx` first
+    hit an environment-only `listen EPERM` in the pretest `tsx` IPC helper;
+    the same exact command passed when rerun with the required sandbox
+    permission and then exercised the landing assertions.
+- TDD GREEN evidence:
+  - `rtk node --test scripts/verify-codex-plugin.test.mjs` PASS (10 tests).
+  - `rtk pnpm --filter @lpc-toolkit/cli test -- command-spec.test.ts plugin-contract.test.ts`
+    PASS (2 files, 67 tests).
+  - `rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx` PASS
+    (3 tests).
+- Product commit:
+  `8a52da4182da78d24370ac0fa9a5accb8bc5584d`
+  (`docs: document asset authoring contract`).
+- Verification evidence:
+  - `rtk pnpm verify:cli-docs-policy` PASS (19 tests).
+  - `rtk pnpm verify:plugin` PASS (40 tests; plugin structure valid).
+  - `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS.
+  - `rtk pnpm --filter @lpc-toolkit/core test` PASS (27 files, 390 tests).
+  - `rtk pnpm --filter @lpc-toolkit/asset-pack-format run typecheck` PASS.
+  - `rtk pnpm --filter @lpc-toolkit/asset-pack-format test` PASS (6 files,
+    72 tests).
+  - `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+  - `rtk pnpm --filter @lpc-toolkit/cli test` PASS (61 files, 1116 tests,
+    1 skipped) after the sandbox-safe rerun for localhost web-server tests.
+  - `rtk pnpm --filter @lpc-toolkit/cli build` PASS.
+  - `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS (`Packed CLI install
+    smoke test passed.`).
+  - `rtk pnpm check:boundaries` PASS.
+  - `rtk pnpm verify` PASS (repository-wide typecheck and workspace tests;
+    Core 390, asset-pack-format 72, CLI 1117 with 1 skipped, Web 861).
+  - `rtk git diff --check` PASS.
+  - `rtk git status --short` PASS (`ok`, no unexpected generated/product files).
+  - `rtk git status --short -- upstream` PASS (`ok`, no `upstream/` change).
+- Final CLI documentation-impact matrix:
+  `help: update — strict-plan help wording and focused help test`;
+  `cli-readme: update — authoring-session contract and plugin version`;
+  `root-readme: update — workflow ownership and formal-install distinction`;
+  `landing: update — audit handoff and source/publication workflow copy`;
+  `architecture: update — Core/CLI/Web/provider/cache/attribution boundaries`;
+  `engineering: update — final authoring and documentation verification map`;
+  `releasing: update — capability release and post-publication procedure`;
+  `plugin: update — compatibility refusal boundary and tests`.
+  Eventual PR declaration: `CLI docs impact: updated`; surfaces are `help,
+  cli-readme, root-readme, landing, architecture, engineering, releasing,
+  plugin`.
+- Intentional deferral: no next plan task remains after Task 10. The current
+  Codex plugin still does not claim the new capability, `attach-pack` does not
+  publish a drawing contract, and provider invocation, a future authoring
+  skill, a Web bridge, formal release orchestration, and speculative MVP
+  capability remain out of scope.
+
 ## Final Acceptance Checklist
 
-- [ ] All 10 tasks are checked and contain implementation notes, full product
+- [x] All 10 tasks are checked and contain implementation notes, full product
   commit hashes, and exact verification results.
-- [ ] Public command/help and JSON contracts exactly match #149.
-- [ ] Packed-CLI acceptance proves real PNG authoring, interruption, and
+- [x] Public command/help and JSON contracts exactly match #149.
+- [x] Packed-CLI acceptance proves real PNG authoring, interruption, and
   recovery from a clean workspace.
-- [ ] All preview pixels retain metadata and TXT/CSV credits.
-- [ ] No provider invocation, future skill, Web bridge, formal release
+- [x] All preview pixels retain metadata and TXT/CSV credits.
+- [x] No provider invocation, future skill, Web bridge, formal release
   orchestration, or speculative MVP capability entered scope.
-- [ ] No dependency, `any`, architecture bypass, cache mutation, generated
+- [x] No dependency, `any`, architecture bypass, cache mutation, generated
   overlay mutation, installed-source mutation, or `upstream/` mutation was
   introduced.
-- [ ] CLI documentation-impact declaration for the eventual PR lists every
+- [x] CLI documentation-impact declaration for the eventual PR lists every
   updated owned surface.
-- [ ] Full repository verification and conditional packed-CLI gate pass.
+- [x] Full repository verification and conditional packed-CLI gate pass.
