@@ -1,4 +1,9 @@
 import path from 'node:path';
+import { CLI_VERSION } from './package-info.js';
+import {
+  AUTHORING_CAPABILITIES,
+  AUTHORING_SCHEMA_VERSIONS,
+} from './capabilities.js';
 
 export interface CliIssue {
   readonly code: string;
@@ -16,6 +21,87 @@ export interface CliResponse<T> {
   readonly data: T | null;
   readonly warnings: readonly CliIssue[];
   readonly errors: readonly CliIssue[];
+}
+
+export type AuthoringGoal = 'new-item' | 'extend-item' | 'attach-pack';
+export type AuthoringState = 'completed' | 'needs-user-action' | 'failed';
+export type AuthoringPhase =
+  | 'planned'
+  | 'scaffolded'
+  | 'contract-ready'
+  | 'awaiting-candidate'
+  | 'imported'
+  | 'validated'
+  | 'previewed'
+  | 'blocked';
+export type AuthoringCheckpointFreshness = 'missing' | 'current' | 'stale' | 'blocked';
+export type AuthoringActionSafety = 'safe' | 'requires-confirmation' | 'blocked';
+
+export interface AuthoringCheckpoint {
+  readonly id: string;
+  readonly digest: string;
+}
+
+export interface AuthoringArtifact {
+  readonly id: string;
+  readonly path: string;
+  readonly digest: string;
+}
+
+export interface AuthoringInputNeeded {
+  readonly id: string;
+  readonly summary: string;
+}
+
+export interface AuthoringNextAction {
+  readonly id: string;
+  readonly summary: string;
+  readonly command: string;
+  readonly safety: AuthoringActionSafety;
+  readonly requiredInputs: readonly string[];
+  readonly preconditionDigests: readonly string[];
+  readonly expectedCheckpoint: AuthoringCheckpoint | null;
+}
+
+export interface AuthoringResponseProjectionInput {
+  readonly sessionId: string;
+  readonly goal: AuthoringGoal;
+  readonly state: AuthoringState;
+  readonly reason: string;
+  readonly phase: AuthoringPhase;
+  readonly checkpoint: AuthoringCheckpoint | null;
+  readonly checkpointFreshness: AuthoringCheckpointFreshness;
+  readonly diagnostics: readonly CliIssue[];
+  readonly artifacts: readonly AuthoringArtifact[];
+  readonly inputsNeeded: readonly AuthoringInputNeeded[];
+  readonly nextActions: readonly AuthoringNextAction[];
+  readonly retrySafety: AuthoringActionSafety;
+  readonly manifestDigest: string | null;
+  readonly sourceDigests: readonly string[];
+}
+
+export interface AuthoringResponseData extends AuthoringResponseProjectionInput {
+  readonly schema: 'lpc-toolkit.asset-authoring-response.v1';
+  readonly cliVersion: string;
+  readonly capabilities: readonly string[];
+  readonly schemaVersions: readonly string[];
+}
+
+export function authoringResponseProjection(
+  input: AuthoringResponseProjectionInput,
+): AuthoringResponseData {
+  return {
+    schema: 'lpc-toolkit.asset-authoring-response.v1',
+    ...input,
+    diagnostics: [...input.diagnostics],
+    artifacts: [...input.artifacts],
+    inputsNeeded: [...input.inputsNeeded],
+    nextActions: [...input.nextActions],
+    sourceDigests: [...input.sourceDigests],
+    cliVersion: CLI_VERSION,
+    capabilities: [...AUTHORING_CAPABILITIES],
+    schemaVersions: [...AUTHORING_SCHEMA_VERSIONS],
+  };
 }
 
 export function commandOk<T>(
@@ -205,6 +291,50 @@ function formatSelectionOrOut(data: JsonRecord, writtenLabel: string): string | 
   const selection = data['selection'];
   if (!isRecord(selection)) return undefined;
   return `${JSON.stringify(selection, null, 2)}\n`;
+}
+
+function formatAuthoringResponse(
+  command: string,
+  data: JsonRecord,
+): string | undefined {
+  if (stringValue(data, 'schema') !== 'lpc-toolkit.asset-authoring-response.v1') {
+    return undefined;
+  }
+  const state = stringValue(data, 'state');
+  const phase = stringValue(data, 'phase');
+  const reason = stringValue(data, 'reason');
+  const checkpointFreshness = stringValue(data, 'checkpointFreshness');
+  if (!state || !phase || !reason || !checkpointFreshness) return undefined;
+
+  const lines = [
+    `Command succeeded: ${command}`,
+    `Workflow state: ${state}`,
+    `Phase: ${phase}`,
+    `Reason: ${reason}`,
+    `Checkpoint: ${checkpointFreshness}`,
+  ];
+  const inputs = recordArrayValue(data, 'inputsNeeded') ?? [];
+  if (inputs.length > 0) {
+    lines.push('Inputs needed:');
+    for (const input of inputs) {
+      const summary = stringValue(input, 'summary');
+      if (summary) lines.push(`- ${summary}`);
+    }
+  }
+  const actions = recordArrayValue(data, 'nextActions') ?? [];
+  for (const action of actions) {
+    const summary = stringValue(action, 'summary');
+    const actionCommand = stringValue(action, 'command');
+    if (!summary) continue;
+    const safety = stringValue(action, 'safety');
+    if (safety === 'requires-confirmation') {
+      lines.push(`Confirmation required: ${summary}`);
+    } else {
+      lines.push(`Next action: ${summary}`);
+    }
+    if (actionCommand) lines.push(`Next command: ${actionCommand}`);
+  }
+  return `${lines.join('\n')}\n`;
 }
 
 function formatPresetList(data: JsonRecord): string | undefined {
@@ -822,6 +952,9 @@ function formatAnimationAudit(data: JsonRecord): string | undefined {
 function formatHumanData(response: CliResponse<unknown>): string | undefined {
   const data = response.data;
   if (!isRecord(data)) return undefined;
+
+  const authoring = formatAuthoringResponse(response.command, data);
+  if (authoring) return authoring;
 
   switch (response.command) {
     case 'asset workspace init':

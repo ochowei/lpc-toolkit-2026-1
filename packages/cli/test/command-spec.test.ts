@@ -278,6 +278,58 @@ describe('helpForCommand', () => {
       'Install or update a verified asset-pack archive. Draft archives are rejected.',
     );
   });
+
+  it('documents the fixed capability and asset authoring command surface', () => {
+    expect(helpForCommand([])).toContain('lpc-toolkit capabilities --json');
+    expect(helpForCommand(['capabilities'])).toContain(
+      'lpc-toolkit capabilities --json',
+    );
+
+    const authoringHelp = helpForCommand(['asset', 'authoring']);
+    for (const command of [
+      'start',
+      'status',
+      'resume',
+      'contract',
+      'import',
+      'validate',
+      'preview',
+      'reconcile-manifest',
+    ]) {
+      expect(authoringHelp).toContain(`lpc-toolkit asset authoring ${command}`);
+    }
+
+    expect(helpForCommand(['asset', 'authoring', 'start'])).toContain(
+      'lpc-toolkit asset authoring start --plan <plan.json>',
+    );
+    expect(helpForCommand(['asset', 'authoring', 'contract'])).toContain(
+      '--refresh',
+    );
+    expect(helpForCommand(['asset', 'authoring', 'import'])).toContain(
+      '--replace-existing',
+    );
+    expect(helpForCommand(['asset', 'authoring', 'import'])).toContain(
+      '--expected-target-digest <sha256>',
+    );
+    expect(helpForCommand(['asset', 'authoring', 'reconcile-manifest'])).toContain(
+      '--use <external|session>',
+    );
+  });
+
+  it('reuses asset preview options for authoring preview help', () => {
+    const assetPreviewHelp = helpForCommand(['asset', 'preview']);
+    const authoringPreviewHelp = helpForCommand(['asset', 'authoring', 'preview']);
+
+    for (const option of [
+      '--asset <local-id>',
+      '--animation <name>',
+      '--body-type <type>',
+      '--character <selection.json>',
+    ]) {
+      expect(assetPreviewHelp).toContain(option);
+      expect(authoringPreviewHelp).toContain(option);
+    }
+  });
 });
 
 describe('validateCommandOptions', () => {

@@ -29,7 +29,16 @@ import {
   characterCommandNeedsAssets,
   runCharacterCommand,
 } from './character-commands.js';
-import { helpForCommand, validateCommandOptions } from './command-spec.js';
+import {
+  helpForCommand,
+  validateCommandArguments,
+  validateCommandOptions,
+} from './command-spec.js';
+import {
+  AUTHORING_NOT_REACHABLE_CODE,
+  AUTHORING_NOT_REACHABLE_MESSAGE,
+  createCapabilityAdvertisement,
+} from './capabilities.js';
 import { materializePreset, runPresetCommand } from './preset-commands.js';
 import { CLI_VERSION } from './package-info.js';
 import { renderSelection } from './render.js';
@@ -178,6 +187,83 @@ function isLoopbackHost(host: string): boolean {
 function preflightCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
   const command = parsed.command[0];
   const subcommand = parsed.command[1];
+
+  if (command === 'capabilities') {
+    if (subcommand !== undefined) {
+      return commandError(parsed.command.join(' '), {
+        code: 'unknown_command',
+        message: `Unknown capabilities command: ${parsed.command.join(' ')}`,
+      });
+    }
+  }
+
+  if (command === 'asset' && subcommand === 'authoring') {
+    const authoringCommand = parsed.command[2];
+    const commandName = parsed.command.join(' ');
+    if (
+      authoringCommand !== 'start'
+      && authoringCommand !== 'status'
+      && authoringCommand !== 'resume'
+      && authoringCommand !== 'contract'
+      && authoringCommand !== 'import'
+      && authoringCommand !== 'validate'
+      && authoringCommand !== 'preview'
+      && authoringCommand !== 'reconcile-manifest'
+    ) {
+      return commandError(commandName, {
+        code: 'unknown_command',
+        message: `Unknown asset authoring command: ${commandName}`,
+      });
+    }
+
+    const requiredStringFlag = (name: string): CliResponse<null> | undefined => {
+      if (flagString(parsed.flags, name)) return undefined;
+      return commandError(commandName, {
+        code: 'missing_argument',
+        message: `--${name} is required.`,
+        path: `--${name}`,
+      });
+    };
+
+    if (authoringCommand === 'start') return requiredStringFlag('plan');
+    if (
+      authoringCommand === 'status'
+      || authoringCommand === 'resume'
+      || authoringCommand === 'contract'
+      || authoringCommand === 'validate'
+      || authoringCommand === 'preview'
+    ) {
+      return requiredStringFlag('session');
+    }
+    if (authoringCommand === 'import') {
+      for (const name of ['session', 'target', 'candidate', 'contract-digest']) {
+        const issue = requiredStringFlag(name);
+        if (issue) return issue;
+      }
+      const expectedTargetDigest = flagString(parsed.flags, 'expected-target-digest');
+      if (flagBoolean(parsed.flags, 'replace-existing') && !expectedTargetDigest) {
+        return commandError(commandName, {
+          code: 'missing_argument',
+          message: '--expected-target-digest is required with --replace-existing.',
+          path: '--expected-target-digest',
+        });
+      }
+      if (!flagBoolean(parsed.flags, 'replace-existing') && expectedTargetDigest !== undefined) {
+        return commandError(commandName, {
+          code: 'invalid_option',
+          message: '--expected-target-digest requires --replace-existing.',
+          path: '--expected-target-digest',
+        });
+      }
+      return undefined;
+    }
+    if (authoringCommand === 'reconcile-manifest') {
+      for (const name of ['session', 'use', 'expected-external-digest']) {
+        const issue = requiredStringFlag(name);
+        if (issue) return issue;
+      }
+    }
+  }
 
   if (
     (command === 'catalog' && subcommand === 'items')
@@ -346,7 +432,7 @@ async function runCliWithRuntime(
       || (
         parsed.command.length === 2
         && parsed.command[0] === 'asset'
-        && parsed.command[1] === 'workspace'
+        && (parsed.command[1] === 'workspace' || parsed.command[1] === 'authoring')
       )
     )
   ) {
@@ -368,9 +454,43 @@ async function runCliWithRuntime(
     );
   }
 
-  const preflightResponse = preflightCommand(parsed) ?? preflightAssetCommand(parsed);
+  const argumentIssue = validateCommandArguments(parsed);
+  if (argumentIssue) {
+    return writeResponse(
+      commandError(parsed.command.join(' '), argumentIssue),
+      parsed,
+      io,
+      '',
+    );
+  }
+
+  const preflightResponse = preflightCommand(parsed)
+    ?? (parsed.command[0] === 'asset' && parsed.command[1] === 'authoring'
+      ? undefined
+      : preflightAssetCommand(parsed));
   if (preflightResponse !== undefined) {
     return writeResponse(preflightResponse, parsed, io, '');
+  }
+
+  if (parsed.command[0] === 'capabilities') {
+    return writeResponse(
+      commandOk('capabilities', createCapabilityAdvertisement()),
+      parsed,
+      io,
+      'Capabilities advertised.\n',
+    );
+  }
+
+  if (parsed.command[0] === 'asset' && parsed.command[1] === 'authoring') {
+    return writeResponse(
+      commandError(parsed.command.join(' '), {
+        code: AUTHORING_NOT_REACHABLE_CODE,
+        message: AUTHORING_NOT_REACHABLE_MESSAGE,
+      }),
+      parsed,
+      io,
+      '',
+    );
   }
 
   if (

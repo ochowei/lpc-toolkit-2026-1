@@ -73,6 +73,21 @@ const ASSET_WORKSPACE_OPTION: CommandOptionSpec = {
   description: 'Use this asset workspace instead of discovering one.',
 };
 
+const AUTHORING_SESSION_OPTION: CommandOptionSpec = {
+  name: 'session',
+  kind: 'value',
+  valueLabel: 'session-id',
+  description: 'Use this workspace-local authoring session.',
+};
+
+const ASSET_PREVIEW_OPTIONS: readonly CommandOptionSpec[] = [
+  ASSET_WORKSPACE_OPTION,
+  { name: 'asset', kind: 'value', valueLabel: 'local-id', description: 'Preview this pack asset.' },
+  { name: 'animation', kind: 'value', valueLabel: 'name', description: 'Preview this animation.' },
+  { name: 'body-type', kind: 'value', valueLabel: 'type', description: 'Preview this body type.' },
+  { name: 'character', kind: 'value', valueLabel: 'selection.json', description: 'Use this character selection for overlap testing.' },
+];
+
 const ASSET_SCAFFOLD_OPTIONS: readonly CommandOptionSpec[] = [
   ASSET_WORKSPACE_OPTION,
   {
@@ -117,6 +132,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
     examples: [
       'lpc-toolkit --version',
       'lpc-toolkit -V',
+      'lpc-toolkit capabilities --json',
       'lpc-toolkit catalog types',
       'lpc-toolkit character create hero',
       'lpc-toolkit character search hero --type hair --query braid --limit 20 --json',
@@ -150,6 +166,105 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
     examples: ['lpc-toolkit asset workspace init ./my-lpc-art'],
   },
   {
+    command: ['asset', 'authoring'],
+    usage: 'lpc-toolkit asset authoring <command>',
+    description: 'Create and resume provider-neutral asset authoring sessions.',
+    options: [HELP_OPTION],
+    examples: [
+      'lpc-toolkit asset authoring start --plan plan.json --json',
+      'lpc-toolkit asset authoring status --session session-id --json',
+    ],
+  },
+  {
+    command: ['asset', 'authoring', 'start'],
+    usage: 'lpc-toolkit asset authoring start --plan <plan.json> [--workspace <directory>] [--json]',
+    description: 'Start one bounded asset authoring session from a strict plan.',
+    options: [
+      HELP_OPTION,
+      JSON_OPTION,
+      { name: 'plan', kind: 'value', valueLabel: 'plan.json', description: 'Read the strict authoring plan.' },
+      ASSET_WORKSPACE_OPTION,
+    ],
+    examples: ['lpc-toolkit asset authoring start --plan plan.json --json'],
+  },
+  {
+    command: ['asset', 'authoring', 'status'],
+    usage: 'lpc-toolkit asset authoring status --session <session-id> [--workspace <directory>] [--json]',
+    description: 'Read the current state and safe next actions for a session.',
+    options: [HELP_OPTION, JSON_OPTION, AUTHORING_SESSION_OPTION, ASSET_WORKSPACE_OPTION],
+    examples: ['lpc-toolkit asset authoring status --session session-id --json'],
+  },
+  {
+    command: ['asset', 'authoring', 'resume'],
+    usage: 'lpc-toolkit asset authoring resume --session <session-id> [--workspace <directory>] [--json]',
+    description: 'Resume a bounded asset authoring session from its latest checkpoint.',
+    options: [HELP_OPTION, JSON_OPTION, AUTHORING_SESSION_OPTION, ASSET_WORKSPACE_OPTION],
+    examples: ['lpc-toolkit asset authoring resume --session session-id --json'],
+  },
+  {
+    command: ['asset', 'authoring', 'contract'],
+    usage: 'lpc-toolkit asset authoring contract --session <session-id> [--refresh] [--workspace <directory>] [--json]',
+    description: 'Create or inspect the provider-neutral sprite drawing contract.',
+    options: [
+      HELP_OPTION,
+      JSON_OPTION,
+      AUTHORING_SESSION_OPTION,
+      { name: 'refresh', kind: 'boolean', description: 'Refresh stale planning evidence and invalidate prior checkpoints.' },
+      ASSET_WORKSPACE_OPTION,
+    ],
+    examples: ['lpc-toolkit asset authoring contract --session session-id --json'],
+  },
+  {
+    command: ['asset', 'authoring', 'import'],
+    usage: 'lpc-toolkit asset authoring import --session <session-id> --target <target-id> --candidate <png> --contract-digest <sha256> [--replace-existing --expected-target-digest <sha256>] [--workspace <directory>] [--json]',
+    description: 'Import one contract-bound candidate PNG through the session trust boundary.',
+    options: [
+      HELP_OPTION,
+      JSON_OPTION,
+      AUTHORING_SESSION_OPTION,
+      { name: 'target', kind: 'value', valueLabel: 'target-id', description: 'Select the contract target to import.' },
+      { name: 'candidate', kind: 'value', valueLabel: 'png', description: 'Read the candidate PNG.' },
+      { name: 'contract-digest', kind: 'value', valueLabel: 'sha256', description: 'Bind the candidate to this contract digest.' },
+      { name: 'replace-existing', kind: 'boolean', description: 'Authorize replacement of a pre-existing target with an expected digest.' },
+      { name: 'expected-target-digest', kind: 'value', valueLabel: 'sha256', description: 'Require this exact digest when replacing an existing target.' },
+      ASSET_WORKSPACE_OPTION,
+    ],
+    examples: ['lpc-toolkit asset authoring import --session session-id --target target-id --candidate candidate.png --contract-digest sha256:contract --json'],
+  },
+  {
+    command: ['asset', 'authoring', 'validate'],
+    usage: 'lpc-toolkit asset authoring validate --session <session-id> [--workspace <directory>] [--json]',
+    description: 'Validate the session-owned asset pack and retain a digest-bound receipt.',
+    options: [HELP_OPTION, JSON_OPTION, AUTHORING_SESSION_OPTION, ASSET_WORKSPACE_OPTION],
+    examples: ['lpc-toolkit asset authoring validate --session session-id --json'],
+  },
+  {
+    command: ['asset', 'authoring', 'preview'],
+    usage: 'lpc-toolkit asset authoring preview --session <session-id> [existing preview options] [--workspace <directory>] [--json]',
+    description: 'Render an attributed session preview using the existing asset preview options.',
+    options: [
+      HELP_OPTION,
+      JSON_OPTION,
+      AUTHORING_SESSION_OPTION,
+      ...ASSET_PREVIEW_OPTIONS,
+    ],
+    examples: ['lpc-toolkit asset authoring preview --session session-id --animation walk --json'],
+  },
+  {
+    command: ['asset', 'authoring', 'reconcile-manifest'],
+    usage: 'lpc-toolkit asset authoring reconcile-manifest --session <session-id> --use <external|session> --expected-external-digest <sha256> [--workspace <directory>] [--json]',
+    description: 'Resolve an external manifest change only with an explicit digest-bound choice.',
+    options: [
+      HELP_OPTION,
+      JSON_OPTION,
+      AUTHORING_SESSION_OPTION,
+      { name: 'use', kind: 'value', valueLabel: 'external|session', allowedValues: ['external', 'session'], description: 'Choose the external or session manifest.' },
+      { name: 'expected-external-digest', kind: 'value', valueLabel: 'sha256', description: 'Require this exact external manifest digest.' },
+      ASSET_WORKSPACE_OPTION,
+    ],
+    examples: ['lpc-toolkit asset authoring reconcile-manifest --session session-id --use external --expected-external-digest sha256:manifest --json'],
+  },
+  {
     command: ['asset', 'init'],
     usage: 'lpc-toolkit asset init (--new | --from-audit <report>) [options]',
     description: 'Scaffold a new or audit-derived artist asset pack.',
@@ -170,15 +285,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
     command: ['asset', 'preview'],
     usage: 'lpc-toolkit asset preview <pack-directory> [options]',
     description: 'Render an attributed preview without changing active workspace output.',
-    options: [
-      HELP_OPTION,
-      JSON_OPTION,
-      ASSET_WORKSPACE_OPTION,
-      { name: 'asset', kind: 'value', valueLabel: 'local-id', description: 'Preview this pack asset.' },
-      { name: 'animation', kind: 'value', valueLabel: 'name', description: 'Preview this animation.' },
-      { name: 'body-type', kind: 'value', valueLabel: 'type', description: 'Preview this body type.' },
-      { name: 'character', kind: 'value', valueLabel: 'selection.json', description: 'Use this character selection for overlap testing.' },
-    ],
+    options: [HELP_OPTION, JSON_OPTION, ...ASSET_PREVIEW_OPTIONS],
     examples: [
       'lpc-toolkit asset preview ./artist-packs/acme.hair --asset moon-braid --animation walk',
     ],
@@ -569,6 +676,19 @@ function renderCommandSpec(spec: CommandSpec): string {
 
 export function helpForCommand(command: readonly string[]): string {
   return renderCommandSpec(findCommandSpec(command) ?? COMMAND_SPECS[0]!);
+}
+
+export function validateCommandArguments(parsed: ParsedArgs): CliIssue | undefined {
+  const isCapabilities = parsed.command.length === 1 && parsed.command[0] === 'capabilities';
+  const isAuthoring = parsed.command[0] === 'asset' && parsed.command[1] === 'authoring';
+  if (!isCapabilities && !isAuthoring) return undefined;
+  if (parsed.positionals.length === 0) return undefined;
+  const positional = parsed.positionals[0]!;
+  return {
+    code: 'unexpected_argument',
+    message: `${parsed.command.join(' ')} does not accept positional arguments.`,
+    path: positional,
+  };
 }
 
 export function validateCommandOptions(parsed: ParsedArgs): CliIssue | undefined {

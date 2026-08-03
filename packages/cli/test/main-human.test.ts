@@ -4,7 +4,10 @@ import path from 'node:path';
 import { createCanvas } from '@napi-rs/canvas';
 import { describe, expect, it } from 'vitest';
 import { runCli } from '../src/main.js';
-import { formatHumanResponse } from '../src/response.js';
+import {
+  authoringResponseProjection,
+  formatHumanResponse,
+} from '../src/response.js';
 import {
   acknowledgeWarning,
   createWarningAssetCommandFixture,
@@ -173,6 +176,77 @@ async function runHumanError(argv: readonly string[], cwd: string): Promise<stri
 }
 
 describe('human-readable CLI output', () => {
+  it('summarizes authoring command success separately from workflow state and next action safety', () => {
+    const output = formatHumanResponse({
+      ok: true,
+      command: 'asset authoring status',
+      data: authoringResponseProjection({
+        sessionId: 'session-1',
+        goal: 'new-item',
+        state: 'needs-user-action',
+        reason: 'missing-inputs',
+        phase: 'planned',
+        checkpoint: null,
+        checkpointFreshness: 'stale',
+        diagnostics: [],
+        artifacts: [],
+        inputsNeeded: [{ id: 'author', summary: 'Human author declaration.' }],
+        nextActions: [{
+          id: 'provide-author',
+          summary: 'Provide the human author declaration.',
+          command: 'asset authoring resume',
+          safety: 'requires-confirmation',
+          requiredInputs: ['author'],
+          preconditionDigests: [],
+          expectedCheckpoint: null,
+        }],
+        retrySafety: 'safe',
+        manifestDigest: null,
+        sourceDigests: [],
+      }),
+      warnings: [],
+      errors: [],
+    }, 'fallback\n');
+
+    expect(output).toContain('Command succeeded: asset authoring status');
+    expect(output).toContain('Workflow state: needs-user-action');
+    expect(output).toContain('Checkpoint: stale');
+    expect(output).toContain('Inputs needed:');
+    expect(output).toContain('Human author declaration.');
+    expect(output).toContain('Confirmation required: Provide the human author declaration.');
+    expect(output).toContain('Next command: asset authoring resume');
+  });
+
+  it('summarizes completed authoring state without inventing a mutation result', () => {
+    const output = formatHumanResponse({
+      ok: true,
+      command: 'asset authoring contract',
+      data: authoringResponseProjection({
+        sessionId: 'session-1',
+        goal: 'new-item',
+        state: 'completed',
+        reason: 'contract-ready',
+        phase: 'contract-ready',
+        checkpoint: { id: 'contract', digest: 'sha256:contract' },
+        checkpointFreshness: 'current',
+        diagnostics: [],
+        artifacts: [],
+        inputsNeeded: [],
+        nextActions: [],
+        retrySafety: 'safe',
+        manifestDigest: null,
+        sourceDigests: [],
+      }),
+      warnings: [],
+      errors: [],
+    }, 'fallback\n');
+
+    expect(output).toContain('Command succeeded: asset authoring contract');
+    expect(output).toContain('Workflow state: completed');
+    expect(output).toContain('Checkpoint: current');
+    expect(output).toContain('Reason: contract-ready');
+  });
+
   it('prints warning-only preview blocks and typed available values after acknowledgement', async () => {
     const fixture = createWarningAssetCommandFixture();
     const runPreview = async () => {

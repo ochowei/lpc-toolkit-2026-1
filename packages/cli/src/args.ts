@@ -20,11 +20,15 @@ const BOOLEAN_FLAGS = new Set([
   'json',
   'new',
   'no-open',
+  'refresh',
+  'replace-existing',
 ]);
 
 function acceptsAnotherCommandToken(command: readonly string[]): boolean {
   if (command.length < 2) return true;
-  return command.length === 2 && command[0] === 'asset' && command[1] === 'workspace';
+  return command.length === 2
+    && command[0] === 'asset'
+    && (command[1] === 'workspace' || command[1] === 'authoring');
 }
 
 function acceptsExplicitEmptyValues(command: readonly string[]): boolean {
