@@ -703,27 +703,63 @@ plugin: update
 - Modify: `packages/cli/test/main-json.test.ts`
 - Modify: `packages/cli/test/main-human.test.ts`
 
-- [ ] Write failing tests proving session validation returns the same report,
+- [x] Write failing tests proving session validation returns the same report,
   warnings, and acknowledgement templates as leaf validation.
-- [ ] Reuse fresh asset-pack validation; record a receipt only for the exact
+- [x] Reuse fresh asset-pack validation; record a receipt only for the exact
   manifest and complete captured source-digest set.
-- [ ] Reuse attributed preview and its existing options. Do not add a second
+- [x] Reuse attributed preview and its existing options. Do not add a second
   composition or preview path.
-- [ ] Record preview input, validation revision, image/metadata/TXT/CSV paths
+- [x] Record preview input, validation revision, image/metadata/TXT/CSV paths
   and digests, warnings, manifest digest, and source digests.
-- [ ] Treat missing metadata, TXT credits, or CSV credits as a failed preview
+- [x] Treat missing metadata, TXT credits, or CSV credits as a failed preview
   checkpoint even when a PNG exists.
-- [ ] Prove manifest/source/validation/preview-input drift makes the correct
+- [x] Prove manifest/source/validation/preview-input drift makes the correct
   receipt stale and yields one safe next action.
-- [ ] Complete bounded human/JSON recovery presentation without dumping full
+- [x] Complete bounded human/JSON recovery presentation without dumping full
   session state or requiring manifest inspection.
-- [ ] Run:
+- [x] Run:
   `rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-receipts.test.ts asset-pack-validation.test.ts asset-pack-preview.test.ts main-json.test.ts main-human.test.ts`
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/cli run typecheck`
-- [ ] Run: `rtk pnpm check:boundaries`
-- [ ] Commit product changes with a focused conventional commit.
-- [ ] Record implementation note, full product commit hash, and exact PASS/FAIL
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/cli run typecheck`
+- [x] Run: `rtk pnpm check:boundaries`
+- [x] Commit product changes with a focused conventional commit.
+- [x] Record implementation note, full product commit hash, and exact PASS/FAIL
   verification evidence here; commit the plan record separately.
+
+  - Implementation: Added session-bound validation and preview commands that
+    capture one complete asset-pack snapshot, reuse the leaf validator, and
+    record a validation receipt only when the session manifest and complete
+    source digest set match. The attributed preview command delegates to the
+    existing `previewAssetPack` path and records the requested input,
+    validation revision, four required artifact paths/digests, warnings,
+    manifest digest, and source digests. Preview artifact capture rejects
+    missing image, metadata, TXT-credit, or CSV-credit outputs before a
+    preview receipt is written. The existing invalidation evaluator now also
+    detects preview-input drift; JSON and human output expose only bounded
+    validation/preview evidence and safe recovery commands, without session
+    plan/provenance dumps or manifest inspection.
+  - Product commit: `6e379276c6b2a868617be0d66e5998d9663f570a`
+    (`feat(cli): record authoring validation and preview receipts`).
+  - TDD RED verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-receipts.test.ts`
+    FAIL (the focused session-validation test returned exit code 1 because
+    validation was still at the deferred authoring-command seam).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-receipts.test.ts asset-pack-validation.test.ts asset-pack-preview.test.ts main-json.test.ts main-human.test.ts`
+    PASS (5 files, 117 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+  - Verification: `rtk pnpm check:boundaries` PASS.
+  - Additional verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-session.test.ts asset-authoring-commands.test.ts asset-authoring-contract.test.ts asset-authoring-import.test.ts`
+    PASS (4 files, 36 tests).
+  - Additional verification: `rtk git diff --check` PASS.
+  - CLI documentation impact reassessment for this validation/preview receipt task:
+    `help: N/A — the fixed authoring validate/preview commands and options were
+    documented in Task 3 and their help text is unchanged`; `cli-readme: N/A —
+    end-to-end workflow and receipt documentation remains the planned Task 10
+    surface`; `root-readme: N/A — no root workflow copy changed`; `landing: N/A
+    — no public positioning copy changed`; `architecture: N/A — validation
+    remains in the existing CLI leaf validator and preview remains in the
+    existing attributed preview seam`; `engineering: N/A — no verification
+    policy changed, with focused evidence recorded here`; `releasing: N/A — no
+    release or package compatibility contract changed`; `plugin: N/A — no
+    plugin capability or compatibility contract changed`.
 
 ### Task 9: Prove the foundation through the public packed CLI
 
