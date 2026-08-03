@@ -488,28 +488,63 @@ plugin: update
 - Modify: `packages/cli/test/main-json.test.ts`
 - Modify: `packages/cli/test/main-human.test.ts`
 
-- [ ] Write failing command tests for new-item, exact audit-derived extension,
+- [x] Write failing command tests for new-item, exact audit-derived extension,
   attach-pack, missing draft credits, workspace discovery/override, and one-pack
   scope enforcement.
-- [ ] Reuse existing scaffold behavior when plan inputs satisfy its contract;
+- [x] Reuse existing scaffold behavior when plan inputs satisfy its contract;
   do not reproduce asset-pack manifest generation.
-- [ ] Persist a session before returning `needs-user-action` for missing
+- [x] Persist a session before returning `needs-user-action` for missing
   manifest-required author/license data; invent no placeholder declarations.
-- [ ] Implement `status` as read-only and `resume` as session-bookkeeping-only.
-- [ ] Detect external PNG drift and record provenance/invalidation without
+- [x] Implement `status` as read-only and `resume` as session-bookkeeping-only.
+- [x] Detect external PNG drift and record provenance/invalidation without
   overwriting source.
-- [ ] Detect all manifest byte drift as conflict. Implement explicit adopt
+- [x] Detect all manifest byte drift as conflict. Implement explicit adopt
   external and restore session revisions with the required expected digest and
   race-safe atomic behavior.
-- [ ] Return structured next actions with precise safety and precondition
+- [x] Return structured next actions with precise safety and precondition
   digests for every recoverable state.
-- [ ] Run:
+- [x] Run:
   `rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-commands.test.ts main-json.test.ts main-human.test.ts main-assets.test.ts`
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/cli run typecheck`
-- [ ] Run: `rtk pnpm check:boundaries`
-- [ ] Commit product changes with a focused conventional commit.
-- [ ] Record implementation note, full product commit hash, and exact PASS/FAIL
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/cli run typecheck`
+- [x] Run: `rtk pnpm check:boundaries`
+- [x] Commit product changes with a focused conventional commit.
+- [x] Record implementation note, full product commit hash, and exact PASS/FAIL
   verification evidence here; commit the plan record separately.
+
+  - Implementation: Added the public CLI authoring command application for
+    start, attach-pack, status, resume, and manifest reconciliation. It
+    discovers or honors the explicit workspace override, parses strict plans,
+    persists sessions before missing-credit pauses, reuses the existing new-item
+    scaffold without duplicating manifest generation, preserves exact
+    audit-derived extension evidence for the next contract step, and keeps
+    attach-pack manifests unchanged. Status is read-only; resume records
+    external PNG evidence and detects every manifest-byte drift as a conflict;
+    external adoption and session-revision restore require the expected digest,
+    with manager-owned manifest snapshots and atomic replacement. Responses
+    expose stable JSON/human state, inputs, artifacts, safety, preconditions, and
+    next actions. Removed the obsolete not-yet-reachable production seam.
+  - Product commit: `2cba86b4c76f9b52ef900440f3fa9ae9ed224763`
+    (`feat(cli): orchestrate authoring sessions`).
+  - TDD RED verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-commands.test.ts main-json.test.ts main-human.test.ts main-assets.test.ts`
+    FAIL (13 focused tests failed before the command application existed: 8 new
+    command tests, 3 dispatch requirement cases, and the new JSON/human routing
+    cases).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-commands.test.ts main-json.test.ts main-human.test.ts main-assets.test.ts`
+    PASS (4 files, 209 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+  - Verification: `rtk pnpm check:boundaries` PASS.
+  - Additional verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-session.test.ts asset-workspace.test.ts`
+    PASS (2 files, 26 tests).
+  - Additional verification: `rtk git diff --check` PASS.
+  - CLI documentation impact reassessment for this command-orchestration task:
+    `help: N/A — the fixed authoring help surface was added in Task 3 and no
+    help text changed here`; `cli-readme: N/A — workflow prose is deferred to
+    Task 10`; `root-readme: N/A — no root workflow copy changed`; `landing: N/A
+    — no public positioning changed`; `architecture: N/A — ownership
+    boundaries remain unchanged`; `engineering: N/A — the verification policy
+    remains unchanged`; `releasing: N/A — no release compatibility contract
+    changed`; `plugin: N/A — no plugin capability or compatibility contract
+    changed`.
 
 ---
 
