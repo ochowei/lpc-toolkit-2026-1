@@ -35,6 +35,11 @@ A natural-language task that a user can copy and give to an agent to invoke an
 agent integration workflow, including the intended outcome when useful.
 _Avoid_: CLI command example, implementation instruction
 
+**Expected result**:
+A read-only summary of the files and conversational response an agent prompt
+example is expected to produce. It is guidance, not part of the copied prompt.
+_Avoid_: Expected output field, prompt requirement
+
 **Character concept**:
 A user's open-ended description of the character they want to create, such as
 fisher or blacksmith. It may guide asset discovery without being a built-in
