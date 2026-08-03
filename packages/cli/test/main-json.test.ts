@@ -15,7 +15,7 @@ import {
   type AssetPackSource,
 } from '@lpc-toolkit/core';
 import { createAssetPackArchive } from '@lpc-toolkit/asset-pack-format';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   createDeterministicAssetPackArchive,
 } from '../src/asset-pack-archive-format.js';
@@ -24,6 +24,16 @@ import { initializeAssetWorkspace } from '../src/asset-workspace.js';
 import { createRuntimeContext } from '../src/context.js';
 import { runCli } from '../src/main.js';
 import { nodeAssetPackFormatRuntime } from '../src/asset-pack-node-runtime.js';
+import {
+  AUTHORING_CAPABILITIES,
+  AUTHORING_SCHEMA_VERSIONS,
+} from '../src/capabilities.js';
+import {
+  authoringResponseProjection,
+  type AuthoringResponseProjectionInput,
+} from '../src/response.js';
+import type { AssetPackValidationReport } from '../src/asset-pack-validation.js';
+import type { AuthoringPreviewData } from '../src/response.js';
 import type { RuntimeAssets } from '../src/runtime-assets.js';
 import {
   acknowledgeWarning,
@@ -195,6 +205,284 @@ function auditDefinition(animations: readonly string[]): Record<string, unknown>
 }
 
 describe('main json behavior', () => {
+  it('advertises stable authoring capabilities without preparing workspace or cache state', async () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-main-json-capabilities-'));
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const prepare = vi.fn(async () => {
+      throw new Error('capability discovery must not prepare runtime assets');
+    });
+
+    const code = await runCli(['capabilities', '--json'], {
+      cwd,
+      stdout: (text) => stdout.push(text),
+      stderr: (text) => stderr.push(text),
+    }, { prepareRuntimeAssets: prepare });
+
+    expect(code).toBe(0);
+    expect(prepare).not.toHaveBeenCalled();
+    expect(stderr).toEqual([]);
+    expect(JSON.parse(stdout.join(''))).toMatchObject({
+      ok: true,
+      command: 'capabilities',
+      data: {
+        capabilities: AUTHORING_CAPABILITIES,
+        schemaVersions: AUTHORING_SCHEMA_VERSIONS,
+      },
+      warnings: [],
+      errors: [],
+    });
+  });
+
+  it.each([
+    [
+      ['asset', 'authoring', 'start', '--json'],
+      '--plan',
+    ],
+    [
+      ['asset', 'authoring', 'status', '--json'],
+      '--session',
+    ],
+    [
+      [
+        'asset', 'authoring', 'import', '--session', 'session-1', '--target', 'target',
+        '--candidate', 'candidate.png', '--json',
+      ],
+      '--contract-digest',
+    ],
+    [
+      [
+        'asset', 'authoring', 'import', '--session', 'session-1', '--target', 'target',
+        '--candidate', 'candidate.png', '--contract-digest', 'sha256:contract',
+        '--replace-existing', '--json',
+      ],
+      '--expected-target-digest',
+    ],
+    [
+      ['asset', 'authoring', 'reconcile-manifest', '--session', 'session-1', '--json'],
+      '--use',
+    ],
+  ])('rejects authoring invocation without required %s', async (argv, requiredFlag) => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-main-json-authoring-missing-'));
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const prepare = vi.fn(async () => {
+      throw new Error('authoring contract preflight must not prepare runtime assets');
+    });
+
+    const code = await runCli(argv, {
+      cwd,
+      stdout: (text) => stdout.push(text),
+      stderr: (text) => stderr.push(text),
+    }, { prepareRuntimeAssets: prepare });
+
+    expect(code).toBe(1);
+    expect(prepare).not.toHaveBeenCalled();
+    expect(stderr).toEqual([]);
+    expect(JSON.parse(stdout.join(''))).toMatchObject({
+      ok: false,
+      errors: [{ code: 'missing_argument', path: requiredFlag }],
+    });
+  });
+
+  it('rejects authoring extra positionals and unknown options before dispatch', async () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-main-json-authoring-invalid-'));
+    const run = async (argv: readonly string[]) => {
+      const stdout: string[] = [];
+      const stderr: string[] = [];
+      const code = await runCli(argv, {
+        cwd,
+        stdout: (text) => stdout.push(text),
+        stderr: (text) => stderr.push(text),
+      });
+      return { code, response: JSON.parse(stdout.join('')) as Record<string, unknown>, stderr };
+    };
+
+    const positional = await run([
+      'asset', 'authoring', 'status', 'extra', '--session', 'session-1', '--json',
+    ]);
+    expect(positional.code).toBe(1);
+    expect(positional.response).toMatchObject({
+      ok: false,
+      errors: [{ code: 'unexpected_argument' }],
+    });
+    expect(positional.stderr).toEqual([]);
+
+    const unknown = await run([
+      'asset', 'authoring', 'status', '--session', 'session-1', '--mystery', '--json',
+    ]);
+    expect(unknown.code).toBe(1);
+    expect(unknown.response).toMatchObject({
+      ok: false,
+      errors: [{ code: 'unknown_option', path: '--mystery' }],
+    });
+  });
+
+  it('routes a reachable authoring start through the workspace command application', async () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-main-json-authoring-start-'));
+    const workspace = initializeAssetWorkspace(path.join(cwd, 'workspace'));
+    const planPath = path.join(cwd, 'plan.json');
+    writeFileSync(planPath, `${JSON.stringify({
+      schema: 'lpc-toolkit.asset-authoring-plan.v1',
+      goal: 'new-item',
+      pack: {
+        id: 'acme.main-json',
+        version: '1.0.0',
+        displayName: 'ACME Main JSON',
+      },
+      asset: {
+        kind: 'new-item',
+        localId: 'moon-braid',
+        displayName: 'Moon Braid',
+        typeName: 'hair',
+        bodyTypes: ['male'],
+        animations: ['walk'],
+        layers: [{ id: 'foreground', zPos: 120, bodyTypes: ['male'] }],
+      },
+      scope: {
+        packId: 'acme.main-json',
+        assetId: 'moon-braid',
+        bodyTypes: ['male'],
+        animations: ['walk'],
+        paths: ['sprites/moon-braid/foreground/walk.png'],
+      },
+      draftCredits: {
+        authors: ['Alice'],
+        licenses: ['CC-BY-SA 4.0'],
+        urls: ['https://example.test/main-json'],
+        notes: 'Main JSON fixture.',
+      },
+    }, null, 2)}\n`);
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const code = await runCli([
+      'asset', 'authoring', 'start', '--plan', planPath,
+      '--workspace', workspace.root, '--json',
+    ], {
+      cwd,
+      stdout: (text) => stdout.push(text),
+      stderr: (text) => stderr.push(text),
+    });
+
+    expect(code).toBe(0);
+    expect(stderr).toEqual([]);
+    expect(JSON.parse(stdout.join(''))).toMatchObject({
+      ok: true,
+      command: 'asset authoring start',
+      data: {
+        schema: 'lpc-toolkit.asset-authoring-response.v1',
+        goal: 'new-item',
+        phase: 'scaffolded',
+        state: 'needs-user-action',
+      },
+    });
+  });
+
+  it('projects the initial authoring response with stable state and action fields', () => {
+    const input: AuthoringResponseProjectionInput = {
+      sessionId: 'session-1',
+      goal: 'new-item',
+      state: 'needs-user-action',
+      reason: 'missing-inputs',
+      phase: 'planned',
+      checkpoint: null,
+      checkpointFreshness: 'missing',
+      diagnostics: [{ code: 'authoring_input_missing', message: 'Author is required.' }],
+      artifacts: [],
+      inputsNeeded: [{ id: 'author', summary: 'Human author declaration.' }],
+      nextActions: [{
+        id: 'provide-author',
+        summary: 'Provide the human author declaration.',
+        command: 'asset authoring resume',
+        safety: 'safe',
+        requiredInputs: ['author'],
+        preconditionDigests: [],
+        expectedCheckpoint: null,
+      }],
+      retrySafety: 'safe',
+      manifestDigest: null,
+      sourceDigests: [],
+    };
+
+    expect(authoringResponseProjection(input)).toMatchObject({
+      schema: 'lpc-toolkit.asset-authoring-response.v1',
+      sessionId: 'session-1',
+      goal: 'new-item',
+      state: 'needs-user-action',
+      reason: 'missing-inputs',
+      phase: 'planned',
+      checkpointFreshness: 'missing',
+      inputsNeeded: input.inputsNeeded,
+      nextActions: input.nextActions,
+      retrySafety: 'safe',
+    });
+  });
+
+  it('keeps validation and preview receipts bounded in the JSON projection', () => {
+    const validation = {
+      schema: 'lpc-toolkit.asset-pack-validation.v1',
+      packDirectory: '/workspace/artist-packs/acme.hair',
+      contentDigest: `sha256:${'a'.repeat(64)}`,
+      manifestDigest: `sha256:${'b'.repeat(64)}`,
+      sourceDigests: [{ path: 'sprites/moon-braid/walk.png', digest: `sha256:${'c'.repeat(64)}` }],
+      valid: false,
+      diagnostics: [{
+        code: 'asset_optional_frame_blank',
+        severity: 'warning',
+        message: 'Optional padding frames are blank.',
+      }],
+      acknowledgementRecords: [{
+        code: 'asset_optional_frame_blank',
+        subject: { sourcePath: 'sprites/moon-braid/walk.png' },
+        contentDigest: `sha256:${'a'.repeat(64)}`,
+        reason: '',
+      }],
+    } as AssetPackValidationReport;
+    const preview = {
+      input: {
+        assetId: 'moon-braid',
+        animation: 'walk',
+        bodyType: 'male',
+        characterPath: null,
+        digest: `sha256:${'d'.repeat(64)}`,
+      },
+      validationRevision: `sha256:${'a'.repeat(64)}`,
+      artifacts: [{
+        id: 'preview:credits_txt',
+        path: '/workspace/artist-packs/acme.hair/previews/moon-braid.credits.txt',
+        digest: `sha256:${'e'.repeat(64)}`,
+      }],
+      warnings: [],
+      manifestDigest: `sha256:${'b'.repeat(64)}`,
+      sourceDigests: [{ path: 'sprites/moon-braid/walk.png', digest: `sha256:${'c'.repeat(64)}` }],
+    } as AuthoringPreviewData;
+
+    const projected = authoringResponseProjection({
+      sessionId: 'session-1',
+      goal: 'new-item',
+      state: 'needs-user-action',
+      reason: 'validation-failed',
+      phase: 'validated',
+      checkpoint: null,
+      checkpointFreshness: 'stale',
+      diagnostics: [],
+      artifacts: [],
+      inputsNeeded: [],
+      nextActions: [],
+      retrySafety: 'safe',
+      manifestDigest: validation.manifestDigest!,
+      sourceDigests: [],
+      validation,
+      preview,
+    });
+
+    expect(projected.validation).toEqual(validation);
+    expect(projected.preview).toEqual(preview);
+    expect(projected).not.toHaveProperty('plan');
+    expect(projected).not.toHaveProperty('provenance');
+    expect(projected).not.toHaveProperty('checkpoints');
+  });
+
   it('keeps preview warning blocks in warnings and preserves typed details after acknowledgement', async () => {
     const fixture = createWarningAssetCommandFixture();
     const runAssetJson = async (command: 'preview' | 'sync') => {

@@ -39,6 +39,16 @@ const auditWorkflowPath = path.resolve(
   '../../../plugins/lpc-toolkit/skills/animation-asset-audit/references/audit-workflow.md',
 );
 const auditWorkflow = readFileSync(auditWorkflowPath, 'utf8');
+const characterCompatibilityPath = path.resolve(
+  here,
+  '../../../plugins/lpc-toolkit/skills/character-authoring/references/compatibility.md',
+);
+const characterCompatibility = readFileSync(characterCompatibilityPath, 'utf8');
+const auditCompatibilityPath = path.resolve(
+  here,
+  '../../../plugins/lpc-toolkit/skills/animation-asset-audit/references/compatibility.md',
+);
+const auditCompatibility = readFileSync(auditCompatibilityPath, 'utf8');
 
 describe('Codex plugin CLI contract', () => {
   it('uses the versioned character contract schema', () => {
@@ -108,5 +118,32 @@ describe('Codex plugin CLI contract', () => {
     expect(auditWorkflow).toContain('Web Asset Pack Workbench');
     expect(auditWorkflow).toContain('status: "draft"');
     expect(auditWorkflow).toContain('cannot be installed by the CLI');
+  });
+
+  it('does not claim the newer asset-authoring session capability', () => {
+    const pluginCommands = [...characterContract.commands, ...auditContract.commands];
+    expect(pluginCommands.some(({ argv }) => argv.slice(0, 2).join(' ') === 'asset authoring'))
+      .toBe(false);
+    expect(pluginCommands.every(({ argv }) =>
+      !(argv[0] === 'asset' && argv[1] === 'authoring'))).toBe(true);
+    expect(workflow).not.toContain('asset authoring');
+    expect(auditWorkflow).not.toContain('asset authoring');
+
+    const unsupportedAuthoringCommand = parseArgs([
+      'asset', 'authoring', 'start', '--plan', 'plan.json', '--json',
+    ]);
+    expect(
+      pluginCommands.some(({ argv }) =>
+        argv.slice(0, unsupportedAuthoringCommand.command.length).join(' ') ===
+        unsupportedAuthoringCommand.command.join(' ')),
+    ).toBe(false);
+  });
+
+  it('documents the plugin boundary for newer authoring capabilities', () => {
+    for (const compatibility of [characterCompatibility, auditCompatibility]) {
+      expect(compatibility).toContain('asset-authoring-session.v1');
+      expect(compatibility).toContain('must not claim or invoke');
+      expect(compatibility).toContain('sprite-drawing-contract.v1');
+    }
   });
 });

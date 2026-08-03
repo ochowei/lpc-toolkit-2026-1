@@ -587,6 +587,71 @@ clear it and preserve governed acknowledgements. Attribution remains attached
 to preview, draft, formal, and CLI lifecycle paths. The Web reuses the Core
 schema and does not introduce an alternate manifest format.
 
+### Strict authoring session foundation
+
+The shipped authoring foundation is a provider-neutral CLI application layer
+around the pure Core plan and drawing contracts. Core owns strict parsing for
+`lpc-toolkit.asset-authoring-plan.v1` and deterministic planning for
+`lpc-toolkit.sprite-drawing-contract.v1`; it receives plan, catalog, geometry,
+credit, and source-evidence values as inputs and never reads a workspace,
+invokes a provider, or writes a PNG. The CLI owns the Node filesystem session,
+candidate trust boundary, digest checkpoints, receipt invalidation, and the
+existing validation/preview leaf commands.
+
+`lpc-toolkit capabilities --json` advertises the shipped capability identifiers
+`asset-authoring-session.v1`, `sprite-drawing-contract.v1`,
+`asset-authoring-candidate-import.v1`, and `asset-authoring-recovery.v1`.
+Their public schema set is
+`lpc-toolkit.asset-authoring-plan.v1`,
+`lpc-toolkit.asset-authoring-session.v1`,
+`lpc-toolkit.asset-authoring-response.v1`, and
+`lpc-toolkit.sprite-drawing-contract.v1`. Contract artifact metadata is
+session-local and uses `lpc-toolkit.asset-authoring-artifact-metadata.v1`; it
+is not a publishable asset-pack schema.
+
+The public session flow is `start`, `status`, `resume`, `contract`, `import`,
+`validate`, `preview`, and `reconcile-manifest` below
+`asset authoring`. A strict plan may describe `new-item`, `extend-item`, or
+`attach-pack`; the current contract planner supports drawing targets for the
+first two goals and explicitly refuses to publish a drawing contract for
+`attach-pack`. The CLI records session state below
+`.lpc-toolkit/asset-packs/authoring-sessions/<session-id>/`, while the
+publishable source remains the ordinary
+`artist-packs/<pack-id>/asset-pack.json` and `sprites/` tree. Session state is
+not silently embedded in a formal archive.
+
+Contract generation writes `contract.json`, metadata, transparent templates,
+guides, and any attributed working/reference artifacts in a session-owned
+`contract-artifacts/` directory. Metadata binds every artifact to the session
+and contract digest and marks it `importable: false`. Candidate import accepts
+only a workspace-contained regular transparent RGBA PNG with exact contract
+geometry and a supplied contract digest; artifact paths or bytes cannot be
+reused as candidates. New targets write only the declared artist-pack source
+path. Replacement requires explicit `--replace-existing` plus the exact
+currently observed `--expected-target-digest`. External PNG drift and manifest
+drift block the session and expose digest-bound review/reconcile actions;
+`resume` never chooses external or session bytes implicitly.
+
+Validation and preview receipts bind the current manifest/source digests and,
+for preview, the requested input and validation revision. A source correction
+clears stale receipts and requires validation again. Warnings still require
+the existing structured acknowledgement and human reason. Preview artifacts
+remain the existing attributed PNG, metadata, TXT-credit, and CSV-credit files
+under the artist pack. New-item credits come from declared human draft credits;
+extension contracts preserve inherited source attribution. Neither the
+authoring session nor the Web Workbench invokes a drawing provider or creates
+a second attribution path.
+
+Animation audit remains read-only and provider-neutral.
+`catalog audit-animations --json` reports unsupported, missing-file, blank-frame, and
+inspection-error findings without writing; only a complete report can feed
+`asset init --from-audit` or explicit extend-item remediation evidence. The Web
+Workbench remains an in-memory archive repair/download surface for draft or
+formal archives, not a bridge to the CLI authoring session. All authoring
+session reads and writes stay in the standalone workspace; they do not modify
+checked-in assets, the verified base cache, generated `assets_custom/` output,
+installed snapshots, or the dormant read-only `upstream/` gitlink.
+
 Production asset resolution uses the local tree or pinned managed cache.
 `upstream/` is an optional read-only provenance dormant gitlink that preserves source
 provenance without participating in normal install, test, build, E2E, package,

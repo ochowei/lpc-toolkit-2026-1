@@ -50,9 +50,21 @@ export interface AssetPackValidationReport {
   readonly packId?: string;
   readonly packDirectory: string;
   readonly contentDigest?: string;
+  readonly manifestDigest?: string;
+  readonly sourceDigests?: readonly AssetPackValidationSourceDigest[];
   readonly valid: boolean;
   readonly diagnostics: readonly (AssetPackDiagnostic | AssetPackLifecycleDiagnostic)[];
   readonly acknowledgementRecords: readonly AssetPackAcknowledgement[];
+}
+
+export interface AssetPackValidationSourceDigest {
+  readonly path: string;
+  readonly digest: string;
+}
+
+export interface AssetPackValidationEvidence {
+  readonly manifestDigest: string;
+  readonly sourceDigests: readonly AssetPackValidationSourceDigest[];
 }
 
 const VALIDATION_SCHEMA = 'lpc-toolkit.asset-pack-validation.v1' as const;
@@ -61,6 +73,17 @@ const INSPECTION_CONCURRENCY = 4;
 
 function sha256Buffer(buffer: Buffer): string {
   return createHash('sha256').update(buffer).digest('hex');
+}
+
+function validationEvidence(
+  payload: AssetPackPayloadSuccess,
+): AssetPackValidationEvidence {
+  return {
+    manifestDigest: `sha256:${sha256Buffer(payload.manifestBytes)}`,
+    sourceDigests: [...payload.sourceDigests.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([sourcePath, digest]) => ({ path: sourcePath, digest })),
+  };
 }
 
 function sha256Json(value: unknown): string {
@@ -423,6 +446,7 @@ export async function validateAssetPackPayload(options: {
     pack: options.payload.pack,
     inspections,
     contentDigest: options.payload.contentDigest,
+    evidence: validationEvidence(options.payload),
     runtime: options.runtime,
     ...(options.workspace ? { workspace: options.workspace } : {}),
     origin: options.origin,
@@ -433,6 +457,7 @@ function validateInspectedAssetPack(options: {
   readonly pack: NormalizedAssetPack;
   readonly inspections: readonly AssetPackSourceInspection[];
   readonly contentDigest: string;
+  readonly evidence?: AssetPackValidationEvidence;
   readonly runtime: RuntimeAssets;
   readonly workspace?: AssetWorkspace;
   readonly origin: string;
@@ -458,6 +483,10 @@ function validateInspectedAssetPack(options: {
     packId: options.pack.id,
     packDirectory: options.origin,
     contentDigest: options.contentDigest,
+    ...(options.evidence === undefined ? {} : {
+      manifestDigest: options.evidence.manifestDigest,
+      sourceDigests: options.evidence.sourceDigests,
+    }),
     valid: result.ok && compatibilityDiagnostics.length === 0,
     diagnostics: [...compatibilityDiagnostics, ...result.diagnostics],
     acknowledgementRecords: result.acknowledgementRecords,

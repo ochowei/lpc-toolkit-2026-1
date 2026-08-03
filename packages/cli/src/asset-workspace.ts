@@ -23,6 +23,7 @@ const OUTPUT_MARKER_FILE = '.lpc-toolkit-managed.json';
 const DEFAULT_PACKS_DIRECTORY = 'artist-packs';
 const DEFAULT_OUTPUT_DIRECTORY = 'assets_custom';
 const DEFAULT_STATE_DIRECTORY = '.lpc-toolkit/asset-packs';
+export const ASSET_AUTHORING_SESSIONS_DIRECTORY = 'authoring-sessions' as const;
 const INSTALL_STAGING_NAME = /^install-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 export interface AssetWorkspace {
@@ -35,6 +36,15 @@ export interface AssetWorkspace {
   readonly stagingRoot: string;
   readonly transactionsRoot: string;
   readonly registryPath: string;
+}
+
+export function assetAuthoringSessionsRoot(workspace: AssetWorkspace): string {
+  const stateRoot = path.resolve(workspace.stateRoot);
+  const sessionsRoot = path.resolve(stateRoot, ASSET_AUTHORING_SESSIONS_DIRECTORY);
+  if (!isInsideRoot(stateRoot, sessionsRoot)) {
+    throw new Error('Asset authoring session root escapes the workspace state root.');
+  }
+  return sessionsRoot;
 }
 
 export interface AssetPackInstallStagingRoot {

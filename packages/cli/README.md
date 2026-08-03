@@ -200,6 +200,120 @@ PNG invalidates the acknowledgement; changing only the acknowledgement array
 does not change the content digest. There is no broad force or ignore-warnings
 flag.
 
+### Strict asset-authoring sessions
+
+The CLI also exposes a provider-neutral, resumable authoring foundation. It
+does not invoke an image provider and it does not treat a generated artifact as
+an input. An external artist or tool stages a candidate PNG inside the
+workspace; the CLI verifies the candidate against the session's drawing
+contract before importing it into the artist pack.
+
+Discover the public contract without preparing the asset cache:
+
+```sh
+lpc-toolkit capabilities --json
+```
+
+The advertisement includes these capability identifiers:
+
+- `asset-authoring-session.v1`
+- `sprite-drawing-contract.v1`
+- `asset-authoring-candidate-import.v1`
+- `asset-authoring-recovery.v1`
+
+and these schema identifiers:
+
+- `lpc-toolkit.asset-authoring-plan.v1`
+- `lpc-toolkit.asset-authoring-session.v1`
+- `lpc-toolkit.asset-authoring-response.v1`
+- `lpc-toolkit.sprite-drawing-contract.v1`
+
+The strict plan schema has three goals: `new-item`, `extend-item`, and
+`attach-pack`. New-item plans declare pack and asset identity, body types,
+animations, layers, paths, human draft credits, and optional consent/provider
+metadata. Extend-item plans add audit remediation evidence, including the
+report digest, selected finding, consumer, geometry, source-cell mapping, and
+path confidence. Attach-pack sessions can inspect an existing pack, but this
+foundation does not publish a drawing contract for that goal.
+
+The public session commands are:
+
+| Command | Contract |
+| --- | --- |
+| `asset authoring start --plan <plan.json> [--workspace <directory>] [--json]` | Strictly parse the plan, create or attach the artist pack, and return a session response. |
+| `asset authoring status --session <session-id> [--workspace <directory>] [--json]` | Read state, checkpoint freshness, bounded diagnostics, artifacts, and safe next actions. |
+| `asset authoring resume --session <session-id> [--workspace <directory>] [--json]` | Reconcile current manifest/PNG/receipt evidence and return the next safe action. |
+| `asset authoring contract --session <session-id> [--refresh] [--workspace <directory>] [--json]` | Materialize or inspect the provider-neutral drawing contract and non-importable artifacts. |
+| `asset authoring import --session <session-id> --target <target-id> --candidate <png> --contract-digest <sha256> [--replace-existing --expected-target-digest <sha256>] [--workspace <directory>] [--json]` | Import one contract-bound candidate through the trust boundary. |
+| `asset authoring validate --session <session-id> [--workspace <directory>] [--json]` | Validate the session-owned pack and record a digest-bound validation receipt. |
+| `asset authoring preview --session <session-id> [existing preview options] [--workspace <directory>] [--json]` | Render an attributed preview from the current validation receipt. |
+| `asset authoring reconcile-manifest --session <session-id> --use <external\|session> --expected-external-digest <sha256> [--workspace <directory>] [--json]` | Resolve an observed external manifest change with an explicit digest-bound choice. |
+
+Each JSON command returns the normal `ok`, `command`, `data`, `warnings`, and
+`errors` envelope. Authoring data uses schema
+`lpc-toolkit.asset-authoring-response.v1` and exposes `sessionId`, `goal`,
+`state`, `reason`, `phase`, `checkpoint`, `checkpointFreshness`,
+`diagnostics`, `inputsNeeded`, `artifacts`, `nextActions`, `retrySafety`,
+`manifestDigest`, `sourceDigests`, `validation`, `preview`, `capabilities`,
+and `schemaVersions`. The response deliberately projects bounded evidence; it
+does not make session internals or provider output part of the publishable pack.
+
+The state and checkpoint fields are recovery data, not asset identity:
+
+| Field | Values and meaning |
+| --- | --- |
+| `state` | `needs-user-action` means a bounded session is waiting for a safe or explicitly confirmed next action; `failed` means the current operation is blocked; `completed` is reserved for a future terminal completion and is not required by the current drawing flow. |
+| `phase` | `planned`, `scaffolded`, `contract-ready`, `awaiting-candidate`, `imported`, `validated`, `previewed`, or `blocked`; each records the furthest trustworthy session boundary. |
+| `checkpoint` | `null` or an `{id, digest}` pair naming the last trustworthy session boundary and the exact evidence digest that established it. |
+| `checkpointFreshness` | `missing`, `current`, `stale`, or `blocked`; stale evidence must not be treated as current. |
+| `nextActions[].safety` | `safe`, `requires-confirmation`, or `blocked`; callers must honor this value and the listed precondition digests. |
+
+Sessions live below
+`.lpc-toolkit/asset-packs/authoring-sessions/<session-id>/session.json`.
+The session is workflow state only; the canonical publishable source remains
+`artist-packs/<pack-id>/asset-pack.json` plus `sprites/`. The contract command
+writes session-owned artifacts below
+`contract-artifacts/`: `contract.json`, `metadata.json`, transparent templates,
+guides, attributed working copies, and reference overlays where a baseline is
+available. Artifact metadata uses
+`lpc-toolkit.asset-authoring-artifact-metadata.v1`; every listed artifact has a
+digest, session/contract binding, and `importable: false`. Never pass a template,
+guide, working copy, reference overlay, or metadata file as a candidate.
+
+Candidates must be workspace-contained, regular transparent RGBA PNGs with the
+exact target geometry and contract-bound digest. A candidate is never read
+from `contract-artifacts/`, may not be the destination itself, and may not
+match a non-importable artifact by path or bytes. Importing a new target writes
+the declared logical source path below the artist pack. Replacing an existing
+target requires both `--replace-existing` and the exact currently observed
+`--expected-target-digest`; external PNG drift first blocks the session with a
+`review-external-png` action. A successful correction import clears stale
+validation and preview receipts, so the next required action is validation.
+
+Validation remains the existing strict pack validator. Warnings require the
+exact acknowledgement record and a non-empty human reason bound to the current
+content digest. The validation receipt records the manifest digest and every
+source digest; the preview receipt additionally records the preview input and
+validation revision. Manifest drift is resolved only by
+`reconcile-manifest --use external|session` with the observed external digest.
+`resume` re-evaluates these bindings and exposes recovery actions instead of
+silently choosing a side.
+
+`asset authoring preview` publishes the same attributed preview artifacts as
+the existing leaf command under
+`artist-packs/<pack-id>/previews/<asset-id>/`: the PNG, metadata JSON,
+`credits.txt`, and `credits.csv`. These paths and their digests are returned in
+the response. New-item attribution comes from the plan's human draft credits;
+extend-item contracts carry inherited source attribution, and all previews
+retain effective base and pack credits. Authoring sessions do not create a
+formal archive: run `asset validate`, then `asset pack`, `asset inspect`, and
+`asset install` for the separate formal publication and consumer workflow.
+
+Authoring sessions use the standalone workspace's artist source and managed
+state only. They never modify checked-in `assets/`, the verified base cache,
+generated `assets_custom/` output, installed archive snapshots, or the dormant
+read-only `upstream/` gitlink.
+
 Sync, install, upgrade, downgrade, and removal compile every active linked and
 installed pack in deterministic order. Path, semantic-field, baseline-digest,
 credit, replacement, and ownership conflicts fail instead of using
@@ -335,7 +449,7 @@ clone.
 
 ### Codex Plugin
 
-1. Install or upgrade the CLI to the range supported by plugin `0.2.0`:
+1. Install or upgrade the CLI to the range supported by plugin `0.2.1`:
 
 ```sh
 npm install -g '@lpc-toolkit/cli@>=0.2.0 <0.3.0'

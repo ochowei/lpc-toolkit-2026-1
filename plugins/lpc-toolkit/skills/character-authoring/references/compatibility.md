@@ -30,3 +30,9 @@ Interpret the JSON result:
 Node.js 22 or newer is required by the CLI. Plugin and CLI versions are
 independent; update this file, the checker constants, tests, and release notes
 together when the supported range changes.
+
+These skills intentionally do not implement the newer authoring-session
+workflow. They must not claim or invoke `asset-authoring-session.v1` or
+`sprite-drawing-contract.v1`; the plugin can safely refuse those capabilities.
+The character workflow remains limited to the commands listed in its versioned
+contract.

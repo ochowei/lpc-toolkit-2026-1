@@ -140,7 +140,7 @@ export function standardAnimationGeometry(target: AnimationName): AnimationAudit
   };
 }
 
-function customGeometry(sourceAnimation: AnimationName): AnimationAuditGeometry {
+export function customAnimationGeometry(sourceAnimation: AnimationName): AnimationAuditGeometry {
   const definition = customAnimations[sourceAnimation];
   if (!definition) throw new Error(`Unknown custom animation: ${sourceAnimation}`);
 
@@ -156,6 +156,17 @@ function customGeometry(sourceAnimation: AnimationName): AnimationAuditGeometry 
       })),
     })),
   };
+}
+
+/**
+ * Returns the registered geometry for either a standard or custom animation
+ * source. Callers must use this registry-backed helper rather than inferring
+ * LPC frame dimensions from an asset path or provider input.
+ */
+export function animationAuditGeometry(sourceAnimation: AnimationName): AnimationAuditGeometry {
+  return customAnimations[sourceAnimation]
+    ? customAnimationGeometry(sourceAnimation)
+    : standardAnimationGeometry(sourceAnimation);
 }
 
 function variantsFor(item: ItemDefinition): readonly (string | undefined)[] {
@@ -380,7 +391,7 @@ export function planAssetAnimationAudit(
         const sourceAnimation = compatibleSource
           ?? (VIRTUAL_ANIMATION_MAP[target as keyof typeof VIRTUAL_ANIMATION_MAP] ?? target);
         const geometry = compatibleSource
-          ? customGeometry(compatibleSource)
+          ? customAnimationGeometry(compatibleSource)
           : standardAnimationGeometry(target);
         const applicableGroups = compatibleSource
           ? groups.filter((group) => group.customAnimation === compatibleSource)

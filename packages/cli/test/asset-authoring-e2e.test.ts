@@ -252,6 +252,14 @@ describe('public CLI no-repository artist workflow', () => {
     expect(existsSync(path.join(workspaceRoot, '.git'))).toBe(false);
     expect(existsSync(path.join(workspaceRoot, 'assets'))).toBe(false);
 
+    const capabilitiesResult = await runJson<{
+      readonly capabilities: readonly string[];
+      readonly schemaVersions: readonly string[];
+    }>(['capabilities'], workspaceRoot, forbiddenPrepare);
+    const capabilities = expectSuccessfulData(capabilitiesResult);
+    expect(capabilities.capabilities).toContain('asset-authoring-session.v1');
+    expect(capabilities.schemaVersions).toContain('lpc-toolkit.asset-authoring-plan.v1');
+
     const prepare = vi.fn(async (options: PrepareRuntimeAssetsOptions) => {
       expect(options).toMatchObject({ cwd: workspaceRoot, managedCacheOnly: true });
       return runtime;

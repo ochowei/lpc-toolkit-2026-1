@@ -94,6 +94,38 @@ export {
 } from './asset-pack-baseline.js';
 
 export type {
+  AssetAuthoringBlankFramesFinding,
+  AssetAuthoringConsent,
+  AssetAuthoringDiagnostic,
+  AssetAuthoringDiagnosticCode,
+  AssetAuthoringIntent,
+  AssetAuthoringLayerIntent,
+  AssetAuthoringMissingFileFinding,
+  AssetAuthoringPackIntent,
+  AssetAuthoringPathConfidence,
+  AssetAuthoringPlan,
+  AssetAuthoringPlanGoal,
+  AssetAuthoringPlanParseResult,
+  AssetAuthoringProviderMetadata,
+  AssetAuthoringRemediationEvidence,
+  AssetAuthoringSelectedFinding,
+  AssetAuthoringSourceCell,
+  AssetAuthoringUnsupportedFinding,
+  AssetAuthoringUnsupportedRequirement,
+  AssetAuthoringWorkScope,
+  AttachPackAuthoringIntent,
+  AttachPackAssetAuthoringPlan,
+  ExtendItemAuthoringIntent,
+  ExtendItemAssetAuthoringPlan,
+  NewItemAuthoringIntent,
+  NewItemAssetAuthoringPlan,
+} from './asset-authoring-schema.js';
+export {
+  ASSET_AUTHORING_PLAN_SCHEMA,
+  parseAssetAuthoringPlan,
+} from './asset-authoring-schema.js';
+
+export type {
   AssetPackCreditRecord,
   NormalizedAssetPack,
   NormalizedAssetPackAsset,
@@ -331,6 +363,37 @@ export type {
   UnsupportedAnimationRequirement,
 } from './asset-animation-audit.js';
 export {
+  animationAuditGeometry,
+  customAnimationGeometry,
   planAssetAnimationAudit,
   standardAnimationGeometry,
 } from './asset-animation-audit.js';
+
+// ==========================================
+// 18. Provider-Neutral Sprite Drawing Contract
+// ==========================================
+export type {
+  PlanSpriteDrawingContractOptions,
+  SpriteDrawingBaselineCell,
+  SpriteDrawingBaselineReference,
+  SpriteDrawingCell,
+  SpriteDrawingCellPolicy,
+  SpriteDrawingCellPolicyInput,
+  SpriteDrawingContract,
+  SpriteDrawingGeometry,
+  SpriteDrawingLayerContext,
+  SpriteDrawingReference,
+  SpriteDrawingRow,
+  SpriteDrawingSourceReference,
+  SpriteDrawingTarget,
+  SpriteDrawingTargetInput,
+  SpriteDrawingTransparencyRules,
+  SpriteDrawingWorkKind,
+} from './sprite-drawing-contract.js';
+export {
+  planSpriteDrawingContract,
+  spriteDrawingContractDigestInput,
+  spriteDrawingContractProjection,
+  spriteDrawingTargetId,
+  SPRITE_DRAWING_CONTRACT_SCHEMA,
+} from './sprite-drawing-contract.js';

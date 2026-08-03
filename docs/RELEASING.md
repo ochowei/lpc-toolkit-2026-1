@@ -35,6 +35,37 @@ workspace dependencies. For a full render, verify the offline `.viewer.html`
 beside its sheet, metadata, and TXT/CSV credits, and verify ZIP output contains
 the same portable attributed set.
 
+### Capability and schema release gate
+
+When a release includes the authoring foundation or changes its public
+capability advertisement, run the built executable before tagging:
+
+```sh
+node packages/cli/dist/index.js capabilities --json
+node packages/cli/dist/index.js asset authoring --help
+node --test scripts/verify-codex-plugin.test.mjs
+pnpm verify:plugin
+```
+
+The capability response must retain the exact shipped identifiers
+`asset-authoring-session.v1`, `sprite-drawing-contract.v1`,
+`asset-authoring-candidate-import.v1`, and `asset-authoring-recovery.v1`, plus
+the four versioned authoring schemas. Check that the CLI help lists
+`start`, `status`, `resume`, `contract`, `import`, `validate`, `preview`, and
+`reconcile-manifest`, and that the CLI README, root README, landing copy, and
+plugin compatibility references describe the same boundary. Plugin `0.2.1`
+must continue to document CLI range `>=0.2.0 <0.3.0`; the plugin intentionally
+does not claim or invoke the newer authoring-session capabilities.
+
+The packed CLI smoke remains the release proof for the public contract. In a
+clean workspace, it must discover capabilities, create a strict-plan session,
+materialize the drawing contract, import a real transparent PNG through the
+digest-bound trust boundary, validate, preview with PNG/metadata/TXT/CSV
+credits, and recover from interruption and external drift. It must also prove
+that checked-in assets, the managed base cache, generated overlay, installed
+source, unowned output, and dormant `upstream/` remain untouched. No provider
+invocation or Web bridge is part of this release gate.
+
 ## Release Candidate
 
 1. Set `packages/cli/package.json` to the intended version, including any
@@ -71,6 +102,26 @@ Install the exact published version into a clean prefix and verify:
   extraction;
 - independence from unpublished workspace packages; and
 - equality between registry version, package version, and release tag.
+
+For a capability release, add these post-publication checks from the clean
+prefix:
+
+```sh
+lpc-toolkit capabilities --json
+lpc-toolkit --help
+lpc-toolkit catalog audit-animations --animation walk --json
+lpc-toolkit asset workspace init ./authoring-smoke
+```
+
+Then run the packed authoring smoke's fixture plan through
+`asset authoring start`, `contract`, `import`, `validate`, and `preview`. Check
+that every returned artifact path stays inside the workspace, the four preview
+artifacts retain matching attribution, and a correction after observed PNG
+drift requires the exact target digest. Finally use `asset pack` for formal
+archive publication and verify that a separate consumer still needs
+`asset inspect` and `asset install`; a session response is not a release
+archive. Record the capability JSON, plugin version/range, package version,
+published version, commands, and PASS/FAIL results with the workflow URLs.
 
 Record workflow URLs, the published version, commands, and PASS/FAIL results.
 Never delete or retarget a pushed tag, overwrite a published npm version,

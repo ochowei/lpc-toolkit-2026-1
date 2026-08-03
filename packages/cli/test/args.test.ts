@@ -83,4 +83,50 @@ describe('parseArgs', () => {
       ['pack-id', 'acme.hair'],
     ]));
   });
+
+  it('parses the complete asset authoring command path', () => {
+    expect(parseArgs([
+      'asset', 'authoring', 'import',
+      '--session', 'session-1',
+      '--target', 'sprites/hair/walk.png',
+      '--candidate', 'candidate.png',
+      '--contract-digest', 'sha256:contract',
+      '--workspace', './artist-workspace',
+      '--json',
+    ])).toEqual({
+      command: ['asset', 'authoring', 'import'],
+      flags: new Map<string, FlagValue>([
+        ['session', 'session-1'],
+        ['target', 'sprites/hair/walk.png'],
+        ['candidate', 'candidate.png'],
+        ['contract-digest', 'sha256:contract'],
+        ['workspace', './artist-workspace'],
+        ['json', true],
+      ]),
+      positionals: [],
+    });
+  });
+
+  it('parses authoring refresh and replacement switches as booleans', () => {
+    expect(parseArgs([
+      'asset', 'authoring', 'contract', '--session', 'session-1', '--refresh',
+    ]).flags).toEqual(new Map<string, FlagValue>([
+      ['session', 'session-1'],
+      ['refresh', true],
+    ]));
+
+    expect(parseArgs([
+      'asset', 'authoring', 'import', '--session', 'session-1',
+      '--target', 'target', '--candidate', 'candidate.png',
+      '--contract-digest', 'sha256:contract', '--replace-existing',
+      '--expected-target-digest', 'sha256:target',
+    ]).flags).toEqual(new Map<string, FlagValue>([
+      ['session', 'session-1'],
+      ['target', 'target'],
+      ['candidate', 'candidate.png'],
+      ['contract-digest', 'sha256:contract'],
+      ['replace-existing', true],
+      ['expected-target-digest', 'sha256:target'],
+    ]));
+  });
 });

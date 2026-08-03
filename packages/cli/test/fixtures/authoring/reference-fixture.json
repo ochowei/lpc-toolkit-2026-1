@@ -1,0 +1,7 @@
+{
+  "file": "../viewer/fixture.sheet.png",
+  "author": "Fixture Artist",
+  "license": "GPL 3.0",
+  "source": "../viewer/viewer-data.json",
+  "notes": "The existing attributed CLI viewer PNG is reused as the real authoring reference fixture; the binary source is not modified."
+}

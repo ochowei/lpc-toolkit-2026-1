@@ -76,8 +76,10 @@ describe('CLI and agent integration pages', () => {
       .replaceAll('&gt;', '>');
     const commands = [
       'npm install -g @lpc-toolkit/cli',
+      'lpc-toolkit catalog audit-animations --animation climb --json',
       'lpc-toolkit asset workspace init ./my-lpc-art',
       'cd ./my-lpc-art',
+      'lpc-toolkit asset init --from-audit audit.json --item hair_braid --pack-id acme.audit --display-name "ACME Audit" --author Alice --license "CC-BY-SA 4.0" --url https://example.com/acme/audit',
       'lpc-toolkit asset init --new --pack-id acme.fantasy-hair --asset-id moon-braid --display-name "Moon Braid" --type hair --body-type male --body-type female --animation walk --animation climb --author Alice --license "CC-BY-SA 4.0" --url https://example.com/acme/fantasy-hair',
       'lpc-toolkit asset validate ./artist-packs/<pack-id>',
       'lpc-toolkit asset preview ./artist-packs/<pack-id>',
@@ -95,6 +97,7 @@ describe('CLI and agent integration pages', () => {
 
     expect(positions).toEqual([...positions].sort((left, right) => left - right));
     expect(html).toContain('artist-packs/<pack-id>/sprites/');
+    expect(html).toContain('Character composition, source asset creation, audit handoff, validation, formal archive publication, and installation are separate CLI responsibilities.');
     expect(html).toContain('You do not need to clone this repository');
     expect(html).not.toContain('Phase 3');
     expect(html).toContain('browser can inspect, validate, repair, and assemble');

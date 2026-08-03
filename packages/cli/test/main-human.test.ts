@@ -4,7 +4,11 @@ import path from 'node:path';
 import { createCanvas } from '@napi-rs/canvas';
 import { describe, expect, it } from 'vitest';
 import { runCli } from '../src/main.js';
-import { formatHumanResponse } from '../src/response.js';
+import {
+  authoringResponseProjection,
+  formatHumanResponse,
+} from '../src/response.js';
+import { initializeAssetWorkspace } from '../src/asset-workspace.js';
 import {
   acknowledgeWarning,
   createWarningAssetCommandFixture,
@@ -173,6 +177,199 @@ async function runHumanError(argv: readonly string[], cwd: string): Promise<stri
 }
 
 describe('human-readable CLI output', () => {
+  it('presents a durable missing-credit pause from authoring start', async () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-human-authoring-start-'));
+    const workspace = initializeAssetWorkspace(path.join(cwd, 'workspace'));
+    const planPath = path.join(cwd, 'plan.json');
+    writeFileSync(planPath, `${JSON.stringify({
+      schema: 'lpc-toolkit.asset-authoring-plan.v1',
+      goal: 'new-item',
+      pack: {
+        id: 'acme.human-output',
+        version: '1.0.0',
+        displayName: 'ACME Human Output',
+      },
+      asset: {
+        kind: 'new-item',
+        localId: 'moon-braid',
+        displayName: 'Moon Braid',
+        typeName: 'hair',
+        bodyTypes: ['male'],
+        animations: ['walk'],
+        layers: [{ id: 'foreground', zPos: 120, bodyTypes: ['male'] }],
+      },
+      scope: {
+        packId: 'acme.human-output',
+        assetId: 'moon-braid',
+        bodyTypes: ['male'],
+        animations: ['walk'],
+        paths: ['sprites/moon-braid/foreground/walk.png'],
+      },
+    }, null, 2)}\n`);
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+
+    const code = await runCli([
+      'asset', 'authoring', 'start', '--plan', planPath,
+      '--workspace', workspace.root,
+    ], {
+      cwd,
+      stdout: (text) => stdout.push(text),
+      stderr: (text) => stderr.push(text),
+    });
+
+    expect(code).toBe(0);
+    expect(stderr).toEqual([]);
+    expect(stdout.join('')).toContain('Workflow state: needs-user-action');
+    expect(stdout.join('')).toContain('Reason: missing-draft-credits');
+    expect(stdout.join('')).toContain('Provide the human attribution author.');
+  });
+
+  it('summarizes authoring command success separately from workflow state and next action safety', () => {
+    const output = formatHumanResponse({
+      ok: true,
+      command: 'asset authoring status',
+      data: authoringResponseProjection({
+        sessionId: 'session-1',
+        goal: 'new-item',
+        state: 'needs-user-action',
+        reason: 'missing-inputs',
+        phase: 'planned',
+        checkpoint: null,
+        checkpointFreshness: 'stale',
+        diagnostics: [],
+        artifacts: [],
+        inputsNeeded: [{ id: 'author', summary: 'Human author declaration.' }],
+        nextActions: [{
+          id: 'provide-author',
+          summary: 'Provide the human author declaration.',
+          command: 'asset authoring resume',
+          safety: 'requires-confirmation',
+          requiredInputs: ['author'],
+          preconditionDigests: [],
+          expectedCheckpoint: null,
+        }],
+        retrySafety: 'safe',
+        manifestDigest: null,
+        sourceDigests: [],
+      }),
+      warnings: [],
+      errors: [],
+    }, 'fallback\n');
+
+    expect(output).toContain('Command succeeded: asset authoring status');
+    expect(output).toContain('Workflow state: needs-user-action');
+    expect(output).toContain('Checkpoint: stale');
+    expect(output).toContain('Inputs needed:');
+    expect(output).toContain('Human author declaration.');
+    expect(output).toContain('Confirmation required: Provide the human author declaration.');
+    expect(output).toContain('Next command: asset authoring resume');
+  });
+
+  it('summarizes completed authoring state without inventing a mutation result', () => {
+    const output = formatHumanResponse({
+      ok: true,
+      command: 'asset authoring contract',
+      data: authoringResponseProjection({
+        sessionId: 'session-1',
+        goal: 'new-item',
+        state: 'completed',
+        reason: 'contract-ready',
+        phase: 'contract-ready',
+        checkpoint: { id: 'contract', digest: 'sha256:contract' },
+        checkpointFreshness: 'current',
+        diagnostics: [],
+        artifacts: [],
+        inputsNeeded: [],
+        nextActions: [],
+        retrySafety: 'safe',
+        manifestDigest: null,
+        sourceDigests: [],
+      }),
+      warnings: [],
+      errors: [],
+    }, 'fallback\n');
+
+    expect(output).toContain('Command succeeded: asset authoring contract');
+    expect(output).toContain('Workflow state: completed');
+    expect(output).toContain('Checkpoint: current');
+    expect(output).toContain('Reason: contract-ready');
+  });
+
+  it('presents bounded validation and preview receipt recovery details', () => {
+    const output = formatHumanResponse({
+      ok: true,
+      command: 'asset authoring preview',
+      data: authoringResponseProjection({
+        sessionId: 'session-1',
+        goal: 'new-item',
+        state: 'needs-user-action',
+        reason: 'validation-failed',
+        phase: 'validated',
+        checkpoint: null,
+        checkpointFreshness: 'stale',
+        diagnostics: [],
+        artifacts: [],
+        inputsNeeded: [],
+        nextActions: [{
+          id: 'validate-session',
+          summary: 'Re-run validation against the current session-owned pack sources.',
+          command: 'asset authoring validate --session session-1',
+          safety: 'safe',
+          requiredInputs: [],
+          preconditionDigests: [],
+          expectedCheckpoint: null,
+        }],
+        retrySafety: 'safe',
+        manifestDigest: `sha256:${'b'.repeat(64)}`,
+        sourceDigests: [],
+        validation: {
+          schema: 'lpc-toolkit.asset-pack-validation.v1',
+          packDirectory: '/workspace/artist-packs/acme.hair',
+          contentDigest: `sha256:${'a'.repeat(64)}`,
+          valid: false,
+          diagnostics: [{
+            code: 'asset_source_missing',
+            severity: 'error',
+            message: 'Source PNG is missing.',
+            sourcePath: 'sprites/moon-braid/walk.png',
+          }],
+          acknowledgementRecords: [],
+        },
+        preview: {
+          input: {
+            assetId: 'moon-braid',
+            animation: 'walk',
+            bodyType: 'male',
+            characterPath: null,
+            digest: `sha256:${'d'.repeat(64)}`,
+          },
+          validationRevision: `sha256:${'a'.repeat(64)}`,
+          artifacts: [{
+            id: 'preview:credits_csv',
+            path: '/workspace/artist-packs/acme.hair/previews/moon-braid.credits.csv',
+            digest: `sha256:${'e'.repeat(64)}`,
+          }],
+          warnings: [],
+          manifestDigest: `sha256:${'b'.repeat(64)}`,
+          sourceDigests: [],
+        },
+      }),
+      warnings: [],
+      errors: [],
+    }, 'fallback\n');
+
+    expect(output).toContain('Validation: invalid');
+    expect(output).toContain('Validation errors: 1');
+    expect(output).toContain('Validation revision:');
+    expect(output).toContain('Preview input:');
+    expect(output).toContain(
+      '- preview:credits_csv: /workspace/artist-packs/acme.hair/previews/moon-braid.credits.csv',
+    );
+    expect(output).not.toContain('provenance');
+    expect(output).not.toContain('checkpoints');
+  });
+
   it('prints warning-only preview blocks and typed available values after acknowledgement', async () => {
     const fixture = createWarningAssetCommandFixture();
     const runPreview = async () => {
