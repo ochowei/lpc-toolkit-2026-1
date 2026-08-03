@@ -356,25 +356,64 @@ plugin: update
 - Modify: `packages/cli/test/main-json.test.ts`
 - Modify: `packages/cli/test/main-human.test.ts`
 
-- [ ] Write failing parser/help tests for the exact fixed command surface,
+- [x] Write failing parser/help tests for the exact fixed command surface,
   mutual requirements, replacement flags, preview option reuse, and rejected
   extra positional/unknown options.
-- [ ] Write failing JSON tests for `capabilities --json`, schema identifiers,
+- [x] Write failing JSON tests for `capabilities --json`, schema identifiers,
   stable capability ordering, and the initial authoring response projection.
-- [ ] Add human summaries that distinguish command success, workflow state,
+- [x] Add human summaries that distinguish command success, workflow state,
   stale checkpoints, missing inputs, and confirmation-required actions.
-- [ ] Keep capability discovery read-only and independent of workspace/cache
+- [x] Keep capability discovery read-only and independent of workspace/cache
   preparation.
-- [ ] Do not dispatch mutating behavior until Tasks 4–8 provide the owning
+- [x] Do not dispatch mutating behavior until Tasks 4–8 provide the owning
   application modules; use explicit structured not-yet-reachable test seams,
   not silent placeholders in production output.
-- [ ] Run:
+- [x] Run:
   `rtk pnpm --filter @lpc-toolkit/cli test -- args.test.ts command-spec.test.ts main-json.test.ts main-human.test.ts`
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/cli run typecheck`
-- [ ] Run: `rtk pnpm check:boundaries`
-- [ ] Commit product changes with a focused conventional commit.
-- [ ] Record implementation note, full product commit hash, and exact PASS/FAIL
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/cli run typecheck`
+- [x] Run: `rtk pnpm check:boundaries`
+- [x] Commit product changes with a focused conventional commit.
+- [x] Record implementation note, full product commit hash, and exact PASS/FAIL
   verification evidence here; commit the plan record separately.
+
+  - Implementation: Added read-only CLI capability advertisement with the fixed
+    schema/capability ordering, parsed the complete three-token `asset authoring`
+    command tree, enforced required and replacement/reconciliation flag
+    relationships before dispatch, reused existing asset preview options, and
+    added typed initial authoring-response projection plus human summaries for
+    state, stale checkpoints, missing inputs, and confirmation-required actions.
+    Authoring leaves stop at an explicit structured not-yet-reachable seam; no
+    session, workspace, cache, asset, or candidate mutation is dispatched before
+    Tasks 4–8 provide the owning application modules.
+  - Product commit: `f2ee62a222a2eb9663ffcd386631de0fba8c01d3`
+    (`feat(cli): add authoring command contract`).
+  - TDD RED verification: `rtk pnpm --filter @lpc-toolkit/cli test -- args.test.ts command-spec.test.ts main-json.test.ts main-human.test.ts`
+    FAIL (5 focused tests failed as expected; the parser returned `import` as a
+    positional, fixed authoring/capabilities help was absent, the capabilities
+    module could not load, and the response projection was not implemented).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- args.test.ts command-spec.test.ts main-json.test.ts main-human.test.ts`
+    PASS (4 files, 131 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+  - Verification: `rtk pnpm check:boundaries` PASS.
+  - Additional verification: `rtk git diff --check` PASS.
+  - Additional verification: `rtk pnpm --filter @lpc-toolkit/cli test` FAIL
+    (54 files passed, 1 skipped, 1,050 tests passed; 13 existing
+    `web-server.test.ts` cases could not bind `127.0.0.1` in the sandbox and
+    returned `listen EPERM`).
+  - Additional verification: `rtk pnpm --filter @lpc-toolkit/cli test -- web-server.test.ts`
+    PASS (22 tests when rerun with the required loopback-binding escalation;
+    confirms the full-suite failures are environmental and unrelated).
+  - CLI documentation impact reassessment for this contract-only task:
+    `help: update` (generated command help changed here); `cli-readme: N/A — prose
+    workflow documentation remains a later plan documentation surface`;
+    `root-readme: N/A — the overall workflow landing remains a later plan
+    documentation surface`; `landing: N/A — public positioning remains a later
+    plan documentation surface`; `architecture: N/A — ownership prose remains a
+    later plan documentation surface`; `engineering: N/A — verification mapping
+    remains a later plan documentation surface`; `releasing: N/A — release
+    compatibility prose remains a later plan documentation surface`; `plugin:
+    N/A — plugin compatibility and skill documentation remain a later plan
+    documentation surface`.
 
 ### Task 4: Persist strict workspace-bound authoring sessions
 
