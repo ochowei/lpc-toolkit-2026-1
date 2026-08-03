@@ -363,6 +363,37 @@ export type {
   UnsupportedAnimationRequirement,
 } from './asset-animation-audit.js';
 export {
+  animationAuditGeometry,
+  customAnimationGeometry,
   planAssetAnimationAudit,
   standardAnimationGeometry,
 } from './asset-animation-audit.js';
+
+// ==========================================
+// 18. Provider-Neutral Sprite Drawing Contract
+// ==========================================
+export type {
+  PlanSpriteDrawingContractOptions,
+  SpriteDrawingBaselineCell,
+  SpriteDrawingBaselineReference,
+  SpriteDrawingCell,
+  SpriteDrawingCellPolicy,
+  SpriteDrawingCellPolicyInput,
+  SpriteDrawingContract,
+  SpriteDrawingGeometry,
+  SpriteDrawingLayerContext,
+  SpriteDrawingReference,
+  SpriteDrawingRow,
+  SpriteDrawingSourceReference,
+  SpriteDrawingTarget,
+  SpriteDrawingTargetInput,
+  SpriteDrawingTransparencyRules,
+  SpriteDrawingWorkKind,
+} from './sprite-drawing-contract.js';
+export {
+  planSpriteDrawingContract,
+  spriteDrawingContractDigestInput,
+  spriteDrawingContractProjection,
+  spriteDrawingTargetId,
+  SPRITE_DRAWING_CONTRACT_SCHEMA,
+} from './sprite-drawing-contract.js';
