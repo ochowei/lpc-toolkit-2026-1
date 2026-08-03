@@ -94,6 +94,38 @@ export {
 } from './asset-pack-baseline.js';
 
 export type {
+  AssetAuthoringBlankFramesFinding,
+  AssetAuthoringConsent,
+  AssetAuthoringDiagnostic,
+  AssetAuthoringDiagnosticCode,
+  AssetAuthoringIntent,
+  AssetAuthoringLayerIntent,
+  AssetAuthoringMissingFileFinding,
+  AssetAuthoringPackIntent,
+  AssetAuthoringPathConfidence,
+  AssetAuthoringPlan,
+  AssetAuthoringPlanGoal,
+  AssetAuthoringPlanParseResult,
+  AssetAuthoringProviderMetadata,
+  AssetAuthoringRemediationEvidence,
+  AssetAuthoringSelectedFinding,
+  AssetAuthoringSourceCell,
+  AssetAuthoringUnsupportedFinding,
+  AssetAuthoringUnsupportedRequirement,
+  AssetAuthoringWorkScope,
+  AttachPackAuthoringIntent,
+  AttachPackAssetAuthoringPlan,
+  ExtendItemAuthoringIntent,
+  ExtendItemAssetAuthoringPlan,
+  NewItemAuthoringIntent,
+  NewItemAssetAuthoringPlan,
+} from './asset-authoring-schema.js';
+export {
+  ASSET_AUTHORING_PLAN_SCHEMA,
+  parseAssetAuthoringPlan,
+} from './asset-authoring-schema.js';
+
+export type {
   AssetPackCreditRecord,
   NormalizedAssetPack,
   NormalizedAssetPackAsset,
