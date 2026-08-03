@@ -168,7 +168,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
   {
     command: ['asset', 'authoring'],
     usage: 'lpc-toolkit asset authoring <command>',
-    description: 'Create and resume provider-neutral asset authoring sessions.',
+    description: 'Create and resume provider-neutral asset authoring sessions from strict plans.',
     options: [HELP_OPTION],
     examples: [
       'lpc-toolkit asset authoring start --plan plan.json --json',

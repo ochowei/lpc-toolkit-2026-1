@@ -56,6 +56,13 @@ test('publishes the two-workflow presentation', () => {
   ), 'utf8'));
   const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
   const codexPluginSection = readme.split('### Codex Plugin', 2)[1]?.split('## ', 1)[0] ?? '';
+  const cliReadme = readFileSync(new URL('../packages/cli/README.md', import.meta.url), 'utf8');
+  const cliPluginSection = cliReadme.split('### Codex Plugin', 2)[1]?.split('## ', 1)[0] ?? '';
+  const compatibility = readFileSync(new URL(
+    '../plugins/lpc-toolkit/skills/character-authoring/references/compatibility.md',
+    import.meta.url,
+  ), 'utf8');
+  const compatibilityVersion = /Plugin version `([^`]+)`/u.exec(compatibility)?.[1];
 
   assert.equal(manifest.version, '0.2.1');
   assert.match(manifest.description, /audit/u);
@@ -75,6 +82,17 @@ test('publishes the two-workflow presentation', () => {
       `missing Codex Plugin presentation: ${required}`,
     );
   }
+  assert.equal(
+    cliPluginSection.includes(`plugin \`${manifest.version}\``),
+    true,
+    `CLI README must document plugin \`${manifest.version}\``,
+  );
+  assert.equal(compatibilityVersion, manifest.version);
+  assert.equal(
+    cliPluginSection.includes(`plugin \`${compatibilityVersion}\``),
+    true,
+    'CLI README must match the plugin compatibility metadata',
+  );
 });
 
 for (const skillName of ['animation-asset-audit', 'character-authoring']) {

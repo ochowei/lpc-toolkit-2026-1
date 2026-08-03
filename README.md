@@ -133,10 +133,22 @@ only the public CLI. Git and a repository clone are optional; neither the
 author nor the consumer needs to initialize `upstream/` or create local base
 assets.
 
+These are separate workflows: `character create`/`character set` compose an
+existing character; `catalog audit-animations --json` is a read-only audit
+handoff; `asset init --new` creates a source item while
+`asset init --from-audit` turns a complete audit report into a bounded source
+worklist; `asset validate` checks the source; `asset pack` publishes a formal
+archive; and `asset inspect`/`asset install` handle a consumer's installation.
+The authoring-session commands documented in the [CLI asset lifecycle
+guide](packages/cli/README.md#strict-asset-authoring-sessions) coordinate
+contract-bound candidate PNGs but do not replace formal archive publication.
+
 ```sh
 npm install -g @lpc-toolkit/cli
+lpc-toolkit catalog audit-animations --animation climb --json
 lpc-toolkit asset workspace init ./my-lpc-art
 cd ./my-lpc-art
+lpc-toolkit asset init --from-audit audit.json --item hair_braid --pack-id acme.audit --display-name "ACME Audit" --author Alice --license "CC-BY-SA 4.0" --url https://example.com/acme/audit
 lpc-toolkit asset init --new --pack-id acme.fantasy-hair --asset-id moon-braid --display-name "Moon Braid" --type hair --body-type male --body-type female --animation walk --animation climb --author Alice --license "CC-BY-SA 4.0" --url https://example.com/acme/fantasy-hair
 lpc-toolkit asset validate ./artist-packs/<pack-id>
 lpc-toolkit asset preview ./artist-packs/<pack-id>

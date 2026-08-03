@@ -314,6 +314,9 @@ describe('helpForCommand', () => {
     expect(helpForCommand(['asset', 'authoring', 'reconcile-manifest'])).toContain(
       '--use <external|session>',
     );
+    expect(helpForCommand(['asset', 'authoring'])).toContain(
+      'Create and resume provider-neutral asset authoring sessions from strict plans.',
+    );
   });
 
   it('reuses asset preview options for authoring preview help', () => {

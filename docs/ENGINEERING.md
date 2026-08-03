@@ -203,6 +203,48 @@ together:
 pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifacts.test.ts
 ```
 
+#### Strict authoring-session and documentation contract
+
+The provider-neutral authoring foundation has a separate focused map. Core
+tests cover strict plan parsing, audit evidence, target geometry, source-cell
+mapping, and deterministic drawing-contract projections:
+
+```sh
+pnpm --filter @lpc-toolkit/core test -- asset-authoring-schema.test.ts asset-animation-audit.test.ts sprite-drawing-contract.test.ts
+pnpm --filter @lpc-toolkit/core run typecheck
+```
+
+CLI tests cover session persistence, command orchestration, contract artifacts,
+candidate trust/replacement, receipt invalidation, JSON/human projections, the
+public packed-argv acceptance, command help, and the intentionally bounded
+Codex plugin contract:
+
+```sh
+pnpm --filter @lpc-toolkit/cli test -- asset-authoring-session.test.ts asset-authoring-commands.test.ts asset-authoring-contract.test.ts asset-authoring-import.test.ts asset-authoring-receipts.test.ts asset-authoring-session-e2e.test.ts command-spec.test.ts plugin-contract.test.ts main-json.test.ts main-human.test.ts
+pnpm --filter @lpc-toolkit/cli run typecheck
+pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifacts.test.ts
+node --test scripts/verify-codex-plugin.test.mjs
+```
+
+The final documentation and release-contract map is:
+
+```sh
+pnpm verify:cli-docs-policy
+pnpm verify:plugin
+pnpm --filter @lpc-toolkit/asset-pack-format run typecheck
+pnpm --filter @lpc-toolkit/asset-pack-format test
+pnpm --filter @lpc-toolkit/cli build
+pnpm --filter @lpc-toolkit/cli test:package
+pnpm check:boundaries
+pnpm verify
+```
+
+These checks prove the advertised capability/schema identifiers, public
+command/help wording, plugin-version alignment, landing distinction between
+composition and asset publication, and the clean packed-CLI authoring flow.
+They do not add provider invocation, a Web session bridge, or formal release
+orchestration to the shipped product.
+
 Run `pnpm check:boundaries` for every asset-pack architecture change. Run
 the packed CLI smoke conditionally whenever CLI package metadata, build output,
 or `packages/cli/scripts/` changes; it installs the produced tarball in a clean
