@@ -423,26 +423,58 @@ plugin: update
 - Modify: `packages/cli/src/asset-workspace.ts`
 - Create: `packages/cli/test/asset-authoring-session.test.ts`
 
-- [ ] Write failing tests for UUID identity, workspace binding, strict schema,
+- [x] Write failing tests for UUID identity, workspace binding, strict schema,
   atomic create/replace, prior-state survival after injected failure, foreign
   workspace refusal, tamper/unknown-version refusal, and containment.
-- [ ] Implement the fixed phases, per-target checkpoints, freshness values,
+- [x] Implement the fixed phases, per-target checkpoints, freshness values,
   receipts, provenance events, conflict record, and session timestamps.
-- [ ] Store session state only in manager-owned workspace state outside pack,
+- [x] Store session state only in manager-owned workspace state outside pack,
   overlay, registry/installed state, and base cache.
-- [ ] Add pure invalidation decisions for manifest semantic drift, contract
+- [x] Add pure invalidation decisions for manifest semantic drift, contract
   replacement, PNG drift, validation receipts, and preview receipts.
-- [ ] Implement read-only status inspection separately from bookkeeping-only
+- [x] Implement read-only status inspection separately from bookkeeping-only
   resume reconciliation.
-- [ ] Prove repeated status/resume with unchanged files is semantically
+- [x] Prove repeated status/resume with unchanged files is semantically
   idempotent.
-- [ ] Run:
+- [x] Run:
   `rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-session.test.ts asset-workspace.test.ts`
-- [ ] Run: `rtk pnpm --filter @lpc-toolkit/cli run typecheck`
-- [ ] Run: `rtk pnpm check:boundaries`
-- [ ] Commit product changes with a focused conventional commit.
-- [ ] Record implementation note, full product commit hash, and exact PASS/FAIL
+- [x] Run: `rtk pnpm --filter @lpc-toolkit/cli run typecheck`
+- [x] Run: `rtk pnpm check:boundaries`
+- [x] Commit product changes with a focused conventional commit.
+- [x] Record implementation note, full product commit hash, and exact PASS/FAIL
   verification evidence here; commit the plan record separately.
+
+  - Implementation: Added a strict v1 session document and workspace-scoped
+    store under `<workspace stateRoot>/authoring-sessions`, with UUIDv4 identity,
+    strict plan/schema parsing, workspace and pack containment checks, atomic
+    create/replace, cleanup and prior-state survival on injected replacement
+    failure. The session records fixed phases, per-target checkpoints and
+    freshness, validation/preview receipts, provenance, manifest conflicts, and
+    timestamps. `status` is read-only; `resume` performs only idempotent
+    bookkeeping for supplied invalidation decisions. No pack, overlay,
+    registry/installed, base-cache, checked-in asset, or `upstream/` state was
+    changed.
+  - Product commit: `3142ef9974d251c855681466b5885f1119613d87`
+    (`feat(cli): persist authoring sessions`).
+  - TDD RED verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-session.test.ts asset-workspace.test.ts`
+    FAIL (the new focused test module could not load the not-yet-created
+    `../src/asset-authoring-session.js`; existing `asset-workspace.test.ts`
+    passed 18 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-session.test.ts asset-workspace.test.ts`
+    PASS (2 files, 26 tests).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS
+    (the first implementation iteration reported one unused helper; the helper
+    was removed and the final run passed).
+  - Verification: `rtk pnpm check:boundaries` PASS.
+  - Additional verification: `rtk git diff --check` PASS.
+  - CLI documentation impact reassessment for this persistence-only task:
+    `help: N/A — no public command/help text changed`; `cli-readme: N/A — no
+    user-facing workflow prose changed`; `root-readme: N/A — no root workflow
+    landing changed`; `landing: N/A — no public positioning changed`;
+    `architecture: N/A — the existing ownership boundaries remain unchanged`;
+    `engineering: N/A — no verification policy or command contract changed`;
+    `releasing: N/A — no release or package compatibility contract changed`;
+    `plugin: N/A — no plugin capability or compatibility contract changed`.
 
 ### Task 5: Start, attach, inspect, resume, and reconcile sessions
 
