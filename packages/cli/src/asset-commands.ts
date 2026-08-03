@@ -93,7 +93,11 @@ export function assetCommandRequirements(
   if (parsed.command[1] === 'workspace' && parsed.command[2] === 'init') {
     return NO_ASSET_COMMAND_REQUIREMENTS;
   }
-  if (parsed.command[1] === 'authoring') return LIST_REQUIREMENTS;
+  if (parsed.command[1] === 'authoring') {
+    return parsed.command[2] === 'contract'
+      ? WORKSPACE_RUNTIME_REQUIREMENTS
+      : LIST_REQUIREMENTS;
+  }
   if (parsed.command[1] === 'inspect') return INSPECTION_REQUIREMENTS;
   if (parsed.command[1] === 'list') return LIST_REQUIREMENTS;
   if ([
@@ -563,6 +567,7 @@ export async function runAssetCommand(
         parsed,
         cwd,
         workspace: workspaceContext.workspace,
+        ...(context.runtime === undefined ? {} : { runtime: context.runtime }),
       });
     }
     if (subcommand === 'init') return await runInitCommand(context);

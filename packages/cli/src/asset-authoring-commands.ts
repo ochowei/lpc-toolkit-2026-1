@@ -9,10 +9,15 @@ import {
 import path from 'node:path';
 import { parseAssetAuthoringPlan, type AssetAuthoringPlan } from '@lpc-toolkit/core';
 import {
+  flagBoolean,
   flagString,
   type ParsedArgs,
 } from './args.js';
 import { scaffoldNewAssetPack } from './asset-pack-scaffold.js';
+import {
+  AssetAuthoringContractError,
+  materializeAssetAuthoringContract,
+} from './asset-authoring-contract.js';
 import {
   assetAuthoringSessionPath,
   createAssetAuthoringSessionStore,
@@ -23,6 +28,7 @@ import {
   type AssetAuthoringSessionUpdate,
 } from './asset-authoring-session.js';
 import type { AssetWorkspace } from './asset-workspace.js';
+import type { RuntimeAssets } from './runtime-assets.js';
 import {
   authoringResponseProjection,
   commandError,
@@ -44,6 +50,7 @@ interface AuthoringCommandContext {
   readonly parsed: ParsedArgs;
   readonly cwd: string;
   readonly workspace: AssetWorkspace;
+  readonly runtime?: RuntimeAssets;
 }
 
 interface AuthoringCommandErrorOptions {
@@ -664,6 +671,85 @@ function resumeCommand(
   ));
 }
 
+function refreshContractSession(
+  session: AssetAuthoringSession,
+): AssetAuthoringSessionUpdate {
+  return {
+    state: 'needs-user-action',
+    reason: 'planning-refreshed',
+    phase: session.manifestDigest === null ? 'planned' : 'scaffolded',
+    checkpoint: null,
+    checkpointFreshness: 'stale',
+    checkpoints: session.checkpoints.map((checkpoint) => ({
+      ...checkpoint,
+      freshness: 'stale',
+      checkpoint: null,
+    })),
+    receipts: {
+      validation: null,
+      preview: null,
+    },
+    provenance: appendProvenance(session, {
+      kind: 'checkpoint-invalidated',
+      occurredAt: new Date().toISOString(),
+      summary: 'Contract planning was explicitly refreshed; prior checkpoints were invalidated.',
+    }),
+  };
+}
+
+async function contractCommand(
+  context: AuthoringCommandContext,
+  sessionId: string,
+): Promise<CliResponse<AuthoringResponseData>> {
+  const runtime = context.runtime;
+  if (runtime === undefined) {
+    throw new AuthoringCommandError(
+      'The asset authoring contract command requires prepared runtime assets.',
+      { code: 'asset_authoring_runtime_missing' },
+    );
+  }
+  const store = createAssetAuthoringSessionStore(context.workspace);
+  let session = resumeSession(context.workspace, store.read(sessionId));
+  if (session.conflict !== null) {
+    throw new AuthoringCommandError(
+      'The authoring session has an unresolved manifest conflict; reconcile it before publishing a contract.',
+      { code: 'asset_authoring_manifest_conflict' },
+    );
+  }
+  if (session.goal === 'attach-pack') {
+    throw new AuthoringCommandError(
+      'Attach-pack authoring sessions do not publish drawing contracts.',
+      { code: 'asset_authoring_goal_unsupported' },
+    );
+  }
+
+  const refresh = flagBoolean(context.parsed.flags, 'refresh');
+  if (refresh) session = store.replace(session.sessionId, refreshContractSession(session));
+
+  const result = await materializeAssetAuthoringContract({
+    session,
+    workspace: context.workspace,
+    runtime,
+    refresh,
+  });
+  session = store.replace(session.sessionId, {
+    state: 'needs-user-action',
+    reason: 'contract-ready',
+    phase: 'contract-ready',
+    checkpoint: {
+      id: 'contract',
+      phase: 'contract-ready',
+      digest: result.contractDigest,
+      freshness: 'current',
+    },
+    checkpointFreshness: 'current',
+  });
+  return commandOk(
+    'asset authoring contract',
+    responseFor(session, { artifacts: result.artifacts }),
+  );
+}
+
 function requireDigest(value: string | undefined, flag: string): string {
   if (value === undefined || !DIGEST_PATTERN.test(value)) {
     throw new AuthoringCommandError(
@@ -773,6 +859,7 @@ export async function runAssetAuthoringCommand(
     if (sessionId === undefined) {
       return commandError(command, issue('missing_argument', '--session is required.', '--session'));
     }
+    if (authoringCommand === 'contract') return await contractCommand(context, sessionId);
     if (authoringCommand === 'status') return statusSession(context.workspace, sessionId);
     if (authoringCommand === 'resume') return resumeCommand(context.workspace, sessionId);
     if (authoringCommand === 'reconcile-manifest') {
@@ -790,6 +877,13 @@ export async function runAssetAuthoringCommand(
   } catch (error) {
     if (error instanceof AuthoringCommandError) return commandFailure(command, error);
     if (error instanceof AssetAuthoringSessionError) {
+      return commandError(command, issue(
+        error.code,
+        error.message,
+        error.path,
+      ));
+    }
+    if (error instanceof AssetAuthoringContractError) {
       return commandError(command, issue(
         error.code,
         error.message,
