@@ -37,12 +37,15 @@ describe('agent prompt builders', () => {
   });
 
   it('describes the files and conversation each prompt is expected to produce', () => {
-    expect(buildCreateCharacterResult('fisher')).toContain('fisher.json');
+    expect(buildCreateCharacterResult('fisher')).toContain('`./fisher.json`');
+    expect(buildCreateCharacterResult('fisher')).toContain('`./preview/fisher/`');
     expect(buildCreateCharacterResult('fisher')).toContain('.preview.png');
-    expect(buildRefineCharacterResult('hero')).toContain('hero.json');
+    expect(buildRefineCharacterResult('hero')).toContain('`./hero.json`');
+    expect(buildRefineCharacterResult('hero')).toContain('`./preview/hero/`');
     expect(buildRefineCharacterResult('hero')).toContain('validation result');
     expect(buildExportCharacterResult('hero', 'attributed ZIP bundle')).toContain('ZIP bundle');
     expect(buildExportCharacterResult('hero', 'attributed ZIP bundle')).toContain('.viewer.html');
+    expect(buildExportCharacterResult('hero', 'attributed ZIP bundle')).toContain('`./rendered/hero/`');
     expect(buildAnimationAuditResult('clothes', '20')).toContain('clothes');
     expect(buildAnimationAuditResult('clothes', '20')).toContain('20-item drawing worklist');
   });
@@ -71,5 +74,7 @@ describe('agent prompt builders', () => {
     expect(html).toContain('group-open:visible');
     expect(html).toContain('Read-only — no files are modified.');
     expect(html).toContain('role="note"');
+    expect(html).toContain('<code');
+    expect(html).toContain('./rendered/fisher/');
   });
 });

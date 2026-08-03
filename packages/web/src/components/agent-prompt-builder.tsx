@@ -50,15 +50,15 @@ export function buildAnimationAuditPrompt(fields: AnimationAuditFields): string 
 }
 
 export function buildCreateCharacterResult(concept: string): string {
-  return `Creates or updates the ${concept.trim()}.json character file and writes an attributed .preview.png with .metadata.json, .credits.txt, and .credits.csv files. Codex summarizes the selected assets and asks what to refine next.`;
+  return `Creates or updates \`./${concept.trim()}.json\`, then writes an attributed preview under \`./preview/${concept.trim()}/\` with .preview.png, .metadata.json, .credits.txt, and .credits.csv files. Codex summarizes the selected assets and asks what to refine next.`;
 }
 
 export function buildRefineCharacterResult(characterName: string): string {
-  return `Updates ${characterName.trim()}.json and writes a fresh attributed .preview.png with metadata and credit files. Codex summarizes the change and its validation result.`;
+  return `Updates \`./${characterName.trim()}.json\` and writes a fresh attributed preview under \`./preview/${characterName.trim()}/\` with metadata and credit files. Codex summarizes the change and its validation result.`;
 }
 
 export function buildExportCharacterResult(characterName: string, bundle: string): string {
-  return `Writes an attributed ${bundle.trim()} for ${characterName.trim()} with a spritesheet PNG, .viewer.html, .metadata.json, .credits.txt, and .credits.csv. Codex reports validation warnings and the artifact paths.`;
+  return `Writes an attributed ${bundle.trim()} for ${characterName.trim()} under \`./rendered/${characterName.trim()}/\`, including the spritesheet PNG, .viewer.html, .metadata.json, .credits.txt, and .credits.csv. Codex reports validation warnings and the artifact paths.`;
 }
 
 export function buildAnimationAuditResult(assetType: string, worklistSize: string): string {
@@ -162,10 +162,18 @@ function ExpectedResultPopover({
             Read-only — no files are modified.
           </p>
         )}
-        <p>{children}</p>
+        <p>{renderExpectedResult(children)}</p>
       </div>
     </details>
   );
+}
+
+function renderExpectedResult(result: React.ReactNode): React.ReactNode {
+  if (typeof result !== 'string') return result;
+  const parts = result.split('`');
+  return parts.map((part, index) => index % 2 === 1
+    ? <code key={`${part}-${index}`} className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[0.9em] text-text">{part}</code>
+    : part);
 }
 
 function HighlightedPrompt({ prompt, highlights }: { readonly prompt: string; readonly highlights: readonly string[] }) {
