@@ -98,6 +98,13 @@ describe('CLI and agent integration pages', () => {
     expect(positions).toEqual([...positions].sort((left, right) => left - right));
     expect(html).toContain('artist-packs/<pack-id>/sprites/');
     expect(html).toContain('Character composition, source asset creation, audit handoff, validation, formal archive publication, and installation are separate CLI responsibilities.');
+    expect(html).toContain('Record the human release checkpoint separately');
+    for (const command of [
+      'lpc-toolkit asset authoring acknowledge --session <session-id> --acknowledgement <record.json> --confirm',
+      'lpc-toolkit asset authoring declare --session <session-id> --declaration <declaration.json> --confirm',
+      'lpc-toolkit asset authoring accept-preview --session <session-id> --preview-digest <sha256> --confirm',
+    ]) expect(html).toContain(command);
+    expect(html).toContain('These receipts govern the authoring session only. Formal archive publication and consumer installation remain separate CLI steps.');
     expect(html).toContain('You do not need to clone this repository');
     expect(html).not.toContain('Phase 3');
     expect(html).toContain('browser can inspect, validate, repair, and assemble');

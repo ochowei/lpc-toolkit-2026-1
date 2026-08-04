@@ -49,13 +49,23 @@ pnpm verify:plugin
 
 The capability response must retain the exact shipped identifiers
 `asset-authoring-session.v1`, `sprite-drawing-contract.v1`,
-`asset-authoring-candidate-import.v1`, and `asset-authoring-recovery.v1`, plus
-the four versioned authoring schemas. Check that the CLI help lists
-`start`, `status`, `resume`, `contract`, `import`, `validate`, `preview`, and
+`asset-authoring-candidate-import.v1`, `asset-authoring-recovery.v1`, and
+`asset-authoring-release.v1`, plus the six versioned authoring/release schemas.
+Check that the CLI help lists `start`, `status`, `resume`, `contract`, `import`,
+`validate`, `preview`, `acknowledge`, `declare`, `accept-preview`, and
 `reconcile-manifest`, and that the CLI README, root README, landing copy, and
 plugin compatibility references describe the same boundary. Plugin `0.2.1`
 must continue to document CLI range `>=0.2.0 <0.3.0`; the plugin intentionally
-does not claim or invoke the newer authoring-session capabilities.
+does not claim or invoke the authoring-session release capability.
+
+Phase 1's release boundary is still session evidence, not archive publication.
+The packed smoke must show `releaseGates.releaseReady: true` only after the
+exact warning acknowledgement, explicit declaration, and exact
+`--preview-digest --confirm` acceptance. It must preserve the PNG,
+`preview:metadata`, `preview:credits_txt`, and `preview:credits_csv` digests,
+and prove that a changed artifact or source makes the downstream receipt stale
+without mutating the last valid session bytes. Formal `asset pack`,
+`asset inspect`, and `asset install` remain separate later release gates.
 
 The packed CLI smoke remains the release proof for the public contract. In a
 clean workspace, it must discover capabilities, create a strict-plan session,
@@ -114,10 +124,12 @@ lpc-toolkit asset workspace init ./authoring-smoke
 ```
 
 Then run the packed authoring smoke's fixture plan through
-`asset authoring start`, `contract`, `import`, `validate`, and `preview`. Check
-that every returned artifact path stays inside the workspace, the four preview
-artifacts retain matching attribution, and a correction after observed PNG
-drift requires the exact target digest. Finally use `asset pack` for formal
+`asset authoring start`, `contract`, `import`, `validate`, and `preview`, then
+exercise `acknowledge`, `declare`, and `accept-preview` with explicit human
+inputs. Check that every returned artifact path stays inside the workspace, the
+four preview artifacts retain matching attribution, a correction after
+observed PNG drift requires the exact target digest, and release readiness is
+reported only after the final preview digest is confirmed. Finally use `asset pack` for formal
 archive publication and verify that a separate consumer still needs
 `asset inspect` and `asset install`; a session response is not a release
 archive. Record the capability JSON, plugin version/range, package version,

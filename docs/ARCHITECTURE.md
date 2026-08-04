@@ -27,6 +27,8 @@ LPC behavior:
 - credits and attribution manifests
 - strict artist asset-pack schema, normalized models, validation decisions,
   warning acknowledgements, and deterministic compile plans
+- pure asset-release declaration and receipt schemas, canonical digest
+  projections, exact preview artifact identifiers, and release-gate predicates
 - hash/token serialization and parsing
 - the canonical character document and pure upstream compatibility adapter
 - static asset validation
@@ -145,6 +147,9 @@ not modify `upstream/`.
 - artist pack scaffolding, PNG inspection, attributed preview, linked-pack
   registry orchestration, deterministic archive inspection/packaging,
   linked/installed desired-state compilation, and journaled publication/recovery
+- strict release declaration and preview-acceptance input handling, session
+  receipt persistence, current evidence collection, artifact re-digestion, and
+  bounded human/JSON release-gate responses
 
 CLI code may use Node APIs, `@napi-rs/canvas` (MIT), and `jszip` (MIT) because
 it is a Node runtime package. Those dependencies must not move into
@@ -162,6 +167,27 @@ The plugin may invoke the public CLI and inspect returned artifact paths. It
 must not import CLI source, add Node runtime behavior to core, suppress credit
 artifacts, install the CLI silently, or introduce MCP/apps/hooks without a new
 approved design.
+
+The plugin's current character and animation skills intentionally stop before
+the newer authoring-session release capability. They do not claim or invoke
+`asset-authoring-release.v1`,
+`lpc-toolkit.asset-release-declaration.v1`,
+`lpc-toolkit.asset-authoring-release-receipt.v1`, or the
+`acknowledge`/`declare`/`accept-preview` commands; the installed CLI remains
+the sole owner of those release receipts.
+
+### Release evidence ownership
+
+Core owns the environment-agnostic declaration, discriminated receipt, exact
+artifact-ID, canonical digest, and release-gate contracts. It never reads a
+session file or decides who a human is. The CLI owns strict user-file loading,
+manifest/source containment, session receipt timestamps, atomic persistence,
+fresh validation and attribution evidence, preview artifact re-digestion, and
+the explicit `--confirm` boundaries. A preview is not release-ready by itself:
+the CLI must expose current acknowledgement, validation, declaration, preview,
+four-artifact, and preview-acceptance gates before a session can report
+`releaseReady: true`. These Phase 1 receipts remain authoring-session state and
+do not create a formal archive, sync a generated overlay, or install a pack.
 
 ### Documentation and Governance
 

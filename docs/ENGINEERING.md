@@ -226,6 +226,27 @@ pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifacts.t
 node --test scripts/verify-codex-plugin.test.mjs
 ```
 
+Phase 1 release-boundary changes add a focused red/green map:
+
+```sh
+pnpm --filter @lpc-toolkit/core test -- asset-release-schema.test.ts
+pnpm --filter @lpc-toolkit/core run typecheck
+pnpm --filter @lpc-toolkit/cli test -- asset-authoring-receipts.test.ts asset-authoring-session.test.ts command-spec.test.ts main-json.test.ts main-human.test.ts
+pnpm --filter @lpc-toolkit/cli test -- asset-authoring-session-e2e.test.ts asset-authoring-commands.test.ts
+pnpm --filter @lpc-toolkit/cli run typecheck
+pnpm check:boundaries
+pnpm verify:cli-docs-policy
+pnpm verify:plugin
+```
+
+The release tests use the public Core parser/gate, session persistence, exact
+`runCli` argv, and bounded JSON/human response seams. They prove explicit human
+acknowledgement/declaration/preview acceptance, four-artifact digest binding,
+non-mutating confirmation/race failures, idempotency, and stale receipt
+preservation. Phase 1 deliberately stops before sync, draft recovery, formal
+archive creation/inspection, and consumer installation; a `releaseReady: true`
+session is not an archive.
+
 The final documentation and release-contract map is:
 
 ```sh

@@ -142,6 +142,13 @@ archive; and `asset inspect`/`asset install` handle a consumer's installation.
 The authoring-session commands documented in the [CLI asset lifecycle
 guide](packages/cli/README.md#strict-asset-authoring-sessions) coordinate
 contract-bound candidate PNGs but do not replace formal archive publication.
+After a current attributed preview, a session may pause at three explicit human
+release boundaries: one exact warning acknowledgement, a declaration of the
+author/source and license authority, and final acceptance of the exact PNG plus
+metadata/TXT/CSV credit artifacts. Their `releaseGates` and `releaseReady`
+response fields describe session evidence only; no identity or approval is
+inferred from Git, an Agent, a provider, or the operating system, and these
+receipts do not publish an archive.
 
 ```sh
 npm install -g @lpc-toolkit/cli
@@ -155,6 +162,20 @@ lpc-toolkit asset preview ./artist-packs/<pack-id>
 lpc-toolkit asset sync ./artist-packs/<pack-id>
 lpc-toolkit asset pack ./artist-packs/<pack-id>
 ```
+
+For the separate governed authoring-session boundary, use the exact current
+evidence and explicit confirmation:
+
+```sh
+lpc-toolkit asset authoring acknowledge --session <session-id> --acknowledgement <record.json> --confirm
+lpc-toolkit asset authoring declare --session <session-id> --declaration <declaration.json> --confirm
+lpc-toolkit asset authoring accept-preview --session <session-id> --preview-digest <sha256> --confirm
+```
+
+Stale manifest, source, validation, warning, preview-input, artifact, or
+declaration evidence is preserved for review and requires the structured next
+action from `status` or `resume`. Formal archive publication still uses
+`asset pack`, followed by separate `asset inspect` and consumer `asset install`.
 
 Give the resulting `<pack-id>-<version>.lpc-assets.zip` to a consumer. They use
 a separate standalone workspace and run the lifecycle in order:

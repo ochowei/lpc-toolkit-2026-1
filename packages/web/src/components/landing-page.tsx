@@ -124,6 +124,12 @@ const artistWorkflowCommands = [
   'lpc-toolkit asset doctor',
 ] as const;
 
+const releaseAcceptanceCommands = [
+  'lpc-toolkit asset authoring acknowledge --session <session-id> --acknowledgement <record.json> --confirm',
+  'lpc-toolkit asset authoring declare --session <session-id> --declaration <declaration.json> --confirm',
+  'lpc-toolkit asset authoring accept-preview --session <session-id> --preview-digest <sha256> --confirm',
+] as const;
+
 const cliReadmeUrl =
   'https://github.com/ochowei/lpc-toolkit-2026-1/blob/main/packages/cli/README.md';
 
@@ -232,6 +238,30 @@ export function CliPage({ onNavigate }: ProductPageProps) {
               </li>
             ))}
           </ol>
+          <div className="mt-6 rounded-md border border-border bg-surface-2 p-4">
+            <h3 className="text-lg font-semibold text-text">
+              Record the human release checkpoint separately
+            </h3>
+            <p className="mt-2 text-sm text-text-2">
+              A valid preview is not a release. An authoring session can persist
+              one exact warning acknowledgement, an explicit author/source and
+              license declaration, and final acceptance of the exact PNG plus
+              metadata, TXT-credit, and CSV-credit artifacts. Each command is a
+              separate confirmation boundary; stale evidence remains visible in
+              the session and never becomes release-ready silently.
+            </p>
+            <ol className="mt-4 space-y-3">
+              {releaseAcceptanceCommands.map((command, index) => (
+                <li key={`${index}-${command}`}>
+                  <CopyCode children={command} />
+                </li>
+              ))}
+            </ol>
+            <p className="mt-4 text-sm text-text-2">
+              These receipts govern the authoring session only. Formal archive
+              publication and consumer installation remain separate CLI steps.
+            </p>
+          </div>
           <p className="mt-4 text-sm text-text-2">
             Put PNGs under <code>artist-packs/&lt;pack-id&gt;/sprites/</code>.
             Keep the preview metadata and credit files with the generated

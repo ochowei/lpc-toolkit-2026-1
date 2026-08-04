@@ -144,6 +144,11 @@ describe('Codex plugin CLI contract', () => {
       expect(compatibility).toContain('asset-authoring-session.v1');
       expect(compatibility).toContain('must not claim or invoke');
       expect(compatibility).toContain('sprite-drawing-contract.v1');
+      expect(compatibility).toContain('asset-authoring-release.v1');
+      expect(compatibility).toContain('lpc-toolkit.asset-release-declaration.v1');
+      expect(compatibility).toContain('lpc-toolkit.asset-authoring-release-receipt.v1');
+      expect(compatibility).toContain('asset authoring acknowledge');
+      expect(compatibility).toContain('accept-preview');
     }
   });
 });
