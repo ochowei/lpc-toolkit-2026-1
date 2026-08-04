@@ -143,5 +143,5 @@ Implementation note:
 - [x] Task 4 — documentation, packed acceptance, protected paths, and full
   verification recorded.
   - Product commit: `d240ff779b9cece402cd8cd7f05f0955395d91f9`
-  - Plan-record commit: pending; recorded after the separate plan commit.
+  - Plan-record commit: `882c803863b6e801434e064b5cc2700e82a6296d`
   - Verification: `rtk pnpm verify` PASS; `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS.
