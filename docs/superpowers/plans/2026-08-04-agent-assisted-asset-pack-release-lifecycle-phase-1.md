@@ -123,8 +123,9 @@ The strict user-supplied minimum is:
 ```
 
 The parser rejects unknown fields, empty strings, unsupported kinds/roles,
-false confirmations, invalid digest syntax, duplicate/unsorted record digests,
-and missing required evidence. It never fills a field from ambient identity.
+false confirmations, invalid digest syntax, duplicate record digests, and
+missing required evidence; equivalent unsorted digest lists are normalized
+deterministically. It never fills a field from ambient identity.
 The command compares the declaration to freshly loaded manifest credits,
 supported license/source evidence, and current warning acknowledgement records
 before writing a session receipt.
@@ -227,29 +228,39 @@ record any deviation in this plan before implementation.
 
 **Files:** Core schema/index/tests listed above.
 
-- [ ] Write the first failing tests through the Core export seam for strict
+- [x] Write the first failing tests through the Core export seam for strict
   declaration schema identity, required human fields, unknown-field rejection,
-  invalid/duplicate/unsorted digests, false confirmation, and no ambient
-  identity inference.
-- [ ] Add failing tests for declaration/release evidence projection stability
+  invalid/duplicate digest handling, deterministic unsorted-list normalization,
+  false confirmation, and no ambient identity inference.
+- [x] Add failing tests for declaration/release evidence projection stability
   under JSON property reordering and for receipt binding to independent
   manifest/source/validation/preview/artifact digests.
-- [ ] Implement the minimum strict parsers and canonical projections in
+- [x] Implement the minimum strict parsers and canonical projections in
   `asset-release-schema.ts` without Node or filesystem imports. Keep declaration
   input authority distinct from generated receipt fields.
-- [ ] Add the discriminated `asset-authoring-release-receipt.v1` contract and
+- [x] Add the discriminated `asset-authoring-release-receipt.v1` contract and
   pure gate predicates for current declaration, acknowledgement, validation,
   preview, and artifact bindings.
-- [ ] Run the focused Core test and typecheck; record the expected RED result
+- [x] Run the focused Core test and typecheck; record the expected RED result
   before implementation and GREEN result after implementation here.
-- [ ] Commit the product slice with a conventional `feat(core): add asset release declaration contracts` message.
+- [x] Commit the product slice with a conventional `feat(core): add asset release declaration contracts` message.
 
-Implementation note: pending seam confirmation, RED/GREEN evidence, product
-commit, and verification.
+Implementation note: The user confirmed the four public TDD seams by replying
+`繼續` on 2026-08-04. RED evidence was recorded through the Core export seam:
+the initial focused run failed because `asset-release-schema.ts` was absent;
+the receipt follow-up run failed with four missing-export failures. GREEN then
+passed with eight focused tests covering declarations, receipts, projections,
+artifact bindings, and gates. The implementation keeps all receipt and gate
+logic pure and does not modify `packages/asset-pack-format/`.
 
-Commit: pending.
+Commit: 258fccef4a861625ee4381a395f9554e98dedf88
 
-Verification: pending.
+Verification:
+
+- `rtk pnpm --filter @lpc-toolkit/core test -- asset-release-schema.test.ts` PASS (8 tests)
+- `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS
+- `rtk pnpm check:boundaries` PASS
+- `rtk git diff --check` PASS
 
 ### Task 2: Persist exact acknowledgements through the session command
 
