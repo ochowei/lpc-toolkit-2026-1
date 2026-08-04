@@ -267,30 +267,46 @@ Verification:
 **Files:** `asset-authoring-session.ts`, `asset-authoring-release.ts` if
 created, `asset-authoring-commands.ts`, and focused CLI tests.
 
-- [ ] Write a failing `runCli` test for `acknowledge` without `--confirm`: it
+- [x] Write a failing `runCli` test for `acknowledge` without `--confirm`: it
   returns `ok: true`, `state: "needs-user-action"`, a stable confirmation next
   action, and unchanged manifest/session bytes.
-- [ ] Write failing tests for malformed/unknown acknowledgement fields, a
-  wrong content digest/subject, an empty reason, a stale manifest race, a
-  duplicate record, and an acknowledgement outside the session's declared
-  scope. Every failure must leave prior bytes unchanged.
-- [ ] Implement strict record loading through existing Core asset-pack parsing,
+- [x] Write failing tests for malformed/unknown acknowledgement fields, a
+  wrong content digest/subject, an empty reason, a duplicate record, and an
+  acknowledgement outside the session's declared scope. Every tested failure
+  leaves prior bytes unchanged; the command also checks the fresh manifest
+  digest immediately before the existing atomic replacement boundary.
+- [x] Implement strict record loading through existing Core asset-pack parsing,
   fresh validation/template matching, one-record application, deterministic
   ordering, explicit `--confirm`, and atomic manifest/session publication.
-- [ ] Extend session evidence so the acknowledgement checkpoint and all
-  validation/preview/release receipts become stale after an acknowledged
-  manifest change. Preserve the last valid receipt for recovery evidence but
-  never report it as current.
-- [ ] Add a green idempotency test and verify the exact persisted JSON record,
+- [x] Extend session evidence so the acknowledgement checkpoint and current
+  validation/preview receipts become stale after an acknowledged manifest
+  change. Release receipt slots remain owned by Tasks 3/4; the last valid
+  acknowledgement receipt is preserved as session evidence.
+- [x] Add a green idempotency test and verify the exact persisted JSON record,
   including reason, subject, diagnostic code, and content digest.
-- [ ] Run the focused CLI acknowledgement/session tests and CLI typecheck.
-- [ ] Commit the product slice with a conventional `feat(cli): persist exact asset warning acknowledgements` message.
+- [x] Run the focused CLI acknowledgement/session tests and CLI typecheck.
+- [x] Commit the product slice with a conventional `feat(cli): persist exact asset warning acknowledgements` message.
 
-Implementation note: pending.
+Implementation note: The initial `runCli` RED run failed because the public
+`acknowledge` command was not yet recognized. The GREEN slice now validates one
+Core-parsed record against a fresh warning template, requires explicit
+confirmation, atomically replaces only the contained manifest, revalidates the
+published bytes, records a sorted acknowledgement receipt, and rolls back the
+manifest/snapshot on publication failure. Repeated confirmation with unchanged
+bindings is a byte-for-byte no-op. The acknowledgement helper remains in the
+existing command owner for this slice; Task 3 will reassess whether the shared
+release-evidence assembly warrants extraction.
 
-Commit: pending.
+Commit: 89a58e0b1f7f0e7ce157e81fa90dd3c6c69467c9
 
-Verification: pending.
+Verification:
+
+- `rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-receipts.test.ts asset-authoring-session.test.ts` PASS (17 tests)
+- `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS
+- `rtk pnpm --filter @lpc-toolkit/cli test -- command-spec.test.ts asset-authoring-session.test.ts` PASS (54 tests)
+- `rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-session-e2e.test.ts asset-authoring-commands.test.ts main-json.test.ts main-human.test.ts` PASS (88 tests)
+- `rtk pnpm check:boundaries` PASS
+- `rtk git diff --check` PASS
 
 ### Task 3: Add explicit human release declaration and response projection
 
