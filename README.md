@@ -142,6 +142,13 @@ archive; and `asset inspect`/`asset install` handle a consumer's installation.
 The authoring-session commands documented in the [CLI asset lifecycle
 guide](packages/cli/README.md#strict-asset-authoring-sessions) coordinate
 contract-bound candidate PNGs but do not replace formal archive publication.
+After a current attributed preview, a session may pause at three explicit human
+release boundaries: one exact warning acknowledgement, a declaration of the
+author/source and license authority, and final acceptance of the exact PNG plus
+metadata/TXT/CSV credit artifacts. Their `releaseGates` and `releaseReady`
+response fields describe session evidence only; no identity or approval is
+inferred from Git, an Agent, a provider, or the operating system, and these
+receipts do not publish an archive until the separate formal pack boundary.
 
 ```sh
 npm install -g @lpc-toolkit/cli
@@ -155,6 +162,64 @@ lpc-toolkit asset preview ./artist-packs/<pack-id>
 lpc-toolkit asset sync ./artist-packs/<pack-id>
 lpc-toolkit asset pack ./artist-packs/<pack-id>
 ```
+
+For the separate governed authoring-session boundary, use the exact current
+evidence and explicit confirmation:
+
+```sh
+lpc-toolkit asset authoring acknowledge --session <session-id> --acknowledgement <record.json> --confirm
+lpc-toolkit asset authoring declare --session <session-id> --declaration <declaration.json> --confirm
+lpc-toolkit asset authoring accept-preview --session <session-id> --preview-digest <sha256> --confirm
+```
+
+Phase 2 adds two separate session recovery boundaries. `asset authoring draft`
+writes a deterministic, explicitly non-installable recovery archive below the
+session's `release-artifacts/` directory and records a digest-bound
+`draftArchive` receipt. Existing `asset inspect` reports its `status: "draft"`
+and `asset install` rejects it before changing a consumer workspace. After an
+explicit confirmation, `asset authoring sync --session <session-id> --confirm`
+calls the existing linked-sync transaction and records a `sync` receipt for the
+actual manager-owned `assets_custom/` output and registry generation. Without
+`--confirm`, sync does not mutate manager output, registry, transaction state,
+or the session receipt. Source packs, checked-in assets, the managed base cache,
+installed snapshots, unowned output, and `upstream/` remain outside both
+operations.
+
+```sh
+lpc-toolkit asset authoring draft --session <session-id>
+lpc-toolkit asset authoring sync --session <session-id> --confirm
+```
+
+Stale manifest, source, validation, warning, preview-input, artifact, or
+declaration evidence, draft bytes, registry bytes, or generated output is
+preserved for review and requires the structured next action from `status` or
+`resume`. Phase 3 adds an explicit session-owned formal boundary: after all
+release gates are current, `asset authoring pack --session <session-id> --confirm`
+writes a non-draft archive below `release-artifacts/`, and
+`asset authoring inspect --session <session-id> --archive <archive>` records
+the exact-byte inspection only when its digest matches the formal pack receipt.
+Changed or copied archive bytes remain stale/mismatch evidence and are never
+adopted silently. Phase 4 adds an optional, explicit consumer activation for
+the exact inspected archive. It requires an initialized managed consumer
+workspace outside the artist workspace, repository, base cache, and generated
+output roots; it never initializes or mutates that workspace before
+confirmation. The successful response records an `installationReceipt` with
+the consumer identity, installed source payload digests, registry/output
+digests, and matching `CREDITS.csv` digest. Consumer drift remains stale
+evidence and preserves the previous receipt.
+
+```sh
+lpc-toolkit asset authoring pack --session <session-id> --confirm
+lpc-toolkit asset authoring inspect --session <session-id> --archive <archive>
+lpc-toolkit asset authoring install --session <session-id> --archive <archive> --consumer-workspace <directory> --confirm
+```
+
+`asset authoring install` is never implicit after `pack` or `inspect`. Without
+`--confirm` it returns a bounded confirmation action without changing the
+artist session, archive, or consumer workspace. Repeating the same confirmed
+install against unchanged consumer state returns the same installation receipt
+without rewriting it; version replacement and downgrade behavior remain owned
+by the ordinary `asset install` lifecycle policy.
 
 Give the resulting `<pack-id>-<version>.lpc-assets.zip` to a consumer. They use
 a separate standalone workspace and run the lifecycle in order:

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   existsSync,
   lstatSync,
@@ -11,8 +11,14 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 import {
+  ASSET_AUTHORING_RELEASE_ARTIFACT_IDS,
+  assetAuthoringReleaseReceiptDigestInput,
   parseAssetAuthoringPlan,
+  parseAssetAuthoringReleaseReceipt,
   type AssetAuthoringPlan,
+  type AssetAuthoringPreviewAcceptanceReceipt as CoreAssetAuthoringPreviewAcceptanceReceipt,
+  type AssetAuthoringReleaseArtifactDigest,
+  type AssetAuthoringReleaseDeclarationReceipt as CoreAssetAuthoringReleaseDeclarationReceipt,
 } from '@lpc-toolkit/core';
 import { CLI_VERSION } from './package-info.js';
 import {
@@ -114,12 +120,123 @@ export interface AssetAuthoringPreviewReceipt {
   readonly id: string;
   readonly manifestDigest: string;
   readonly sourceDigests: readonly AssetAuthoringSourceDigest[];
+  /** Null means this receipt predates the validation-revision binding. */
+  readonly validationReceiptId: string | null;
   readonly inputDigest: string;
+  /** Null means this receipt predates the exact preview artifact binding. */
+  readonly artifacts: readonly AssetAuthoringReleaseArtifactDigest[] | null;
 }
+
+export interface AssetAuthoringAcknowledgementReceipt {
+  readonly id: string;
+  readonly manifestDigest: string;
+  readonly sourceDigests: readonly AssetAuthoringSourceDigest[];
+  readonly recordDigests: readonly string[];
+}
+
+export const ASSET_AUTHORING_DRAFT_RECEIPT_SCHEMA =
+  'lpc-toolkit.asset-authoring-draft-receipt.v1' as const;
+export const ASSET_AUTHORING_FORMAL_ARCHIVE_RECEIPT_SCHEMA =
+  'lpc-toolkit.asset-authoring-formal-archive-receipt.v1' as const;
+export const ASSET_AUTHORING_ARCHIVE_INSPECTION_RECEIPT_SCHEMA =
+  'lpc-toolkit.asset-authoring-archive-inspection-receipt.v1' as const;
+export const ASSET_AUTHORING_INSTALLATION_RECEIPT_SCHEMA =
+  'lpc-toolkit.asset-authoring-install-receipt.v1' as const;
+
+export interface AssetAuthoringDraftArchiveReceipt {
+  readonly schema: typeof ASSET_AUTHORING_DRAFT_RECEIPT_SCHEMA;
+  readonly packId: string;
+  readonly version: string;
+  readonly archivePath: string;
+  readonly archiveDigest: string;
+  readonly manifestDigest: string;
+  readonly contentDigest: string;
+  readonly sourceDigests: readonly AssetAuthoringSourceDigest[];
+  readonly recordedAt: string;
+}
+
+export interface AssetAuthoringSyncReceipt {
+  readonly id: string;
+  readonly packId: string;
+  readonly version: string;
+  readonly manifestDigest: string;
+  readonly contentDigest: string;
+  readonly sourceDigests: readonly AssetAuthoringSourceDigest[];
+  readonly workspaceId: string;
+  readonly outputRoot: string;
+  readonly registryDigest: string;
+  readonly compileDigest: string;
+  readonly generatedDigests: Readonly<Record<string, string>>;
+  readonly recordedAt: string;
+}
+
+export interface AssetAuthoringFormalArchiveReceipt {
+  readonly schema: typeof ASSET_AUTHORING_FORMAL_ARCHIVE_RECEIPT_SCHEMA;
+  readonly packId: string;
+  readonly version: string;
+  readonly archivePath: string;
+  readonly archiveDigest: string;
+  readonly manifestDigest: string;
+  readonly contentDigest: string;
+  readonly sourceDigests: readonly AssetAuthoringSourceDigest[];
+  readonly validationReceiptId: string;
+  readonly declarationReceiptDigest: string;
+  readonly previewAcceptanceReceiptDigest: string;
+  readonly previewInputDigest: string;
+  readonly previewArtifacts: readonly AssetAuthoringReleaseArtifactDigest[];
+  readonly recordedAt: string;
+}
+
+export interface AssetAuthoringArchiveInspectionReceipt {
+  readonly schema: typeof ASSET_AUTHORING_ARCHIVE_INSPECTION_RECEIPT_SCHEMA;
+  readonly packId: string;
+  readonly version: string;
+  readonly archivePath: string;
+  readonly archiveDigest: string;
+  readonly formalArchiveDigest: string;
+  readonly manifestDigest: string;
+  readonly contentDigest: string;
+  readonly sourceDigests: readonly AssetAuthoringSourceDigest[];
+  readonly entryCount: number;
+  readonly totalUncompressedBytes: number;
+  readonly recordedAt: string;
+}
+
+export interface AssetAuthoringInstallationReceipt {
+  readonly schema: typeof ASSET_AUTHORING_INSTALLATION_RECEIPT_SCHEMA;
+  readonly workspaceId: string;
+  readonly workspaceRoot: string;
+  readonly packId: string;
+  readonly version: string;
+  readonly archivePath: string;
+  readonly archiveDigest: string;
+  readonly installedDirectory: string;
+  readonly payloadDigests: Readonly<Record<string, string>>;
+  readonly registryPath: string;
+  readonly registryDigest: string;
+  readonly outputRoot: string;
+  readonly generatedDigests: Readonly<Record<string, string>>;
+  readonly creditsDigest: string;
+  readonly recordedAt: string;
+}
+
+export type AssetAuthoringReleaseDeclarationReceipt =
+  CoreAssetAuthoringReleaseDeclarationReceipt;
+
+export type AssetAuthoringPreviewAcceptanceReceipt =
+  CoreAssetAuthoringPreviewAcceptanceReceipt;
 
 export interface AssetAuthoringSessionReceipts {
   readonly validation: AssetAuthoringValidationReceipt | null;
   readonly preview: AssetAuthoringPreviewReceipt | null;
+  readonly acknowledgements: AssetAuthoringAcknowledgementReceipt | null;
+  readonly releaseDeclaration: AssetAuthoringReleaseDeclarationReceipt | null;
+  readonly previewAcceptance: AssetAuthoringPreviewAcceptanceReceipt | null;
+  readonly draftArchive?: AssetAuthoringDraftArchiveReceipt | null;
+  readonly sync?: AssetAuthoringSyncReceipt | null;
+  readonly formalArchive?: AssetAuthoringFormalArchiveReceipt | null;
+  readonly archiveInspection?: AssetAuthoringArchiveInspectionReceipt | null;
+  readonly installation?: AssetAuthoringInstallationReceipt | null;
 }
 
 export interface AssetAuthoringSessionCheckpoint {
@@ -140,8 +257,14 @@ export type AssetAuthoringProvenanceKind =
   | 'checkpoint-invalidated'
   | 'external-png-observed'
   | 'manifest-conflict'
+  | 'draft-archive-recorded'
+  | 'sync-receipt-recorded'
+  | 'formal-archive-recorded'
+  | 'archive-inspection-recorded'
+  | 'installation-receipt-recorded'
   | 'provider'
-  | 'human-declaration';
+  | 'human-declaration'
+  | 'human-preview-acceptance';
 
 export interface AssetAuthoringProvenanceEvent {
   readonly id: string;
@@ -237,6 +360,12 @@ export interface AssetAuthoringEvidence {
   readonly sourceDigests: readonly AssetAuthoringSourceDigest[];
   readonly validationReceipt: AssetAuthoringValidationReceipt | null;
   readonly previewReceipt: AssetAuthoringPreviewReceipt | null;
+  readonly acknowledgementsReceipt?: AssetAuthoringAcknowledgementReceipt | null;
+  readonly releaseDeclarationReceipt?: AssetAuthoringReleaseDeclarationReceipt | null;
+  readonly previewAcceptanceReceipt?: AssetAuthoringPreviewAcceptanceReceipt | null;
+  readonly formalArchiveReceipt?: AssetAuthoringFormalArchiveReceipt | null;
+  readonly archiveInspectionReceipt?: AssetAuthoringArchiveInspectionReceipt | null;
+  readonly installationReceipt?: AssetAuthoringInstallationReceipt | null;
   /** The newly requested preview input, separate from the last receipt. */
   readonly previewInputDigest?: string | null;
 }
@@ -245,15 +374,29 @@ export type AssetAuthoringInvalidationCheckpoint =
   | 'manifest'
   | 'contract'
   | 'source'
+  | 'acknowledgements'
   | 'validation'
-  | 'preview';
+  | 'preview'
+  | 'previewArtifacts'
+  | 'releaseDeclaration'
+  | 'previewAcceptance'
+  | 'formalArchive'
+  | 'archiveInspection'
+  | 'installation';
 
 export type AssetAuthoringInvalidationReason =
   | 'manifest-semantic-drift'
   | 'contract-replaced'
   | 'png-drift'
+  | 'acknowledgement-receipt-stale'
   | 'validation-receipt-stale'
-  | 'preview-receipt-stale';
+  | 'preview-receipt-stale'
+  | 'preview-artifact-stale'
+  | 'release-declaration-stale'
+  | 'preview-acceptance-stale'
+  | 'formal-archive-stale'
+  | 'archive-inspection-stale'
+  | 'installation-stale';
 
 export interface AssetAuthoringInvalidationDecision {
   readonly checkpoint: AssetAuthoringInvalidationCheckpoint;
@@ -449,14 +592,413 @@ function parseTargetCheckpoints(value: unknown): readonly AssetAuthoringTargetCh
 
 function parseReceipts(value: unknown): AssetAuthoringSessionReceipts {
   const record = requireRecord(value, 'session.receipts');
-  assertExactKeys(record, ['validation', 'preview'], 'session.receipts');
+  assertExactKeys(
+    record,
+    [
+      'validation',
+      'preview',
+      'acknowledgements',
+      'releaseDeclaration',
+      'previewAcceptance',
+      'draftArchive',
+      'sync',
+      'formalArchive',
+      'archiveInspection',
+      'installation',
+    ],
+    'session.receipts',
+  );
   const validation = record.validation === null
     ? null
     : parseValidationReceipt(record.validation);
   const preview = record.preview === null
     ? null
     : parsePreviewReceipt(record.preview);
-  return { validation, preview };
+  const acknowledgements = record.acknowledgements === undefined || record.acknowledgements === null
+    ? null
+    : parseAcknowledgementsReceipt(record.acknowledgements);
+  const releaseDeclaration = record.releaseDeclaration === undefined || record.releaseDeclaration === null
+    ? null
+    : parseReleaseDeclarationReceipt(record.releaseDeclaration);
+  const previewAcceptance = record.previewAcceptance === undefined || record.previewAcceptance === null
+    ? null
+    : parsePreviewAcceptanceReceipt(record.previewAcceptance);
+  const draftArchive = record.draftArchive === undefined || record.draftArchive === null
+    ? null
+    : parseDraftArchiveReceipt(record.draftArchive);
+  const sync = record.sync === undefined || record.sync === null
+    ? null
+    : parseSyncReceipt(record.sync);
+  const formalArchive = record.formalArchive === undefined || record.formalArchive === null
+    ? null
+    : parseFormalArchiveReceipt(record.formalArchive);
+  const archiveInspection = record.archiveInspection === undefined || record.archiveInspection === null
+    ? null
+    : parseArchiveInspectionReceipt(record.archiveInspection);
+  const installation = record.installation === undefined || record.installation === null
+    ? null
+    : parseInstallationReceipt(record.installation);
+  return {
+    validation,
+    preview,
+    acknowledgements,
+    releaseDeclaration,
+    previewAcceptance,
+    draftArchive,
+    sync,
+    formalArchive,
+    archiveInspection,
+    installation,
+  };
+}
+
+function parseAbsoluteReceiptPath(
+  record: JsonRecord,
+  key: string,
+  label: string,
+): string {
+  const value = requireString(record, key, label);
+  if (!path.isAbsolute(value)) {
+    fail('asset_authoring_session_path_invalid', `${label}.${key} must be absolute.`);
+  }
+  return value;
+}
+
+function parseFormalArchiveReceipt(value: unknown): AssetAuthoringFormalArchiveReceipt {
+  const record = requireRecord(value, 'session.receipts.formalArchive');
+  assertExactKeys(
+    record,
+    [
+      'schema',
+      'packId',
+      'version',
+      'archivePath',
+      'archiveDigest',
+      'manifestDigest',
+      'contentDigest',
+      'sourceDigests',
+      'validationReceiptId',
+      'declarationReceiptDigest',
+      'previewAcceptanceReceiptDigest',
+      'previewInputDigest',
+      'previewArtifacts',
+      'recordedAt',
+    ],
+    'session.receipts.formalArchive',
+  );
+  if (record.schema !== ASSET_AUTHORING_FORMAL_ARCHIVE_RECEIPT_SCHEMA) {
+    fail(
+      'asset_authoring_session_tampered',
+      `Unknown formal archive receipt schema: ${String(record.schema)}.`,
+    );
+  }
+  const previewArtifacts = parsePreviewArtifactReceipts(
+    record.previewArtifacts,
+    'session.receipts.formalArchive.previewArtifacts',
+  );
+  if (previewArtifacts === null) {
+    fail(
+      'asset_authoring_session_invalid',
+      'session.receipts.formalArchive.previewArtifacts must contain all release artifacts.',
+    );
+  }
+  return {
+    schema: ASSET_AUTHORING_FORMAL_ARCHIVE_RECEIPT_SCHEMA,
+    packId: requireString(record, 'packId', 'session.receipts.formalArchive'),
+    version: requireString(record, 'version', 'session.receipts.formalArchive'),
+    archivePath: parseAbsoluteReceiptPath(record, 'archivePath', 'session.receipts.formalArchive'),
+    archiveDigest: requireDigest(record.archiveDigest, 'session.receipts.formalArchive.archiveDigest'),
+    manifestDigest: requireDigest(record.manifestDigest, 'session.receipts.formalArchive.manifestDigest'),
+    contentDigest: requireDigest(record.contentDigest, 'session.receipts.formalArchive.contentDigest'),
+    sourceDigests: parseSourceDigests(
+      record.sourceDigests,
+      'session.receipts.formalArchive.sourceDigests',
+    ),
+    validationReceiptId: requireString(record, 'validationReceiptId', 'session.receipts.formalArchive'),
+    declarationReceiptDigest: requireDigest(
+      record.declarationReceiptDigest,
+      'session.receipts.formalArchive.declarationReceiptDigest',
+    ),
+    previewAcceptanceReceiptDigest: requireDigest(
+      record.previewAcceptanceReceiptDigest,
+      'session.receipts.formalArchive.previewAcceptanceReceiptDigest',
+    ),
+    previewInputDigest: requireDigest(
+      record.previewInputDigest,
+      'session.receipts.formalArchive.previewInputDigest',
+    ),
+    previewArtifacts,
+    recordedAt: requireTimestamp(record.recordedAt, 'session.receipts.formalArchive.recordedAt'),
+  };
+}
+
+function parseArchiveInspectionReceipt(value: unknown): AssetAuthoringArchiveInspectionReceipt {
+  const record = requireRecord(value, 'session.receipts.archiveInspection');
+  assertExactKeys(
+    record,
+    [
+      'schema',
+      'packId',
+      'version',
+      'archivePath',
+      'archiveDigest',
+      'formalArchiveDigest',
+      'manifestDigest',
+      'contentDigest',
+      'sourceDigests',
+      'entryCount',
+      'totalUncompressedBytes',
+      'recordedAt',
+    ],
+    'session.receipts.archiveInspection',
+  );
+  if (record.schema !== ASSET_AUTHORING_ARCHIVE_INSPECTION_RECEIPT_SCHEMA) {
+    fail(
+      'asset_authoring_session_tampered',
+      `Unknown archive inspection receipt schema: ${String(record.schema)}.`,
+    );
+  }
+  const entryCount = record.entryCount;
+  const totalUncompressedBytes = record.totalUncompressedBytes;
+  if (typeof entryCount !== 'number' || !Number.isInteger(entryCount) || entryCount < 0) {
+    fail('asset_authoring_session_invalid', 'session.receipts.archiveInspection.entryCount must be a non-negative integer.');
+  }
+  if (
+    typeof totalUncompressedBytes !== 'number'
+    || !Number.isInteger(totalUncompressedBytes)
+    || totalUncompressedBytes < 0
+  ) {
+    fail('asset_authoring_session_invalid', 'session.receipts.archiveInspection.totalUncompressedBytes must be a non-negative integer.');
+  }
+  return {
+    schema: ASSET_AUTHORING_ARCHIVE_INSPECTION_RECEIPT_SCHEMA,
+    packId: requireString(record, 'packId', 'session.receipts.archiveInspection'),
+    version: requireString(record, 'version', 'session.receipts.archiveInspection'),
+    archivePath: parseAbsoluteReceiptPath(record, 'archivePath', 'session.receipts.archiveInspection'),
+    archiveDigest: requireDigest(record.archiveDigest, 'session.receipts.archiveInspection.archiveDigest'),
+    formalArchiveDigest: requireDigest(record.formalArchiveDigest, 'session.receipts.archiveInspection.formalArchiveDigest'),
+    manifestDigest: requireDigest(record.manifestDigest, 'session.receipts.archiveInspection.manifestDigest'),
+    contentDigest: requireDigest(record.contentDigest, 'session.receipts.archiveInspection.contentDigest'),
+    sourceDigests: parseSourceDigests(
+      record.sourceDigests,
+      'session.receipts.archiveInspection.sourceDigests',
+    ),
+    entryCount,
+    totalUncompressedBytes,
+    recordedAt: requireTimestamp(record.recordedAt, 'session.receipts.archiveInspection.recordedAt'),
+  };
+}
+
+function parseInstallationReceipt(value: unknown): AssetAuthoringInstallationReceipt {
+  const record = requireRecord(value, 'session.receipts.installation');
+  assertExactKeys(
+    record,
+    [
+      'schema',
+      'workspaceId',
+      'workspaceRoot',
+      'packId',
+      'version',
+      'archivePath',
+      'archiveDigest',
+      'installedDirectory',
+      'payloadDigests',
+      'registryPath',
+      'registryDigest',
+      'outputRoot',
+      'generatedDigests',
+      'creditsDigest',
+      'recordedAt',
+    ],
+    'session.receipts.installation',
+  );
+  if (record.schema !== ASSET_AUTHORING_INSTALLATION_RECEIPT_SCHEMA) {
+    fail(
+      'asset_authoring_session_tampered',
+      `Unknown installation receipt schema: ${String(record.schema)}.`,
+    );
+  }
+  const workspaceRoot = parseAbsoluteReceiptPath(
+    record,
+    'workspaceRoot',
+    'session.receipts.installation',
+  );
+  const installedDirectory = parseAbsoluteReceiptPath(
+    record,
+    'installedDirectory',
+    'session.receipts.installation',
+  );
+  const registryPath = parseAbsoluteReceiptPath(
+    record,
+    'registryPath',
+    'session.receipts.installation',
+  );
+  const outputRoot = parseAbsoluteReceiptPath(
+    record,
+    'outputRoot',
+    'session.receipts.installation',
+  );
+  return {
+    schema: ASSET_AUTHORING_INSTALLATION_RECEIPT_SCHEMA,
+    workspaceId: requireString(record, 'workspaceId', 'session.receipts.installation'),
+    workspaceRoot,
+    packId: requireString(record, 'packId', 'session.receipts.installation'),
+    version: requireString(record, 'version', 'session.receipts.installation'),
+    archivePath: parseAbsoluteReceiptPath(
+      record,
+      'archivePath',
+      'session.receipts.installation',
+    ),
+    archiveDigest: requireDigest(
+      record.archiveDigest,
+      'session.receipts.installation.archiveDigest',
+    ),
+    installedDirectory,
+    payloadDigests: parseGeneratedDigests(
+      record.payloadDigests,
+      'session.receipts.installation.payloadDigests',
+    ),
+    registryPath,
+    registryDigest: requireDigest(
+      record.registryDigest,
+      'session.receipts.installation.registryDigest',
+    ),
+    outputRoot,
+    generatedDigests: parseGeneratedDigests(
+      record.generatedDigests,
+      'session.receipts.installation.generatedDigests',
+    ),
+    creditsDigest: requireDigest(
+      record.creditsDigest,
+      'session.receipts.installation.creditsDigest',
+    ),
+    recordedAt: requireTimestamp(
+      record.recordedAt,
+      'session.receipts.installation.recordedAt',
+    ),
+  };
+}
+
+function parseDraftArchiveReceipt(value: unknown): AssetAuthoringDraftArchiveReceipt {
+  const record = requireRecord(value, 'session.receipts.draftArchive');
+  assertExactKeys(
+    record,
+    [
+      'schema',
+      'packId',
+      'version',
+      'archivePath',
+      'archiveDigest',
+      'manifestDigest',
+      'contentDigest',
+      'sourceDigests',
+      'recordedAt',
+    ],
+    'session.receipts.draftArchive',
+  );
+  if (record.schema !== ASSET_AUTHORING_DRAFT_RECEIPT_SCHEMA) {
+    fail(
+      'asset_authoring_session_tampered',
+      `Unknown draft receipt schema: ${String(record.schema)}.`,
+    );
+  }
+  const archivePath = requireString(record, 'archivePath', 'session.receipts.draftArchive');
+  if (!path.isAbsolute(archivePath)) {
+    fail(
+      'asset_authoring_session_path_invalid',
+      'session.receipts.draftArchive.archivePath must be absolute.',
+    );
+  }
+  return {
+    schema: ASSET_AUTHORING_DRAFT_RECEIPT_SCHEMA,
+    packId: requireString(record, 'packId', 'session.receipts.draftArchive'),
+    version: requireString(record, 'version', 'session.receipts.draftArchive'),
+    archivePath,
+    archiveDigest: requireDigest(
+      record.archiveDigest,
+      'session.receipts.draftArchive.archiveDigest',
+    ),
+    manifestDigest: requireDigest(
+      record.manifestDigest,
+      'session.receipts.draftArchive.manifestDigest',
+    ),
+    contentDigest: requireDigest(
+      record.contentDigest,
+      'session.receipts.draftArchive.contentDigest',
+    ),
+    sourceDigests: parseSourceDigests(
+      record.sourceDigests,
+      'session.receipts.draftArchive.sourceDigests',
+    ),
+    recordedAt: requireTimestamp(
+      record.recordedAt,
+      'session.receipts.draftArchive.recordedAt',
+    ),
+  };
+}
+
+function parseGeneratedDigests(
+  value: unknown,
+  label: string,
+): Readonly<Record<string, string>> {
+  const record = requireRecord(value, label);
+  const entries = Object.entries(record);
+  const paths = entries.map(([entryPath]) => requireLogicalTargetId(entryPath, label));
+  assertStableOrder(paths, label);
+  const result: Record<string, string> = {};
+  for (const [entryPath, digest] of entries) {
+    result[entryPath] = requireDigest(digest, `${label}.${entryPath}`);
+  }
+  return result;
+}
+
+function parseSyncReceipt(value: unknown): AssetAuthoringSyncReceipt {
+  const record = requireRecord(value, 'session.receipts.sync');
+  assertExactKeys(
+    record,
+    [
+      'id',
+      'packId',
+      'version',
+      'manifestDigest',
+      'contentDigest',
+      'sourceDigests',
+      'workspaceId',
+      'outputRoot',
+      'registryDigest',
+      'compileDigest',
+      'generatedDigests',
+      'recordedAt',
+    ],
+    'session.receipts.sync',
+  );
+  const outputRoot = requireString(record, 'outputRoot', 'session.receipts.sync');
+  if (!path.isAbsolute(outputRoot)) {
+    fail(
+      'asset_authoring_session_path_invalid',
+      'session.receipts.sync.outputRoot must be absolute.',
+    );
+  }
+  return {
+    id: requireDigest(record.id, 'session.receipts.sync.id'),
+    packId: requireString(record, 'packId', 'session.receipts.sync'),
+    version: requireString(record, 'version', 'session.receipts.sync'),
+    manifestDigest: requireDigest(record.manifestDigest, 'session.receipts.sync.manifestDigest'),
+    contentDigest: requireDigest(record.contentDigest, 'session.receipts.sync.contentDigest'),
+    sourceDigests: parseSourceDigests(
+      record.sourceDigests,
+      'session.receipts.sync.sourceDigests',
+    ),
+    workspaceId: requireString(record, 'workspaceId', 'session.receipts.sync'),
+    outputRoot,
+    registryDigest: requireDigest(record.registryDigest, 'session.receipts.sync.registryDigest'),
+    compileDigest: requireDigest(record.compileDigest, 'session.receipts.sync.compileDigest'),
+    generatedDigests: parseGeneratedDigests(
+      record.generatedDigests,
+      'session.receipts.sync.generatedDigests',
+    ),
+    recordedAt: requireTimestamp(record.recordedAt, 'session.receipts.sync.recordedAt'),
+  };
 }
 
 function parseValidationReceipt(value: unknown): AssetAuthoringValidationReceipt {
@@ -483,8 +1025,15 @@ function parsePreviewReceipt(value: unknown): AssetAuthoringPreviewReceipt {
   const record = requireRecord(value, 'session.receipts.preview');
   assertExactKeys(
     record,
-    ['id', 'manifestDigest', 'sourceDigests', 'inputDigest'],
+    ['id', 'manifestDigest', 'sourceDigests', 'validationReceiptId', 'inputDigest', 'artifacts'],
     'session.receipts.preview',
+  );
+  const validationReceiptId = record.validationReceiptId === undefined
+    ? null
+    : requireString(record, 'validationReceiptId', 'session.receipts.preview');
+  const artifacts = parsePreviewArtifactReceipts(
+    record.artifacts,
+    'session.receipts.preview.artifacts',
   );
   return {
     id: requireString(record, 'id', 'session.receipts.preview'),
@@ -496,8 +1045,134 @@ function parsePreviewReceipt(value: unknown): AssetAuthoringPreviewReceipt {
       record.sourceDigests,
       'session.receipts.preview.sourceDigests',
     ),
+    validationReceiptId,
     inputDigest: requireDigest(record.inputDigest, 'session.receipts.preview.inputDigest'),
+    artifacts,
   };
+}
+
+function parsePreviewArtifactReceipts(
+  value: unknown,
+  label: string,
+): readonly AssetAuthoringReleaseArtifactDigest[] | null {
+  if (value === undefined) return null;
+  if (!Array.isArray(value) || value.length !== ASSET_AUTHORING_RELEASE_ARTIFACT_IDS.length) {
+    fail(
+      'asset_authoring_session_invalid',
+      `${label} must contain exactly ${ASSET_AUTHORING_RELEASE_ARTIFACT_IDS.length} artifacts.`,
+    );
+  }
+  const seen = new Set<string>();
+  const parsed = value.map((entry, index) => {
+    const entryLabel = `${label}[${index}]`;
+    const record = requireRecord(entry, entryLabel);
+    assertExactKeys(record, ['id', 'path', 'digest'], entryLabel);
+    const id = requireString(record, 'id', entryLabel);
+    if (!ASSET_AUTHORING_RELEASE_ARTIFACT_IDS.includes(
+      id as (typeof ASSET_AUTHORING_RELEASE_ARTIFACT_IDS)[number],
+    )) {
+      fail('asset_authoring_session_invalid', `${entryLabel}.id is unsupported.`);
+    }
+    if (seen.has(id)) {
+      fail('asset_authoring_session_tampered', `${label} contains duplicate artifact ids.`);
+    }
+    seen.add(id);
+    const artifactPath = requireString(record, 'path', entryLabel);
+    if (!path.isAbsolute(artifactPath)) {
+      fail('asset_authoring_session_path_invalid', `${entryLabel}.path must be absolute.`);
+    }
+    return {
+      id: id as AssetAuthoringReleaseArtifactDigest['id'],
+      path: artifactPath,
+      digest: requireDigest(record.digest, `${entryLabel}.digest`),
+    };
+  });
+  const expectedIds = [...ASSET_AUTHORING_RELEASE_ARTIFACT_IDS];
+  if (parsed.some((artifact, index) => artifact.id !== expectedIds[index])) {
+    fail('asset_authoring_session_tampered', `${label} must use stable artifact ordering.`);
+  }
+  return parsed;
+}
+
+function parseAcknowledgementsReceipt(value: unknown): AssetAuthoringAcknowledgementReceipt {
+  const record = requireRecord(value, 'session.receipts.acknowledgements');
+  assertExactKeys(
+    record,
+    ['id', 'manifestDigest', 'sourceDigests', 'recordDigests'],
+    'session.receipts.acknowledgements',
+  );
+  const recordDigests = record.recordDigests;
+  if (!Array.isArray(recordDigests)) {
+    fail(
+      'asset_authoring_session_invalid',
+      'session.receipts.acknowledgements.recordDigests must be an array.',
+    );
+  }
+  const parsedRecordDigests = recordDigests.map((digest, index) =>
+    requireDigest(digest, `session.receipts.acknowledgements.recordDigests[${index}]`));
+  if (parsedRecordDigests.length === 0) {
+    fail(
+      'asset_authoring_session_invalid',
+      'session.receipts.acknowledgements.recordDigests must not be empty.',
+    );
+  }
+  if (new Set(parsedRecordDigests).size !== parsedRecordDigests.length) {
+    fail(
+      'asset_authoring_session_tampered',
+      'session.receipts.acknowledgements.recordDigests contains duplicates.',
+    );
+  }
+  assertStableOrder(parsedRecordDigests, 'session.receipts.acknowledgements.recordDigests');
+  return {
+    id: requireDigest(record.id, 'session.receipts.acknowledgements.id'),
+    manifestDigest: requireDigest(
+      record.manifestDigest,
+      'session.receipts.acknowledgements.manifestDigest',
+    ),
+    sourceDigests: parseSourceDigests(
+      record.sourceDigests,
+      'session.receipts.acknowledgements.sourceDigests',
+    ),
+    recordDigests: parsedRecordDigests,
+  };
+}
+
+function parseReleaseDeclarationReceipt(
+  value: unknown,
+): AssetAuthoringReleaseDeclarationReceipt {
+  const result = parseAssetAuthoringReleaseReceipt(value);
+  if (!result.ok) {
+    fail(
+      'asset_authoring_session_invalid',
+      result.diagnostics[0]?.message ?? 'session.receipts.releaseDeclaration is invalid.',
+    );
+  }
+  if (result.receipt.kind !== 'declaration') {
+    fail(
+      'asset_authoring_session_invalid',
+      'session.receipts.releaseDeclaration must be a declaration receipt.',
+    );
+  }
+  return result.receipt;
+}
+
+function parsePreviewAcceptanceReceipt(
+  value: unknown,
+): AssetAuthoringPreviewAcceptanceReceipt {
+  const result = parseAssetAuthoringReleaseReceipt(value);
+  if (!result.ok) {
+    fail(
+      'asset_authoring_session_invalid',
+      result.diagnostics[0]?.message ?? 'session.receipts.previewAcceptance is invalid.',
+    );
+  }
+  if (result.receipt.kind !== 'preview-acceptance') {
+    fail(
+      'asset_authoring_session_invalid',
+      'session.receipts.previewAcceptance must be a preview-acceptance receipt.',
+    );
+  }
+  return result.receipt;
 }
 
 function parseProvenance(value: unknown): readonly AssetAuthoringProvenanceEvent[] {
@@ -516,8 +1191,14 @@ function parseProvenance(value: unknown): readonly AssetAuthoringProvenanceEvent
         'checkpoint-invalidated',
         'external-png-observed',
         'manifest-conflict',
+        'draft-archive-recorded',
+        'sync-receipt-recorded',
+        'formal-archive-recorded',
+        'archive-inspection-recorded',
+        'installation-receipt-recorded',
         'provider',
         'human-declaration',
+        'human-preview-acceptance',
       ], label),
       occurredAt: requireTimestamp(record.occurredAt, `${label}.occurredAt`),
       summary: requireString(record, 'summary', label),
@@ -723,6 +1404,7 @@ function parseSessionDocument(
   );
   const checkpoints = parseTargetCheckpoints(record.checkpoints);
   const receipts = parseReceipts(record.receipts);
+  validateReceiptScope(receipts, workspace, sessionId, packRoot);
   const provenance = parseProvenance(record.provenance);
   const conflict = parseConflict(record.conflict);
   const manifestDigest = requireNullableDigest(record, 'manifestDigest', 'session');
@@ -752,6 +1434,94 @@ function parseSessionDocument(
     createdAt,
     updatedAt,
   };
+}
+
+function validateReceiptScope(
+  receipts: AssetAuthoringSessionReceipts,
+  workspace: AssetWorkspace,
+  sessionId: string,
+  packRoot: string,
+): void {
+  const draftArchive = receipts.draftArchive;
+  if (draftArchive !== null && draftArchive !== undefined) {
+    const artifactRoot = path.join(
+      path.dirname(assetAuthoringSessionPath(workspace, sessionId)),
+      'release-artifacts',
+    );
+    if (!isInsideRoot(path.resolve(artifactRoot), path.resolve(draftArchive.archivePath))) {
+      fail(
+        'asset_authoring_session_path_invalid',
+        'session.receipts.draftArchive.archivePath must stay inside the session release-artifact root.',
+        draftArchive.archivePath,
+      );
+    }
+  }
+
+  const sync = receipts.sync;
+  if (sync !== null && sync !== undefined) {
+    const outputRoot = path.resolve(workspace.outputRoot);
+    if (path.resolve(sync.outputRoot) !== outputRoot) {
+      fail(
+        'asset_authoring_session_workspace_mismatch',
+        'session.receipts.sync.outputRoot must match the workspace manager output root.',
+        sync.outputRoot,
+      );
+    }
+  }
+
+  const formalArchive = receipts.formalArchive;
+  if (formalArchive !== null && formalArchive !== undefined) {
+    const artifactRoot = path.join(
+      path.dirname(assetAuthoringSessionPath(workspace, sessionId)),
+      'release-artifacts',
+    );
+    if (!isInsideRoot(path.resolve(artifactRoot), path.resolve(formalArchive.archivePath))) {
+      fail(
+        'asset_authoring_session_path_invalid',
+        'session.receipts.formalArchive.archivePath must stay inside the session release-artifact root.',
+        formalArchive.archivePath,
+      );
+    }
+    const resolvedPackRoot = path.resolve(packRoot);
+    for (const artifact of formalArchive.previewArtifacts) {
+      if (!isInsideRoot(resolvedPackRoot, path.resolve(artifact.path))) {
+        fail(
+          'asset_authoring_session_path_invalid',
+          'session.receipts.formalArchive.previewArtifacts must stay inside the session pack root.',
+          artifact.path,
+        );
+      }
+    }
+  }
+
+  const installation = receipts.installation;
+  if (installation !== null && installation !== undefined) {
+    const artistWorkspaceRoot = path.resolve(workspace.root);
+    const consumerWorkspaceRoot = path.resolve(installation.workspaceRoot);
+    if (
+      isInsideRoot(artistWorkspaceRoot, consumerWorkspaceRoot)
+      || isInsideRoot(consumerWorkspaceRoot, artistWorkspaceRoot)
+    ) {
+      fail(
+        'asset_authoring_session_workspace_mismatch',
+        'session.receipts.installation.workspaceRoot must be a distinct workspace outside the artist workspace.',
+        installation.workspaceRoot,
+      );
+    }
+    for (const [label, target] of [
+      ['installedDirectory', installation.installedDirectory],
+      ['registryPath', installation.registryPath],
+      ['outputRoot', installation.outputRoot],
+    ] as const) {
+      if (!isInsideRoot(consumerWorkspaceRoot, path.resolve(target))) {
+        fail(
+          'asset_authoring_session_path_invalid',
+          `session.receipts.installation.${label} must stay inside the consumer workspace.`,
+          target,
+        );
+      }
+    }
+  }
 }
 
 function serializeSession(session: AssetAuthoringSession): string {
@@ -796,7 +1566,12 @@ function updateFromSession(
     ...(update.checkpoint === undefined ? {} : { checkpoint: update.checkpoint }),
     ...(update.checkpointFreshness === undefined ? {} : { checkpointFreshness: update.checkpointFreshness }),
     ...(update.checkpoints === undefined ? {} : { checkpoints: update.checkpoints }),
-    ...(update.receipts === undefined ? {} : { receipts: update.receipts }),
+    ...(update.receipts === undefined ? {} : {
+      receipts: {
+        ...session.receipts,
+        ...update.receipts,
+      },
+    }),
     ...(update.provenance === undefined ? {} : { provenance: update.provenance }),
     ...(update.conflict === undefined ? {} : { conflict: update.conflict }),
     ...(update.manifestDigest === undefined ? {} : { manifestDigest: update.manifestDigest }),
@@ -845,7 +1620,18 @@ class AssetAuthoringSessionStoreImpl implements AssetAuthoringSessionStore {
       checkpoint: null,
       checkpointFreshness: 'missing',
       checkpoints: sessionTargetCheckpoints(planResult.plan),
-      receipts: { validation: null, preview: null },
+      receipts: {
+        validation: null,
+        preview: null,
+        acknowledgements: null,
+        releaseDeclaration: null,
+        previewAcceptance: null,
+        draftArchive: null,
+        sync: null,
+        formalArchive: null,
+        archiveInspection: null,
+        installation: null,
+      },
       provenance: [{
         id: this.eventId(),
         kind: 'session-created',
@@ -970,6 +1756,133 @@ function sameSourceDigests(
   });
 }
 
+function sameArtifactDigests(
+  left: readonly AssetAuthoringReleaseArtifactDigest[],
+  right: readonly AssetAuthoringReleaseArtifactDigest[],
+): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((artifact, index) => {
+    const other = right[index];
+    return other !== undefined
+      && artifact.id === other.id
+      && artifact.path === other.path
+      && artifact.digest === other.digest;
+  });
+}
+
+function sameReleaseDeclarationReceipts(
+  left: AssetAuthoringReleaseDeclarationReceipt | null | undefined,
+  right: AssetAuthoringReleaseDeclarationReceipt | null | undefined,
+): boolean {
+  if (left === null || left === undefined || right === null || right === undefined) {
+    return left === right;
+  }
+  return left.declarationDigest === right.declarationDigest
+    && left.manifestDigest === right.manifestDigest
+    && sameSourceDigests(left.sourceDigests, right.sourceDigests)
+    && left.validationReceiptId === right.validationReceiptId
+    && left.validationReceiptRevision === right.validationReceiptRevision
+    && left.creditDigests.authorAndSource === right.creditDigests.authorAndSource
+    && left.creditDigests.licenseAuthority === right.creditDigests.licenseAuthority
+    && left.acknowledgements.contentDigest === right.acknowledgements.contentDigest
+    && left.acknowledgements.recordDigests.length === right.acknowledgements.recordDigests.length
+    && left.acknowledgements.recordDigests.every((digest, index) =>
+      digest === right.acknowledgements.recordDigests[index]);
+}
+
+function samePreviewAcceptanceReceipts(
+  left: AssetAuthoringPreviewAcceptanceReceipt | null | undefined,
+  right: AssetAuthoringPreviewAcceptanceReceipt | null | undefined,
+): boolean {
+  if (left === null || left === undefined || right === null || right === undefined) {
+    return left === right;
+  }
+  return left.declarationReceiptDigest === right.declarationReceiptDigest
+    && left.manifestDigest === right.manifestDigest
+    && sameSourceDigests(left.sourceDigests, right.sourceDigests)
+    && left.validationReceiptId === right.validationReceiptId
+    && left.validationReceiptRevision === right.validationReceiptRevision
+    && left.previewReceiptId === right.previewReceiptId
+    && left.previewInputDigest === right.previewInputDigest
+    && sameArtifactDigests(left.artifacts, right.artifacts);
+}
+
+function sameFormalArchiveReceipts(
+  left: AssetAuthoringFormalArchiveReceipt | null | undefined,
+  right: AssetAuthoringFormalArchiveReceipt | null | undefined,
+): boolean {
+  if (left === null || left === undefined || right === null || right === undefined) {
+    return left === right;
+  }
+  return left.schema === right.schema
+    && left.packId === right.packId
+    && left.version === right.version
+    && left.archivePath === right.archivePath
+    && left.archiveDigest === right.archiveDigest
+    && left.manifestDigest === right.manifestDigest
+    && left.contentDigest === right.contentDigest
+    && sameSourceDigests(left.sourceDigests, right.sourceDigests)
+    && left.validationReceiptId === right.validationReceiptId
+    && left.declarationReceiptDigest === right.declarationReceiptDigest
+    && left.previewAcceptanceReceiptDigest === right.previewAcceptanceReceiptDigest
+    && left.previewInputDigest === right.previewInputDigest
+    && sameArtifactDigests(left.previewArtifacts, right.previewArtifacts)
+    && left.recordedAt === right.recordedAt;
+}
+
+function sameArchiveInspectionReceipts(
+  left: AssetAuthoringArchiveInspectionReceipt | null | undefined,
+  right: AssetAuthoringArchiveInspectionReceipt | null | undefined,
+): boolean {
+  if (left === null || left === undefined || right === null || right === undefined) {
+    return left === right;
+  }
+  return left.schema === right.schema
+    && left.packId === right.packId
+    && left.version === right.version
+    && left.archivePath === right.archivePath
+    && left.archiveDigest === right.archiveDigest
+    && left.formalArchiveDigest === right.formalArchiveDigest
+    && left.manifestDigest === right.manifestDigest
+    && left.contentDigest === right.contentDigest
+    && sameSourceDigests(left.sourceDigests, right.sourceDigests)
+    && left.entryCount === right.entryCount
+    && left.totalUncompressedBytes === right.totalUncompressedBytes
+    && left.recordedAt === right.recordedAt;
+}
+
+function sameInstallationReceipts(
+  left: AssetAuthoringInstallationReceipt | null | undefined,
+  right: AssetAuthoringInstallationReceipt | null | undefined,
+): boolean {
+  if (left === null || left === undefined || right === null || right === undefined) {
+    return left === right;
+  }
+  return left.schema === right.schema
+    && left.workspaceId === right.workspaceId
+    && left.workspaceRoot === right.workspaceRoot
+    && left.packId === right.packId
+    && left.version === right.version
+    && left.archivePath === right.archivePath
+    && left.archiveDigest === right.archiveDigest
+    && left.installedDirectory === right.installedDirectory
+    && JSON.stringify(left.payloadDigests) === JSON.stringify(right.payloadDigests)
+    && left.registryPath === right.registryPath
+    && left.registryDigest === right.registryDigest
+    && left.outputRoot === right.outputRoot
+    && JSON.stringify(left.generatedDigests) === JSON.stringify(right.generatedDigests)
+    && left.creditsDigest === right.creditsDigest
+    && left.recordedAt === right.recordedAt;
+}
+
+function releaseReceiptDigest(
+  receipt: AssetAuthoringReleaseDeclarationReceipt | AssetAuthoringPreviewAcceptanceReceipt,
+): string {
+  return `sha256:${createHash('sha256')
+    .update(assetAuthoringReleaseReceiptDigestInput(receipt), 'utf8')
+    .digest('hex')}`;
+}
+
 export function deriveAuthoringInvalidationDecisions(
   previous: AssetAuthoringEvidence,
   current: AssetAuthoringEvidence,
@@ -992,6 +1905,17 @@ export function deriveAuthoringInvalidationDecisions(
   if (!sameSourceDigests(previous.sourceDigests, current.sourceDigests)) {
     decisions.push({ checkpoint: 'source', reason: 'png-drift' });
   }
+  const acknowledgementsReceipt = current.acknowledgementsReceipt;
+  if (
+    acknowledgementsReceipt !== undefined
+    && acknowledgementsReceipt !== null
+    && (
+      acknowledgementsReceipt.manifestDigest !== current.manifestDigest
+      || !sameSourceDigests(acknowledgementsReceipt.sourceDigests, current.sourceDigests)
+    )
+  ) {
+    decisions.push({ checkpoint: 'acknowledgements', reason: 'acknowledgement-receipt-stale' });
+  }
   if (
     current.validationReceipt !== null
     && (
@@ -1006,6 +1930,9 @@ export function deriveAuthoringInvalidationDecisions(
     && (
       current.previewReceipt.manifestDigest !== current.manifestDigest
       || !sameSourceDigests(current.previewReceipt.sourceDigests, current.sourceDigests)
+      || current.validationReceipt === null
+      || current.previewReceipt.validationReceiptId === null
+      || current.previewReceipt.validationReceiptId !== current.validationReceipt.id
       || (
         current.previewInputDigest !== undefined
         && current.previewInputDigest !== current.previewReceipt.inputDigest
@@ -1013,6 +1940,163 @@ export function deriveAuthoringInvalidationDecisions(
     )
   ) {
     decisions.push({ checkpoint: 'preview', reason: 'preview-receipt-stale' });
+  }
+  const previousPreviewArtifacts = previous.previewReceipt?.artifacts;
+  const currentPreviewArtifacts = current.previewReceipt?.artifacts;
+  if (
+    previous.previewReceipt !== null
+    && current.previewReceipt !== null
+    && previousPreviewArtifacts !== null
+    && previousPreviewArtifacts !== undefined
+    && currentPreviewArtifacts !== null
+    && currentPreviewArtifacts !== undefined
+    && !sameArtifactDigests(previousPreviewArtifacts, currentPreviewArtifacts)
+  ) {
+    decisions.push({ checkpoint: 'previewArtifacts', reason: 'preview-artifact-stale' });
+  }
+  const previousDeclaration = previous.releaseDeclarationReceipt;
+  const currentDeclaration = current.releaseDeclarationReceipt;
+  if (!sameReleaseDeclarationReceipts(previousDeclaration, currentDeclaration)) {
+    if (previousDeclaration !== undefined && previousDeclaration !== null) {
+      decisions.push({ checkpoint: 'releaseDeclaration', reason: 'release-declaration-stale' });
+    }
+  } else if (
+    previousDeclaration !== undefined
+    && previousDeclaration !== null
+    && currentDeclaration !== undefined
+    && currentDeclaration !== null
+    && (
+      current.validationReceipt === null
+      || currentDeclaration.manifestDigest !== current.manifestDigest
+      || !sameSourceDigests(currentDeclaration.sourceDigests, current.sourceDigests)
+      || currentDeclaration.validationReceiptId !== current.validationReceipt.id
+      || (
+        current.acknowledgementsReceipt !== undefined
+        && (
+          current.acknowledgementsReceipt === null
+          || currentDeclaration.acknowledgements.recordDigests.length
+            !== current.acknowledgementsReceipt.recordDigests.length
+          || currentDeclaration.acknowledgements.recordDigests.some((digest, index) =>
+            digest !== current.acknowledgementsReceipt?.recordDigests[index])
+        )
+      )
+    )
+  ) {
+    decisions.push({ checkpoint: 'releaseDeclaration', reason: 'release-declaration-stale' });
+  }
+  const previousAcceptance = previous.previewAcceptanceReceipt;
+  const currentAcceptance = current.previewAcceptanceReceipt;
+  if (!samePreviewAcceptanceReceipts(previousAcceptance, currentAcceptance)) {
+    if (previousAcceptance !== undefined && previousAcceptance !== null) {
+      decisions.push({ checkpoint: 'previewAcceptance', reason: 'preview-acceptance-stale' });
+    }
+  } else if (
+    previousAcceptance !== undefined
+    && previousAcceptance !== null
+    && currentAcceptance !== undefined
+    && currentAcceptance !== null
+    && (
+      currentDeclaration === undefined
+      || currentDeclaration === null
+      || current.validationReceipt === null
+      || current.previewReceipt === null
+      || current.previewReceipt.artifacts === null
+      || currentAcceptance.declarationReceiptDigest !== currentDeclaration?.declarationDigest
+      || currentAcceptance.manifestDigest !== current.manifestDigest
+      || !sameSourceDigests(currentAcceptance.sourceDigests, current.sourceDigests)
+      || currentAcceptance.validationReceiptId !== current.validationReceipt.id
+      || currentAcceptance.previewReceiptId !== current.previewReceipt.id
+      || currentAcceptance.previewInputDigest !== current.previewReceipt.inputDigest
+      || !sameArtifactDigests(currentAcceptance.artifacts, current.previewReceipt.artifacts)
+    )
+  ) {
+    decisions.push({ checkpoint: 'previewAcceptance', reason: 'preview-acceptance-stale' });
+  }
+  const previousFormalArchive = previous.formalArchiveReceipt;
+  const currentFormalArchive = current.formalArchiveReceipt;
+  if (!sameFormalArchiveReceipts(previousFormalArchive, currentFormalArchive)) {
+    if (previousFormalArchive !== undefined && previousFormalArchive !== null) {
+      decisions.push({ checkpoint: 'formalArchive', reason: 'formal-archive-stale' });
+    }
+  } else if (
+    previousFormalArchive !== undefined
+    && previousFormalArchive !== null
+    && currentFormalArchive !== undefined
+    && currentFormalArchive !== null
+    && (
+      current.validationReceipt === null
+      || current.releaseDeclarationReceipt === undefined
+      || current.releaseDeclarationReceipt === null
+      || current.previewAcceptanceReceipt === undefined
+      || current.previewAcceptanceReceipt === null
+      || currentFormalArchive.manifestDigest !== current.manifestDigest
+      || !sameSourceDigests(currentFormalArchive.sourceDigests, current.sourceDigests)
+      || currentFormalArchive.validationReceiptId !== current.validationReceipt.id
+      || currentFormalArchive.declarationReceiptDigest
+        !== current.releaseDeclarationReceipt.declarationDigest
+      || currentFormalArchive.previewAcceptanceReceiptDigest
+        !== releaseReceiptDigest(current.previewAcceptanceReceipt)
+      || currentFormalArchive.previewInputDigest !== current.previewAcceptanceReceipt.previewInputDigest
+      || !sameArtifactDigests(
+        currentFormalArchive.previewArtifacts,
+        current.previewAcceptanceReceipt.artifacts,
+      )
+    )
+  ) {
+    decisions.push({ checkpoint: 'formalArchive', reason: 'formal-archive-stale' });
+  }
+
+  const previousArchiveInspection = previous.archiveInspectionReceipt;
+  const currentArchiveInspection = current.archiveInspectionReceipt;
+  if (!sameArchiveInspectionReceipts(previousArchiveInspection, currentArchiveInspection)) {
+    if (previousArchiveInspection !== undefined && previousArchiveInspection !== null) {
+      decisions.push({ checkpoint: 'archiveInspection', reason: 'archive-inspection-stale' });
+    }
+  } else if (
+    previousArchiveInspection !== undefined
+    && previousArchiveInspection !== null
+    && currentArchiveInspection !== undefined
+    && currentArchiveInspection !== null
+    && (
+      currentFormalArchive === undefined
+      || currentFormalArchive === null
+      || currentArchiveInspection.formalArchiveDigest !== currentFormalArchive.archiveDigest
+      || currentArchiveInspection.packId !== currentFormalArchive.packId
+      || currentArchiveInspection.version !== currentFormalArchive.version
+      || currentArchiveInspection.manifestDigest !== currentFormalArchive.manifestDigest
+      || currentArchiveInspection.contentDigest !== currentFormalArchive.contentDigest
+      || !sameSourceDigests(currentArchiveInspection.sourceDigests, currentFormalArchive.sourceDigests)
+      || currentArchiveInspection.manifestDigest !== current.manifestDigest
+      || !sameSourceDigests(currentArchiveInspection.sourceDigests, current.sourceDigests)
+    )
+  ) {
+    decisions.push({ checkpoint: 'archiveInspection', reason: 'archive-inspection-stale' });
+  }
+
+  const previousInstallation = previous.installationReceipt;
+  const currentInstallation = current.installationReceipt;
+  const releaseArchiveStale = decisions.some((decision) =>
+    decision.checkpoint === 'formalArchive' || decision.checkpoint === 'archiveInspection');
+  if (!sameInstallationReceipts(previousInstallation, currentInstallation)) {
+    if (previousInstallation !== undefined && previousInstallation !== null) {
+      decisions.push({ checkpoint: 'installation', reason: 'installation-stale' });
+    }
+  } else if (
+    previousInstallation !== undefined
+    && previousInstallation !== null
+    && currentInstallation !== undefined
+    && currentInstallation !== null
+    && (
+      currentArchiveInspection === undefined
+      || currentArchiveInspection === null
+      || currentInstallation.archiveDigest !== currentArchiveInspection.archiveDigest
+      || currentInstallation.packId !== currentArchiveInspection.packId
+      || currentInstallation.version !== currentArchiveInspection.version
+      || currentInstallation.archivePath !== currentArchiveInspection.archivePath
+      || releaseArchiveStale
+    )
+  ) {
+    decisions.push({ checkpoint: 'installation', reason: 'installation-stale' });
   }
   return decisions;
 }

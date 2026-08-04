@@ -91,6 +91,9 @@ my-lpc-art/
         ├── transactions/              operation staging/backups while journaled
         ├── validation/
         └── staging/
+    authoring-sessions/
+        └── <session-id>/
+            └── release-artifacts/     deterministic draft recovery archives
 ```
 
 The workspace config uses schema `lpc-toolkit.asset-workspace.v1` and records
@@ -220,6 +223,9 @@ The advertisement includes these capability identifiers:
 - `sprite-drawing-contract.v1`
 - `asset-authoring-candidate-import.v1`
 - `asset-authoring-recovery.v1`
+- `asset-authoring-release.v1`
+- `asset-authoring-draft-recovery.v1`
+- `asset-authoring-consumer-install.v1`
 
 and these schema identifiers:
 
@@ -227,6 +233,12 @@ and these schema identifiers:
 - `lpc-toolkit.asset-authoring-session.v1`
 - `lpc-toolkit.asset-authoring-response.v1`
 - `lpc-toolkit.sprite-drawing-contract.v1`
+- `lpc-toolkit.asset-release-declaration.v1`
+- `lpc-toolkit.asset-authoring-release-receipt.v1`
+- `lpc-toolkit.asset-authoring-draft-receipt.v1`
+- `lpc-toolkit.asset-authoring-formal-archive-receipt.v1`
+- `lpc-toolkit.asset-authoring-archive-inspection-receipt.v1`
+- `lpc-toolkit.asset-authoring-install-receipt.v1`
 
 The strict plan schema has three goals: `new-item`, `extend-item`, and
 `attach-pack`. New-item plans declare pack and asset identity, body types,
@@ -247,22 +259,41 @@ The public session commands are:
 | `asset authoring import --session <session-id> --target <target-id> --candidate <png> --contract-digest <sha256> [--replace-existing --expected-target-digest <sha256>] [--workspace <directory>] [--json]` | Import one contract-bound candidate through the trust boundary. |
 | `asset authoring validate --session <session-id> [--workspace <directory>] [--json]` | Validate the session-owned pack and record a digest-bound validation receipt. |
 | `asset authoring preview --session <session-id> [existing preview options] [--workspace <directory>] [--json]` | Render an attributed preview from the current validation receipt. |
+| `asset authoring acknowledge --session <session-id> --acknowledgement <record.json> [--confirm] [--workspace <directory>] [--json]` | Persist one exact warning acknowledgement with its non-empty human reason; without `--confirm`, return the pending action without mutation. |
+| `asset authoring declare --session <session-id> --declaration <declaration.json> [--confirm] [--workspace <directory>] [--json]` | Record explicit human author/source and license authority for the current manifest, credits, validation, and acknowledgement evidence. |
+| `asset authoring accept-preview --session <session-id> --preview-digest <sha256> --confirm [--workspace <directory>] [--json]` | Accept the exact current attributed PNG plus matching metadata, TXT-credit, and CSV-credit artifacts. |
 | `asset authoring reconcile-manifest --session <session-id> --use <external\|session> --expected-external-digest <sha256> [--workspace <directory>] [--json]` | Resolve an observed external manifest change with an explicit digest-bound choice. |
+| `asset authoring draft --session <session-id> [--output <archive>] [--workspace <directory>] [--json]` | Snapshot the current contained manifest and source files into a deterministic, explicitly non-installable recovery archive. The default output is below the session's `release-artifacts/` directory; an explicit path must remain there. |
+| `asset authoring sync --session <session-id> [--confirm] [--workspace <directory>] [--json]` | Without `--confirm`, return one confirmation action without mutation. With confirmation, run the existing linked-sync transaction for the session pack and record the actual manager-owned output/registry generation. |
+| `asset authoring pack --session <session-id> [--output <archive>] --confirm [--workspace <directory>] [--json]` | After fresh validation and every release gate is current, publish a deterministic formal archive below the session's `release-artifacts/` root. Without `--confirm`, return the confirmation action without publication. |
+| `asset authoring inspect --session <session-id> --archive <archive> [--workspace <directory>] [--json]` | Inspect the exact formal archive bytes through the existing archive authority and record an inspection receipt only when its digest matches the current formal archive receipt. |
+| `asset authoring install --session <session-id> --archive <archive> --consumer-workspace <directory> --confirm [--workspace <directory>] [--json]` | Optionally install the exact inspected formal archive into an already initialized, managed consumer workspace outside the artist and protected roots. Without `--confirm`, return the confirmation action without mutation; success records a verified installation receipt. |
 
 Each JSON command returns the normal `ok`, `command`, `data`, `warnings`, and
 `errors` envelope. Authoring data uses schema
 `lpc-toolkit.asset-authoring-response.v1` and exposes `sessionId`, `goal`,
 `state`, `reason`, `phase`, `checkpoint`, `checkpointFreshness`,
 `diagnostics`, `inputsNeeded`, `artifacts`, `nextActions`, `retrySafety`,
-`manifestDigest`, `sourceDigests`, `validation`, `preview`, `capabilities`,
-and `schemaVersions`. The response deliberately projects bounded evidence; it
-does not make session internals or provider output part of the publishable pack.
+`manifestDigest`, `sourceDigests`, `validation`, `preview`, `releaseGates`,
+`releaseDeclaration`, `previewAcceptance`, `draftArchive`, `syncReceipt`,
+`formalArchiveReceipt`, `inspectionReceipt`, `installationReceipt`,
+`capabilities`, and
+`schemaVersions`. `releaseGates.gates` reports current, missing, stale, or
+blocked acknowledgement, validation, declaration, preview, preview-artifact,
+and preview-acceptance evidence; `releaseReady` is true only when every Phase 1
+gate is current. `installationReceipt` binds the exact inspected archive to one
+distinct consumer workspace and includes verified installed payload, registry,
+managed-output, and `CREDITS.csv` digests. It is written only after the
+existing transactional `asset install` authority commits and the consumer
+generation is re-verified. The response deliberately projects bounded
+evidence; it does not make session internals or provider output part of the
+publishable pack.
 
 The state and checkpoint fields are recovery data, not asset identity:
 
 | Field | Values and meaning |
 | --- | --- |
-| `state` | `needs-user-action` means a bounded session is waiting for a safe or explicitly confirmed next action; `failed` means the current operation is blocked; `completed` is reserved for a future terminal completion and is not required by the current drawing flow. |
+| `state` | `needs-user-action` means a bounded session is waiting for a safe or explicitly confirmed next action; `failed` means the current operation is blocked; `completed` means the requested operation reached a trustworthy boundary. For draft/sync operations it means the receipt is current; formal `pack` reaches a current archive, formal `inspect` reaches the exact-byte inspection checkpoint, and formal `install` reaches a verified consumer generation. Consumer installation is optional and never implicit. |
 | `phase` | `planned`, `scaffolded`, `contract-ready`, `awaiting-candidate`, `imported`, `validated`, `previewed`, or `blocked`; each records the furthest trustworthy session boundary. |
 | `checkpoint` | `null` or an `{id, digest}` pair naming the last trustworthy session boundary and the exact evidence digest that established it. |
 | `checkpointFreshness` | `missing`, `current`, `stale`, or `blocked`; stale evidence must not be treated as current. |
@@ -293,8 +324,10 @@ validation and preview receipts, so the next required action is validation.
 Validation remains the existing strict pack validator. Warnings require the
 exact acknowledgement record and a non-empty human reason bound to the current
 content digest. The validation receipt records the manifest digest and every
-source digest; the preview receipt additionally records the preview input and
-validation revision. Manifest drift is resolved only by
+source digest; the preview receipt additionally records the preview input,
+validation revision, and exact absolute paths/digests for `preview:preview`,
+`preview:metadata`, `preview:credits_txt`, and `preview:credits_csv`.
+Manifest drift is resolved only by
 `reconcile-manifest --use external|session` with the observed external digest.
 `resume` re-evaluates these bindings and exposes recovery actions instead of
 silently choosing a side.
@@ -306,8 +339,73 @@ the existing leaf command under
 the response. New-item attribution comes from the plan's human draft credits;
 extend-item contracts carry inherited source attribution, and all previews
 retain effective base and pack credits. Authoring sessions do not create a
-formal archive: run `asset validate`, then `asset pack`, `asset inspect`, and
-`asset install` for the separate formal publication and consumer workflow.
+formal archive. Before separate formal publication, a current session can
+record the human release boundary:
+
+```sh
+lpc-toolkit asset authoring acknowledge --session <session-id> --acknowledgement <record.json> --confirm
+lpc-toolkit asset authoring declare --session <session-id> --declaration <declaration.json> --confirm
+lpc-toolkit asset authoring accept-preview --session <session-id> --preview-digest <sha256> --confirm
+```
+
+The declaration input must explicitly identify the human declarant, confirm
+author/source and license authority, and match the current credit and warning
+evidence. `accept-preview` re-digests all four attributed artifacts and accepts
+only the supplied rendered PNG digest. Omitting `--confirm`, supplying stale or
+wrong evidence, or losing an artifact leaves the session unchanged and returns
+one structured next action. `resume` preserves the last valid receipt as stale
+evidence after source, manifest, validation, preview-input, artifact, or
+declaration drift. These receipts make the session release-ready but do not
+publish or inspect an archive. `asset authoring pack --confirm` then calls the
+existing formal pack authority only after every gate is current and writes the
+archive below the session-owned `release-artifacts/` root. `asset authoring
+inspect` reads the exact archive bytes and records `inspectionReceipt` only for
+the current formal archive digest. External archive changes and copied valid
+archives remain visible as stale or mismatch evidence; they are never adopted
+silently. Consumer installation remains the separate `asset install` workflow.
+
+Phase 2 adds session recovery and manager-generation evidence without changing
+that boundary. `asset authoring draft` uses the shared deterministic archive
+writer to snapshot the current manifest and referenced regular source files.
+The default `<pack-id>-<version>.draft.lpc-assets.zip` is contained below
+`.lpc-toolkit/asset-packs/authoring-sessions/<session-id>/release-artifacts/`;
+an explicit `--output` path must remain in that directory. The persisted
+`draftArchive` receipt binds the archive, raw manifest, content, source, and
+recording-time digests. Equal existing bytes are reused; a changed, symlinked,
+or non-regular target is a conflict and is never overwritten. The archive keeps
+`status: "draft"`, so public `asset inspect` reports `asset_pack_draft` and
+public `asset install` rejects it before staging or changing a consumer
+workspace.
+
+`asset authoring sync` requires `--confirm` because it mutates only the
+manager-owned `assets_custom/` generation and workspace registry. It calls the
+existing linked-sync transaction, then captures the committed registry bytes,
+ownership marker, compile generation, and every generated definition, sprite,
+and credit digest into the `syncReceipt`. Repeating unchanged sync is
+idempotent. A source, manifest, registry, marker, output, or compile-generation
+change preserves the last receipt as stale evidence and exposes a structured
+confirmation or recovery action; it never silently adopts an unknown
+generation. Neither command writes checked-in `assets/`, the managed base
+cache, installed snapshots, unowned output, or `upstream/`.
+
+Phase 3 adds the formal session boundary. `asset authoring pack` requires a
+fresh validation receipt, current release gates, explicit `--confirm`, and a
+regular output path contained below the session's `release-artifacts/` root.
+It delegates archive bytes, checksums, draft-marker exclusion, attribution,
+and safety limits to the existing formal `asset pack` authority, then records
+`formalArchiveReceipt` only after re-reading and digest-checking the published
+bytes. Repeating unchanged publication is idempotent. A changed or missing
+recorded archive is preserved as stale evidence; the changed path is never
+silently overwritten, while an explicit new contained output can recover the
+formal receipt after review.
+
+`asset authoring inspect --archive <archive>` delegates to the existing
+`asset inspect` authority and never mutates archive bytes. It records
+`inspectionReceipt` only when the archive is valid, formal, and its exact
+digest matches the current `formalArchiveReceipt`. A valid copied archive with
+different bytes remains a bounded mismatch and cannot become the session
+checkpoint. Formal pack and inspect do not install a consumer; `asset install`
+remains an independent later workflow.
 
 Authoring sessions use the standalone workspace's artist source and managed
 state only. They never modify checked-in `assets/`, the verified base cache,

@@ -124,6 +124,38 @@ export {
   ASSET_AUTHORING_PLAN_SCHEMA,
   parseAssetAuthoringPlan,
 } from './asset-authoring-schema.js';
+export type {
+  AssetAuthoringPreviewAcceptanceReceipt,
+  AssetAuthoringReleaseArtifactDigest,
+  AssetAuthoringReleaseArtifactId,
+  AssetAuthoringReleaseDeclarationReceipt,
+  AssetAuthoringReleaseGate,
+  AssetAuthoringReleaseGateFreshness,
+  AssetAuthoringReleaseGateId,
+  AssetAuthoringReleaseGateProjection,
+  AssetAuthoringReleaseGateProjectionInput,
+  AssetAuthoringReleaseReceipt,
+  AssetAuthoringReleaseReceiptParseResult,
+  AssetReleaseDeclaration,
+  AssetReleaseDeclarationParseResult,
+  AssetReleaseDeclarant,
+  AssetReleaseDeclarantKind,
+  AssetReleaseAcknowledgementEvidence,
+  AssetReleaseDiagnostic,
+  AssetReleaseSourceDigest,
+} from './asset-release-schema.js';
+export {
+  ASSET_AUTHORING_RELEASE_ARTIFACT_IDS,
+  ASSET_AUTHORING_RELEASE_RECEIPT_SCHEMA,
+  ASSET_RELEASE_DECLARATION_SCHEMA,
+  assetAuthoringReleaseGateProjection,
+  assetAuthoringReleaseReceiptDigestInput,
+  assetAuthoringReleaseReceiptProjection,
+  assetReleaseDeclarationDigestInput,
+  assetReleaseDeclarationProjection,
+  parseAssetAuthoringReleaseReceipt,
+  parseAssetReleaseDeclaration,
+} from './asset-release-schema.js';
 
 export type {
   AssetPackCreditRecord,

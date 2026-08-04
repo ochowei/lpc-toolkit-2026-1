@@ -98,6 +98,24 @@ describe('CLI and agent integration pages', () => {
     expect(positions).toEqual([...positions].sort((left, right) => left - right));
     expect(html).toContain('artist-packs/<pack-id>/sprites/');
     expect(html).toContain('Character composition, source asset creation, audit handoff, validation, formal archive publication, and installation are separate CLI responsibilities.');
+    expect(html).toContain('Record the human release checkpoint separately');
+    for (const command of [
+      'lpc-toolkit asset authoring acknowledge --session <session-id> --acknowledgement <record.json> --confirm',
+      'lpc-toolkit asset authoring declare --session <session-id> --declaration <declaration.json> --confirm',
+      'lpc-toolkit asset authoring accept-preview --session <session-id> --preview-digest <sha256> --confirm',
+      'lpc-toolkit asset authoring pack --session <session-id> --confirm',
+      'lpc-toolkit asset authoring inspect --session <session-id> --archive <archive>',
+      'lpc-toolkit asset authoring install --session <session-id> --archive <archive> --consumer-workspace <directory> --confirm',
+      'lpc-toolkit asset authoring draft --session <session-id>',
+      'lpc-toolkit asset authoring sync --session <session-id> --confirm',
+    ]) expect(html).toContain(command);
+    expect(html).toContain('These receipts govern the authoring session only. Formal archive publication and consumer installation remain separate CLI steps.');
+    expect(html).toContain('formal pack writes a non-draft archive below the session-owned release-artifacts directory');
+    expect(html).toContain('Optionally activate the exact archive in a consumer workspace');
+    expect(html).toContain('records an installation receipt');
+    expect(html).toContain('Recover or synchronize the session separately');
+    expect(html).toContain('asset_pack_draft');
+    expect(html).toContain('manager-owned output and registry generation');
     expect(html).toContain('You do not need to clone this repository');
     expect(html).not.toContain('Phase 3');
     expect(html).toContain('browser can inspect, validate, repair, and assemble');

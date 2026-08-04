@@ -124,6 +124,26 @@ const artistWorkflowCommands = [
   'lpc-toolkit asset doctor',
 ] as const;
 
+const releaseAcceptanceCommands = [
+  'lpc-toolkit asset authoring acknowledge --session <session-id> --acknowledgement <record.json> --confirm',
+  'lpc-toolkit asset authoring declare --session <session-id> --declaration <declaration.json> --confirm',
+  'lpc-toolkit asset authoring accept-preview --session <session-id> --preview-digest <sha256> --confirm',
+] as const;
+
+const releasePublicationCommands = [
+  'lpc-toolkit asset authoring pack --session <session-id> --confirm',
+  'lpc-toolkit asset authoring inspect --session <session-id> --archive <archive>',
+] as const;
+
+const releaseConsumerCommands = [
+  'lpc-toolkit asset authoring install --session <session-id> --archive <archive> --consumer-workspace <directory> --confirm',
+] as const;
+
+const releaseRecoveryCommands = [
+  'lpc-toolkit asset authoring draft --session <session-id>',
+  'lpc-toolkit asset authoring sync --session <session-id> --confirm',
+] as const;
+
 const cliReadmeUrl =
   'https://github.com/ochowei/lpc-toolkit-2026-1/blob/main/packages/cli/README.md';
 
@@ -218,7 +238,9 @@ export function CliPage({ onNavigate }: ProductPageProps) {
             You do not need to clone this repository. The published CLI creates
             a standalone artist workspace, validates complete animation PNGs,
             renders attributed previews, packages a deterministic archive, and
-            installs it into a second standalone workspace.
+            installs it into a second standalone workspace. A session can also
+            create a non-installable recovery draft or synchronize its
+            manager-owned overlay after explicit confirmation.
           </p>
           <p className="mt-2 max-w-3xl text-sm text-text-2">
             Character composition, source asset creation, audit handoff,
@@ -232,6 +254,80 @@ export function CliPage({ onNavigate }: ProductPageProps) {
               </li>
             ))}
           </ol>
+          <div className="mt-6 rounded-md border border-border bg-surface-2 p-4">
+            <h3 className="text-lg font-semibold text-text">
+              Record the human release checkpoint separately
+            </h3>
+            <p className="mt-2 text-sm text-text-2">
+              A valid preview is not a release. An authoring session can persist
+              one exact warning acknowledgement, an explicit author/source and
+              license declaration, and final acceptance of the exact PNG plus
+              metadata, TXT-credit, and CSV-credit artifacts. Each command is a
+              separate confirmation boundary; stale evidence remains visible in
+              the session and never becomes release-ready silently.
+            </p>
+            <ol className="mt-4 space-y-3">
+              {releaseAcceptanceCommands.map((command, index) => (
+                <li key={`${index}-${command}`}>
+                  <CopyCode children={command} />
+                </li>
+              ))}
+            </ol>
+            <p className="mt-4 text-sm text-text-2">
+              These receipts govern the authoring session only. Formal archive
+              publication and consumer installation remain separate CLI steps.
+              Once every release gate is current, formal pack writes a
+              non-draft archive below the session-owned release-artifacts
+              directory; inspect records the exact archive digest only when it
+              matches that formal receipt.
+            </p>
+            <ol className="mt-4 space-y-3">
+              {releasePublicationCommands.map((command, index) => (
+                <li key={`${index}-${command}`}>
+                  <CopyCode children={command} />
+                </li>
+              ))}
+            </ol>
+            <h3 className="mt-5 text-lg font-semibold text-text">
+              Optionally activate the exact archive in a consumer workspace
+            </h3>
+            <p className="mt-2 text-sm text-text-2">
+              Consumer activation is explicit and separate from formal
+              publication. The target must already be an initialized managed
+              workspace outside the artist, repository, cache, and generated
+              output roots. The command confirms the exact inspected digest,
+              verifies the committed registry/output/source and matching
+              <code>CREDITS.csv</code>, and records an installation receipt;
+              unchanged retries are idempotent.
+            </p>
+            <ol className="mt-4 space-y-3">
+              {releaseConsumerCommands.map((command, index) => (
+                <li key={`${index}-${command}`}>
+                  <CopyCode children={command} />
+                </li>
+              ))}
+            </ol>
+            <h3 className="mt-5 text-lg font-semibold text-text">
+              Recover or synchronize the session separately
+            </h3>
+            <p className="mt-2 text-sm text-text-2">
+              A recovery draft is deterministic evidence, not a formal archive:
+              the CLI marks it <code>status: "draft"</code>, public inspect
+              reports <code>asset_pack_draft</code>, and public install rejects
+              it before changing a consumer workspace. Confirmed sync calls the
+              existing linked-sync transaction and records the actual
+              manager-owned output and registry generation. Stale source,
+              registry, marker, or generated-output evidence remains visible
+              instead of being silently replaced.
+            </p>
+            <ol className="mt-4 space-y-3">
+              {releaseRecoveryCommands.map((command, index) => (
+                <li key={`${index}-${command}`}>
+                  <CopyCode children={command} />
+                </li>
+              ))}
+            </ol>
+          </div>
           <p className="mt-4 text-sm text-text-2">
             Put PNGs under <code>artist-packs/&lt;pack-id&gt;/sprites/</code>.
             Keep the preview metadata and credit files with the generated

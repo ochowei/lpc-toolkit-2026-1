@@ -5,6 +5,12 @@ export const AUTHORING_SCHEMA_VERSIONS = [
   'lpc-toolkit.asset-authoring-session.v1',
   'lpc-toolkit.asset-authoring-response.v1',
   'lpc-toolkit.sprite-drawing-contract.v1',
+  'lpc-toolkit.asset-release-declaration.v1',
+  'lpc-toolkit.asset-authoring-release-receipt.v1',
+  'lpc-toolkit.asset-authoring-draft-receipt.v1',
+  'lpc-toolkit.asset-authoring-formal-archive-receipt.v1',
+  'lpc-toolkit.asset-authoring-archive-inspection-receipt.v1',
+  'lpc-toolkit.asset-authoring-install-receipt.v1',
 ] as const;
 
 export const AUTHORING_CAPABILITIES = [
@@ -12,6 +18,9 @@ export const AUTHORING_CAPABILITIES = [
   'sprite-drawing-contract.v1',
   'asset-authoring-candidate-import.v1',
   'asset-authoring-recovery.v1',
+  'asset-authoring-release.v1',
+  'asset-authoring-draft-recovery.v1',
+  'asset-authoring-consumer-install.v1',
 ] as const;
 
 export interface CapabilityAdvertisement {

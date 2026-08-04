@@ -96,6 +96,13 @@ export function assetCommandRequirements(
   if (parsed.command[1] === 'authoring') {
     return parsed.command[2] === 'contract'
       || parsed.command[2] === 'validate'
+      || parsed.command[2] === 'acknowledge'
+      || parsed.command[2] === 'declare'
+      || parsed.command[2] === 'accept-preview'
+      || parsed.command[2] === 'pack'
+      || parsed.command[2] === 'inspect'
+      || parsed.command[2] === 'install'
+      || parsed.command[2] === 'sync'
       || parsed.command[2] === 'preview'
       ? WORKSPACE_RUNTIME_REQUIREMENTS
       : LIST_REQUIREMENTS;

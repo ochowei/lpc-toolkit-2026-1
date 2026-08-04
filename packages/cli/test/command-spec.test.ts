@@ -293,6 +293,12 @@ describe('helpForCommand', () => {
       'contract',
       'import',
       'validate',
+      'acknowledge',
+      'declare',
+      'accept-preview',
+      'pack',
+      'inspect',
+      'install',
       'preview',
       'reconcile-manifest',
     ]) {
@@ -314,6 +320,34 @@ describe('helpForCommand', () => {
     expect(helpForCommand(['asset', 'authoring', 'reconcile-manifest'])).toContain(
       '--use <external|session>',
     );
+    expect(helpForCommand(['asset', 'authoring', 'acknowledge'])).toContain(
+      '--acknowledgement <record.json>',
+    );
+    expect(helpForCommand(['asset', 'authoring', 'declare'])).toContain(
+      '--declaration <declaration.json>',
+    );
+    expect(helpForCommand(['asset', 'authoring', 'accept-preview'])).toContain(
+      '--preview-digest <sha256>',
+    );
+    const formalPackHelp = helpForCommand(['asset', 'authoring', 'pack']);
+    expect(formalPackHelp).toContain(
+      'lpc-toolkit asset authoring pack --session <session-id> [--output <archive>] --confirm',
+    );
+    expect(formalPackHelp).toContain('--confirm');
+    expect(formalPackHelp).toContain(
+      'Write the formal archive below the session release-artifact root.',
+    );
+    const formalInspectHelp = helpForCommand(['asset', 'authoring', 'inspect']);
+    expect(formalInspectHelp).toContain(
+      'lpc-toolkit asset authoring inspect --session <session-id> --archive <archive>',
+    );
+    expect(formalInspectHelp).toContain('--archive <archive>');
+    const consumerInstallHelp = helpForCommand(['asset', 'authoring', 'install']);
+    expect(consumerInstallHelp).toContain(
+      'lpc-toolkit asset authoring install --session <session-id> --archive <archive> --consumer-workspace <directory> --confirm',
+    );
+    expect(consumerInstallHelp).toContain('--consumer-workspace <directory>');
+    expect(consumerInstallHelp).toContain('--confirm');
     expect(helpForCommand(['asset', 'authoring'])).toContain(
       'Create and resume provider-neutral asset authoring sessions from strict plans.',
     );

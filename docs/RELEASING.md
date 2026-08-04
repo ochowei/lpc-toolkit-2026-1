@@ -49,13 +49,64 @@ pnpm verify:plugin
 
 The capability response must retain the exact shipped identifiers
 `asset-authoring-session.v1`, `sprite-drawing-contract.v1`,
-`asset-authoring-candidate-import.v1`, and `asset-authoring-recovery.v1`, plus
-the four versioned authoring schemas. Check that the CLI help lists
-`start`, `status`, `resume`, `contract`, `import`, `validate`, `preview`, and
-`reconcile-manifest`, and that the CLI README, root README, landing copy, and
+`asset-authoring-candidate-import.v1`, `asset-authoring-recovery.v1`, and
+`asset-authoring-release.v1`, `asset-authoring-draft-recovery.v1`, and
+`asset-authoring-consumer-install.v1`, plus the ten versioned authoring/release
+schemas, including
+`lpc-toolkit.asset-authoring-formal-archive-receipt.v1` and
+`lpc-toolkit.asset-authoring-archive-inspection-receipt.v1` and
+`lpc-toolkit.asset-authoring-install-receipt.v1`.
+Check that the CLI help lists `start`, `status`, `resume`, `contract`, `import`,
+`validate`, `preview`, `acknowledge`, `declare`, `accept-preview`, and
+`reconcile-manifest`, `draft`, `sync`, `pack`, `inspect`, and `install`, and that the CLI README, root README, landing copy, and
 plugin compatibility references describe the same boundary. Plugin `0.2.1`
 must continue to document CLI range `>=0.2.0 <0.3.0`; the plugin intentionally
-does not claim or invoke the newer authoring-session capabilities.
+does not claim or invoke the authoring-session release, draft-recovery,
+formal-pack, formal-inspect, manager-sync, or consumer-install capabilities.
+
+Phase 1's release boundary is still session evidence, not archive publication.
+The packed smoke must show `releaseGates.releaseReady: true` only after the
+exact warning acknowledgement, explicit declaration, and exact
+`--preview-digest --confirm` acceptance. It must preserve the PNG,
+`preview:metadata`, `preview:credits_txt`, and `preview:credits_csv` digests,
+and prove that a changed artifact or source makes the downstream receipt stale
+without mutating the last valid session bytes. Formal `asset pack`,
+`asset inspect`, and `asset install` remain separate later release gates.
+
+Phase 2 adds two additional packed-smoke assertions. `asset authoring draft`
+must produce deterministic, session-contained bytes with a digest-bound
+`draftArchive` receipt; the existing public inspect command must report
+`status: "draft"` and `asset_pack_draft`, while install must reject before any
+consumer staging or registry mutation. `asset authoring sync` must return one
+confirmation action without `--confirm`, then call the existing linked-sync
+transaction only with explicit confirmation and record the committed registry,
+compile, marker, and generated-output digests in `syncReceipt`. Repeating an
+unchanged sync is a no-op. Source, manifest, registry, marker, output, or
+transaction drift must preserve the previous receipt as stale evidence and
+exercise the existing doctor/recovery path. These receipts are not formal pack,
+inspect, or consumer-install receipts.
+
+Phase 3 adds the formal session boundary to the packed release proof. After
+the validation, declaration, preview-acceptance, and source gates are current,
+`asset authoring pack --session <id> --confirm` must publish a deterministic
+non-draft archive only below the session-owned `release-artifacts/` root and
+record `formalArchiveReceipt` after digest re-verification. The no-confirm path
+must return one confirmation action without writing the archive. The following
+`asset authoring inspect --session <id> --archive <archive>` call must use the
+existing inspection authority, remain read-only, and record `inspectionReceipt`
+only for the exact formal archive digest. Mutated archive bytes and valid
+copied archives must preserve the prior receipt and expose stale/mismatch
+recovery; a new contained output is the explicit recovery path. Formal pack and
+inspect never perform consumer installation.
+
+Phase 4 adds the optional consumer activation gate. The packed smoke must use
+the exact archive digest recorded by session inspection, refuse an uninitialized
+or protected consumer path, return a confirmation action without `--confirm`,
+and record `installationReceipt` only after the existing transactional install
+commits and verifies the installed payload, registry, generated output, and
+matching `CREDITS.csv`. Repeating an unchanged install must preserve the
+receipt and artist/archive bytes; consumer output drift must become stale
+evidence and remain available to the existing doctor/recovery policy.
 
 The packed CLI smoke remains the release proof for the public contract. In a
 clean workspace, it must discover capabilities, create a strict-plan session,
@@ -114,13 +165,18 @@ lpc-toolkit asset workspace init ./authoring-smoke
 ```
 
 Then run the packed authoring smoke's fixture plan through
-`asset authoring start`, `contract`, `import`, `validate`, and `preview`. Check
-that every returned artifact path stays inside the workspace, the four preview
-artifacts retain matching attribution, and a correction after observed PNG
-drift requires the exact target digest. Finally use `asset pack` for formal
-archive publication and verify that a separate consumer still needs
-`asset inspect` and `asset install`; a session response is not a release
-archive. Record the capability JSON, plugin version/range, package version,
+`asset authoring start`, `contract`, `import`, `validate`, and `preview`, then
+exercise `acknowledge`, `declare`, and `accept-preview` with explicit human
+inputs. Check that every returned artifact path stays inside the workspace, the
+four preview artifacts retain matching attribution, a correction after
+observed PNG drift requires the exact target digest, and release readiness is
+reported only after the final preview digest is confirmed. Finally use `asset pack` for formal
+archive publication, exact session inspection, and the optional explicit
+`asset authoring install --session <id> --archive <archive>
+--consumer-workspace <directory> --confirm` flow. Verify the consumer receipt,
+installed catalog/render attribution, matching `CREDITS.csv`, doctor health,
+idempotent retry, and that artist/archive/protected sentinel bytes are
+unchanged. A session response is not a release archive. Record the capability JSON, plugin version/range, package version,
 published version, commands, and PASS/FAIL results with the workflow URLs.
 
 Record workflow URLs, the published version, commands, and PASS/FAIL results.

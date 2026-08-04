@@ -27,6 +27,8 @@ LPC behavior:
 - credits and attribution manifests
 - strict artist asset-pack schema, normalized models, validation decisions,
   warning acknowledgements, and deterministic compile plans
+- pure asset-release declaration and receipt schemas, canonical digest
+  projections, exact preview artifact identifiers, and release-gate predicates
 - hash/token serialization and parsing
 - the canonical character document and pure upstream compatibility adapter
 - static asset validation
@@ -145,6 +147,9 @@ not modify `upstream/`.
 - artist pack scaffolding, PNG inspection, attributed preview, linked-pack
   registry orchestration, deterministic archive inspection/packaging,
   linked/installed desired-state compilation, and journaled publication/recovery
+- strict release declaration and preview-acceptance input handling, session
+  receipt persistence, current evidence collection, artifact re-digestion, and
+  bounded human/JSON release-gate responses
 
 CLI code may use Node APIs, `@napi-rs/canvas` (MIT), and `jszip` (MIT) because
 it is a Node runtime package. Those dependencies must not move into
@@ -162,6 +167,31 @@ The plugin may invoke the public CLI and inspect returned artifact paths. It
 must not import CLI source, add Node runtime behavior to core, suppress credit
 artifacts, install the CLI silently, or introduce MCP/apps/hooks without a new
 approved design.
+
+The plugin's current character and animation skills intentionally stop before
+the newer authoring-session release capability. They do not claim or invoke
+`asset-authoring-release.v1`,
+`lpc-toolkit.asset-release-declaration.v1`,
+`lpc-toolkit.asset-authoring-release-receipt.v1`,
+`lpc-toolkit.asset-authoring-draft-receipt.v1`,
+`lpc-toolkit.asset-authoring-formal-archive-receipt.v1`, or
+`lpc-toolkit.asset-authoring-archive-inspection-receipt.v1`, or the
+`acknowledge`/`declare`/`accept-preview`/`draft`/`sync`/`pack`/`inspect`
+commands; the installed CLI remains the sole owner of those release and
+archive receipts.
+
+### Release evidence ownership
+
+Core owns the environment-agnostic declaration, discriminated receipt, exact
+artifact-ID, canonical digest, and release-gate contracts. It never reads a
+session file or decides who a human is. The CLI owns strict user-file loading,
+manifest/source containment, session receipt timestamps, atomic persistence,
+fresh validation and attribution evidence, preview artifact re-digestion, and
+the explicit `--confirm` boundaries. A preview is not release-ready by itself:
+the CLI must expose current acknowledgement, validation, declaration, preview,
+four-artifact, and preview-acceptance gates before a session can report
+`releaseReady: true`. These Phase 1 receipts remain authoring-session state and
+do not create a formal archive, sync a generated overlay, or install a pack.
 
 ### Documentation and Governance
 
@@ -600,17 +630,26 @@ existing validation/preview leaf commands.
 
 `lpc-toolkit capabilities --json` advertises the shipped capability identifiers
 `asset-authoring-session.v1`, `sprite-drawing-contract.v1`,
-`asset-authoring-candidate-import.v1`, and `asset-authoring-recovery.v1`.
+`asset-authoring-candidate-import.v1`, `asset-authoring-recovery.v1`,
+`asset-authoring-release.v1`, `asset-authoring-draft-recovery.v1`, and
+`asset-authoring-consumer-install.v1`.
 Their public schema set is
 `lpc-toolkit.asset-authoring-plan.v1`,
 `lpc-toolkit.asset-authoring-session.v1`,
 `lpc-toolkit.asset-authoring-response.v1`, and
-`lpc-toolkit.sprite-drawing-contract.v1`. Contract artifact metadata is
+`lpc-toolkit.sprite-drawing-contract.v1`,
+`lpc-toolkit.asset-release-declaration.v1`,
+`lpc-toolkit.asset-authoring-release-receipt.v1`, and
+`lpc-toolkit.asset-authoring-draft-receipt.v1`,
+`lpc-toolkit.asset-authoring-formal-archive-receipt.v1`, and
+`lpc-toolkit.asset-authoring-archive-inspection-receipt.v1`, and
+`lpc-toolkit.asset-authoring-install-receipt.v1`. Contract artifact metadata is
 session-local and uses `lpc-toolkit.asset-authoring-artifact-metadata.v1`; it
 is not a publishable asset-pack schema.
 
 The public session flow is `start`, `status`, `resume`, `contract`, `import`,
-`validate`, `preview`, and `reconcile-manifest` below
+`validate`, `preview`, `acknowledge`, `declare`, `accept-preview`,
+`reconcile-manifest`, `draft`, `sync`, `pack`, `inspect`, and optional `install` below
 `asset authoring`. A strict plan may describe `new-item`, `extend-item`, or
 `attach-pack`; the current contract planner supports drawing targets for the
 first two goals and explicitly refuses to publish a drawing contract for
@@ -642,15 +681,73 @@ extension contracts preserve inherited source attribution. Neither the
 authoring session nor the Web Workbench invokes a drawing provider or creates
 a second attribution path.
 
+Phase 2 keeps the authoring layer as a coordinator around existing archive and
+manager authorities. `asset authoring draft` requests the shared deterministic
+`createAssetPackArchive({kind: 'draft'})` writer, snapshots the current
+contained manifest/source evidence, and publishes only below the session-owned
+`release-artifacts/` root. Its `draftArchive` receipt binds archive, raw
+manifest, content, source, and recording-time digests. The resulting archive
+remains explicitly `status: "draft"`; existing inspect/install authorities
+report `asset_pack_draft` and reject it before consumer mutation.
+
+`asset authoring sync` is the only Phase 2 authoring command that can change
+manager-owned generation, and only after `--confirm`. It calls the existing
+`syncLinkedAssetPack` transaction for the exact session pack, then reads the
+committed v2 registry and managed-output marker through the existing registry
+and output authorities. The `sync` receipt records the actual registry,
+compile-generation, and generated definition/sprite/credit digests. Repeated
+unchanged sync is idempotent; source, manifest, registry, marker, output, or
+compile drift preserves the previous receipt as stale evidence. The wrapper
+does not implement a second registry or sync policy and never writes checked-in
+assets, the base cache, installed snapshots, unowned output, or `upstream/`.
+
+Phase 3 adds session-aware formal archive publication and exact-byte
+inspection without replacing the shared authorities. `asset authoring pack`
+projects the current validation, declaration, preview-acceptance, manifest,
+and source evidence, requires explicit confirmation, and then calls the
+existing formal `packAssetPack` path with a publication target below the
+session-owned `release-artifacts/` root. The wrapper records a
+`formalArchiveReceipt` only after re-reading the regular output and verifying
+its archive, manifest, content, source, validation, declaration, and accepted
+preview-artifact digests. It does not add a second manifest, checksum writer,
+attribution path, or archive format; formal output omits `status: "draft"` and
+existing leaf `asset pack` bytes remain authoritative.
+
+`asset authoring inspect --archive <archive>` calls the existing
+`inspectAssetPackArchive` authority and is read-only. It records an
+`archiveInspection` checkpoint and `inspectionReceipt` only when the inspected
+archive is valid, formal, and its exact archive digest matches the current
+formal receipt. A copied valid archive, a changed archive, or a stale source
+receipt is reported as bounded mismatch/stale evidence and is never adopted
+silently. Consumer installation remains a separate lifecycle boundary and is
+not implicit after either command. Phase 4 adds
+`asset authoring install --session <session-id> --archive <archive>
+--consumer-workspace <directory> --confirm` as a separate coordinator around
+the existing `installAssetPack` authority. It first requires the current formal
+archive and exact inspection receipt, then verifies the consumer workspace is
+already initialized, manager-owned, distinct from the artist workspace and
+protected repository/cache/output roots, and finally delegates the transaction.
+The wrapper records `installationReceipt` only after registry, installed
+payload, generated output, and matching `CREDITS.csv` digests are re-verified.
+Repeated unchanged installation is a no-op; consumer drift invalidates the
+receipt without adopting unknown output, and existing install version and
+recovery policy remains authoritative. Formal archive paths are
+session-contained, while an inspection or explicitly confirmed installation
+may read the exact archive from a copied path only when its digest matches the
+inspection receipt.
+
 Animation audit remains read-only and provider-neutral.
 `catalog audit-animations --json` reports unsupported, missing-file, blank-frame, and
 inspection-error findings without writing; only a complete report can feed
 `asset init --from-audit` or explicit extend-item remediation evidence. The Web
 Workbench remains an in-memory archive repair/download surface for draft or
-formal archives, not a bridge to the CLI authoring session. All authoring
-session reads and writes stay in the standalone workspace; they do not modify
-checked-in assets, the verified base cache, generated `assets_custom/` output,
-installed snapshots, or the dormant read-only `upstream/` gitlink.
+formal archives, not a bridge to the CLI authoring session. Session evidence
+and draft publication stay in the standalone workspace. Confirmed authoring
+sync is the narrowly scoped exception: it publishes only the existing
+manager-owned `assets_custom/` output and registry through the linked-sync
+transaction. Neither path modifies checked-in assets, the verified base cache,
+installed snapshots, unowned output, or the dormant read-only `upstream/`
+gitlink.
 
 Production asset resolution uses the local tree or pinned managed cache.
 `upstream/` is an optional read-only provenance dormant gitlink that preserves source

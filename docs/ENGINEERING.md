@@ -226,6 +226,88 @@ pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifacts.t
 node --test scripts/verify-codex-plugin.test.mjs
 ```
 
+Phase 1 release-boundary changes add a focused red/green map:
+
+```sh
+pnpm --filter @lpc-toolkit/core test -- asset-release-schema.test.ts
+pnpm --filter @lpc-toolkit/core run typecheck
+pnpm --filter @lpc-toolkit/cli test -- asset-authoring-receipts.test.ts asset-authoring-session.test.ts command-spec.test.ts main-json.test.ts main-human.test.ts
+pnpm --filter @lpc-toolkit/cli test -- asset-authoring-session-e2e.test.ts asset-authoring-commands.test.ts
+pnpm --filter @lpc-toolkit/cli run typecheck
+pnpm check:boundaries
+pnpm verify:cli-docs-policy
+pnpm verify:plugin
+```
+
+The release tests use the public Core parser/gate, session persistence, exact
+`runCli` argv, and bounded JSON/human response seams. They prove explicit human
+acknowledgement/declaration/preview acceptance, four-artifact digest binding,
+non-mutating confirmation/race failures, idempotency, and stale receipt
+preservation. The phase-specific maps below extend that evidence through
+formal archive publication, exact inspection, and optional consumer
+installation; a `releaseReady: true` session is not an archive.
+
+Phase 2 release-lifecycle changes add the following red/green map:
+
+```sh
+pnpm --filter @lpc-toolkit/cli test -- asset-authoring-release.test.ts asset-authoring-session.test.ts main-json.test.ts main-human.test.ts command-spec.test.ts
+pnpm --filter @lpc-toolkit/cli test -- asset-pack-sync.test.ts asset-pack-transaction.test.ts asset-pack-doctor.test.ts
+pnpm --filter @lpc-toolkit/cli run typecheck
+pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifacts.test.ts
+pnpm verify:cli-docs-policy
+pnpm verify:plugin
+```
+
+The Phase 2 tests use real temporary workspaces and the public `runCli`
+boundary. They prove deterministic draft bytes and strict receipt persistence,
+session-contained output/traversal checks, existing inspect/install draft
+rejection before consumer mutation, explicit sync confirmation, idempotent
+manager generations, registry/output/marker drift, transaction recovery, and
+protected sentinels. `asset-authoring-release-lifecycle.ts` is only a
+coordinator: archive bytes, inspection/install policy, linked sync, registry,
+managed-output audit, transaction, and doctor behavior remain owned by their
+existing modules.
+
+Phase 3 formal pack/inspect changes add this focused red/green map:
+
+```sh
+pnpm --filter @lpc-toolkit/cli test -- asset-authoring-release.test.ts asset-authoring-session.test.ts command-spec.test.ts main-human.test.ts response.test.ts
+pnpm --filter @lpc-toolkit/cli test -- asset-pack-packaging.test.ts asset-pack-inspection.test.ts asset-pack-archive-format.test.ts
+pnpm --filter @lpc-toolkit/cli run typecheck
+pnpm check:boundaries
+pnpm verify:cli-docs-policy
+pnpm verify:plugin
+```
+
+The Phase 3 tests use the public `runCli` seam plus real temporary workspaces
+and shared pack/inspection authorities. They prove release-gate refusal,
+explicit formal-pack confirmation, contained output, deterministic formal
+fixture parity, draft-marker exclusion, exact-byte inspection, idempotency,
+external archive/source drift, copied-archive mismatch, and recovery to a new
+contained output without overwriting changed bytes. The session wrapper owns
+only gate projection, receipt persistence, and recovery actions; archive
+format, checksum, attribution, validation, and inspection policy stay in the
+existing modules.
+
+Phase 4 consumer-install changes add this focused red/green map:
+
+```sh
+pnpm --filter @lpc-toolkit/cli test -- asset-authoring-release.test.ts asset-authoring-session.test.ts command-spec.test.ts main-json.test.ts main-human.test.ts response.test.ts
+pnpm --filter @lpc-toolkit/cli test -- asset-lifecycle-e2e.test.ts asset-pack-install.test.ts asset-pack-doctor.test.ts asset-pack-transaction.test.ts
+pnpm --filter @lpc-toolkit/cli run typecheck
+pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifacts.test.ts
+pnpm verify:cli-docs-policy
+pnpm verify:plugin
+```
+
+These tests prove exact formal/inspection receipt binding, explicit consumer
+confirmation, initialized managed-workspace and protected-root refusal,
+transactional installation verification, payload/registry/output/`CREDITS.csv`
+digests, idempotent retries, consumer drift invalidation, second-workspace
+render attribution, and packed recovery/doctor health. The authoring wrapper
+must continue to delegate install policy and transaction recovery to the
+existing lifecycle authorities.
+
 The final documentation and release-contract map is:
 
 ```sh
@@ -241,17 +323,17 @@ pnpm verify
 
 These checks prove the advertised capability/schema identifiers, public
 command/help wording, plugin-version alignment, landing distinction between
-composition and asset publication, and the clean packed-CLI authoring flow.
-They do not add provider invocation, a Web session bridge, or formal release
-orchestration to the shipped product.
+composition and asset publication, optional exact-archive consumer activation,
+and the clean packed-CLI authoring flow. They do not add provider invocation,
+a Web session bridge, or remote release infrastructure to the shipped product.
 
 Run `pnpm check:boundaries` for every asset-pack architecture change. Run
 the packed CLI smoke conditionally whenever CLI package metadata, build output,
 or `packages/cli/scripts/` changes; it installs the produced tarball in a clean
 consumer directory. After preparing one pinned cache, it proves no-repository
-workspace init, fixture authoring/validation/packing, second-workspace
-inspection/install/list, installed attributed preview/render, doctor, and
-removal through the installed package without `upstream/`:
+workspace init, fixture authoring/validation/packing, exact session inspect and
+explicit second-workspace install, installed attributed preview/render/list,
+doctor, and removal through the installed package without `upstream/`:
 
 ```sh
 pnpm --filter @lpc-toolkit/cli test:package

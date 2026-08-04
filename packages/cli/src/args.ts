@@ -16,6 +16,7 @@ const BOOLEAN_FLAGS = new Set([
   'advanced',
   'all',
   'allow-partial',
+  'confirm',
   'help',
   'json',
   'new',

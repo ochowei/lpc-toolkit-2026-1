@@ -205,6 +205,14 @@ function preflightCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
       && authoringCommand !== 'contract'
       && authoringCommand !== 'import'
       && authoringCommand !== 'validate'
+      && authoringCommand !== 'acknowledge'
+      && authoringCommand !== 'declare'
+      && authoringCommand !== 'accept-preview'
+      && authoringCommand !== 'draft'
+      && authoringCommand !== 'pack'
+      && authoringCommand !== 'inspect'
+      && authoringCommand !== 'install'
+      && authoringCommand !== 'sync'
       && authoringCommand !== 'preview'
       && authoringCommand !== 'reconcile-manifest'
     ) {
@@ -229,9 +237,33 @@ function preflightCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
       || authoringCommand === 'resume'
       || authoringCommand === 'contract'
       || authoringCommand === 'validate'
+      || authoringCommand === 'draft'
+      || authoringCommand === 'pack'
+      || authoringCommand === 'sync'
       || authoringCommand === 'preview'
     ) {
       return requiredStringFlag('session');
+    }
+    if (authoringCommand === 'acknowledge') {
+      const sessionIssue = requiredStringFlag('session');
+      return sessionIssue ?? requiredStringFlag('acknowledgement');
+    }
+    if (authoringCommand === 'declare') {
+      const sessionIssue = requiredStringFlag('session');
+      return sessionIssue ?? requiredStringFlag('declaration');
+    }
+    if (authoringCommand === 'accept-preview') {
+      const sessionIssue = requiredStringFlag('session');
+      return sessionIssue ?? requiredStringFlag('preview-digest');
+    }
+    if (authoringCommand === 'inspect') {
+      const sessionIssue = requiredStringFlag('session');
+      return sessionIssue ?? requiredStringFlag('archive');
+    }
+    if (authoringCommand === 'install') {
+      const sessionIssue = requiredStringFlag('session');
+      const archiveIssue = sessionIssue ?? requiredStringFlag('archive');
+      return archiveIssue ?? requiredStringFlag('consumer-workspace');
     }
     if (authoringCommand === 'import') {
       for (const name of ['session', 'target', 'candidate', 'contract-digest']) {

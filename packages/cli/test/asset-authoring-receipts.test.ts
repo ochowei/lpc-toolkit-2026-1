@@ -15,6 +15,7 @@ import { createDirectoryAssetStore } from '../src/asset-store.js';
 import {
   createAssetAuthoringSessionStore,
   deriveAuthoringInvalidationDecisions,
+  assetAuthoringSessionPath,
   type AssetAuthoringEvidence,
 } from '../src/asset-authoring-session.js';
 import { createRuntimeContext } from '../src/context.js';
@@ -217,6 +218,23 @@ function sha256(bytes: Buffer): string {
   return `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
 }
 
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map((entry) => canonicalize(entry));
+  if (value === null || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entry]) => [key, canonicalize(entry)] as const),
+  );
+}
+
+function creditDigest(manifest: Record<string, unknown>): string {
+  return sha256(Buffer.from(JSON.stringify(canonicalize({
+    credits: manifest.credits,
+    creditOverrides: manifest.creditOverrides ?? {},
+  }))));
+}
+
 function writeCandidate(filePath: string, target: ContractDocument['targets'][number]): Buffer {
   const canvas = createCanvas(target.geometry.canvasWidth, target.geometry.canvasHeight);
   const context = canvas.getContext('2d');
@@ -389,6 +407,384 @@ describe('asset authoring validation and preview receipts', () => {
     ]);
   });
 
+  it('requires confirmation and persists one exact acknowledgement atomically and idempotently', async () => {
+    const fixture = await createImportedFixture();
+    const validation = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'validate', '--session', fixture.sessionId,
+    ], fixture.workspace.root, async () => fixture.runtime);
+    const validationData = dataOf(validation.response);
+    const template = validationData.validation?.acknowledgementRecords[0];
+    if (!template) throw new Error('Expected one acknowledgement template.');
+
+    const acknowledgementPath = path.join(fixture.workspace.root, 'acknowledgement.json');
+    const acknowledgement = {
+      ...template,
+      reason: 'Reviewed the optional padding frame evidence and accept the destination.',
+    };
+    writeJson(acknowledgementPath, acknowledgement);
+    const manifestPath = path.join(fixture.packRoot, 'asset-pack.json');
+    const sessionPath = assetAuthoringSessionPath(fixture.workspace, fixture.sessionId);
+    const beforeManifest = readFileSync(manifestPath);
+    const beforeSession = readFileSync(sessionPath);
+
+    const pending = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'acknowledge',
+      '--session', fixture.sessionId,
+      '--acknowledgement', acknowledgementPath,
+    ], fixture.workspace.root, async () => fixture.runtime);
+    expect(pending.code).toBe(0);
+    expect(dataOf(pending.response)).toMatchObject({
+      state: 'needs-user-action',
+      reason: 'acknowledgement-confirmation-required',
+      nextActions: [expect.objectContaining({
+        id: 'acknowledge-session',
+        safety: 'requires-confirmation',
+      })],
+    });
+    expect(readFileSync(manifestPath)).toEqual(beforeManifest);
+    expect(readFileSync(sessionPath)).toEqual(beforeSession);
+
+    const accepted = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'acknowledge',
+      '--session', fixture.sessionId,
+      '--acknowledgement', acknowledgementPath,
+      '--confirm',
+    ], fixture.workspace.root, async () => fixture.runtime);
+    expect(accepted.code).toBe(0);
+    const acceptedData = dataOf(accepted.response);
+    expect(acceptedData).toMatchObject({
+      state: 'needs-user-action',
+      reason: 'acknowledgement-current',
+      phase: 'validated',
+      validation: { valid: true },
+    });
+    const persistedManifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+      readonly acknowledgements?: readonly Record<string, unknown>[];
+    };
+    expect(persistedManifest.acknowledgements).toEqual([acknowledgement]);
+    const stored = createAssetAuthoringSessionStore(fixture.workspace).read(fixture.sessionId);
+    expect(stored.receipts.acknowledgements).toMatchObject({
+      id: expect.stringMatching(/^sha256:[0-9a-f]{64}$/u),
+      manifestDigest: sha256(readFileSync(manifestPath)),
+      sourceDigests: acceptedData.validation?.sourceDigests,
+      recordDigests: [expect.stringMatching(/^sha256:[0-9a-f]{64}$/u)],
+    });
+
+    const afterManifest = readFileSync(manifestPath);
+    const afterSession = readFileSync(sessionPath);
+    const repeated = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'acknowledge',
+      '--session', fixture.sessionId,
+      '--acknowledgement', acknowledgementPath,
+      '--confirm',
+    ], fixture.workspace.root, async () => fixture.runtime);
+    expect(repeated.code).toBe(0);
+    expect(readFileSync(manifestPath)).toEqual(afterManifest);
+    expect(readFileSync(sessionPath)).toEqual(afterSession);
+  }, 30000);
+
+  it('refuses malformed or out-of-scope acknowledgement records without changing bytes', async () => {
+    const fixture = await createImportedFixture();
+    const validation = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'validate', '--session', fixture.sessionId,
+    ], fixture.workspace.root, async () => fixture.runtime);
+    const template = dataOf(validation.response).validation?.acknowledgementRecords[0];
+    if (!template) throw new Error('Expected one acknowledgement template.');
+
+    const acknowledgementPath = path.join(fixture.workspace.root, 'acknowledgement.json');
+    const manifestPath = path.join(fixture.packRoot, 'asset-pack.json');
+    const sessionPath = assetAuthoringSessionPath(fixture.workspace, fixture.sessionId);
+    const beforeManifest = readFileSync(manifestPath);
+    const beforeSession = readFileSync(sessionPath);
+
+    writeJson(acknowledgementPath, { ...template, reason: '   ' });
+    const malformed = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'acknowledge',
+      '--session', fixture.sessionId,
+      '--acknowledgement', acknowledgementPath,
+      '--confirm',
+    ], fixture.workspace.root, async () => fixture.runtime);
+    expect(malformed.code).toBe(1);
+    expect(malformed.response.errors[0]?.code).toBe('asset_authoring_acknowledgement_invalid');
+    expect(readFileSync(manifestPath)).toEqual(beforeManifest);
+    expect(readFileSync(sessionPath)).toEqual(beforeSession);
+
+    writeJson(acknowledgementPath, {
+      ...template,
+      reason: 'Reviewed the current warning.',
+      ambientIdentity: 'must-not-be-inferred',
+    });
+    const unknownField = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'acknowledge',
+      '--session', fixture.sessionId,
+      '--acknowledgement', acknowledgementPath,
+      '--confirm',
+    ], fixture.workspace.root, async () => fixture.runtime);
+    expect(unknownField.code).toBe(1);
+    expect(unknownField.response.errors[0]?.code).toBe('asset_authoring_acknowledgement_invalid');
+    expect(readFileSync(manifestPath)).toEqual(beforeManifest);
+    expect(readFileSync(sessionPath)).toEqual(beforeSession);
+
+    writeJson(acknowledgementPath, {
+      ...template,
+      contentDigest: DIGEST_A,
+      reason: 'This digest is not for the current warning.',
+    });
+    const outOfScope = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'acknowledge',
+      '--session', fixture.sessionId,
+      '--acknowledgement', acknowledgementPath,
+      '--confirm',
+    ], fixture.workspace.root, async () => fixture.runtime);
+    expect(outOfScope.code).toBe(1);
+    expect(outOfScope.response.errors[0]?.code).toBe(
+      'asset_authoring_acknowledgement_out_of_scope',
+    );
+    expect(readFileSync(manifestPath)).toEqual(beforeManifest);
+    expect(readFileSync(sessionPath)).toEqual(beforeSession);
+  }, 30000);
+
+  it('requires an explicit declaration file through the public argv seam', async () => {
+    const fixture = await createImportedFixture();
+    const result = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'declare', '--session', fixture.sessionId,
+    ], fixture.workspace.root, async () => fixture.runtime);
+
+    expect(result.code).toBe(1);
+    expect(result.response.errors).toEqual([expect.objectContaining({
+      code: 'missing_argument',
+      path: '--declaration',
+    })]);
+  });
+
+  it('pauses declaration until fresh validation and exact acknowledgement evidence exist', async () => {
+    const fixture = await createImportedFixture();
+    const manifestPath = path.join(fixture.packRoot, 'asset-pack.json');
+    const manifestBytes = readFileSync(manifestPath);
+    const manifest = JSON.parse(manifestBytes.toString('utf8')) as Record<string, unknown>;
+    const declarationPath = path.join(fixture.workspace.root, 'declaration.json');
+    writeJson(declarationPath, {
+      schema: 'lpc-toolkit.asset-release-declaration.v1',
+      expectedManifestDigest: sha256(manifestBytes),
+      declarant: {
+        displayName: 'Alice Example',
+        kind: 'person',
+        role: 'authorized-release-declarant',
+      },
+      authorAndSource: { confirmed: true, creditDigest: creditDigest(manifest) },
+      licenseAuthority: { confirmed: true, creditDigest: creditDigest(manifest) },
+      acknowledgements: {
+        confirmed: true,
+        contentDigest: DIGEST_A,
+        recordDigests: [DIGEST_B],
+      },
+    });
+    const sessionPath = assetAuthoringSessionPath(fixture.workspace, fixture.sessionId);
+    const before = readFileSync(sessionPath);
+
+    const result = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'declare',
+      '--session', fixture.sessionId,
+      '--declaration', declarationPath,
+      '--confirm',
+    ], fixture.workspace.root, async () => fixture.runtime);
+    const data = dataOf(result.response);
+
+    expect(result.code).toBe(0);
+    expect(data).toMatchObject({
+      state: 'needs-user-action',
+      reason: 'validation-receipt-stale',
+      releaseDeclaration: null,
+      nextActions: [expect.objectContaining({ id: 'validate-session' })],
+    });
+    expect(readFileSync(sessionPath)).toEqual(before);
+  }, 30000);
+
+  it('requires an exact preview digest through the public accept-preview argv seam', async () => {
+    const fixture = await createImportedFixture();
+    const result = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'accept-preview', '--session', fixture.sessionId,
+    ], fixture.workspace.root, async () => fixture.runtime);
+
+    expect(result.code).toBe(1);
+    expect(result.response.errors).toEqual([expect.objectContaining({
+      code: 'missing_argument',
+      path: '--preview-digest',
+    })]);
+  });
+
+  it('stops acceptance when the human release declaration is missing without mutating the session', async () => {
+    const fixture = await createImportedFixture();
+    const sessionPath = assetAuthoringSessionPath(fixture.workspace, fixture.sessionId);
+    const before = readFileSync(sessionPath);
+    const result = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'accept-preview',
+      '--session', fixture.sessionId,
+      '--preview-digest', DIGEST_A,
+      '--confirm',
+    ], fixture.workspace.root, async () => fixture.runtime);
+    const data = dataOf(result.response);
+
+    expect(result.code).toBe(0);
+    expect(data).toMatchObject({
+      state: 'needs-user-action',
+      reason: 'release-declaration-stale',
+      nextActions: [expect.objectContaining({ id: 'declare-release' })],
+    });
+    expect(readFileSync(sessionPath)).toEqual(before);
+  });
+
+  it('requires confirmation and records an attributed human declaration idempotently', async () => {
+    const fixture = await createImportedFixture();
+    const validation = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'validate', '--session', fixture.sessionId,
+    ], fixture.workspace.root, async () => fixture.runtime);
+    const validationData = dataOf(validation.response);
+    const validationReport = validationData.validation;
+    if (!validationReport || validationReport.acknowledgementRecords.length === 0) {
+      throw new Error('Expected a warning template before declaration.');
+    }
+
+    const acknowledgementPath = path.join(fixture.workspace.root, 'acknowledgement.json');
+    writeJson(acknowledgementPath, {
+      ...validationReport.acknowledgementRecords[0],
+      reason: 'Reviewed the optional padding frame evidence and accept the destination.',
+    });
+    const acknowledged = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'acknowledge',
+      '--session', fixture.sessionId,
+      '--acknowledgement', acknowledgementPath,
+      '--confirm',
+    ], fixture.workspace.root, async () => fixture.runtime);
+    expect(acknowledged.code).toBe(0);
+
+    const manifestPath = path.join(fixture.packRoot, 'asset-pack.json');
+    const manifestBytes = readFileSync(manifestPath);
+    const manifest = JSON.parse(manifestBytes.toString('utf8')) as Record<string, unknown>;
+    const storedSession = createAssetAuthoringSessionStore(fixture.workspace).read(fixture.sessionId);
+    const acknowledgementReceipt = storedSession.receipts.acknowledgements;
+    const currentValidation = dataOf(acknowledged.response).validation;
+    if (!currentValidation || !acknowledgementReceipt) {
+      throw new Error('Expected current validation and acknowledgement receipts.');
+    }
+    const declarationPath = path.join(fixture.workspace.root, 'declaration.json');
+    writeJson(declarationPath, {
+      schema: 'lpc-toolkit.asset-release-declaration.v1',
+      expectedManifestDigest: sha256(manifestBytes),
+      declarant: {
+        displayName: 'Alice Example',
+        kind: 'person',
+        role: 'authorized-release-declarant',
+      },
+      authorAndSource: {
+        confirmed: true,
+        creditDigest: creditDigest(manifest),
+      },
+      licenseAuthority: {
+        confirmed: true,
+        creditDigest: creditDigest(manifest),
+      },
+      acknowledgements: {
+        confirmed: true,
+        contentDigest: currentValidation.contentDigest,
+        recordDigests: acknowledgementReceipt.recordDigests,
+      },
+    });
+
+    const sessionPath = assetAuthoringSessionPath(fixture.workspace, fixture.sessionId);
+    const beforePending = readFileSync(sessionPath);
+    const pending = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'declare',
+      '--session', fixture.sessionId,
+      '--declaration', declarationPath,
+    ], fixture.workspace.root, async () => fixture.runtime);
+    const pendingData = dataOf(pending.response);
+    expect(pending.code).toBe(0);
+    expect(pendingData).toMatchObject({
+      state: 'needs-user-action',
+      reason: 'release-declaration-confirmation-required',
+      releaseDeclaration: null,
+      nextActions: [expect.objectContaining({
+        id: 'declare-release',
+        safety: 'requires-confirmation',
+      })],
+    });
+    expect(pendingData.releaseGates.gates).toContainEqual({
+      id: 'releaseDeclaration',
+      freshness: 'missing',
+    });
+    expect(readFileSync(sessionPath)).toEqual(beforePending);
+
+    const accepted = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'declare',
+      '--session', fixture.sessionId,
+      '--declaration', declarationPath,
+      '--confirm',
+    ], fixture.workspace.root, async () => fixture.runtime);
+    const acceptedData = dataOf(accepted.response);
+    expect(accepted.code).toBe(0);
+    expect(acceptedData).toMatchObject({
+      state: 'needs-user-action',
+      reason: 'release-declaration-current',
+      releaseDeclaration: {
+        kind: 'declaration',
+        declarant: { displayName: 'Alice Example' },
+        manifestDigest: sha256(manifestBytes),
+        validationReceiptId: storedSession.receipts.validation?.id,
+      },
+    });
+    expect(acceptedData.releaseGates.gates).toContainEqual({
+      id: 'releaseDeclaration',
+      freshness: 'current',
+    });
+    const persistedSession = readFileSync(sessionPath);
+    const persisted = createAssetAuthoringSessionStore(fixture.workspace).read(fixture.sessionId);
+    expect(persisted.receipts.releaseDeclaration).toEqual(acceptedData.releaseDeclaration);
+
+    const repeated = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'declare',
+      '--session', fixture.sessionId,
+      '--declaration', declarationPath,
+      '--confirm',
+    ], fixture.workspace.root, async () => fixture.runtime);
+    expect(repeated.code).toBe(0);
+    expect(readFileSync(sessionPath)).toEqual(persistedSession);
+
+    const declaration = JSON.parse(readFileSync(declarationPath, 'utf8')) as Record<string, unknown>;
+    writeJson(declarationPath, {
+      ...declaration,
+      expectedManifestDigest: DIGEST_A,
+    });
+    const beforeStale = readFileSync(sessionPath);
+    const stale = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'declare',
+      '--session', fixture.sessionId,
+      '--declaration', declarationPath,
+      '--confirm',
+    ], fixture.workspace.root, async () => fixture.runtime);
+    expect(stale.code).toBe(1);
+    expect(stale.response.errors[0]?.code).toBe('asset_authoring_declaration_stale');
+    expect(readFileSync(sessionPath)).toEqual(beforeStale);
+
+    writeJson(declarationPath, {
+      ...declaration,
+      licenseAuthority: {
+        confirmed: true,
+        creditDigest: DIGEST_A,
+      },
+    });
+    const beforeCreditMismatch = readFileSync(sessionPath);
+    const creditMismatch = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'declare',
+      '--session', fixture.sessionId,
+      '--declaration', declarationPath,
+      '--confirm',
+    ], fixture.workspace.root, async () => fixture.runtime);
+    expect(creditMismatch.code).toBe(1);
+    expect(creditMismatch.response.errors[0]?.code).toBe('asset_authoring_credit_digest_mismatch');
+    expect(readFileSync(sessionPath)).toEqual(beforeCreditMismatch);
+  }, 30000);
+
   it('records attributed preview paths and digests from the current validation receipt', async () => {
     const fixture = await createImportedFixture();
     await acknowledgeOptionalFrameWarning(fixture);
@@ -433,10 +829,193 @@ describe('asset authoring validation and preview receipts', () => {
       id: preview.input.digest,
       manifestDigest: preview.manifestDigest,
       sourceDigests: preview.sourceDigests,
+      validationReceiptId: session.receipts.validation?.id,
       inputDigest: preview.input.digest,
+      artifacts: [
+        'preview:preview',
+        'preview:metadata',
+        'preview:credits_txt',
+        'preview:credits_csv',
+      ].map((id) => {
+        const artifact = preview.artifacts.find((candidate) => candidate.id === id);
+        if (!artifact) throw new Error(`Missing preview artifact ${id}.`);
+        return artifact;
+      }),
     });
     expect(data).not.toHaveProperty('plan');
     expect(data).not.toHaveProperty('provenance');
+  }, 30000);
+
+  it('requires the exact attributed preview artifacts and accepts them idempotently', async () => {
+    const fixture = await createImportedFixture();
+    const validation = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'validate', '--session', fixture.sessionId,
+    ], fixture.workspace.root, async () => fixture.runtime);
+    const validationData = dataOf(validation.response);
+    const validationReport = validationData.validation;
+    if (!validationReport || validationReport.acknowledgementRecords.length === 0) {
+      throw new Error('Expected a warning template before preview acceptance.');
+    }
+    const acknowledgementPath = path.join(fixture.workspace.root, 'acknowledgement.json');
+    writeJson(acknowledgementPath, {
+      ...validationReport.acknowledgementRecords[0],
+      reason: 'Reviewed the optional padding frame evidence and accept the destination.',
+    });
+    const acknowledged = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'acknowledge',
+      '--session', fixture.sessionId,
+      '--acknowledgement', acknowledgementPath,
+      '--confirm',
+    ], fixture.workspace.root, async () => fixture.runtime);
+    const manifestPath = path.join(fixture.packRoot, 'asset-pack.json');
+    const manifestBytes = readFileSync(manifestPath);
+    const manifest = JSON.parse(manifestBytes.toString('utf8')) as Record<string, unknown>;
+    const acknowledgedData = dataOf(acknowledged.response);
+    const acknowledgementReceipt = createAssetAuthoringSessionStore(fixture.workspace)
+      .read(fixture.sessionId).receipts.acknowledgements;
+    if (!acknowledgedData.validation || !acknowledgementReceipt) {
+      throw new Error('Expected current acknowledgement evidence.');
+    }
+    const declarationPath = path.join(fixture.workspace.root, 'declaration.json');
+    const declaration = {
+      schema: 'lpc-toolkit.asset-release-declaration.v1',
+      expectedManifestDigest: sha256(manifestBytes),
+      declarant: {
+        displayName: 'Alice Example',
+        kind: 'person',
+        role: 'authorized-release-declarant',
+      },
+      authorAndSource: { confirmed: true, creditDigest: creditDigest(manifest) },
+      licenseAuthority: { confirmed: true, creditDigest: creditDigest(manifest) },
+      acknowledgements: {
+        confirmed: true,
+        contentDigest: acknowledgedData.validation.contentDigest,
+        recordDigests: acknowledgementReceipt.recordDigests,
+      },
+    };
+    writeJson(declarationPath, declaration);
+    const declared = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'declare',
+      '--session', fixture.sessionId,
+      '--declaration', declarationPath,
+      '--confirm',
+    ], fixture.workspace.root, async () => fixture.runtime);
+    expect(declared.code).toBe(0);
+
+    const previewResult = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'preview', '--session', fixture.sessionId,
+    ], fixture.workspace.root, async () => fixture.runtime);
+    const previewData = dataOf(previewResult.response);
+    const preview = previewData.preview;
+    if (!preview) throw new Error('Expected a preview projection.');
+    const previewDigest = preview.artifacts.find((artifact) => artifact.id === 'preview:preview')?.digest;
+    if (!previewDigest) throw new Error('Expected a rendered preview digest.');
+    const sessionPath = assetAuthoringSessionPath(fixture.workspace, fixture.sessionId);
+    const beforeAcceptance = readFileSync(sessionPath);
+
+    const wrongDigest = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'accept-preview',
+      '--session', fixture.sessionId,
+      '--preview-digest', DIGEST_A,
+      '--confirm',
+    ], fixture.workspace.root, async () => fixture.runtime);
+    expect(wrongDigest.code).toBe(1);
+    expect(wrongDigest.response.errors[0]?.code).toBe('asset_authoring_preview_digest_mismatch');
+    expect(readFileSync(sessionPath)).toEqual(beforeAcceptance);
+
+    const pending = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'accept-preview',
+      '--session', fixture.sessionId,
+      '--preview-digest', previewDigest,
+    ], fixture.workspace.root, async () => fixture.runtime);
+    const pendingData = dataOf(pending.response);
+    expect(pending.code).toBe(0);
+    expect(pendingData).toMatchObject({
+      state: 'needs-user-action',
+      reason: 'preview-acceptance-confirmation-required',
+      previewAcceptance: null,
+      nextActions: [expect.objectContaining({
+        id: 'accept-preview',
+        safety: 'requires-confirmation',
+      })],
+    });
+    expect(pendingData.releaseGates.gates).toContainEqual({
+      id: 'previewAcceptance',
+      freshness: 'missing',
+    });
+    expect(pendingData.releaseGates.releaseReady).toBe(false);
+    expect(readFileSync(sessionPath)).toEqual(beforeAcceptance);
+
+    const accepted = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'accept-preview',
+      '--session', fixture.sessionId,
+      '--preview-digest', previewDigest,
+      '--confirm',
+    ], fixture.workspace.root, async () => fixture.runtime);
+    const acceptedData = dataOf(accepted.response);
+    expect(accepted.code).toBe(0);
+    expect(acceptedData).toMatchObject({
+      state: 'completed',
+      reason: 'preview-acceptance-current',
+      releaseGates: { releaseReady: true },
+      previewAcceptance: {
+        kind: 'preview-acceptance',
+        declarationReceiptDigest: dataOf(declared.response).releaseDeclaration?.declarationDigest,
+        previewInputDigest: preview.input.digest,
+        artifacts: expect.arrayContaining([
+          expect.objectContaining({ id: 'preview:preview', digest: previewDigest }),
+          expect.objectContaining({ id: 'preview:metadata' }),
+          expect.objectContaining({ id: 'preview:credits_txt' }),
+          expect.objectContaining({ id: 'preview:credits_csv' }),
+        ]),
+      },
+    });
+    const persisted = createAssetAuthoringSessionStore(fixture.workspace).read(fixture.sessionId);
+    expect(persisted.receipts.previewAcceptance).toEqual(acceptedData.previewAcceptance);
+    const afterAcceptance = readFileSync(sessionPath);
+
+    const repeated = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'accept-preview',
+      '--session', fixture.sessionId,
+      '--preview-digest', previewDigest,
+      '--confirm',
+    ], fixture.workspace.root, async () => fixture.runtime);
+    expect(repeated.code).toBe(0);
+    expect(dataOf(repeated.response).releaseGates.releaseReady).toBe(true);
+    expect(readFileSync(sessionPath)).toEqual(afterAcceptance);
+
+    const rerendered = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'preview', '--session', fixture.sessionId, '--animation', 'walk',
+    ], fixture.workspace.root, async () => fixture.runtime);
+    const rerenderedData = dataOf(rerendered.response);
+    expect(rerendered.code).toBe(0);
+    expect(rerenderedData.releaseGates.releaseReady).toBe(false);
+    expect(rerenderedData.previewAcceptance).toEqual(acceptedData.previewAcceptance);
+    expect(rerenderedData.nextActions).toEqual([
+      expect.objectContaining({ id: 'accept-preview', safety: 'requires-confirmation' }),
+    ]);
+
+    const currentPreview = rerenderedData.preview;
+    if (!currentPreview) throw new Error('Expected a re-rendered preview projection.');
+    const currentPreviewDigest = currentPreview.artifacts.find(
+      (artifact) => artifact.id === 'preview:preview',
+    )?.digest;
+    if (!currentPreviewDigest) throw new Error('Expected a re-rendered preview digest.');
+    const creditsTxt = currentPreview.artifacts.find((artifact) => artifact.id === 'preview:credits_txt');
+    if (!creditsTxt) throw new Error('Expected a TXT credit artifact.');
+    const creditsTxtBytes = readFileSync(creditsTxt.path);
+    writeFileSync(creditsTxt.path, Buffer.concat([creditsTxtBytes, Buffer.from('\nchanged\n')]));
+    const beforeArtifactFailure = readFileSync(sessionPath);
+    const changedArtifact = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'accept-preview',
+      '--session', fixture.sessionId,
+      '--preview-digest', currentPreviewDigest,
+      '--confirm',
+    ], fixture.workspace.root, async () => fixture.runtime);
+    expect(changedArtifact.code).toBe(1);
+    expect(changedArtifact.response.errors[0]?.code).toBe('asset_authoring_preview_artifact_stale');
+    expect(readFileSync(sessionPath)).toEqual(beforeArtifactFailure);
+    writeFileSync(creditsTxt.path, creditsTxtBytes);
   }, 30000);
 
   it('fails the preview checkpoint when a required attributed artifact is missing', () => {
@@ -476,7 +1055,9 @@ describe('asset authoring validation and preview receipts', () => {
         id: 'preview-1',
         manifestDigest: DIGEST_A,
         sourceDigests: [{ path: 'sprites/source.png', digest: DIGEST_A }],
+        validationReceiptId: 'validation-1',
         inputDigest: DIGEST_C,
+        artifacts: null,
       },
     };
     const current: AssetAuthoringEvidence = {

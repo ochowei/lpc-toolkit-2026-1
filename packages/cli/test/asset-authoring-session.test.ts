@@ -16,7 +16,10 @@ import {
   assetAuthoringSessionPath,
   createAssetAuthoringSessionStore,
   deriveAuthoringInvalidationDecisions,
+  type AssetAuthoringArchiveInspectionReceipt,
   type AssetAuthoringEvidence,
+  type AssetAuthoringFormalArchiveReceipt,
+  type AssetAuthoringInstallationReceipt,
 } from '../src/asset-authoring-session.js';
 import {
   assetAuthoringSessionsRoot,
@@ -111,8 +114,84 @@ function evidence(overrides: Partial<AssetAuthoringEvidence> = {}): AssetAuthori
       id: 'preview-1',
       manifestDigest: DIGEST_A,
       sourceDigests: [{ path: 'sprites/moon-braid/foreground/walk.png', digest: DIGEST_C }],
+      validationReceiptId: 'validation-1',
       inputDigest: DIGEST_D,
+      artifacts: null,
     },
+    ...overrides,
+  };
+}
+
+function formalArchiveReceipt(
+  overrides: Partial<AssetAuthoringFormalArchiveReceipt> = {},
+): AssetAuthoringFormalArchiveReceipt {
+  return {
+    schema: 'lpc-toolkit.asset-authoring-formal-archive-receipt.v1',
+    packId: PLAN.pack.id,
+    version: PLAN.pack.version,
+    archivePath: '/workspace/release-artifacts/acme.fantasy-hair-1.0.0.lpc-assets.zip',
+    archiveDigest: DIGEST_A,
+    manifestDigest: DIGEST_A,
+    contentDigest: DIGEST_B,
+    sourceDigests: [{ path: PLAN.scope.paths[0]!, digest: DIGEST_C }],
+    validationReceiptId: 'validation-1',
+    declarationReceiptDigest: DIGEST_D,
+    previewAcceptanceReceiptDigest: DIGEST_A,
+    previewInputDigest: DIGEST_B,
+    previewArtifacts: [
+      { id: 'preview:preview', path: '/workspace/release-preview/preview.png', digest: DIGEST_A },
+      { id: 'preview:metadata', path: '/workspace/release-preview/metadata.json', digest: DIGEST_B },
+      { id: 'preview:credits_txt', path: '/workspace/release-preview/credits.txt', digest: DIGEST_C },
+      { id: 'preview:credits_csv', path: '/workspace/release-preview/credits.csv', digest: DIGEST_D },
+    ],
+    recordedAt: NOW,
+    ...overrides,
+  };
+}
+
+function archiveInspectionReceipt(
+  formal: AssetAuthoringFormalArchiveReceipt,
+  overrides: Partial<AssetAuthoringArchiveInspectionReceipt> = {},
+): AssetAuthoringArchiveInspectionReceipt {
+  return {
+    schema: 'lpc-toolkit.asset-authoring-archive-inspection-receipt.v1',
+    packId: formal.packId,
+    version: formal.version,
+    archivePath: formal.archivePath,
+    archiveDigest: formal.archiveDigest,
+    formalArchiveDigest: formal.archiveDigest,
+    manifestDigest: formal.manifestDigest,
+    contentDigest: formal.contentDigest,
+    sourceDigests: formal.sourceDigests,
+    entryCount: 2,
+    totalUncompressedBytes: 128,
+    recordedAt: NOW,
+    ...overrides,
+  };
+}
+
+function installationReceipt(
+  overrides: Partial<AssetAuthoringInstallationReceipt> = {},
+): AssetAuthoringInstallationReceipt {
+  return {
+    schema: 'lpc-toolkit.asset-authoring-install-receipt.v1',
+    workspaceId: 'consumer-workspace-id',
+    workspaceRoot: '/consumer-workspace',
+    packId: PLAN.pack.id,
+    version: PLAN.pack.version,
+    archivePath: '/artist-workspace/release-artifacts/acme.fantasy-hair-1.0.0.lpc-assets.zip',
+    archiveDigest: DIGEST_A,
+    installedDirectory: '/consumer-workspace/.lpc-toolkit/asset-packs/installed/acme.fantasy-hair/1.0.0/sha256-archive',
+    payloadDigests: {
+      'asset-pack.json': DIGEST_A,
+      'sprites/moon-braid/foreground/walk.png': DIGEST_B,
+    },
+    registryPath: '/consumer-workspace/assets_custom/asset-pack-registry.json',
+    registryDigest: DIGEST_C,
+    outputRoot: '/consumer-workspace/assets_custom',
+    generatedDigests: { 'CREDITS.csv': DIGEST_D },
+    creditsDigest: DIGEST_D,
+    recordedAt: NOW,
     ...overrides,
   };
 }
@@ -187,6 +266,193 @@ describe('asset authoring session persistence', () => {
       { targetId: 'sprites/moon-braid/foreground/idle.png', freshness: 'missing' },
       { targetId: 'sprites/moon-braid/foreground/walk.png', freshness: 'missing' },
     ]);
+  });
+
+  it('backward-reads old receipt slots and persists a strict acknowledgement receipt', () => {
+    const workspace = createWorkspace();
+    const store = createStore(workspace);
+    const session = store.create({ plan: PLAN, packRoot: packRoot(workspace) });
+    const sessionPath = assetAuthoringSessionPath(workspace, session.sessionId);
+    const oldDocument = JSON.parse(readFileSync(sessionPath, 'utf8')) as {
+      readonly receipts: Record<string, unknown>;
+    };
+    delete oldDocument.receipts.acknowledgements;
+    delete oldDocument.receipts.releaseDeclaration;
+    delete oldDocument.receipts.previewAcceptance;
+    delete oldDocument.receipts.draftArchive;
+    delete oldDocument.receipts.sync;
+    writeFileSync(sessionPath, `${JSON.stringify(oldDocument, null, 2)}\n`);
+
+    expect(store.read(session.sessionId).receipts.acknowledgements).toBeNull();
+    expect(store.read(session.sessionId).receipts.releaseDeclaration).toBeNull();
+    expect(store.read(session.sessionId).receipts.previewAcceptance).toBeNull();
+    expect(store.read(session.sessionId).receipts.draftArchive).toBeNull();
+    expect(store.read(session.sessionId).receipts.sync).toBeNull();
+    const replaced = store.replace(session.sessionId, {
+      receipts: {
+        validation: null,
+        preview: null,
+        acknowledgements: {
+          id: DIGEST_A,
+          manifestDigest: DIGEST_B,
+          sourceDigests: [{
+            path: 'sprites/moon-braid/foreground/walk.png',
+            digest: DIGEST_C,
+          }],
+          recordDigests: [DIGEST_C, DIGEST_D],
+        },
+        releaseDeclaration: null,
+        previewAcceptance: null,
+      },
+    });
+
+    expect(replaced.receipts.acknowledgements).toEqual({
+      id: DIGEST_A,
+      manifestDigest: DIGEST_B,
+      sourceDigests: [{
+        path: 'sprites/moon-braid/foreground/walk.png',
+        digest: DIGEST_C,
+      }],
+      recordDigests: [DIGEST_C, DIGEST_D],
+    });
+  });
+
+  it('persists and reads the bounded consumer installation receipt', () => {
+    const workspace = createWorkspace();
+    const consumer = initializeAssetWorkspace(
+      path.join(createDirectory('lpc-authoring-consumer-'), 'workspace'),
+    );
+    const store = createStore(workspace);
+    const session = store.create({ plan: PLAN, packRoot: packRoot(workspace) });
+    const receipt = installationReceipt({
+      workspaceId: 'consumer-workspace-id',
+      workspaceRoot: consumer.root,
+      installedDirectory: path.join(consumer.stateRoot, 'installed', 'acme.fantasy-hair', '1.0.0', 'sha256-archive'),
+      registryPath: consumer.registryPath,
+      outputRoot: consumer.outputRoot,
+    });
+
+    const next = store.replace(session.sessionId, {
+      receipts: { ...session.receipts, installation: receipt },
+    });
+
+    expect(next.receipts.installation).toEqual(receipt);
+    expect(store.read(session.sessionId).receipts.installation).toEqual(receipt);
+  });
+
+  it('persists strict draft and sync receipts and rejects out-of-scope receipt paths', () => {
+    const workspace = createWorkspace();
+    const store = createStore(workspace);
+    const session = store.create({ plan: PLAN, packRoot: packRoot(workspace) });
+    const sessionDirectory = path.dirname(assetAuthoringSessionPath(workspace, session.sessionId));
+    const draftArchivePath = path.join(
+      sessionDirectory,
+      'release-artifacts',
+      'acme.fantasy-hair-1.0.0.draft.lpc-assets.zip',
+    );
+    const sourceDigests = [{
+      path: 'sprites/moon-braid/foreground/walk.png',
+      digest: DIGEST_C,
+    }];
+    const replaced = store.replace(session.sessionId, {
+      receipts: {
+        validation: null,
+        preview: null,
+        acknowledgements: null,
+        releaseDeclaration: null,
+        previewAcceptance: null,
+        draftArchive: {
+          schema: 'lpc-toolkit.asset-authoring-draft-receipt.v1',
+          packId: PLAN.pack.id,
+          version: PLAN.pack.version,
+          archivePath: draftArchivePath,
+          archiveDigest: DIGEST_A,
+          manifestDigest: DIGEST_B,
+          contentDigest: DIGEST_C,
+          sourceDigests,
+          recordedAt: NOW,
+        },
+        sync: {
+          id: DIGEST_A,
+          packId: PLAN.pack.id,
+          version: PLAN.pack.version,
+          manifestDigest: DIGEST_B,
+          contentDigest: DIGEST_C,
+          sourceDigests,
+          workspaceId: 'workspace-id',
+          outputRoot: workspace.outputRoot,
+          registryDigest: DIGEST_D,
+          compileDigest: DIGEST_A,
+          generatedDigests: {
+            'sheet_definitions/hair/moon-braid.json': DIGEST_B,
+          },
+          recordedAt: NOW,
+        },
+      },
+    });
+
+    expect(replaced.receipts.draftArchive).toMatchObject({
+      schema: 'lpc-toolkit.asset-authoring-draft-receipt.v1',
+      archivePath: draftArchivePath,
+    });
+    expect(replaced.receipts.sync).toMatchObject({
+      outputRoot: workspace.outputRoot,
+      generatedDigests: { 'sheet_definitions/hair/moon-braid.json': DIGEST_B },
+    });
+    expect(store.read(session.sessionId).receipts).toEqual(replaced.receipts);
+
+    const sessionPath = assetAuthoringSessionPath(workspace, session.sessionId);
+    const document = JSON.parse(readFileSync(sessionPath, 'utf8')) as {
+      readonly receipts: Record<string, unknown>;
+    };
+    document.receipts.draftArchive = {
+      ...document.receipts.draftArchive as Record<string, unknown>,
+      archivePath: path.join(workspace.root, 'outside.draft.lpc-assets.zip'),
+    };
+    writeFileSync(sessionPath, `${JSON.stringify(document, null, 2)}\n`);
+    expect(() => store.read(session.sessionId)).toThrow(
+      'must stay inside the session release-artifact root',
+    );
+  });
+
+  it('persists canonical preview artifact bindings and reads old previews without them', () => {
+    const workspace = createWorkspace();
+    const store = createStore(workspace);
+    const session = store.create({ plan: PLAN, packRoot: packRoot(workspace) });
+    const previewArtifacts = [
+      { id: 'preview:preview' as const, path: path.join(session.packRoot, 'previews/preview.png'), digest: DIGEST_A },
+      { id: 'preview:metadata' as const, path: path.join(session.packRoot, 'previews/metadata.json'), digest: DIGEST_B },
+      { id: 'preview:credits_txt' as const, path: path.join(session.packRoot, 'previews/credits.txt'), digest: DIGEST_C },
+      { id: 'preview:credits_csv' as const, path: path.join(session.packRoot, 'previews/credits.csv'), digest: DIGEST_D },
+    ];
+    const replaced = store.replace(session.sessionId, {
+      receipts: {
+        validation: null,
+        preview: {
+          id: DIGEST_A,
+          manifestDigest: DIGEST_B,
+          sourceDigests: [{
+            path: 'sprites/moon-braid/foreground/walk.png',
+            digest: DIGEST_C,
+          }],
+          validationReceiptId: DIGEST_A,
+          inputDigest: DIGEST_D,
+          artifacts: previewArtifacts,
+        },
+        acknowledgements: null,
+        releaseDeclaration: null,
+        previewAcceptance: null,
+      },
+    });
+
+    expect(replaced.receipts.preview?.artifacts).toEqual(previewArtifacts);
+    const sessionPath = assetAuthoringSessionPath(workspace, session.sessionId);
+    const document = JSON.parse(readFileSync(sessionPath, 'utf8')) as {
+      readonly receipts: { readonly preview: Record<string, unknown> };
+    };
+    delete document.receipts.preview.artifacts;
+    writeFileSync(sessionPath, `${JSON.stringify(document, null, 2)}\n`);
+    expect(store.read(session.sessionId).receipts.preview?.artifacts).toBeNull();
   });
 
   it('replaces one session atomically while preserving the prior state after a failed rename', () => {
@@ -288,7 +554,9 @@ describe('asset authoring checkpoint invalidation', () => {
         id: 'preview-1',
         manifestDigest: DIGEST_A,
         sourceDigests: [{ path: 'sprites/moon-braid/foreground/walk.png', digest: DIGEST_C }],
+        validationReceiptId: 'validation-1',
         inputDigest: DIGEST_A,
+        artifacts: null,
       },
     });
 
@@ -310,5 +578,105 @@ describe('asset authoring checkpoint invalidation', () => {
       validationReceipt: { ...baseline.validationReceipt! },
       previewReceipt: { ...baseline.previewReceipt! },
     })).toEqual([]);
+  });
+
+  it('invalidates a preview when its validation revision changes', () => {
+    const baseline = evidence();
+    const current = {
+      ...baseline,
+      validationReceipt: {
+        ...baseline.validationReceipt!,
+        id: 'validation-2',
+      },
+    };
+
+    expect(deriveAuthoringInvalidationDecisions(baseline, current)).toEqual([
+      { checkpoint: 'preview', reason: 'preview-receipt-stale' },
+    ]);
+  });
+
+  it('invalidates the preview artifact checkpoint when one bound artifact changes', () => {
+    const artifacts = [
+      { id: 'preview:preview' as const, path: '/workspace/preview.png', digest: DIGEST_A },
+      { id: 'preview:metadata' as const, path: '/workspace/metadata.json', digest: DIGEST_B },
+      { id: 'preview:credits_txt' as const, path: '/workspace/credits.txt', digest: DIGEST_C },
+      { id: 'preview:credits_csv' as const, path: '/workspace/credits.csv', digest: DIGEST_D },
+    ];
+    const baseline = evidence();
+    const previous = {
+      ...baseline,
+      previewReceipt: {
+        ...baseline.previewReceipt!,
+        artifacts,
+      },
+    };
+    const current = {
+      ...baseline,
+      previewReceipt: {
+        ...baseline.previewReceipt!,
+        artifacts: artifacts.map((artifact, index) => index === 2
+          ? { ...artifact, digest: DIGEST_A }
+          : artifact),
+      },
+    };
+
+    expect(deriveAuthoringInvalidationDecisions(previous, current)).toEqual([
+      { checkpoint: 'previewArtifacts', reason: 'preview-artifact-stale' },
+    ]);
+  });
+
+  it('invalidates the acknowledgement receipt after manifest or source drift', () => {
+    const baseline = evidence({
+      acknowledgementsReceipt: {
+        id: DIGEST_A,
+        manifestDigest: DIGEST_A,
+        sourceDigests: [{
+          path: 'sprites/moon-braid/foreground/walk.png',
+          digest: DIGEST_C,
+        }],
+        recordDigests: [DIGEST_D],
+      },
+    });
+    const current = {
+      ...baseline,
+      manifestDigest: DIGEST_B,
+      sourceDigests: [{
+        path: 'sprites/moon-braid/foreground/walk.png',
+        digest: DIGEST_D,
+      }],
+    };
+
+    expect(deriveAuthoringInvalidationDecisions(baseline, current)).toEqual([
+      { checkpoint: 'manifest', reason: 'manifest-semantic-drift' },
+      { checkpoint: 'source', reason: 'png-drift' },
+      { checkpoint: 'acknowledgements', reason: 'acknowledgement-receipt-stale' },
+      { checkpoint: 'validation', reason: 'validation-receipt-stale' },
+      { checkpoint: 'preview', reason: 'preview-receipt-stale' },
+    ]);
+  });
+
+  it('invalidates formal archive and inspection receipts after bound evidence drifts', () => {
+    const formal = formalArchiveReceipt();
+    const installation = installationReceipt();
+    const current = evidence({
+      manifestDigest: DIGEST_B,
+      formalArchiveReceipt: formal,
+      archiveInspectionReceipt: archiveInspectionReceipt(formal),
+      installationReceipt: installation,
+    });
+
+    expect(deriveAuthoringInvalidationDecisions({
+      ...evidence(),
+      formalArchiveReceipt: formal,
+      archiveInspectionReceipt: archiveInspectionReceipt(formal),
+      installationReceipt: installation,
+    }, current)).toEqual([
+      { checkpoint: 'manifest', reason: 'manifest-semantic-drift' },
+      { checkpoint: 'validation', reason: 'validation-receipt-stale' },
+      { checkpoint: 'preview', reason: 'preview-receipt-stale' },
+      { checkpoint: 'formalArchive', reason: 'formal-archive-stale' },
+      { checkpoint: 'archiveInspection', reason: 'archive-inspection-stale' },
+      { checkpoint: 'installation', reason: 'installation-stale' },
+    ]);
   });
 });

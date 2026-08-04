@@ -1,10 +1,24 @@
 import path from 'node:path';
+import {
+  assetAuthoringReleaseGateProjection,
+  assetAuthoringReleaseReceiptProjection,
+  type AssetAuthoringPreviewAcceptanceReceipt,
+  type AssetAuthoringReleaseDeclarationReceipt,
+  type AssetAuthoringReleaseGateProjection,
+} from '@lpc-toolkit/core';
 import { CLI_VERSION } from './package-info.js';
 import {
   AUTHORING_CAPABILITIES,
   AUTHORING_SCHEMA_VERSIONS,
 } from './capabilities.js';
 import type { AssetPackValidationReport } from './asset-pack-validation.js';
+import type {
+  AssetAuthoringArchiveInspectionReceipt,
+  AssetAuthoringDraftArchiveReceipt,
+  AssetAuthoringFormalArchiveReceipt,
+  AssetAuthoringInstallationReceipt,
+  AssetAuthoringSyncReceipt,
+} from './asset-authoring-session.js';
 
 export interface CliIssue {
   readonly code: string;
@@ -103,18 +117,105 @@ export interface AuthoringResponseProjectionInput {
   readonly sourceDigests: readonly string[];
   readonly validation?: AssetPackValidationReport;
   readonly preview?: AuthoringPreviewData;
+  readonly releaseGates?: AssetAuthoringReleaseGateProjection;
+  readonly releaseDeclaration?: AssetAuthoringReleaseDeclarationReceipt | null;
+  readonly previewAcceptance?: AssetAuthoringPreviewAcceptanceReceipt | null;
+  readonly draftReceipt?: AssetAuthoringDraftArchiveReceipt | null;
+  readonly syncReceipt?: AssetAuthoringSyncReceipt | null;
+  readonly formalArchiveReceipt?: AssetAuthoringFormalArchiveReceipt | null;
+  readonly inspectionReceipt?: AssetAuthoringArchiveInspectionReceipt | null;
+  readonly installationReceipt?: AssetAuthoringInstallationReceipt | null;
 }
 
-export interface AuthoringResponseData extends AuthoringResponseProjectionInput {
+export interface AuthoringResponseData extends Omit<
+  AuthoringResponseProjectionInput,
+  'releaseGates' | 'releaseDeclaration' | 'previewAcceptance' | 'draftReceipt' | 'syncReceipt'
+  | 'formalArchiveReceipt' | 'inspectionReceipt' | 'installationReceipt'
+> {
   readonly schema: 'lpc-toolkit.asset-authoring-response.v1';
   readonly cliVersion: string;
   readonly capabilities: readonly string[];
   readonly schemaVersions: readonly string[];
+  readonly releaseGates: AssetAuthoringReleaseGateProjection;
+  readonly releaseDeclaration: AssetAuthoringReleaseDeclarationReceipt | null;
+  readonly previewAcceptance: AssetAuthoringPreviewAcceptanceReceipt | null;
+  readonly draftReceipt: AssetAuthoringDraftArchiveReceipt | null;
+  readonly syncReceipt: AssetAuthoringSyncReceipt | null;
+  readonly formalArchiveReceipt: AssetAuthoringFormalArchiveReceipt | null;
+  readonly inspectionReceipt: AssetAuthoringArchiveInspectionReceipt | null;
+  readonly installationReceipt: AssetAuthoringInstallationReceipt | null;
 }
 
 export function authoringResponseProjection(
   input: AuthoringResponseProjectionInput,
 ): AuthoringResponseData {
+  const releaseGates = input.releaseGates ?? assetAuthoringReleaseGateProjection({
+    acknowledgements: 'missing',
+    validation: 'missing',
+    releaseDeclaration: 'missing',
+    preview: 'missing',
+    previewArtifacts: 'missing',
+    previewAcceptance: 'missing',
+  });
+  const releaseDeclaration = input.releaseDeclaration === undefined
+    || input.releaseDeclaration === null
+    ? null
+    : assetAuthoringReleaseReceiptProjection(input.releaseDeclaration);
+  const previewAcceptance = input.previewAcceptance === undefined
+    || input.previewAcceptance === null
+    ? null
+    : assetAuthoringReleaseReceiptProjection(input.previewAcceptance);
+  const draftReceipt = input.draftReceipt === undefined || input.draftReceipt === null
+    ? null
+    : {
+      ...input.draftReceipt,
+      sourceDigests: [...input.draftReceipt.sourceDigests],
+    };
+  const syncReceipt = input.syncReceipt === undefined || input.syncReceipt === null
+    ? null
+    : {
+      ...input.syncReceipt,
+      sourceDigests: [...input.syncReceipt.sourceDigests],
+      generatedDigests: Object.fromEntries(
+        Object.entries(input.syncReceipt.generatedDigests)
+          .sort(([left], [right]) => left.localeCompare(right)),
+      ),
+    };
+  const formalArchiveReceipt = input.formalArchiveReceipt === undefined
+    || input.formalArchiveReceipt === null
+    ? null
+    : {
+      ...input.formalArchiveReceipt,
+      sourceDigests: [...input.formalArchiveReceipt.sourceDigests],
+      previewArtifacts: [...input.formalArchiveReceipt.previewArtifacts],
+    };
+  const inspectionReceipt = input.inspectionReceipt === undefined
+    || input.inspectionReceipt === null
+    ? null
+    : {
+      ...input.inspectionReceipt,
+      sourceDigests: [...input.inspectionReceipt.sourceDigests],
+    };
+  const installationReceipt = input.installationReceipt === undefined
+    || input.installationReceipt === null
+    ? null
+    : {
+      ...input.installationReceipt,
+      payloadDigests: Object.fromEntries(
+        Object.entries(input.installationReceipt.payloadDigests)
+          .sort(([left], [right]) => left.localeCompare(right)),
+      ),
+      generatedDigests: Object.fromEntries(
+        Object.entries(input.installationReceipt.generatedDigests)
+          .sort(([left], [right]) => left.localeCompare(right)),
+      ),
+    };
+  if (releaseDeclaration !== null && releaseDeclaration.kind !== 'declaration') {
+    throw new Error('Release declaration response receipt has the wrong kind.');
+  }
+  if (previewAcceptance !== null && previewAcceptance.kind !== 'preview-acceptance') {
+    throw new Error('Preview acceptance response receipt has the wrong kind.');
+  }
   return {
     schema: 'lpc-toolkit.asset-authoring-response.v1',
     ...input,
@@ -142,6 +243,17 @@ export function authoringResponseProjection(
         sourceDigests: [...input.preview.sourceDigests],
       },
     }),
+    releaseGates: {
+      releaseReady: releaseGates.releaseReady,
+      gates: releaseGates.gates.map((gate) => ({ ...gate })),
+    },
+    releaseDeclaration,
+    previewAcceptance,
+    draftReceipt,
+    syncReceipt,
+    formalArchiveReceipt,
+    inspectionReceipt,
+    installationReceipt,
     cliVersion: CLI_VERSION,
     capabilities: [...AUTHORING_CAPABILITIES],
     schemaVersions: [...AUTHORING_SCHEMA_VERSIONS],
@@ -357,6 +469,96 @@ function formatAuthoringResponse(
     `Reason: ${reason}`,
     `Checkpoint: ${checkpointFreshness}`,
   ];
+  const releaseGates = data['releaseGates'];
+  if (isRecord(releaseGates)) {
+    const releaseReady = releaseGates['releaseReady'];
+    if (typeof releaseReady === 'boolean') {
+      lines.push(`Release readiness: ${releaseReady ? 'ready' : 'not ready'}`);
+    }
+    const gates = recordArrayValue(releaseGates, 'gates') ?? [];
+    for (const gate of gates) {
+      const gateId = stringValue(gate, 'id');
+      const freshness = stringValue(gate, 'freshness');
+      if (gateId && freshness) lines.push(`Release gate ${gateId}: ${freshness}`);
+    }
+  }
+  const releaseDeclaration = data['releaseDeclaration'];
+  if (isRecord(releaseDeclaration)) {
+    const declarant = isRecord(releaseDeclaration['declarant'])
+      ? stringValue(releaseDeclaration['declarant'], 'displayName')
+      : undefined;
+    const declarationDigest = stringValue(releaseDeclaration, 'declarationDigest');
+    if (declarant) {
+      lines.push(
+        `Human release declaration: ${declarant}${declarationDigest ? ` (${declarationDigest})` : ''}`,
+      );
+    }
+  }
+  const previewAcceptance = data['previewAcceptance'];
+  if (isRecord(previewAcceptance)) {
+    const declarant = isRecord(previewAcceptance['declarant'])
+      ? stringValue(previewAcceptance['declarant'], 'displayName')
+      : undefined;
+    const previewDigest = recordArrayValue(previewAcceptance, 'artifacts')
+      ?.find((artifact) => stringValue(artifact, 'id') === 'preview:preview');
+    const digest = previewDigest === undefined
+      ? undefined
+      : stringValue(previewDigest, 'digest');
+    if (declarant) {
+      lines.push(
+        `Human preview acceptance: ${declarant}${digest ? ` (${digest})` : ''}`,
+      );
+    }
+  }
+  const draftReceipt = data['draftReceipt'];
+  if (isRecord(draftReceipt)) {
+    const archivePath = stringValue(draftReceipt, 'archivePath');
+    const archiveDigest = stringValue(draftReceipt, 'archiveDigest');
+    if (archivePath) {
+      lines.push(
+        `Draft recovery archive: ${archivePath}${archiveDigest ? ` (${archiveDigest})` : ''}`,
+      );
+    }
+  }
+  const syncReceipt = data['syncReceipt'];
+  if (isRecord(syncReceipt)) {
+    const outputRoot = stringValue(syncReceipt, 'outputRoot');
+    const registryDigest = stringValue(syncReceipt, 'registryDigest');
+    const compileDigest = stringValue(syncReceipt, 'compileDigest');
+    if (outputRoot) lines.push(`Synchronized overlay: ${outputRoot}`);
+    if (registryDigest) lines.push(`Registry receipt: ${registryDigest}`);
+    if (compileDigest) lines.push(`Compile receipt: ${compileDigest}`);
+  }
+  const formalArchiveReceipt = data['formalArchiveReceipt'];
+  if (isRecord(formalArchiveReceipt)) {
+    const archivePath = stringValue(formalArchiveReceipt, 'archivePath');
+    const archiveDigest = stringValue(formalArchiveReceipt, 'archiveDigest');
+    if (archivePath) {
+      lines.push(
+        `Formal archive: ${archivePath}${archiveDigest ? ` (${archiveDigest})` : ''}`,
+      );
+    }
+  }
+  const inspectionReceipt = data['inspectionReceipt'];
+  if (isRecord(inspectionReceipt)) {
+    const archivePath = stringValue(inspectionReceipt, 'archivePath');
+    const archiveDigest = stringValue(inspectionReceipt, 'archiveDigest');
+    if (archivePath) {
+      lines.push(
+        `Archive inspection: ${archivePath}${archiveDigest ? ` (${archiveDigest})` : ''}`,
+      );
+    }
+  }
+  const installationReceipt = data['installationReceipt'];
+  if (isRecord(installationReceipt)) {
+    const workspaceRoot = stringValue(installationReceipt, 'workspaceRoot');
+    const archiveDigest = stringValue(installationReceipt, 'archiveDigest');
+    if (workspaceRoot) {
+      lines.push(
+        `Consumer installation: ${workspaceRoot}${archiveDigest ? ` (${archiveDigest})` : ''}`,
+      );
+    }
+  }
   const validation = data['validation'];
   if (isRecord(validation) && typeof validation['valid'] === 'boolean') {
     const diagnostics = recordArrayValue(validation, 'diagnostics') ?? [];

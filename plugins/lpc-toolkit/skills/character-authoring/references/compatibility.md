@@ -32,7 +32,19 @@ independent; update this file, the checker constants, tests, and release notes
 together when the supported range changes.
 
 These skills intentionally do not implement the newer authoring-session
-workflow. They must not claim or invoke `asset-authoring-session.v1` or
-`sprite-drawing-contract.v1`; the plugin can safely refuse those capabilities.
-The character workflow remains limited to the commands listed in its versioned
-contract.
+workflow or its release boundary. They must not claim or invoke
+`asset-authoring-session.v1`, `sprite-drawing-contract.v1`, or
+`asset-authoring-release.v1`, or `asset-authoring-draft-recovery.v1`; they also
+refuse
+`lpc-toolkit.asset-release-declaration.v1`,
+`lpc-toolkit.asset-authoring-release-receipt.v1`,
+`lpc-toolkit.asset-authoring-draft-receipt.v1`,
+`lpc-toolkit.asset-authoring-formal-archive-receipt.v1`, and
+`lpc-toolkit.asset-authoring-archive-inspection-receipt.v1`, and the
+`lpc-toolkit.asset-authoring-install-receipt.v1` and
+`asset-authoring-consumer-install.v1` capability, and the
+`asset authoring acknowledge`, `declare`, `accept-preview`, `draft`, `sync`,
+`pack`, and `inspect` commands; it also refuses the newer `install` command.
+The character workflow remains limited to the
+commands listed in its versioned contract; it never writes manager-owned
+overlay or registry state or publishes/inspects a session formal archive.
