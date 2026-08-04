@@ -90,7 +90,10 @@ test('documents the public stable CLI installation contract for both workflows',
       'Plugin version `0.2.1` supports `@lpc-toolkit/cli >=0.2.0 <0.3.0`',
       '`asset-authoring-draft-recovery.v1`',
       '`lpc-toolkit.asset-authoring-draft-receipt.v1`',
-      '`asset authoring acknowledge`, `declare`, `accept-preview`, `draft`, and `sync`',
+      '`lpc-toolkit.asset-authoring-formal-archive-receipt.v1`',
+      '`lpc-toolkit.asset-authoring-archive-inspection-receipt.v1`',
+      '`asset authoring acknowledge`, `declare`, `accept-preview`, `draft`, `sync`,',
+      '`pack`, and `inspect` commands',
     ]) {
       assert.equal(
         compatibility.includes(required),

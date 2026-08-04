@@ -247,6 +247,12 @@ describe('main json behavior', () => {
     expect(advertisement.data.schemaVersions).toContain(
       'lpc-toolkit.asset-authoring-draft-receipt.v1',
     );
+    expect(advertisement.data.schemaVersions).toContain(
+      'lpc-toolkit.asset-authoring-formal-archive-receipt.v1',
+    );
+    expect(advertisement.data.schemaVersions).toContain(
+      'lpc-toolkit.asset-authoring-archive-inspection-receipt.v1',
+    );
     expect(advertisement.data.capabilities).not.toContain('asset-authoring-consumer-install.v1');
   });
 
@@ -281,6 +287,14 @@ describe('main json behavior', () => {
     [
       ['asset', 'authoring', 'accept-preview', '--session', 'session-1', '--json'],
       '--preview-digest',
+    ],
+    [
+      ['asset', 'authoring', 'pack', '--json'],
+      '--session',
+    ],
+    [
+      ['asset', 'authoring', 'inspect', '--session', 'session-1', '--json'],
+      '--archive',
     ],
   ])('rejects authoring invocation without required %s', async (argv, requiredFlag) => {
     const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-main-json-authoring-missing-'));

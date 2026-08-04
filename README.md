@@ -148,7 +148,7 @@ author/source and license authority, and final acceptance of the exact PNG plus
 metadata/TXT/CSV credit artifacts. Their `releaseGates` and `releaseReady`
 response fields describe session evidence only; no identity or approval is
 inferred from Git, an Agent, a provider, or the operating system, and these
-receipts do not publish an archive.
+receipts do not publish an archive until the separate formal pack boundary.
 
 ```sh
 npm install -g @lpc-toolkit/cli
@@ -193,9 +193,19 @@ lpc-toolkit asset authoring sync --session <session-id> --confirm
 Stale manifest, source, validation, warning, preview-input, artifact, or
 declaration evidence, draft bytes, registry bytes, or generated output is
 preserved for review and requires the structured next action from `status` or
-`resume`. Formal archive publication still uses `asset pack`, followed by
-separate `asset inspect` and consumer `asset install`; neither Phase 2 receipt
-is a formal archive or a consumer installation receipt.
+`resume`. Phase 3 adds an explicit session-owned formal boundary: after all
+release gates are current, `asset authoring pack --session <session-id> --confirm`
+writes a non-draft archive below `release-artifacts/`, and
+`asset authoring inspect --session <session-id> --archive <archive>` records
+the exact-byte inspection only when its digest matches the formal pack receipt.
+Changed or copied archive bytes remain stale/mismatch evidence and are never
+adopted silently. Consumer `asset install` remains a separate workflow; no
+consumer installation receipt is produced by this phase.
+
+```sh
+lpc-toolkit asset authoring pack --session <session-id> --confirm
+lpc-toolkit asset authoring inspect --session <session-id> --archive <archive>
+```
 
 Give the resulting `<pack-id>-<version>.lpc-assets.zip` to a consumer. They use
 a separate standalone workspace and run the lifecycle in order:

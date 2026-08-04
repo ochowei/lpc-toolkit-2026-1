@@ -64,6 +64,23 @@ function sha256(bytes) {
   return `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
 }
 
+function canonicalize(value) {
+  if (Array.isArray(value)) return value.map((entry) => canonicalize(entry));
+  if (value === null || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entry]) => [key, canonicalize(entry)]),
+  );
+}
+
+function releaseCreditDigest(manifest) {
+  return sha256(Buffer.from(JSON.stringify(canonicalize({
+    credits: manifest.credits,
+    creditOverrides: manifest.creditOverrides ?? {},
+  }))));
+}
+
 function digestFile(filePath) {
   return sha256(readFileSync(filePath));
 }
@@ -795,29 +812,21 @@ try {
   let currentValidationData = currentValidationOutput.data;
   if (!currentValidationData?.validation?.valid) {
     assert.ok(currentValidationData?.validation?.acknowledgementRecords.length > 0);
-    const manifest = JSON.parse(readFileSync(authoringManifestPath, 'utf8'));
-    writeJson(authoringManifestPath, {
-      ...manifest,
-      acknowledgements: currentValidationData.validation.acknowledgementRecords.map((record) => ({
-        ...record,
-        reason: 'Reviewed the corrected packed session validation evidence.',
-      })),
+    const acknowledgementPath = path.join(
+      canonicalWorkspaceRoot,
+      'packed-release-acknowledgement.json',
+    );
+    writeJson(acknowledgementPath, {
+      ...currentValidationData.validation.acknowledgementRecords[0],
+      reason: 'Reviewed the corrected packed session validation evidence.',
     });
-    const externalManifestDigest = digestFile(authoringManifestPath);
-    const manifestConflict = runInstalledJson([
-      'asset', 'authoring', 'resume', '--session', authoringSessionId,
-    ], workspaceRoot);
-    assert.equal(manifestConflict.data?.reason, 'manifest-conflict');
-    const manifestReconciled = runInstalledJson([
-      'asset', 'authoring', 'reconcile-manifest',
-      '--session', authoringSessionId,
-      '--use', 'external',
-      '--expected-external-digest', externalManifestDigest,
-    ], workspaceRoot);
-    assert.equal(manifestReconciled.data?.reason, 'manifest-adopted');
     currentValidationOutput = runInstalledJson([
-      'asset', 'authoring', 'validate', '--session', authoringSessionId,
+      'asset', 'authoring', 'acknowledge',
+      '--session', authoringSessionId,
+      '--acknowledgement', acknowledgementPath,
+      '--confirm',
     ], workspaceRoot);
+    assert.equal(currentValidationOutput.ok, true);
     currentValidationData = currentValidationOutput.data;
   }
   assert.equal(currentValidationData?.validation?.valid, true, JSON.stringify(currentValidationData));
@@ -844,6 +853,128 @@ try {
   for (const artifact of currentPreviewData.preview.artifacts) {
     assert.equal(digestFile(artifact.path), artifact.digest);
   }
+
+  const currentManifest = JSON.parse(readFileSync(authoringManifestPath, 'utf8'));
+  const authoringSessionPath = path.join(
+    workspaceRoot,
+    '.lpc-toolkit',
+    'asset-packs',
+    'authoring-sessions',
+    authoringSessionId,
+    'session.json',
+  );
+  const authoringSession = JSON.parse(readFileSync(authoringSessionPath, 'utf8'));
+  const declarationPath = path.join(canonicalWorkspaceRoot, 'packed-release-declaration.json');
+  writeJson(declarationPath, {
+    schema: 'lpc-toolkit.asset-release-declaration.v1',
+    expectedManifestDigest: digestFile(authoringManifestPath),
+    declarant: {
+      displayName: 'Packed Release Declarant',
+      kind: 'person',
+      role: 'authorized-release-declarant',
+    },
+    authorAndSource: {
+      confirmed: true,
+      creditDigest: releaseCreditDigest(currentManifest),
+    },
+    licenseAuthority: {
+      confirmed: true,
+      creditDigest: releaseCreditDigest(currentManifest),
+    },
+    acknowledgements: {
+      confirmed: true,
+      contentDigest: currentValidationData.validation.contentDigest,
+      recordDigests: authoringSession.receipts.acknowledgements?.recordDigests ?? [],
+    },
+  });
+  const declarationPending = runInstalledJson([
+    'asset', 'authoring', 'declare',
+    '--session', authoringSessionId,
+    '--declaration', declarationPath,
+  ], workspaceRoot);
+  assert.equal(declarationPending.data?.reason, 'release-declaration-confirmation-required');
+  const declarationOutput = runInstalledJson([
+    'asset', 'authoring', 'declare',
+    '--session', authoringSessionId,
+    '--declaration', declarationPath,
+    '--confirm',
+  ], workspaceRoot);
+  assert.equal(declarationOutput.data?.reason, 'release-declaration-current');
+
+  const currentPreviewDigest = currentPreviewData.preview.artifacts
+    .find(({ id }) => id === 'preview:preview')?.digest;
+  assert.equal(typeof currentPreviewDigest, 'string');
+  const acceptancePending = runInstalledJson([
+    'asset', 'authoring', 'accept-preview',
+    '--session', authoringSessionId,
+    '--preview-digest', currentPreviewDigest,
+  ], workspaceRoot);
+  assert.equal(acceptancePending.data?.reason, 'preview-acceptance-confirmation-required');
+  const acceptanceOutput = runInstalledJson([
+    'asset', 'authoring', 'accept-preview',
+    '--session', authoringSessionId,
+    '--preview-digest', currentPreviewDigest,
+    '--confirm',
+  ], workspaceRoot);
+  assert.equal(acceptanceOutput.data?.reason, 'preview-acceptance-current');
+  assert.equal(acceptanceOutput.data?.releaseGates?.releaseReady, true);
+
+  const formalPending = runInstalledJson([
+    'asset', 'authoring', 'pack', '--session', authoringSessionId,
+  ], workspaceRoot);
+  assert.equal(formalPending.data?.reason, 'formal-pack-confirmation-required');
+  assert.equal(formalPending.data?.formalArchiveReceipt, null);
+  const formalOutput = runInstalledJson([
+    'asset', 'authoring', 'pack', '--session', authoringSessionId, '--confirm',
+  ], workspaceRoot);
+  assert.equal(formalOutput.data?.reason, 'formal-archive-current');
+  const formalReceipt = formalOutput.data?.formalArchiveReceipt;
+  assert.ok(formalReceipt);
+  assert.equal(path.dirname(formalReceipt.archivePath), path.join(
+    canonicalWorkspaceRoot,
+    '.lpc-toolkit',
+    'asset-packs',
+    'authoring-sessions',
+    authoringSessionId,
+    'release-artifacts',
+  ));
+  assert.equal(
+    existsSync(path.join(path.dirname(authoringPackRoot), 'smoke.packed-authoring-1.0.0.lpc-assets.zip')),
+    false,
+  );
+  const formalZip = await JSZip.loadAsync(readFileSync(formalReceipt.archivePath));
+  const formalManifest = JSON.parse(
+    await formalZip.file('asset-pack.json').async('string'),
+  );
+  assert.equal(formalManifest.status, undefined);
+
+  const authoringInspectionOutput = runInstalledJson([
+    'asset', 'authoring', 'inspect',
+    '--session', authoringSessionId,
+    '--archive', formalReceipt.archivePath,
+  ], workspaceRoot);
+  assert.equal(authoringInspectionOutput.data?.reason, 'archive-inspection-current');
+  assert.equal(
+    authoringInspectionOutput.data?.inspectionReceipt?.archiveDigest,
+    formalReceipt.archiveDigest,
+  );
+  const repeatedFormalOutput = runInstalledJson([
+    'asset', 'authoring', 'pack', '--session', authoringSessionId, '--confirm',
+  ], workspaceRoot);
+  assert.equal(repeatedFormalOutput.data?.formalArchiveReceipt?.archiveDigest, formalReceipt.archiveDigest);
+  assert.equal(
+    repeatedFormalOutput.data?.inspectionReceipt?.archiveDigest,
+    formalReceipt.archiveDigest,
+  );
+  const repeatedInspectionOutput = runInstalledJson([
+    'asset', 'authoring', 'inspect',
+    '--session', authoringSessionId,
+    '--archive', formalReceipt.archivePath,
+  ], workspaceRoot);
+  assert.equal(
+    repeatedInspectionOutput.data?.inspectionReceipt?.archiveDigest,
+    formalReceipt.archiveDigest,
+  );
 
   assert.equal(
     readFileSync(cacheSentinelPath, 'utf8'),

@@ -9,6 +9,7 @@ import {
 import path from 'node:path';
 import {
   ASSET_AUTHORING_RELEASE_ARTIFACT_IDS,
+  assetAuthoringReleaseReceiptDigestInput,
   normalizeAssetPack,
   parseAssetAuthoringPlan,
   parseAssetReleaseDeclaration,
@@ -67,15 +68,20 @@ import {
   type AssetAuthoringSessionUpdate,
   type AssetAuthoringPreviewReceipt,
   type AssetAuthoringSyncReceipt,
+  type AssetAuthoringArchiveInspectionReceipt,
+  type AssetAuthoringFormalArchiveReceipt,
   type AssetAuthoringValidationReceipt,
 } from './asset-authoring-session.js';
 import {
+  createFormalArchive,
   createDraftArchive,
   assetAuthoringReleaseArtifactRoot,
   captureSyncReceipt,
+  resolveFormalArchivePath,
   syncReceiptStaleReason,
   AssetAuthoringReleaseLifecycleError,
 } from './asset-authoring-release-lifecycle.js';
+import { inspectAssetPackArchive } from './asset-pack-inspection.js';
 import type { AssetWorkspace } from './asset-workspace.js';
 import type { RuntimeAssets } from './runtime-assets.js';
 import { syncLinkedAssetPack } from './asset-pack-sync.js';
@@ -128,6 +134,8 @@ interface ResponseOptions {
   readonly inputsNeeded?: readonly AuthoringInputNeeded[];
   readonly validation?: AssetPackValidationReport;
   readonly preview?: AuthoringPreviewData;
+  readonly formalArchiveReceipt?: AssetAuthoringFormalArchiveReceipt | null;
+  readonly inspectionReceipt?: AssetAuthoringArchiveInspectionReceipt | null;
 }
 
 function issue(
@@ -505,6 +513,39 @@ function nextActionsFor(session: AssetAuthoringSession): readonly AuthoringNextA
     )];
   }
 
+  if (
+    session.reason === 'formal-pack-confirmation-required'
+    || session.reason === 'formal-archive-stale'
+  ) {
+    return [nextAction(
+      'pack-formal-archive',
+      'Confirm deterministic formal archive publication after reviewing the current release evidence.',
+      `asset authoring pack --session ${session.sessionId} --output <archive> --confirm`,
+      'requires-confirmation',
+      session.receipts.formalArchive === null || session.receipts.formalArchive === undefined
+        ? []
+        : [session.receipts.formalArchive.archiveDigest],
+      ['confirm'],
+    )];
+  }
+
+  if (
+    session.reason === 'archive-inspection-stale'
+    || session.reason === 'archive-inspection-mismatch'
+    || session.reason === 'formal-archive-current'
+  ) {
+    return [nextAction(
+      'inspect-formal-archive',
+      'Inspect the exact formal archive bytes before marking the release checkpoint complete.',
+      `asset authoring inspect --session ${session.sessionId} --archive <archive>`,
+      'safe',
+      session.receipts.formalArchive === null || session.receipts.formalArchive === undefined
+        ? []
+        : [session.receipts.formalArchive.archiveDigest],
+      ['archive'],
+    )];
+  }
+
   if (session.phase === 'planned' || session.phase === 'scaffolded') {
     return [nextAction(
       'create-contract',
@@ -635,6 +676,49 @@ function nextActionsFor(session: AssetAuthoringSession): readonly AuthoringNextA
   const gates = releaseGateFreshness(session).gates;
   const gateFreshness = (id: AssetAuthoringReleaseGateId): AssetAuthoringReleaseGateFreshness =>
     gates.find((gate) => gate.id === id)?.freshness ?? 'missing';
+
+  if (session.reason === 'release-gates-incomplete') {
+    if (gateFreshness('validation') !== 'current') {
+      return [nextAction(
+        'validate-session',
+        'Re-run validation against the current session-owned pack sources.',
+        `asset authoring validate --session ${session.sessionId}`,
+        'safe',
+        session.manifestDigest === null ? [] : [session.manifestDigest],
+      )];
+    }
+    if (gateFreshness('preview') !== 'current' || gateFreshness('previewArtifacts') !== 'current') {
+      return [nextAction(
+        'preview-session',
+        'Re-render the attributed preview for the current validation receipt and artifact set.',
+        `asset authoring preview --session ${session.sessionId}`,
+        'safe',
+        session.manifestDigest === null ? [] : [session.manifestDigest],
+      )];
+    }
+    if (gateFreshness('releaseDeclaration') !== 'current') {
+      return [nextAction(
+        'declare-release',
+        'Confirm the explicit human release declaration before recording it for this session.',
+        `asset authoring declare --session ${session.sessionId} --declaration <declaration.json> --confirm`,
+        'requires-confirmation',
+        session.manifestDigest === null ? [] : [session.manifestDigest],
+        ['declaration', 'confirm'],
+      )];
+    }
+    if (gateFreshness('previewAcceptance') !== 'current') {
+      const previewDigest = session.receipts.preview?.artifacts
+        ?.find((artifact) => artifact.id === 'preview:preview')?.digest;
+      return [nextAction(
+        'accept-preview',
+        'Confirm the exact current attributed preview before marking the session release-ready.',
+        `asset authoring accept-preview --session ${session.sessionId} --preview-digest <sha256> --confirm`,
+        'requires-confirmation',
+        previewDigest === undefined ? [] : [previewDigest],
+        ['preview-digest', 'confirm'],
+      )];
+    }
+  }
   if (
     session.receipts.preview !== null
     && gateFreshness('validation') === 'current'
@@ -691,6 +775,38 @@ function nextActionsFor(session: AssetAuthoringSession): readonly AuthoringNextA
     )];
   }
 
+  if (gateFreshness('validation') === 'current'
+    && gateFreshness('releaseDeclaration') === 'current'
+    && gateFreshness('previewAcceptance') === 'current'
+    && (session.receipts.formalArchive === null || session.receipts.formalArchive === undefined)
+  ) {
+    return [nextAction(
+      'pack-formal-archive',
+      'Publish a deterministic formal archive after reviewing the release evidence.',
+      `asset authoring pack --session ${session.sessionId} --output <archive> --confirm`,
+      'requires-confirmation',
+      session.manifestDigest === null ? [] : [session.manifestDigest],
+      ['confirm'],
+    )];
+  }
+
+  if (gateFreshness('validation') === 'current'
+    && gateFreshness('releaseDeclaration') === 'current'
+    && gateFreshness('previewAcceptance') === 'current'
+    && session.receipts.formalArchive !== null
+    && session.receipts.formalArchive !== undefined
+    && (session.receipts.archiveInspection === null || session.receipts.archiveInspection === undefined)
+  ) {
+    return [nextAction(
+      'inspect-formal-archive',
+      'Inspect the exact formal archive bytes before marking the release checkpoint complete.',
+      `asset authoring inspect --session ${session.sessionId} --archive <archive>`,
+      'safe',
+      [session.receipts.formalArchive.archiveDigest],
+      ['archive'],
+    )];
+  }
+
   return [];
 }
 
@@ -727,6 +843,12 @@ function responseFor(
     previewAcceptance: session.receipts.previewAcceptance,
     draftReceipt: session.receipts.draftArchive ?? null,
     syncReceipt: session.receipts.sync ?? null,
+    formalArchiveReceipt: options.formalArchiveReceipt === undefined
+      ? session.receipts.formalArchive ?? null
+      : options.formalArchiveReceipt,
+    inspectionReceipt: options.inspectionReceipt === undefined
+      ? session.receipts.archiveInspection ?? null
+      : options.inspectionReceipt,
   };
   return authoringResponseProjection(input);
 }
@@ -1016,10 +1138,9 @@ async function statusSession(
   sessionId: string,
 ): Promise<CliResponse<AuthoringResponseData>> {
   const store = createAssetAuthoringSessionStore(workspace);
-  const session = await refreshSyncReceiptState(
-    workspace,
+  const session = await refreshFormalArchiveState(
     store,
-    store.status(sessionId),
+    await refreshSyncReceiptState(workspace, store, store.status(sessionId)),
   );
   return commandOk('asset authoring status', responseFor(
     session,
@@ -1150,6 +1271,541 @@ async function draftReceiptStale(
     return 'the session manifest or source evidence changed externally';
   }
   return undefined;
+}
+
+function releaseReceiptDigest(
+  receipt: AssetAuthoringReleaseDeclarationReceipt | AssetAuthoringPreviewAcceptanceReceipt,
+): string {
+  return sha256(Buffer.from(assetAuthoringReleaseReceiptDigestInput(receipt), 'utf8'));
+}
+
+function formalArchiveReceiptFor(options: {
+  readonly session: AssetAuthoringSession;
+  readonly archivePath: string;
+  readonly archiveDigest: string;
+  readonly manifestDigest: string;
+  readonly contentDigest: string;
+  readonly sourceDigests: readonly { readonly path: string; readonly digest: string }[];
+  readonly recordedAt?: string;
+}): AssetAuthoringFormalArchiveReceipt {
+  const validation = options.session.receipts.validation;
+  const declaration = options.session.receipts.releaseDeclaration;
+  const acceptance = options.session.receipts.previewAcceptance;
+  if (validation === null || declaration === null || acceptance === null) {
+    throw new AuthoringCommandError(
+      'Formal archive evidence is incomplete; current validation, declaration, and preview acceptance are required.',
+      { code: 'asset_authoring_release_gates_incomplete' },
+    );
+  }
+  const recordedAt = new Date(options.recordedAt ?? new Date().toISOString());
+  if (Number.isNaN(recordedAt.getTime())) {
+    throw new AuthoringCommandError(
+      'Formal archive receipt timestamp is invalid.',
+      { code: 'asset_authoring_formal_receipt_invalid' },
+    );
+  }
+  return {
+    schema: 'lpc-toolkit.asset-authoring-formal-archive-receipt.v1',
+    packId: options.session.plan.pack.id,
+    version: options.session.plan.pack.version,
+    archivePath: options.archivePath,
+    archiveDigest: options.archiveDigest,
+    manifestDigest: options.manifestDigest,
+    contentDigest: options.contentDigest,
+    sourceDigests: [...options.sourceDigests].sort((left, right) => left.path.localeCompare(right.path)),
+    validationReceiptId: validation.id,
+    declarationReceiptDigest: declaration.declarationDigest,
+    previewAcceptanceReceiptDigest: releaseReceiptDigest(acceptance),
+    previewInputDigest: acceptance.previewInputDigest,
+    previewArtifacts: [...acceptance.artifacts],
+    recordedAt: recordedAt.toISOString(),
+  };
+}
+
+function sameFormalArchiveReceiptBinding(
+  left: AssetAuthoringFormalArchiveReceipt,
+  right: AssetAuthoringFormalArchiveReceipt,
+): boolean {
+  return left.packId === right.packId
+    && left.version === right.version
+    && left.archivePath === right.archivePath
+    && left.archiveDigest === right.archiveDigest
+    && left.manifestDigest === right.manifestDigest
+    && left.contentDigest === right.contentDigest
+    && sourceDigestSetsEqual(left.sourceDigests, right.sourceDigests)
+    && left.validationReceiptId === right.validationReceiptId
+    && left.declarationReceiptDigest === right.declarationReceiptDigest
+    && left.previewAcceptanceReceiptDigest === right.previewAcceptanceReceiptDigest
+    && left.previewInputDigest === right.previewInputDigest
+    && artifactSetsEqual(left.previewArtifacts, right.previewArtifacts);
+}
+
+async function formalArchiveReceiptStale(
+  receipt: AssetAuthoringFormalArchiveReceipt,
+  session: AssetAuthoringSession,
+): Promise<string | undefined> {
+  const archiveBytes = readRegularFile(receipt.archivePath);
+  if (archiveBytes === undefined) return 'the recorded formal archive is missing or not regular';
+  if (sha256(archiveBytes) !== receipt.archiveDigest) {
+    return 'the recorded formal archive bytes changed externally';
+  }
+  const loaded = await loadAssetPackFiles(session.packRoot);
+  if (!loaded.ok) return 'the session pack can no longer be captured';
+  const manifestDigest = sha256(loaded.manifestBytes);
+  const currentSourceDigests = [...loaded.sourceDigests]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([sourcePath, digest]) => ({ path: sourcePath, digest }));
+  if (
+    loaded.pack.id !== receipt.packId
+    || loaded.pack.version !== receipt.version
+    || manifestDigest !== receipt.manifestDigest
+    || loaded.contentDigest !== receipt.contentDigest
+    || !sourceDigestSetsEqual(currentSourceDigests, receipt.sourceDigests)
+  ) {
+    return 'the session manifest or source evidence changed externally';
+  }
+  const validation = session.receipts.validation;
+  const declaration = session.receipts.releaseDeclaration;
+  const acceptance = session.receipts.previewAcceptance;
+  if (
+    validation === null
+    || declaration === null
+    || acceptance === null
+    || validation.id !== receipt.validationReceiptId
+    || declaration.declarationDigest !== receipt.declarationReceiptDigest
+    || releaseReceiptDigest(acceptance) !== receipt.previewAcceptanceReceiptDigest
+    || acceptance.previewInputDigest !== receipt.previewInputDigest
+    || !artifactSetsEqual(acceptance.artifacts, receipt.previewArtifacts)
+  ) {
+    return 'the current release evidence changed externally';
+  }
+  for (const artifact of acceptance.artifacts) {
+    const artifactBytes = readRegularFile(artifact.path);
+    if (artifactBytes === undefined || sha256(artifactBytes) !== artifact.digest) {
+      return 'the accepted preview artifact bytes changed externally';
+    }
+  }
+  return undefined;
+}
+
+function archiveInspectionReceiptStale(
+  receipt: AssetAuthoringArchiveInspectionReceipt,
+  formalArchive: AssetAuthoringFormalArchiveReceipt,
+): string | undefined {
+  const archiveBytes = readRegularFile(receipt.archivePath);
+  if (archiveBytes === undefined) return 'the inspected archive is missing or not regular';
+  if (sha256(archiveBytes) !== receipt.archiveDigest) return 'the inspected archive bytes changed externally';
+  if (
+    receipt.archiveDigest !== formalArchive.archiveDigest
+    || receipt.formalArchiveDigest !== formalArchive.archiveDigest
+    || receipt.packId !== formalArchive.packId
+    || receipt.version !== formalArchive.version
+    || receipt.manifestDigest !== formalArchive.manifestDigest
+    || receipt.contentDigest !== formalArchive.contentDigest
+    || !sourceDigestSetsEqual(receipt.sourceDigests, formalArchive.sourceDigests)
+  ) {
+    return 'the inspection receipt no longer matches the formal archive receipt';
+  }
+  return undefined;
+}
+
+function markFormalArchiveStale(
+  store: ReturnType<typeof createAssetAuthoringSessionStore>,
+  session: AssetAuthoringSession,
+  summary: string,
+): AssetAuthoringSession {
+  return store.replace(session.sessionId, {
+    state: 'needs-user-action',
+    reason: 'formal-archive-stale',
+    phase: session.phase,
+    checkpoint: session.checkpoint === null
+      ? null
+      : { ...session.checkpoint, freshness: 'stale' },
+    checkpointFreshness: session.checkpointFreshness,
+    provenance: appendProvenance(session, {
+      kind: 'checkpoint-invalidated',
+      occurredAt: new Date().toISOString(),
+      ...(session.receipts.formalArchive?.archiveDigest === undefined
+        ? {}
+        : { digest: session.receipts.formalArchive.archiveDigest }),
+      summary,
+    }),
+  });
+}
+
+function markArchiveInspectionStale(
+  store: ReturnType<typeof createAssetAuthoringSessionStore>,
+  session: AssetAuthoringSession,
+  summary: string,
+): AssetAuthoringSession {
+  return store.replace(session.sessionId, {
+    state: 'needs-user-action',
+    reason: 'archive-inspection-stale',
+    phase: session.phase,
+    checkpoint: session.checkpoint === null
+      ? null
+      : { ...session.checkpoint, freshness: 'stale' },
+    checkpointFreshness: session.checkpointFreshness,
+    provenance: appendProvenance(session, {
+      kind: 'checkpoint-invalidated',
+      occurredAt: new Date().toISOString(),
+      ...(session.receipts.archiveInspection?.archiveDigest === undefined
+        ? {}
+        : { digest: session.receipts.archiveInspection.archiveDigest }),
+      summary,
+    }),
+  });
+}
+
+async function refreshFormalArchiveState(
+  store: ReturnType<typeof createAssetAuthoringSessionStore>,
+  session: AssetAuthoringSession,
+): Promise<AssetAuthoringSession> {
+  const formalArchive = session.receipts.formalArchive;
+  if (formalArchive === null || formalArchive === undefined) return session;
+  if (session.reason === 'formal-archive-stale') return session;
+  const formalStale = await formalArchiveReceiptStale(formalArchive, session);
+  if (formalStale !== undefined) {
+    return markFormalArchiveStale(store, session, `Formal archive receipt invalidated: ${formalStale}.`);
+  }
+  const inspection = session.receipts.archiveInspection;
+  if (inspection === null || inspection === undefined || session.reason === 'archive-inspection-stale') {
+    return session;
+  }
+  const inspectionStale = archiveInspectionReceiptStale(inspection, formalArchive);
+  return inspectionStale === undefined
+    ? session
+    : markArchiveInspectionStale(store, session, `Archive inspection receipt invalidated: ${inspectionStale}.`);
+}
+
+function sameArchiveInspectionReceiptBinding(
+  left: AssetAuthoringArchiveInspectionReceipt,
+  right: AssetAuthoringArchiveInspectionReceipt,
+): boolean {
+  return left.packId === right.packId
+    && left.version === right.version
+    && left.archivePath === right.archivePath
+    && left.archiveDigest === right.archiveDigest
+    && left.formalArchiveDigest === right.formalArchiveDigest
+    && left.manifestDigest === right.manifestDigest
+    && left.contentDigest === right.contentDigest
+    && sourceDigestSetsEqual(left.sourceDigests, right.sourceDigests)
+    && left.entryCount === right.entryCount
+    && left.totalUncompressedBytes === right.totalUncompressedBytes;
+}
+
+function validationReceiptMatchesReport(
+  session: AssetAuthoringSession,
+  report: AssetPackValidationReport,
+): boolean {
+  const validation = session.receipts.validation;
+  return report.valid
+    && report.contentDigest !== undefined
+    && report.manifestDigest !== undefined
+    && report.sourceDigests !== undefined
+    && validation !== null
+    && validation.id === report.contentDigest
+    && validation.manifestDigest === report.manifestDigest
+    && sourceDigestSetsEqual(validation.sourceDigests, report.sourceDigests);
+}
+
+async function packCommand(
+  context: AuthoringCommandContext,
+  sessionId: string,
+): Promise<CliResponse<AuthoringResponseData>> {
+  if (context.runtime === undefined) {
+    throw new AuthoringCommandError(
+      'The asset authoring pack command requires prepared runtime assets.',
+      { code: 'asset_authoring_runtime_missing' },
+    );
+  }
+  const store = createAssetAuthoringSessionStore(context.workspace);
+  let session = await refreshFormalArchiveState(
+    store,
+    resumeSession(context.workspace, store.read(sessionId)),
+  );
+  if (session.conflict !== null || session.reason === 'external-png-drift') {
+    return commandOk('asset authoring pack', responseFor(session));
+  }
+
+  const report = await freshSessionValidation({
+    session,
+    workspace: context.workspace,
+    runtime: context.runtime,
+  });
+  const releaseGates = releaseGateFreshness(session);
+  if (!validationReceiptMatchesReport(session, report) || !releaseGates.releaseReady) {
+    const blocked: AssetAuthoringSession = {
+      ...session,
+      state: 'needs-user-action',
+      reason: 'release-gates-incomplete',
+    };
+    return commandOk('asset authoring pack', responseFor(blocked, { validation: report }));
+  }
+
+  if (!flagBoolean(context.parsed.flags, 'confirm')) {
+    const pending: AssetAuthoringSession = {
+      ...session,
+      state: 'needs-user-action',
+      reason: 'formal-pack-confirmation-required',
+    };
+    return commandOk('asset authoring pack', responseFor(pending, { validation: report }));
+  }
+
+  const outputArgument = flagString(context.parsed.flags, 'output');
+  const outputPath = resolveFormalArchivePath({
+    cwd: context.cwd,
+    workspace: context.workspace,
+    session,
+    ...(outputArgument === undefined ? {} : { outputPath: outputArgument }),
+    runtime: context.runtime,
+  });
+  const previous = session.receipts.formalArchive;
+  const existingBytes = readRegularFile(outputPath);
+  if (previous !== null && previous !== undefined) {
+    const stale = await formalArchiveReceiptStale(previous, session);
+    const canRecoverExternalArchive = stale === 'the recorded formal archive is missing or not regular'
+      || stale === 'the recorded formal archive bytes changed externally';
+    const canPublishRecovery = canRecoverExternalArchive
+      && (previous.archivePath !== outputPath || existingBytes === undefined);
+    if (stale !== undefined && !canPublishRecovery) {
+      session = session.reason === 'formal-archive-stale'
+        ? session
+        : markFormalArchiveStale(store, session, `Formal archive receipt invalidated: ${stale}.`);
+      return commandOk('asset authoring pack', responseFor(session, { validation: report }));
+    }
+    if (previous.archivePath === outputPath && existingBytes !== undefined
+      && sha256(existingBytes) === previous.archiveDigest) {
+      if (session.reason === 'archive-inspection-current'
+        && session.receipts.archiveInspection !== null
+        && session.receipts.archiveInspection !== undefined) {
+        return commandOk('asset authoring pack', responseFor(session, { validation: report }));
+      }
+      const current = session.reason === 'formal-archive-current'
+        ? session
+        : store.replace(sessionId, {
+          state: 'needs-user-action',
+          reason: 'formal-archive-current',
+          phase: session.phase,
+          checkpoint: {
+            id: 'formalArchive',
+            phase: session.phase,
+            digest: previous.archiveDigest,
+            freshness: 'current',
+          },
+          checkpointFreshness: 'current',
+        });
+      return commandOk('asset authoring pack', responseFor(current, { validation: report }));
+    }
+  }
+  if (existingBytes !== undefined && (previous === null || previous === undefined
+    || previous.archivePath !== outputPath || sha256(existingBytes) !== previous.archiveDigest)) {
+    throw new AuthoringCommandError(
+      `Formal archive output already contains different bytes: ${outputPath}.`,
+      { code: 'asset_authoring_formal_archive_conflict', path: outputPath },
+    );
+  }
+
+  const result = await createFormalArchive({
+    cwd: context.cwd,
+    workspace: context.workspace,
+    session,
+    runtime: context.runtime,
+    ...(outputArgument === undefined ? {} : { outputPath: outputArgument }),
+  });
+  const validationAfter = session.receipts.validation;
+  if (
+    validationAfter === null
+    || result.manifestDigest !== validationAfter.manifestDigest
+    || result.contentDigest !== validationAfter.id
+    || !sourceDigestSetsEqual(result.sourceDigests, validationAfter.sourceDigests)
+  ) {
+    throw new AuthoringCommandError(
+      'The session source evidence changed while formal archive bytes were being published.',
+      { code: 'asset_authoring_formal_archive_race', path: outputPath },
+    );
+  }
+  const generatedReceipt = formalArchiveReceiptFor({
+    session,
+    archivePath: result.pack.archivePath,
+    archiveDigest: result.pack.archiveDigest,
+    manifestDigest: result.manifestDigest,
+    contentDigest: result.contentDigest,
+    sourceDigests: result.sourceDigests,
+  });
+  const receipt = previous !== null
+    && previous !== undefined
+    && sameFormalArchiveReceiptBinding(previous, generatedReceipt)
+    ? previous
+    : generatedReceipt;
+  const next = store.replace(sessionId, {
+    state: 'needs-user-action',
+    reason: 'formal-archive-current',
+    phase: session.phase,
+    checkpoint: {
+      id: 'formalArchive',
+      phase: session.phase,
+      digest: receipt.archiveDigest,
+      freshness: 'current',
+    },
+    checkpointFreshness: 'current',
+    receipts: {
+      ...session.receipts,
+      formalArchive: receipt,
+    },
+    provenance: appendProvenance(session, {
+      kind: 'formal-archive-recorded',
+      occurredAt: receipt.recordedAt,
+      digest: receipt.archiveDigest,
+      summary: 'Deterministic formal asset-pack archive recorded after all release gates passed.',
+    }),
+  });
+  return commandOk(
+    'asset authoring pack',
+    responseFor(next, {
+      validation: report,
+      artifacts: [{
+        id: 'formal-archive',
+        path: receipt.archivePath,
+        digest: receipt.archiveDigest,
+      }],
+    }),
+  );
+}
+
+async function inspectCommand(
+  context: AuthoringCommandContext,
+  sessionId: string,
+): Promise<CliResponse<AuthoringResponseData>> {
+  if (context.runtime === undefined) {
+    throw new AuthoringCommandError(
+      'The asset authoring inspect command requires prepared runtime assets.',
+      { code: 'asset_authoring_runtime_missing' },
+    );
+  }
+  const archiveArgument = flagString(context.parsed.flags, 'archive');
+  if (archiveArgument === undefined) {
+    throw new AuthoringCommandError(
+      'Inspection requires --archive.',
+      { code: 'missing_argument', path: '--archive' },
+    );
+  }
+  const store = createAssetAuthoringSessionStore(context.workspace);
+  const archivePath = path.resolve(context.cwd, archiveArgument);
+  const inspected = await inspectAssetPackArchive({
+    archivePath,
+    runtime: context.runtime,
+  });
+  const diagnostic = inspected.report.diagnostics.find((entry) => entry.severity === 'error')
+    ?? inspected.report.diagnostics[0];
+  if (!inspected.report.valid || inspected.report.archiveDigest === undefined || inspected.snapshot === undefined) {
+    throw new AuthoringCommandError(
+      diagnostic?.message ?? 'The formal archive did not pass inspection.',
+      {
+        code: diagnostic?.code ?? 'asset_authoring_archive_inspection_failed',
+        path: diagnostic?.path ?? archivePath,
+      },
+    );
+  }
+
+  const session = await refreshFormalArchiveState(
+    store,
+    resumeSession(context.workspace, store.read(sessionId)),
+  );
+
+  const formalArchive = session.receipts.formalArchive;
+  if (formalArchive === null || formalArchive === undefined) {
+    const pending: AssetAuthoringSession = {
+      ...session,
+      state: 'needs-user-action',
+      reason: 'formal-archive-missing',
+    };
+    return commandOk('asset authoring inspect', responseFor(pending, {
+      artifacts: [{
+        id: 'inspected-archive',
+        path: archivePath,
+        digest: inspected.report.archiveDigest,
+      }],
+    }));
+  }
+  if (
+    inspected.report.archiveDigest !== formalArchive.archiveDigest
+    || inspected.report.packId !== formalArchive.packId
+    || inspected.report.version !== formalArchive.version
+    || inspected.report.contentDigest !== formalArchive.contentDigest
+  ) {
+    const mismatch: AssetAuthoringSession = {
+      ...session,
+      state: 'needs-user-action',
+      reason: 'archive-inspection-mismatch',
+    };
+    return commandOk('asset authoring inspect', responseFor(mismatch, {
+      artifacts: [{
+        id: 'inspected-archive',
+        path: archivePath,
+        digest: inspected.report.archiveDigest,
+      }],
+    }));
+  }
+
+  const generatedReceipt: AssetAuthoringArchiveInspectionReceipt = {
+    schema: 'lpc-toolkit.asset-authoring-archive-inspection-receipt.v1',
+    packId: formalArchive.packId,
+    version: formalArchive.version,
+    archivePath,
+    archiveDigest: inspected.report.archiveDigest,
+    formalArchiveDigest: formalArchive.archiveDigest,
+    manifestDigest: formalArchive.manifestDigest,
+    contentDigest: inspected.report.contentDigest ?? formalArchive.contentDigest,
+    sourceDigests: formalArchive.sourceDigests,
+    entryCount: inspected.report.entryCount,
+    totalUncompressedBytes: inspected.report.totalUncompressedBytes,
+    recordedAt: new Date().toISOString(),
+  };
+  const previous = session.receipts.archiveInspection;
+  const receipt = previous !== null
+    && previous !== undefined
+    && sameArchiveInspectionReceiptBinding(previous, generatedReceipt)
+    ? previous
+    : generatedReceipt;
+  if (previous !== null
+    && previous !== undefined
+    && sameArchiveInspectionReceiptBinding(previous, generatedReceipt)
+    && session.reason === 'archive-inspection-current') {
+    return commandOk('asset authoring inspect', responseFor(session));
+  }
+  const next = store.replace(sessionId, {
+    state: 'completed',
+    reason: 'archive-inspection-current',
+    phase: session.phase,
+    checkpoint: {
+      id: 'archiveInspection',
+      phase: session.phase,
+      digest: receipt.archiveDigest,
+      freshness: 'current',
+    },
+    checkpointFreshness: 'current',
+    receipts: {
+      ...session.receipts,
+      archiveInspection: receipt,
+    },
+    provenance: appendProvenance(session, {
+      kind: 'archive-inspection-recorded',
+      occurredAt: receipt.recordedAt,
+      digest: receipt.archiveDigest,
+      summary: 'Exact formal archive bytes passed structural, checksum, attribution, and installability inspection.',
+    }),
+  });
+  return commandOk(
+    'asset authoring inspect',
+    responseFor(next, {
+      artifacts: [{
+        id: 'formal-archive',
+        path: formalArchive.archivePath,
+        digest: formalArchive.archiveDigest,
+      }],
+    }),
+  );
 }
 
 function syncFailureIsStale(
@@ -1317,10 +1973,9 @@ async function resumeCommand(
 ): Promise<CliResponse<AuthoringResponseData>> {
   const store = createAssetAuthoringSessionStore(workspace);
   const session = store.read(sessionId);
-  const resumed = await refreshSyncReceiptState(
-    workspace,
+  const resumed = await refreshFormalArchiveState(
     store,
-    resumeSession(workspace, session),
+    await refreshSyncReceiptState(workspace, store, resumeSession(workspace, session)),
   );
   return commandOk('asset authoring resume', responseFor(
     resumed,
@@ -2878,6 +3533,8 @@ export async function runAssetAuthoringCommand(
     if (authoringCommand === 'declare') return await declareCommand(context, sessionId);
     if (authoringCommand === 'accept-preview') return await acceptPreviewCommand(context, sessionId);
     if (authoringCommand === 'draft') return await draftCommand(context, sessionId);
+    if (authoringCommand === 'pack') return await packCommand(context, sessionId);
+    if (authoringCommand === 'inspect') return await inspectCommand(context, sessionId);
     if (authoringCommand === 'sync') return await syncCommand(context, sessionId);
     if (authoringCommand === 'preview') return await previewCommand(context, sessionId);
     if (authoringCommand === 'status') return await statusSession(context.workspace, sessionId);

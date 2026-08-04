@@ -268,6 +268,28 @@ coordinator: archive bytes, inspection/install policy, linked sync, registry,
 managed-output audit, transaction, and doctor behavior remain owned by their
 existing modules.
 
+Phase 3 formal pack/inspect changes add this focused red/green map:
+
+```sh
+pnpm --filter @lpc-toolkit/cli test -- asset-authoring-release.test.ts asset-authoring-session.test.ts command-spec.test.ts main-human.test.ts response.test.ts
+pnpm --filter @lpc-toolkit/cli test -- asset-pack-packaging.test.ts asset-pack-inspection.test.ts asset-pack-archive-format.test.ts
+pnpm --filter @lpc-toolkit/cli run typecheck
+pnpm check:boundaries
+pnpm verify:cli-docs-policy
+pnpm verify:plugin
+```
+
+The Phase 3 tests use the public `runCli` seam plus real temporary workspaces
+and shared pack/inspection authorities. They prove release-gate refusal,
+explicit formal-pack confirmation, contained output, deterministic formal
+fixture parity, draft-marker exclusion, exact-byte inspection, idempotency,
+external archive/source drift, copied-archive mismatch, and recovery to a new
+contained output without overwriting changed bytes. The session wrapper owns
+only gate projection, receipt persistence, and recovery actions; archive
+format, checksum, attribution, validation, and inspection policy stay in the
+existing modules. Phase 4 consumer installation and its installation receipt
+remain deferred.
+
 The final documentation and release-contract map is:
 
 ```sh
@@ -284,8 +306,8 @@ pnpm verify
 These checks prove the advertised capability/schema identifiers, public
 command/help wording, plugin-version alignment, landing distinction between
 composition and asset publication, and the clean packed-CLI authoring flow.
-They do not add provider invocation, a Web session bridge, or formal release
-orchestration to the shipped product.
+They do not add provider invocation, a Web session bridge, consumer
+installation, or remote release infrastructure to the shipped product.
 
 Run `pnpm check:boundaries` for every asset-pack architecture change. Run
 the packed CLI smoke conditionally whenever CLI package metadata, build output,

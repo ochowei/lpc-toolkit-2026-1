@@ -130,6 +130,11 @@ const releaseAcceptanceCommands = [
   'lpc-toolkit asset authoring accept-preview --session <session-id> --preview-digest <sha256> --confirm',
 ] as const;
 
+const releasePublicationCommands = [
+  'lpc-toolkit asset authoring pack --session <session-id> --confirm',
+  'lpc-toolkit asset authoring inspect --session <session-id> --archive <archive>',
+] as const;
+
 const releaseRecoveryCommands = [
   'lpc-toolkit asset authoring draft --session <session-id>',
   'lpc-toolkit asset authoring sync --session <session-id> --confirm',
@@ -267,7 +272,18 @@ export function CliPage({ onNavigate }: ProductPageProps) {
             <p className="mt-4 text-sm text-text-2">
               These receipts govern the authoring session only. Formal archive
               publication and consumer installation remain separate CLI steps.
+              Once every release gate is current, formal pack writes a
+              non-draft archive below the session-owned release-artifacts
+              directory; inspect records the exact archive digest only when it
+              matches that formal receipt.
             </p>
+            <ol className="mt-4 space-y-3">
+              {releasePublicationCommands.map((command, index) => (
+                <li key={`${index}-${command}`}>
+                  <CopyCode children={command} />
+                </li>
+              ))}
+            </ol>
             <h3 className="mt-5 text-lg font-semibold text-text">
               Recover or synchronize the session separately
             </h3>

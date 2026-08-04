@@ -253,6 +253,10 @@ export async function packAssetPack(options: {
   readonly packDirectory: string;
   readonly workspace: AssetWorkspace;
   readonly runtime: RuntimeAssets;
+  /** Optional caller-owned publication target; the default remains pack-adjacent. */
+  readonly archivePath?: string;
+  /** Refuse a pre-existing caller-owned target instead of replacing it. */
+  readonly refuseExistingTarget?: boolean;
   readonly fileOps?: AssetPackArchivePublicationFileOps;
   readonly sourceFileOps?: AssetPackDirectoryFileOps;
 }): Promise<PackAssetPackResult> {
@@ -308,14 +312,32 @@ export async function packAssetPack(options: {
     );
   }
 
-  const archivePath = path.join(
-    path.dirname(snapshot.root),
-    `${snapshot.pack.id}-${snapshot.pack.version}.lpc-assets.zip`,
-  );
+  const archivePath = options.archivePath === undefined
+    ? path.join(
+      path.dirname(snapshot.root),
+      `${snapshot.pack.id}-${snapshot.pack.version}.lpc-assets.zip`,
+    )
+    : path.resolve(options.archivePath);
   const directoryError = assertPublicationDirectory(path.dirname(archivePath), fileOps);
   if (directoryError) return failure('asset_pack_archive_target_unsafe', directoryError);
   const targetError = assertArchiveTarget(archivePath, fileOps);
   if (targetError) return failure('asset_pack_archive_target_unsafe', targetError);
+  if (options.refuseExistingTarget) {
+    try {
+      fileOps.lstatSync(archivePath);
+      return failure(
+        'asset_pack_archive_target_conflict',
+        `Asset-pack archive target already exists: ${archivePath}.`,
+      );
+    } catch (error) {
+      if (!isMissing(error)) {
+        return failure(
+          'asset_pack_archive_target_unsafe',
+          error instanceof Error ? error.message : 'Could not inspect asset-pack archive target.',
+        );
+      }
+    }
+  }
 
   const expectedArchiveDigest = archiveDigest(archiveBytes);
   const temporaryPath = siblingPath(archivePath, 'tmp');

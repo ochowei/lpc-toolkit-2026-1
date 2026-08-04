@@ -51,14 +51,16 @@ The capability response must retain the exact shipped identifiers
 `asset-authoring-session.v1`, `sprite-drawing-contract.v1`,
 `asset-authoring-candidate-import.v1`, `asset-authoring-recovery.v1`, and
 `asset-authoring-release.v1`, and `asset-authoring-draft-recovery.v1`, plus the
-seven versioned authoring/release schemas.
+nine versioned authoring/release schemas, including
+`lpc-toolkit.asset-authoring-formal-archive-receipt.v1` and
+`lpc-toolkit.asset-authoring-archive-inspection-receipt.v1`.
 Check that the CLI help lists `start`, `status`, `resume`, `contract`, `import`,
 `validate`, `preview`, `acknowledge`, `declare`, `accept-preview`, and
-`reconcile-manifest`, `draft`, and `sync`, and that the CLI README, root README, landing copy, and
+`reconcile-manifest`, `draft`, `sync`, `pack`, and `inspect`, and that the CLI README, root README, landing copy, and
 plugin compatibility references describe the same boundary. Plugin `0.2.1`
 must continue to document CLI range `>=0.2.0 <0.3.0`; the plugin intentionally
-does not claim or invoke the authoring-session release, draft-recovery, or
-manager-sync capabilities.
+does not claim or invoke the authoring-session release, draft-recovery,
+formal-pack, formal-inspect, or manager-sync capabilities.
 
 Phase 1's release boundary is still session evidence, not archive publication.
 The packed smoke must show `releaseGates.releaseReady: true` only after the
@@ -80,7 +82,20 @@ compile, marker, and generated-output digests in `syncReceipt`. Repeating an
 unchanged sync is a no-op. Source, manifest, registry, marker, output, or
 transaction drift must preserve the previous receipt as stale evidence and
 exercise the existing doctor/recovery path. These receipts are not formal pack,
-inspect, or consumer-install receipts; Phase 3 and Phase 4 remain deferred.
+inspect, or consumer-install receipts.
+
+Phase 3 adds the formal session boundary to the packed release proof. After
+the validation, declaration, preview-acceptance, and source gates are current,
+`asset authoring pack --session <id> --confirm` must publish a deterministic
+non-draft archive only below the session-owned `release-artifacts/` root and
+record `formalArchiveReceipt` after digest re-verification. The no-confirm path
+must return one confirmation action without writing the archive. The following
+`asset authoring inspect --session <id> --archive <archive>` call must use the
+existing inspection authority, remain read-only, and record `inspectionReceipt`
+only for the exact formal archive digest. Mutated archive bytes and valid
+copied archives must preserve the prior receipt and expose stale/mismatch
+recovery; a new contained output is the explicit recovery path. Formal pack and
+inspect never perform consumer installation.
 
 The packed CLI smoke remains the release proof for the public contract. In a
 clean workspace, it must discover capabilities, create a strict-plan session,

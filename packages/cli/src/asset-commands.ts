@@ -99,6 +99,8 @@ export function assetCommandRequirements(
       || parsed.command[2] === 'acknowledge'
       || parsed.command[2] === 'declare'
       || parsed.command[2] === 'accept-preview'
+      || parsed.command[2] === 'pack'
+      || parsed.command[2] === 'inspect'
       || parsed.command[2] === 'sync'
       || parsed.command[2] === 'preview'
       ? WORKSPACE_RUNTIME_REQUIREMENTS

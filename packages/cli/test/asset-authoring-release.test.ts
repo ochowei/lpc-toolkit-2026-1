@@ -20,6 +20,8 @@ import {
 } from '../src/asset-authoring-session.js';
 import { createDirectoryAssetStore } from '../src/asset-store.js';
 import { readAssetPackArchive } from '../src/asset-pack-archive-format.js';
+import { packAssetPack } from '../src/asset-pack-packaging.js';
+import { validateAssetPackDirectory } from '../src/asset-pack-validation.js';
 import { initializeAssetWorkspace } from '../src/asset-workspace.js';
 import { runCli, type CliDependencies } from '../src/main.js';
 import { createRuntimeContext } from '../src/context.js';
@@ -167,7 +169,7 @@ function createEmptyRuntime(cwd: string): RuntimeAssets {
   };
 }
 
-function writeWalkPng(filePath: string): void {
+function writeWalkPng(filePath: string, fillStyle = '#884422'): void {
   const geometry = standardAnimationGeometry('walk');
   const maxColumn = Math.max(
     ...geometry.rows.flatMap((row) => row.cells.map((cell) => cell.sourceColumn)),
@@ -177,7 +179,7 @@ function writeWalkPng(filePath: string): void {
     geometry.rows.length * geometry.frameSize,
   );
   const context = canvas.getContext('2d');
-  context.fillStyle = '#884422';
+  context.fillStyle = fillStyle;
   context.fillRect(0, 0, canvas.width, canvas.height);
   mkdirSync(path.dirname(filePath), { recursive: true });
   writeFileSync(filePath, canvas.toBuffer('image/png'));
@@ -208,6 +210,123 @@ function createPreparedSyncFixture(): ReturnType<typeof createDraftFixture> & {
     }],
   });
   return { ...fixture, session, runtime: createEmptyRuntime(fixture.workspaceRoot) };
+}
+
+function digest(bytes: Buffer): string {
+  return `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+}
+
+async function createFormalReadyFixture(): Promise<ReturnType<typeof createPreparedSyncFixture>> {
+  const fixture = createPreparedSyncFixture();
+  const report = await validateAssetPackDirectory({
+    packDirectory: fixture.packRoot,
+    workspace: fixture.workspace,
+    runtime: fixture.runtime,
+  });
+  if (!report.valid || report.contentDigest === undefined || report.manifestDigest === undefined
+    || report.sourceDigests === undefined) {
+    throw new Error(`Expected a formal-ready validation report: ${JSON.stringify(report)}`);
+  }
+  const previewRoot = path.join(fixture.packRoot, 'release-preview');
+  const previewPng = path.join(previewRoot, 'preview.png');
+  writeWalkPng(previewPng);
+  const metadataPath = path.join(previewRoot, 'metadata.json');
+  const creditsTxtPath = path.join(previewRoot, 'credits.txt');
+  const creditsCsvPath = path.join(previewRoot, 'credits.csv');
+  writeJson(metadataPath, { asset: PLAN.asset.localId, animation: 'walk' });
+  writeFileSync(creditsTxtPath, 'Draft Artist — CC-BY-SA 4.0\n');
+  writeFileSync(creditsCsvPath, 'filename,authors,licenses\n');
+  const artifacts = [
+    { id: 'preview:preview' as const, path: previewPng },
+    { id: 'preview:metadata' as const, path: metadataPath },
+    { id: 'preview:credits_txt' as const, path: creditsTxtPath },
+    { id: 'preview:credits_csv' as const, path: creditsCsvPath },
+  ].map((artifact) => ({ ...artifact, digest: digest(readFileSync(artifact.path)) }));
+  const manifestDigest = report.manifestDigest;
+  const sourceDigests = report.sourceDigests.map((source) => ({
+    path: source.path,
+    digest: source.digest,
+  }));
+  const validationReceipt = {
+    id: report.contentDigest,
+    manifestDigest,
+    sourceDigests,
+  };
+  const declarationDigest = digest(Buffer.from('formal-declaration'));
+  const declaration = {
+    schema: 'lpc-toolkit.asset-authoring-release-receipt.v1' as const,
+    kind: 'declaration' as const,
+    sessionId: fixture.session.sessionId,
+    cliVersion: '0.2.0',
+    recordedAt: '2026-08-04T00:00:00.000Z',
+    declarant: {
+      displayName: 'Release Artist',
+      kind: 'person' as const,
+      role: 'authorized-release-declarant' as const,
+    },
+    declarationDigest,
+    manifestDigest,
+    sourceDigests,
+    validationReceiptId: report.contentDigest,
+    validationReceiptRevision: report.contentDigest,
+    creditDigests: {
+      authorAndSource: digest(Buffer.from('credits')),
+      licenseAuthority: digest(Buffer.from('credits')),
+    },
+    acknowledgements: {
+      contentDigest: report.contentDigest,
+      recordDigests: [],
+    },
+  };
+  const previewAcceptance = {
+    schema: 'lpc-toolkit.asset-authoring-release-receipt.v1' as const,
+    kind: 'preview-acceptance' as const,
+    sessionId: fixture.session.sessionId,
+    cliVersion: '0.2.0',
+    recordedAt: '2026-08-04T00:00:01.000Z',
+    declarant: declaration.declarant,
+    declarationReceiptDigest: declarationDigest,
+    manifestDigest,
+    sourceDigests,
+    validationReceiptId: report.contentDigest,
+    validationReceiptRevision: report.contentDigest,
+    previewReceiptId: digest(Buffer.from('preview-input')),
+    previewInputDigest: digest(Buffer.from('preview-input')),
+    artifacts,
+  };
+  const store = createAssetAuthoringSessionStore(fixture.workspace);
+  const session = store.replace(fixture.session.sessionId, {
+    state: 'completed',
+    reason: 'preview-acceptance-current',
+    phase: 'previewed',
+    checkpoint: {
+      id: 'previewAcceptance',
+      phase: 'previewed',
+      digest: previewAcceptance.previewInputDigest,
+      freshness: 'current',
+    },
+    checkpointFreshness: 'current',
+    manifestDigest,
+    receipts: {
+      validation: validationReceipt,
+      preview: {
+        id: previewAcceptance.previewReceiptId,
+        manifestDigest,
+        sourceDigests,
+        validationReceiptId: report.contentDigest,
+        inputDigest: previewAcceptance.previewInputDigest,
+        artifacts,
+      },
+      acknowledgements: null,
+      releaseDeclaration: declaration,
+      previewAcceptance,
+      draftArchive: null,
+      sync: null,
+      formalArchive: null,
+      archiveInspection: null,
+    },
+  });
+  return { ...fixture, session };
 }
 
 function runJson<T>(
@@ -575,5 +694,317 @@ describe('session-aware release boundaries', () => {
       syncReceipt: firstReceipt,
       nextActions: [{ id: 'confirm-sync' }],
     });
+  });
+
+  it('refuses formal packaging before all release gates are current', async () => {
+    const fixture = createPreparedSyncFixture();
+    const sessionPath = assetAuthoringSessionPath(fixture.workspace, fixture.session.sessionId);
+    const sessionBefore = readFileSync(sessionPath);
+
+    const result = await runJson<{
+      readonly state: string;
+      readonly reason: string;
+      readonly formalArchiveReceipt: null;
+      readonly nextActions: readonly { readonly id: string }[];
+    }>([
+      'asset', 'authoring', 'pack', '--session', fixture.session.sessionId, '--confirm',
+    ], fixture.workspaceRoot, {
+      prepareRuntimeAssets: async () => fixture.runtime,
+    });
+
+    expect(result.code).toBe(0);
+    expect(result.response.errors).toEqual([]);
+    expect(result.response.data).toMatchObject({
+      state: 'needs-user-action',
+      reason: 'release-gates-incomplete',
+      formalArchiveReceipt: null,
+      nextActions: [{ id: 'validate-session' }],
+    });
+    expect(readFileSync(sessionPath)).toEqual(sessionBefore);
+    expect(existsSync(path.join(
+      path.dirname(sessionPath),
+      'release-artifacts',
+      `${PLAN.pack.id}-${PLAN.pack.version}.lpc-assets.zip`,
+    ))).toBe(false);
+  });
+
+  it('publishes and inspects the exact formal archive after explicit confirmation', async () => {
+    const fixture = await createFormalReadyFixture();
+    const { workspaceRoot, workspace, runtime, session } = fixture;
+    const pending = await runJson<{
+      readonly state: string;
+      readonly reason: string;
+      readonly formalArchiveReceipt: null;
+      readonly nextActions: readonly { readonly id: string; readonly safety: string }[];
+    }>(['asset', 'authoring', 'pack', '--session', session.sessionId], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    expect(pending.code).toBe(0);
+    expect(pending.response.data).toMatchObject({
+      state: 'needs-user-action',
+      reason: 'formal-pack-confirmation-required',
+      formalArchiveReceipt: null,
+      nextActions: [{ id: 'pack-formal-archive', safety: 'requires-confirmation' }],
+    });
+
+    const packed = await runJson<{
+      readonly state: string;
+      readonly reason: string;
+      readonly formalArchiveReceipt: {
+        readonly schema: string;
+        readonly archivePath: string;
+        readonly archiveDigest: string;
+        readonly manifestDigest: string;
+        readonly contentDigest: string;
+        readonly sourceDigests: readonly { readonly path: string; readonly digest: string }[];
+        readonly validationReceiptId: string;
+        readonly declarationReceiptDigest: string;
+        readonly previewAcceptanceReceiptDigest: string;
+        readonly previewInputDigest: string;
+        readonly previewArtifacts: readonly { readonly id: string; readonly digest: string }[];
+      } | null;
+      readonly inspectionReceipt: null;
+    }>(['asset', 'authoring', 'pack', '--session', session.sessionId, '--confirm'], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    expect(packed.code, JSON.stringify(packed.response, null, 2)).toBe(0);
+    expect(packed.response.data).toMatchObject({
+      state: 'needs-user-action',
+      reason: 'formal-archive-current',
+      formalArchiveReceipt: {
+        schema: 'lpc-toolkit.asset-authoring-formal-archive-receipt.v1',
+        archivePath: expect.stringContaining('/release-artifacts/'),
+        archiveDigest: expect.stringMatching(/^sha256:[0-9a-f]{64}$/u),
+        manifestDigest: expect.stringMatching(/^sha256:[0-9a-f]{64}$/u),
+        contentDigest: expect.stringMatching(/^sha256:[0-9a-f]{64}$/u),
+        validationReceiptId: expect.stringMatching(/^sha256:[0-9a-f]{64}$/u),
+        declarationReceiptDigest: expect.stringMatching(/^sha256:[0-9a-f]{64}$/u),
+        previewAcceptanceReceiptDigest: expect.stringMatching(/^sha256:[0-9a-f]{64}$/u),
+        previewInputDigest: expect.stringMatching(/^sha256:[0-9a-f]{64}$/u),
+      },
+      inspectionReceipt: null,
+      nextActions: [{ id: 'inspect-formal-archive' }],
+    });
+    const formalReceipt = packed.response.data?.formalArchiveReceipt;
+    if (formalReceipt === null || formalReceipt === undefined) {
+      throw new Error('Expected a formal archive receipt.');
+    }
+    expect(path.dirname(formalReceipt.archivePath)).toBe(
+      path.join(path.dirname(assetAuthoringSessionPath(workspace, session.sessionId)), 'release-artifacts'),
+    );
+    expect(existsSync(path.join(
+      path.dirname(fixture.packRoot),
+      `${PLAN.pack.id}-${PLAN.pack.version}.lpc-assets.zip`,
+    ))).toBe(false);
+    const archive = await readAssetPackArchive({ archivePath: formalReceipt.archivePath });
+    expect(archive.ok).toBe(true);
+    if (!archive.ok) throw new Error('Expected formal archive bytes to be readable.');
+    expect(archive.snapshot.payload.pack.status).toBeUndefined();
+
+    const inspected = await runJson<{
+      readonly state: string;
+      readonly reason: string;
+      readonly formalArchiveReceipt: typeof formalReceipt;
+      readonly inspectionReceipt: {
+        readonly archivePath: string;
+        readonly archiveDigest: string;
+        readonly formalArchiveDigest: string;
+        readonly entryCount: number;
+        readonly totalUncompressedBytes: number;
+      } | null;
+    }>([
+      'asset', 'authoring', 'inspect', '--session', session.sessionId,
+      '--archive', formalReceipt.archivePath,
+    ], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    expect(inspected.code, JSON.stringify(inspected.response, null, 2)).toBe(0);
+    expect(inspected.response.data).toMatchObject({
+      state: 'completed',
+      reason: 'archive-inspection-current',
+      formalArchiveReceipt: formalReceipt,
+      inspectionReceipt: {
+        archivePath: formalReceipt.archivePath,
+        archiveDigest: formalReceipt.archiveDigest,
+        formalArchiveDigest: formalReceipt.archiveDigest,
+        entryCount: expect.any(Number),
+        totalUncompressedBytes: expect.any(Number),
+      },
+    });
+    const inspectionReceipt = inspected.response.data?.inspectionReceipt;
+    if (inspectionReceipt === null || inspectionReceipt === undefined) {
+      throw new Error('Expected an archive inspection receipt.');
+    }
+    const sessionPath = assetAuthoringSessionPath(workspace, session.sessionId);
+    const afterInspection = readFileSync(sessionPath);
+    const repeated = await runJson<{
+      readonly inspectionReceipt: typeof inspectionReceipt;
+    }>([
+      'asset', 'authoring', 'inspect', '--session', session.sessionId,
+      '--archive', formalReceipt.archivePath,
+    ], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    expect(repeated.code).toBe(0);
+    expect(repeated.response.data?.inspectionReceipt).toEqual(inspectionReceipt);
+    expect(readFileSync(sessionPath)).toEqual(afterInspection);
+
+    const humanStdout: string[] = [];
+    const humanStderr: string[] = [];
+    const humanCode = await runCli([
+      'asset', 'authoring', 'status', '--session', session.sessionId,
+    ], {
+      cwd: workspaceRoot,
+      stdout: (text) => humanStdout.push(text),
+      stderr: (text) => humanStderr.push(text),
+    });
+    expect(humanCode).toBe(0);
+    expect(humanStderr).toEqual([]);
+    expect(humanStdout.join('')).toContain(`Formal archive: ${formalReceipt.archivePath}`);
+    expect(humanStdout.join('')).toContain(`Archive inspection: ${inspectionReceipt.archivePath}`);
+  });
+
+  it('rejects a traversal formal archive destination without changing session or filesystem state', async () => {
+    const fixture = await createFormalReadyFixture();
+    const sessionPath = assetAuthoringSessionPath(fixture.workspace, fixture.session.sessionId);
+    const sessionBefore = readFileSync(sessionPath);
+    const escapedPath = path.join(fixture.root, 'escaped-formal.lpc-assets.zip');
+
+    const result = await runJson<null>([
+      'asset', 'authoring', 'pack', '--session', fixture.session.sessionId,
+      '--output', '../escaped-formal.lpc-assets.zip', '--confirm',
+    ], fixture.workspaceRoot, {
+      prepareRuntimeAssets: async () => fixture.runtime,
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.response.errors).toEqual([
+      expect.objectContaining({ code: 'asset_authoring_formal_path_invalid' }),
+    ]);
+    expect(existsSync(escapedPath)).toBe(false);
+    expect(readFileSync(sessionPath)).toEqual(sessionBefore);
+  });
+
+  it('preserves a formal receipt and refuses to overwrite externally changed archive bytes', async () => {
+    const fixture = await createFormalReadyFixture();
+    const packed = await runJson<{
+      readonly formalArchiveReceipt: { readonly archivePath: string; readonly archiveDigest: string } | null;
+    }>(['asset', 'authoring', 'pack', '--session', fixture.session.sessionId, '--confirm'], fixture.workspaceRoot, {
+      prepareRuntimeAssets: async () => fixture.runtime,
+    });
+    const formalReceipt = packed.response.data?.formalArchiveReceipt;
+    if (formalReceipt === null || formalReceipt === undefined) {
+      throw new Error('Expected a formal archive receipt.');
+    }
+    const tamperedBytes = Buffer.from('tampered-formal-archive');
+    writeFileSync(formalReceipt.archivePath, tamperedBytes);
+
+    const status = await runJson<{
+      readonly state: string;
+      readonly reason: string;
+      readonly formalArchiveReceipt: typeof formalReceipt;
+      readonly nextActions: readonly { readonly id: string }[];
+    }>(['asset', 'authoring', 'status', '--session', fixture.session.sessionId], fixture.workspaceRoot);
+    expect(status.code).toBe(0);
+    expect(status.response.data).toMatchObject({
+      state: 'needs-user-action',
+      reason: 'formal-archive-stale',
+      formalArchiveReceipt: formalReceipt,
+      nextActions: [{ id: 'pack-formal-archive' }],
+    });
+
+    const retry = await runJson<{
+      readonly reason: string;
+      readonly formalArchiveReceipt: typeof formalReceipt;
+    }>(['asset', 'authoring', 'pack', '--session', fixture.session.sessionId, '--confirm'], fixture.workspaceRoot, {
+      prepareRuntimeAssets: async () => fixture.runtime,
+    });
+    expect(retry.code).toBe(0);
+    expect(retry.response.data).toMatchObject({
+      reason: 'formal-archive-stale',
+      formalArchiveReceipt: formalReceipt,
+    });
+    expect(readFileSync(formalReceipt.archivePath)).toEqual(tamperedBytes);
+
+    const recoveryPath = path.join(
+      path.dirname(formalReceipt.archivePath),
+      'recovered-formal.lpc-assets.zip',
+    );
+    const recovered = await runJson<{
+      readonly reason: string;
+      readonly formalArchiveReceipt: {
+        readonly archivePath: string;
+        readonly archiveDigest: string;
+      } | null;
+    }>([
+      'asset', 'authoring', 'pack', '--session', fixture.session.sessionId,
+      '--output', recoveryPath, '--confirm',
+    ], fixture.workspaceRoot, {
+      prepareRuntimeAssets: async () => fixture.runtime,
+    });
+    expect(recovered.code, JSON.stringify(recovered.response, null, 2)).toBe(0);
+    expect(recovered.response.data).toMatchObject({
+      reason: 'formal-archive-current',
+      formalArchiveReceipt: {
+        archivePath: recoveryPath,
+        archiveDigest: expect.stringMatching(/^sha256:[0-9a-f]{64}$/u),
+      },
+    });
+    expect(readFileSync(formalReceipt.archivePath)).toEqual(tamperedBytes);
+    expect(existsSync(recoveryPath)).toBe(true);
+  });
+
+  it('does not adopt a valid but different archive during session inspection', async () => {
+    const fixture = await createFormalReadyFixture();
+    const packed = await runJson<{
+      readonly formalArchiveReceipt: {
+        readonly archivePath: string;
+        readonly archiveDigest: string;
+        readonly contentDigest: string;
+      } | null;
+    }>(['asset', 'authoring', 'pack', '--session', fixture.session.sessionId, '--confirm'], fixture.workspaceRoot, {
+      prepareRuntimeAssets: async () => fixture.runtime,
+    });
+    const formalReceipt = packed.response.data?.formalArchiveReceipt;
+    if (formalReceipt === null || formalReceipt === undefined) {
+      throw new Error('Expected a formal archive receipt.');
+    }
+
+    const originalSource = readFileSync(fixture.sourcePath);
+    const alternatePath = path.join(fixture.root, 'alternate-formal.lpc-assets.zip');
+    writeWalkPng(fixture.sourcePath, '#224488');
+    const alternate = await packAssetPack({
+      packDirectory: fixture.packRoot,
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+      archivePath: alternatePath,
+    });
+    expect(alternate.ok).toBe(true);
+    if (!alternate.ok) throw new Error('Expected the alternate formal archive to be valid.');
+    expect(alternate.archiveDigest).not.toBe(formalReceipt.archiveDigest);
+    expect(alternate.contentDigest).not.toBe(formalReceipt.contentDigest);
+    writeFileSync(fixture.sourcePath, originalSource);
+
+    const sessionBefore = readFileSync(assetAuthoringSessionPath(fixture.workspace, fixture.session.sessionId));
+    const inspected = await runJson<{
+      readonly state: string;
+      readonly reason: string;
+      readonly formalArchiveReceipt: typeof formalReceipt;
+      readonly inspectionReceipt: null;
+    }>([
+      'asset', 'authoring', 'inspect', '--session', fixture.session.sessionId,
+      '--archive', alternatePath,
+    ], fixture.workspaceRoot, {
+      prepareRuntimeAssets: async () => fixture.runtime,
+    });
+    expect(inspected.code).toBe(0);
+    expect(inspected.response.data).toMatchObject({
+      state: 'needs-user-action',
+      reason: 'archive-inspection-mismatch',
+      formalArchiveReceipt: formalReceipt,
+      inspectionReceipt: null,
+    });
+    expect(readFileSync(assetAuthoringSessionPath(fixture.workspace, fixture.session.sessionId)))
+      .toEqual(sessionBefore);
   });
 });

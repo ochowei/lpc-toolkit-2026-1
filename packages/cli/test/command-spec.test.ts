@@ -296,6 +296,8 @@ describe('helpForCommand', () => {
       'acknowledge',
       'declare',
       'accept-preview',
+      'pack',
+      'inspect',
       'preview',
       'reconcile-manifest',
     ]) {
@@ -326,6 +328,19 @@ describe('helpForCommand', () => {
     expect(helpForCommand(['asset', 'authoring', 'accept-preview'])).toContain(
       '--preview-digest <sha256>',
     );
+    const formalPackHelp = helpForCommand(['asset', 'authoring', 'pack']);
+    expect(formalPackHelp).toContain(
+      'lpc-toolkit asset authoring pack --session <session-id> [--output <archive>] --confirm',
+    );
+    expect(formalPackHelp).toContain('--confirm');
+    expect(formalPackHelp).toContain(
+      'Write the formal archive below the session release-artifact root.',
+    );
+    const formalInspectHelp = helpForCommand(['asset', 'authoring', 'inspect']);
+    expect(formalInspectHelp).toContain(
+      'lpc-toolkit asset authoring inspect --session <session-id> --archive <archive>',
+    );
+    expect(formalInspectHelp).toContain('--archive <archive>');
     expect(helpForCommand(['asset', 'authoring'])).toContain(
       'Create and resume provider-neutral asset authoring sessions from strict plans.',
     );

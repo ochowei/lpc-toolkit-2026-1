@@ -294,6 +294,33 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
     examples: ['lpc-toolkit asset authoring draft --session session-id --json'],
   },
   {
+    command: ['asset', 'authoring', 'pack'],
+    usage: 'lpc-toolkit asset authoring pack --session <session-id> [--output <archive>] --confirm [--workspace <directory>] [--json]',
+    description: 'Publish a deterministic formal asset-pack archive after all release gates pass.',
+    options: [
+      HELP_OPTION,
+      JSON_OPTION,
+      AUTHORING_SESSION_OPTION,
+      { name: 'output', kind: 'value', valueLabel: 'archive', description: 'Write the formal archive below the session release-artifact root.' },
+      { name: 'confirm', kind: 'boolean', description: 'Confirm formal archive publication after reviewing release evidence.' },
+      ASSET_WORKSPACE_OPTION,
+    ],
+    examples: ['lpc-toolkit asset authoring pack --session session-id --confirm --json'],
+  },
+  {
+    command: ['asset', 'authoring', 'inspect'],
+    usage: 'lpc-toolkit asset authoring inspect --session <session-id> --archive <archive> [--workspace <directory>] [--json]',
+    description: 'Inspect the exact formal archive bytes and record the session inspection checkpoint.',
+    options: [
+      HELP_OPTION,
+      JSON_OPTION,
+      AUTHORING_SESSION_OPTION,
+      { name: 'archive', kind: 'value', valueLabel: 'archive', description: 'Read the formal archive to inspect.' },
+      ASSET_WORKSPACE_OPTION,
+    ],
+    examples: ['lpc-toolkit asset authoring inspect --session session-id --archive release.lpc-assets.zip --json'],
+  },
+  {
     command: ['asset', 'authoring', 'sync'],
     usage: 'lpc-toolkit asset authoring sync --session <session-id> [--confirm] [--workspace <directory>] [--json]',
     description: 'Synchronize the current session pack into the manager-owned generated overlay after explicit confirmation.',

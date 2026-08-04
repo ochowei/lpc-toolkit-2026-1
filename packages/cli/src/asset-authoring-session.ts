@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   existsSync,
   lstatSync,
@@ -12,6 +12,7 @@ import {
 import path from 'node:path';
 import {
   ASSET_AUTHORING_RELEASE_ARTIFACT_IDS,
+  assetAuthoringReleaseReceiptDigestInput,
   parseAssetAuthoringPlan,
   parseAssetAuthoringReleaseReceipt,
   type AssetAuthoringPlan,
@@ -135,6 +136,10 @@ export interface AssetAuthoringAcknowledgementReceipt {
 
 export const ASSET_AUTHORING_DRAFT_RECEIPT_SCHEMA =
   'lpc-toolkit.asset-authoring-draft-receipt.v1' as const;
+export const ASSET_AUTHORING_FORMAL_ARCHIVE_RECEIPT_SCHEMA =
+  'lpc-toolkit.asset-authoring-formal-archive-receipt.v1' as const;
+export const ASSET_AUTHORING_ARCHIVE_INSPECTION_RECEIPT_SCHEMA =
+  'lpc-toolkit.asset-authoring-archive-inspection-receipt.v1' as const;
 
 export interface AssetAuthoringDraftArchiveReceipt {
   readonly schema: typeof ASSET_AUTHORING_DRAFT_RECEIPT_SCHEMA;
@@ -163,6 +168,38 @@ export interface AssetAuthoringSyncReceipt {
   readonly recordedAt: string;
 }
 
+export interface AssetAuthoringFormalArchiveReceipt {
+  readonly schema: typeof ASSET_AUTHORING_FORMAL_ARCHIVE_RECEIPT_SCHEMA;
+  readonly packId: string;
+  readonly version: string;
+  readonly archivePath: string;
+  readonly archiveDigest: string;
+  readonly manifestDigest: string;
+  readonly contentDigest: string;
+  readonly sourceDigests: readonly AssetAuthoringSourceDigest[];
+  readonly validationReceiptId: string;
+  readonly declarationReceiptDigest: string;
+  readonly previewAcceptanceReceiptDigest: string;
+  readonly previewInputDigest: string;
+  readonly previewArtifacts: readonly AssetAuthoringReleaseArtifactDigest[];
+  readonly recordedAt: string;
+}
+
+export interface AssetAuthoringArchiveInspectionReceipt {
+  readonly schema: typeof ASSET_AUTHORING_ARCHIVE_INSPECTION_RECEIPT_SCHEMA;
+  readonly packId: string;
+  readonly version: string;
+  readonly archivePath: string;
+  readonly archiveDigest: string;
+  readonly formalArchiveDigest: string;
+  readonly manifestDigest: string;
+  readonly contentDigest: string;
+  readonly sourceDigests: readonly AssetAuthoringSourceDigest[];
+  readonly entryCount: number;
+  readonly totalUncompressedBytes: number;
+  readonly recordedAt: string;
+}
+
 export type AssetAuthoringReleaseDeclarationReceipt =
   CoreAssetAuthoringReleaseDeclarationReceipt;
 
@@ -177,6 +214,8 @@ export interface AssetAuthoringSessionReceipts {
   readonly previewAcceptance: AssetAuthoringPreviewAcceptanceReceipt | null;
   readonly draftArchive?: AssetAuthoringDraftArchiveReceipt | null;
   readonly sync?: AssetAuthoringSyncReceipt | null;
+  readonly formalArchive?: AssetAuthoringFormalArchiveReceipt | null;
+  readonly archiveInspection?: AssetAuthoringArchiveInspectionReceipt | null;
 }
 
 export interface AssetAuthoringSessionCheckpoint {
@@ -199,6 +238,8 @@ export type AssetAuthoringProvenanceKind =
   | 'manifest-conflict'
   | 'draft-archive-recorded'
   | 'sync-receipt-recorded'
+  | 'formal-archive-recorded'
+  | 'archive-inspection-recorded'
   | 'provider'
   | 'human-declaration'
   | 'human-preview-acceptance';
@@ -300,6 +341,8 @@ export interface AssetAuthoringEvidence {
   readonly acknowledgementsReceipt?: AssetAuthoringAcknowledgementReceipt | null;
   readonly releaseDeclarationReceipt?: AssetAuthoringReleaseDeclarationReceipt | null;
   readonly previewAcceptanceReceipt?: AssetAuthoringPreviewAcceptanceReceipt | null;
+  readonly formalArchiveReceipt?: AssetAuthoringFormalArchiveReceipt | null;
+  readonly archiveInspectionReceipt?: AssetAuthoringArchiveInspectionReceipt | null;
   /** The newly requested preview input, separate from the last receipt. */
   readonly previewInputDigest?: string | null;
 }
@@ -313,7 +356,9 @@ export type AssetAuthoringInvalidationCheckpoint =
   | 'preview'
   | 'previewArtifacts'
   | 'releaseDeclaration'
-  | 'previewAcceptance';
+  | 'previewAcceptance'
+  | 'formalArchive'
+  | 'archiveInspection';
 
 export type AssetAuthoringInvalidationReason =
   | 'manifest-semantic-drift'
@@ -324,7 +369,9 @@ export type AssetAuthoringInvalidationReason =
   | 'preview-receipt-stale'
   | 'preview-artifact-stale'
   | 'release-declaration-stale'
-  | 'preview-acceptance-stale';
+  | 'preview-acceptance-stale'
+  | 'formal-archive-stale'
+  | 'archive-inspection-stale';
 
 export interface AssetAuthoringInvalidationDecision {
   readonly checkpoint: AssetAuthoringInvalidationCheckpoint;
@@ -530,6 +577,8 @@ function parseReceipts(value: unknown): AssetAuthoringSessionReceipts {
       'previewAcceptance',
       'draftArchive',
       'sync',
+      'formalArchive',
+      'archiveInspection',
     ],
     'session.receipts',
   );
@@ -554,6 +603,12 @@ function parseReceipts(value: unknown): AssetAuthoringSessionReceipts {
   const sync = record.sync === undefined || record.sync === null
     ? null
     : parseSyncReceipt(record.sync);
+  const formalArchive = record.formalArchive === undefined || record.formalArchive === null
+    ? null
+    : parseFormalArchiveReceipt(record.formalArchive);
+  const archiveInspection = record.archiveInspection === undefined || record.archiveInspection === null
+    ? null
+    : parseArchiveInspectionReceipt(record.archiveInspection);
   return {
     validation,
     preview,
@@ -562,6 +617,145 @@ function parseReceipts(value: unknown): AssetAuthoringSessionReceipts {
     previewAcceptance,
     draftArchive,
     sync,
+    formalArchive,
+    archiveInspection,
+  };
+}
+
+function parseAbsoluteReceiptPath(
+  record: JsonRecord,
+  key: string,
+  label: string,
+): string {
+  const value = requireString(record, key, label);
+  if (!path.isAbsolute(value)) {
+    fail('asset_authoring_session_path_invalid', `${label}.${key} must be absolute.`);
+  }
+  return value;
+}
+
+function parseFormalArchiveReceipt(value: unknown): AssetAuthoringFormalArchiveReceipt {
+  const record = requireRecord(value, 'session.receipts.formalArchive');
+  assertExactKeys(
+    record,
+    [
+      'schema',
+      'packId',
+      'version',
+      'archivePath',
+      'archiveDigest',
+      'manifestDigest',
+      'contentDigest',
+      'sourceDigests',
+      'validationReceiptId',
+      'declarationReceiptDigest',
+      'previewAcceptanceReceiptDigest',
+      'previewInputDigest',
+      'previewArtifacts',
+      'recordedAt',
+    ],
+    'session.receipts.formalArchive',
+  );
+  if (record.schema !== ASSET_AUTHORING_FORMAL_ARCHIVE_RECEIPT_SCHEMA) {
+    fail(
+      'asset_authoring_session_tampered',
+      `Unknown formal archive receipt schema: ${String(record.schema)}.`,
+    );
+  }
+  const previewArtifacts = parsePreviewArtifactReceipts(
+    record.previewArtifacts,
+    'session.receipts.formalArchive.previewArtifacts',
+  );
+  if (previewArtifacts === null) {
+    fail(
+      'asset_authoring_session_invalid',
+      'session.receipts.formalArchive.previewArtifacts must contain all release artifacts.',
+    );
+  }
+  return {
+    schema: ASSET_AUTHORING_FORMAL_ARCHIVE_RECEIPT_SCHEMA,
+    packId: requireString(record, 'packId', 'session.receipts.formalArchive'),
+    version: requireString(record, 'version', 'session.receipts.formalArchive'),
+    archivePath: parseAbsoluteReceiptPath(record, 'archivePath', 'session.receipts.formalArchive'),
+    archiveDigest: requireDigest(record.archiveDigest, 'session.receipts.formalArchive.archiveDigest'),
+    manifestDigest: requireDigest(record.manifestDigest, 'session.receipts.formalArchive.manifestDigest'),
+    contentDigest: requireDigest(record.contentDigest, 'session.receipts.formalArchive.contentDigest'),
+    sourceDigests: parseSourceDigests(
+      record.sourceDigests,
+      'session.receipts.formalArchive.sourceDigests',
+    ),
+    validationReceiptId: requireString(record, 'validationReceiptId', 'session.receipts.formalArchive'),
+    declarationReceiptDigest: requireDigest(
+      record.declarationReceiptDigest,
+      'session.receipts.formalArchive.declarationReceiptDigest',
+    ),
+    previewAcceptanceReceiptDigest: requireDigest(
+      record.previewAcceptanceReceiptDigest,
+      'session.receipts.formalArchive.previewAcceptanceReceiptDigest',
+    ),
+    previewInputDigest: requireDigest(
+      record.previewInputDigest,
+      'session.receipts.formalArchive.previewInputDigest',
+    ),
+    previewArtifacts,
+    recordedAt: requireTimestamp(record.recordedAt, 'session.receipts.formalArchive.recordedAt'),
+  };
+}
+
+function parseArchiveInspectionReceipt(value: unknown): AssetAuthoringArchiveInspectionReceipt {
+  const record = requireRecord(value, 'session.receipts.archiveInspection');
+  assertExactKeys(
+    record,
+    [
+      'schema',
+      'packId',
+      'version',
+      'archivePath',
+      'archiveDigest',
+      'formalArchiveDigest',
+      'manifestDigest',
+      'contentDigest',
+      'sourceDigests',
+      'entryCount',
+      'totalUncompressedBytes',
+      'recordedAt',
+    ],
+    'session.receipts.archiveInspection',
+  );
+  if (record.schema !== ASSET_AUTHORING_ARCHIVE_INSPECTION_RECEIPT_SCHEMA) {
+    fail(
+      'asset_authoring_session_tampered',
+      `Unknown archive inspection receipt schema: ${String(record.schema)}.`,
+    );
+  }
+  const entryCount = record.entryCount;
+  const totalUncompressedBytes = record.totalUncompressedBytes;
+  if (typeof entryCount !== 'number' || !Number.isInteger(entryCount) || entryCount < 0) {
+    fail('asset_authoring_session_invalid', 'session.receipts.archiveInspection.entryCount must be a non-negative integer.');
+  }
+  if (
+    typeof totalUncompressedBytes !== 'number'
+    || !Number.isInteger(totalUncompressedBytes)
+    || totalUncompressedBytes < 0
+  ) {
+    fail('asset_authoring_session_invalid', 'session.receipts.archiveInspection.totalUncompressedBytes must be a non-negative integer.');
+  }
+  return {
+    schema: ASSET_AUTHORING_ARCHIVE_INSPECTION_RECEIPT_SCHEMA,
+    packId: requireString(record, 'packId', 'session.receipts.archiveInspection'),
+    version: requireString(record, 'version', 'session.receipts.archiveInspection'),
+    archivePath: parseAbsoluteReceiptPath(record, 'archivePath', 'session.receipts.archiveInspection'),
+    archiveDigest: requireDigest(record.archiveDigest, 'session.receipts.archiveInspection.archiveDigest'),
+    formalArchiveDigest: requireDigest(record.formalArchiveDigest, 'session.receipts.archiveInspection.formalArchiveDigest'),
+    manifestDigest: requireDigest(record.manifestDigest, 'session.receipts.archiveInspection.manifestDigest'),
+    contentDigest: requireDigest(record.contentDigest, 'session.receipts.archiveInspection.contentDigest'),
+    sourceDigests: parseSourceDigests(
+      record.sourceDigests,
+      'session.receipts.archiveInspection.sourceDigests',
+    ),
+    entryCount,
+    totalUncompressedBytes,
+    recordedAt: requireTimestamp(record.recordedAt, 'session.receipts.archiveInspection.recordedAt'),
   };
 }
 
@@ -879,6 +1073,8 @@ function parseProvenance(value: unknown): readonly AssetAuthoringProvenanceEvent
         'manifest-conflict',
         'draft-archive-recorded',
         'sync-receipt-recorded',
+        'formal-archive-recorded',
+        'archive-inspection-recorded',
         'provider',
         'human-declaration',
         'human-preview-acceptance',
@@ -1087,7 +1283,7 @@ function parseSessionDocument(
   );
   const checkpoints = parseTargetCheckpoints(record.checkpoints);
   const receipts = parseReceipts(record.receipts);
-  validateReceiptScope(receipts, workspace, sessionId);
+  validateReceiptScope(receipts, workspace, sessionId, packRoot);
   const provenance = parseProvenance(record.provenance);
   const conflict = parseConflict(record.conflict);
   const manifestDigest = requireNullableDigest(record, 'manifestDigest', 'session');
@@ -1123,6 +1319,7 @@ function validateReceiptScope(
   receipts: AssetAuthoringSessionReceipts,
   workspace: AssetWorkspace,
   sessionId: string,
+  packRoot: string,
 ): void {
   const draftArchive = receipts.draftArchive;
   if (draftArchive !== null && draftArchive !== undefined) {
@@ -1148,6 +1345,31 @@ function validateReceiptScope(
         'session.receipts.sync.outputRoot must match the workspace manager output root.',
         sync.outputRoot,
       );
+    }
+  }
+
+  const formalArchive = receipts.formalArchive;
+  if (formalArchive !== null && formalArchive !== undefined) {
+    const artifactRoot = path.join(
+      path.dirname(assetAuthoringSessionPath(workspace, sessionId)),
+      'release-artifacts',
+    );
+    if (!isInsideRoot(path.resolve(artifactRoot), path.resolve(formalArchive.archivePath))) {
+      fail(
+        'asset_authoring_session_path_invalid',
+        'session.receipts.formalArchive.archivePath must stay inside the session release-artifact root.',
+        formalArchive.archivePath,
+      );
+    }
+    const resolvedPackRoot = path.resolve(packRoot);
+    for (const artifact of formalArchive.previewArtifacts) {
+      if (!isInsideRoot(resolvedPackRoot, path.resolve(artifact.path))) {
+        fail(
+          'asset_authoring_session_path_invalid',
+          'session.receipts.formalArchive.previewArtifacts must stay inside the session pack root.',
+          artifact.path,
+        );
+      }
     }
   }
 }
@@ -1194,7 +1416,12 @@ function updateFromSession(
     ...(update.checkpoint === undefined ? {} : { checkpoint: update.checkpoint }),
     ...(update.checkpointFreshness === undefined ? {} : { checkpointFreshness: update.checkpointFreshness }),
     ...(update.checkpoints === undefined ? {} : { checkpoints: update.checkpoints }),
-    ...(update.receipts === undefined ? {} : { receipts: update.receipts }),
+    ...(update.receipts === undefined ? {} : {
+      receipts: {
+        ...session.receipts,
+        ...update.receipts,
+      },
+    }),
     ...(update.provenance === undefined ? {} : { provenance: update.provenance }),
     ...(update.conflict === undefined ? {} : { conflict: update.conflict }),
     ...(update.manifestDigest === undefined ? {} : { manifestDigest: update.manifestDigest }),
@@ -1251,6 +1478,8 @@ class AssetAuthoringSessionStoreImpl implements AssetAuthoringSessionStore {
         previewAcceptance: null,
         draftArchive: null,
         sync: null,
+        formalArchive: null,
+        archiveInspection: null,
       },
       provenance: [{
         id: this.eventId(),
@@ -1427,6 +1656,58 @@ function samePreviewAcceptanceReceipts(
     && sameArtifactDigests(left.artifacts, right.artifacts);
 }
 
+function sameFormalArchiveReceipts(
+  left: AssetAuthoringFormalArchiveReceipt | null | undefined,
+  right: AssetAuthoringFormalArchiveReceipt | null | undefined,
+): boolean {
+  if (left === null || left === undefined || right === null || right === undefined) {
+    return left === right;
+  }
+  return left.schema === right.schema
+    && left.packId === right.packId
+    && left.version === right.version
+    && left.archivePath === right.archivePath
+    && left.archiveDigest === right.archiveDigest
+    && left.manifestDigest === right.manifestDigest
+    && left.contentDigest === right.contentDigest
+    && sameSourceDigests(left.sourceDigests, right.sourceDigests)
+    && left.validationReceiptId === right.validationReceiptId
+    && left.declarationReceiptDigest === right.declarationReceiptDigest
+    && left.previewAcceptanceReceiptDigest === right.previewAcceptanceReceiptDigest
+    && left.previewInputDigest === right.previewInputDigest
+    && sameArtifactDigests(left.previewArtifacts, right.previewArtifacts)
+    && left.recordedAt === right.recordedAt;
+}
+
+function sameArchiveInspectionReceipts(
+  left: AssetAuthoringArchiveInspectionReceipt | null | undefined,
+  right: AssetAuthoringArchiveInspectionReceipt | null | undefined,
+): boolean {
+  if (left === null || left === undefined || right === null || right === undefined) {
+    return left === right;
+  }
+  return left.schema === right.schema
+    && left.packId === right.packId
+    && left.version === right.version
+    && left.archivePath === right.archivePath
+    && left.archiveDigest === right.archiveDigest
+    && left.formalArchiveDigest === right.formalArchiveDigest
+    && left.manifestDigest === right.manifestDigest
+    && left.contentDigest === right.contentDigest
+    && sameSourceDigests(left.sourceDigests, right.sourceDigests)
+    && left.entryCount === right.entryCount
+    && left.totalUncompressedBytes === right.totalUncompressedBytes
+    && left.recordedAt === right.recordedAt;
+}
+
+function releaseReceiptDigest(
+  receipt: AssetAuthoringReleaseDeclarationReceipt | AssetAuthoringPreviewAcceptanceReceipt,
+): string {
+  return `sha256:${createHash('sha256')
+    .update(assetAuthoringReleaseReceiptDigestInput(receipt), 'utf8')
+    .digest('hex')}`;
+}
+
 export function deriveAuthoringInvalidationDecisions(
   previous: AssetAuthoringEvidence,
   current: AssetAuthoringEvidence,
@@ -1555,6 +1836,66 @@ export function deriveAuthoringInvalidationDecisions(
     )
   ) {
     decisions.push({ checkpoint: 'previewAcceptance', reason: 'preview-acceptance-stale' });
+  }
+  const previousFormalArchive = previous.formalArchiveReceipt;
+  const currentFormalArchive = current.formalArchiveReceipt;
+  if (!sameFormalArchiveReceipts(previousFormalArchive, currentFormalArchive)) {
+    if (previousFormalArchive !== undefined && previousFormalArchive !== null) {
+      decisions.push({ checkpoint: 'formalArchive', reason: 'formal-archive-stale' });
+    }
+  } else if (
+    previousFormalArchive !== undefined
+    && previousFormalArchive !== null
+    && currentFormalArchive !== undefined
+    && currentFormalArchive !== null
+    && (
+      current.validationReceipt === null
+      || current.releaseDeclarationReceipt === undefined
+      || current.releaseDeclarationReceipt === null
+      || current.previewAcceptanceReceipt === undefined
+      || current.previewAcceptanceReceipt === null
+      || currentFormalArchive.manifestDigest !== current.manifestDigest
+      || !sameSourceDigests(currentFormalArchive.sourceDigests, current.sourceDigests)
+      || currentFormalArchive.validationReceiptId !== current.validationReceipt.id
+      || currentFormalArchive.declarationReceiptDigest
+        !== current.releaseDeclarationReceipt.declarationDigest
+      || currentFormalArchive.previewAcceptanceReceiptDigest
+        !== releaseReceiptDigest(current.previewAcceptanceReceipt)
+      || currentFormalArchive.previewInputDigest !== current.previewAcceptanceReceipt.previewInputDigest
+      || !sameArtifactDigests(
+        currentFormalArchive.previewArtifacts,
+        current.previewAcceptanceReceipt.artifacts,
+      )
+    )
+  ) {
+    decisions.push({ checkpoint: 'formalArchive', reason: 'formal-archive-stale' });
+  }
+
+  const previousArchiveInspection = previous.archiveInspectionReceipt;
+  const currentArchiveInspection = current.archiveInspectionReceipt;
+  if (!sameArchiveInspectionReceipts(previousArchiveInspection, currentArchiveInspection)) {
+    if (previousArchiveInspection !== undefined && previousArchiveInspection !== null) {
+      decisions.push({ checkpoint: 'archiveInspection', reason: 'archive-inspection-stale' });
+    }
+  } else if (
+    previousArchiveInspection !== undefined
+    && previousArchiveInspection !== null
+    && currentArchiveInspection !== undefined
+    && currentArchiveInspection !== null
+    && (
+      currentFormalArchive === undefined
+      || currentFormalArchive === null
+      || currentArchiveInspection.formalArchiveDigest !== currentFormalArchive.archiveDigest
+      || currentArchiveInspection.packId !== currentFormalArchive.packId
+      || currentArchiveInspection.version !== currentFormalArchive.version
+      || currentArchiveInspection.manifestDigest !== currentFormalArchive.manifestDigest
+      || currentArchiveInspection.contentDigest !== currentFormalArchive.contentDigest
+      || !sameSourceDigests(currentArchiveInspection.sourceDigests, currentFormalArchive.sourceDigests)
+      || currentArchiveInspection.manifestDigest !== current.manifestDigest
+      || !sameSourceDigests(currentArchiveInspection.sourceDigests, current.sourceDigests)
+    )
+  ) {
+    decisions.push({ checkpoint: 'archiveInspection', reason: 'archive-inspection-stale' });
   }
   return decisions;
 }

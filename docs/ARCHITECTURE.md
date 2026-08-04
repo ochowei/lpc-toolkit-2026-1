@@ -172,9 +172,13 @@ The plugin's current character and animation skills intentionally stop before
 the newer authoring-session release capability. They do not claim or invoke
 `asset-authoring-release.v1`,
 `lpc-toolkit.asset-release-declaration.v1`,
-`lpc-toolkit.asset-authoring-release-receipt.v1`, or the
-`acknowledge`/`declare`/`accept-preview` commands; the installed CLI remains
-the sole owner of those release receipts.
+`lpc-toolkit.asset-authoring-release-receipt.v1`,
+`lpc-toolkit.asset-authoring-draft-receipt.v1`,
+`lpc-toolkit.asset-authoring-formal-archive-receipt.v1`, or
+`lpc-toolkit.asset-authoring-archive-inspection-receipt.v1`, or the
+`acknowledge`/`declare`/`accept-preview`/`draft`/`sync`/`pack`/`inspect`
+commands; the installed CLI remains the sole owner of those release and
+archive receipts.
 
 ### Release evidence ownership
 
@@ -635,13 +639,15 @@ Their public schema set is
 `lpc-toolkit.sprite-drawing-contract.v1`,
 `lpc-toolkit.asset-release-declaration.v1`,
 `lpc-toolkit.asset-authoring-release-receipt.v1`, and
-`lpc-toolkit.asset-authoring-draft-receipt.v1`. Contract artifact metadata is
+`lpc-toolkit.asset-authoring-draft-receipt.v1`,
+`lpc-toolkit.asset-authoring-formal-archive-receipt.v1`, and
+`lpc-toolkit.asset-authoring-archive-inspection-receipt.v1`. Contract artifact metadata is
 session-local and uses `lpc-toolkit.asset-authoring-artifact-metadata.v1`; it
 is not a publishable asset-pack schema.
 
 The public session flow is `start`, `status`, `resume`, `contract`, `import`,
 `validate`, `preview`, `acknowledge`, `declare`, `accept-preview`,
-`reconcile-manifest`, `draft`, and `sync` below
+`reconcile-manifest`, `draft`, `sync`, `pack`, and `inspect` below
 `asset authoring`. A strict plan may describe `new-item`, `extend-item`, or
 `attach-pack`; the current contract planner supports drawing targets for the
 first two goals and explicitly refuses to publish a drawing contract for
@@ -692,6 +698,29 @@ unchanged sync is idempotent; source, manifest, registry, marker, output, or
 compile drift preserves the previous receipt as stale evidence. The wrapper
 does not implement a second registry or sync policy and never writes checked-in
 assets, the base cache, installed snapshots, unowned output, or `upstream/`.
+
+Phase 3 adds session-aware formal archive publication and exact-byte
+inspection without replacing the shared authorities. `asset authoring pack`
+projects the current validation, declaration, preview-acceptance, manifest,
+and source evidence, requires explicit confirmation, and then calls the
+existing formal `packAssetPack` path with a publication target below the
+session-owned `release-artifacts/` root. The wrapper records a
+`formalArchiveReceipt` only after re-reading the regular output and verifying
+its archive, manifest, content, source, validation, declaration, and accepted
+preview-artifact digests. It does not add a second manifest, checksum writer,
+attribution path, or archive format; formal output omits `status: "draft"` and
+existing leaf `asset pack` bytes remain authoritative.
+
+`asset authoring inspect --archive <archive>` calls the existing
+`inspectAssetPackArchive` authority and is read-only. It records an
+`archiveInspection` checkpoint and `inspectionReceipt` only when the inspected
+archive is valid, formal, and its exact archive digest matches the current
+formal receipt. A copied valid archive, a changed archive, or a stale source
+receipt is reported as bounded mismatch/stale evidence and is never adopted
+silently. Consumer installation remains a separate lifecycle boundary and is
+not represented by a Phase 3 installation receipt. Formal archive paths are
+session-contained, while an inspection may read a copied archive outside that
+root only for comparison.
 
 Animation audit remains read-only and provider-neutral.
 `catalog audit-animations --json` reports unsupported, missing-file, blank-frame, and

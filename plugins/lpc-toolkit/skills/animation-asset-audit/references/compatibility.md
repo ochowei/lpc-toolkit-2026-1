@@ -38,7 +38,10 @@ workflow or its release boundary. They must not claim or invoke
 refuse
 `lpc-toolkit.asset-release-declaration.v1`,
 `lpc-toolkit.asset-authoring-release-receipt.v1`,
-`lpc-toolkit.asset-authoring-draft-receipt.v1`, and the
-`asset authoring acknowledge`, `declare`, `accept-preview`, `draft`, and `sync`
-commands. The audit workflow remains limited to the commands listed in its
-versioned contract, and `catalog audit-animations` stays read-only.
+`lpc-toolkit.asset-authoring-draft-receipt.v1`,
+`lpc-toolkit.asset-authoring-formal-archive-receipt.v1`, and
+`lpc-toolkit.asset-authoring-archive-inspection-receipt.v1`, and the
+`asset authoring acknowledge`, `declare`, `accept-preview`, `draft`, `sync`,
+`pack`, and `inspect` commands. The audit workflow remains limited to the
+commands listed in its versioned contract, and `catalog audit-animations` stays
+read-only.

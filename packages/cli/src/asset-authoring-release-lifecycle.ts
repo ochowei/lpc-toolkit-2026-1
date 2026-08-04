@@ -20,12 +20,17 @@ import {
 import { loadAssetPackFiles } from './asset-pack-files.js';
 import { nodeAssetPackFormatRuntime } from './asset-pack-node-runtime.js';
 import {
+  packAssetPack,
+  type PackAssetPackSuccess,
+} from './asset-pack-packaging.js';
+import {
   auditPublishedManagedOutput,
   readAssetPackRegistry,
   type AssetPackRegistryDocument,
 } from './asset-pack-registry.js';
 import { readAssetPackManagedFile } from './asset-pack-managed-file.js';
 import type { AssetPackSyncSuccess } from './asset-pack-sync.js';
+import type { RuntimeAssets } from './runtime-assets.js';
 import {
   ASSET_OUTPUT_MARKER_SCHEMA,
   type AssetWorkspace,
@@ -58,6 +63,22 @@ export interface DraftArchiveResult {
   readonly receipt: AssetAuthoringDraftArchiveReceipt;
   readonly archiveBytes: Buffer;
   readonly reusedExistingArchive: boolean;
+}
+
+export interface FormalArchiveOptions {
+  readonly cwd: string;
+  readonly workspace: AssetWorkspace;
+  readonly session: AssetAuthoringSession;
+  readonly runtime: RuntimeAssets;
+  readonly outputPath?: string;
+}
+
+export interface FormalArchiveResult {
+  readonly pack: PackAssetPackSuccess;
+  readonly archiveBytes: Buffer;
+  readonly manifestDigest: string;
+  readonly contentDigest: string;
+  readonly sourceDigests: readonly AssetAuthoringSourceDigest[];
 }
 
 export interface SyncReceiptOptions {
@@ -311,32 +332,41 @@ function isInsideRoot(root: string, candidate: string): boolean {
     );
 }
 
-function assertDirectory(target: string, label: string): void {
+function assertDirectory(
+  target: string,
+  label: string,
+  errorCode = 'asset_authoring_draft_path_invalid',
+): void {
   let stats: ReturnType<typeof lstatSync>;
   try {
     stats = lstatSync(target);
   } catch (error) {
     throw new AssetAuthoringReleaseLifecycleError(
-      'asset_authoring_draft_path_invalid',
+      errorCode,
       `${label} is unavailable: ${target}. ${error instanceof Error ? error.message : String(error)}`,
       target,
     );
   }
   if (stats.isSymbolicLink() || !stats.isDirectory()) {
     throw new AssetAuthoringReleaseLifecycleError(
-      'asset_authoring_draft_path_invalid',
+      errorCode,
       `${label} must be a real directory: ${target}.`,
       target,
     );
   }
 }
 
-function ensureContainedDirectory(root: string, target: string, label: string): void {
+function ensureContainedDirectory(
+  root: string,
+  target: string,
+  label: string,
+  errorCode = 'asset_authoring_draft_path_invalid',
+): void {
   const resolvedRoot = path.resolve(root);
   const resolvedTarget = path.resolve(target);
   if (!isInsideRoot(resolvedRoot, resolvedTarget)) {
     throw new AssetAuthoringReleaseLifecycleError(
-      'asset_authoring_draft_path_invalid',
+      errorCode,
       `${label} must stay inside the session-owned release-artifact root: ${target}.`,
       target,
     );
@@ -394,6 +424,39 @@ function resolveDraftArchivePath(options: DraftArchiveOptions): string {
     );
   }
   ensureContainedDirectory(artifactRoot, path.dirname(requested), 'Draft archive parent');
+  return requested;
+}
+
+export function resolveFormalArchivePath(options: FormalArchiveOptions): string {
+  const sessionDirectory = path.dirname(assetAuthoringSessionPath(
+    options.workspace,
+    options.session.sessionId,
+  ));
+  assertDirectory(sessionDirectory, 'Authoring session directory', 'asset_authoring_formal_path_invalid');
+  const artifactRoot = path.join(sessionDirectory, RELEASE_ARTIFACT_DIRECTORY);
+  const requested = options.outputPath === undefined
+    ? path.join(
+      artifactRoot,
+      `${options.session.plan.pack.id}-${options.session.plan.pack.version}.lpc-assets.zip`,
+    )
+    : path.resolve(options.cwd, options.outputPath);
+  if (requested === artifactRoot || !isInsideRoot(artifactRoot, requested)) {
+    throw new AssetAuthoringReleaseLifecycleError(
+      'asset_authoring_formal_path_invalid',
+      `Formal archive output must stay inside the session-owned release-artifact root: ${requested}.`,
+      requested,
+    );
+  }
+  if (!existsSync(artifactRoot)) {
+    mkdirSync(artifactRoot, { mode: 0o700 });
+  }
+  assertDirectory(artifactRoot, 'Authoring release-artifact root', 'asset_authoring_formal_path_invalid');
+  ensureContainedDirectory(
+    artifactRoot,
+    path.dirname(requested),
+    'Formal archive parent',
+    'asset_authoring_formal_path_invalid',
+  );
   return requested;
 }
 
@@ -541,4 +604,78 @@ export async function createDraftArchive(
   };
   const reusedExistingArchive = publishDraftArchive(archivePath, archiveBytes);
   return { receipt, archiveBytes, reusedExistingArchive };
+}
+
+export async function createFormalArchive(
+  options: FormalArchiveOptions,
+): Promise<FormalArchiveResult> {
+  const archivePath = resolveFormalArchivePath(options);
+  const result = await packAssetPack({
+    packDirectory: options.session.packRoot,
+    workspace: options.workspace,
+    runtime: options.runtime,
+    archivePath,
+    refuseExistingTarget: true,
+  });
+  if (!result.ok) {
+    const diagnostic = result.diagnostics[0];
+    throw new AssetAuthoringReleaseLifecycleError(
+      diagnostic?.code ?? 'asset_authoring_formal_archive_failed',
+      diagnostic?.message ?? 'Could not create the formal asset-pack archive.',
+      diagnostic?.path ?? archivePath,
+    );
+  }
+
+  const loaded = await loadAssetPackFiles(options.session.packRoot);
+  if (!loaded.ok) {
+    const diagnostic = loaded.diagnostics[0];
+    throw new AssetAuthoringReleaseLifecycleError(
+      'asset_authoring_formal_archive_race',
+      diagnostic?.message ?? 'The session pack changed while formal archive bytes were published.',
+      diagnostic?.path ?? options.session.packRoot,
+    );
+  }
+
+  let archiveBytes: Buffer;
+  try {
+    const status = lstatSync(archivePath);
+    if (status.isSymbolicLink() || !status.isFile()) {
+      throw new Error('Formal archive output must be a regular file.');
+    }
+    archiveBytes = readFileSync(archivePath);
+  } catch (error) {
+    throw new AssetAuthoringReleaseLifecycleError(
+      'asset_authoring_formal_archive_race',
+      error instanceof Error ? error.message : 'Formal archive bytes could not be re-read.',
+      archivePath,
+    );
+  }
+  if (sha256(archiveBytes) !== result.archiveDigest) {
+    throw new AssetAuthoringReleaseLifecycleError(
+      'asset_authoring_formal_archive_race',
+      'Formal archive bytes changed while the publication receipt was being captured.',
+      archivePath,
+    );
+  }
+
+  const manifestDigest = sha256(loaded.manifestBytes);
+  if (
+    loaded.pack.id !== result.packId
+    || loaded.pack.version !== result.version
+    || loaded.contentDigest !== result.contentDigest
+    || manifestDigest !== options.session.manifestDigest
+  ) {
+    throw new AssetAuthoringReleaseLifecycleError(
+      'asset_authoring_formal_archive_race',
+      'The session pack changed while the formal archive receipt was being captured.',
+      options.session.packRoot,
+    );
+  }
+  return {
+    pack: result,
+    archiveBytes,
+    manifestDigest,
+    contentDigest: loaded.contentDigest,
+    sourceDigests: sourceDigestsFrom(loaded.sourceDigests),
+  };
 }

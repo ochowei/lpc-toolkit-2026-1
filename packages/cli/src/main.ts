@@ -209,6 +209,8 @@ function preflightCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
       && authoringCommand !== 'declare'
       && authoringCommand !== 'accept-preview'
       && authoringCommand !== 'draft'
+      && authoringCommand !== 'pack'
+      && authoringCommand !== 'inspect'
       && authoringCommand !== 'sync'
       && authoringCommand !== 'preview'
       && authoringCommand !== 'reconcile-manifest'
@@ -235,6 +237,7 @@ function preflightCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
       || authoringCommand === 'contract'
       || authoringCommand === 'validate'
       || authoringCommand === 'draft'
+      || authoringCommand === 'pack'
       || authoringCommand === 'sync'
       || authoringCommand === 'preview'
     ) {
@@ -251,6 +254,10 @@ function preflightCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
     if (authoringCommand === 'accept-preview') {
       const sessionIssue = requiredStringFlag('session');
       return sessionIssue ?? requiredStringFlag('preview-digest');
+    }
+    if (authoringCommand === 'inspect') {
+      const sessionIssue = requiredStringFlag('session');
+      return sessionIssue ?? requiredStringFlag('archive');
     }
     if (authoringCommand === 'import') {
       for (const name of ['session', 'target', 'candidate', 'contract-digest']) {
