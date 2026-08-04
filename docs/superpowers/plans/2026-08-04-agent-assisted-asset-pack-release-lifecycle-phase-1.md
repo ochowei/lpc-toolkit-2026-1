@@ -53,6 +53,11 @@ Before writing any implementation test, confirm these seams with the user as req
 
 The first implementation PR must record the user's seam confirmation before its first test commit. This plan records the seams now so the review can approve or adjust them without starting implementation prematurely.
 
+Seam confirmation: On 2026-08-04 the user replied `繼續` after reviewing this
+plan. That confirmation authorizes the four seams above for the Phase 1
+implementation and does not authorize private-helper tests or internal-module
+mocking.
+
 ## Fixed Phase 1 public contract
 
 ### Commands
@@ -446,4 +451,3 @@ deferred to Phases 3 and 4.
 - [ ] No dependency, `any`, provider call, authoring skill, Web bridge,
   backend, archive implementation, cache mutation, checked-in asset mutation,
   or `upstream/` mutation entered the Phase 1 change.
-
