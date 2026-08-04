@@ -243,9 +243,30 @@ The release tests use the public Core parser/gate, session persistence, exact
 `runCli` argv, and bounded JSON/human response seams. They prove explicit human
 acknowledgement/declaration/preview acceptance, four-artifact digest binding,
 non-mutating confirmation/race failures, idempotency, and stale receipt
-preservation. Phase 1 deliberately stops before sync, draft recovery, formal
-archive creation/inspection, and consumer installation; a `releaseReady: true`
-session is not an archive.
+preservation. Phase 1 deliberately stops before the Phase 2 sync and draft
+recovery commands, formal archive orchestration, and consumer installation; a
+`releaseReady: true` session is not an archive.
+
+Phase 2 release-lifecycle changes add the following red/green map:
+
+```sh
+pnpm --filter @lpc-toolkit/cli test -- asset-authoring-release.test.ts asset-authoring-session.test.ts main-json.test.ts main-human.test.ts command-spec.test.ts
+pnpm --filter @lpc-toolkit/cli test -- asset-pack-sync.test.ts asset-pack-transaction.test.ts asset-pack-doctor.test.ts
+pnpm --filter @lpc-toolkit/cli run typecheck
+pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifacts.test.ts
+pnpm verify:cli-docs-policy
+pnpm verify:plugin
+```
+
+The Phase 2 tests use real temporary workspaces and the public `runCli`
+boundary. They prove deterministic draft bytes and strict receipt persistence,
+session-contained output/traversal checks, existing inspect/install draft
+rejection before consumer mutation, explicit sync confirmation, idempotent
+manager generations, registry/output/marker drift, transaction recovery, and
+protected sentinels. `asset-authoring-release-lifecycle.ts` is only a
+coordinator: archive bytes, inspection/install policy, linked sync, registry,
+managed-output audit, transaction, and doctor behavior remain owned by their
+existing modules.
 
 The final documentation and release-contract map is:
 

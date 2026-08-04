@@ -91,6 +91,9 @@ my-lpc-art/
         ├── transactions/              operation staging/backups while journaled
         ├── validation/
         └── staging/
+    authoring-sessions/
+        └── <session-id>/
+            └── release-artifacts/     deterministic draft recovery archives
 ```
 
 The workspace config uses schema `lpc-toolkit.asset-workspace.v1` and records
@@ -221,6 +224,7 @@ The advertisement includes these capability identifiers:
 - `asset-authoring-candidate-import.v1`
 - `asset-authoring-recovery.v1`
 - `asset-authoring-release.v1`
+- `asset-authoring-draft-recovery.v1`
 
 and these schema identifiers:
 
@@ -230,6 +234,7 @@ and these schema identifiers:
 - `lpc-toolkit.sprite-drawing-contract.v1`
 - `lpc-toolkit.asset-release-declaration.v1`
 - `lpc-toolkit.asset-authoring-release-receipt.v1`
+- `lpc-toolkit.asset-authoring-draft-receipt.v1`
 
 The strict plan schema has three goals: `new-item`, `extend-item`, and
 `attach-pack`. New-item plans declare pack and asset identity, body types,
@@ -254,6 +259,8 @@ The public session commands are:
 | `asset authoring declare --session <session-id> --declaration <declaration.json> [--confirm] [--workspace <directory>] [--json]` | Record explicit human author/source and license authority for the current manifest, credits, validation, and acknowledgement evidence. |
 | `asset authoring accept-preview --session <session-id> --preview-digest <sha256> --confirm [--workspace <directory>] [--json]` | Accept the exact current attributed PNG plus matching metadata, TXT-credit, and CSV-credit artifacts. |
 | `asset authoring reconcile-manifest --session <session-id> --use <external\|session> --expected-external-digest <sha256> [--workspace <directory>] [--json]` | Resolve an observed external manifest change with an explicit digest-bound choice. |
+| `asset authoring draft --session <session-id> [--output <archive>] [--workspace <directory>] [--json]` | Snapshot the current contained manifest and source files into a deterministic, explicitly non-installable recovery archive. The default output is below the session's `release-artifacts/` directory; an explicit path must remain there. |
+| `asset authoring sync --session <session-id> [--confirm] [--workspace <directory>] [--json]` | Without `--confirm`, return one confirmation action without mutation. With confirmation, run the existing linked-sync transaction for the session pack and record the actual manager-owned output/registry generation. |
 
 Each JSON command returns the normal `ok`, `command`, `data`, `warnings`, and
 `errors` envelope. Authoring data uses schema
@@ -261,7 +268,8 @@ Each JSON command returns the normal `ok`, `command`, `data`, `warnings`, and
 `state`, `reason`, `phase`, `checkpoint`, `checkpointFreshness`,
 `diagnostics`, `inputsNeeded`, `artifacts`, `nextActions`, `retrySafety`,
 `manifestDigest`, `sourceDigests`, `validation`, `preview`, `releaseGates`,
-`releaseDeclaration`, `previewAcceptance`, `capabilities`, and
+`releaseDeclaration`, `previewAcceptance`, `draftArchive`, `syncReceipt`,
+`capabilities`, and
 `schemaVersions`. `releaseGates.gates` reports current, missing, stale, or
 blocked acknowledgement, validation, declaration, preview, preview-artifact,
 and preview-acceptance evidence; `releaseReady` is true only when every Phase 1
@@ -272,7 +280,7 @@ The state and checkpoint fields are recovery data, not asset identity:
 
 | Field | Values and meaning |
 | --- | --- |
-| `state` | `needs-user-action` means a bounded session is waiting for a safe or explicitly confirmed next action; `failed` means the current operation is blocked; `completed` is reserved for a future terminal completion and is not required by the current drawing flow. |
+| `state` | `needs-user-action` means a bounded session is waiting for a safe or explicitly confirmed next action; `failed` means the current operation is blocked; `completed` means the requested operation reached a trustworthy boundary. For Phase 2 draft/sync operations it means the receipt is current, not that a formal archive was published or a consumer was installed. |
 | `phase` | `planned`, `scaffolded`, `contract-ready`, `awaiting-candidate`, `imported`, `validated`, `previewed`, or `blocked`; each records the furthest trustworthy session boundary. |
 | `checkpoint` | `null` or an `{id, digest}` pair naming the last trustworthy session boundary and the exact evidence digest that established it. |
 | `checkpointFreshness` | `missing`, `current`, `stale`, or `blocked`; stale evidence must not be treated as current. |
@@ -337,6 +345,30 @@ evidence after source, manifest, validation, preview-input, artifact, or
 declaration drift. These receipts make the session release-ready; they do not
 publish, sync, inspect, or install an archive. Run `asset pack`, `asset inspect`,
 and `asset install` for that separate formal publication and consumer workflow.
+
+Phase 2 adds session recovery and manager-generation evidence without changing
+that boundary. `asset authoring draft` uses the shared deterministic archive
+writer to snapshot the current manifest and referenced regular source files.
+The default `<pack-id>-<version>.draft.lpc-assets.zip` is contained below
+`.lpc-toolkit/asset-packs/authoring-sessions/<session-id>/release-artifacts/`;
+an explicit `--output` path must remain in that directory. The persisted
+`draftArchive` receipt binds the archive, raw manifest, content, source, and
+recording-time digests. Equal existing bytes are reused; a changed, symlinked,
+or non-regular target is a conflict and is never overwritten. The archive keeps
+`status: "draft"`, so public `asset inspect` reports `asset_pack_draft` and
+public `asset install` rejects it before staging or changing a consumer
+workspace.
+
+`asset authoring sync` requires `--confirm` because it mutates only the
+manager-owned `assets_custom/` generation and workspace registry. It calls the
+existing linked-sync transaction, then captures the committed registry bytes,
+ownership marker, compile generation, and every generated definition, sprite,
+and credit digest into the `syncReceipt`. Repeating unchanged sync is
+idempotent. A source, manifest, registry, marker, output, or compile-generation
+change preserves the last receipt as stale evidence and exposes a structured
+confirmation or recovery action; it never silently adopts an unknown
+generation. Neither command writes checked-in `assets/`, the managed base
+cache, installed snapshots, unowned output, or `upstream/`.
 
 Authoring sessions use the standalone workspace's artist source and managed
 state only. They never modify checked-in `assets/`, the verified base cache,

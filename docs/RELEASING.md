@@ -50,13 +50,15 @@ pnpm verify:plugin
 The capability response must retain the exact shipped identifiers
 `asset-authoring-session.v1`, `sprite-drawing-contract.v1`,
 `asset-authoring-candidate-import.v1`, `asset-authoring-recovery.v1`, and
-`asset-authoring-release.v1`, plus the six versioned authoring/release schemas.
+`asset-authoring-release.v1`, and `asset-authoring-draft-recovery.v1`, plus the
+seven versioned authoring/release schemas.
 Check that the CLI help lists `start`, `status`, `resume`, `contract`, `import`,
 `validate`, `preview`, `acknowledge`, `declare`, `accept-preview`, and
-`reconcile-manifest`, and that the CLI README, root README, landing copy, and
+`reconcile-manifest`, `draft`, and `sync`, and that the CLI README, root README, landing copy, and
 plugin compatibility references describe the same boundary. Plugin `0.2.1`
 must continue to document CLI range `>=0.2.0 <0.3.0`; the plugin intentionally
-does not claim or invoke the authoring-session release capability.
+does not claim or invoke the authoring-session release, draft-recovery, or
+manager-sync capabilities.
 
 Phase 1's release boundary is still session evidence, not archive publication.
 The packed smoke must show `releaseGates.releaseReady: true` only after the
@@ -66,6 +68,19 @@ exact warning acknowledgement, explicit declaration, and exact
 and prove that a changed artifact or source makes the downstream receipt stale
 without mutating the last valid session bytes. Formal `asset pack`,
 `asset inspect`, and `asset install` remain separate later release gates.
+
+Phase 2 adds two additional packed-smoke assertions. `asset authoring draft`
+must produce deterministic, session-contained bytes with a digest-bound
+`draftArchive` receipt; the existing public inspect command must report
+`status: "draft"` and `asset_pack_draft`, while install must reject before any
+consumer staging or registry mutation. `asset authoring sync` must return one
+confirmation action without `--confirm`, then call the existing linked-sync
+transaction only with explicit confirmation and record the committed registry,
+compile, marker, and generated-output digests in `syncReceipt`. Repeating an
+unchanged sync is a no-op. Source, manifest, registry, marker, output, or
+transaction drift must preserve the previous receipt as stale evidence and
+exercise the existing doctor/recovery path. These receipts are not formal pack,
+inspect, or consumer-install receipts; Phase 3 and Phase 4 remain deferred.
 
 The packed CLI smoke remains the release proof for the public contract. In a
 clean workspace, it must discover capabilities, create a strict-plan session,

@@ -130,6 +130,11 @@ const releaseAcceptanceCommands = [
   'lpc-toolkit asset authoring accept-preview --session <session-id> --preview-digest <sha256> --confirm',
 ] as const;
 
+const releaseRecoveryCommands = [
+  'lpc-toolkit asset authoring draft --session <session-id>',
+  'lpc-toolkit asset authoring sync --session <session-id> --confirm',
+] as const;
+
 const cliReadmeUrl =
   'https://github.com/ochowei/lpc-toolkit-2026-1/blob/main/packages/cli/README.md';
 
@@ -224,7 +229,9 @@ export function CliPage({ onNavigate }: ProductPageProps) {
             You do not need to clone this repository. The published CLI creates
             a standalone artist workspace, validates complete animation PNGs,
             renders attributed previews, packages a deterministic archive, and
-            installs it into a second standalone workspace.
+            installs it into a second standalone workspace. A session can also
+            create a non-installable recovery draft or synchronize its
+            manager-owned overlay after explicit confirmation.
           </p>
           <p className="mt-2 max-w-3xl text-sm text-text-2">
             Character composition, source asset creation, audit handoff,
@@ -261,6 +268,26 @@ export function CliPage({ onNavigate }: ProductPageProps) {
               These receipts govern the authoring session only. Formal archive
               publication and consumer installation remain separate CLI steps.
             </p>
+            <h3 className="mt-5 text-lg font-semibold text-text">
+              Recover or synchronize the session separately
+            </h3>
+            <p className="mt-2 text-sm text-text-2">
+              A recovery draft is deterministic evidence, not a formal archive:
+              the CLI marks it <code>status: "draft"</code>, public inspect
+              reports <code>asset_pack_draft</code>, and public install rejects
+              it before changing a consumer workspace. Confirmed sync calls the
+              existing linked-sync transaction and records the actual
+              manager-owned output and registry generation. Stale source,
+              registry, marker, or generated-output evidence remains visible
+              instead of being silently replaced.
+            </p>
+            <ol className="mt-4 space-y-3">
+              {releaseRecoveryCommands.map((command, index) => (
+                <li key={`${index}-${command}`}>
+                  <CopyCode children={command} />
+                </li>
+              ))}
+            </ol>
           </div>
           <p className="mt-4 text-sm text-text-2">
             Put PNGs under <code>artist-packs/&lt;pack-id&gt;/sprites/</code>.

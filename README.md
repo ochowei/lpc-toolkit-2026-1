@@ -172,10 +172,30 @@ lpc-toolkit asset authoring declare --session <session-id> --declaration <declar
 lpc-toolkit asset authoring accept-preview --session <session-id> --preview-digest <sha256> --confirm
 ```
 
+Phase 2 adds two separate session recovery boundaries. `asset authoring draft`
+writes a deterministic, explicitly non-installable recovery archive below the
+session's `release-artifacts/` directory and records a digest-bound
+`draftArchive` receipt. Existing `asset inspect` reports its `status: "draft"`
+and `asset install` rejects it before changing a consumer workspace. After an
+explicit confirmation, `asset authoring sync --session <session-id> --confirm`
+calls the existing linked-sync transaction and records a `sync` receipt for the
+actual manager-owned `assets_custom/` output and registry generation. Without
+`--confirm`, sync does not mutate manager output, registry, transaction state,
+or the session receipt. Source packs, checked-in assets, the managed base cache,
+installed snapshots, unowned output, and `upstream/` remain outside both
+operations.
+
+```sh
+lpc-toolkit asset authoring draft --session <session-id>
+lpc-toolkit asset authoring sync --session <session-id> --confirm
+```
+
 Stale manifest, source, validation, warning, preview-input, artifact, or
-declaration evidence is preserved for review and requires the structured next
-action from `status` or `resume`. Formal archive publication still uses
-`asset pack`, followed by separate `asset inspect` and consumer `asset install`.
+declaration evidence, draft bytes, registry bytes, or generated output is
+preserved for review and requires the structured next action from `status` or
+`resume`. Formal archive publication still uses `asset pack`, followed by
+separate `asset inspect` and consumer `asset install`; neither Phase 2 receipt
+is a formal archive or a consumer installation receipt.
 
 Give the resulting `<pack-id>-<version>.lpc-assets.zip` to a consumer. They use
 a separate standalone workspace and run the lifecycle in order:
