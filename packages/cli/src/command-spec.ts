@@ -321,6 +321,21 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
     examples: ['lpc-toolkit asset authoring inspect --session session-id --archive release.lpc-assets.zip --json'],
   },
   {
+    command: ['asset', 'authoring', 'install'],
+    usage: 'lpc-toolkit asset authoring install --session <session-id> --archive <archive> --consumer-workspace <directory> --confirm [--workspace <directory>] [--json]',
+    description: 'Install the exact inspected formal archive in a separate consumer workspace and record the verified result.',
+    options: [
+      HELP_OPTION,
+      JSON_OPTION,
+      AUTHORING_SESSION_OPTION,
+      { name: 'archive', kind: 'value', valueLabel: 'archive', description: 'Install the archive whose bytes match the current inspection receipt.' },
+      { name: 'consumer-workspace', kind: 'value', valueLabel: 'directory', description: 'Use an already initialized consumer workspace outside the artist and protected roots.' },
+      { name: 'confirm', kind: 'boolean', description: 'Confirm the consumer workspace installation.' },
+      ASSET_WORKSPACE_OPTION,
+    ],
+    examples: ['lpc-toolkit asset authoring install --session session-id --archive release.lpc-assets.zip --consumer-workspace ../consumer-workspace --confirm --json'],
+  },
+  {
     command: ['asset', 'authoring', 'sync'],
     usage: 'lpc-toolkit asset authoring sync --session <session-id> [--confirm] [--workspace <directory>] [--json]',
     description: 'Synchronize the current session pack into the manager-owned generated overlay after explicit confirmation.',

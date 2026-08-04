@@ -41,7 +41,10 @@ refuse
 `lpc-toolkit.asset-authoring-draft-receipt.v1`,
 `lpc-toolkit.asset-authoring-formal-archive-receipt.v1`, and
 `lpc-toolkit.asset-authoring-archive-inspection-receipt.v1`, and the
+`lpc-toolkit.asset-authoring-install-receipt.v1` and
+`asset-authoring-consumer-install.v1` capability, and the
 `asset authoring acknowledge`, `declare`, `accept-preview`, `draft`, `sync`,
-`pack`, and `inspect` commands. The character workflow remains limited to the
+`pack`, and `inspect` commands; it also refuses the newer `install` command.
+The character workflow remains limited to the
 commands listed in its versioned contract; it never writes manager-owned
 overlay or registry state or publishes/inspects a session formal archive.

@@ -631,7 +631,8 @@ existing validation/preview leaf commands.
 `lpc-toolkit capabilities --json` advertises the shipped capability identifiers
 `asset-authoring-session.v1`, `sprite-drawing-contract.v1`,
 `asset-authoring-candidate-import.v1`, `asset-authoring-recovery.v1`,
-`asset-authoring-release.v1`, and `asset-authoring-draft-recovery.v1`.
+`asset-authoring-release.v1`, `asset-authoring-draft-recovery.v1`, and
+`asset-authoring-consumer-install.v1`.
 Their public schema set is
 `lpc-toolkit.asset-authoring-plan.v1`,
 `lpc-toolkit.asset-authoring-session.v1`,
@@ -641,13 +642,14 @@ Their public schema set is
 `lpc-toolkit.asset-authoring-release-receipt.v1`, and
 `lpc-toolkit.asset-authoring-draft-receipt.v1`,
 `lpc-toolkit.asset-authoring-formal-archive-receipt.v1`, and
-`lpc-toolkit.asset-authoring-archive-inspection-receipt.v1`. Contract artifact metadata is
+`lpc-toolkit.asset-authoring-archive-inspection-receipt.v1`, and
+`lpc-toolkit.asset-authoring-install-receipt.v1`. Contract artifact metadata is
 session-local and uses `lpc-toolkit.asset-authoring-artifact-metadata.v1`; it
 is not a publishable asset-pack schema.
 
 The public session flow is `start`, `status`, `resume`, `contract`, `import`,
 `validate`, `preview`, `acknowledge`, `declare`, `accept-preview`,
-`reconcile-manifest`, `draft`, `sync`, `pack`, and `inspect` below
+`reconcile-manifest`, `draft`, `sync`, `pack`, `inspect`, and optional `install` below
 `asset authoring`. A strict plan may describe `new-item`, `extend-item`, or
 `attach-pack`; the current contract planner supports drawing targets for the
 first two goals and explicitly refuses to publish a drawing contract for
@@ -718,9 +720,21 @@ archive is valid, formal, and its exact archive digest matches the current
 formal receipt. A copied valid archive, a changed archive, or a stale source
 receipt is reported as bounded mismatch/stale evidence and is never adopted
 silently. Consumer installation remains a separate lifecycle boundary and is
-not represented by a Phase 3 installation receipt. Formal archive paths are
-session-contained, while an inspection may read a copied archive outside that
-root only for comparison.
+not implicit after either command. Phase 4 adds
+`asset authoring install --session <session-id> --archive <archive>
+--consumer-workspace <directory> --confirm` as a separate coordinator around
+the existing `installAssetPack` authority. It first requires the current formal
+archive and exact inspection receipt, then verifies the consumer workspace is
+already initialized, manager-owned, distinct from the artist workspace and
+protected repository/cache/output roots, and finally delegates the transaction.
+The wrapper records `installationReceipt` only after registry, installed
+payload, generated output, and matching `CREDITS.csv` digests are re-verified.
+Repeated unchanged installation is a no-op; consumer drift invalidates the
+receipt without adopting unknown output, and existing install version and
+recovery policy remains authoritative. Formal archive paths are
+session-contained, while an inspection or explicitly confirmed installation
+may read the exact archive from a copied path only when its digest matches the
+inspection receipt.
 
 Animation audit remains read-only and provider-neutral.
 `catalog audit-animations --json` reports unsupported, missing-file, blank-frame, and

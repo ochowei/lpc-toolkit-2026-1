@@ -199,13 +199,27 @@ writes a non-draft archive below `release-artifacts/`, and
 `asset authoring inspect --session <session-id> --archive <archive>` records
 the exact-byte inspection only when its digest matches the formal pack receipt.
 Changed or copied archive bytes remain stale/mismatch evidence and are never
-adopted silently. Consumer `asset install` remains a separate workflow; no
-consumer installation receipt is produced by this phase.
+adopted silently. Phase 4 adds an optional, explicit consumer activation for
+the exact inspected archive. It requires an initialized managed consumer
+workspace outside the artist workspace, repository, base cache, and generated
+output roots; it never initializes or mutates that workspace before
+confirmation. The successful response records an `installationReceipt` with
+the consumer identity, installed source payload digests, registry/output
+digests, and matching `CREDITS.csv` digest. Consumer drift remains stale
+evidence and preserves the previous receipt.
 
 ```sh
 lpc-toolkit asset authoring pack --session <session-id> --confirm
 lpc-toolkit asset authoring inspect --session <session-id> --archive <archive>
+lpc-toolkit asset authoring install --session <session-id> --archive <archive> --consumer-workspace <directory> --confirm
 ```
+
+`asset authoring install` is never implicit after `pack` or `inspect`. Without
+`--confirm` it returns a bounded confirmation action without changing the
+artist session, archive, or consumer workspace. Repeating the same confirmed
+install against unchanged consumer state returns the same installation receipt
+without rewriting it; version replacement and downgrade behavior remain owned
+by the ordinary `asset install` lifecycle policy.
 
 Give the resulting `<pack-id>-<version>.lpc-assets.zip` to a consumer. They use
 a separate standalone workspace and run the lifecycle in order:

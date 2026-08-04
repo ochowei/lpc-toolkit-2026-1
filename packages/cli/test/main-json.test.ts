@@ -253,7 +253,10 @@ describe('main json behavior', () => {
     expect(advertisement.data.schemaVersions).toContain(
       'lpc-toolkit.asset-authoring-archive-inspection-receipt.v1',
     );
-    expect(advertisement.data.capabilities).not.toContain('asset-authoring-consumer-install.v1');
+    expect(advertisement.data.capabilities).toContain('asset-authoring-consumer-install.v1');
+    expect(advertisement.data.schemaVersions).toContain(
+      'lpc-toolkit.asset-authoring-install-receipt.v1',
+    );
   });
 
   it.each([
@@ -294,6 +297,10 @@ describe('main json behavior', () => {
     ],
     [
       ['asset', 'authoring', 'inspect', '--session', 'session-1', '--json'],
+      '--archive',
+    ],
+    [
+      ['asset', 'authoring', 'install', '--session', 'session-1', '--json'],
       '--archive',
     ],
   ])('rejects authoring invocation without required %s', async (argv, requiredFlag) => {

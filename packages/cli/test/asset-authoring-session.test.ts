@@ -19,6 +19,7 @@ import {
   type AssetAuthoringArchiveInspectionReceipt,
   type AssetAuthoringEvidence,
   type AssetAuthoringFormalArchiveReceipt,
+  type AssetAuthoringInstallationReceipt,
 } from '../src/asset-authoring-session.js';
 import {
   assetAuthoringSessionsRoot,
@@ -169,6 +170,32 @@ function archiveInspectionReceipt(
   };
 }
 
+function installationReceipt(
+  overrides: Partial<AssetAuthoringInstallationReceipt> = {},
+): AssetAuthoringInstallationReceipt {
+  return {
+    schema: 'lpc-toolkit.asset-authoring-install-receipt.v1',
+    workspaceId: 'consumer-workspace-id',
+    workspaceRoot: '/consumer-workspace',
+    packId: PLAN.pack.id,
+    version: PLAN.pack.version,
+    archivePath: '/artist-workspace/release-artifacts/acme.fantasy-hair-1.0.0.lpc-assets.zip',
+    archiveDigest: DIGEST_A,
+    installedDirectory: '/consumer-workspace/.lpc-toolkit/asset-packs/installed/acme.fantasy-hair/1.0.0/sha256-archive',
+    payloadDigests: {
+      'asset-pack.json': DIGEST_A,
+      'sprites/moon-braid/foreground/walk.png': DIGEST_B,
+    },
+    registryPath: '/consumer-workspace/assets_custom/asset-pack-registry.json',
+    registryDigest: DIGEST_C,
+    outputRoot: '/consumer-workspace/assets_custom',
+    generatedDigests: { 'CREDITS.csv': DIGEST_D },
+    creditsDigest: DIGEST_D,
+    recordedAt: NOW,
+    ...overrides,
+  };
+}
+
 afterEach(() => {
   for (const directory of temporaryDirectories.splice(0)) {
     rmSync(directory, { recursive: true, force: true });
@@ -288,6 +315,29 @@ describe('asset authoring session persistence', () => {
       }],
       recordDigests: [DIGEST_C, DIGEST_D],
     });
+  });
+
+  it('persists and reads the bounded consumer installation receipt', () => {
+    const workspace = createWorkspace();
+    const consumer = initializeAssetWorkspace(
+      path.join(createDirectory('lpc-authoring-consumer-'), 'workspace'),
+    );
+    const store = createStore(workspace);
+    const session = store.create({ plan: PLAN, packRoot: packRoot(workspace) });
+    const receipt = installationReceipt({
+      workspaceId: 'consumer-workspace-id',
+      workspaceRoot: consumer.root,
+      installedDirectory: path.join(consumer.stateRoot, 'installed', 'acme.fantasy-hair', '1.0.0', 'sha256-archive'),
+      registryPath: consumer.registryPath,
+      outputRoot: consumer.outputRoot,
+    });
+
+    const next = store.replace(session.sessionId, {
+      receipts: { ...session.receipts, installation: receipt },
+    });
+
+    expect(next.receipts.installation).toEqual(receipt);
+    expect(store.read(session.sessionId).receipts.installation).toEqual(receipt);
   });
 
   it('persists strict draft and sync receipts and rejects out-of-scope receipt paths', () => {
@@ -607,22 +657,26 @@ describe('asset authoring checkpoint invalidation', () => {
 
   it('invalidates formal archive and inspection receipts after bound evidence drifts', () => {
     const formal = formalArchiveReceipt();
+    const installation = installationReceipt();
     const current = evidence({
       manifestDigest: DIGEST_B,
       formalArchiveReceipt: formal,
       archiveInspectionReceipt: archiveInspectionReceipt(formal),
+      installationReceipt: installation,
     });
 
     expect(deriveAuthoringInvalidationDecisions({
       ...evidence(),
       formalArchiveReceipt: formal,
       archiveInspectionReceipt: archiveInspectionReceipt(formal),
+      installationReceipt: installation,
     }, current)).toEqual([
       { checkpoint: 'manifest', reason: 'manifest-semantic-drift' },
       { checkpoint: 'validation', reason: 'validation-receipt-stale' },
       { checkpoint: 'preview', reason: 'preview-receipt-stale' },
       { checkpoint: 'formalArchive', reason: 'formal-archive-stale' },
       { checkpoint: 'archiveInspection', reason: 'archive-inspection-stale' },
+      { checkpoint: 'installation', reason: 'installation-stale' },
     ]);
   });
 });

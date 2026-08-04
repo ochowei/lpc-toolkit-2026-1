@@ -140,6 +140,8 @@ export const ASSET_AUTHORING_FORMAL_ARCHIVE_RECEIPT_SCHEMA =
   'lpc-toolkit.asset-authoring-formal-archive-receipt.v1' as const;
 export const ASSET_AUTHORING_ARCHIVE_INSPECTION_RECEIPT_SCHEMA =
   'lpc-toolkit.asset-authoring-archive-inspection-receipt.v1' as const;
+export const ASSET_AUTHORING_INSTALLATION_RECEIPT_SCHEMA =
+  'lpc-toolkit.asset-authoring-install-receipt.v1' as const;
 
 export interface AssetAuthoringDraftArchiveReceipt {
   readonly schema: typeof ASSET_AUTHORING_DRAFT_RECEIPT_SCHEMA;
@@ -200,6 +202,24 @@ export interface AssetAuthoringArchiveInspectionReceipt {
   readonly recordedAt: string;
 }
 
+export interface AssetAuthoringInstallationReceipt {
+  readonly schema: typeof ASSET_AUTHORING_INSTALLATION_RECEIPT_SCHEMA;
+  readonly workspaceId: string;
+  readonly workspaceRoot: string;
+  readonly packId: string;
+  readonly version: string;
+  readonly archivePath: string;
+  readonly archiveDigest: string;
+  readonly installedDirectory: string;
+  readonly payloadDigests: Readonly<Record<string, string>>;
+  readonly registryPath: string;
+  readonly registryDigest: string;
+  readonly outputRoot: string;
+  readonly generatedDigests: Readonly<Record<string, string>>;
+  readonly creditsDigest: string;
+  readonly recordedAt: string;
+}
+
 export type AssetAuthoringReleaseDeclarationReceipt =
   CoreAssetAuthoringReleaseDeclarationReceipt;
 
@@ -216,6 +236,7 @@ export interface AssetAuthoringSessionReceipts {
   readonly sync?: AssetAuthoringSyncReceipt | null;
   readonly formalArchive?: AssetAuthoringFormalArchiveReceipt | null;
   readonly archiveInspection?: AssetAuthoringArchiveInspectionReceipt | null;
+  readonly installation?: AssetAuthoringInstallationReceipt | null;
 }
 
 export interface AssetAuthoringSessionCheckpoint {
@@ -240,6 +261,7 @@ export type AssetAuthoringProvenanceKind =
   | 'sync-receipt-recorded'
   | 'formal-archive-recorded'
   | 'archive-inspection-recorded'
+  | 'installation-receipt-recorded'
   | 'provider'
   | 'human-declaration'
   | 'human-preview-acceptance';
@@ -343,6 +365,7 @@ export interface AssetAuthoringEvidence {
   readonly previewAcceptanceReceipt?: AssetAuthoringPreviewAcceptanceReceipt | null;
   readonly formalArchiveReceipt?: AssetAuthoringFormalArchiveReceipt | null;
   readonly archiveInspectionReceipt?: AssetAuthoringArchiveInspectionReceipt | null;
+  readonly installationReceipt?: AssetAuthoringInstallationReceipt | null;
   /** The newly requested preview input, separate from the last receipt. */
   readonly previewInputDigest?: string | null;
 }
@@ -358,7 +381,8 @@ export type AssetAuthoringInvalidationCheckpoint =
   | 'releaseDeclaration'
   | 'previewAcceptance'
   | 'formalArchive'
-  | 'archiveInspection';
+  | 'archiveInspection'
+  | 'installation';
 
 export type AssetAuthoringInvalidationReason =
   | 'manifest-semantic-drift'
@@ -371,7 +395,8 @@ export type AssetAuthoringInvalidationReason =
   | 'release-declaration-stale'
   | 'preview-acceptance-stale'
   | 'formal-archive-stale'
-  | 'archive-inspection-stale';
+  | 'archive-inspection-stale'
+  | 'installation-stale';
 
 export interface AssetAuthoringInvalidationDecision {
   readonly checkpoint: AssetAuthoringInvalidationCheckpoint;
@@ -579,6 +604,7 @@ function parseReceipts(value: unknown): AssetAuthoringSessionReceipts {
       'sync',
       'formalArchive',
       'archiveInspection',
+      'installation',
     ],
     'session.receipts',
   );
@@ -609,6 +635,9 @@ function parseReceipts(value: unknown): AssetAuthoringSessionReceipts {
   const archiveInspection = record.archiveInspection === undefined || record.archiveInspection === null
     ? null
     : parseArchiveInspectionReceipt(record.archiveInspection);
+  const installation = record.installation === undefined || record.installation === null
+    ? null
+    : parseInstallationReceipt(record.installation);
   return {
     validation,
     preview,
@@ -619,6 +648,7 @@ function parseReceipts(value: unknown): AssetAuthoringSessionReceipts {
     sync,
     formalArchive,
     archiveInspection,
+    installation,
   };
 }
 
@@ -756,6 +786,96 @@ function parseArchiveInspectionReceipt(value: unknown): AssetAuthoringArchiveIns
     entryCount,
     totalUncompressedBytes,
     recordedAt: requireTimestamp(record.recordedAt, 'session.receipts.archiveInspection.recordedAt'),
+  };
+}
+
+function parseInstallationReceipt(value: unknown): AssetAuthoringInstallationReceipt {
+  const record = requireRecord(value, 'session.receipts.installation');
+  assertExactKeys(
+    record,
+    [
+      'schema',
+      'workspaceId',
+      'workspaceRoot',
+      'packId',
+      'version',
+      'archivePath',
+      'archiveDigest',
+      'installedDirectory',
+      'payloadDigests',
+      'registryPath',
+      'registryDigest',
+      'outputRoot',
+      'generatedDigests',
+      'creditsDigest',
+      'recordedAt',
+    ],
+    'session.receipts.installation',
+  );
+  if (record.schema !== ASSET_AUTHORING_INSTALLATION_RECEIPT_SCHEMA) {
+    fail(
+      'asset_authoring_session_tampered',
+      `Unknown installation receipt schema: ${String(record.schema)}.`,
+    );
+  }
+  const workspaceRoot = parseAbsoluteReceiptPath(
+    record,
+    'workspaceRoot',
+    'session.receipts.installation',
+  );
+  const installedDirectory = parseAbsoluteReceiptPath(
+    record,
+    'installedDirectory',
+    'session.receipts.installation',
+  );
+  const registryPath = parseAbsoluteReceiptPath(
+    record,
+    'registryPath',
+    'session.receipts.installation',
+  );
+  const outputRoot = parseAbsoluteReceiptPath(
+    record,
+    'outputRoot',
+    'session.receipts.installation',
+  );
+  return {
+    schema: ASSET_AUTHORING_INSTALLATION_RECEIPT_SCHEMA,
+    workspaceId: requireString(record, 'workspaceId', 'session.receipts.installation'),
+    workspaceRoot,
+    packId: requireString(record, 'packId', 'session.receipts.installation'),
+    version: requireString(record, 'version', 'session.receipts.installation'),
+    archivePath: parseAbsoluteReceiptPath(
+      record,
+      'archivePath',
+      'session.receipts.installation',
+    ),
+    archiveDigest: requireDigest(
+      record.archiveDigest,
+      'session.receipts.installation.archiveDigest',
+    ),
+    installedDirectory,
+    payloadDigests: parseGeneratedDigests(
+      record.payloadDigests,
+      'session.receipts.installation.payloadDigests',
+    ),
+    registryPath,
+    registryDigest: requireDigest(
+      record.registryDigest,
+      'session.receipts.installation.registryDigest',
+    ),
+    outputRoot,
+    generatedDigests: parseGeneratedDigests(
+      record.generatedDigests,
+      'session.receipts.installation.generatedDigests',
+    ),
+    creditsDigest: requireDigest(
+      record.creditsDigest,
+      'session.receipts.installation.creditsDigest',
+    ),
+    recordedAt: requireTimestamp(
+      record.recordedAt,
+      'session.receipts.installation.recordedAt',
+    ),
   };
 }
 
@@ -1075,6 +1195,7 @@ function parseProvenance(value: unknown): readonly AssetAuthoringProvenanceEvent
         'sync-receipt-recorded',
         'formal-archive-recorded',
         'archive-inspection-recorded',
+        'installation-receipt-recorded',
         'provider',
         'human-declaration',
         'human-preview-acceptance',
@@ -1372,6 +1493,35 @@ function validateReceiptScope(
       }
     }
   }
+
+  const installation = receipts.installation;
+  if (installation !== null && installation !== undefined) {
+    const artistWorkspaceRoot = path.resolve(workspace.root);
+    const consumerWorkspaceRoot = path.resolve(installation.workspaceRoot);
+    if (
+      isInsideRoot(artistWorkspaceRoot, consumerWorkspaceRoot)
+      || isInsideRoot(consumerWorkspaceRoot, artistWorkspaceRoot)
+    ) {
+      fail(
+        'asset_authoring_session_workspace_mismatch',
+        'session.receipts.installation.workspaceRoot must be a distinct workspace outside the artist workspace.',
+        installation.workspaceRoot,
+      );
+    }
+    for (const [label, target] of [
+      ['installedDirectory', installation.installedDirectory],
+      ['registryPath', installation.registryPath],
+      ['outputRoot', installation.outputRoot],
+    ] as const) {
+      if (!isInsideRoot(consumerWorkspaceRoot, path.resolve(target))) {
+        fail(
+          'asset_authoring_session_path_invalid',
+          `session.receipts.installation.${label} must stay inside the consumer workspace.`,
+          target,
+        );
+      }
+    }
+  }
 }
 
 function serializeSession(session: AssetAuthoringSession): string {
@@ -1480,6 +1630,7 @@ class AssetAuthoringSessionStoreImpl implements AssetAuthoringSessionStore {
         sync: null,
         formalArchive: null,
         archiveInspection: null,
+        installation: null,
       },
       provenance: [{
         id: this.eventId(),
@@ -1700,6 +1851,30 @@ function sameArchiveInspectionReceipts(
     && left.recordedAt === right.recordedAt;
 }
 
+function sameInstallationReceipts(
+  left: AssetAuthoringInstallationReceipt | null | undefined,
+  right: AssetAuthoringInstallationReceipt | null | undefined,
+): boolean {
+  if (left === null || left === undefined || right === null || right === undefined) {
+    return left === right;
+  }
+  return left.schema === right.schema
+    && left.workspaceId === right.workspaceId
+    && left.workspaceRoot === right.workspaceRoot
+    && left.packId === right.packId
+    && left.version === right.version
+    && left.archivePath === right.archivePath
+    && left.archiveDigest === right.archiveDigest
+    && left.installedDirectory === right.installedDirectory
+    && JSON.stringify(left.payloadDigests) === JSON.stringify(right.payloadDigests)
+    && left.registryPath === right.registryPath
+    && left.registryDigest === right.registryDigest
+    && left.outputRoot === right.outputRoot
+    && JSON.stringify(left.generatedDigests) === JSON.stringify(right.generatedDigests)
+    && left.creditsDigest === right.creditsDigest
+    && left.recordedAt === right.recordedAt;
+}
+
 function releaseReceiptDigest(
   receipt: AssetAuthoringReleaseDeclarationReceipt | AssetAuthoringPreviewAcceptanceReceipt,
 ): string {
@@ -1896,6 +2071,32 @@ export function deriveAuthoringInvalidationDecisions(
     )
   ) {
     decisions.push({ checkpoint: 'archiveInspection', reason: 'archive-inspection-stale' });
+  }
+
+  const previousInstallation = previous.installationReceipt;
+  const currentInstallation = current.installationReceipt;
+  const releaseArchiveStale = decisions.some((decision) =>
+    decision.checkpoint === 'formalArchive' || decision.checkpoint === 'archiveInspection');
+  if (!sameInstallationReceipts(previousInstallation, currentInstallation)) {
+    if (previousInstallation !== undefined && previousInstallation !== null) {
+      decisions.push({ checkpoint: 'installation', reason: 'installation-stale' });
+    }
+  } else if (
+    previousInstallation !== undefined
+    && previousInstallation !== null
+    && currentInstallation !== undefined
+    && currentInstallation !== null
+    && (
+      currentArchiveInspection === undefined
+      || currentArchiveInspection === null
+      || currentInstallation.archiveDigest !== currentArchiveInspection.archiveDigest
+      || currentInstallation.packId !== currentArchiveInspection.packId
+      || currentInstallation.version !== currentArchiveInspection.version
+      || currentInstallation.archivePath !== currentArchiveInspection.archivePath
+      || releaseArchiveStale
+    )
+  ) {
+    decisions.push({ checkpoint: 'installation', reason: 'installation-stale' });
   }
   return decisions;
 }

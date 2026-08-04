@@ -2,6 +2,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  realpathSync,
   readdirSync,
   readFileSync,
   rmSync,
@@ -359,6 +360,21 @@ afterEach(() => {
 });
 
 describe('session-aware release boundaries', () => {
+  it('requires an exact archive for public consumer installation', async () => {
+    const fixture = createDraftFixture();
+    const response = await runJson<null>([
+      'asset', 'authoring', 'install',
+      '--session', fixture.session.sessionId,
+      '--consumer-workspace', path.join(fixture.root, 'consumer-workspace'),
+      '--confirm',
+    ], fixture.workspaceRoot);
+
+    expect(response.code).toBe(1);
+    expect(response.response.errors).toEqual([
+      expect.objectContaining({ code: 'missing_argument', path: '--archive' }),
+    ]);
+  });
+
   it('validates the draft command through its public argv seam', async () => {
     const stdout: string[] = [];
     const stderr: string[] = [];
@@ -862,6 +878,359 @@ describe('session-aware release boundaries', () => {
     expect(humanStderr).toEqual([]);
     expect(humanStdout.join('')).toContain(`Formal archive: ${formalReceipt.archivePath}`);
     expect(humanStdout.join('')).toContain(`Archive inspection: ${inspectionReceipt.archivePath}`);
+  });
+
+  it('requires explicit confirmation before installing the inspected archive into a consumer workspace', async () => {
+    const fixture = await createFormalReadyFixture();
+    const { workspaceRoot, runtime, session } = fixture;
+    const packed = await runJson<{
+      readonly formalArchiveReceipt: { readonly archivePath: string } | null;
+    }>(['asset', 'authoring', 'pack', '--session', session.sessionId, '--confirm'], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    const archivePath = packed.response.data?.formalArchiveReceipt?.archivePath;
+    if (archivePath === undefined) throw new Error('Expected a formal archive.');
+    const inspected = await runJson<null>([
+      'asset', 'authoring', 'inspect', '--session', session.sessionId, '--archive', archivePath,
+    ], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    expect(inspected.code).toBe(0);
+
+    const consumer = initializeAssetWorkspace(
+      path.join(createDirectory('lpc-authoring-consumer-'), 'workspace'),
+    );
+    const sessionPath = assetAuthoringSessionPath(fixture.workspace, session.sessionId);
+    const sessionBefore = readFileSync(sessionPath);
+    const pending = await runJson<{
+      readonly state: string;
+      readonly reason: string;
+      readonly installationReceipt: null;
+      readonly nextActions: readonly { readonly id: string; readonly safety: string }[];
+    }>([
+      'asset', 'authoring', 'install', '--session', session.sessionId,
+      '--archive', archivePath, '--consumer-workspace', consumer.root,
+    ], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+
+    expect(pending.code).toBe(0);
+    expect(pending.response.data).toMatchObject({
+      state: 'needs-user-action',
+      reason: 'installation-confirmation-required',
+      installationReceipt: null,
+      nextActions: [{ id: 'install-consumer-archive', safety: 'requires-confirmation' }],
+    });
+    expect(readFileSync(sessionPath)).toEqual(sessionBefore);
+    expect(readdirSync(consumer.outputRoot)).toEqual(['.lpc-toolkit-managed.json']);
+  });
+
+  it('requires current archive inspection before consumer installation', async () => {
+    const fixture = await createFormalReadyFixture();
+    const { workspaceRoot, workspace, runtime, session } = fixture;
+    const packed = await runJson<{
+      readonly formalArchiveReceipt: { readonly archivePath: string } | null;
+    }>(['asset', 'authoring', 'pack', '--session', session.sessionId, '--confirm'], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    const archivePath = packed.response.data?.formalArchiveReceipt?.archivePath;
+    if (archivePath === undefined) throw new Error('Expected a formal archive.');
+    const sessionPath = assetAuthoringSessionPath(workspace, session.sessionId);
+    const sessionBefore = readFileSync(sessionPath);
+    const consumerRoot = path.join(createDirectory('lpc-authoring-uninspected-consumer-'), 'workspace');
+    const result = await runJson<{
+      readonly state: string;
+      readonly reason: string;
+      readonly installationReceipt: null;
+      readonly nextActions: readonly { readonly id: string }[];
+    }>([
+      'asset', 'authoring', 'install', '--session', session.sessionId,
+      '--archive', archivePath, '--consumer-workspace', consumerRoot, '--confirm',
+    ], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+
+    expect(result.code).toBe(0);
+    expect(result.response.data).toMatchObject({
+      state: 'needs-user-action',
+      reason: 'formal-archive-current',
+      installationReceipt: null,
+      nextActions: [{ id: 'inspect-formal-archive' }],
+    });
+    expect(readFileSync(sessionPath)).toEqual(sessionBefore);
+    expect(existsSync(consumerRoot)).toBe(false);
+  });
+
+  it('rejects an archive whose bytes do not match the current inspection receipt', async () => {
+    const fixture = await createFormalReadyFixture();
+    const { workspaceRoot, workspace, runtime, session } = fixture;
+    const packed = await runJson<{
+      readonly formalArchiveReceipt: { readonly archivePath: string } | null;
+    }>(['asset', 'authoring', 'pack', '--session', session.sessionId, '--confirm'], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    const archivePath = packed.response.data?.formalArchiveReceipt?.archivePath;
+    if (archivePath === undefined) throw new Error('Expected a formal archive.');
+    const inspected = await runJson<null>([
+      'asset', 'authoring', 'inspect', '--session', session.sessionId, '--archive', archivePath,
+    ], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    expect(inspected.code).toBe(0);
+
+    const mismatchedArchivePath = path.join(createDirectory('lpc-authoring-mismatch-'), 'archive.zip');
+    writeFileSync(mismatchedArchivePath, Buffer.concat([
+      readFileSync(archivePath),
+      Buffer.from('external byte mutation'),
+    ]));
+    const consumer = initializeAssetWorkspace(
+      path.join(createDirectory('lpc-authoring-mismatch-consumer-'), 'workspace'),
+    );
+    const sessionPath = assetAuthoringSessionPath(workspace, session.sessionId);
+    const sessionBefore = readFileSync(sessionPath);
+    const archiveBefore = readFileSync(mismatchedArchivePath);
+    const consumerRegistryBefore = existsSync(consumer.registryPath)
+      ? readFileSync(consumer.registryPath)
+      : undefined;
+    const result = await runJson<null>([
+      'asset', 'authoring', 'install', '--session', session.sessionId,
+      '--archive', mismatchedArchivePath,
+      '--consumer-workspace', consumer.root, '--confirm',
+    ], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.response.errors).toEqual([
+      expect.objectContaining({ code: 'asset_authoring_install_archive_mismatch' }),
+    ]);
+    expect(readFileSync(sessionPath)).toEqual(sessionBefore);
+    expect(readFileSync(mismatchedArchivePath)).toEqual(archiveBefore);
+    expect(existsSync(consumer.registryPath)).toBe(consumerRegistryBefore !== undefined);
+    if (consumerRegistryBefore !== undefined) {
+      expect(readFileSync(consumer.registryPath)).toEqual(consumerRegistryBefore);
+    }
+    expect(readdirSync(consumer.outputRoot)).toEqual(['.lpc-toolkit-managed.json']);
+  });
+
+  it('installs the exact inspected archive, records verified attribution, and is byte-idempotent', async () => {
+    const fixture = await createFormalReadyFixture();
+    const { workspaceRoot, workspace, runtime, session } = fixture;
+    const packed = await runJson<{
+      readonly formalArchiveReceipt: { readonly archivePath: string } | null;
+    }>(['asset', 'authoring', 'pack', '--session', session.sessionId, '--confirm'], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    const archivePath = packed.response.data?.formalArchiveReceipt?.archivePath;
+    if (archivePath === undefined) throw new Error('Expected a formal archive.');
+    const inspected = await runJson<null>([
+      'asset', 'authoring', 'inspect', '--session', session.sessionId, '--archive', archivePath,
+    ], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    expect(inspected.code).toBe(0);
+
+    const consumer = initializeAssetWorkspace(
+      path.join(createDirectory('lpc-authoring-consumer-'), 'workspace'),
+    );
+    const consumerRoot = realpathSync.native(consumer.root);
+    const consumerOutputRoot = path.join(consumerRoot, 'assets_custom');
+    const consumerRegistryPath = path.join(
+      consumerRoot,
+      '.lpc-toolkit',
+      'asset-packs',
+      'registry.json',
+    );
+    const archiveBefore = readFileSync(archivePath);
+    const first = await runJson<{
+      readonly state: string;
+      readonly reason: string;
+      readonly installationReceipt: {
+        readonly schema: string;
+        readonly workspaceRoot: string;
+        readonly packId: string;
+        readonly version: string;
+        readonly archivePath: string;
+        readonly archiveDigest: string;
+        readonly installedDirectory: string;
+        readonly registryPath: string;
+        readonly registryDigest: string;
+        readonly outputRoot: string;
+        readonly generatedDigests: Readonly<Record<string, string>>;
+        readonly creditsDigest: string;
+      } | null;
+    }>([
+      'asset', 'authoring', 'install', '--session', session.sessionId,
+      '--archive', archivePath, '--consumer-workspace', consumerRoot, '--confirm',
+    ], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    expect(first.code, JSON.stringify(first.response, null, 2)).toBe(0);
+    expect(first.response.data).toMatchObject({
+      state: 'completed',
+      reason: 'installation-current',
+      installationReceipt: {
+        schema: 'lpc-toolkit.asset-authoring-install-receipt.v1',
+        workspaceRoot: consumerRoot,
+        packId: PLAN.pack.id,
+        version: PLAN.pack.version,
+        archivePath,
+        archiveDigest: expect.stringMatching(/^sha256:[0-9a-f]{64}$/u),
+        installedDirectory: expect.stringContaining(path.join('.lpc-toolkit', 'asset-packs', 'installed')),
+        registryPath: consumerRegistryPath,
+        registryDigest: expect.stringMatching(/^sha256:[0-9a-f]{64}$/u),
+        outputRoot: consumerOutputRoot,
+        generatedDigests: expect.objectContaining({ 'CREDITS.csv': expect.any(String) }),
+        creditsDigest: expect.stringMatching(/^sha256:[0-9a-f]{64}$/u),
+      },
+      nextActions: [],
+    });
+    const receipt = first.response.data?.installationReceipt;
+    if (receipt === null || receipt === undefined) throw new Error('Expected an installation receipt.');
+    expect(receipt.generatedDigests['CREDITS.csv']).toBe(receipt.creditsDigest);
+    expect(existsSync(path.join(consumerOutputRoot, 'CREDITS.csv'))).toBe(true);
+    const consumerRuntime: RuntimeAssets = {
+      ...createEmptyRuntime(consumerRoot),
+      source: 'managed-cache',
+      releaseTag: 'test-pinned-release',
+    };
+    writeJson(path.join(
+      consumerRuntime.context.assetsRoot,
+      'sheet_definitions',
+      'body',
+      'body.json',
+    ), {
+      name: 'Body',
+      type_name: 'body',
+      animations: ['walk'],
+      credits: [],
+      layer_1: { zPos: 10, male: 'body/base/' },
+    });
+    writeWalkPng(path.join(
+      consumerRuntime.context.assetsRoot,
+      'spritesheets',
+      'body',
+      'base',
+      'walk.png',
+    ), '#224466');
+    const selectionPath = path.join(consumerRoot, 'consumer-hero.selection.json');
+    writeJson(selectionPath, {
+      schema: 'lpc-toolkit.selection.v2',
+      name: 'consumer-hero',
+      bodyType: 'male',
+      items: {
+        body: { name: 'Body' },
+        hair: { name: `${PLAN.pack.id}--${PLAN.asset.localId}` },
+      },
+    });
+    const consumerPreview = await runJson<{
+      readonly artifacts: readonly { readonly type: string; readonly path: string }[];
+    }>([
+      'character', 'preview', '--selection', selectionPath,
+      '--animation', 'walk', '--direction', 'down',
+    ], consumerRoot, {
+      prepareRuntimeAssets: async () => consumerRuntime,
+    });
+    expect(consumerPreview.code, JSON.stringify(consumerPreview.response, null, 2)).toBe(0);
+    const consumerCredits = consumerPreview.response.data?.artifacts.find(
+      (artifact) => artifact.type === 'credits_txt',
+    );
+    if (consumerCredits === undefined) throw new Error('Expected consumer preview credits.');
+    expect(readFileSync(consumerCredits.path, 'utf8')).toContain('Draft Artist');
+    const sessionPath = assetAuthoringSessionPath(workspace, session.sessionId);
+    const sessionAfterInstall = readFileSync(sessionPath);
+
+    const repeatPending = await runJson<{
+      readonly state: string;
+      readonly reason: string;
+      readonly installationReceipt: typeof receipt;
+    }>([
+      'asset', 'authoring', 'install', '--session', session.sessionId,
+      '--archive', archivePath, '--consumer-workspace', consumerRoot,
+    ], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    expect(repeatPending.code).toBe(0);
+    expect(repeatPending.response.data).toMatchObject({
+      state: 'needs-user-action',
+      reason: 'installation-confirmation-required',
+      installationReceipt: receipt,
+    });
+    expect(readFileSync(sessionPath)).toEqual(sessionAfterInstall);
+
+    const second = await runJson<{
+      readonly installationReceipt: typeof receipt;
+    }>([
+      'asset', 'authoring', 'install', '--session', session.sessionId,
+      '--archive', archivePath, '--consumer-workspace', consumerRoot, '--confirm',
+    ], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    expect(second.code, JSON.stringify(second.response, null, 2)).toBe(0);
+    expect(second.response.data?.installationReceipt).toEqual(receipt);
+    expect(readFileSync(sessionPath)).toEqual(sessionAfterInstall);
+    expect(readFileSync(archivePath)).toEqual(archiveBefore);
+
+    writeFileSync(path.join(consumerOutputRoot, 'CREDITS.csv'), 'tampered credits\n');
+    const stale = await runJson<{
+      readonly state: string;
+      readonly reason: string;
+      readonly installationReceipt: typeof receipt;
+      readonly nextActions: readonly { readonly id: string }[];
+    }>(['asset', 'authoring', 'status', '--session', session.sessionId], workspaceRoot);
+    expect(stale.code).toBe(0);
+    expect(stale.response.data).toMatchObject({
+      state: 'needs-user-action',
+      reason: 'installation-stale',
+      installationReceipt: receipt,
+      nextActions: [{ id: 'install-consumer-archive' }],
+    });
+  });
+
+  it('refuses unsafe or uninitialized consumer workspaces before installation', async () => {
+    const fixture = await createFormalReadyFixture();
+    const { workspaceRoot, workspace, runtime, session } = fixture;
+    const packed = await runJson<{
+      readonly formalArchiveReceipt: { readonly archivePath: string } | null;
+    }>(['asset', 'authoring', 'pack', '--session', session.sessionId, '--confirm'], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    const archivePath = packed.response.data?.formalArchiveReceipt?.archivePath;
+    if (archivePath === undefined) throw new Error('Expected a formal archive.');
+    const inspected = await runJson<null>([
+      'asset', 'authoring', 'inspect', '--session', session.sessionId, '--archive', archivePath,
+    ], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    expect(inspected.code).toBe(0);
+    const sessionPath = assetAuthoringSessionPath(workspace, session.sessionId);
+    const sessionBefore = readFileSync(sessionPath);
+
+    const artistRoot = await runJson<null>([
+      'asset', 'authoring', 'install', '--session', session.sessionId,
+      '--archive', archivePath, '--consumer-workspace', workspace.root, '--confirm',
+    ], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    expect(artistRoot.code).toBe(1);
+    expect(artistRoot.response.errors).toEqual([
+      expect.objectContaining({ code: 'asset_authoring_consumer_workspace_unsafe' }),
+    ]);
+    expect(readFileSync(sessionPath)).toEqual(sessionBefore);
+
+    const uninitialized = path.join(fixture.root, 'uninitialized-consumer');
+    const missingWorkspace = await runJson<null>([
+      'asset', 'authoring', 'install', '--session', session.sessionId,
+      '--archive', archivePath, '--consumer-workspace', uninitialized, '--confirm',
+    ], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    expect(missingWorkspace.code).toBe(1);
+    expect(missingWorkspace.response.errors).toEqual([
+      expect.objectContaining({ code: 'asset_authoring_consumer_workspace_invalid' }),
+    ]);
+    expect(existsSync(uninitialized)).toBe(false);
+    expect(readFileSync(sessionPath)).toEqual(sessionBefore);
   });
 
   it('rejects a traversal formal archive destination without changing session or filesystem state', async () => {

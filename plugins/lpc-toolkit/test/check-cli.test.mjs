@@ -92,6 +92,8 @@ test('documents the public stable CLI installation contract for both workflows',
       '`lpc-toolkit.asset-authoring-draft-receipt.v1`',
       '`lpc-toolkit.asset-authoring-formal-archive-receipt.v1`',
       '`lpc-toolkit.asset-authoring-archive-inspection-receipt.v1`',
+      '`lpc-toolkit.asset-authoring-install-receipt.v1`',
+      '`asset-authoring-consumer-install.v1`',
       '`asset authoring acknowledge`, `declare`, `accept-preview`, `draft`, `sync`,',
       '`pack`, and `inspect` commands',
     ]) {

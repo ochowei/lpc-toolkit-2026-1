@@ -552,8 +552,10 @@ try {
   assert.equal(capabilitiesOutput.ok, true);
   assert.equal(capabilitiesOutput.command, 'capabilities');
   assert.ok(capabilitiesOutput.data?.capabilities.includes('asset-authoring-session.v1'));
+  assert.ok(capabilitiesOutput.data?.capabilities.includes('asset-authoring-consumer-install.v1'));
   assert.ok(capabilitiesOutput.data?.capabilities.includes('sprite-drawing-contract.v1'));
   assert.ok(capabilitiesOutput.data?.schemaVersions.includes('lpc-toolkit.asset-authoring-plan.v1'));
+  assert.ok(capabilitiesOutput.data?.schemaVersions.includes('lpc-toolkit.asset-authoring-install-receipt.v1'));
 
   const authoringPlanPath = path.join(emptyCwd, 'packed-authoring-plan.json');
   writeJson(authoringPlanPath, {
@@ -975,6 +977,114 @@ try {
     repeatedInspectionOutput.data?.inspectionReceipt?.archiveDigest,
     formalReceipt.archiveDigest,
   );
+
+  const authoringConsumerWorkspaceRoot = path.join(emptyCwd, 'authoring-consumer');
+  const authoringConsumerInit = runInstalledJson([
+    'asset', 'workspace', 'init', authoringConsumerWorkspaceRoot,
+  ]);
+  assert.equal(authoringConsumerInit.data?.root, authoringConsumerWorkspaceRoot);
+  const canonicalAuthoringConsumerWorkspaceRoot = realpathSync.native(authoringConsumerWorkspaceRoot);
+  const authoringSessionFile = path.join(
+    canonicalWorkspaceRoot,
+    '.lpc-toolkit',
+    'asset-packs',
+    'authoring-sessions',
+    authoringSessionId,
+    'session.json',
+  );
+  const authoringSessionBeforeInstall = readFileSync(authoringSessionFile);
+  const formalArchiveBeforeInstall = readFileSync(formalReceipt.archivePath);
+  assert.deepEqual(
+    readdirSync(path.join(authoringConsumerWorkspaceRoot, 'assets_custom')),
+    ['.lpc-toolkit-managed.json'],
+  );
+  const authoringInstallPending = runInstalledJson([
+    'asset', 'authoring', 'install',
+    '--session', authoringSessionId,
+    '--archive', formalReceipt.archivePath,
+    '--consumer-workspace', authoringConsumerWorkspaceRoot,
+  ], workspaceRoot);
+  assert.equal(authoringInstallPending.data?.reason, 'installation-confirmation-required');
+  assert.equal(authoringInstallPending.data?.installationReceipt, null);
+  assert.deepEqual(
+    authoringInstallPending.data?.nextActions.map(({ id, safety }) => ({ id, safety })),
+    [{ id: 'install-consumer-archive', safety: 'requires-confirmation' }],
+  );
+  assert.deepEqual(readFileSync(authoringSessionFile), authoringSessionBeforeInstall);
+  assert.deepEqual(readFileSync(formalReceipt.archivePath), formalArchiveBeforeInstall);
+  assert.deepEqual(
+    readdirSync(path.join(authoringConsumerWorkspaceRoot, 'assets_custom')),
+    ['.lpc-toolkit-managed.json'],
+  );
+
+  const authoringInstallOutput = runInstalledJson([
+    'asset', 'authoring', 'install',
+    '--session', authoringSessionId,
+    '--archive', formalReceipt.archivePath,
+    '--consumer-workspace', authoringConsumerWorkspaceRoot,
+    '--confirm',
+  ], workspaceRoot);
+  assert.equal(authoringInstallOutput.data?.reason, 'installation-current');
+  const authoringInstallationReceipt = authoringInstallOutput.data?.installationReceipt;
+  assert.ok(authoringInstallationReceipt);
+  assert.equal(
+    authoringInstallationReceipt.schema,
+    'lpc-toolkit.asset-authoring-install-receipt.v1',
+  );
+  assert.equal(authoringInstallationReceipt.archiveDigest, formalReceipt.archiveDigest);
+  assert.equal(authoringInstallationReceipt.workspaceRoot, canonicalAuthoringConsumerWorkspaceRoot);
+  assert.equal(
+    authoringInstallationReceipt.generatedDigests['CREDITS.csv'],
+    authoringInstallationReceipt.creditsDigest,
+  );
+  assert.deepEqual(readFileSync(formalReceipt.archivePath), formalArchiveBeforeInstall);
+  const authoringSessionAfterInstall = readFileSync(authoringSessionFile);
+  const repeatedAuthoringInstall = runInstalledJson([
+    'asset', 'authoring', 'install',
+    '--session', authoringSessionId,
+    '--archive', formalReceipt.archivePath,
+    '--consumer-workspace', authoringConsumerWorkspaceRoot,
+    '--confirm',
+  ], workspaceRoot);
+  assert.deepEqual(
+    repeatedAuthoringInstall.data?.installationReceipt,
+    authoringInstallationReceipt,
+  );
+  assert.deepEqual(readFileSync(authoringSessionFile), authoringSessionAfterInstall);
+
+  writeJson(
+    path.join(authoringConsumerWorkspaceRoot, 'characters', 'packed-authoring.selection.json'),
+    {
+      schema: 'lpc-toolkit.selection.v1',
+      name: 'packed-authoring',
+      bodyType: 'male',
+      items: { hair: { name: 'smoke.packed-authoring--moon-braid' } },
+    },
+  );
+  runInstalled([
+    'character', 'preview', 'packed-authoring', '--animation', 'walk',
+  ], authoringConsumerWorkspaceRoot);
+  const authoringConsumerPreviewRoot = path.join(
+    authoringConsumerWorkspaceRoot,
+    'characters',
+    'previews',
+    'packed-authoring',
+  );
+  assert.match(
+    readFileSync(path.join(authoringConsumerPreviewRoot, 'packed-authoring.credits.txt'), 'utf8'),
+    /Packed Authoring Artist/u,
+  );
+  assert.match(
+    readFileSync(path.join(authoringConsumerPreviewRoot, 'packed-authoring.credits.csv'), 'utf8'),
+    /Packed Authoring Artist/u,
+  );
+  const authoringConsumerList = runInstalledJson(['asset', 'list'], authoringConsumerWorkspaceRoot);
+  assert.deepEqual(
+    authoringConsumerList.data?.entries?.map(({ packId, version, kind }) => ({ packId, version, kind })),
+    [{ packId: 'smoke.packed-authoring', version: '1.0.0', kind: 'installed' }],
+  );
+  const authoringConsumerDoctor = runInstalledJson(['asset', 'doctor'], authoringConsumerWorkspaceRoot);
+  assert.equal(authoringConsumerDoctor.data?.healthy, true);
 
   assert.equal(
     readFileSync(cacheSentinelPath, 'utf8'),

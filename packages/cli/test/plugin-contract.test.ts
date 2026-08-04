@@ -147,6 +147,8 @@ describe('Codex plugin CLI contract', () => {
       expect(compatibility).toContain('asset-authoring-release.v1');
       expect(compatibility).toContain('lpc-toolkit.asset-release-declaration.v1');
       expect(compatibility).toContain('lpc-toolkit.asset-authoring-release-receipt.v1');
+      expect(compatibility).toContain('lpc-toolkit.asset-authoring-install-receipt.v1');
+      expect(compatibility).toContain('asset-authoring-consumer-install.v1');
       expect(compatibility).toContain('asset authoring acknowledge');
       expect(compatibility).toContain('accept-preview');
     }

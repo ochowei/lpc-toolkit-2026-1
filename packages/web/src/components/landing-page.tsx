@@ -135,6 +135,10 @@ const releasePublicationCommands = [
   'lpc-toolkit asset authoring inspect --session <session-id> --archive <archive>',
 ] as const;
 
+const releaseConsumerCommands = [
+  'lpc-toolkit asset authoring install --session <session-id> --archive <archive> --consumer-workspace <directory> --confirm',
+] as const;
+
 const releaseRecoveryCommands = [
   'lpc-toolkit asset authoring draft --session <session-id>',
   'lpc-toolkit asset authoring sync --session <session-id> --confirm',
@@ -279,6 +283,25 @@ export function CliPage({ onNavigate }: ProductPageProps) {
             </p>
             <ol className="mt-4 space-y-3">
               {releasePublicationCommands.map((command, index) => (
+                <li key={`${index}-${command}`}>
+                  <CopyCode children={command} />
+                </li>
+              ))}
+            </ol>
+            <h3 className="mt-5 text-lg font-semibold text-text">
+              Optionally activate the exact archive in a consumer workspace
+            </h3>
+            <p className="mt-2 text-sm text-text-2">
+              Consumer activation is explicit and separate from formal
+              publication. The target must already be an initialized managed
+              workspace outside the artist, repository, cache, and generated
+              output roots. The command confirms the exact inspected digest,
+              verifies the committed registry/output/source and matching
+              <code>CREDITS.csv</code>, and records an installation receipt;
+              unchanged retries are idempotent.
+            </p>
+            <ol className="mt-4 space-y-3">
+              {releaseConsumerCommands.map((command, index) => (
                 <li key={`${index}-${command}`}>
                   <CopyCode children={command} />
                 </li>

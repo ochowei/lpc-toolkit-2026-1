@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import {
   lstatSync,
+  realpathSync,
   readFileSync,
   renameSync,
   rmSync,
@@ -54,6 +55,15 @@ import {
   atomicallyReplaceAssetPackSource,
   loadAssetPackFiles,
 } from './asset-pack-files.js';
+import {
+  installAssetPack,
+  ASSET_PACK_INSTALL_RECEIPT_SCHEMA,
+} from './asset-pack-install.js';
+import {
+  auditPublishedManagedOutput,
+  readAssetPackRegistry,
+  type InstalledAssetPackRegistryEntry,
+} from './asset-pack-registry.js';
 import { PreviewError } from './preview.js';
 import { CLI_VERSION } from './package-info.js';
 import {
@@ -70,6 +80,7 @@ import {
   type AssetAuthoringSyncReceipt,
   type AssetAuthoringArchiveInspectionReceipt,
   type AssetAuthoringFormalArchiveReceipt,
+  type AssetAuthoringInstallationReceipt,
   type AssetAuthoringValidationReceipt,
 } from './asset-authoring-session.js';
 import {
@@ -82,7 +93,11 @@ import {
   AssetAuthoringReleaseLifecycleError,
 } from './asset-authoring-release-lifecycle.js';
 import { inspectAssetPackArchive } from './asset-pack-inspection.js';
-import type { AssetWorkspace } from './asset-workspace.js';
+import {
+  assertManagedAssetOutput,
+  findAssetWorkspace,
+  type AssetWorkspace,
+} from './asset-workspace.js';
 import type { RuntimeAssets } from './runtime-assets.js';
 import { syncLinkedAssetPack } from './asset-pack-sync.js';
 import {
@@ -136,6 +151,7 @@ interface ResponseOptions {
   readonly preview?: AuthoringPreviewData;
   readonly formalArchiveReceipt?: AssetAuthoringFormalArchiveReceipt | null;
   readonly inspectionReceipt?: AssetAuthoringArchiveInspectionReceipt | null;
+  readonly installationReceipt?: AssetAuthoringInstallationReceipt | null;
 }
 
 function issue(
@@ -546,6 +562,25 @@ function nextActionsFor(session: AssetAuthoringSession): readonly AuthoringNextA
     )];
   }
 
+  if (
+    session.reason === 'archive-inspection-current'
+    || session.reason === 'installation-stale'
+    || session.reason === 'installation-confirmation-required'
+    || session.reason === 'installation-archive-mismatch'
+  ) {
+    const inspection = session.receipts.archiveInspection;
+    return inspection === null || inspection === undefined
+      ? []
+      : [nextAction(
+        'install-consumer-archive',
+        'Install the exact inspected formal archive into a distinct managed consumer workspace after review.',
+        `asset authoring install --session ${session.sessionId} --archive <archive> --consumer-workspace <directory> --confirm`,
+        'requires-confirmation',
+        [inspection.archiveDigest],
+        ['archive', 'consumer-workspace', 'confirm'],
+      )];
+  }
+
   if (session.phase === 'planned' || session.phase === 'scaffolded') {
     return [nextAction(
       'create-contract',
@@ -849,6 +884,9 @@ function responseFor(
     inspectionReceipt: options.inspectionReceipt === undefined
       ? session.receipts.archiveInspection ?? null
       : options.inspectionReceipt,
+    installationReceipt: options.installationReceipt === undefined
+      ? session.receipts.installation ?? null
+      : options.installationReceipt,
   };
   return authoringResponseProjection(input);
 }
@@ -1140,7 +1178,11 @@ async function statusSession(
   const store = createAssetAuthoringSessionStore(workspace);
   const session = await refreshFormalArchiveState(
     store,
-    await refreshSyncReceiptState(workspace, store, store.status(sessionId)),
+    refreshInstallationState(
+      workspace,
+      store,
+      await refreshSyncReceiptState(workspace, store, store.status(sessionId)),
+    ),
   );
   return commandOk('asset authoring status', responseFor(
     session,
@@ -1808,6 +1850,503 @@ async function inspectCommand(
   );
 }
 
+interface ConsumerWorkspaceMarker {
+  readonly bytes: Buffer;
+  readonly workspaceId: string;
+}
+
+interface ConsumerInstallationVerification {
+  readonly ok: true;
+  readonly marker: ConsumerWorkspaceMarker;
+  readonly registryDigest: string;
+  readonly installedDirectory: string;
+  readonly payloadDigests: Readonly<Record<string, string>>;
+  readonly generatedDigests: Readonly<Record<string, string>>;
+  readonly creditsDigest: string;
+}
+
+type ConsumerInstallationVerificationResult =
+  | ConsumerInstallationVerification
+  | { readonly ok: false; readonly reason: string };
+
+function parseInstallationDigestRecord(
+  value: unknown,
+  label: string,
+): Readonly<Record<string, string>> {
+  if (!isRecord(value)) throw new Error(`${label} must be an object.`);
+  const entries = Object.entries(value);
+  const sortedEntries = [...entries].sort(([left], [right]) => left.localeCompare(right));
+  if (JSON.stringify(entries.map(([key]) => key)) !== JSON.stringify(sortedEntries.map(([key]) => key))) {
+    throw new Error(`${label} must use stable lexical ordering.`);
+  }
+  const result: Record<string, string> = {};
+  for (const [key, digest] of entries) {
+    if (key.length === 0 || key.includes('\u0000') || key.split('/').some((segment) => segment === '..')) {
+      throw new Error(`${label} contains an unsafe path: ${key}.`);
+    }
+    if (typeof digest !== 'string' || !DIGEST_PATTERN.test(digest)) {
+      throw new Error(`${label}.${key} must be a sha256 digest.`);
+    }
+    result[key] = digest;
+  }
+  return result;
+}
+
+function readConsumerWorkspaceMarker(
+  workspace: AssetWorkspace,
+): ConsumerWorkspaceMarker {
+  const markerPath = path.join(workspace.outputRoot, '.lpc-toolkit-managed.json');
+  const bytes = readRegularFile(markerPath);
+  if (bytes === undefined) throw new Error(`Managed asset output marker is missing: ${markerPath}.`);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(bytes.toString('utf8')) as unknown;
+  } catch {
+    throw new Error(`Managed asset output marker is invalid: ${markerPath}.`);
+  }
+  if (!isRecord(parsed) || typeof parsed.workspaceId !== 'string' || parsed.workspaceId.length === 0) {
+    throw new Error(`Managed asset output marker does not contain a workspace ID: ${markerPath}.`);
+  }
+  return { bytes, workspaceId: parsed.workspaceId };
+}
+
+function readInstalledPayloadDigests(options: {
+  readonly installedDirectory: string;
+  readonly workspaceId: string;
+  readonly entry: InstalledAssetPackRegistryEntry;
+}): Readonly<Record<string, string>> {
+  const receiptPath = path.join(options.installedDirectory, 'install-receipt.json');
+  const bytes = readRegularFile(receiptPath);
+  if (bytes === undefined) throw new Error(`Installed asset-pack receipt is missing: ${receiptPath}.`);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(bytes.toString('utf8')) as unknown;
+  } catch {
+    throw new Error(`Installed asset-pack receipt is invalid: ${receiptPath}.`);
+  }
+  if (!isRecord(parsed)) throw new Error(`Installed asset-pack receipt is invalid: ${receiptPath}.`);
+  if (
+    parsed.schema !== ASSET_PACK_INSTALL_RECEIPT_SCHEMA
+    || parsed.workspaceId !== options.workspaceId
+    || parsed.packId !== options.entry.packId
+    || parsed.version !== options.entry.version
+    || parsed.archiveDigest !== options.entry.archiveDigest
+    || parsed.contentDigest !== options.entry.contentDigest
+  ) {
+    throw new Error(`Installed asset-pack receipt does not match the registry entry: ${receiptPath}.`);
+  }
+  const payloadDigests = parseInstallationDigestRecord(
+    parsed.payloadDigests,
+    'Installed asset-pack receipt.payloadDigests',
+  );
+  const expectedPaths = ['asset-pack.json', ...Object.keys(options.entry.sourceDigests)]
+    .sort((left, right) => left.localeCompare(right));
+  if (JSON.stringify(Object.keys(payloadDigests)) !== JSON.stringify(expectedPaths)) {
+    throw new Error(`Installed asset-pack receipt payload coverage is incomplete: ${receiptPath}.`);
+  }
+  return payloadDigests;
+}
+
+function verifyConsumerInstallation(options: {
+  readonly workspace: AssetWorkspace;
+  readonly packId: string;
+  readonly version: string;
+  readonly archiveDigest: string;
+}): ConsumerInstallationVerificationResult {
+  try {
+    const marker = readConsumerWorkspaceMarker(options.workspace);
+    const registryBytes = readRegularFile(options.workspace.registryPath);
+    if (registryBytes === undefined) {
+      return { ok: false, reason: 'the consumer workspace registry is missing' };
+    }
+    const registry = readAssetPackRegistry({
+      workspace: options.workspace,
+      markerWorkspaceId: marker.workspaceId,
+      registryBytes,
+    });
+    if (!registry.ok) {
+      return {
+        ok: false,
+        reason: registry.diagnostics[0]?.message ?? 'the consumer workspace registry is invalid',
+      };
+    }
+    const entry = registry.document.entries.find(
+      (candidate): candidate is InstalledAssetPackRegistryEntry =>
+        candidate.kind === 'installed' && candidate.packId === options.packId,
+    );
+    if (entry === undefined) {
+      return { ok: false, reason: 'the consumer workspace does not contain the installed pack' };
+    }
+    if (entry.version !== options.version || entry.archiveDigest !== options.archiveDigest) {
+      return { ok: false, reason: 'the consumer workspace pack does not match the inspected archive' };
+    }
+    const outputAudit = auditPublishedManagedOutput({
+      workspace: options.workspace,
+      markerBytes: marker.bytes,
+      generatedDigests: registry.document.generatedDigests,
+    });
+    if (outputAudit !== undefined) return { ok: false, reason: outputAudit.message };
+    const creditsDigest = registry.document.generatedDigests['CREDITS.csv'];
+    if (creditsDigest === undefined) {
+      return { ok: false, reason: 'the consumer workspace registry does not publish CREDITS.csv' };
+    }
+    const creditsBytes = readRegularFile(path.join(options.workspace.outputRoot, 'CREDITS.csv'));
+    if (creditsBytes === undefined || sha256(creditsBytes) !== creditsDigest) {
+      return { ok: false, reason: 'the consumer workspace CREDITS.csv does not match its registry digest' };
+    }
+    const payloadDigests = readInstalledPayloadDigests({
+      installedDirectory: entry.installedDirectory,
+      workspaceId: marker.workspaceId,
+      entry,
+    });
+    return {
+      ok: true,
+      marker,
+      registryDigest: sha256(registryBytes),
+      installedDirectory: entry.installedDirectory,
+      payloadDigests,
+      generatedDigests: registry.document.generatedDigests,
+      creditsDigest,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+function recordsEqual(
+  left: Readonly<Record<string, string>>,
+  right: Readonly<Record<string, string>>,
+): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function installationReceiptStale(
+  receipt: AssetAuthoringInstallationReceipt,
+  consumer: AssetWorkspace,
+): string | undefined {
+  if (path.resolve(receipt.workspaceRoot) !== path.resolve(consumer.root)) {
+    return 'the recorded consumer workspace differs from the requested workspace';
+  }
+  const verified = verifyConsumerInstallation({
+    workspace: consumer,
+    packId: receipt.packId,
+    version: receipt.version,
+    archiveDigest: receipt.archiveDigest,
+  });
+  if (!verified.ok) return verified.reason;
+  if (
+    verified.marker.workspaceId !== receipt.workspaceId
+    || verified.installedDirectory !== receipt.installedDirectory
+    || verified.registryDigest !== receipt.registryDigest
+    || !recordsEqual(verified.payloadDigests, receipt.payloadDigests)
+    || !recordsEqual(verified.generatedDigests, receipt.generatedDigests)
+    || verified.creditsDigest !== receipt.creditsDigest
+  ) {
+    return 'the consumer installation no longer matches its recorded receipt';
+  }
+  return undefined;
+}
+
+function installationReceiptFor(options: {
+  readonly session: AssetAuthoringSession;
+  readonly archivePath: string;
+  readonly archiveDigest: string;
+  readonly consumer: AssetWorkspace;
+  readonly verified: ConsumerInstallationVerification;
+}): AssetAuthoringInstallationReceipt {
+  return {
+    schema: 'lpc-toolkit.asset-authoring-install-receipt.v1',
+    workspaceId: options.verified.marker.workspaceId,
+    workspaceRoot: path.resolve(options.consumer.root),
+    packId: options.session.plan.pack.id,
+    version: options.session.plan.pack.version,
+    archivePath: options.archivePath,
+    archiveDigest: options.archiveDigest,
+    installedDirectory: options.verified.installedDirectory,
+    payloadDigests: options.verified.payloadDigests,
+    registryPath: options.consumer.registryPath,
+    registryDigest: options.verified.registryDigest,
+    outputRoot: options.consumer.outputRoot,
+    generatedDigests: options.verified.generatedDigests,
+    creditsDigest: options.verified.creditsDigest,
+    recordedAt: new Date().toISOString(),
+  };
+}
+
+function resolveConsumerWorkspace(
+  context: AuthoringCommandContext,
+  argument: string,
+): AssetWorkspace {
+  const requestedRoot = path.resolve(context.cwd, argument);
+  try {
+    if (context.runtime === undefined) {
+      throw new AuthoringCommandError(
+        'The asset authoring install command requires prepared runtime assets.',
+        { code: 'asset_authoring_runtime_missing' },
+      );
+    }
+    const requestedConsumer = findAssetWorkspace(context.cwd, requestedRoot);
+    assertManagedAssetOutput(requestedConsumer);
+    const consumerRoot = realpathSync.native(requestedConsumer.root);
+    // Child processes may report the kernel's canonical cwd (for example
+    // `/private/var` instead of the `/var` spelling used by the caller). Keep
+    // every path written to the consumer registry on that same canonical root
+    // so later runtime activation can authenticate the content-addressed path.
+    const consumer = findAssetWorkspace(consumerRoot, '.');
+    assertManagedAssetOutput(consumer);
+    const protectedRoots = [
+      context.workspace.root,
+      context.runtime.context.repoRoot,
+      context.runtime.context.assetsRoot,
+      context.runtime.context.customAssetsRoot,
+    ];
+    for (const protectedRoot of protectedRoots) {
+      const canonicalProtectedRoot = realpathSync.native(protectedRoot);
+      if (
+        isInsideRoot(canonicalProtectedRoot, consumerRoot)
+        || isInsideRoot(consumerRoot, canonicalProtectedRoot)
+      ) {
+        throw new AuthoringCommandError(
+          'The consumer workspace must be distinct from the artist workspace, repository, base cache, and generated output roots.',
+          { code: 'asset_authoring_consumer_workspace_unsafe', path: consumer.root },
+        );
+      }
+    }
+    return consumer;
+  } catch (error) {
+    if (error instanceof AuthoringCommandError) throw error;
+    throw new AuthoringCommandError(
+      error instanceof Error
+        ? error.message
+        : 'The consumer workspace is not an initialized managed asset workspace.',
+      { code: 'asset_authoring_consumer_workspace_invalid', path: requestedRoot },
+    );
+  }
+}
+
+function markInstallationStale(
+  store: ReturnType<typeof createAssetAuthoringSessionStore>,
+  session: AssetAuthoringSession,
+  summary: string,
+): AssetAuthoringSession {
+  return store.replace(session.sessionId, {
+    state: 'needs-user-action',
+    reason: 'installation-stale',
+    phase: session.phase,
+    checkpoint: session.checkpoint === null
+      ? null
+      : { ...session.checkpoint, freshness: 'stale' },
+    checkpointFreshness: session.checkpointFreshness,
+    provenance: appendProvenance(session, {
+      kind: 'checkpoint-invalidated',
+      occurredAt: new Date().toISOString(),
+      ...(session.receipts.installation?.archiveDigest === undefined
+        ? {}
+        : { digest: session.receipts.installation.archiveDigest }),
+      summary,
+    }),
+  });
+}
+
+function refreshInstallationState(
+  workspace: AssetWorkspace,
+  store: ReturnType<typeof createAssetAuthoringSessionStore>,
+  session: AssetAuthoringSession,
+): AssetAuthoringSession {
+  const receipt = session.receipts.installation;
+  if (receipt === null || receipt === undefined || session.reason === 'installation-stale') {
+    return session;
+  }
+  try {
+    const consumer = findAssetWorkspace(workspace.root, receipt.workspaceRoot);
+    assertManagedAssetOutput(consumer);
+    const stale = installationReceiptStale(receipt, consumer);
+    return stale === undefined
+      ? session
+      : markInstallationStale(store, session, `Consumer installation receipt invalidated: ${stale}.`);
+  } catch (error) {
+    return markInstallationStale(
+      store,
+      session,
+      `Consumer installation receipt invalidated: ${error instanceof Error ? error.message : String(error)}.`,
+    );
+  }
+}
+
+async function installCommand(
+  context: AuthoringCommandContext,
+  sessionId: string,
+): Promise<CliResponse<AuthoringResponseData>> {
+  if (context.runtime === undefined) {
+    throw new AuthoringCommandError(
+      'The asset authoring install command requires prepared runtime assets.',
+      { code: 'asset_authoring_runtime_missing' },
+    );
+  }
+  const archiveArgument = flagString(context.parsed.flags, 'archive');
+  if (archiveArgument === undefined) {
+    throw new AuthoringCommandError(
+      'Installation requires --archive.',
+      { code: 'missing_argument', path: '--archive' },
+    );
+  }
+  const consumerArgument = flagString(context.parsed.flags, 'consumer-workspace');
+  if (consumerArgument === undefined) {
+    throw new AuthoringCommandError(
+      'Installation requires --consumer-workspace.',
+      { code: 'missing_argument', path: '--consumer-workspace' },
+    );
+  }
+
+  const store = createAssetAuthoringSessionStore(context.workspace);
+  let session = await refreshFormalArchiveState(
+    store,
+    refreshInstallationState(
+      context.workspace,
+      store,
+      resumeSession(context.workspace, store.read(sessionId)),
+    ),
+  );
+  const formalArchive = session.receipts.formalArchive;
+  const inspection = session.receipts.archiveInspection;
+  if (formalArchive === null || formalArchive === undefined || inspection === null || inspection === undefined) {
+    return commandOk('asset authoring install', responseFor(session));
+  }
+  const archivePath = path.resolve(context.cwd, archiveArgument);
+  const archiveBytes = readRegularFile(archivePath);
+  if (archiveBytes === undefined) {
+    throw new AuthoringCommandError(
+      'The exact inspected archive is missing or not a regular file.',
+      { code: 'asset_authoring_install_archive_invalid', path: archivePath },
+    );
+  }
+  const archiveDigest = sha256(archiveBytes);
+  if (
+    archiveDigest !== inspection.archiveDigest
+    || archiveDigest !== formalArchive.archiveDigest
+  ) {
+    throw new AuthoringCommandError(
+      'Installation requires the exact archive digest recorded by the current formal and inspection receipts.',
+      { code: 'asset_authoring_install_archive_mismatch', path: archivePath },
+    );
+  }
+
+  const consumer = resolveConsumerWorkspace(context, consumerArgument);
+  const existing = session.receipts.installation;
+  if (existing !== null && existing !== undefined) {
+    if (
+      path.resolve(existing.workspaceRoot) !== path.resolve(consumer.root)
+      || existing.archiveDigest !== archiveDigest
+    ) {
+      throw new AuthoringCommandError(
+        'The authoring session already records a different consumer installation; review it before replacing the receipt.',
+        { code: 'asset_authoring_installation_conflict', path: existing.workspaceRoot },
+      );
+    }
+    const stale = installationReceiptStale(existing, consumer);
+    if (stale === undefined && session.reason === 'installation-current') {
+      if (!flagBoolean(context.parsed.flags, 'confirm')) {
+        const pending: AssetAuthoringSession = {
+          ...session,
+          state: 'needs-user-action',
+          reason: 'installation-confirmation-required',
+        };
+        return commandOk('asset authoring install', responseFor(pending));
+      }
+      return commandOk('asset authoring install', responseFor(session));
+    }
+    if (stale !== undefined && session.reason !== 'installation-stale') {
+      session = markInstallationStale(
+        store,
+        session,
+        `Consumer installation receipt invalidated: ${stale}.`,
+      );
+    }
+  }
+
+  if (!flagBoolean(context.parsed.flags, 'confirm')) {
+    const pending: AssetAuthoringSession = {
+      ...session,
+      state: 'needs-user-action',
+      reason: 'installation-confirmation-required',
+    };
+    return commandOk('asset authoring install', responseFor(pending));
+  }
+
+  const installed = await installAssetPack({
+    archivePath,
+    workspace: consumer,
+    runtime: context.runtime,
+  });
+  if (!installed.ok) {
+    const diagnostic = installed.diagnostics.find((entry) => entry.severity === 'error')
+      ?? installed.diagnostics[0];
+    throw new AuthoringCommandError(
+      diagnostic?.message ?? 'The consumer asset-pack installation failed.',
+      {
+        code: diagnostic?.code ?? 'asset_authoring_consumer_install_failed',
+        ...(diagnostic?.path === undefined ? {} : { path: diagnostic.path }),
+      },
+    );
+  }
+  const verified = verifyConsumerInstallation({
+    workspace: consumer,
+    packId: formalArchive.packId,
+    version: formalArchive.version,
+    archiveDigest,
+  });
+  if (!verified.ok) {
+    throw new AuthoringCommandError(
+      `Consumer installation verification failed: ${verified.reason}.`,
+      { code: 'asset_authoring_consumer_install_verification_failed', path: consumer.root },
+    );
+  }
+  const receipt = installationReceiptFor({
+    session,
+    archivePath,
+    archiveDigest,
+    consumer,
+    verified,
+  });
+  const previous = session.receipts.installation;
+  if (
+    previous !== null
+    && previous !== undefined
+    && installationReceiptStale(previous, consumer) === undefined
+    && previous.archiveDigest === receipt.archiveDigest
+    && previous.workspaceRoot === receipt.workspaceRoot
+    && session.reason === 'installation-current'
+  ) {
+    return commandOk('asset authoring install', responseFor(session));
+  }
+  const next = store.replace(sessionId, {
+    state: 'completed',
+    reason: 'installation-current',
+    phase: 'previewed',
+    checkpoint: {
+      id: 'installation',
+      phase: 'previewed',
+      digest: receipt.archiveDigest,
+      freshness: 'current',
+    },
+    checkpointFreshness: 'current',
+    receipts: {
+      ...session.receipts,
+      installation: receipt,
+    },
+    provenance: appendProvenance(session, {
+      kind: 'installation-receipt-recorded',
+      occurredAt: receipt.recordedAt,
+      digest: receipt.archiveDigest,
+      summary: 'Exact inspected formal archive installed into a distinct managed consumer workspace with verified attribution output.',
+    }),
+  });
+  return commandOk('asset authoring install', responseFor(next));
+}
+
 function syncFailureIsStale(
   code: string,
 ): boolean {
@@ -1975,7 +2514,11 @@ async function resumeCommand(
   const session = store.read(sessionId);
   const resumed = await refreshFormalArchiveState(
     store,
-    await refreshSyncReceiptState(workspace, store, resumeSession(workspace, session)),
+    refreshInstallationState(
+      workspace,
+      store,
+      await refreshSyncReceiptState(workspace, store, resumeSession(workspace, session)),
+    ),
   );
   return commandOk('asset authoring resume', responseFor(
     resumed,
@@ -3535,6 +4078,7 @@ export async function runAssetAuthoringCommand(
     if (authoringCommand === 'draft') return await draftCommand(context, sessionId);
     if (authoringCommand === 'pack') return await packCommand(context, sessionId);
     if (authoringCommand === 'inspect') return await inspectCommand(context, sessionId);
+    if (authoringCommand === 'install') return await installCommand(context, sessionId);
     if (authoringCommand === 'sync') return await syncCommand(context, sessionId);
     if (authoringCommand === 'preview') return await previewCommand(context, sessionId);
     if (authoringCommand === 'status') return await statusSession(context.workspace, sessionId);

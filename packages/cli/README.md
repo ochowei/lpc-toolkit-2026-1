@@ -225,6 +225,7 @@ The advertisement includes these capability identifiers:
 - `asset-authoring-recovery.v1`
 - `asset-authoring-release.v1`
 - `asset-authoring-draft-recovery.v1`
+- `asset-authoring-consumer-install.v1`
 
 and these schema identifiers:
 
@@ -237,6 +238,7 @@ and these schema identifiers:
 - `lpc-toolkit.asset-authoring-draft-receipt.v1`
 - `lpc-toolkit.asset-authoring-formal-archive-receipt.v1`
 - `lpc-toolkit.asset-authoring-archive-inspection-receipt.v1`
+- `lpc-toolkit.asset-authoring-install-receipt.v1`
 
 The strict plan schema has three goals: `new-item`, `extend-item`, and
 `attach-pack`. New-item plans declare pack and asset identity, body types,
@@ -265,6 +267,7 @@ The public session commands are:
 | `asset authoring sync --session <session-id> [--confirm] [--workspace <directory>] [--json]` | Without `--confirm`, return one confirmation action without mutation. With confirmation, run the existing linked-sync transaction for the session pack and record the actual manager-owned output/registry generation. |
 | `asset authoring pack --session <session-id> [--output <archive>] --confirm [--workspace <directory>] [--json]` | After fresh validation and every release gate is current, publish a deterministic formal archive below the session's `release-artifacts/` root. Without `--confirm`, return the confirmation action without publication. |
 | `asset authoring inspect --session <session-id> --archive <archive> [--workspace <directory>] [--json]` | Inspect the exact formal archive bytes through the existing archive authority and record an inspection receipt only when its digest matches the current formal archive receipt. |
+| `asset authoring install --session <session-id> --archive <archive> --consumer-workspace <directory> --confirm [--workspace <directory>] [--json]` | Optionally install the exact inspected formal archive into an already initialized, managed consumer workspace outside the artist and protected roots. Without `--confirm`, return the confirmation action without mutation; success records a verified installation receipt. |
 
 Each JSON command returns the normal `ok`, `command`, `data`, `warnings`, and
 `errors` envelope. Authoring data uses schema
@@ -273,19 +276,24 @@ Each JSON command returns the normal `ok`, `command`, `data`, `warnings`, and
 `diagnostics`, `inputsNeeded`, `artifacts`, `nextActions`, `retrySafety`,
 `manifestDigest`, `sourceDigests`, `validation`, `preview`, `releaseGates`,
 `releaseDeclaration`, `previewAcceptance`, `draftArchive`, `syncReceipt`,
-`formalArchiveReceipt`, `inspectionReceipt`,
+`formalArchiveReceipt`, `inspectionReceipt`, `installationReceipt`,
 `capabilities`, and
 `schemaVersions`. `releaseGates.gates` reports current, missing, stale, or
 blocked acknowledgement, validation, declaration, preview, preview-artifact,
 and preview-acceptance evidence; `releaseReady` is true only when every Phase 1
-gate is current. The response deliberately projects bounded evidence; it does
-not make session internals or provider output part of the publishable pack.
+gate is current. `installationReceipt` binds the exact inspected archive to one
+distinct consumer workspace and includes verified installed payload, registry,
+managed-output, and `CREDITS.csv` digests. It is written only after the
+existing transactional `asset install` authority commits and the consumer
+generation is re-verified. The response deliberately projects bounded
+evidence; it does not make session internals or provider output part of the
+publishable pack.
 
 The state and checkpoint fields are recovery data, not asset identity:
 
 | Field | Values and meaning |
 | --- | --- |
-| `state` | `needs-user-action` means a bounded session is waiting for a safe or explicitly confirmed next action; `failed` means the current operation is blocked; `completed` means the requested operation reached a trustworthy boundary. For draft/sync operations it means the receipt is current; formal `pack` reaches a current archive, and formal `inspect` reaches the exact-byte inspection checkpoint. Consumer installation remains a separate workflow. |
+| `state` | `needs-user-action` means a bounded session is waiting for a safe or explicitly confirmed next action; `failed` means the current operation is blocked; `completed` means the requested operation reached a trustworthy boundary. For draft/sync operations it means the receipt is current; formal `pack` reaches a current archive, formal `inspect` reaches the exact-byte inspection checkpoint, and formal `install` reaches a verified consumer generation. Consumer installation is optional and never implicit. |
 | `phase` | `planned`, `scaffolded`, `contract-ready`, `awaiting-candidate`, `imported`, `validated`, `previewed`, or `blocked`; each records the furthest trustworthy session boundary. |
 | `checkpoint` | `null` or an `{id, digest}` pair naming the last trustworthy session boundary and the exact evidence digest that established it. |
 | `checkpointFreshness` | `missing`, `current`, `stale`, or `blocked`; stale evidence must not be treated as current. |

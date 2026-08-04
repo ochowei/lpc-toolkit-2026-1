@@ -298,6 +298,7 @@ describe('helpForCommand', () => {
       'accept-preview',
       'pack',
       'inspect',
+      'install',
       'preview',
       'reconcile-manifest',
     ]) {
@@ -341,6 +342,12 @@ describe('helpForCommand', () => {
       'lpc-toolkit asset authoring inspect --session <session-id> --archive <archive>',
     );
     expect(formalInspectHelp).toContain('--archive <archive>');
+    const consumerInstallHelp = helpForCommand(['asset', 'authoring', 'install']);
+    expect(consumerInstallHelp).toContain(
+      'lpc-toolkit asset authoring install --session <session-id> --archive <archive> --consumer-workspace <directory> --confirm',
+    );
+    expect(consumerInstallHelp).toContain('--consumer-workspace <directory>');
+    expect(consumerInstallHelp).toContain('--confirm');
     expect(helpForCommand(['asset', 'authoring'])).toContain(
       'Create and resume provider-neutral asset authoring sessions from strict plans.',
     );

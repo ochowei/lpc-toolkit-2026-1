@@ -211,6 +211,7 @@ function preflightCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
       && authoringCommand !== 'draft'
       && authoringCommand !== 'pack'
       && authoringCommand !== 'inspect'
+      && authoringCommand !== 'install'
       && authoringCommand !== 'sync'
       && authoringCommand !== 'preview'
       && authoringCommand !== 'reconcile-manifest'
@@ -258,6 +259,11 @@ function preflightCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
     if (authoringCommand === 'inspect') {
       const sessionIssue = requiredStringFlag('session');
       return sessionIssue ?? requiredStringFlag('archive');
+    }
+    if (authoringCommand === 'install') {
+      const sessionIssue = requiredStringFlag('session');
+      const archiveIssue = sessionIssue ?? requiredStringFlag('archive');
+      return archiveIssue ?? requiredStringFlag('consumer-workspace');
     }
     if (authoringCommand === 'import') {
       for (const name of ['session', 'target', 'candidate', 'contract-digest']) {

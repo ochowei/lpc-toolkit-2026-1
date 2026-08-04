@@ -16,6 +16,7 @@ import type {
   AssetAuthoringArchiveInspectionReceipt,
   AssetAuthoringDraftArchiveReceipt,
   AssetAuthoringFormalArchiveReceipt,
+  AssetAuthoringInstallationReceipt,
   AssetAuthoringSyncReceipt,
 } from './asset-authoring-session.js';
 
@@ -123,12 +124,13 @@ export interface AuthoringResponseProjectionInput {
   readonly syncReceipt?: AssetAuthoringSyncReceipt | null;
   readonly formalArchiveReceipt?: AssetAuthoringFormalArchiveReceipt | null;
   readonly inspectionReceipt?: AssetAuthoringArchiveInspectionReceipt | null;
+  readonly installationReceipt?: AssetAuthoringInstallationReceipt | null;
 }
 
 export interface AuthoringResponseData extends Omit<
   AuthoringResponseProjectionInput,
   'releaseGates' | 'releaseDeclaration' | 'previewAcceptance' | 'draftReceipt' | 'syncReceipt'
-  | 'formalArchiveReceipt' | 'inspectionReceipt'
+  | 'formalArchiveReceipt' | 'inspectionReceipt' | 'installationReceipt'
 > {
   readonly schema: 'lpc-toolkit.asset-authoring-response.v1';
   readonly cliVersion: string;
@@ -141,6 +143,7 @@ export interface AuthoringResponseData extends Omit<
   readonly syncReceipt: AssetAuthoringSyncReceipt | null;
   readonly formalArchiveReceipt: AssetAuthoringFormalArchiveReceipt | null;
   readonly inspectionReceipt: AssetAuthoringArchiveInspectionReceipt | null;
+  readonly installationReceipt: AssetAuthoringInstallationReceipt | null;
 }
 
 export function authoringResponseProjection(
@@ -193,6 +196,20 @@ export function authoringResponseProjection(
       ...input.inspectionReceipt,
       sourceDigests: [...input.inspectionReceipt.sourceDigests],
     };
+  const installationReceipt = input.installationReceipt === undefined
+    || input.installationReceipt === null
+    ? null
+    : {
+      ...input.installationReceipt,
+      payloadDigests: Object.fromEntries(
+        Object.entries(input.installationReceipt.payloadDigests)
+          .sort(([left], [right]) => left.localeCompare(right)),
+      ),
+      generatedDigests: Object.fromEntries(
+        Object.entries(input.installationReceipt.generatedDigests)
+          .sort(([left], [right]) => left.localeCompare(right)),
+      ),
+    };
   if (releaseDeclaration !== null && releaseDeclaration.kind !== 'declaration') {
     throw new Error('Release declaration response receipt has the wrong kind.');
   }
@@ -236,6 +253,7 @@ export function authoringResponseProjection(
     syncReceipt,
     formalArchiveReceipt,
     inspectionReceipt,
+    installationReceipt,
     cliVersion: CLI_VERSION,
     capabilities: [...AUTHORING_CAPABILITIES],
     schemaVersions: [...AUTHORING_SCHEMA_VERSIONS],
@@ -528,6 +546,16 @@ function formatAuthoringResponse(
     if (archivePath) {
       lines.push(
         `Archive inspection: ${archivePath}${archiveDigest ? ` (${archiveDigest})` : ''}`,
+      );
+    }
+  }
+  const installationReceipt = data['installationReceipt'];
+  if (isRecord(installationReceipt)) {
+    const workspaceRoot = stringValue(installationReceipt, 'workspaceRoot');
+    const archiveDigest = stringValue(installationReceipt, 'archiveDigest');
+    if (workspaceRoot) {
+      lines.push(
+        `Consumer installation: ${workspaceRoot}${archiveDigest ? ` (${archiveDigest})` : ''}`,
       );
     }
   }
