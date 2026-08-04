@@ -364,34 +364,53 @@ Verification:
 **Files:** session/command/release helper/response and focused receipt,
 session-E2E, JSON, and human tests.
 
-- [ ] Write a failing test showing that `accept-preview` without `--confirm`,
+- [x] Write a failing test showing that `accept-preview` without `--confirm`,
   with a wrong rendered PNG digest, with a missing/stale declaration, with a
   stale validation/preview receipt, or with a changed metadata/TXT/CSV credit
   artifact cannot publish acceptance.
-- [ ] Extend the preview receipt to persist the exact four artifact IDs,
+- [x] Extend the preview receipt to persist the exact four artifact IDs,
   absolute paths, and byte digests plus validation/preview binding. Re-digest
   those regular files immediately before acceptance and reject races without
   mutating the session.
-- [ ] Implement exact `--preview-digest` matching against the rendered PNG
+- [x] Implement exact `--preview-digest` matching against the rendered PNG
   artifact, explicit confirmation, declaration binding, and the
   `previewAcceptance` receipt. Advance only to a release-ready session
   checkpoint; do not create or inspect an archive.
-- [ ] Extend pure/CLI invalidation to cover manifest identity/asset/source/
+- [x] Extend pure/CLI invalidation to cover manifest identity/asset/source/
   compatibility/credit/acknowledgement changes, source PNG changes, validation
   or warning changes, preview input/artifact changes, and declaration changes.
   `resume` must preserve prior receipts as stale evidence and expose exactly one
   safe or human-conflict next action.
-- [ ] Prove unchanged artifact bytes are idempotent, JSON property reordering
+- [x] Prove unchanged artifact bytes are idempotent, JSON property reordering
   keeps release projection digests stable, and an externally changed artifact
   or source makes only the affected downstream checkpoints stale.
-- [ ] Run the focused receipt, session-E2E, JSON, human, Core/CLI typecheck, and
+- [x] Run the focused receipt, session-E2E, JSON, human, Core/CLI typecheck, and
   CLI tests. Commit with `feat(cli): accept attributed release previews`.
 
-Implementation note: pending.
+Implementation note: The initial public-argv RED run failed as expected because
+`accept-preview` was not yet recognized and returned `unknown_command` instead
+of the required missing `--preview-digest` diagnostic. The GREEN slice now
+stores a backward-readable validation-revision-bound preview receipt with the
+canonical PNG, metadata, TXT-credit, and CSV-credit artifact set; re-digests
+every contained regular file before acceptance; requires the exact PNG digest,
+current declaration/validation/preview bindings, and explicit `--confirm`; and
+publishes an idempotent `previewAcceptance` receipt without archive work. Wrong
+digests, missing declarations, stale validation/preview evidence, and artifact
+races leave session bytes unchanged. Resume/status preserve old receipts as
+stale evidence, expose one recovery action, and the Core release-gate
+projection now includes `previewAcceptance`.
 
-Commit: pending.
+Commit: f3c9239a45a2da91aff37d8b5b6f1dfce3577358
 
-Verification: pending.
+Verification:
+
+- `rtk pnpm --filter @lpc-toolkit/core test -- asset-release-schema.test.ts` PASS (10 tests)
+- `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS
+- `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS
+- `rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-receipts.test.ts asset-authoring-session.test.ts command-spec.test.ts main-json.test.ts main-human.test.ts` PASS (152 tests)
+- `rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-session-e2e.test.ts asset-authoring-commands.test.ts` PASS (10 tests)
+- `rtk pnpm check:boundaries` PASS
+- `rtk git diff --check` PASS
 
 ### Task 5: Synchronize Phase 1 documentation and record the implementation gate
 
