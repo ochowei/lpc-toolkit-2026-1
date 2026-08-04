@@ -327,6 +327,7 @@ describe('asset authoring release gates', () => {
       releaseDeclaration: 'current',
       preview: 'current',
       previewArtifacts: 'current',
+      previewAcceptance: 'current',
     } as const;
     const reordered = {
       previewArtifacts: 'current',
@@ -334,6 +335,7 @@ describe('asset authoring release gates', () => {
       releaseDeclaration: 'current',
       validation: 'current',
       acknowledgements: 'current',
+      previewAcceptance: 'current',
     } as const;
 
     expect(assetAuthoringReleaseGateProjection(input)).toEqual({
@@ -344,11 +346,16 @@ describe('asset authoring release gates', () => {
         { id: 'releaseDeclaration', freshness: 'current' },
         { id: 'preview', freshness: 'current' },
         { id: 'previewArtifacts', freshness: 'current' },
+        { id: 'previewAcceptance', freshness: 'current' },
       ],
     });
     expect(assetAuthoringReleaseGateProjection(reordered))
       .toEqual(assetAuthoringReleaseGateProjection(input));
     expect(assetAuthoringReleaseGateProjection({ ...input, preview: 'stale' }).releaseReady)
       .toBe(false);
+    expect(assetAuthoringReleaseGateProjection({
+      ...input,
+      previewAcceptance: 'missing',
+    }).releaseReady).toBe(false);
   });
 });

@@ -137,6 +137,7 @@ export function authoringResponseProjection(
     releaseDeclaration: 'missing',
     preview: 'missing',
     previewArtifacts: 'missing',
+    previewAcceptance: 'missing',
   });
   const releaseDeclaration = input.releaseDeclaration === undefined
     || input.releaseDeclaration === null
@@ -422,6 +423,22 @@ function formatAuthoringResponse(
     if (declarant) {
       lines.push(
         `Human release declaration: ${declarant}${declarationDigest ? ` (${declarationDigest})` : ''}`,
+      );
+    }
+  }
+  const previewAcceptance = data['previewAcceptance'];
+  if (isRecord(previewAcceptance)) {
+    const declarant = isRecord(previewAcceptance['declarant'])
+      ? stringValue(previewAcceptance['declarant'], 'displayName')
+      : undefined;
+    const previewDigest = recordArrayValue(previewAcceptance, 'artifacts')
+      ?.find((artifact) => stringValue(artifact, 'id') === 'preview:preview');
+    const digest = previewDigest === undefined
+      ? undefined
+      : stringValue(previewDigest, 'digest');
+    if (declarant) {
+      lines.push(
+        `Human preview acceptance: ${declarant}${digest ? ` (${digest})` : ''}`,
       );
     }
   }

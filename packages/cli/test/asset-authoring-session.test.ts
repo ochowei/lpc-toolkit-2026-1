@@ -111,7 +111,9 @@ function evidence(overrides: Partial<AssetAuthoringEvidence> = {}): AssetAuthori
       id: 'preview-1',
       manifestDigest: DIGEST_A,
       sourceDigests: [{ path: 'sprites/moon-braid/foreground/walk.png', digest: DIGEST_C }],
+      validationReceiptId: 'validation-1',
       inputDigest: DIGEST_D,
+      artifacts: null,
     },
     ...overrides,
   };
@@ -198,9 +200,13 @@ describe('asset authoring session persistence', () => {
       readonly receipts: Record<string, unknown>;
     };
     delete oldDocument.receipts.acknowledgements;
+    delete oldDocument.receipts.releaseDeclaration;
+    delete oldDocument.receipts.previewAcceptance;
     writeFileSync(sessionPath, `${JSON.stringify(oldDocument, null, 2)}\n`);
 
     expect(store.read(session.sessionId).receipts.acknowledgements).toBeNull();
+    expect(store.read(session.sessionId).receipts.releaseDeclaration).toBeNull();
+    expect(store.read(session.sessionId).receipts.previewAcceptance).toBeNull();
     const replaced = store.replace(session.sessionId, {
       receipts: {
         validation: null,
@@ -228,6 +234,46 @@ describe('asset authoring session persistence', () => {
       }],
       recordDigests: [DIGEST_C, DIGEST_D],
     });
+  });
+
+  it('persists canonical preview artifact bindings and reads old previews without them', () => {
+    const workspace = createWorkspace();
+    const store = createStore(workspace);
+    const session = store.create({ plan: PLAN, packRoot: packRoot(workspace) });
+    const previewArtifacts = [
+      { id: 'preview:preview' as const, path: path.join(session.packRoot, 'previews/preview.png'), digest: DIGEST_A },
+      { id: 'preview:metadata' as const, path: path.join(session.packRoot, 'previews/metadata.json'), digest: DIGEST_B },
+      { id: 'preview:credits_txt' as const, path: path.join(session.packRoot, 'previews/credits.txt'), digest: DIGEST_C },
+      { id: 'preview:credits_csv' as const, path: path.join(session.packRoot, 'previews/credits.csv'), digest: DIGEST_D },
+    ];
+    const replaced = store.replace(session.sessionId, {
+      receipts: {
+        validation: null,
+        preview: {
+          id: DIGEST_A,
+          manifestDigest: DIGEST_B,
+          sourceDigests: [{
+            path: 'sprites/moon-braid/foreground/walk.png',
+            digest: DIGEST_C,
+          }],
+          validationReceiptId: DIGEST_A,
+          inputDigest: DIGEST_D,
+          artifacts: previewArtifacts,
+        },
+        acknowledgements: null,
+        releaseDeclaration: null,
+        previewAcceptance: null,
+      },
+    });
+
+    expect(replaced.receipts.preview?.artifacts).toEqual(previewArtifacts);
+    const sessionPath = assetAuthoringSessionPath(workspace, session.sessionId);
+    const document = JSON.parse(readFileSync(sessionPath, 'utf8')) as {
+      readonly receipts: { readonly preview: Record<string, unknown> };
+    };
+    delete document.receipts.preview.artifacts;
+    writeFileSync(sessionPath, `${JSON.stringify(document, null, 2)}\n`);
+    expect(store.read(session.sessionId).receipts.preview?.artifacts).toBeNull();
   });
 
   it('replaces one session atomically while preserving the prior state after a failed rename', () => {
@@ -329,7 +375,9 @@ describe('asset authoring checkpoint invalidation', () => {
         id: 'preview-1',
         manifestDigest: DIGEST_A,
         sourceDigests: [{ path: 'sprites/moon-braid/foreground/walk.png', digest: DIGEST_C }],
+        validationReceiptId: 'validation-1',
         inputDigest: DIGEST_A,
+        artifacts: null,
       },
     });
 
@@ -351,6 +399,51 @@ describe('asset authoring checkpoint invalidation', () => {
       validationReceipt: { ...baseline.validationReceipt! },
       previewReceipt: { ...baseline.previewReceipt! },
     })).toEqual([]);
+  });
+
+  it('invalidates a preview when its validation revision changes', () => {
+    const baseline = evidence();
+    const current = {
+      ...baseline,
+      validationReceipt: {
+        ...baseline.validationReceipt!,
+        id: 'validation-2',
+      },
+    };
+
+    expect(deriveAuthoringInvalidationDecisions(baseline, current)).toEqual([
+      { checkpoint: 'preview', reason: 'preview-receipt-stale' },
+    ]);
+  });
+
+  it('invalidates the preview artifact checkpoint when one bound artifact changes', () => {
+    const artifacts = [
+      { id: 'preview:preview' as const, path: '/workspace/preview.png', digest: DIGEST_A },
+      { id: 'preview:metadata' as const, path: '/workspace/metadata.json', digest: DIGEST_B },
+      { id: 'preview:credits_txt' as const, path: '/workspace/credits.txt', digest: DIGEST_C },
+      { id: 'preview:credits_csv' as const, path: '/workspace/credits.csv', digest: DIGEST_D },
+    ];
+    const baseline = evidence();
+    const previous = {
+      ...baseline,
+      previewReceipt: {
+        ...baseline.previewReceipt!,
+        artifacts,
+      },
+    };
+    const current = {
+      ...baseline,
+      previewReceipt: {
+        ...baseline.previewReceipt!,
+        artifacts: artifacts.map((artifact, index) => index === 2
+          ? { ...artifact, digest: DIGEST_A }
+          : artifact),
+      },
+    };
+
+    expect(deriveAuthoringInvalidationDecisions(previous, current)).toEqual([
+      { checkpoint: 'previewArtifacts', reason: 'preview-artifact-stale' },
+    ]);
   });
 
   it('invalidates the acknowledgement receipt after manifest or source drift', () => {

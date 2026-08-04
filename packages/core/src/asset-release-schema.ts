@@ -126,7 +126,8 @@ export type AssetAuthoringReleaseGateId =
   | 'validation'
   | 'releaseDeclaration'
   | 'preview'
-  | 'previewArtifacts';
+  | 'previewArtifacts'
+  | 'previewAcceptance';
 
 export interface AssetAuthoringReleaseGateProjectionInput {
   readonly acknowledgements: AssetAuthoringReleaseGateFreshness;
@@ -134,6 +135,7 @@ export interface AssetAuthoringReleaseGateProjectionInput {
   readonly releaseDeclaration: AssetAuthoringReleaseGateFreshness;
   readonly preview: AssetAuthoringReleaseGateFreshness;
   readonly previewArtifacts: AssetAuthoringReleaseGateFreshness;
+  readonly previewAcceptance: AssetAuthoringReleaseGateFreshness;
 }
 
 export interface AssetAuthoringReleaseGate {
@@ -902,6 +904,7 @@ export function assetAuthoringReleaseGateProjection(
     { id: 'releaseDeclaration', freshness: input.releaseDeclaration },
     { id: 'preview', freshness: input.preview },
     { id: 'previewArtifacts', freshness: input.previewArtifacts },
+    { id: 'previewAcceptance', freshness: input.previewAcceptance },
   ];
   return {
     releaseReady: gates.every((gate) => gate.freshness === 'current'),

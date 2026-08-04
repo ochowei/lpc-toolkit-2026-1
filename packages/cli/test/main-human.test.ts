@@ -293,6 +293,7 @@ describe('human-readable CLI output', () => {
             { id: 'releaseDeclaration', freshness: 'current' },
             { id: 'preview', freshness: 'missing' },
             { id: 'previewArtifacts', freshness: 'missing' },
+            { id: 'previewAcceptance', freshness: 'missing' },
           ],
         },
         releaseDeclaration: {
@@ -320,6 +321,30 @@ describe('human-readable CLI output', () => {
             recordDigests: [],
           },
         },
+        previewAcceptance: {
+          schema: 'lpc-toolkit.asset-authoring-release-receipt.v1',
+          kind: 'preview-acceptance',
+          sessionId: '123e4567-e89b-42d3-a456-426614174000',
+          cliVersion: '0.2.0',
+          recordedAt: '2026-08-04T04:00:00.000Z',
+          declarant: {
+            displayName: 'Alice Example',
+            kind: 'person',
+            role: 'authorized-release-declarant',
+          },
+          declarationReceiptDigest: 'sha256:declaration',
+          manifestDigest: 'sha256:manifest',
+          sourceDigests: [{ path: 'sprites/a.png', digest: 'sha256:source' }],
+          validationReceiptId: 'sha256:validation',
+          validationReceiptRevision: 'sha256:validation',
+          previewReceiptId: 'sha256:preview',
+          previewInputDigest: 'sha256:input',
+          artifacts: [{
+            id: 'preview:preview',
+            path: '/workspace/preview.png',
+            digest: 'sha256:preview-png',
+          }],
+        },
       }),
       warnings: [],
       errors: [],
@@ -329,6 +354,7 @@ describe('human-readable CLI output', () => {
     expect(output).toContain('Release gate releaseDeclaration: current');
     expect(output).toContain('Release gate preview: missing');
     expect(output).toContain('Human release declaration: Alice Example (sha256:declaration)');
+    expect(output).toContain('Human preview acceptance: Alice Example (sha256:preview-png)');
   });
 
   it('summarizes completed authoring state without inventing a mutation result', () => {

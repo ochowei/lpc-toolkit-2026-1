@@ -11,10 +11,12 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 import {
+  ASSET_AUTHORING_RELEASE_ARTIFACT_IDS,
   parseAssetAuthoringPlan,
   parseAssetAuthoringReleaseReceipt,
   type AssetAuthoringPlan,
   type AssetAuthoringPreviewAcceptanceReceipt as CoreAssetAuthoringPreviewAcceptanceReceipt,
+  type AssetAuthoringReleaseArtifactDigest,
   type AssetAuthoringReleaseDeclarationReceipt as CoreAssetAuthoringReleaseDeclarationReceipt,
 } from '@lpc-toolkit/core';
 import { CLI_VERSION } from './package-info.js';
@@ -117,7 +119,11 @@ export interface AssetAuthoringPreviewReceipt {
   readonly id: string;
   readonly manifestDigest: string;
   readonly sourceDigests: readonly AssetAuthoringSourceDigest[];
+  /** Null means this receipt predates the validation-revision binding. */
+  readonly validationReceiptId: string | null;
   readonly inputDigest: string;
+  /** Null means this receipt predates the exact preview artifact binding. */
+  readonly artifacts: readonly AssetAuthoringReleaseArtifactDigest[] | null;
 }
 
 export interface AssetAuthoringAcknowledgementReceipt {
@@ -160,7 +166,8 @@ export type AssetAuthoringProvenanceKind =
   | 'external-png-observed'
   | 'manifest-conflict'
   | 'provider'
-  | 'human-declaration';
+  | 'human-declaration'
+  | 'human-preview-acceptance';
 
 export interface AssetAuthoringProvenanceEvent {
   readonly id: string;
@@ -257,6 +264,8 @@ export interface AssetAuthoringEvidence {
   readonly validationReceipt: AssetAuthoringValidationReceipt | null;
   readonly previewReceipt: AssetAuthoringPreviewReceipt | null;
   readonly acknowledgementsReceipt?: AssetAuthoringAcknowledgementReceipt | null;
+  readonly releaseDeclarationReceipt?: AssetAuthoringReleaseDeclarationReceipt | null;
+  readonly previewAcceptanceReceipt?: AssetAuthoringPreviewAcceptanceReceipt | null;
   /** The newly requested preview input, separate from the last receipt. */
   readonly previewInputDigest?: string | null;
 }
@@ -267,7 +276,10 @@ export type AssetAuthoringInvalidationCheckpoint =
   | 'source'
   | 'acknowledgements'
   | 'validation'
-  | 'preview';
+  | 'preview'
+  | 'previewArtifacts'
+  | 'releaseDeclaration'
+  | 'previewAcceptance';
 
 export type AssetAuthoringInvalidationReason =
   | 'manifest-semantic-drift'
@@ -275,7 +287,10 @@ export type AssetAuthoringInvalidationReason =
   | 'png-drift'
   | 'acknowledgement-receipt-stale'
   | 'validation-receipt-stale'
-  | 'preview-receipt-stale';
+  | 'preview-receipt-stale'
+  | 'preview-artifact-stale'
+  | 'release-declaration-stale'
+  | 'preview-acceptance-stale';
 
 export interface AssetAuthoringInvalidationDecision {
   readonly checkpoint: AssetAuthoringInvalidationCheckpoint;
@@ -524,8 +539,15 @@ function parsePreviewReceipt(value: unknown): AssetAuthoringPreviewReceipt {
   const record = requireRecord(value, 'session.receipts.preview');
   assertExactKeys(
     record,
-    ['id', 'manifestDigest', 'sourceDigests', 'inputDigest'],
+    ['id', 'manifestDigest', 'sourceDigests', 'validationReceiptId', 'inputDigest', 'artifacts'],
     'session.receipts.preview',
+  );
+  const validationReceiptId = record.validationReceiptId === undefined
+    ? null
+    : requireString(record, 'validationReceiptId', 'session.receipts.preview');
+  const artifacts = parsePreviewArtifactReceipts(
+    record.artifacts,
+    'session.receipts.preview.artifacts',
   );
   return {
     id: requireString(record, 'id', 'session.receipts.preview'),
@@ -537,8 +559,53 @@ function parsePreviewReceipt(value: unknown): AssetAuthoringPreviewReceipt {
       record.sourceDigests,
       'session.receipts.preview.sourceDigests',
     ),
+    validationReceiptId,
     inputDigest: requireDigest(record.inputDigest, 'session.receipts.preview.inputDigest'),
+    artifacts,
   };
+}
+
+function parsePreviewArtifactReceipts(
+  value: unknown,
+  label: string,
+): readonly AssetAuthoringReleaseArtifactDigest[] | null {
+  if (value === undefined) return null;
+  if (!Array.isArray(value) || value.length !== ASSET_AUTHORING_RELEASE_ARTIFACT_IDS.length) {
+    fail(
+      'asset_authoring_session_invalid',
+      `${label} must contain exactly ${ASSET_AUTHORING_RELEASE_ARTIFACT_IDS.length} artifacts.`,
+    );
+  }
+  const seen = new Set<string>();
+  const parsed = value.map((entry, index) => {
+    const entryLabel = `${label}[${index}]`;
+    const record = requireRecord(entry, entryLabel);
+    assertExactKeys(record, ['id', 'path', 'digest'], entryLabel);
+    const id = requireString(record, 'id', entryLabel);
+    if (!ASSET_AUTHORING_RELEASE_ARTIFACT_IDS.includes(
+      id as (typeof ASSET_AUTHORING_RELEASE_ARTIFACT_IDS)[number],
+    )) {
+      fail('asset_authoring_session_invalid', `${entryLabel}.id is unsupported.`);
+    }
+    if (seen.has(id)) {
+      fail('asset_authoring_session_tampered', `${label} contains duplicate artifact ids.`);
+    }
+    seen.add(id);
+    const artifactPath = requireString(record, 'path', entryLabel);
+    if (!path.isAbsolute(artifactPath)) {
+      fail('asset_authoring_session_path_invalid', `${entryLabel}.path must be absolute.`);
+    }
+    return {
+      id: id as AssetAuthoringReleaseArtifactDigest['id'],
+      path: artifactPath,
+      digest: requireDigest(record.digest, `${entryLabel}.digest`),
+    };
+  });
+  const expectedIds = [...ASSET_AUTHORING_RELEASE_ARTIFACT_IDS];
+  if (parsed.some((artifact, index) => artifact.id !== expectedIds[index])) {
+    fail('asset_authoring_session_tampered', `${label} must use stable artifact ordering.`);
+  }
+  return parsed;
 }
 
 function parseAcknowledgementsReceipt(value: unknown): AssetAuthoringAcknowledgementReceipt {
@@ -640,6 +707,7 @@ function parseProvenance(value: unknown): readonly AssetAuthoringProvenanceEvent
         'manifest-conflict',
         'provider',
         'human-declaration',
+        'human-preview-acceptance',
       ], label),
       occurredAt: requireTimestamp(record.occurredAt, `${label}.occurredAt`),
       summary: requireString(record, 'summary', label),
@@ -1098,6 +1166,57 @@ function sameSourceDigests(
   });
 }
 
+function sameArtifactDigests(
+  left: readonly AssetAuthoringReleaseArtifactDigest[],
+  right: readonly AssetAuthoringReleaseArtifactDigest[],
+): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((artifact, index) => {
+    const other = right[index];
+    return other !== undefined
+      && artifact.id === other.id
+      && artifact.path === other.path
+      && artifact.digest === other.digest;
+  });
+}
+
+function sameReleaseDeclarationReceipts(
+  left: AssetAuthoringReleaseDeclarationReceipt | null | undefined,
+  right: AssetAuthoringReleaseDeclarationReceipt | null | undefined,
+): boolean {
+  if (left === null || left === undefined || right === null || right === undefined) {
+    return left === right;
+  }
+  return left.declarationDigest === right.declarationDigest
+    && left.manifestDigest === right.manifestDigest
+    && sameSourceDigests(left.sourceDigests, right.sourceDigests)
+    && left.validationReceiptId === right.validationReceiptId
+    && left.validationReceiptRevision === right.validationReceiptRevision
+    && left.creditDigests.authorAndSource === right.creditDigests.authorAndSource
+    && left.creditDigests.licenseAuthority === right.creditDigests.licenseAuthority
+    && left.acknowledgements.contentDigest === right.acknowledgements.contentDigest
+    && left.acknowledgements.recordDigests.length === right.acknowledgements.recordDigests.length
+    && left.acknowledgements.recordDigests.every((digest, index) =>
+      digest === right.acknowledgements.recordDigests[index]);
+}
+
+function samePreviewAcceptanceReceipts(
+  left: AssetAuthoringPreviewAcceptanceReceipt | null | undefined,
+  right: AssetAuthoringPreviewAcceptanceReceipt | null | undefined,
+): boolean {
+  if (left === null || left === undefined || right === null || right === undefined) {
+    return left === right;
+  }
+  return left.declarationReceiptDigest === right.declarationReceiptDigest
+    && left.manifestDigest === right.manifestDigest
+    && sameSourceDigests(left.sourceDigests, right.sourceDigests)
+    && left.validationReceiptId === right.validationReceiptId
+    && left.validationReceiptRevision === right.validationReceiptRevision
+    && left.previewReceiptId === right.previewReceiptId
+    && left.previewInputDigest === right.previewInputDigest
+    && sameArtifactDigests(left.artifacts, right.artifacts);
+}
+
 export function deriveAuthoringInvalidationDecisions(
   previous: AssetAuthoringEvidence,
   current: AssetAuthoringEvidence,
@@ -1145,6 +1264,9 @@ export function deriveAuthoringInvalidationDecisions(
     && (
       current.previewReceipt.manifestDigest !== current.manifestDigest
       || !sameSourceDigests(current.previewReceipt.sourceDigests, current.sourceDigests)
+      || current.validationReceipt === null
+      || current.previewReceipt.validationReceiptId === null
+      || current.previewReceipt.validationReceiptId !== current.validationReceipt.id
       || (
         current.previewInputDigest !== undefined
         && current.previewInputDigest !== current.previewReceipt.inputDigest
@@ -1152,6 +1274,77 @@ export function deriveAuthoringInvalidationDecisions(
     )
   ) {
     decisions.push({ checkpoint: 'preview', reason: 'preview-receipt-stale' });
+  }
+  const previousPreviewArtifacts = previous.previewReceipt?.artifacts;
+  const currentPreviewArtifacts = current.previewReceipt?.artifacts;
+  if (
+    previous.previewReceipt !== null
+    && current.previewReceipt !== null
+    && previousPreviewArtifacts !== null
+    && previousPreviewArtifacts !== undefined
+    && currentPreviewArtifacts !== null
+    && currentPreviewArtifacts !== undefined
+    && !sameArtifactDigests(previousPreviewArtifacts, currentPreviewArtifacts)
+  ) {
+    decisions.push({ checkpoint: 'previewArtifacts', reason: 'preview-artifact-stale' });
+  }
+  const previousDeclaration = previous.releaseDeclarationReceipt;
+  const currentDeclaration = current.releaseDeclarationReceipt;
+  if (!sameReleaseDeclarationReceipts(previousDeclaration, currentDeclaration)) {
+    if (previousDeclaration !== undefined && previousDeclaration !== null) {
+      decisions.push({ checkpoint: 'releaseDeclaration', reason: 'release-declaration-stale' });
+    }
+  } else if (
+    previousDeclaration !== undefined
+    && previousDeclaration !== null
+    && currentDeclaration !== undefined
+    && currentDeclaration !== null
+    && (
+      current.validationReceipt === null
+      || currentDeclaration.manifestDigest !== current.manifestDigest
+      || !sameSourceDigests(currentDeclaration.sourceDigests, current.sourceDigests)
+      || currentDeclaration.validationReceiptId !== current.validationReceipt.id
+      || (
+        current.acknowledgementsReceipt !== undefined
+        && (
+          current.acknowledgementsReceipt === null
+          || currentDeclaration.acknowledgements.recordDigests.length
+            !== current.acknowledgementsReceipt.recordDigests.length
+          || currentDeclaration.acknowledgements.recordDigests.some((digest, index) =>
+            digest !== current.acknowledgementsReceipt?.recordDigests[index])
+        )
+      )
+    )
+  ) {
+    decisions.push({ checkpoint: 'releaseDeclaration', reason: 'release-declaration-stale' });
+  }
+  const previousAcceptance = previous.previewAcceptanceReceipt;
+  const currentAcceptance = current.previewAcceptanceReceipt;
+  if (!samePreviewAcceptanceReceipts(previousAcceptance, currentAcceptance)) {
+    if (previousAcceptance !== undefined && previousAcceptance !== null) {
+      decisions.push({ checkpoint: 'previewAcceptance', reason: 'preview-acceptance-stale' });
+    }
+  } else if (
+    previousAcceptance !== undefined
+    && previousAcceptance !== null
+    && currentAcceptance !== undefined
+    && currentAcceptance !== null
+    && (
+      currentDeclaration === undefined
+      || currentDeclaration === null
+      || current.validationReceipt === null
+      || current.previewReceipt === null
+      || current.previewReceipt.artifacts === null
+      || currentAcceptance.declarationReceiptDigest !== currentDeclaration?.declarationDigest
+      || currentAcceptance.manifestDigest !== current.manifestDigest
+      || !sameSourceDigests(currentAcceptance.sourceDigests, current.sourceDigests)
+      || currentAcceptance.validationReceiptId !== current.validationReceipt.id
+      || currentAcceptance.previewReceiptId !== current.previewReceipt.id
+      || currentAcceptance.previewInputDigest !== current.previewReceipt.inputDigest
+      || !sameArtifactDigests(currentAcceptance.artifacts, current.previewReceipt.artifacts)
+    )
+  ) {
+    decisions.push({ checkpoint: 'previewAcceptance', reason: 'preview-acceptance-stale' });
   }
   return decisions;
 }

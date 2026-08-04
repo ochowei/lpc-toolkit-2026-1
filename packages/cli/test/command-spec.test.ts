@@ -295,6 +295,7 @@ describe('helpForCommand', () => {
       'validate',
       'acknowledge',
       'declare',
+      'accept-preview',
       'preview',
       'reconcile-manifest',
     ]) {
@@ -321,6 +322,9 @@ describe('helpForCommand', () => {
     );
     expect(helpForCommand(['asset', 'authoring', 'declare'])).toContain(
       '--declaration <declaration.json>',
+    );
+    expect(helpForCommand(['asset', 'authoring', 'accept-preview'])).toContain(
+      '--preview-digest <sha256>',
     );
     expect(helpForCommand(['asset', 'authoring'])).toContain(
       'Create and resume provider-neutral asset authoring sessions from strict plans.',

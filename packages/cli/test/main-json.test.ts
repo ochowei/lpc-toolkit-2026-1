@@ -275,6 +275,10 @@ describe('main json behavior', () => {
       ['asset', 'authoring', 'reconcile-manifest', '--session', 'session-1', '--json'],
       '--use',
     ],
+    [
+      ['asset', 'authoring', 'accept-preview', '--session', 'session-1', '--json'],
+      '--preview-digest',
+    ],
   ])('rejects authoring invocation without required %s', async (argv, requiredFlag) => {
     const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-main-json-authoring-missing-'));
     const stdout: string[] = [];

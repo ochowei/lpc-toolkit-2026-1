@@ -8,6 +8,7 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 import {
+  ASSET_AUTHORING_RELEASE_ARTIFACT_IDS,
   normalizeAssetPack,
   parseAssetAuthoringPlan,
   parseAssetReleaseDeclaration,
@@ -15,7 +16,10 @@ import {
   assetAuthoringReleaseGateProjection,
   assetReleaseDeclarationDigestInput,
   type AssetPackAcknowledgement,
+  type AssetAuthoringPreviewAcceptanceReceipt,
+  type AssetAuthoringReleaseArtifactDigest,
   type AssetAuthoringReleaseDeclarationReceipt,
+  type AssetAuthoringReleaseGateId,
   type AssetAuthoringReleaseGateFreshness,
   type AssetAuthoringReleaseGateProjection,
   type AssetReleaseDeclaration,
@@ -61,6 +65,8 @@ import {
   type AssetAuthoringSession,
   type AssetAuthoringSessionReceipts,
   type AssetAuthoringSessionUpdate,
+  type AssetAuthoringPreviewReceipt,
+  type AssetAuthoringValidationReceipt,
 } from './asset-authoring-session.js';
 import type { AssetWorkspace } from './asset-workspace.js';
 import type { RuntimeAssets } from './runtime-assets.js';
@@ -305,6 +311,32 @@ function sourceDigestSetsEqual(
   });
 }
 
+function artifactSetsEqual(
+  left: readonly AssetAuthoringReleaseArtifactDigest[],
+  right: readonly AssetAuthoringReleaseArtifactDigest[],
+): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((artifact, index) => {
+    const other = right[index];
+    return other !== undefined
+      && artifact.id === other.id
+      && artifact.path === other.path
+      && artifact.digest === other.digest;
+  });
+}
+
+function previewArtifactFilesCurrent(
+  session: AssetAuthoringSession,
+  preview: AssetAuthoringPreviewReceipt | null,
+): boolean {
+  if (preview?.artifacts === null || preview === null || preview === undefined) return false;
+  return preview.artifacts.every((artifact) => {
+    if (!isInsideRoot(session.packRoot, artifact.path)) return false;
+    const bytes = readRegularFile(artifact.path);
+    return bytes !== undefined && sha256(bytes) === artifact.digest;
+  });
+}
+
 function releaseGateFreshness(
   session: AssetAuthoringSession,
 ): AssetAuthoringReleaseGateProjection {
@@ -314,6 +346,8 @@ function releaseGateFreshness(
     && validation !== null
     && session.manifestDigest !== null
     && validation.manifestDigest === session.manifestDigest
+    && session.checkpointFreshness === 'current'
+    && (session.phase === 'validated' || session.phase === 'previewed')
     && session.reason !== 'validation-failed';
   const acknowledgement = session.receipts.acknowledgements;
   const acknowledgementCurrent = validationCurrent
@@ -336,7 +370,24 @@ function releaseGateFreshness(
     && preview !== null
     && session.manifestDigest !== null
     && preview.manifestDigest === session.manifestDigest
+    && preview.validationReceiptId === validation.id
     && sourceDigestSetsEqual(preview.sourceDigests, validation.sourceDigests);
+  const previewArtifactsCurrent = previewCurrent
+    && preview?.artifacts !== null
+    && previewArtifactFilesCurrent(session, preview);
+  const previewAcceptance = session.receipts.previewAcceptance;
+  const previewAcceptanceCurrent = previewArtifactsCurrent
+    && previewAcceptance !== null
+    && declarationCurrent
+    && preview !== null
+    && previewAcceptance.declarationReceiptDigest === declaration?.declarationDigest
+    && previewAcceptance.manifestDigest === preview.manifestDigest
+    && sourceDigestSetsEqual(previewAcceptance.sourceDigests, preview.sourceDigests)
+    && previewAcceptance.validationReceiptId === validation?.id
+    && previewAcceptance.previewReceiptId === preview.id
+    && previewAcceptance.previewInputDigest === preview.inputDigest
+    && preview.artifacts !== null
+    && artifactSetsEqual(previewAcceptance.artifacts, preview.artifacts);
   const freshness = (
     current: boolean,
     present: boolean,
@@ -353,7 +404,14 @@ function releaseGateFreshness(
     validation: freshness(validationCurrent, validation !== null),
     releaseDeclaration: freshness(declarationCurrent, declaration !== null),
     preview: freshness(previewCurrent, preview !== null),
-    previewArtifacts: 'missing',
+    previewArtifacts: freshness(
+      previewArtifactsCurrent,
+      preview !== null && preview.artifacts !== null,
+    ),
+    previewAcceptance: freshness(
+      previewAcceptanceCurrent,
+      previewAcceptance !== null,
+    ),
   });
 }
 
@@ -442,7 +500,10 @@ function nextActionsFor(session: AssetAuthoringSession): readonly AuthoringNextA
     )];
   }
 
-  if (session.reason === 'release-declaration-confirmation-required') {
+  if (
+    session.reason === 'release-declaration-confirmation-required'
+    || session.reason === 'release-declaration-stale'
+  ) {
     return [nextAction(
       'declare-release',
       'Confirm the explicit human release declaration before recording it for this session.',
@@ -450,6 +511,50 @@ function nextActionsFor(session: AssetAuthoringSession): readonly AuthoringNextA
       'requires-confirmation',
       session.manifestDigest === null ? [] : [session.manifestDigest],
       ['declaration', 'confirm'],
+    )];
+  }
+
+  if (session.reason === 'preview-acceptance-confirmation-required') {
+    const previewDigest = session.receipts.preview?.artifacts
+      ?.find((artifact) => artifact.id === 'preview:preview')?.digest;
+    return [nextAction(
+      'accept-preview',
+      'Confirm the exact current attributed preview before marking the session release-ready.',
+      `asset authoring accept-preview --session ${session.sessionId} --preview-digest <sha256> --confirm`,
+      'requires-confirmation',
+      previewDigest === undefined ? [] : [previewDigest],
+      ['preview-digest', 'confirm'],
+    )];
+  }
+
+  if (session.reason === 'preview-acceptance-stale') {
+    const previewDigest = session.receipts.preview?.artifacts
+      ?.find((artifact) => artifact.id === 'preview:preview')?.digest;
+    return [nextAction(
+      'accept-preview',
+      'Re-confirm the exact current attributed preview after release evidence changed.',
+      `asset authoring accept-preview --session ${session.sessionId} --preview-digest <sha256> --confirm`,
+      'requires-confirmation',
+      previewDigest === undefined ? [] : [previewDigest],
+      ['preview-digest', 'confirm'],
+    )];
+  }
+
+  if (
+    (session.reason === 'preview-current' || session.reason === 'release-declaration-current')
+    && session.receipts.previewAcceptance !== null
+    && releaseGateFreshness(session).gates.some((gate) =>
+      gate.id === 'previewAcceptance' && gate.freshness !== 'current')
+  ) {
+    const previewDigest = session.receipts.preview?.artifacts
+      ?.find((artifact) => artifact.id === 'preview:preview')?.digest;
+    return [nextAction(
+      'accept-preview',
+      'Re-confirm the exact current attributed preview after release evidence changed.',
+      `asset authoring accept-preview --session ${session.sessionId} --preview-digest <sha256> --confirm`,
+      'requires-confirmation',
+      previewDigest === undefined ? [] : [previewDigest],
+      ['preview-digest', 'confirm'],
     )];
   }
 
@@ -467,7 +572,10 @@ function nextActionsFor(session: AssetAuthoringSession): readonly AuthoringNextA
     )];
   }
 
-  if (session.reason === 'preview-receipt-stale') {
+  if (
+    session.reason === 'preview-receipt-stale'
+    || session.reason === 'preview-artifact-stale'
+  ) {
     return [nextAction(
       'preview-session',
       'Re-render the attributed preview for the current validation receipt.',
@@ -477,7 +585,56 @@ function nextActionsFor(session: AssetAuthoringSession): readonly AuthoringNextA
     )];
   }
 
-  if (session.phase === 'imported' && session.receipts.validation === null) {
+  const gates = releaseGateFreshness(session).gates;
+  const gateFreshness = (id: AssetAuthoringReleaseGateId): AssetAuthoringReleaseGateFreshness =>
+    gates.find((gate) => gate.id === id)?.freshness ?? 'missing';
+  if (
+    session.receipts.preview !== null
+    && gateFreshness('validation') === 'current'
+    && (gateFreshness('preview') !== 'current' || gateFreshness('previewArtifacts') !== 'current')
+  ) {
+    return [nextAction(
+      'preview-session',
+      'Re-render the attributed preview for the current validation receipt and artifact set.',
+      `asset authoring preview --session ${session.sessionId}`,
+      'safe',
+      session.manifestDigest === null ? [] : [session.manifestDigest],
+    )];
+  }
+
+  if (
+    gateFreshness('validation') === 'current'
+    && gateFreshness('releaseDeclaration') !== 'current'
+  ) {
+    return [nextAction(
+      'declare-release',
+      'Confirm the explicit human release declaration before recording it for this session.',
+      `asset authoring declare --session ${session.sessionId} --declaration <declaration.json> --confirm`,
+      'requires-confirmation',
+      session.manifestDigest === null ? [] : [session.manifestDigest],
+      ['declaration', 'confirm'],
+    )];
+  }
+
+  if (
+    session.receipts.preview !== null
+    && gateFreshness('preview') === 'current'
+    && gateFreshness('previewArtifacts') === 'current'
+    && gateFreshness('previewAcceptance') !== 'current'
+  ) {
+    const previewDigest = session.receipts.preview.artifacts
+      ?.find((artifact) => artifact.id === 'preview:preview')?.digest;
+    return [nextAction(
+      'accept-preview',
+      'Confirm the exact current attributed preview before marking the session release-ready.',
+      `asset authoring accept-preview --session ${session.sessionId} --preview-digest <sha256> --confirm`,
+      'requires-confirmation',
+      previewDigest === undefined ? [] : [previewDigest],
+      ['preview-digest', 'confirm'],
+    )];
+  }
+
+  if (session.phase === 'imported') {
     return [nextAction(
       'validate-session',
       'Validate the imported candidate against the current asset-pack sources.',
@@ -1123,6 +1280,125 @@ function declarationReceiptFor(options: {
   };
 }
 
+function previewAcceptanceReceiptFor(options: {
+  readonly session: AssetAuthoringSession;
+  readonly declaration: AssetAuthoringReleaseDeclarationReceipt;
+  readonly validation: AssetAuthoringValidationReceipt;
+  readonly preview: AssetAuthoringPreviewReceipt;
+  readonly artifacts: readonly AssetAuthoringReleaseArtifactDigest[];
+}): AssetAuthoringPreviewAcceptanceReceipt {
+  return {
+    schema: 'lpc-toolkit.asset-authoring-release-receipt.v1',
+    kind: 'preview-acceptance',
+    sessionId: options.session.sessionId,
+    cliVersion: CLI_VERSION,
+    recordedAt: new Date().toISOString(),
+    declarant: options.declaration.declarant,
+    declarationReceiptDigest: options.declaration.declarationDigest,
+    manifestDigest: options.preview.manifestDigest,
+    sourceDigests: options.preview.sourceDigests,
+    validationReceiptId: options.validation.id,
+    validationReceiptRevision: options.validation.id,
+    previewReceiptId: options.preview.id,
+    previewInputDigest: options.preview.inputDigest,
+    artifacts: options.artifacts,
+  };
+}
+
+function redigestPreviewArtifacts(
+  session: AssetAuthoringSession,
+  preview: AssetAuthoringPreviewReceipt,
+): readonly AssetAuthoringReleaseArtifactDigest[] {
+  if (preview.artifacts === null) {
+    throw new AuthoringCommandError(
+      'The preview receipt predates exact artifact evidence; render a fresh preview first.',
+      { code: 'asset_authoring_preview_artifacts_incomplete' },
+    );
+  }
+  return preview.artifacts.map((artifact) => {
+    if (!isInsideRoot(session.packRoot, artifact.path)) {
+      throw new AuthoringCommandError(
+        'The preview artifact path is outside the session-owned pack.',
+        { code: 'asset_authoring_path_invalid', path: artifact.path },
+      );
+    }
+    const bytes = readRegularFile(artifact.path);
+    if (bytes === undefined) {
+      throw new AuthoringCommandError(
+        `The preview artifact is missing or not a regular file: ${artifact.path}.`,
+        { code: 'asset_authoring_preview_artifact_stale', path: artifact.path },
+      );
+    }
+    const digest = sha256(bytes);
+    if (digest !== artifact.digest) {
+      throw new AuthoringCommandError(
+        `The preview artifact changed after rendering: ${artifact.path}.`,
+        { code: 'asset_authoring_preview_artifact_stale', path: artifact.path },
+      );
+    }
+    return { ...artifact };
+  });
+}
+
+function previewArtifactDigest(
+  artifacts: readonly AssetAuthoringReleaseArtifactDigest[],
+): string {
+  const preview = artifacts.find((artifact) => artifact.id === 'preview:preview');
+  if (preview === undefined) {
+    throw new AuthoringCommandError(
+      'The preview receipt is missing the rendered PNG artifact.',
+      { code: 'asset_authoring_preview_artifacts_incomplete' },
+    );
+  }
+  return preview.digest;
+}
+
+function blockedReleaseSession(
+  session: AssetAuthoringSession,
+  reason: string,
+  phase: AssetAuthoringSession['phase'] = 'blocked',
+): AssetAuthoringSession {
+  return {
+    ...session,
+    state: 'needs-user-action',
+    reason,
+    phase,
+    checkpointFreshness: 'stale',
+  };
+}
+
+function sameReleaseDeclarationBinding(
+  declaration: AssetAuthoringReleaseDeclarationReceipt,
+  validation: AssetAuthoringValidationReceipt,
+  preview: AssetAuthoringPreviewReceipt | null,
+  acknowledgement: AssetAuthoringAcknowledgementReceipt | null,
+  manifestDigest: string,
+): boolean {
+  const acknowledgementDigests = acknowledgement?.recordDigests ?? [];
+  return declaration.manifestDigest === manifestDigest
+    && declaration.validationReceiptId === validation.id
+    && sourceDigestSetsEqual(declaration.sourceDigests, validation.sourceDigests)
+    && declaration.acknowledgements.recordDigests.length === acknowledgementDigests.length
+    && declaration.acknowledgements.recordDigests.every((digest, index) =>
+      digest === acknowledgementDigests[index])
+    && (preview === null || declaration.manifestDigest === preview.manifestDigest);
+}
+
+function samePreviewAcceptanceBinding(
+  left: AssetAuthoringPreviewAcceptanceReceipt,
+  right: AssetAuthoringPreviewAcceptanceReceipt,
+): boolean {
+  return left.sessionId === right.sessionId
+    && left.declarationReceiptDigest === right.declarationReceiptDigest
+    && left.manifestDigest === right.manifestDigest
+    && sourceDigestSetsEqual(left.sourceDigests, right.sourceDigests)
+    && left.validationReceiptId === right.validationReceiptId
+    && left.validationReceiptRevision === right.validationReceiptRevision
+    && left.previewReceiptId === right.previewReceiptId
+    && left.previewInputDigest === right.previewInputDigest
+    && artifactSetsEqual(left.artifacts, right.artifacts);
+}
+
 function validationSessionUpdate(
   session: AssetAuthoringSession,
   report: AssetPackValidationReport,
@@ -1151,42 +1427,15 @@ function validationSessionUpdate(
       digest: validationRevision,
       freshness: exactEvidence ? 'current' as const : 'stale' as const,
     };
-  const acknowledgementReceipt = session.receipts.acknowledgements;
-  const acknowledgements = receipt !== null
-    && acknowledgementReceipt !== null
-    && acknowledgementReceipt.id === receipt.id
-    && acknowledgementReceipt.manifestDigest === receipt.manifestDigest
-    && sourceDigestSetsEqual(acknowledgementReceipt.sourceDigests, receipt.sourceDigests)
-    ? acknowledgementReceipt
-    : null;
-  const previousDeclaration = session.receipts.releaseDeclaration;
-  const declarationRecordDigests = previousDeclaration?.acknowledgements.recordDigests ?? [];
-  const acknowledgementRecordDigests = acknowledgements?.recordDigests ?? [];
-  const releaseDeclaration = receipt !== null
-    && previousDeclaration !== null
-    && previousDeclaration.manifestDigest === receipt.manifestDigest
-    && previousDeclaration.validationReceiptId === receipt.id
-    && sourceDigestSetsEqual(previousDeclaration.sourceDigests, receipt.sourceDigests)
-    && declarationRecordDigests.length === acknowledgementRecordDigests.length
-    && declarationRecordDigests.every((digest, index) => digest === acknowledgementRecordDigests[index])
-    ? previousDeclaration
-    : null;
-  const previousPreview = session.receipts.preview;
-  const preview = receipt !== null
-    && previousPreview !== null
-    && previousPreview.manifestDigest === receipt.manifestDigest
-    && sourceDigestSetsEqual(previousPreview.sourceDigests, receipt.sourceDigests)
-    ? previousPreview
-    : null;
   const reason = report.valid
     ? exactEvidence ? 'validation-current' : 'validation-incomplete'
     : 'validation-failed';
   const receipts: AssetAuthoringSessionReceipts = {
     validation: receipt,
-    preview,
-    acknowledgements,
-    releaseDeclaration,
-    previewAcceptance: null,
+    preview: session.receipts.preview,
+    acknowledgements: session.receipts.acknowledgements,
+    releaseDeclaration: session.receipts.releaseDeclaration,
+    previewAcceptance: session.receipts.previewAcceptance,
   };
   return {
     state: 'needs-user-action',
@@ -1431,10 +1680,10 @@ async function acknowledgeCommand(
       checkpointFreshness: 'current',
       receipts: {
         validation: validationReceipt,
-        preview: published ? null : session.receipts.preview,
+        preview: session.receipts.preview,
         acknowledgements: acknowledgementReceipt,
-        releaseDeclaration: null,
-        previewAcceptance: null,
+        releaseDeclaration: session.receipts.releaseDeclaration,
+        previewAcceptance: session.receipts.previewAcceptance,
       },
       manifestDigest: finalManifestDigest,
       provenance: appendProvenance(session, {
@@ -1660,7 +1909,7 @@ async function declareCommand(
       preview: session.receipts.preview,
       acknowledgements: session.receipts.acknowledgements,
       releaseDeclaration: receipt,
-      previewAcceptance: null,
+      previewAcceptance: session.receipts.previewAcceptance,
     },
     provenance: appendProvenance(session, {
       kind: 'human-declaration',
@@ -1674,6 +1923,192 @@ async function declareCommand(
     responseFor(next, {
       validation: report,
     }),
+  );
+}
+
+async function acceptPreviewCommand(
+  context: AuthoringCommandContext,
+  sessionId: string,
+): Promise<CliResponse<AuthoringResponseData>> {
+  if (context.runtime === undefined) {
+    throw new AuthoringCommandError(
+      'The asset authoring accept-preview command requires prepared runtime assets.',
+      { code: 'asset_authoring_runtime_missing' },
+    );
+  }
+  const suppliedPreviewDigest = requireDigest(
+    flagString(context.parsed.flags, 'preview-digest'),
+    'preview-digest',
+  );
+  const store = createAssetAuthoringSessionStore(context.workspace);
+  const session = resumeSession(context.workspace, store.read(sessionId));
+  if (session.conflict !== null) {
+    throw new AuthoringCommandError(
+      'The authoring session has an unresolved manifest conflict; reconcile it before accepting a preview.',
+      { code: 'asset_authoring_manifest_conflict' },
+    );
+  }
+  const declaration = session.receipts.releaseDeclaration;
+  if (declaration === null) {
+    return commandOk(
+      'asset authoring accept-preview',
+      responseFor(blockedReleaseSession(session, 'release-declaration-stale', 'previewed')),
+    );
+  }
+  const preview = session.receipts.preview;
+  if (preview === null || preview.artifacts === null) {
+    return commandOk(
+      'asset authoring accept-preview',
+      responseFor(blockedReleaseSession(session, 'preview-receipt-stale', 'previewed')),
+    );
+  }
+
+  const loaded = await loadAssetPackFiles(session.packRoot);
+  if (!loaded.ok) {
+    const diagnostic = loaded.diagnostics[0];
+    throw new AuthoringCommandError(
+      diagnostic?.message ?? 'The session asset pack could not be loaded.',
+      { code: diagnostic?.code ?? 'asset_authoring_pack_invalid', path: session.packRoot },
+    );
+  }
+  const currentManifestDigest = sha256(loaded.manifestBytes);
+  if (session.manifestDigest === null || session.manifestDigest !== currentManifestDigest) {
+    throw new AuthoringCommandError(
+      'The session manifest changed before preview acceptance evidence was collected.',
+      { code: 'asset_authoring_digest_mismatch', path: manifestPathFor(session) },
+    );
+  }
+
+  const report = await freshSessionValidation({
+    session,
+    workspace: context.workspace,
+    runtime: context.runtime,
+  });
+  const validation = session.receipts.validation;
+  if (!report.valid || report.contentDigest === undefined || report.manifestDigest !== currentManifestDigest
+    || report.sourceDigests === undefined || validation === null
+    || validation.id !== report.contentDigest
+    || validation.manifestDigest !== currentManifestDigest
+    || !sourceDigestSetsEqual(validation.sourceDigests, report.sourceDigests)) {
+    return commandOk(
+      'asset authoring accept-preview',
+      responseFor(blockedReleaseSession(session, 'validation-receipt-stale'), { validation: report }),
+    );
+  }
+  if (!sameReleaseDeclarationBinding(
+    declaration,
+    validation,
+    preview,
+    session.receipts.acknowledgements,
+    currentManifestDigest,
+  )) {
+    return commandOk(
+      'asset authoring accept-preview',
+      responseFor(blockedReleaseSession(session, 'release-declaration-stale'), { validation: report }),
+    );
+  }
+  if (preview.manifestDigest !== currentManifestDigest
+    || preview.validationReceiptId !== validation.id
+    || preview.id !== preview.inputDigest
+    || !sourceDigestSetsEqual(preview.sourceDigests, report.sourceDigests)) {
+    return commandOk(
+      'asset authoring accept-preview',
+      responseFor(blockedReleaseSession(session, 'preview-receipt-stale'), { validation: report }),
+    );
+  }
+
+  const artifacts = redigestPreviewArtifacts(session, preview);
+  const expectedPreviewDigest = previewArtifactDigest(artifacts);
+  if (suppliedPreviewDigest !== expectedPreviewDigest) {
+    throw new AuthoringCommandError(
+      'The supplied preview digest does not match the exact rendered PNG artifact.',
+      { code: 'asset_authoring_preview_digest_mismatch', path: '--preview-digest' },
+    );
+  }
+  const receipt = previewAcceptanceReceiptFor({
+    session,
+    declaration,
+    validation,
+    preview,
+    artifacts,
+  });
+  if (!flagBoolean(context.parsed.flags, 'confirm')) {
+    const pending = {
+      ...session,
+      state: 'needs-user-action' as const,
+      reason: 'preview-acceptance-confirmation-required',
+      phase: 'previewed' as const,
+      checkpointFreshness: 'current' as const,
+    };
+    return commandOk(
+      'asset authoring accept-preview',
+      responseFor(pending, { validation: report }),
+    );
+  }
+
+  const latestManifestBytes = readRegularFile(manifestPathFor(session));
+  if (latestManifestBytes === undefined || sha256(latestManifestBytes) !== currentManifestDigest) {
+    throw new AuthoringCommandError(
+      'The manifest changed while preparing preview acceptance.',
+      { code: 'asset_authoring_digest_mismatch', path: manifestPathFor(session) },
+    );
+  }
+  const finalArtifacts = redigestPreviewArtifacts(session, preview);
+  if (!artifactSetsEqual(artifacts, finalArtifacts)) {
+    throw new AuthoringCommandError(
+      'A preview artifact changed while preparing preview acceptance.',
+      { code: 'asset_authoring_preview_artifact_stale' },
+    );
+  }
+  const finalReport = await freshSessionValidation({
+    session,
+    workspace: context.workspace,
+    runtime: context.runtime,
+  });
+  if (!finalReport.valid || finalReport.contentDigest !== report.contentDigest
+    || finalReport.manifestDigest !== report.manifestDigest
+    || finalReport.sourceDigests === undefined
+    || !sourceDigestSetsEqual(finalReport.sourceDigests, report.sourceDigests)) {
+    throw new AuthoringCommandError(
+      'Validation evidence changed while preparing preview acceptance.',
+      { code: 'asset_authoring_validation_receipt_stale' },
+    );
+  }
+  const existing = session.receipts.previewAcceptance;
+  if (existing !== null && samePreviewAcceptanceBinding(existing, receipt)) {
+    return commandOk(
+      'asset authoring accept-preview',
+      responseFor(session, { validation: finalReport }),
+    );
+  }
+  const next = store.replace(sessionId, {
+    state: 'completed',
+    reason: 'preview-acceptance-current',
+    phase: 'previewed',
+    checkpoint: {
+      id: 'previewAcceptance',
+      phase: 'previewed',
+      digest: expectedPreviewDigest,
+      freshness: 'current',
+    },
+    checkpointFreshness: 'current',
+    receipts: {
+      validation: session.receipts.validation,
+      preview: session.receipts.preview,
+      acknowledgements: session.receipts.acknowledgements,
+      releaseDeclaration: session.receipts.releaseDeclaration,
+      previewAcceptance: receipt,
+    },
+    provenance: appendProvenance(session, {
+      kind: 'human-preview-acceptance',
+      occurredAt: receipt.recordedAt,
+      digest: expectedPreviewDigest,
+      summary: 'Exact attributed preview artifact set accepted by the human declarant.',
+    }),
+  });
+  return commandOk(
+    'asset authoring accept-preview',
+    responseFor(next, { validation: finalReport }),
   );
 }
 
@@ -1699,6 +2134,25 @@ function previewArtifacts(
   return captureAssetPackPreviewArtifacts(result).map((artifact) => {
     return {
       id: `preview:${artifact.type}`,
+      path: artifact.path,
+      digest: artifact.digest,
+    };
+  });
+}
+
+function previewReceiptArtifacts(
+  artifacts: readonly AuthoringArtifact[],
+): readonly AssetAuthoringReleaseArtifactDigest[] {
+  return ASSET_AUTHORING_RELEASE_ARTIFACT_IDS.map((id) => {
+    const artifact = artifacts.find((candidate) => candidate.id === id);
+    if (artifact === undefined) {
+      throw new AuthoringCommandError(
+        `The preview is missing required artifact ${id}.`,
+        { code: 'asset_authoring_preview_artifacts_incomplete' },
+      );
+    }
+    return {
+      id,
       path: artifact.path,
       digest: artifact.digest,
     };
@@ -1752,7 +2206,9 @@ async function previewCommand(
     id: input.digest,
     manifestDigest: validated.receipts.validation.manifestDigest,
     sourceDigests,
+    validationReceiptId: validated.receipts.validation.id,
     inputDigest: input.digest,
+    artifacts: previewReceiptArtifacts(artifacts),
   };
   const next = store.replace(sessionId, {
     state: 'needs-user-action',
@@ -1770,7 +2226,7 @@ async function previewCommand(
       preview: previewReceipt,
       acknowledgements: validated.receipts.acknowledgements,
       releaseDeclaration: validated.receipts.releaseDeclaration,
-      previewAcceptance: null,
+      previewAcceptance: validated.receipts.previewAcceptance,
     },
     provenance: appendProvenance(validated, {
       kind: 'provider',
@@ -1814,11 +2270,11 @@ function refreshContractSession(
       checkpoint: null,
     })),
     receipts: {
-      validation: null,
-      preview: null,
-      acknowledgements: null,
-      releaseDeclaration: null,
-      previewAcceptance: null,
+      validation: session.receipts.validation,
+      preview: session.receipts.preview,
+      acknowledgements: session.receipts.acknowledgements,
+      releaseDeclaration: session.receipts.releaseDeclaration,
+      previewAcceptance: session.receipts.previewAcceptance,
     },
     provenance: appendProvenance(session, {
       kind: 'checkpoint-invalidated',
@@ -1937,11 +2393,11 @@ async function importCommand(
     },
     checkpointFreshness: 'current',
     receipts: {
-      validation: null,
-      preview: null,
-      acknowledgements: null,
-      releaseDeclaration: null,
-      previewAcceptance: null,
+      validation: session.receipts.validation,
+      preview: session.receipts.preview,
+      acknowledgements: session.receipts.acknowledgements,
+      releaseDeclaration: session.receipts.releaseDeclaration,
+      previewAcceptance: session.receipts.previewAcceptance,
     },
     checkpoints,
     provenance: appendProvenance(session, {
@@ -2078,6 +2534,7 @@ export async function runAssetAuthoringCommand(
     if (authoringCommand === 'validate') return await validateCommand(context, sessionId);
     if (authoringCommand === 'acknowledge') return await acknowledgeCommand(context, sessionId);
     if (authoringCommand === 'declare') return await declareCommand(context, sessionId);
+    if (authoringCommand === 'accept-preview') return await acceptPreviewCommand(context, sessionId);
     if (authoringCommand === 'preview') return await previewCommand(context, sessionId);
     if (authoringCommand === 'status') return statusSession(context.workspace, sessionId);
     if (authoringCommand === 'resume') return resumeCommand(context.workspace, sessionId);

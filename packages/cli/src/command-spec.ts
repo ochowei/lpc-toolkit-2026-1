@@ -267,6 +267,20 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
     examples: ['lpc-toolkit asset authoring declare --session session-id --declaration declaration.json --confirm --json'],
   },
   {
+    command: ['asset', 'authoring', 'accept-preview'],
+    usage: 'lpc-toolkit asset authoring accept-preview --session <session-id> --preview-digest <sha256> --confirm [--workspace <directory>] [--json]',
+    description: 'Accept the exact current attributed preview artifact set for the session release checkpoint.',
+    options: [
+      HELP_OPTION,
+      JSON_OPTION,
+      AUTHORING_SESSION_OPTION,
+      { name: 'preview-digest', kind: 'value', valueLabel: 'sha256', description: 'Match the exact rendered preview PNG digest.' },
+      { name: 'confirm', kind: 'boolean', description: 'Confirm the human preview acceptance.' },
+      ASSET_WORKSPACE_OPTION,
+    ],
+    examples: ['lpc-toolkit asset authoring accept-preview --session session-id --preview-digest sha256:preview --confirm --json'],
+  },
+  {
     command: ['asset', 'authoring', 'preview'],
     usage: 'lpc-toolkit asset authoring preview --session <session-id> [existing preview options] [--workspace <directory>] [--json]',
     description: 'Render an attributed session preview using the existing asset preview options.',
