@@ -314,29 +314,50 @@ Verification:
 `command-spec.ts`, `response.ts`, `main.ts` only where dispatch requires it,
 and focused CLI tests/docs contract tests.
 
-- [ ] Write failing public-argv tests for `declare` missing `--declaration`,
+- [x] Write failing public-argv tests for `declare` missing `--declaration`,
   unknown options, absent/stale validation, missing exact acknowledgements,
   mismatched manifest/credit/license/source digests, and no `--confirm`.
-- [ ] Implement declaration file containment/read validation, Core parsing,
+- [x] Implement declaration file containment/read validation, Core parsing,
   fresh validation and attribution evidence checks, explicit confirmation, and
   atomic session-owned declaration receipt publication. Do not write identity or
   authority back into the asset-pack manifest.
-- [ ] Add the Phase 1 capability/schema identifiers while keeping draft and
+- [x] Add the Phase 1 capability/schema identifiers while keeping draft and
   consumer-install identifiers absent. Older sessions/integrations stop with a
   structured safe action at the #149 preview boundary.
-- [ ] Extend the bounded response with `releaseGates` and `releaseDeclaration`
+- [x] Extend the bounded response with `releaseGates` and `releaseDeclaration`
   plus the current next action/precondition digests. Keep private plan,
   provenance, and raw session internals out of JSON.
-- [ ] Add human output lines that distinguish technical validation, human
+- [x] Add human output lines that distinguish technical validation, human
   declaration, and release readiness; do not claim formal archive publication.
-- [ ] Run command-spec, JSON, human, declaration, capability, and CLI typecheck
+- [x] Run command-spec, JSON, human, declaration, capability, and CLI typecheck
   tests. Commit with `feat(cli): add human asset release declarations`.
 
-Implementation note: pending.
+Implementation note: The initial public-argv RED run failed because `declare`
+was not yet recognized by the command surface. The GREEN slice now confines and
+strictly parses a user declaration, revalidates the current manifest/source and
+Core attribution evidence, requires explicit confirmation, and publishes only
+the session-owned declaration receipt. It never writes human identity or
+authority into `asset-pack.json`. Missing/stale validation or exact warning
+evidence pauses with a safe structured action; stale manifest and credit
+evidence errors leave session bytes unchanged. The normalized pack credit
+evidence digest is bound to both declaration authority fields because the
+current manifest exposes one combined credit/source projection; the two fields
+remain independently required and explicitly confirmed. Release gates and
+bounded declaration receipts are projected into JSON and stable human output;
+deferred draft, archive, install, and final preview-acceptance behavior remains
+unadvertised/unimplemented.
 
-Commit: pending.
+Commit: f6ab370d4b0adfc64e7da3f841bc766efeb849de
 
-Verification: pending.
+Verification:
+
+- `rtk pnpm --filter @lpc-toolkit/core test -- asset-release-schema.test.ts` PASS (10 tests)
+- `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS
+- `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS
+- `rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-receipts.test.ts asset-authoring-session.test.ts command-spec.test.ts main-json.test.ts main-human.test.ts` PASS (145 tests)
+- `rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-session-e2e.test.ts asset-authoring-commands.test.ts` PASS (10 tests)
+- `rtk pnpm check:boundaries` PASS
+- `rtk git diff --check` PASS
 
 ### Task 4: Accept the exact attributed preview and close Phase 1 invalidation
 
