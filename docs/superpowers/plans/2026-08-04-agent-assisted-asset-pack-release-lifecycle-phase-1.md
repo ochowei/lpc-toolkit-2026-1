@@ -417,30 +417,45 @@ Verification:
 **Files:** Every owned CLI documentation surface below, relevant tests, and
 this plan.
 
-- [ ] Reassess the complete CLI documentation matrix against the actual diff.
+- [x] Reassess the complete CLI documentation matrix against the actual diff.
   Update every surface whose contract changed; do not imply provider invocation,
   a Codex skill, a Web bridge, draft recovery, sync, formal archive, or install
   in Phase 1.
-- [ ] Update help and CLI README with the exact three commands, flags,
+- [x] Update help and CLI README with the exact three commands, flags,
   confirmation semantics, declaration/acknowledgement evidence, response
   fields, and stale-receipt recovery.
-- [ ] Update root README and landing copy to distinguish human release
+- [x] Update root README and landing copy to distinguish human release
   declarations/final preview acceptance from validation, formal archive
   publication, and consumer installation.
-- [ ] Update Architecture with Core/CLI receipt ownership and attribution
+- [x] Update Architecture with Core/CLI receipt ownership and attribution
   boundaries; update Engineering with focused red/green tests and the Phase 1
   verification map; update Releasing with capability/schema compatibility and
   the fact that Phase 1 does not publish an archive.
-- [ ] Update plugin compatibility references/tests to keep the current plugin
+- [x] Update plugin compatibility references/tests to keep the current plugin
   refusing the new release capability; do not add a skill.
-- [ ] Run the documentation policy and plugin checks. Commit documentation and
+- [x] Run the documentation policy and plugin checks. Commit documentation and
   plan-record changes separately from product code.
 
-Implementation note: pending.
+Implementation note: The documentation matrix was reassessed against the
+public command/help and capability diff. All eight owned surfaces were updated:
+help (the checked-in command specification), CLI README, root README, landing,
+Architecture, Engineering, Releasing, and plugin compatibility references/tests.
+The copy documents `acknowledge`, `declare`, and `accept-preview`, explicit
+confirmation, bounded `releaseGates`/`releaseReady`, exact four-artifact
+attribution, stale receipt recovery, and the boundary that Phase 1 does not
+invoke providers, add a Codex skill, bridge Web sessions, or publish/sync/
+inspect/install archives.
 
-Commit: pending.
+Commit: 741fa885dd3ee3bd7d363cac797a5c98aabca91a
 
-Verification: pending.
+Verification:
+
+- `rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifacts.test.ts` PASS (4 tests)
+- `rtk pnpm --filter @lpc-toolkit/cli test -- plugin-contract.test.ts` PASS (21 tests)
+- `rtk pnpm verify:cli-docs-policy` PASS (19 tests)
+- `rtk pnpm verify:plugin` PASS (40 tests)
+- `rtk pnpm verify` PASS (Core 400, asset-pack-format 72, presets 8, CLI 1132 with 1 skipped, Web 861; all typechecks and gates passed)
+- `rtk git diff --check` PASS
 
 ## CLI documentation impact matrix
 
@@ -501,20 +516,20 @@ deferred to Phases 3 and 4.
 
 ## Final acceptance checklist
 
-- [ ] Core declaration and release-receipt contracts are strict, deterministic,
+- [x] Core declaration and release-receipt contracts are strict, deterministic,
   environment-agnostic, and exported through the approved public surface.
-- [ ] Exact acknowledgements require a real supplied reason and explicit
+- [x] Exact acknowledgements require a real supplied reason and explicit
   confirmation; no inferred identity or acknowledge-all behavior exists.
-- [ ] Declaration receipts bind current manifest/source/validation/credit/
+- [x] Declaration receipts bind current manifest/source/validation/credit/
   acknowledgement evidence and explicit human identity/authority.
-- [ ] Preview acceptance binds the exact current validation, preview, PNG,
+- [x] Preview acceptance binds the exact current validation, preview, PNG,
   metadata, TXT-credit, and CSV-credit artifacts and requires explicit consent.
-- [ ] Relevant drift makes downstream receipts stale without silently adopting
+- [x] Relevant drift makes downstream receipts stale without silently adopting
   external bytes or losing the last valid receipt.
-- [ ] JSON and human responses expose bounded release gates and safe next
+- [x] JSON and human responses expose bounded release gates and safe next
   actions without claiming formal archive, sync, draft, or installation.
-- [ ] All Phase 1 focused RED/GREEN, type, boundary, documentation-policy,
+- [x] All Phase 1 focused RED/GREEN, type, boundary, documentation-policy,
   plugin, repository verification, and protected-path checks pass.
-- [ ] No dependency, `any`, provider call, authoring skill, Web bridge,
+- [x] No dependency, `any`, provider call, authoring skill, Web bridge,
   backend, archive implementation, cache mutation, checked-in asset mutation,
   or `upstream/` mutation entered the Phase 1 change.
