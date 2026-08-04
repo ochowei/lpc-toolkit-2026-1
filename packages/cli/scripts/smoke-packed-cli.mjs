@@ -704,7 +704,7 @@ try {
   const authoringPreviewData = authoringPreviewOutput.data;
   assert.equal(authoringPreviewData?.phase, 'previewed');
   assert.equal(authoringPreviewData?.reason, 'preview-current');
-  assert.deepEqual(authoringPreviewData?.nextActions, []);
+  assert.deepEqual(authoringPreviewData?.nextActions.map(({ id }) => id), ['declare-release']);
   assert.equal(authoringPreviewData?.preview?.input.bodyType, 'male');
   assert.equal(authoringPreviewData?.preview?.input.animation, 'walk');
   assert.equal(authoringPreviewData?.preview?.manifestDigest, authoringValidationData?.validation?.manifestDigest);
@@ -734,13 +734,13 @@ try {
       phase: interruptedAuthoring.data?.phase,
       reason: interruptedAuthoring.data?.reason,
       checkpointFreshness: interruptedAuthoring.data?.checkpointFreshness,
-      nextActions: interruptedAuthoring.data?.nextActions,
+      nextActions: interruptedAuthoring.data?.nextActions.map(({ id }) => id),
     },
     {
       phase: 'previewed',
       reason: 'preview-current',
       checkpointFreshness: 'current',
-      nextActions: [],
+      nextActions: ['declare-release'],
     },
   );
   const resumedAuthoring = runInstalledJson([
@@ -748,7 +748,7 @@ try {
   ], workspaceRoot);
   assert.equal(resumedAuthoring.ok, true);
   assert.equal(resumedAuthoring.data?.reason, 'preview-current');
-  assert.deepEqual(resumedAuthoring.data?.nextActions, []);
+  assert.deepEqual(resumedAuthoring.data?.nextActions.map(({ id }) => id), ['declare-release']);
 
   const externalBytes = writeAuthoringCandidate(
     path.join(canonicalWorkspaceRoot, 'external-authoring.png'),

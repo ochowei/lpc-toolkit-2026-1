@@ -622,6 +622,16 @@ function nextActionsFor(session: AssetAuthoringSession): readonly AuthoringNextA
     )];
   }
 
+  if (session.phase === 'validated' && session.receipts.validation !== null && session.receipts.preview === null) {
+    return [nextAction(
+      'preview-session',
+      'Create an attributed preview from the current validation receipt.',
+      `asset authoring preview --session ${session.sessionId}`,
+      'safe',
+      session.manifestDigest === null ? [] : [session.manifestDigest],
+    )];
+  }
+
   const gates = releaseGateFreshness(session).gates;
   const gateFreshness = (id: AssetAuthoringReleaseGateId): AssetAuthoringReleaseGateFreshness =>
     gates.find((gate) => gate.id === id)?.freshness ?? 'missing';
@@ -676,16 +686,6 @@ function nextActionsFor(session: AssetAuthoringSession): readonly AuthoringNextA
       'validate-session',
       'Validate the imported candidate against the current asset-pack sources.',
       `asset authoring validate --session ${session.sessionId}`,
-      'safe',
-      session.manifestDigest === null ? [] : [session.manifestDigest],
-    )];
-  }
-
-  if (session.phase === 'validated' && session.receipts.validation !== null && session.receipts.preview === null) {
-    return [nextAction(
-      'preview-session',
-      'Create an attributed preview from the current validation receipt.',
-      `asset authoring preview --session ${session.sessionId}`,
       'safe',
       session.manifestDigest === null ? [] : [session.manifestDigest],
     )];
@@ -1764,6 +1764,8 @@ function validationSessionUpdate(
     acknowledgements: session.receipts.acknowledgements,
     releaseDeclaration: session.receipts.releaseDeclaration,
     previewAcceptance: session.receipts.previewAcceptance,
+    draftArchive: session.receipts.draftArchive ?? null,
+    sync: session.receipts.sync ?? null,
   };
   return {
     state: 'needs-user-action',
@@ -2012,6 +2014,8 @@ async function acknowledgeCommand(
         acknowledgements: acknowledgementReceipt,
         releaseDeclaration: session.receipts.releaseDeclaration,
         previewAcceptance: session.receipts.previewAcceptance,
+        draftArchive: session.receipts.draftArchive ?? null,
+        sync: session.receipts.sync ?? null,
       },
       manifestDigest: finalManifestDigest,
       provenance: appendProvenance(session, {
@@ -2238,6 +2242,8 @@ async function declareCommand(
       acknowledgements: session.receipts.acknowledgements,
       releaseDeclaration: receipt,
       previewAcceptance: session.receipts.previewAcceptance,
+      draftArchive: session.receipts.draftArchive ?? null,
+      sync: session.receipts.sync ?? null,
     },
     provenance: appendProvenance(session, {
       kind: 'human-declaration',
@@ -2426,6 +2432,8 @@ async function acceptPreviewCommand(
       acknowledgements: session.receipts.acknowledgements,
       releaseDeclaration: session.receipts.releaseDeclaration,
       previewAcceptance: receipt,
+      draftArchive: session.receipts.draftArchive ?? null,
+      sync: session.receipts.sync ?? null,
     },
     provenance: appendProvenance(session, {
       kind: 'human-preview-acceptance',
@@ -2555,6 +2563,8 @@ async function previewCommand(
       acknowledgements: validated.receipts.acknowledgements,
       releaseDeclaration: validated.receipts.releaseDeclaration,
       previewAcceptance: validated.receipts.previewAcceptance,
+      draftArchive: validated.receipts.draftArchive ?? null,
+      sync: validated.receipts.sync ?? null,
     },
     provenance: appendProvenance(validated, {
       kind: 'provider',
@@ -2603,6 +2613,8 @@ function refreshContractSession(
       acknowledgements: session.receipts.acknowledgements,
       releaseDeclaration: session.receipts.releaseDeclaration,
       previewAcceptance: session.receipts.previewAcceptance,
+      draftArchive: session.receipts.draftArchive ?? null,
+      sync: session.receipts.sync ?? null,
     },
     provenance: appendProvenance(session, {
       kind: 'checkpoint-invalidated',
@@ -2726,6 +2738,8 @@ async function importCommand(
       acknowledgements: session.receipts.acknowledgements,
       releaseDeclaration: session.receipts.releaseDeclaration,
       previewAcceptance: session.receipts.previewAcceptance,
+      draftArchive: session.receipts.draftArchive ?? null,
+      sync: session.receipts.sync ?? null,
     },
     checkpoints,
     provenance: appendProvenance(session, {
