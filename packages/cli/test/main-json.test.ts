@@ -243,7 +243,10 @@ describe('main json behavior', () => {
       'lpc-toolkit.asset-release-declaration.v1',
       'lpc-toolkit.asset-authoring-release-receipt.v1',
     ]));
-    expect(advertisement.data.capabilities).not.toContain('asset-authoring-draft-recovery.v1');
+    expect(advertisement.data.capabilities).toContain('asset-authoring-draft-recovery.v1');
+    expect(advertisement.data.schemaVersions).toContain(
+      'lpc-toolkit.asset-authoring-draft-receipt.v1',
+    );
     expect(advertisement.data.capabilities).not.toContain('asset-authoring-consumer-install.v1');
   });
 

@@ -7,6 +7,7 @@ export const AUTHORING_SCHEMA_VERSIONS = [
   'lpc-toolkit.sprite-drawing-contract.v1',
   'lpc-toolkit.asset-release-declaration.v1',
   'lpc-toolkit.asset-authoring-release-receipt.v1',
+  'lpc-toolkit.asset-authoring-draft-receipt.v1',
 ] as const;
 
 export const AUTHORING_CAPABILITIES = [
@@ -15,6 +16,7 @@ export const AUTHORING_CAPABILITIES = [
   'asset-authoring-candidate-import.v1',
   'asset-authoring-recovery.v1',
   'asset-authoring-release.v1',
+  'asset-authoring-draft-recovery.v1',
 ] as const;
 
 export interface CapabilityAdvertisement {

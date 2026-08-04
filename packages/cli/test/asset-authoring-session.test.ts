@@ -202,11 +202,15 @@ describe('asset authoring session persistence', () => {
     delete oldDocument.receipts.acknowledgements;
     delete oldDocument.receipts.releaseDeclaration;
     delete oldDocument.receipts.previewAcceptance;
+    delete oldDocument.receipts.draftArchive;
+    delete oldDocument.receipts.sync;
     writeFileSync(sessionPath, `${JSON.stringify(oldDocument, null, 2)}\n`);
 
     expect(store.read(session.sessionId).receipts.acknowledgements).toBeNull();
     expect(store.read(session.sessionId).receipts.releaseDeclaration).toBeNull();
     expect(store.read(session.sessionId).receipts.previewAcceptance).toBeNull();
+    expect(store.read(session.sessionId).receipts.draftArchive).toBeNull();
+    expect(store.read(session.sessionId).receipts.sync).toBeNull();
     const replaced = store.replace(session.sessionId, {
       receipts: {
         validation: null,
@@ -234,6 +238,81 @@ describe('asset authoring session persistence', () => {
       }],
       recordDigests: [DIGEST_C, DIGEST_D],
     });
+  });
+
+  it('persists strict draft and sync receipts and rejects out-of-scope receipt paths', () => {
+    const workspace = createWorkspace();
+    const store = createStore(workspace);
+    const session = store.create({ plan: PLAN, packRoot: packRoot(workspace) });
+    const sessionDirectory = path.dirname(assetAuthoringSessionPath(workspace, session.sessionId));
+    const draftArchivePath = path.join(
+      sessionDirectory,
+      'release-artifacts',
+      'acme.fantasy-hair-1.0.0.draft.lpc-assets.zip',
+    );
+    const sourceDigests = [{
+      path: 'sprites/moon-braid/foreground/walk.png',
+      digest: DIGEST_C,
+    }];
+    const replaced = store.replace(session.sessionId, {
+      receipts: {
+        validation: null,
+        preview: null,
+        acknowledgements: null,
+        releaseDeclaration: null,
+        previewAcceptance: null,
+        draftArchive: {
+          schema: 'lpc-toolkit.asset-authoring-draft-receipt.v1',
+          packId: PLAN.pack.id,
+          version: PLAN.pack.version,
+          archivePath: draftArchivePath,
+          archiveDigest: DIGEST_A,
+          manifestDigest: DIGEST_B,
+          contentDigest: DIGEST_C,
+          sourceDigests,
+          recordedAt: NOW,
+        },
+        sync: {
+          id: DIGEST_A,
+          packId: PLAN.pack.id,
+          version: PLAN.pack.version,
+          manifestDigest: DIGEST_B,
+          contentDigest: DIGEST_C,
+          sourceDigests,
+          workspaceId: 'workspace-id',
+          outputRoot: workspace.outputRoot,
+          registryDigest: DIGEST_D,
+          compileDigest: DIGEST_A,
+          generatedDigests: {
+            'sheet_definitions/hair/moon-braid.json': DIGEST_B,
+          },
+          recordedAt: NOW,
+        },
+      },
+    });
+
+    expect(replaced.receipts.draftArchive).toMatchObject({
+      schema: 'lpc-toolkit.asset-authoring-draft-receipt.v1',
+      archivePath: draftArchivePath,
+    });
+    expect(replaced.receipts.sync).toMatchObject({
+      outputRoot: workspace.outputRoot,
+      generatedDigests: { 'sheet_definitions/hair/moon-braid.json': DIGEST_B },
+    });
+    expect(store.read(session.sessionId).receipts).toEqual(replaced.receipts);
+
+    const sessionPath = assetAuthoringSessionPath(workspace, session.sessionId);
+    const document = JSON.parse(readFileSync(sessionPath, 'utf8')) as {
+      readonly receipts: Record<string, unknown>;
+    };
+    document.receipts.draftArchive = {
+      ...document.receipts.draftArchive as Record<string, unknown>,
+      archivePath: path.join(workspace.root, 'outside.draft.lpc-assets.zip'),
+    };
+    writeFileSync(sessionPath, `${JSON.stringify(document, null, 2)}\n`);
+    expect(() => store.read(session.sessionId)).toThrow(
+      'must stay inside the session release-artifact root',
+    );
   });
 
   it('persists canonical preview artifact bindings and reads old previews without them', () => {

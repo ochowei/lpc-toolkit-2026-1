@@ -66,10 +66,19 @@ import {
   type AssetAuthoringSessionReceipts,
   type AssetAuthoringSessionUpdate,
   type AssetAuthoringPreviewReceipt,
+  type AssetAuthoringSyncReceipt,
   type AssetAuthoringValidationReceipt,
 } from './asset-authoring-session.js';
+import {
+  createDraftArchive,
+  assetAuthoringReleaseArtifactRoot,
+  captureSyncReceipt,
+  syncReceiptStaleReason,
+  AssetAuthoringReleaseLifecycleError,
+} from './asset-authoring-release-lifecycle.js';
 import type { AssetWorkspace } from './asset-workspace.js';
 import type { RuntimeAssets } from './runtime-assets.js';
+import { syncLinkedAssetPack } from './asset-pack-sync.js';
 import {
   authoringResponseProjection,
   commandError,
@@ -468,6 +477,34 @@ function nextActionsFor(session: AssetAuthoringSession): readonly AuthoringNextA
     ];
   }
 
+  if (session.reason === 'draft-archive-stale') {
+    return [nextAction(
+      'recreate-draft-archive',
+      'Create a new draft recovery archive after reviewing changed session evidence.',
+      `asset authoring draft --session ${session.sessionId} --output <archive>`,
+      'safe',
+      session.receipts.draftArchive === null || session.receipts.draftArchive === undefined
+        ? []
+        : [session.receipts.draftArchive.archiveDigest],
+    )];
+  }
+
+  if (
+    session.reason === 'sync-confirmation-required'
+    || session.reason === 'sync-receipt-stale'
+  ) {
+    return [nextAction(
+      'confirm-sync',
+      'Confirm publication into the manager-owned generated overlay and registry.',
+      `asset authoring sync --session ${session.sessionId} --confirm`,
+      'requires-confirmation',
+      session.receipts.sync === null || session.receipts.sync === undefined
+        ? []
+        : [session.receipts.sync.compileDigest, session.receipts.sync.registryDigest],
+      ['confirm'],
+    )];
+  }
+
   if (session.phase === 'planned' || session.phase === 'scaffolded') {
     return [nextAction(
       'create-contract',
@@ -688,6 +725,8 @@ function responseFor(
     releaseGates: releaseGateFreshness(session),
     releaseDeclaration: session.receipts.releaseDeclaration,
     previewAcceptance: session.receipts.previewAcceptance,
+    draftReceipt: session.receipts.draftArchive ?? null,
+    syncReceipt: session.receipts.sync ?? null,
   };
   return authoringResponseProjection(input);
 }
@@ -972,11 +1011,16 @@ function startSession(
   return commandOk('asset authoring start', responseFor(session));
 }
 
-function statusSession(
+async function statusSession(
   workspace: AssetWorkspace,
   sessionId: string,
-): CliResponse<AuthoringResponseData> {
-  const session = createAssetAuthoringSessionStore(workspace).status(sessionId);
+): Promise<CliResponse<AuthoringResponseData>> {
+  const store = createAssetAuthoringSessionStore(workspace);
+  const session = await refreshSyncReceiptState(
+    workspace,
+    store,
+    store.status(sessionId),
+  );
   return commandOk('asset authoring status', responseFor(
     session,
     session.reason === 'missing-draft-credits'
@@ -988,12 +1032,296 @@ function statusSession(
   ));
 }
 
-function resumeCommand(
+async function draftCommand(
+  context: AuthoringCommandContext,
+  sessionId: string,
+): Promise<CliResponse<AuthoringResponseData>> {
+  const store = createAssetAuthoringSessionStore(context.workspace);
+  const session = resumeSession(context.workspace, store.read(sessionId));
+  if (session.conflict !== null || session.reason === 'external-png-drift') {
+    return commandOk('asset authoring draft', responseFor(session));
+  }
+
+  const previous = session.receipts.draftArchive;
+  const outputArgument = flagString(context.parsed.flags, 'output');
+  const defaultOutputPath = path.join(
+    assetAuthoringReleaseArtifactRoot(context.workspace, session.sessionId),
+    `${session.plan.pack.id}-${session.plan.pack.version}.draft.lpc-assets.zip`,
+  );
+  const requestedOutputPath = outputArgument === undefined
+    ? defaultOutputPath
+    : path.resolve(context.cwd, outputArgument);
+  if (previous !== null && previous !== undefined && previous.archivePath === requestedOutputPath) {
+    const stale = await draftReceiptStale(previous, session);
+    if (stale) {
+      const next = store.replace(sessionId, {
+        state: 'needs-user-action',
+        reason: 'draft-archive-stale',
+        phase: 'blocked',
+        checkpointFreshness: 'stale',
+        checkpoints: session.checkpoints.map((checkpoint) => ({
+          ...checkpoint,
+          freshness: 'stale',
+        })),
+        provenance: appendProvenance(session, {
+          kind: 'checkpoint-invalidated',
+          occurredAt: new Date().toISOString(),
+          digest: previous.archiveDigest,
+          summary: `Draft recovery evidence is stale: ${stale}.`,
+        }),
+      });
+      return commandOk('asset authoring draft', responseFor(next));
+    }
+  }
+
+  const result = await createDraftArchive({
+    cwd: context.cwd,
+    workspace: context.workspace,
+    session,
+    ...(outputArgument === undefined
+      ? {}
+      : { outputPath: outputArgument }),
+  });
+  const receipt = previous !== null
+    && previous !== undefined
+    && previous.archivePath === result.receipt.archivePath
+    && previous.archiveDigest === result.receipt.archiveDigest
+    && previous.manifestDigest === result.receipt.manifestDigest
+    && previous.contentDigest === result.receipt.contentDigest
+    && sourceDigestSetsEqual(previous.sourceDigests, result.receipt.sourceDigests)
+    ? previous
+    : result.receipt;
+  const next = store.replace(sessionId, {
+    state: 'completed',
+    reason: 'draft-archive-current',
+    phase: session.phase,
+    checkpoint: {
+      id: 'draftArchive',
+      phase: session.phase,
+      digest: receipt.archiveDigest,
+      freshness: 'current',
+    },
+    checkpointFreshness: 'current',
+    receipts: {
+      ...session.receipts,
+      draftArchive: receipt,
+    },
+    provenance: appendProvenance(session, {
+      kind: 'draft-archive-recorded',
+      occurredAt: receipt.recordedAt,
+      digest: receipt.archiveDigest,
+      summary: 'Deterministic draft recovery archive recorded for the current session source set.',
+    }),
+  });
+  return commandOk(
+    'asset authoring draft',
+    responseFor(next, {
+      artifacts: [{
+        id: 'draft-archive',
+        path: receipt.archivePath,
+        digest: receipt.archiveDigest,
+      }],
+    }),
+  );
+}
+
+async function draftReceiptStale(
+  receipt: NonNullable<AssetAuthoringSession['receipts']['draftArchive']>,
+  session: AssetAuthoringSession,
+): Promise<string | undefined> {
+  const archiveBytes = readRegularFile(receipt.archivePath);
+  if (archiveBytes === undefined) return 'the recorded archive is missing or not regular';
+  if (sha256(archiveBytes) !== receipt.archiveDigest) {
+    return 'the recorded archive bytes changed externally';
+  }
+
+  const loaded = await loadAssetPackFiles(session.packRoot);
+  if (!loaded.ok) return 'the session pack can no longer be captured';
+  const currentSourceDigests = [...loaded.sourceDigests]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([sourcePath, digest]) => ({ path: sourcePath, digest }));
+  if (
+    sha256(loaded.manifestBytes) !== receipt.manifestDigest
+    || loaded.contentDigest !== receipt.contentDigest
+    || loaded.pack.id !== receipt.packId
+    || loaded.pack.version !== receipt.version
+    || !sourceDigestSetsEqual(currentSourceDigests, receipt.sourceDigests)
+  ) {
+    return 'the session manifest or source evidence changed externally';
+  }
+  return undefined;
+}
+
+function syncFailureIsStale(
+  code: string,
+): boolean {
+  return code === 'asset_digest_mismatch'
+    || code === 'asset_output_root_unowned'
+    || code === 'asset_publish_failed'
+    || code === 'asset_transaction_unsafe';
+}
+
+function markSyncReceiptStale(
+  store: ReturnType<typeof createAssetAuthoringSessionStore>,
+  session: AssetAuthoringSession,
+  summary: string,
+): AssetAuthoringSession {
+  return store.replace(session.sessionId, {
+    state: 'needs-user-action',
+    reason: 'sync-receipt-stale',
+    phase: 'blocked',
+    checkpointFreshness: 'stale',
+    checkpoints: session.checkpoints.map((checkpoint) => ({
+      ...checkpoint,
+      freshness: 'stale',
+    })),
+    provenance: appendProvenance(session, {
+      kind: 'checkpoint-invalidated',
+      occurredAt: new Date().toISOString(),
+      ...(session.receipts.sync?.registryDigest === undefined
+        ? {}
+        : { digest: session.receipts.sync.registryDigest }),
+      summary,
+    }),
+  });
+}
+
+async function refreshSyncReceiptState(
+  workspace: AssetWorkspace,
+  store: ReturnType<typeof createAssetAuthoringSessionStore>,
+  session: AssetAuthoringSession,
+): Promise<AssetAuthoringSession> {
+  const receipt = session.receipts.sync;
+  if (receipt === null || receipt === undefined || session.reason === 'sync-receipt-stale') {
+    return session;
+  }
+  const stale = await syncReceiptStaleReason({ workspace, session, receipt });
+  return stale === undefined
+    ? session
+    : markSyncReceiptStale(store, session, `Sync receipt invalidated: ${stale}.`);
+}
+
+async function syncCommand(
+  context: AuthoringCommandContext,
+  sessionId: string,
+): Promise<CliResponse<AuthoringResponseData | null>> {
+  const store = createAssetAuthoringSessionStore(context.workspace);
+  let session = resumeSession(context.workspace, store.read(sessionId));
+  if (session.conflict !== null || session.reason === 'external-png-drift') {
+    return commandOk('asset authoring sync', responseFor(session));
+  }
+  session = await refreshSyncReceiptState(context.workspace, store, session);
+
+  if (!flagBoolean(context.parsed.flags, 'confirm')) {
+    const prompted = session.reason === 'sync-confirmation-required'
+      || session.reason === 'sync-receipt-stale'
+      ? session
+      : store.replace(sessionId, {
+        state: 'needs-user-action',
+        reason: 'sync-confirmation-required',
+        phase: session.phase,
+        checkpointFreshness: session.checkpointFreshness,
+      });
+    return commandOk('asset authoring sync', responseFor(prompted));
+  }
+
+  const result = await syncLinkedAssetPack({
+    packDirectory: session.packRoot,
+    workspace: context.workspace,
+    runtime: context.runtime!,
+  });
+  if (!result.ok) {
+    const diagnostic = result.diagnostics[0];
+    if (session.receipts.sync !== null && session.receipts.sync !== undefined
+      && diagnostic !== undefined && syncFailureIsStale(diagnostic.code)) {
+      markSyncReceiptStale(
+        store,
+        session,
+        `Sync receipt invalidated by manager evidence: ${diagnostic.message}`,
+      );
+      return commandError(
+        'asset authoring sync',
+        issue(diagnostic.code, diagnostic.message, diagnostic.path),
+      );
+    }
+    return commandError(
+      'asset authoring sync',
+      issue(
+        diagnostic?.code ?? 'asset_authoring_sync_failed',
+        diagnostic?.message ?? 'Authoring sync failed.',
+        diagnostic?.path,
+      ),
+    );
+  }
+
+  const receipt = captureSyncReceipt({
+    workspace: context.workspace,
+    session,
+    synced: result,
+  });
+  const previous = session.receipts.sync;
+  if (
+    previous !== null
+    && previous !== undefined
+    && syncReceiptsEqual(previous, receipt)
+    && session.reason === 'sync-current'
+  ) {
+    return commandOk('asset authoring sync', responseFor(session));
+  }
+
+  const next = store.replace(sessionId, {
+    state: 'completed',
+    reason: 'sync-current',
+    phase: session.phase,
+    checkpoint: {
+      id: 'sync',
+      phase: session.phase,
+      digest: receipt.compileDigest,
+      freshness: 'current',
+    },
+    checkpointFreshness: 'current',
+    receipts: {
+      ...session.receipts,
+      sync: receipt,
+    },
+    provenance: appendProvenance(session, {
+      kind: 'sync-receipt-recorded',
+      occurredAt: receipt.recordedAt,
+      digest: receipt.registryDigest,
+      summary: 'Manager-owned linked asset-pack generation and registry receipt recorded.',
+    }),
+  });
+  return commandOk('asset authoring sync', responseFor(next));
+}
+
+function syncReceiptsEqual(
+  left: AssetAuthoringSyncReceipt,
+  right: AssetAuthoringSyncReceipt,
+): boolean {
+  return left.id === right.id
+    && left.packId === right.packId
+    && left.version === right.version
+    && left.manifestDigest === right.manifestDigest
+    && left.contentDigest === right.contentDigest
+    && sourceDigestSetsEqual(left.sourceDigests, right.sourceDigests)
+    && left.workspaceId === right.workspaceId
+    && left.outputRoot === right.outputRoot
+    && left.registryDigest === right.registryDigest
+    && left.compileDigest === right.compileDigest
+    && JSON.stringify(left.generatedDigests) === JSON.stringify(right.generatedDigests);
+}
+
+async function resumeCommand(
   workspace: AssetWorkspace,
   sessionId: string,
-): CliResponse<AuthoringResponseData> {
-  const session = createAssetAuthoringSessionStore(workspace).read(sessionId);
-  const resumed = resumeSession(workspace, session);
+): Promise<CliResponse<AuthoringResponseData>> {
+  const store = createAssetAuthoringSessionStore(workspace);
+  const session = store.read(sessionId);
+  const resumed = await refreshSyncReceiptState(
+    workspace,
+    store,
+    resumeSession(workspace, session),
+  );
   return commandOk('asset authoring resume', responseFor(
     resumed,
     resumed.reason === 'missing-draft-credits'
@@ -2535,9 +2863,11 @@ export async function runAssetAuthoringCommand(
     if (authoringCommand === 'acknowledge') return await acknowledgeCommand(context, sessionId);
     if (authoringCommand === 'declare') return await declareCommand(context, sessionId);
     if (authoringCommand === 'accept-preview') return await acceptPreviewCommand(context, sessionId);
+    if (authoringCommand === 'draft') return await draftCommand(context, sessionId);
+    if (authoringCommand === 'sync') return await syncCommand(context, sessionId);
     if (authoringCommand === 'preview') return await previewCommand(context, sessionId);
-    if (authoringCommand === 'status') return statusSession(context.workspace, sessionId);
-    if (authoringCommand === 'resume') return resumeCommand(context.workspace, sessionId);
+    if (authoringCommand === 'status') return await statusSession(context.workspace, sessionId);
+    if (authoringCommand === 'resume') return await resumeCommand(context.workspace, sessionId);
     if (authoringCommand === 'reconcile-manifest') {
       return reconcileManifest(
         context.workspace,
@@ -2567,6 +2897,13 @@ export async function runAssetAuthoringCommand(
       ));
     }
     if (error instanceof AssetAuthoringImportError) {
+      return commandError(command, issue(
+        error.code,
+        error.message,
+        error.path,
+      ));
+    }
+    if (error instanceof AssetAuthoringReleaseLifecycleError) {
       return commandError(command, issue(
         error.code,
         error.message,

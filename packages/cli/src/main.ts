@@ -208,6 +208,8 @@ function preflightCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
       && authoringCommand !== 'acknowledge'
       && authoringCommand !== 'declare'
       && authoringCommand !== 'accept-preview'
+      && authoringCommand !== 'draft'
+      && authoringCommand !== 'sync'
       && authoringCommand !== 'preview'
       && authoringCommand !== 'reconcile-manifest'
     ) {
@@ -232,6 +234,8 @@ function preflightCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
       || authoringCommand === 'resume'
       || authoringCommand === 'contract'
       || authoringCommand === 'validate'
+      || authoringCommand === 'draft'
+      || authoringCommand === 'sync'
       || authoringCommand === 'preview'
     ) {
       return requiredStringFlag('session');

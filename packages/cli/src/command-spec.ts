@@ -281,6 +281,32 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
     examples: ['lpc-toolkit asset authoring accept-preview --session session-id --preview-digest sha256:preview --confirm --json'],
   },
   {
+    command: ['asset', 'authoring', 'draft'],
+    usage: 'lpc-toolkit asset authoring draft --session <session-id> [--output <archive>] [--workspace <directory>] [--json]',
+    description: 'Create a deterministic, non-installable draft recovery archive from the current session pack.',
+    options: [
+      HELP_OPTION,
+      JSON_OPTION,
+      AUTHORING_SESSION_OPTION,
+      { name: 'output', kind: 'value', valueLabel: 'archive', description: 'Write the draft archive below the session release-artifact root.' },
+      ASSET_WORKSPACE_OPTION,
+    ],
+    examples: ['lpc-toolkit asset authoring draft --session session-id --json'],
+  },
+  {
+    command: ['asset', 'authoring', 'sync'],
+    usage: 'lpc-toolkit asset authoring sync --session <session-id> [--confirm] [--workspace <directory>] [--json]',
+    description: 'Synchronize the current session pack into the manager-owned generated overlay after explicit confirmation.',
+    options: [
+      HELP_OPTION,
+      JSON_OPTION,
+      AUTHORING_SESSION_OPTION,
+      { name: 'confirm', kind: 'boolean', description: 'Confirm the manager-owned overlay and registry mutation.' },
+      ASSET_WORKSPACE_OPTION,
+    ],
+    examples: ['lpc-toolkit asset authoring sync --session session-id --confirm --json'],
+  },
+  {
     command: ['asset', 'authoring', 'preview'],
     usage: 'lpc-toolkit asset authoring preview --session <session-id> [existing preview options] [--workspace <directory>] [--json]',
     description: 'Render an attributed session preview using the existing asset preview options.',

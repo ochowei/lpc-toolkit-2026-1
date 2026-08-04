@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFileSync, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import {
@@ -59,6 +60,7 @@ export interface AssetPackSyncDiagnostic {
 
 export interface AssetPackSyncSuccess {
   readonly ok: true;
+  readonly manifestDigest: string;
   readonly linked: LinkedAssetPackRegistryEntry;
   readonly registry: readonly LinkedAssetPackRegistryEntry[];
 }
@@ -105,6 +107,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function sha256Buffer(bytes: Buffer): string {
+  return `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
 }
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {
@@ -645,6 +651,7 @@ export async function syncLinkedAssetPack(options: {
 
       return {
         ok: true,
+        manifestDigest: sha256Buffer(requested.candidate.loaded.manifestBytes),
         linked,
         registry: desiredState.registry.entries.filter(
           (entry): entry is LinkedAssetPackRegistryEntry => entry.kind === 'linked',

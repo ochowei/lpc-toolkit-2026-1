@@ -133,6 +133,36 @@ export interface AssetAuthoringAcknowledgementReceipt {
   readonly recordDigests: readonly string[];
 }
 
+export const ASSET_AUTHORING_DRAFT_RECEIPT_SCHEMA =
+  'lpc-toolkit.asset-authoring-draft-receipt.v1' as const;
+
+export interface AssetAuthoringDraftArchiveReceipt {
+  readonly schema: typeof ASSET_AUTHORING_DRAFT_RECEIPT_SCHEMA;
+  readonly packId: string;
+  readonly version: string;
+  readonly archivePath: string;
+  readonly archiveDigest: string;
+  readonly manifestDigest: string;
+  readonly contentDigest: string;
+  readonly sourceDigests: readonly AssetAuthoringSourceDigest[];
+  readonly recordedAt: string;
+}
+
+export interface AssetAuthoringSyncReceipt {
+  readonly id: string;
+  readonly packId: string;
+  readonly version: string;
+  readonly manifestDigest: string;
+  readonly contentDigest: string;
+  readonly sourceDigests: readonly AssetAuthoringSourceDigest[];
+  readonly workspaceId: string;
+  readonly outputRoot: string;
+  readonly registryDigest: string;
+  readonly compileDigest: string;
+  readonly generatedDigests: Readonly<Record<string, string>>;
+  readonly recordedAt: string;
+}
+
 export type AssetAuthoringReleaseDeclarationReceipt =
   CoreAssetAuthoringReleaseDeclarationReceipt;
 
@@ -145,6 +175,8 @@ export interface AssetAuthoringSessionReceipts {
   readonly acknowledgements: AssetAuthoringAcknowledgementReceipt | null;
   readonly releaseDeclaration: AssetAuthoringReleaseDeclarationReceipt | null;
   readonly previewAcceptance: AssetAuthoringPreviewAcceptanceReceipt | null;
+  readonly draftArchive?: AssetAuthoringDraftArchiveReceipt | null;
+  readonly sync?: AssetAuthoringSyncReceipt | null;
 }
 
 export interface AssetAuthoringSessionCheckpoint {
@@ -165,6 +197,8 @@ export type AssetAuthoringProvenanceKind =
   | 'checkpoint-invalidated'
   | 'external-png-observed'
   | 'manifest-conflict'
+  | 'draft-archive-recorded'
+  | 'sync-receipt-recorded'
   | 'provider'
   | 'human-declaration'
   | 'human-preview-acceptance';
@@ -488,7 +522,15 @@ function parseReceipts(value: unknown): AssetAuthoringSessionReceipts {
   const record = requireRecord(value, 'session.receipts');
   assertExactKeys(
     record,
-    ['validation', 'preview', 'acknowledgements', 'releaseDeclaration', 'previewAcceptance'],
+    [
+      'validation',
+      'preview',
+      'acknowledgements',
+      'releaseDeclaration',
+      'previewAcceptance',
+      'draftArchive',
+      'sync',
+    ],
     'session.receipts',
   );
   const validation = record.validation === null
@@ -506,12 +548,142 @@ function parseReceipts(value: unknown): AssetAuthoringSessionReceipts {
   const previewAcceptance = record.previewAcceptance === undefined || record.previewAcceptance === null
     ? null
     : parsePreviewAcceptanceReceipt(record.previewAcceptance);
+  const draftArchive = record.draftArchive === undefined || record.draftArchive === null
+    ? null
+    : parseDraftArchiveReceipt(record.draftArchive);
+  const sync = record.sync === undefined || record.sync === null
+    ? null
+    : parseSyncReceipt(record.sync);
   return {
     validation,
     preview,
     acknowledgements,
     releaseDeclaration,
     previewAcceptance,
+    draftArchive,
+    sync,
+  };
+}
+
+function parseDraftArchiveReceipt(value: unknown): AssetAuthoringDraftArchiveReceipt {
+  const record = requireRecord(value, 'session.receipts.draftArchive');
+  assertExactKeys(
+    record,
+    [
+      'schema',
+      'packId',
+      'version',
+      'archivePath',
+      'archiveDigest',
+      'manifestDigest',
+      'contentDigest',
+      'sourceDigests',
+      'recordedAt',
+    ],
+    'session.receipts.draftArchive',
+  );
+  if (record.schema !== ASSET_AUTHORING_DRAFT_RECEIPT_SCHEMA) {
+    fail(
+      'asset_authoring_session_tampered',
+      `Unknown draft receipt schema: ${String(record.schema)}.`,
+    );
+  }
+  const archivePath = requireString(record, 'archivePath', 'session.receipts.draftArchive');
+  if (!path.isAbsolute(archivePath)) {
+    fail(
+      'asset_authoring_session_path_invalid',
+      'session.receipts.draftArchive.archivePath must be absolute.',
+    );
+  }
+  return {
+    schema: ASSET_AUTHORING_DRAFT_RECEIPT_SCHEMA,
+    packId: requireString(record, 'packId', 'session.receipts.draftArchive'),
+    version: requireString(record, 'version', 'session.receipts.draftArchive'),
+    archivePath,
+    archiveDigest: requireDigest(
+      record.archiveDigest,
+      'session.receipts.draftArchive.archiveDigest',
+    ),
+    manifestDigest: requireDigest(
+      record.manifestDigest,
+      'session.receipts.draftArchive.manifestDigest',
+    ),
+    contentDigest: requireDigest(
+      record.contentDigest,
+      'session.receipts.draftArchive.contentDigest',
+    ),
+    sourceDigests: parseSourceDigests(
+      record.sourceDigests,
+      'session.receipts.draftArchive.sourceDigests',
+    ),
+    recordedAt: requireTimestamp(
+      record.recordedAt,
+      'session.receipts.draftArchive.recordedAt',
+    ),
+  };
+}
+
+function parseGeneratedDigests(
+  value: unknown,
+  label: string,
+): Readonly<Record<string, string>> {
+  const record = requireRecord(value, label);
+  const entries = Object.entries(record);
+  const paths = entries.map(([entryPath]) => requireLogicalTargetId(entryPath, label));
+  assertStableOrder(paths, label);
+  const result: Record<string, string> = {};
+  for (const [entryPath, digest] of entries) {
+    result[entryPath] = requireDigest(digest, `${label}.${entryPath}`);
+  }
+  return result;
+}
+
+function parseSyncReceipt(value: unknown): AssetAuthoringSyncReceipt {
+  const record = requireRecord(value, 'session.receipts.sync');
+  assertExactKeys(
+    record,
+    [
+      'id',
+      'packId',
+      'version',
+      'manifestDigest',
+      'contentDigest',
+      'sourceDigests',
+      'workspaceId',
+      'outputRoot',
+      'registryDigest',
+      'compileDigest',
+      'generatedDigests',
+      'recordedAt',
+    ],
+    'session.receipts.sync',
+  );
+  const outputRoot = requireString(record, 'outputRoot', 'session.receipts.sync');
+  if (!path.isAbsolute(outputRoot)) {
+    fail(
+      'asset_authoring_session_path_invalid',
+      'session.receipts.sync.outputRoot must be absolute.',
+    );
+  }
+  return {
+    id: requireDigest(record.id, 'session.receipts.sync.id'),
+    packId: requireString(record, 'packId', 'session.receipts.sync'),
+    version: requireString(record, 'version', 'session.receipts.sync'),
+    manifestDigest: requireDigest(record.manifestDigest, 'session.receipts.sync.manifestDigest'),
+    contentDigest: requireDigest(record.contentDigest, 'session.receipts.sync.contentDigest'),
+    sourceDigests: parseSourceDigests(
+      record.sourceDigests,
+      'session.receipts.sync.sourceDigests',
+    ),
+    workspaceId: requireString(record, 'workspaceId', 'session.receipts.sync'),
+    outputRoot,
+    registryDigest: requireDigest(record.registryDigest, 'session.receipts.sync.registryDigest'),
+    compileDigest: requireDigest(record.compileDigest, 'session.receipts.sync.compileDigest'),
+    generatedDigests: parseGeneratedDigests(
+      record.generatedDigests,
+      'session.receipts.sync.generatedDigests',
+    ),
+    recordedAt: requireTimestamp(record.recordedAt, 'session.receipts.sync.recordedAt'),
   };
 }
 
@@ -705,6 +877,8 @@ function parseProvenance(value: unknown): readonly AssetAuthoringProvenanceEvent
         'checkpoint-invalidated',
         'external-png-observed',
         'manifest-conflict',
+        'draft-archive-recorded',
+        'sync-receipt-recorded',
         'provider',
         'human-declaration',
         'human-preview-acceptance',
@@ -913,6 +1087,7 @@ function parseSessionDocument(
   );
   const checkpoints = parseTargetCheckpoints(record.checkpoints);
   const receipts = parseReceipts(record.receipts);
+  validateReceiptScope(receipts, workspace, sessionId);
   const provenance = parseProvenance(record.provenance);
   const conflict = parseConflict(record.conflict);
   const manifestDigest = requireNullableDigest(record, 'manifestDigest', 'session');
@@ -942,6 +1117,39 @@ function parseSessionDocument(
     createdAt,
     updatedAt,
   };
+}
+
+function validateReceiptScope(
+  receipts: AssetAuthoringSessionReceipts,
+  workspace: AssetWorkspace,
+  sessionId: string,
+): void {
+  const draftArchive = receipts.draftArchive;
+  if (draftArchive !== null && draftArchive !== undefined) {
+    const artifactRoot = path.join(
+      path.dirname(assetAuthoringSessionPath(workspace, sessionId)),
+      'release-artifacts',
+    );
+    if (!isInsideRoot(path.resolve(artifactRoot), path.resolve(draftArchive.archivePath))) {
+      fail(
+        'asset_authoring_session_path_invalid',
+        'session.receipts.draftArchive.archivePath must stay inside the session release-artifact root.',
+        draftArchive.archivePath,
+      );
+    }
+  }
+
+  const sync = receipts.sync;
+  if (sync !== null && sync !== undefined) {
+    const outputRoot = path.resolve(workspace.outputRoot);
+    if (path.resolve(sync.outputRoot) !== outputRoot) {
+      fail(
+        'asset_authoring_session_workspace_mismatch',
+        'session.receipts.sync.outputRoot must match the workspace manager output root.',
+        sync.outputRoot,
+      );
+    }
+  }
 }
 
 function serializeSession(session: AssetAuthoringSession): string {
@@ -1041,6 +1249,8 @@ class AssetAuthoringSessionStoreImpl implements AssetAuthoringSessionStore {
         acknowledgements: null,
         releaseDeclaration: null,
         previewAcceptance: null,
+        draftArchive: null,
+        sync: null,
       },
       provenance: [{
         id: this.eventId(),

@@ -12,6 +12,10 @@ import {
   AUTHORING_SCHEMA_VERSIONS,
 } from './capabilities.js';
 import type { AssetPackValidationReport } from './asset-pack-validation.js';
+import type {
+  AssetAuthoringDraftArchiveReceipt,
+  AssetAuthoringSyncReceipt,
+} from './asset-authoring-session.js';
 
 export interface CliIssue {
   readonly code: string;
@@ -113,11 +117,13 @@ export interface AuthoringResponseProjectionInput {
   readonly releaseGates?: AssetAuthoringReleaseGateProjection;
   readonly releaseDeclaration?: AssetAuthoringReleaseDeclarationReceipt | null;
   readonly previewAcceptance?: AssetAuthoringPreviewAcceptanceReceipt | null;
+  readonly draftReceipt?: AssetAuthoringDraftArchiveReceipt | null;
+  readonly syncReceipt?: AssetAuthoringSyncReceipt | null;
 }
 
 export interface AuthoringResponseData extends Omit<
   AuthoringResponseProjectionInput,
-  'releaseGates' | 'releaseDeclaration' | 'previewAcceptance'
+  'releaseGates' | 'releaseDeclaration' | 'previewAcceptance' | 'draftReceipt' | 'syncReceipt'
 > {
   readonly schema: 'lpc-toolkit.asset-authoring-response.v1';
   readonly cliVersion: string;
@@ -126,6 +132,8 @@ export interface AuthoringResponseData extends Omit<
   readonly releaseGates: AssetAuthoringReleaseGateProjection;
   readonly releaseDeclaration: AssetAuthoringReleaseDeclarationReceipt | null;
   readonly previewAcceptance: AssetAuthoringPreviewAcceptanceReceipt | null;
+  readonly draftReceipt: AssetAuthoringDraftArchiveReceipt | null;
+  readonly syncReceipt: AssetAuthoringSyncReceipt | null;
 }
 
 export function authoringResponseProjection(
@@ -147,6 +155,22 @@ export function authoringResponseProjection(
     || input.previewAcceptance === null
     ? null
     : assetAuthoringReleaseReceiptProjection(input.previewAcceptance);
+  const draftReceipt = input.draftReceipt === undefined || input.draftReceipt === null
+    ? null
+    : {
+      ...input.draftReceipt,
+      sourceDigests: [...input.draftReceipt.sourceDigests],
+    };
+  const syncReceipt = input.syncReceipt === undefined || input.syncReceipt === null
+    ? null
+    : {
+      ...input.syncReceipt,
+      sourceDigests: [...input.syncReceipt.sourceDigests],
+      generatedDigests: Object.fromEntries(
+        Object.entries(input.syncReceipt.generatedDigests)
+          .sort(([left], [right]) => left.localeCompare(right)),
+      ),
+    };
   if (releaseDeclaration !== null && releaseDeclaration.kind !== 'declaration') {
     throw new Error('Release declaration response receipt has the wrong kind.');
   }
@@ -186,6 +210,8 @@ export function authoringResponseProjection(
     },
     releaseDeclaration,
     previewAcceptance,
+    draftReceipt,
+    syncReceipt,
     cliVersion: CLI_VERSION,
     capabilities: [...AUTHORING_CAPABILITIES],
     schemaVersions: [...AUTHORING_SCHEMA_VERSIONS],
@@ -441,6 +467,25 @@ function formatAuthoringResponse(
         `Human preview acceptance: ${declarant}${digest ? ` (${digest})` : ''}`,
       );
     }
+  }
+  const draftReceipt = data['draftReceipt'];
+  if (isRecord(draftReceipt)) {
+    const archivePath = stringValue(draftReceipt, 'archivePath');
+    const archiveDigest = stringValue(draftReceipt, 'archiveDigest');
+    if (archivePath) {
+      lines.push(
+        `Draft recovery archive: ${archivePath}${archiveDigest ? ` (${archiveDigest})` : ''}`,
+      );
+    }
+  }
+  const syncReceipt = data['syncReceipt'];
+  if (isRecord(syncReceipt)) {
+    const outputRoot = stringValue(syncReceipt, 'outputRoot');
+    const registryDigest = stringValue(syncReceipt, 'registryDigest');
+    const compileDigest = stringValue(syncReceipt, 'compileDigest');
+    if (outputRoot) lines.push(`Synchronized overlay: ${outputRoot}`);
+    if (registryDigest) lines.push(`Registry receipt: ${registryDigest}`);
+    if (compileDigest) lines.push(`Compile receipt: ${compileDigest}`);
   }
   const validation = data['validation'];
   if (isRecord(validation) && typeof validation['valid'] === 'boolean') {
