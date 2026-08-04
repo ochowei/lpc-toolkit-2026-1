@@ -189,6 +189,45 @@ describe('asset authoring session persistence', () => {
     ]);
   });
 
+  it('backward-reads old receipt slots and persists a strict acknowledgement receipt', () => {
+    const workspace = createWorkspace();
+    const store = createStore(workspace);
+    const session = store.create({ plan: PLAN, packRoot: packRoot(workspace) });
+    const sessionPath = assetAuthoringSessionPath(workspace, session.sessionId);
+    const oldDocument = JSON.parse(readFileSync(sessionPath, 'utf8')) as {
+      readonly receipts: Record<string, unknown>;
+    };
+    delete oldDocument.receipts.acknowledgements;
+    writeFileSync(sessionPath, `${JSON.stringify(oldDocument, null, 2)}\n`);
+
+    expect(store.read(session.sessionId).receipts.acknowledgements).toBeNull();
+    const replaced = store.replace(session.sessionId, {
+      receipts: {
+        validation: null,
+        preview: null,
+        acknowledgements: {
+          id: DIGEST_A,
+          manifestDigest: DIGEST_B,
+          sourceDigests: [{
+            path: 'sprites/moon-braid/foreground/walk.png',
+            digest: DIGEST_C,
+          }],
+          recordDigests: [DIGEST_C, DIGEST_D],
+        },
+      },
+    });
+
+    expect(replaced.receipts.acknowledgements).toEqual({
+      id: DIGEST_A,
+      manifestDigest: DIGEST_B,
+      sourceDigests: [{
+        path: 'sprites/moon-braid/foreground/walk.png',
+        digest: DIGEST_C,
+      }],
+      recordDigests: [DIGEST_C, DIGEST_D],
+    });
+  });
+
   it('replaces one session atomically while preserving the prior state after a failed rename', () => {
     const workspace = createWorkspace();
     const store = createStore(workspace);
@@ -310,5 +349,35 @@ describe('asset authoring checkpoint invalidation', () => {
       validationReceipt: { ...baseline.validationReceipt! },
       previewReceipt: { ...baseline.previewReceipt! },
     })).toEqual([]);
+  });
+
+  it('invalidates the acknowledgement receipt after manifest or source drift', () => {
+    const baseline = evidence({
+      acknowledgementsReceipt: {
+        id: DIGEST_A,
+        manifestDigest: DIGEST_A,
+        sourceDigests: [{
+          path: 'sprites/moon-braid/foreground/walk.png',
+          digest: DIGEST_C,
+        }],
+        recordDigests: [DIGEST_D],
+      },
+    });
+    const current = {
+      ...baseline,
+      manifestDigest: DIGEST_B,
+      sourceDigests: [{
+        path: 'sprites/moon-braid/foreground/walk.png',
+        digest: DIGEST_D,
+      }],
+    };
+
+    expect(deriveAuthoringInvalidationDecisions(baseline, current)).toEqual([
+      { checkpoint: 'manifest', reason: 'manifest-semantic-drift' },
+      { checkpoint: 'source', reason: 'png-drift' },
+      { checkpoint: 'acknowledgements', reason: 'acknowledgement-receipt-stale' },
+      { checkpoint: 'validation', reason: 'validation-receipt-stale' },
+      { checkpoint: 'preview', reason: 'preview-receipt-stale' },
+    ]);
   });
 });

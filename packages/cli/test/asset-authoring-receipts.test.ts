@@ -15,6 +15,7 @@ import { createDirectoryAssetStore } from '../src/asset-store.js';
 import {
   createAssetAuthoringSessionStore,
   deriveAuthoringInvalidationDecisions,
+  assetAuthoringSessionPath,
   type AssetAuthoringEvidence,
 } from '../src/asset-authoring-session.js';
 import { createRuntimeContext } from '../src/context.js';
@@ -388,6 +389,143 @@ describe('asset authoring validation and preview receipts', () => {
       expect.objectContaining({ id: 'validate-session', safety: 'safe' }),
     ]);
   });
+
+  it('requires confirmation and persists one exact acknowledgement atomically and idempotently', async () => {
+    const fixture = await createImportedFixture();
+    const validation = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'validate', '--session', fixture.sessionId,
+    ], fixture.workspace.root, async () => fixture.runtime);
+    const validationData = dataOf(validation.response);
+    const template = validationData.validation?.acknowledgementRecords[0];
+    if (!template) throw new Error('Expected one acknowledgement template.');
+
+    const acknowledgementPath = path.join(fixture.workspace.root, 'acknowledgement.json');
+    const acknowledgement = {
+      ...template,
+      reason: 'Reviewed the optional padding frame evidence and accept the destination.',
+    };
+    writeJson(acknowledgementPath, acknowledgement);
+    const manifestPath = path.join(fixture.packRoot, 'asset-pack.json');
+    const sessionPath = assetAuthoringSessionPath(fixture.workspace, fixture.sessionId);
+    const beforeManifest = readFileSync(manifestPath);
+    const beforeSession = readFileSync(sessionPath);
+
+    const pending = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'acknowledge',
+      '--session', fixture.sessionId,
+      '--acknowledgement', acknowledgementPath,
+    ], fixture.workspace.root, async () => fixture.runtime);
+    expect(pending.code).toBe(0);
+    expect(dataOf(pending.response)).toMatchObject({
+      state: 'needs-user-action',
+      reason: 'acknowledgement-confirmation-required',
+      nextActions: [expect.objectContaining({
+        id: 'acknowledge-session',
+        safety: 'requires-confirmation',
+      })],
+    });
+    expect(readFileSync(manifestPath)).toEqual(beforeManifest);
+    expect(readFileSync(sessionPath)).toEqual(beforeSession);
+
+    const accepted = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'acknowledge',
+      '--session', fixture.sessionId,
+      '--acknowledgement', acknowledgementPath,
+      '--confirm',
+    ], fixture.workspace.root, async () => fixture.runtime);
+    expect(accepted.code).toBe(0);
+    const acceptedData = dataOf(accepted.response);
+    expect(acceptedData).toMatchObject({
+      state: 'needs-user-action',
+      reason: 'acknowledgement-current',
+      phase: 'validated',
+      validation: { valid: true },
+    });
+    const persistedManifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+      readonly acknowledgements?: readonly Record<string, unknown>[];
+    };
+    expect(persistedManifest.acknowledgements).toEqual([acknowledgement]);
+    const stored = createAssetAuthoringSessionStore(fixture.workspace).read(fixture.sessionId);
+    expect(stored.receipts.acknowledgements).toMatchObject({
+      id: expect.stringMatching(/^sha256:[0-9a-f]{64}$/u),
+      manifestDigest: sha256(readFileSync(manifestPath)),
+      sourceDigests: acceptedData.validation?.sourceDigests,
+      recordDigests: [expect.stringMatching(/^sha256:[0-9a-f]{64}$/u)],
+    });
+
+    const afterManifest = readFileSync(manifestPath);
+    const afterSession = readFileSync(sessionPath);
+    const repeated = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'acknowledge',
+      '--session', fixture.sessionId,
+      '--acknowledgement', acknowledgementPath,
+      '--confirm',
+    ], fixture.workspace.root, async () => fixture.runtime);
+    expect(repeated.code).toBe(0);
+    expect(readFileSync(manifestPath)).toEqual(afterManifest);
+    expect(readFileSync(sessionPath)).toEqual(afterSession);
+  }, 30000);
+
+  it('refuses malformed or out-of-scope acknowledgement records without changing bytes', async () => {
+    const fixture = await createImportedFixture();
+    const validation = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'validate', '--session', fixture.sessionId,
+    ], fixture.workspace.root, async () => fixture.runtime);
+    const template = dataOf(validation.response).validation?.acknowledgementRecords[0];
+    if (!template) throw new Error('Expected one acknowledgement template.');
+
+    const acknowledgementPath = path.join(fixture.workspace.root, 'acknowledgement.json');
+    const manifestPath = path.join(fixture.packRoot, 'asset-pack.json');
+    const sessionPath = assetAuthoringSessionPath(fixture.workspace, fixture.sessionId);
+    const beforeManifest = readFileSync(manifestPath);
+    const beforeSession = readFileSync(sessionPath);
+
+    writeJson(acknowledgementPath, { ...template, reason: '   ' });
+    const malformed = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'acknowledge',
+      '--session', fixture.sessionId,
+      '--acknowledgement', acknowledgementPath,
+      '--confirm',
+    ], fixture.workspace.root, async () => fixture.runtime);
+    expect(malformed.code).toBe(1);
+    expect(malformed.response.errors[0]?.code).toBe('asset_authoring_acknowledgement_invalid');
+    expect(readFileSync(manifestPath)).toEqual(beforeManifest);
+    expect(readFileSync(sessionPath)).toEqual(beforeSession);
+
+    writeJson(acknowledgementPath, {
+      ...template,
+      reason: 'Reviewed the current warning.',
+      ambientIdentity: 'must-not-be-inferred',
+    });
+    const unknownField = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'acknowledge',
+      '--session', fixture.sessionId,
+      '--acknowledgement', acknowledgementPath,
+      '--confirm',
+    ], fixture.workspace.root, async () => fixture.runtime);
+    expect(unknownField.code).toBe(1);
+    expect(unknownField.response.errors[0]?.code).toBe('asset_authoring_acknowledgement_invalid');
+    expect(readFileSync(manifestPath)).toEqual(beforeManifest);
+    expect(readFileSync(sessionPath)).toEqual(beforeSession);
+
+    writeJson(acknowledgementPath, {
+      ...template,
+      contentDigest: DIGEST_A,
+      reason: 'This digest is not for the current warning.',
+    });
+    const outOfScope = await runJson<AuthoringResponseData>([
+      'asset', 'authoring', 'acknowledge',
+      '--session', fixture.sessionId,
+      '--acknowledgement', acknowledgementPath,
+      '--confirm',
+    ], fixture.workspace.root, async () => fixture.runtime);
+    expect(outOfScope.code).toBe(1);
+    expect(outOfScope.response.errors[0]?.code).toBe(
+      'asset_authoring_acknowledgement_out_of_scope',
+    );
+    expect(readFileSync(manifestPath)).toEqual(beforeManifest);
+    expect(readFileSync(sessionPath)).toEqual(beforeSession);
+  }, 30000);
 
   it('records attributed preview paths and digests from the current validation receipt', async () => {
     const fixture = await createImportedFixture();

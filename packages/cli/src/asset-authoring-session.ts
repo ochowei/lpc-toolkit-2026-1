@@ -117,9 +117,17 @@ export interface AssetAuthoringPreviewReceipt {
   readonly inputDigest: string;
 }
 
+export interface AssetAuthoringAcknowledgementReceipt {
+  readonly id: string;
+  readonly manifestDigest: string;
+  readonly sourceDigests: readonly AssetAuthoringSourceDigest[];
+  readonly recordDigests: readonly string[];
+}
+
 export interface AssetAuthoringSessionReceipts {
   readonly validation: AssetAuthoringValidationReceipt | null;
   readonly preview: AssetAuthoringPreviewReceipt | null;
+  readonly acknowledgements: AssetAuthoringAcknowledgementReceipt | null;
 }
 
 export interface AssetAuthoringSessionCheckpoint {
@@ -237,6 +245,7 @@ export interface AssetAuthoringEvidence {
   readonly sourceDigests: readonly AssetAuthoringSourceDigest[];
   readonly validationReceipt: AssetAuthoringValidationReceipt | null;
   readonly previewReceipt: AssetAuthoringPreviewReceipt | null;
+  readonly acknowledgementsReceipt?: AssetAuthoringAcknowledgementReceipt | null;
   /** The newly requested preview input, separate from the last receipt. */
   readonly previewInputDigest?: string | null;
 }
@@ -245,6 +254,7 @@ export type AssetAuthoringInvalidationCheckpoint =
   | 'manifest'
   | 'contract'
   | 'source'
+  | 'acknowledgements'
   | 'validation'
   | 'preview';
 
@@ -252,6 +262,7 @@ export type AssetAuthoringInvalidationReason =
   | 'manifest-semantic-drift'
   | 'contract-replaced'
   | 'png-drift'
+  | 'acknowledgement-receipt-stale'
   | 'validation-receipt-stale'
   | 'preview-receipt-stale';
 
@@ -449,14 +460,17 @@ function parseTargetCheckpoints(value: unknown): readonly AssetAuthoringTargetCh
 
 function parseReceipts(value: unknown): AssetAuthoringSessionReceipts {
   const record = requireRecord(value, 'session.receipts');
-  assertExactKeys(record, ['validation', 'preview'], 'session.receipts');
+  assertExactKeys(record, ['validation', 'preview', 'acknowledgements'], 'session.receipts');
   const validation = record.validation === null
     ? null
     : parseValidationReceipt(record.validation);
   const preview = record.preview === null
     ? null
     : parsePreviewReceipt(record.preview);
-  return { validation, preview };
+  const acknowledgements = record.acknowledgements === undefined || record.acknowledgements === null
+    ? null
+    : parseAcknowledgementsReceipt(record.acknowledgements);
+  return { validation, preview, acknowledgements };
 }
 
 function parseValidationReceipt(value: unknown): AssetAuthoringValidationReceipt {
@@ -497,6 +511,49 @@ function parsePreviewReceipt(value: unknown): AssetAuthoringPreviewReceipt {
       'session.receipts.preview.sourceDigests',
     ),
     inputDigest: requireDigest(record.inputDigest, 'session.receipts.preview.inputDigest'),
+  };
+}
+
+function parseAcknowledgementsReceipt(value: unknown): AssetAuthoringAcknowledgementReceipt {
+  const record = requireRecord(value, 'session.receipts.acknowledgements');
+  assertExactKeys(
+    record,
+    ['id', 'manifestDigest', 'sourceDigests', 'recordDigests'],
+    'session.receipts.acknowledgements',
+  );
+  const recordDigests = record.recordDigests;
+  if (!Array.isArray(recordDigests)) {
+    fail(
+      'asset_authoring_session_invalid',
+      'session.receipts.acknowledgements.recordDigests must be an array.',
+    );
+  }
+  const parsedRecordDigests = recordDigests.map((digest, index) =>
+    requireDigest(digest, `session.receipts.acknowledgements.recordDigests[${index}]`));
+  if (parsedRecordDigests.length === 0) {
+    fail(
+      'asset_authoring_session_invalid',
+      'session.receipts.acknowledgements.recordDigests must not be empty.',
+    );
+  }
+  if (new Set(parsedRecordDigests).size !== parsedRecordDigests.length) {
+    fail(
+      'asset_authoring_session_tampered',
+      'session.receipts.acknowledgements.recordDigests contains duplicates.',
+    );
+  }
+  assertStableOrder(parsedRecordDigests, 'session.receipts.acknowledgements.recordDigests');
+  return {
+    id: requireDigest(record.id, 'session.receipts.acknowledgements.id'),
+    manifestDigest: requireDigest(
+      record.manifestDigest,
+      'session.receipts.acknowledgements.manifestDigest',
+    ),
+    sourceDigests: parseSourceDigests(
+      record.sourceDigests,
+      'session.receipts.acknowledgements.sourceDigests',
+    ),
+    recordDigests: parsedRecordDigests,
   };
 }
 
@@ -845,7 +902,7 @@ class AssetAuthoringSessionStoreImpl implements AssetAuthoringSessionStore {
       checkpoint: null,
       checkpointFreshness: 'missing',
       checkpoints: sessionTargetCheckpoints(planResult.plan),
-      receipts: { validation: null, preview: null },
+      receipts: { validation: null, preview: null, acknowledgements: null },
       provenance: [{
         id: this.eventId(),
         kind: 'session-created',
@@ -991,6 +1048,17 @@ export function deriveAuthoringInvalidationDecisions(
   }
   if (!sameSourceDigests(previous.sourceDigests, current.sourceDigests)) {
     decisions.push({ checkpoint: 'source', reason: 'png-drift' });
+  }
+  const acknowledgementsReceipt = current.acknowledgementsReceipt;
+  if (
+    acknowledgementsReceipt !== undefined
+    && acknowledgementsReceipt !== null
+    && (
+      acknowledgementsReceipt.manifestDigest !== current.manifestDigest
+      || !sameSourceDigests(acknowledgementsReceipt.sourceDigests, current.sourceDigests)
+    )
+  ) {
+    decisions.push({ checkpoint: 'acknowledgements', reason: 'acknowledgement-receipt-stale' });
   }
   if (
     current.validationReceipt !== null

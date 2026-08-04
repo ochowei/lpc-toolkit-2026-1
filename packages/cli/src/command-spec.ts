@@ -239,6 +239,20 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
     examples: ['lpc-toolkit asset authoring validate --session session-id --json'],
   },
   {
+    command: ['asset', 'authoring', 'acknowledge'],
+    usage: 'lpc-toolkit asset authoring acknowledge --session <session-id> --acknowledgement <record.json> [--confirm] [--workspace <directory>] [--json]',
+    description: 'Apply one exact human warning acknowledgement to the session pack.',
+    options: [
+      HELP_OPTION,
+      JSON_OPTION,
+      AUTHORING_SESSION_OPTION,
+      { name: 'acknowledgement', kind: 'value', valueLabel: 'record.json', description: 'Read exactly one Core-valid acknowledgement record.' },
+      { name: 'confirm', kind: 'boolean', description: 'Confirm the exact acknowledgement mutation.' },
+      ASSET_WORKSPACE_OPTION,
+    ],
+    examples: ['lpc-toolkit asset authoring acknowledge --session session-id --acknowledgement record.json --confirm --json'],
+  },
+  {
     command: ['asset', 'authoring', 'preview'],
     usage: 'lpc-toolkit asset authoring preview --session <session-id> [existing preview options] [--workspace <directory>] [--json]',
     description: 'Render an attributed session preview using the existing asset preview options.',

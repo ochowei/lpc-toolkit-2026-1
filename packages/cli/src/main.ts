@@ -205,6 +205,7 @@ function preflightCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
       && authoringCommand !== 'contract'
       && authoringCommand !== 'import'
       && authoringCommand !== 'validate'
+      && authoringCommand !== 'acknowledge'
       && authoringCommand !== 'preview'
       && authoringCommand !== 'reconcile-manifest'
     ) {
@@ -232,6 +233,10 @@ function preflightCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
       || authoringCommand === 'preview'
     ) {
       return requiredStringFlag('session');
+    }
+    if (authoringCommand === 'acknowledge') {
+      const sessionIssue = requiredStringFlag('session');
+      return sessionIssue ?? requiredStringFlag('acknowledgement');
     }
     if (authoringCommand === 'import') {
       for (const name of ['session', 'target', 'candidate', 'contract-digest']) {

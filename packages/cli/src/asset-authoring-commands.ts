@@ -7,7 +7,13 @@ import {
   writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
-import { parseAssetAuthoringPlan, type AssetAuthoringPlan } from '@lpc-toolkit/core';
+import {
+  normalizeAssetPack,
+  parseAssetAuthoringPlan,
+  parseAssetPackSource,
+  type AssetPackAcknowledgement,
+  type AssetAuthoringPlan,
+} from '@lpc-toolkit/core';
 import {
   flagBoolean,
   flagString,
@@ -31,12 +37,16 @@ import {
   validateAssetPackDirectory,
   type AssetPackValidationReport,
 } from './asset-pack-validation.js';
-import { loadAssetPackFiles } from './asset-pack-files.js';
+import {
+  atomicallyReplaceAssetPackSource,
+  loadAssetPackFiles,
+} from './asset-pack-files.js';
 import { PreviewError } from './preview.js';
 import {
   assetAuthoringSessionPath,
   createAssetAuthoringSessionStore,
   AssetAuthoringSessionError,
+  type AssetAuthoringAcknowledgementReceipt,
   type AssetAuthoringManifestConflict,
   type AssetAuthoringProvenanceEvent,
   type AssetAuthoringSession,
@@ -344,6 +354,17 @@ function nextActionsFor(session: AssetAuthoringSession): readonly AuthoringNextA
       'safe',
       session.checkpoints.flatMap((checkpoint) =>
         checkpoint.checkpoint ? [checkpoint.checkpoint.digest] : []),
+    )];
+  }
+
+  if (session.reason === 'acknowledgement-confirmation-required') {
+    return [nextAction(
+      'acknowledge-session',
+      'Confirm the exact supplied acknowledgement before publishing it to the session pack.',
+      `asset authoring acknowledge --session ${session.sessionId} --acknowledgement <record.json> --confirm`,
+      'requires-confirmation',
+      session.manifestDigest === null ? [] : [session.manifestDigest],
+      ['acknowledgement', 'confirm'],
     )];
   }
 
@@ -760,6 +781,177 @@ async function freshSessionValidation(options: {
   });
 }
 
+type JsonRecord = Readonly<Record<string, unknown>>;
+
+function isRecord(value: unknown): value is JsonRecord {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function canonicalizeJson(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map((entry) => canonicalizeJson(entry));
+  if (!isRecord(value)) return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entry]) => [key, canonicalizeJson(entry)] as const),
+  );
+}
+
+function canonicalJson(value: unknown): string {
+  return JSON.stringify(canonicalizeJson(value));
+}
+
+function acknowledgementIdentity(record: AssetPackAcknowledgement): string {
+  return [
+    record.code,
+    canonicalJson(record.subject),
+    record.contentDigest,
+  ].join('\u0000');
+}
+
+function acknowledgementRecordDigest(record: AssetPackAcknowledgement): string {
+  return sha256(Buffer.from(canonicalJson(record), 'utf8'));
+}
+
+function sortAcknowledgements(
+  records: readonly AssetPackAcknowledgement[],
+): readonly AssetPackAcknowledgement[] {
+  return [...records].sort((left, right) =>
+    acknowledgementIdentity(left).localeCompare(acknowledgementIdentity(right)));
+}
+
+function sameAcknowledgement(
+  left: AssetPackAcknowledgement,
+  right: AssetPackAcknowledgement,
+): boolean {
+  return canonicalJson(left) === canonicalJson(right);
+}
+
+function parseManifestRecord(
+  bytes: Buffer,
+  manifestPath: string,
+): JsonRecord {
+  let value: unknown;
+  try {
+    value = JSON.parse(bytes.toString('utf8')) as unknown;
+  } catch {
+    throw new AuthoringCommandError(
+      'The session manifest is not valid JSON.',
+      { code: 'asset_authoring_manifest_invalid', path: manifestPath },
+    );
+  }
+  if (!isRecord(value)) {
+    throw new AuthoringCommandError(
+      'The session manifest must be a JSON object.',
+      { code: 'asset_authoring_manifest_invalid', path: manifestPath },
+    );
+  }
+  return value;
+}
+
+function readAcknowledgementInput(
+  context: AuthoringCommandContext,
+  session: AssetAuthoringSession,
+  manifestBytes: Buffer,
+  acknowledgementArgument: string,
+): AssetPackAcknowledgement {
+  const acknowledgementPath = absolutePath(context.cwd, acknowledgementArgument);
+  if (!isInsideRoot(context.workspace.root, acknowledgementPath)) {
+    throw new AuthoringCommandError(
+      'The acknowledgement file must be inside the asset workspace.',
+      { code: 'asset_authoring_path_invalid', path: acknowledgementPath },
+    );
+  }
+  const bytes = readRegularFile(acknowledgementPath);
+  if (bytes === undefined) {
+    throw new AuthoringCommandError(
+      'The acknowledgement file must be a regular file.',
+      { code: 'asset_authoring_acknowledgement_invalid', path: acknowledgementPath },
+    );
+  }
+  let input: unknown;
+  try {
+    input = JSON.parse(bytes.toString('utf8')) as unknown;
+  } catch {
+    throw new AuthoringCommandError(
+      'The acknowledgement file is not valid JSON.',
+      { code: 'asset_authoring_acknowledgement_invalid', path: acknowledgementPath },
+    );
+  }
+  if (!isRecord(input)) {
+    throw new AuthoringCommandError(
+      'The acknowledgement file must contain exactly one JSON record.',
+      { code: 'asset_authoring_acknowledgement_invalid', path: acknowledgementPath },
+    );
+  }
+
+  const manifest = parseManifestRecord(manifestBytes, manifestPathFor(session));
+  const parsed = parseAssetPackSource({
+    ...manifest,
+    acknowledgements: [input],
+  });
+  if (!parsed.ok) {
+    const diagnostic = parsed.diagnostics[0];
+    const diagnosticPath = diagnostic?.details?.path;
+    throw new AuthoringCommandError(
+      diagnostic?.message ?? 'The acknowledgement record is not Core-valid.',
+      {
+        code: 'asset_authoring_acknowledgement_invalid',
+        ...(typeof diagnosticPath === 'string' ? { path: diagnosticPath } : {}),
+      },
+    );
+  }
+  const normalized = normalizeAssetPack(parsed.source).acknowledgements;
+  const record = normalized[0];
+  if (normalized.length !== 1 || record === undefined) {
+    throw new AuthoringCommandError(
+      'The acknowledgement file must contain exactly one record.',
+      { code: 'asset_authoring_acknowledgement_invalid', path: acknowledgementPath },
+    );
+  }
+  return record;
+}
+
+function acknowledgementReceiptFor(
+  report: AssetPackValidationReport,
+  records: readonly AssetPackAcknowledgement[],
+): AssetAuthoringAcknowledgementReceipt {
+  if (report.contentDigest === undefined || report.manifestDigest === undefined
+    || report.sourceDigests === undefined) {
+    throw new AuthoringCommandError(
+      'Acknowledgement evidence is incomplete because the current pack snapshot is not digest-bound.',
+      { code: 'asset_authoring_evidence_incomplete' },
+    );
+  }
+  return {
+    id: report.contentDigest,
+    manifestDigest: report.manifestDigest,
+    sourceDigests: report.sourceDigests.map((entry) => ({
+      path: entry.path,
+      digest: entry.digest,
+    })),
+    recordDigests: [...records]
+      .map((record) => acknowledgementRecordDigest(record))
+      .sort((left, right) => left.localeCompare(right)),
+  };
+}
+
+function sameAcknowledgementReceipt(
+  left: AssetAuthoringAcknowledgementReceipt | null,
+  right: AssetAuthoringAcknowledgementReceipt,
+): boolean {
+  return left !== null
+    && left.id === right.id
+    && left.manifestDigest === right.manifestDigest
+    && left.recordDigests.length === right.recordDigests.length
+    && left.recordDigests.every((digest, index) => digest === right.recordDigests[index])
+    && left.sourceDigests.length === right.sourceDigests.length
+    && left.sourceDigests.every((entry, index) => {
+      const other = right.sourceDigests[index];
+      return other !== undefined && entry.path === other.path && entry.digest === other.digest;
+    });
+}
+
 function validationSessionUpdate(
   session: AssetAuthoringSession,
   report: AssetPackValidationReport,
@@ -794,6 +986,7 @@ function validationSessionUpdate(
   const receipts: AssetAuthoringSessionReceipts = {
     validation: receipt,
     preview: null,
+    acknowledgements: null,
   };
   return {
     state: 'needs-user-action',
@@ -841,6 +1034,241 @@ async function validateCommand(
     'asset authoring validate',
     responseFor(next, { validation: report }),
   );
+}
+
+async function acknowledgeCommand(
+  context: AuthoringCommandContext,
+  sessionId: string,
+): Promise<CliResponse<AuthoringResponseData>> {
+  if (context.runtime === undefined) {
+    throw new AuthoringCommandError(
+      'The asset authoring acknowledge command requires prepared runtime assets.',
+      { code: 'asset_authoring_runtime_missing' },
+    );
+  }
+  const acknowledgementArgument = flagString(context.parsed.flags, 'acknowledgement');
+  if (acknowledgementArgument === undefined) {
+    throw new AuthoringCommandError(
+      'Acknowledgement requires --acknowledgement.',
+      { code: 'missing_argument', path: '--acknowledgement' },
+    );
+  }
+
+  const store = createAssetAuthoringSessionStore(context.workspace);
+  const session = resumeSession(context.workspace, store.read(sessionId));
+  if (session.conflict !== null) {
+    throw new AuthoringCommandError(
+      'The authoring session has an unresolved manifest conflict; reconcile it before acknowledging a warning.',
+      { code: 'asset_authoring_manifest_conflict' },
+    );
+  }
+
+  const loaded = await loadAssetPackFiles(session.packRoot);
+  if (!loaded.ok) {
+    const diagnostic = loaded.diagnostics[0];
+    throw new AuthoringCommandError(
+      diagnostic?.message ?? 'The session asset pack could not be loaded.',
+      { code: diagnostic?.code ?? 'asset_authoring_pack_invalid', path: session.packRoot },
+    );
+  }
+  const manifestPath = manifestPathFor(session);
+  const currentManifestDigest = sha256(loaded.manifestBytes);
+  if (session.manifestDigest === null || session.manifestDigest !== currentManifestDigest) {
+    throw new AuthoringCommandError(
+      'The session manifest changed before acknowledgement evidence was collected.',
+      { code: 'asset_authoring_digest_mismatch', path: manifestPath },
+    );
+  }
+
+  const report = await freshSessionValidation({
+    session,
+    workspace: context.workspace,
+    runtime: context.runtime,
+  });
+  if (report.manifestDigest !== currentManifestDigest || report.sourceDigests === undefined) {
+    throw new AuthoringCommandError(
+      'Fresh validation did not capture the current manifest and complete source digest set.',
+      { code: 'asset_authoring_evidence_incomplete', path: manifestPath },
+    );
+  }
+  const supplied = readAcknowledgementInput(
+    context,
+    session,
+    loaded.manifestBytes,
+    acknowledgementArgument,
+  );
+  const template = report.acknowledgementRecords.find((record) =>
+    acknowledgementIdentity(record) === acknowledgementIdentity(supplied));
+  if (template === undefined) {
+    throw new AuthoringCommandError(
+      'The supplied acknowledgement does not match one current warning template.',
+      { code: 'asset_authoring_acknowledgement_out_of_scope' },
+    );
+  }
+  if (report.diagnostics.some((diagnostic) => diagnostic.severity === 'error')) {
+    throw new AuthoringCommandError(
+      'Technical validation errors must be resolved before warning acknowledgement is published.',
+      { code: 'asset_authoring_validation_failed' },
+    );
+  }
+
+  const existing = loaded.pack.acknowledgements.find((record) =>
+    acknowledgementIdentity(record) === acknowledgementIdentity(supplied));
+  if (existing !== undefined && !sameAcknowledgement(existing, supplied)) {
+    throw new AuthoringCommandError(
+      'A current acknowledgement with the same warning identity already has a different reason.',
+      { code: 'asset_authoring_acknowledgement_conflict' },
+    );
+  }
+
+  if (!flagBoolean(context.parsed.flags, 'confirm')) {
+    const pendingSession: AssetAuthoringSession = {
+      ...session,
+      state: 'needs-user-action',
+      reason: 'acknowledgement-confirmation-required',
+      phase: 'validated',
+    };
+    return commandOk(
+      'asset authoring acknowledge',
+      responseFor(pendingSession, { validation: report }),
+    );
+  }
+
+  const previousSnapshotBytes = readRegularFile(sessionSnapshotPath(context.workspace, session));
+  let snapshotChanged = false;
+  let published = false;
+  let publishedManifestDigest: string | undefined;
+  try {
+    if (existing === undefined) {
+      const manifest = parseManifestRecord(loaded.manifestBytes, manifestPath);
+      const acknowledgements = sortAcknowledgements([
+        ...loaded.pack.acknowledgements,
+        supplied,
+      ]);
+      const nextManifestBytes = Buffer.from(
+        `${JSON.stringify({ ...manifest, acknowledgements }, null, 2)}\n`,
+        'utf8',
+      );
+      const latestManifestBytes = readRegularFile(manifestPath);
+      if (latestManifestBytes === undefined || sha256(latestManifestBytes) !== currentManifestDigest) {
+        throw new AuthoringCommandError(
+          'The manifest changed while preparing the acknowledgement publication.',
+          { code: 'asset_authoring_digest_mismatch', path: manifestPath },
+        );
+      }
+      const replacement = atomicallyReplaceAssetPackSource({
+        root: session.packRoot,
+        sourcePath: MANIFEST_FILE,
+        bytes: nextManifestBytes,
+        maximumBytes: 16 * 1024 * 1024,
+        expectedTargetDigest: currentManifestDigest as `sha256:${string}`,
+      });
+      published = true;
+      publishedManifestDigest = replacement.digest;
+    }
+
+    const finalLoaded = await loadAssetPackFiles(session.packRoot);
+    if (!finalLoaded.ok) {
+      const diagnostic = finalLoaded.diagnostics[0];
+      throw new AuthoringCommandError(
+        diagnostic?.message ?? 'The published acknowledgement manifest could not be reloaded.',
+        { code: diagnostic?.code ?? 'asset_authoring_pack_invalid', path: manifestPath },
+      );
+    }
+    const finalReport = await freshSessionValidation({
+      session,
+      workspace: context.workspace,
+      runtime: context.runtime,
+    });
+    const finalManifestDigest = sha256(finalLoaded.manifestBytes);
+    if (
+      !finalReport.valid
+      || finalReport.manifestDigest !== finalManifestDigest
+      || finalReport.sourceDigests === undefined
+    ) {
+      throw new AuthoringCommandError(
+        'The acknowledged manifest did not pass fresh validation.',
+        { code: 'asset_authoring_validation_failed', path: manifestPath },
+      );
+    }
+    const finalRecord = finalLoaded.pack.acknowledgements.find((record) =>
+      acknowledgementIdentity(record) === acknowledgementIdentity(supplied));
+    if (finalRecord === undefined) {
+      throw new AuthoringCommandError(
+        'The exact acknowledgement was not present in the published manifest.',
+        { code: 'asset_authoring_acknowledgement_publish_failed', path: manifestPath },
+      );
+    }
+    const acknowledgementReceipt = acknowledgementReceiptFor(
+      finalReport,
+      finalLoaded.pack.acknowledgements,
+    );
+    if (existing !== undefined
+      && sameAcknowledgementReceipt(session.receipts.acknowledgements, acknowledgementReceipt)) {
+      return commandOk(
+        'asset authoring acknowledge',
+        responseFor(session, { validation: finalReport }),
+      );
+    }
+
+    writeSessionManifestSnapshot(context.workspace, session, finalLoaded.manifestBytes);
+    snapshotChanged = true;
+    const validationReceipt = {
+      id: finalReport.contentDigest ?? finalManifestDigest,
+      manifestDigest: finalManifestDigest,
+      sourceDigests: finalReport.sourceDigests,
+    };
+    const next = store.replace(sessionId, {
+      state: 'needs-user-action',
+      reason: 'acknowledgement-current',
+      phase: 'validated',
+      checkpoint: {
+        id: 'acknowledgements',
+        phase: 'validated',
+        digest: acknowledgementReceipt.id,
+        freshness: 'current',
+      },
+      checkpointFreshness: 'current',
+      receipts: {
+        validation: validationReceipt,
+        preview: published ? null : session.receipts.preview,
+        acknowledgements: acknowledgementReceipt,
+      },
+      manifestDigest: finalManifestDigest,
+      provenance: appendProvenance(session, {
+        kind: 'human-declaration',
+        occurredAt: new Date().toISOString(),
+        digest: acknowledgementReceipt.id,
+        summary: 'Exact human warning acknowledgement persisted for the current manifest and source set.',
+      }),
+    });
+    return commandOk(
+      'asset authoring acknowledge',
+      responseFor(next, { validation: finalReport }),
+    );
+  } catch (error) {
+    if (published && publishedManifestDigest !== undefined) {
+      const currentManifestBytes = readRegularFile(manifestPath);
+      if (currentManifestBytes !== undefined && sha256(currentManifestBytes) === publishedManifestDigest) {
+        atomicallyReplaceAssetPackSource({
+          root: session.packRoot,
+          sourcePath: MANIFEST_FILE,
+          bytes: loaded.manifestBytes,
+          maximumBytes: 16 * 1024 * 1024,
+          expectedTargetDigest: publishedManifestDigest as `sha256:${string}`,
+        });
+      }
+    }
+    if (snapshotChanged) {
+      const snapshotPath = sessionSnapshotPath(context.workspace, session);
+      if (previousSnapshotBytes === undefined) {
+        rmSync(snapshotPath, { force: true });
+      } else {
+        atomicWrite(snapshotPath, previousSnapshotBytes);
+      }
+    }
+    throw error;
+  }
 }
 
 function previewInput(context: AuthoringCommandContext): AuthoringPreviewInput {
@@ -934,6 +1362,7 @@ async function previewCommand(
     receipts: {
       validation: validated.receipts.validation,
       preview: previewReceipt,
+      acknowledgements: null,
     },
     provenance: appendProvenance(validated, {
       kind: 'provider',
@@ -979,6 +1408,7 @@ function refreshContractSession(
     receipts: {
       validation: null,
       preview: null,
+      acknowledgements: null,
     },
     provenance: appendProvenance(session, {
       kind: 'checkpoint-invalidated',
@@ -1099,6 +1529,7 @@ async function importCommand(
     receipts: {
       validation: null,
       preview: null,
+      acknowledgements: null,
     },
     checkpoints,
     provenance: appendProvenance(session, {
@@ -1233,6 +1664,7 @@ export async function runAssetAuthoringCommand(
     if (authoringCommand === 'contract') return await contractCommand(context, sessionId);
     if (authoringCommand === 'import') return await importCommand(context, sessionId);
     if (authoringCommand === 'validate') return await validateCommand(context, sessionId);
+    if (authoringCommand === 'acknowledge') return await acknowledgeCommand(context, sessionId);
     if (authoringCommand === 'preview') return await previewCommand(context, sessionId);
     if (authoringCommand === 'status') return statusSession(context.workspace, sessionId);
     if (authoringCommand === 'resume') return resumeCommand(context.workspace, sessionId);
