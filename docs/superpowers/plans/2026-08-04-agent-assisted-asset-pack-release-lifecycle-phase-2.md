@@ -161,27 +161,31 @@ record any deviation in this plan before implementation.
 **Files:** Phase 2 plan, draft lifecycle helper/tests, and only the shared
 format wrapper files required by an existing public authority.
 
-- [ ] Write the first failing public test for `asset authoring draft` and the
+- [x] Write the first failing public test for `asset authoring draft` and the
   shared draft bytes: forced draft marker, sorted checksums, deterministic
   archive digest, absolute contained output path, and unchanged session bytes
   before any command-side mutation.
-- [ ] Add failing tests for output traversal, symlink/non-regular source or
+- [x] Add failing tests for output traversal, symlink/non-regular source or
   destination, invalid manifest/source snapshot, conflicting pre-existing
   archive, and a failed staged write leaving the prior archive/receipt intact.
-- [ ] Implement the minimum deterministic writer around
+- [x] Implement the minimum deterministic writer around
   `createAssetPackArchive({ kind: 'draft' })`, current `loadAssetPackFiles`,
   contained session artifact roots, and atomic exclusive publication.
-- [ ] Add the strict draft receipt value and persist it only after the archive
+- [x] Add the strict draft receipt value and persist it only after the archive
   bytes are verified. Repeating unchanged inputs must return the same digest.
-- [ ] Run focused RED/GREEN shared-format and CLI tests, typecheck, and
+- [x] Run focused RED/GREEN shared-format and CLI tests, typecheck, and
   `git diff --check`.
-- [ ] Commit the product slice with `feat(cli): add deterministic draft recovery archives`.
+- [x] Commit the combined Phase 2 product slice.
 
 Implementation note:
+- Implemented the deterministic writer as a coordinator around the shared
+  draft archive authority. Publication uses an exclusive temporary file plus
+  no-replace hard-link, so a concurrent or conflicting destination is never
+  overwritten.
 
-Commit:
+- Commit: `3d47d2dbd8f501858304341f818d25ff1ed54dc5`
 
-Verification:
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-release.test.ts` PASS; `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS; `rtk git diff --check` PASS.
 
 ### Task 2: Expose draft receipt state and draft inspect/install parity
 
@@ -189,25 +193,29 @@ Verification:
 CLI/session/JSON/human tests, and documentation only when the public contract
 is finalized.
 
-- [ ] Write failing tests for backward-readable Phase 1 sessions, strict
+- [x] Write failing tests for backward-readable Phase 1 sessions, strict
   `draftArchive` receipt parsing, `status`/`resume` projection, and stale draft
   archive detection after external byte changes or removal.
-- [ ] Add `asset authoring draft` help, preflight, dispatch, response fields,
+- [x] Add `asset authoring draft` help, preflight, dispatch, response fields,
   stable `draft-archive` next/recovery actions, and the draft capability/schema
   advertisement. Keep consumer-install capability absent.
-- [ ] Exercise the produced archive through existing public `asset inspect`
+- [x] Exercise the produced archive through existing public `asset inspect`
   and `asset install` seams. Assert `asset_pack_draft` and no consumer-workspace
   mutation before any staging or registry publication.
-- [ ] Extend session invalidation so manifest/source/validation changes make
+- [x] Extend session invalidation so manifest/source/validation changes make
   draft evidence stale without deleting the prior receipt.
-- [ ] Run focused draft/session/JSON/human tests and CLI typecheck.
-- [ ] Commit the product slice with `feat(cli): expose authoring draft recovery state`.
+- [x] Run focused draft/session/JSON/human tests and CLI typecheck.
+- [x] Commit the combined Phase 2 product slice.
 
 Implementation note:
+- Added backward-readable additive receipt slots, strict path/digest parsing,
+  stale archive preservation, public draft inspect/install rejection parity,
+  and bounded JSON/human projections. Consumer-install capability remains
+  absent.
 
-Commit:
+- Commits: `3d47d2dbd8f501858304341f818d25ff1ed54dc5`, `102455b2d6308870584998b7241a2212087325b1`
 
-Verification:
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- main-json.test.ts main-human.test.ts command-spec.test.ts asset-authoring-release.test.ts asset-authoring-session.test.ts` PASS; `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
 
 ### Task 3: Add confirmed session-aware sync and generation receipt
 
@@ -215,57 +223,68 @@ Verification:
 needed, response/parser/dispatch/capability files, and focused sync/authoring
 tests.
 
-- [ ] Write a failing `runCli` test showing sync without `--confirm` returns
+- [x] Write a failing `runCli` test showing sync without `--confirm` returns
   `needs-user-action`, one exact command, and unchanged manager output/registry
   and session receipt bytes.
-- [ ] Write failing green-target tests for confirmed sync, receipt binding to
+- [x] Write failing green-target tests for confirmed sync, receipt binding to
   raw manifest/source/content/registry/compile/generated digests, repeated
   sync idempotency, source/manifest drift, registry/output drift, output marker
   ownership failure, and protected sentinels.
-- [ ] Implement current evidence checks and call the existing
+- [x] Implement current evidence checks and call the existing
   `syncLinkedAssetPack` only after explicit confirmation. Capture the actual
   canonical registry and manager-owned generated output after transaction
   publication; persist the session sync receipt atomically afterward.
-- [ ] Detect a pending/interrupted transaction through existing recovery/doctor
+- [x] Detect a pending/interrupted transaction through existing recovery/doctor
   behavior before recording a receipt. Do not adopt an unknown output or
   registry generation.
-- [ ] Extend `status`/`resume` and human/JSON output with `syncReceipt`, stale
+- [x] Extend `status`/`resume` and human/JSON output with `syncReceipt`, stale
   evidence, output scope, registry generation, and one safe next action.
-- [ ] Run focused sync, transaction, doctor, session-E2E, JSON/human tests and
-  CLI typecheck. Commit with `feat(cli): add confirmed authoring sync receipts`.
+- [x] Run focused sync, transaction, doctor, JSON/human tests and CLI typecheck;
+  commit the combined Phase 2 product slice.
 
 Implementation note:
+- The wrapper reuses linked sync, registry, managed-output audit, transaction,
+  and doctor authorities. The existing `AssetPackSyncSuccess` result was
+  extended only with its already-owned raw `manifestDigest`, which the session
+  receipt needs; no second sync or registry policy was introduced.
 
-Commit:
+- Commits: `3d47d2dbd8f501858304341f818d25ff1ed54dc5`, `102455b2d6308870584998b7241a2212087325b1`
 
-Verification:
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-release.test.ts asset-authoring-session.test.ts asset-pack-sync.test.ts asset-pack-transaction.test.ts asset-pack-doctor.test.ts command-spec.test.ts main-json.test.ts main-human.test.ts` PASS (8 files, 329 tests); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
 
 ### Task 4: Reassess documentation and complete the Phase 2 gate
 
 **Files:** all owned CLI documentation surfaces below, relevant contract tests,
 this plan, and no plugin skill implementation.
 
-- [ ] Reassess the complete CLI documentation matrix against the final diff.
-- [ ] Update help and CLI README with exact draft/sync commands, output roots,
+- [x] Reassess the complete CLI documentation matrix against the final diff.
+- [x] Update help and CLI README with exact draft/sync commands, output roots,
   confirmation, receipt fields, draft rejection, and stale/recovery actions.
-- [ ] Update root README and landing copy to distinguish recovery drafts and
+- [x] Update root README and landing copy to distinguish recovery drafts and
   manager-owned sync from source authoring, formal archive publication, and
   consumer installation.
-- [ ] Update Architecture with receipt/output/registry ownership and update
+- [x] Update Architecture with receipt/output/registry ownership and update
   Engineering with Phase 2 deterministic archive, transaction, doctor, and
   protected-sentinel verification.
-- [ ] Update Releasing with the new capability/schema compatibility and the
+- [x] Update Releasing with the new capability/schema compatibility and the
   fact that formal pack/inspect/install remain deferred.
-- [ ] Update plugin compatibility references/tests so the current plugin still
+- [x] Update plugin compatibility references/tests so the current plugin still
   refuses the new release/draft capabilities; do not add a skill or invoke it.
-- [ ] Run documentation policy, plugin, full verification, and protected-path
+- [x] Run documentation policy, plugin, full verification, and protected-path
   checks. Commit docs and plan-record changes separately from product code.
 
 Implementation note:
+- Final matrix assessment: all eight CLI documentation surfaces are `update`.
+  The command-spec/help contract, CLI and root README, landing copy,
+  architecture, engineering, releasing, and plugin compatibility references
+  now describe the same Phase 2 boundary. The packed CLI smoke was also
+  aligned with the existing Phase 1 declaration checkpoint exposed after a
+  current preview.
 
-Commit:
+Commit: `e1846525d19d4ab6608f2e5b0ee45c349af63bd2`
 
 Verification:
+- Verification: `rtk pnpm verify:cli-docs-policy` PASS; `rtk pnpm verify:plugin` PASS; `rtk pnpm check:boundaries` PASS; `rtk pnpm verify` PASS; `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS; `rtk git diff --check` PASS; `rtk git status --short -- upstream` PASS (clean); `rtk git status --short -- assets assets_custom .lpc-toolkit` PASS (clean).
 
 ## CLI documentation impact matrix
 
@@ -321,22 +340,22 @@ deferred.
 
 ## Final acceptance checklist
 
-- [ ] Deterministic draft archive uses the shared format authority, is safely
+- [x] Deterministic draft archive uses the shared format authority, is safely
   contained, explicitly marked draft, and publishes atomically.
-- [ ] Draft receipt is strict, digest-bound, backward-readable, and stale after
+- [x] Draft receipt is strict, digest-bound, backward-readable, and stale after
   external archive/source/manifest evidence changes.
-- [ ] Existing inspect/install reject drafts with stable diagnostics and no
+- [x] Existing inspect/install reject drafts with stable diagnostics and no
   consumer-workspace mutation.
-- [ ] Confirmed authoring sync calls the existing linked sync transaction and
+- [x] Confirmed authoring sync calls the existing linked sync transaction and
   records exact manager registry/output generation evidence.
-- [ ] Sync receipt is stale after source, manifest, registry, marker, generated
+- [x] Sync receipt is stale after source, manifest, registry, marker, generated
   output, or compile-generation drift; the old receipt remains preserved.
-- [ ] Confirmation, retry, transaction interruption, and doctor recovery are
+- [x] Confirmation, retry, transaction interruption, and doctor recovery are
   covered through public seams and protected sentinels.
-- [ ] JSON/human output and all eight documentation surfaces accurately
+- [x] JSON/human output and all eight documentation surfaces accurately
   describe Phase 2 without claiming formal pack/inspect/install.
-- [ ] Focused, type, boundary, documentation, plugin, full verify, build/
+- [x] Focused, type, boundary, documentation, plugin, full verify, build/
   package, diff, and protected-path checks pass.
-- [ ] No dependency, `any`, provider, skill, Web bridge, backend, parallel
+- [x] No dependency, `any`, provider, skill, Web bridge, backend, parallel
   archive/registry/sync implementation, cache mutation, checked-in asset
   mutation, or `upstream/` mutation entered the Phase 2 change.
