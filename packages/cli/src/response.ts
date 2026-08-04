@@ -1,4 +1,11 @@
 import path from 'node:path';
+import {
+  assetAuthoringReleaseGateProjection,
+  assetAuthoringReleaseReceiptProjection,
+  type AssetAuthoringPreviewAcceptanceReceipt,
+  type AssetAuthoringReleaseDeclarationReceipt,
+  type AssetAuthoringReleaseGateProjection,
+} from '@lpc-toolkit/core';
 import { CLI_VERSION } from './package-info.js';
 import {
   AUTHORING_CAPABILITIES,
@@ -103,18 +110,48 @@ export interface AuthoringResponseProjectionInput {
   readonly sourceDigests: readonly string[];
   readonly validation?: AssetPackValidationReport;
   readonly preview?: AuthoringPreviewData;
+  readonly releaseGates?: AssetAuthoringReleaseGateProjection;
+  readonly releaseDeclaration?: AssetAuthoringReleaseDeclarationReceipt | null;
+  readonly previewAcceptance?: AssetAuthoringPreviewAcceptanceReceipt | null;
 }
 
-export interface AuthoringResponseData extends AuthoringResponseProjectionInput {
+export interface AuthoringResponseData extends Omit<
+  AuthoringResponseProjectionInput,
+  'releaseGates' | 'releaseDeclaration' | 'previewAcceptance'
+> {
   readonly schema: 'lpc-toolkit.asset-authoring-response.v1';
   readonly cliVersion: string;
   readonly capabilities: readonly string[];
   readonly schemaVersions: readonly string[];
+  readonly releaseGates: AssetAuthoringReleaseGateProjection;
+  readonly releaseDeclaration: AssetAuthoringReleaseDeclarationReceipt | null;
+  readonly previewAcceptance: AssetAuthoringPreviewAcceptanceReceipt | null;
 }
 
 export function authoringResponseProjection(
   input: AuthoringResponseProjectionInput,
 ): AuthoringResponseData {
+  const releaseGates = input.releaseGates ?? assetAuthoringReleaseGateProjection({
+    acknowledgements: 'missing',
+    validation: 'missing',
+    releaseDeclaration: 'missing',
+    preview: 'missing',
+    previewArtifacts: 'missing',
+  });
+  const releaseDeclaration = input.releaseDeclaration === undefined
+    || input.releaseDeclaration === null
+    ? null
+    : assetAuthoringReleaseReceiptProjection(input.releaseDeclaration);
+  const previewAcceptance = input.previewAcceptance === undefined
+    || input.previewAcceptance === null
+    ? null
+    : assetAuthoringReleaseReceiptProjection(input.previewAcceptance);
+  if (releaseDeclaration !== null && releaseDeclaration.kind !== 'declaration') {
+    throw new Error('Release declaration response receipt has the wrong kind.');
+  }
+  if (previewAcceptance !== null && previewAcceptance.kind !== 'preview-acceptance') {
+    throw new Error('Preview acceptance response receipt has the wrong kind.');
+  }
   return {
     schema: 'lpc-toolkit.asset-authoring-response.v1',
     ...input,
@@ -142,6 +179,12 @@ export function authoringResponseProjection(
         sourceDigests: [...input.preview.sourceDigests],
       },
     }),
+    releaseGates: {
+      releaseReady: releaseGates.releaseReady,
+      gates: releaseGates.gates.map((gate) => ({ ...gate })),
+    },
+    releaseDeclaration,
+    previewAcceptance,
     cliVersion: CLI_VERSION,
     capabilities: [...AUTHORING_CAPABILITIES],
     schemaVersions: [...AUTHORING_SCHEMA_VERSIONS],
@@ -357,6 +400,31 @@ function formatAuthoringResponse(
     `Reason: ${reason}`,
     `Checkpoint: ${checkpointFreshness}`,
   ];
+  const releaseGates = data['releaseGates'];
+  if (isRecord(releaseGates)) {
+    const releaseReady = releaseGates['releaseReady'];
+    if (typeof releaseReady === 'boolean') {
+      lines.push(`Release readiness: ${releaseReady ? 'ready' : 'not ready'}`);
+    }
+    const gates = recordArrayValue(releaseGates, 'gates') ?? [];
+    for (const gate of gates) {
+      const gateId = stringValue(gate, 'id');
+      const freshness = stringValue(gate, 'freshness');
+      if (gateId && freshness) lines.push(`Release gate ${gateId}: ${freshness}`);
+    }
+  }
+  const releaseDeclaration = data['releaseDeclaration'];
+  if (isRecord(releaseDeclaration)) {
+    const declarant = isRecord(releaseDeclaration['declarant'])
+      ? stringValue(releaseDeclaration['declarant'], 'displayName')
+      : undefined;
+    const declarationDigest = stringValue(releaseDeclaration, 'declarationDigest');
+    if (declarant) {
+      lines.push(
+        `Human release declaration: ${declarant}${declarationDigest ? ` (${declarationDigest})` : ''}`,
+      );
+    }
+  }
   const validation = data['validation'];
   if (isRecord(validation) && typeof validation['valid'] === 'boolean') {
     const diagnostics = recordArrayValue(validation, 'diagnostics') ?? [];

@@ -174,6 +174,27 @@ describe('asset release declaration schema', () => {
     expect(assetReleaseDeclarationDigestInput(first.declaration))
       .toBe(assetReleaseDeclarationDigestInput(second.declaration));
   });
+
+  it('allows confirmed empty warning evidence when the current pack has no warnings', () => {
+    const result = parseAssetReleaseDeclaration({
+      ...DECLARATION,
+      acknowledgements: {
+        ...DECLARATION.acknowledgements,
+        recordDigests: [],
+      },
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      declaration: {
+        ...DECLARATION,
+        acknowledgements: {
+          ...DECLARATION.acknowledgements,
+          recordDigests: [],
+        },
+      },
+    });
+  });
 });
 
 describe('asset authoring release receipts', () => {
@@ -274,6 +295,27 @@ describe('asset authoring release receipts', () => {
       .toEqual(assetAuthoringReleaseReceiptProjection(second.receipt));
     expect(assetAuthoringReleaseReceiptDigestInput(first.receipt))
       .toBe(assetAuthoringReleaseReceiptDigestInput(second.receipt));
+  });
+
+  it('allows declaration receipts with no warning records', () => {
+    const result = parseAssetAuthoringReleaseReceipt({
+      ...DECLARATION_RECEIPT,
+      acknowledgements: {
+        ...DECLARATION_RECEIPT.acknowledgements,
+        recordDigests: [],
+      },
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      receipt: expect.objectContaining({
+        kind: 'declaration',
+        acknowledgements: {
+          contentDigest: DIGEST_C,
+          recordDigests: [],
+        },
+      }),
+    });
   });
 });
 

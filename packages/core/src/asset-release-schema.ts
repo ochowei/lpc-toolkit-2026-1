@@ -252,8 +252,8 @@ function parseAcknowledgements(
   }
   const contentDigest = requiredDigest(record, 'contentDigest', `${path}.contentDigest`, diagnostics);
   const rawRecordDigests = record.recordDigests;
-  if (!Array.isArray(rawRecordDigests) || rawRecordDigests.length === 0) {
-    diagnostics.push(diagnostic(`${path}.recordDigests`, `${path}.recordDigests must be a non-empty array.`));
+  if (!Array.isArray(rawRecordDigests)) {
+    diagnostics.push(diagnostic(`${path}.recordDigests`, `${path}.recordDigests must be an array.`));
   }
   const recordDigests = Array.isArray(rawRecordDigests)
     ? rawRecordDigests.flatMap((entry, index) => {
@@ -270,7 +270,7 @@ function parseAcknowledgements(
   if (new Set(recordDigests).size !== recordDigests.length) {
     diagnostics.push(diagnostic(`${path}.recordDigests`, `${path}.recordDigests must not contain duplicates.`));
   }
-  if (record.confirmed !== true || contentDigest === undefined || recordDigests.length === 0) {
+  if (record.confirmed !== true || contentDigest === undefined) {
     return undefined;
   }
   return {
@@ -532,10 +532,10 @@ function receiptAcknowledgements(
   receiptExactKeys(record, path, ['contentDigest', 'recordDigests'], diagnostics);
   const contentDigest = receiptDigest(record, 'contentDigest', `${path}.contentDigest`, diagnostics);
   const rawRecordDigests = record.recordDigests;
-  if (!Array.isArray(rawRecordDigests) || rawRecordDigests.length === 0) {
+  if (!Array.isArray(rawRecordDigests)) {
     diagnostics.push(receiptDiagnostic(
       `${path}.recordDigests`,
-      `${path}.recordDigests must be a non-empty array.`,
+      `${path}.recordDigests must be an array.`,
     ));
   }
   const recordDigests = Array.isArray(rawRecordDigests)
@@ -556,7 +556,7 @@ function receiptAcknowledgements(
       `${path}.recordDigests must not contain duplicates.`,
     ));
   }
-  if (contentDigest === undefined || recordDigests.length === 0) return undefined;
+  if (contentDigest === undefined) return undefined;
   return {
     contentDigest,
     recordDigests: [...recordDigests].sort(),

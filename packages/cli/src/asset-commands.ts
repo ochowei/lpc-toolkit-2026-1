@@ -97,6 +97,7 @@ export function assetCommandRequirements(
     return parsed.command[2] === 'contract'
       || parsed.command[2] === 'validate'
       || parsed.command[2] === 'acknowledge'
+      || parsed.command[2] === 'declare'
       || parsed.command[2] === 'preview'
       ? WORKSPACE_RUNTIME_REQUIREMENTS
       : LIST_REQUIREMENTS;

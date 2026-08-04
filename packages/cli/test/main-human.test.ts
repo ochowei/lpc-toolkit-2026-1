@@ -266,6 +266,71 @@ describe('human-readable CLI output', () => {
     expect(output).toContain('Next command: asset authoring resume');
   });
 
+  it('distinguishes human release declaration from technical readiness', () => {
+    const output = formatHumanResponse({
+      ok: true,
+      command: 'asset authoring declare',
+      data: authoringResponseProjection({
+        sessionId: 'session-1',
+        goal: 'new-item',
+        state: 'needs-user-action',
+        reason: 'release-declaration-current',
+        phase: 'validated',
+        checkpoint: { id: 'releaseDeclaration', digest: 'sha256:declaration' },
+        checkpointFreshness: 'current',
+        diagnostics: [],
+        artifacts: [],
+        inputsNeeded: [],
+        nextActions: [],
+        retrySafety: 'safe',
+        manifestDigest: 'sha256:manifest',
+        sourceDigests: ['sha256:source'],
+        releaseGates: {
+          releaseReady: false,
+          gates: [
+            { id: 'acknowledgements', freshness: 'current' },
+            { id: 'validation', freshness: 'current' },
+            { id: 'releaseDeclaration', freshness: 'current' },
+            { id: 'preview', freshness: 'missing' },
+            { id: 'previewArtifacts', freshness: 'missing' },
+          ],
+        },
+        releaseDeclaration: {
+          schema: 'lpc-toolkit.asset-authoring-release-receipt.v1',
+          kind: 'declaration',
+          sessionId: '123e4567-e89b-42d3-a456-426614174000',
+          cliVersion: '0.2.0',
+          recordedAt: '2026-08-04T04:00:00.000Z',
+          declarant: {
+            displayName: 'Alice Example',
+            kind: 'person',
+            role: 'authorized-release-declarant',
+          },
+          declarationDigest: 'sha256:declaration',
+          manifestDigest: 'sha256:manifest',
+          sourceDigests: [{ path: 'sprites/a.png', digest: 'sha256:source' }],
+          validationReceiptId: 'sha256:validation',
+          validationReceiptRevision: 'sha256:validation',
+          creditDigests: {
+            authorAndSource: 'sha256:credits',
+            licenseAuthority: 'sha256:credits',
+          },
+          acknowledgements: {
+            contentDigest: 'sha256:validation',
+            recordDigests: [],
+          },
+        },
+      }),
+      warnings: [],
+      errors: [],
+    }, 'fallback\n');
+
+    expect(output).toContain('Release readiness: not ready');
+    expect(output).toContain('Release gate releaseDeclaration: current');
+    expect(output).toContain('Release gate preview: missing');
+    expect(output).toContain('Human release declaration: Alice Example (sha256:declaration)');
+  });
+
   it('summarizes completed authoring state without inventing a mutation result', () => {
     const output = formatHumanResponse({
       ok: true,

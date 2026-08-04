@@ -253,6 +253,20 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
     examples: ['lpc-toolkit asset authoring acknowledge --session session-id --acknowledgement record.json --confirm --json'],
   },
   {
+    command: ['asset', 'authoring', 'declare'],
+    usage: 'lpc-toolkit asset authoring declare --session <session-id> --declaration <declaration.json> [--confirm] [--workspace <directory>] [--json]',
+    description: 'Record an explicit human release declaration for the current attributed pack evidence.',
+    options: [
+      HELP_OPTION,
+      JSON_OPTION,
+      AUTHORING_SESSION_OPTION,
+      { name: 'declaration', kind: 'value', valueLabel: 'declaration.json', description: 'Read the strict human release declaration.' },
+      { name: 'confirm', kind: 'boolean', description: 'Confirm the exact release declaration mutation.' },
+      ASSET_WORKSPACE_OPTION,
+    ],
+    examples: ['lpc-toolkit asset authoring declare --session session-id --declaration declaration.json --confirm --json'],
+  },
+  {
     command: ['asset', 'authoring', 'preview'],
     usage: 'lpc-toolkit asset authoring preview --session <session-id> [existing preview options] [--workspace <directory>] [--json]',
     description: 'Render an attributed session preview using the existing asset preview options.',

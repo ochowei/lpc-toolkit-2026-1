@@ -10,8 +10,16 @@ import path from 'node:path';
 import {
   normalizeAssetPack,
   parseAssetAuthoringPlan,
+  parseAssetReleaseDeclaration,
   parseAssetPackSource,
+  assetAuthoringReleaseGateProjection,
+  assetReleaseDeclarationDigestInput,
   type AssetPackAcknowledgement,
+  type AssetAuthoringReleaseDeclarationReceipt,
+  type AssetAuthoringReleaseGateFreshness,
+  type AssetAuthoringReleaseGateProjection,
+  type AssetReleaseDeclaration,
+  type NormalizedAssetPack,
   type AssetAuthoringPlan,
 } from '@lpc-toolkit/core';
 import {
@@ -42,6 +50,7 @@ import {
   loadAssetPackFiles,
 } from './asset-pack-files.js';
 import { PreviewError } from './preview.js';
+import { CLI_VERSION } from './package-info.js';
 import {
   assetAuthoringSessionPath,
   createAssetAuthoringSessionStore,
@@ -283,6 +292,71 @@ function checkpointForResponse(
     };
 }
 
+function sourceDigestSetsEqual(
+  left: readonly { readonly path: string; readonly digest: string }[],
+  right: readonly { readonly path: string; readonly digest: string }[],
+): boolean {
+  if (left.length !== right.length) return false;
+  const sortedLeft = [...left].sort((a, b) => a.path.localeCompare(b.path));
+  const sortedRight = [...right].sort((a, b) => a.path.localeCompare(b.path));
+  return sortedLeft.every((entry, index) => {
+    const other = sortedRight[index];
+    return other !== undefined && entry.path === other.path && entry.digest === other.digest;
+  });
+}
+
+function releaseGateFreshness(
+  session: AssetAuthoringSession,
+): AssetAuthoringReleaseGateProjection {
+  const blocked = session.conflict !== null || session.checkpointFreshness === 'blocked';
+  const validation = session.receipts.validation;
+  const validationCurrent = !blocked
+    && validation !== null
+    && session.manifestDigest !== null
+    && validation.manifestDigest === session.manifestDigest
+    && session.reason !== 'validation-failed';
+  const acknowledgement = session.receipts.acknowledgements;
+  const acknowledgementCurrent = validationCurrent
+    && (acknowledgement === null
+      || (session.manifestDigest !== null
+        && acknowledgement.manifestDigest === session.manifestDigest
+        && sourceDigestSetsEqual(acknowledgement.sourceDigests, validation.sourceDigests)));
+  const declaration = session.receipts.releaseDeclaration;
+  const declarationCurrent = acknowledgementCurrent
+    && declaration !== null
+    && declaration.manifestDigest === session.manifestDigest
+    && declaration.validationReceiptId === validation.id
+    && sourceDigestSetsEqual(declaration.sourceDigests, validation.sourceDigests)
+    && declaration.acknowledgements.recordDigests.length
+      === (acknowledgement?.recordDigests.length ?? 0)
+    && declaration.acknowledgements.recordDigests.every((digest, index) =>
+      digest === acknowledgement?.recordDigests[index]);
+  const preview = session.receipts.preview;
+  const previewCurrent = validationCurrent
+    && preview !== null
+    && session.manifestDigest !== null
+    && preview.manifestDigest === session.manifestDigest
+    && sourceDigestSetsEqual(preview.sourceDigests, validation.sourceDigests);
+  const freshness = (
+    current: boolean,
+    present: boolean,
+  ): AssetAuthoringReleaseGateFreshness => {
+    if (current) return 'current';
+    if (blocked) return 'blocked';
+    return present ? 'stale' : 'missing';
+  };
+  return assetAuthoringReleaseGateProjection({
+    acknowledgements: freshness(
+      acknowledgementCurrent,
+      acknowledgement !== null || validationCurrent,
+    ),
+    validation: freshness(validationCurrent, validation !== null),
+    releaseDeclaration: freshness(declarationCurrent, declaration !== null),
+    preview: freshness(previewCurrent, preview !== null),
+    previewArtifacts: 'missing',
+  });
+}
+
 function manifestArtifact(session: AssetAuthoringSession): AuthoringArtifact | undefined {
   if (session.manifestDigest === null) return undefined;
   return {
@@ -368,6 +442,17 @@ function nextActionsFor(session: AssetAuthoringSession): readonly AuthoringNextA
     )];
   }
 
+  if (session.reason === 'release-declaration-confirmation-required') {
+    return [nextAction(
+      'declare-release',
+      'Confirm the explicit human release declaration before recording it for this session.',
+      `asset authoring declare --session ${session.sessionId} --declaration <declaration.json> --confirm`,
+      'requires-confirmation',
+      session.manifestDigest === null ? [] : [session.manifestDigest],
+      ['declaration', 'confirm'],
+    )];
+  }
+
   if (
     session.reason === 'validation-receipt-stale'
     || session.reason === 'validation-incomplete'
@@ -443,6 +528,9 @@ function responseFor(
       checkpoint.checkpoint ? [checkpoint.checkpoint.digest] : []),
     ...(options.validation === undefined ? {} : { validation: options.validation }),
     ...(options.preview === undefined ? {} : { preview: options.preview }),
+    releaseGates: releaseGateFreshness(session),
+    releaseDeclaration: session.receipts.releaseDeclaration,
+    previewAcceptance: session.receipts.previewAcceptance,
   };
   return authoringResponseProjection(input);
 }
@@ -952,6 +1040,89 @@ function sameAcknowledgementReceipt(
     });
 }
 
+function readReleaseDeclarationInput(
+  context: AuthoringCommandContext,
+  declarationArgument: string,
+): { readonly result: ReturnType<typeof parseAssetReleaseDeclaration>; readonly path: string } {
+  const declarationPath = absolutePath(context.cwd, declarationArgument);
+  if (!isInsideRoot(context.workspace.root, declarationPath)) {
+    throw new AuthoringCommandError(
+      'The declaration file must be inside the asset workspace.',
+      { code: 'asset_authoring_path_invalid', path: declarationPath },
+    );
+  }
+  const bytes = readRegularFile(declarationPath);
+  if (bytes === undefined) {
+    throw new AuthoringCommandError(
+      'The declaration file must be a regular file.',
+      { code: 'asset_authoring_declaration_invalid', path: declarationPath },
+    );
+  }
+  let input: unknown;
+  try {
+    input = JSON.parse(bytes.toString('utf8')) as unknown;
+  } catch {
+    throw new AuthoringCommandError(
+      'The declaration file is not valid JSON.',
+      { code: 'asset_authoring_declaration_invalid', path: declarationPath },
+    );
+  }
+  const parsed = parseAssetReleaseDeclaration(input);
+  return { result: parsed, path: declarationPath };
+}
+
+function releaseCreditDigest(pack: NormalizedAssetPack): string {
+  const creditOverrides = Object.fromEntries(
+    [...pack.creditOverrides.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, value]) => [key, value]),
+  );
+  return sha256(Buffer.from(canonicalJson({
+    credits: pack.credits,
+    creditOverrides,
+  }), 'utf8'));
+}
+
+function declarationReceiptFor(options: {
+  readonly declaration: AssetReleaseDeclaration;
+  readonly declarationDigest: string;
+  readonly session: AssetAuthoringSession;
+  readonly report: AssetPackValidationReport;
+  readonly acknowledgementRecordDigests: readonly string[];
+  readonly creditDigest: string;
+}): AssetAuthoringReleaseDeclarationReceipt {
+  if (options.report.contentDigest === undefined
+    || options.report.manifestDigest === undefined
+    || options.report.sourceDigests === undefined
+    || options.session.receipts.validation === null) {
+    throw new AuthoringCommandError(
+      'Release declaration evidence is incomplete.',
+      { code: 'asset_authoring_evidence_incomplete' },
+    );
+  }
+  return {
+    schema: 'lpc-toolkit.asset-authoring-release-receipt.v1',
+    kind: 'declaration',
+    sessionId: options.session.sessionId,
+    cliVersion: CLI_VERSION,
+    recordedAt: new Date().toISOString(),
+    declarant: options.declaration.declarant,
+    declarationDigest: options.declarationDigest,
+    manifestDigest: options.report.manifestDigest,
+    sourceDigests: options.report.sourceDigests,
+    validationReceiptId: options.session.receipts.validation.id,
+    validationReceiptRevision: options.session.receipts.validation.id,
+    creditDigests: {
+      authorAndSource: options.creditDigest,
+      licenseAuthority: options.creditDigest,
+    },
+    acknowledgements: {
+      contentDigest: options.report.contentDigest,
+      recordDigests: options.acknowledgementRecordDigests,
+    },
+  };
+}
+
 function validationSessionUpdate(
   session: AssetAuthoringSession,
   report: AssetPackValidationReport,
@@ -980,13 +1151,42 @@ function validationSessionUpdate(
       digest: validationRevision,
       freshness: exactEvidence ? 'current' as const : 'stale' as const,
     };
+  const acknowledgementReceipt = session.receipts.acknowledgements;
+  const acknowledgements = receipt !== null
+    && acknowledgementReceipt !== null
+    && acknowledgementReceipt.id === receipt.id
+    && acknowledgementReceipt.manifestDigest === receipt.manifestDigest
+    && sourceDigestSetsEqual(acknowledgementReceipt.sourceDigests, receipt.sourceDigests)
+    ? acknowledgementReceipt
+    : null;
+  const previousDeclaration = session.receipts.releaseDeclaration;
+  const declarationRecordDigests = previousDeclaration?.acknowledgements.recordDigests ?? [];
+  const acknowledgementRecordDigests = acknowledgements?.recordDigests ?? [];
+  const releaseDeclaration = receipt !== null
+    && previousDeclaration !== null
+    && previousDeclaration.manifestDigest === receipt.manifestDigest
+    && previousDeclaration.validationReceiptId === receipt.id
+    && sourceDigestSetsEqual(previousDeclaration.sourceDigests, receipt.sourceDigests)
+    && declarationRecordDigests.length === acknowledgementRecordDigests.length
+    && declarationRecordDigests.every((digest, index) => digest === acknowledgementRecordDigests[index])
+    ? previousDeclaration
+    : null;
+  const previousPreview = session.receipts.preview;
+  const preview = receipt !== null
+    && previousPreview !== null
+    && previousPreview.manifestDigest === receipt.manifestDigest
+    && sourceDigestSetsEqual(previousPreview.sourceDigests, receipt.sourceDigests)
+    ? previousPreview
+    : null;
   const reason = report.valid
     ? exactEvidence ? 'validation-current' : 'validation-incomplete'
     : 'validation-failed';
   const receipts: AssetAuthoringSessionReceipts = {
     validation: receipt,
-    preview: null,
-    acknowledgements: null,
+    preview,
+    acknowledgements,
+    releaseDeclaration,
+    previewAcceptance: null,
   };
   return {
     state: 'needs-user-action',
@@ -1233,6 +1433,8 @@ async function acknowledgeCommand(
         validation: validationReceipt,
         preview: published ? null : session.receipts.preview,
         acknowledgements: acknowledgementReceipt,
+        releaseDeclaration: null,
+        previewAcceptance: null,
       },
       manifestDigest: finalManifestDigest,
       provenance: appendProvenance(session, {
@@ -1269,6 +1471,210 @@ async function acknowledgeCommand(
     }
     throw error;
   }
+}
+
+async function declareCommand(
+  context: AuthoringCommandContext,
+  sessionId: string,
+): Promise<CliResponse<AuthoringResponseData>> {
+  if (context.runtime === undefined) {
+    throw new AuthoringCommandError(
+      'The asset authoring declare command requires prepared runtime assets.',
+      { code: 'asset_authoring_runtime_missing' },
+    );
+  }
+  const declarationArgument = flagString(context.parsed.flags, 'declaration');
+  if (declarationArgument === undefined) {
+    throw new AuthoringCommandError(
+      'Declaration requires --declaration.',
+      { code: 'missing_argument', path: '--declaration' },
+    );
+  }
+  const store = createAssetAuthoringSessionStore(context.workspace);
+  const session = resumeSession(context.workspace, store.read(sessionId));
+  if (session.conflict !== null) {
+    throw new AuthoringCommandError(
+      'The authoring session has an unresolved manifest conflict; reconcile it before declaring release authority.',
+      { code: 'asset_authoring_manifest_conflict' },
+    );
+  }
+
+  const loaded = await loadAssetPackFiles(session.packRoot);
+  if (!loaded.ok) {
+    const diagnostic = loaded.diagnostics[0];
+    throw new AuthoringCommandError(
+      diagnostic?.message ?? 'The session asset pack could not be loaded.',
+      { code: diagnostic?.code ?? 'asset_authoring_pack_invalid', path: session.packRoot },
+    );
+  }
+  const manifestPath = manifestPathFor(session);
+  const currentManifestDigest = sha256(loaded.manifestBytes);
+  if (session.manifestDigest === null || session.manifestDigest !== currentManifestDigest) {
+    throw new AuthoringCommandError(
+      'The session manifest changed before release declaration evidence was collected.',
+      { code: 'asset_authoring_digest_mismatch', path: manifestPath },
+    );
+  }
+
+  const declarationInput = readReleaseDeclarationInput(context, declarationArgument);
+  if (!declarationInput.result.ok) {
+    const diagnostic = declarationInput.result.diagnostics[0];
+    throw new AuthoringCommandError(
+      diagnostic?.message ?? 'The release declaration is invalid.',
+      { code: 'asset_authoring_declaration_invalid', path: declarationInput.path },
+    );
+  }
+  const declaration = declarationInput.result.declaration;
+  const report = await freshSessionValidation({
+    session,
+    workspace: context.workspace,
+    runtime: context.runtime,
+  });
+  if (!report.valid || report.manifestDigest !== currentManifestDigest
+    || report.sourceDigests === undefined || report.contentDigest === undefined) {
+    const blockedSession: AssetAuthoringSession = {
+      ...session,
+      state: 'needs-user-action',
+      reason: 'validation-receipt-stale',
+      phase: 'blocked',
+      checkpointFreshness: 'stale',
+    };
+    return commandOk(
+      'asset authoring declare',
+      responseFor(blockedSession, { validation: report }),
+    );
+  }
+  const validationReceipt = session.receipts.validation;
+  const expectedAcknowledgements = loaded.pack.acknowledgements.length > 0
+    ? acknowledgementReceiptFor(report, loaded.pack.acknowledgements)
+    : null;
+  if (validationReceipt === null
+    || validationReceipt.id !== report.contentDigest
+    || validationReceipt.manifestDigest !== currentManifestDigest
+    || !sourceDigestSetsEqual(validationReceipt.sourceDigests, report.sourceDigests)
+    || (expectedAcknowledgements === null
+      ? session.receipts.acknowledgements !== null
+      : !sameAcknowledgementReceipt(session.receipts.acknowledgements, expectedAcknowledgements))) {
+    const blockedSession: AssetAuthoringSession = {
+      ...session,
+      state: 'needs-user-action',
+      reason: 'validation-receipt-stale',
+      phase: 'blocked',
+      checkpointFreshness: 'stale',
+    };
+    return commandOk(
+      'asset authoring declare',
+      responseFor(blockedSession, { validation: report }),
+    );
+  }
+  if (declaration.expectedManifestDigest !== currentManifestDigest) {
+    throw new AuthoringCommandError(
+      'The declaration expectedManifestDigest does not match the current session manifest.',
+      { code: 'asset_authoring_declaration_stale', path: `${declarationInput.path}:$.expectedManifestDigest` },
+    );
+  }
+  const creditDigest = releaseCreditDigest(loaded.pack);
+  if (declaration.authorAndSource.creditDigest !== creditDigest) {
+    throw new AuthoringCommandError(
+      'The declaration author/source credit digest does not match the current pack credits.',
+      { code: 'asset_authoring_credit_digest_mismatch', path: `${declarationInput.path}:$.authorAndSource.creditDigest` },
+    );
+  }
+  if (declaration.licenseAuthority.creditDigest !== creditDigest) {
+    throw new AuthoringCommandError(
+      'The declaration license authority credit digest does not match the current pack credits.',
+      { code: 'asset_authoring_credit_digest_mismatch', path: `${declarationInput.path}:$.licenseAuthority.creditDigest` },
+    );
+  }
+  if (declaration.acknowledgements.contentDigest !== report.contentDigest
+    || declaration.acknowledgements.recordDigests.length
+      !== (expectedAcknowledgements?.recordDigests.length ?? 0)
+    || declaration.acknowledgements.recordDigests.some((digest, index) =>
+      digest !== expectedAcknowledgements?.recordDigests[index])) {
+    throw new AuthoringCommandError(
+      'The declaration acknowledgement evidence does not match the current persisted warning records.',
+      { code: 'asset_authoring_acknowledgement_digest_mismatch', path: `${declarationInput.path}:$.acknowledgements` },
+    );
+  }
+
+  const declarationDigest = sha256(Buffer.from(
+    assetReleaseDeclarationDigestInput(declaration),
+    'utf8',
+  ));
+  const receipt = declarationReceiptFor({
+    declaration,
+    declarationDigest,
+    session,
+    report,
+    acknowledgementRecordDigests: expectedAcknowledgements?.recordDigests ?? [],
+    creditDigest,
+  });
+  if (!flagBoolean(context.parsed.flags, 'confirm')) {
+    const pendingSession: AssetAuthoringSession = {
+      ...session,
+      state: 'needs-user-action',
+      reason: 'release-declaration-confirmation-required',
+    };
+    return commandOk(
+      'asset authoring declare',
+      responseFor(pendingSession, {
+        validation: report,
+      }),
+    );
+  }
+
+  const latestManifestBytes = readRegularFile(manifestPath);
+  if (latestManifestBytes === undefined || sha256(latestManifestBytes) !== currentManifestDigest) {
+    throw new AuthoringCommandError(
+      'The manifest changed while preparing the release declaration receipt.',
+      { code: 'asset_authoring_digest_mismatch', path: manifestPath },
+    );
+  }
+  const existing = session.receipts.releaseDeclaration;
+  if (existing !== null
+    && existing.declarationDigest === receipt.declarationDigest
+    && existing.manifestDigest === receipt.manifestDigest
+    && existing.validationReceiptId === receipt.validationReceiptId
+    && sourceDigestSetsEqual(existing.sourceDigests, receipt.sourceDigests)
+    && existing.acknowledgements.contentDigest === receipt.acknowledgements.contentDigest
+    && existing.acknowledgements.recordDigests.every((digest, index) =>
+      digest === receipt.acknowledgements.recordDigests[index])) {
+    return commandOk(
+      'asset authoring declare',
+      responseFor(session, { validation: report }),
+    );
+  }
+  const next = store.replace(sessionId, {
+    state: 'needs-user-action',
+    reason: 'release-declaration-current',
+    phase: session.phase,
+    checkpoint: {
+      id: 'releaseDeclaration',
+      phase: session.phase,
+      digest: receipt.declarationDigest,
+      freshness: 'current',
+    },
+    checkpointFreshness: 'current',
+    receipts: {
+      validation: session.receipts.validation,
+      preview: session.receipts.preview,
+      acknowledgements: session.receipts.acknowledgements,
+      releaseDeclaration: receipt,
+      previewAcceptance: null,
+    },
+    provenance: appendProvenance(session, {
+      kind: 'human-declaration',
+      occurredAt: receipt.recordedAt,
+      digest: receipt.declarationDigest,
+      summary: 'Explicit human release declaration recorded for the current manifest and attribution evidence.',
+    }),
+  });
+  return commandOk(
+    'asset authoring declare',
+    responseFor(next, {
+      validation: report,
+    }),
+  );
 }
 
 function previewInput(context: AuthoringCommandContext): AuthoringPreviewInput {
@@ -1362,7 +1768,9 @@ async function previewCommand(
     receipts: {
       validation: validated.receipts.validation,
       preview: previewReceipt,
-      acknowledgements: null,
+      acknowledgements: validated.receipts.acknowledgements,
+      releaseDeclaration: validated.receipts.releaseDeclaration,
+      previewAcceptance: null,
     },
     provenance: appendProvenance(validated, {
       kind: 'provider',
@@ -1409,6 +1817,8 @@ function refreshContractSession(
       validation: null,
       preview: null,
       acknowledgements: null,
+      releaseDeclaration: null,
+      previewAcceptance: null,
     },
     provenance: appendProvenance(session, {
       kind: 'checkpoint-invalidated',
@@ -1530,6 +1940,8 @@ async function importCommand(
       validation: null,
       preview: null,
       acknowledgements: null,
+      releaseDeclaration: null,
+      previewAcceptance: null,
     },
     checkpoints,
     provenance: appendProvenance(session, {
@@ -1665,6 +2077,7 @@ export async function runAssetAuthoringCommand(
     if (authoringCommand === 'import') return await importCommand(context, sessionId);
     if (authoringCommand === 'validate') return await validateCommand(context, sessionId);
     if (authoringCommand === 'acknowledge') return await acknowledgeCommand(context, sessionId);
+    if (authoringCommand === 'declare') return await declareCommand(context, sessionId);
     if (authoringCommand === 'preview') return await previewCommand(context, sessionId);
     if (authoringCommand === 'status') return statusSession(context.workspace, sessionId);
     if (authoringCommand === 'resume') return resumeCommand(context.workspace, sessionId);

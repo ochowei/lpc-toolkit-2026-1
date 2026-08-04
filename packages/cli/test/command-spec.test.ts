@@ -293,6 +293,8 @@ describe('helpForCommand', () => {
       'contract',
       'import',
       'validate',
+      'acknowledge',
+      'declare',
       'preview',
       'reconcile-manifest',
     ]) {
@@ -313,6 +315,12 @@ describe('helpForCommand', () => {
     );
     expect(helpForCommand(['asset', 'authoring', 'reconcile-manifest'])).toContain(
       '--use <external|session>',
+    );
+    expect(helpForCommand(['asset', 'authoring', 'acknowledge'])).toContain(
+      '--acknowledgement <record.json>',
+    );
+    expect(helpForCommand(['asset', 'authoring', 'declare'])).toContain(
+      '--declaration <declaration.json>',
     );
     expect(helpForCommand(['asset', 'authoring'])).toContain(
       'Create and resume provider-neutral asset authoring sessions from strict plans.',

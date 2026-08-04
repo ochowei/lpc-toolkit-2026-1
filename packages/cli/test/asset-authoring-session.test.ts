@@ -214,6 +214,8 @@ describe('asset authoring session persistence', () => {
           }],
           recordDigests: [DIGEST_C, DIGEST_D],
         },
+        releaseDeclaration: null,
+        previewAcceptance: null,
       },
     });
 

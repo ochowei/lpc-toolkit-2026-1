@@ -232,6 +232,19 @@ describe('main json behavior', () => {
       warnings: [],
       errors: [],
     });
+    const advertisement = JSON.parse(stdout.join('')) as {
+      readonly data: {
+        readonly capabilities: readonly string[];
+        readonly schemaVersions: readonly string[];
+      };
+    };
+    expect(advertisement.data.capabilities).toContain('asset-authoring-release.v1');
+    expect(advertisement.data.schemaVersions).toEqual(expect.arrayContaining([
+      'lpc-toolkit.asset-release-declaration.v1',
+      'lpc-toolkit.asset-authoring-release-receipt.v1',
+    ]));
+    expect(advertisement.data.capabilities).not.toContain('asset-authoring-draft-recovery.v1');
+    expect(advertisement.data.capabilities).not.toContain('asset-authoring-consumer-install.v1');
   });
 
   it.each([

@@ -12,7 +12,10 @@ import {
 import path from 'node:path';
 import {
   parseAssetAuthoringPlan,
+  parseAssetAuthoringReleaseReceipt,
   type AssetAuthoringPlan,
+  type AssetAuthoringPreviewAcceptanceReceipt as CoreAssetAuthoringPreviewAcceptanceReceipt,
+  type AssetAuthoringReleaseDeclarationReceipt as CoreAssetAuthoringReleaseDeclarationReceipt,
 } from '@lpc-toolkit/core';
 import { CLI_VERSION } from './package-info.js';
 import {
@@ -124,10 +127,18 @@ export interface AssetAuthoringAcknowledgementReceipt {
   readonly recordDigests: readonly string[];
 }
 
+export type AssetAuthoringReleaseDeclarationReceipt =
+  CoreAssetAuthoringReleaseDeclarationReceipt;
+
+export type AssetAuthoringPreviewAcceptanceReceipt =
+  CoreAssetAuthoringPreviewAcceptanceReceipt;
+
 export interface AssetAuthoringSessionReceipts {
   readonly validation: AssetAuthoringValidationReceipt | null;
   readonly preview: AssetAuthoringPreviewReceipt | null;
   readonly acknowledgements: AssetAuthoringAcknowledgementReceipt | null;
+  readonly releaseDeclaration: AssetAuthoringReleaseDeclarationReceipt | null;
+  readonly previewAcceptance: AssetAuthoringPreviewAcceptanceReceipt | null;
 }
 
 export interface AssetAuthoringSessionCheckpoint {
@@ -460,7 +471,11 @@ function parseTargetCheckpoints(value: unknown): readonly AssetAuthoringTargetCh
 
 function parseReceipts(value: unknown): AssetAuthoringSessionReceipts {
   const record = requireRecord(value, 'session.receipts');
-  assertExactKeys(record, ['validation', 'preview', 'acknowledgements'], 'session.receipts');
+  assertExactKeys(
+    record,
+    ['validation', 'preview', 'acknowledgements', 'releaseDeclaration', 'previewAcceptance'],
+    'session.receipts',
+  );
   const validation = record.validation === null
     ? null
     : parseValidationReceipt(record.validation);
@@ -470,7 +485,19 @@ function parseReceipts(value: unknown): AssetAuthoringSessionReceipts {
   const acknowledgements = record.acknowledgements === undefined || record.acknowledgements === null
     ? null
     : parseAcknowledgementsReceipt(record.acknowledgements);
-  return { validation, preview, acknowledgements };
+  const releaseDeclaration = record.releaseDeclaration === undefined || record.releaseDeclaration === null
+    ? null
+    : parseReleaseDeclarationReceipt(record.releaseDeclaration);
+  const previewAcceptance = record.previewAcceptance === undefined || record.previewAcceptance === null
+    ? null
+    : parsePreviewAcceptanceReceipt(record.previewAcceptance);
+  return {
+    validation,
+    preview,
+    acknowledgements,
+    releaseDeclaration,
+    previewAcceptance,
+  };
 }
 
 function parseValidationReceipt(value: unknown): AssetAuthoringValidationReceipt {
@@ -555,6 +582,44 @@ function parseAcknowledgementsReceipt(value: unknown): AssetAuthoringAcknowledge
     ),
     recordDigests: parsedRecordDigests,
   };
+}
+
+function parseReleaseDeclarationReceipt(
+  value: unknown,
+): AssetAuthoringReleaseDeclarationReceipt {
+  const result = parseAssetAuthoringReleaseReceipt(value);
+  if (!result.ok) {
+    fail(
+      'asset_authoring_session_invalid',
+      result.diagnostics[0]?.message ?? 'session.receipts.releaseDeclaration is invalid.',
+    );
+  }
+  if (result.receipt.kind !== 'declaration') {
+    fail(
+      'asset_authoring_session_invalid',
+      'session.receipts.releaseDeclaration must be a declaration receipt.',
+    );
+  }
+  return result.receipt;
+}
+
+function parsePreviewAcceptanceReceipt(
+  value: unknown,
+): AssetAuthoringPreviewAcceptanceReceipt {
+  const result = parseAssetAuthoringReleaseReceipt(value);
+  if (!result.ok) {
+    fail(
+      'asset_authoring_session_invalid',
+      result.diagnostics[0]?.message ?? 'session.receipts.previewAcceptance is invalid.',
+    );
+  }
+  if (result.receipt.kind !== 'preview-acceptance') {
+    fail(
+      'asset_authoring_session_invalid',
+      'session.receipts.previewAcceptance must be a preview-acceptance receipt.',
+    );
+  }
+  return result.receipt;
 }
 
 function parseProvenance(value: unknown): readonly AssetAuthoringProvenanceEvent[] {
@@ -902,7 +967,13 @@ class AssetAuthoringSessionStoreImpl implements AssetAuthoringSessionStore {
       checkpoint: null,
       checkpointFreshness: 'missing',
       checkpoints: sessionTargetCheckpoints(planResult.plan),
-      receipts: { validation: null, preview: null, acknowledgements: null },
+      receipts: {
+        validation: null,
+        preview: null,
+        acknowledgements: null,
+        releaseDeclaration: null,
+        previewAcceptance: null,
+      },
       provenance: [{
         id: this.eventId(),
         kind: 'session-created',
