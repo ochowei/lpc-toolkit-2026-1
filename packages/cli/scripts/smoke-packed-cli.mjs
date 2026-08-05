@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
+  copyFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -978,6 +979,106 @@ try {
     formalReceipt.archiveDigest,
   );
 
+  const formalArchiveBeforeProvenance = readFileSync(formalReceipt.archivePath);
+  const provenancePending = runInstalledJson([
+    'asset', 'authoring', 'provenance', '--session', authoringSessionId,
+  ], workspaceRoot);
+  assert.equal(provenancePending.ok, true);
+  assert.equal(provenancePending.data?.reason, 'release-provenance-confirmation-required');
+  assert.equal(provenancePending.data?.releaseProvenanceReceipt, null);
+  assert.deepEqual(
+    provenancePending.data?.nextActions.map(({ id, safety }) => ({ id, safety })),
+    [{ id: 'publish-release-provenance', safety: 'requires-confirmation' }],
+  );
+  const provenanceOutput = runInstalledJson([
+    'asset', 'authoring', 'provenance', '--session', authoringSessionId, '--confirm',
+  ], workspaceRoot);
+  assert.equal(provenanceOutput.ok, true);
+  assert.equal(provenanceOutput.data?.reason, 'release-provenance-current');
+  const provenanceReceipt = provenanceOutput.data?.releaseProvenanceReceipt;
+  assert.ok(provenanceReceipt);
+  assert.equal(
+    provenanceReceipt.schema,
+    'lpc-toolkit.asset-authoring-release-provenance-receipt.v1',
+  );
+  assert.equal(existsSync(provenanceReceipt.provenancePath), true);
+  assert.deepEqual(readFileSync(formalReceipt.archivePath), formalArchiveBeforeProvenance);
+  const provenanceDocument = JSON.parse(
+    readFileSync(provenanceReceipt.provenancePath, 'utf8'),
+  );
+  assert.equal(provenanceDocument.schema, 'lpc-toolkit.asset-release-provenance.v1');
+  assert.equal(provenanceDocument.projection.pack.id, formalReceipt.packId);
+  assert.equal(provenanceDocument.projection.pack.version, formalReceipt.version);
+  assert.equal(
+    provenanceDocument.projection.releaseBindings.archiveDigest,
+    formalReceipt.archiveDigest,
+  );
+  assert.equal(
+    provenanceDocument.projection.releaseBindings.contentDigest,
+    formalReceipt.contentDigest,
+  );
+  assert.equal(
+    provenanceDocument.projection.releaseBindings.manifestDigest,
+    sha256(Buffer.from(await formalZip.file('asset-pack.json').async('nodebuffer'))),
+  );
+  assert.equal(formalZip.file(path.basename(provenanceReceipt.provenancePath)), null);
+  const repeatedProvenanceOutput = runInstalledJson([
+    'asset', 'authoring', 'provenance', '--session', authoringSessionId,
+  ], workspaceRoot);
+  assert.deepEqual(
+    repeatedProvenanceOutput.data?.releaseProvenanceReceipt,
+    provenanceReceipt,
+  );
+
+  const provenanceConsumerRoot = path.join(emptyCwd, 'provenance-consumer');
+  mkdirSync(provenanceConsumerRoot, { recursive: true });
+  const copiedProvenanceArchive = path.join(provenanceConsumerRoot, 'release.lpc-assets.zip');
+  const copiedProvenanceReceipt = path.join(provenanceConsumerRoot, 'release-provenance.json');
+  copyFileSync(formalReceipt.archivePath, copiedProvenanceArchive);
+  copyFileSync(provenanceReceipt.provenancePath, copiedProvenanceReceipt);
+  const provenanceConsumerBefore = readdirSync(provenanceConsumerRoot).sort();
+  const provenanceVerification = runInstalledJson([
+    'asset', 'provenance', 'verify',
+    '--archive', copiedProvenanceArchive,
+    '--provenance', copiedProvenanceReceipt,
+  ], provenanceConsumerRoot);
+  assert.equal(provenanceVerification.ok, true);
+  assert.deepEqual(provenanceVerification.data, {
+    schema: 'lpc-toolkit.asset-release-provenance-verification.v1',
+    verified: true,
+    archivePath: copiedProvenanceArchive,
+    provenancePath: copiedProvenanceReceipt,
+    provenanceDigest: provenanceReceipt.provenanceDigest,
+    projectionDigest: provenanceReceipt.projectionDigest,
+    packId: formalReceipt.packId,
+    version: formalReceipt.version,
+    archiveDigest: formalReceipt.archiveDigest,
+    manifestDigest: provenanceDocument.projection.releaseBindings.manifestDigest,
+    contentDigest: formalReceipt.contentDigest,
+    sourceDigests: provenanceDocument.projection.releaseBindings.sourceDigests,
+    recordCount: 0,
+    releaseDeclarationReceiptDigest:
+      provenanceDocument.projection.releaseBindings.releaseDeclarationReceiptDigest,
+    previewAcceptanceReceiptDigest:
+      provenanceDocument.projection.releaseBindings.previewAcceptanceReceiptDigest,
+    previewArtifacts: provenanceDocument.projection.releaseBindings.previewArtifacts,
+    humanEvidence: {
+      releaseDeclarationReceiptRecreated: false,
+      previewAcceptanceReceiptRecreated: false,
+    },
+  });
+  assert.deepEqual(readdirSync(provenanceConsumerRoot).sort(), provenanceConsumerBefore);
+
+  const missingProvenanceResult = runInstalledResult([
+    'asset', 'provenance', 'verify',
+    '--archive', copiedProvenanceArchive,
+    '--provenance', path.join(provenanceConsumerRoot, 'missing.json'),
+  ], provenanceConsumerRoot);
+  assert.equal(missingProvenanceResult.status, 1);
+  const missingProvenanceResponse = JSON.parse(missingProvenanceResult.stdout);
+  assert.equal(missingProvenanceResponse.errors[0]?.code, 'asset_release_provenance_invalid');
+  assert.deepEqual(readdirSync(provenanceConsumerRoot).sort(), provenanceConsumerBefore);
+
   const authoringConsumerWorkspaceRoot = path.join(emptyCwd, 'authoring-consumer');
   const authoringConsumerInit = runInstalledJson([
     'asset', 'workspace', 'init', authoringConsumerWorkspaceRoot,
@@ -1037,6 +1138,11 @@ try {
     authoringInstallationReceipt.generatedDigests['CREDITS.csv'],
     authoringInstallationReceipt.creditsDigest,
   );
+  assert.equal(
+    existsSync(path.join(authoringInstallationReceipt.installedDirectory, 'release-provenance.json')),
+    false,
+  );
+  assert.deepEqual(readFileSync(formalReceipt.archivePath), formalArchiveBeforeProvenance);
   assert.deepEqual(readFileSync(formalReceipt.archivePath), formalArchiveBeforeInstall);
   const authoringSessionAfterInstall = readFileSync(authoringSessionFile);
   const repeatedAuthoringInstall = runInstalledJson([

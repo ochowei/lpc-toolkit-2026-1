@@ -48,3 +48,12 @@ refuse
 The audit workflow remains limited to the
 commands listed in its versioned contract, and `catalog audit-animations` stays
 read-only.
+
+The D1 release-provenance capability
+`asset-authoring-release-provenance.v1`, schemas
+`lpc-toolkit.asset-release-provenance.v1` and
+`lpc-toolkit.asset-release-provenance-verification.v1`, and
+`asset provenance verify` are likewise outside this plugin contract. The plugin
+does not publish or verify release provenance, invoke providers, or add a new
+skill; use the installed CLI's public command directly when an external consumer
+needs independent verification.

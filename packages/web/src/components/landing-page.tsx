@@ -135,6 +135,11 @@ const releasePublicationCommands = [
   'lpc-toolkit asset authoring inspect --session <session-id> --archive <archive>',
 ] as const;
 
+const releaseProvenanceCommands = [
+  'lpc-toolkit asset authoring provenance --session <session-id> --confirm',
+  'lpc-toolkit asset provenance verify --archive <archive> --provenance <receipt> --json',
+] as const;
+
 const releaseConsumerCommands = [
   'lpc-toolkit asset authoring install --session <session-id> --archive <archive> --consumer-workspace <directory> --confirm',
 ] as const;
@@ -283,6 +288,23 @@ export function CliPage({ onNavigate }: ProductPageProps) {
             </p>
             <ol className="mt-4 space-y-3">
               {releasePublicationCommands.map((command, index) => (
+                <li key={`${index}-${command}`}>
+                  <CopyCode children={command} />
+                </li>
+              ))}
+            </ol>
+            <h3 className="mt-5 text-lg font-semibold text-text">
+              Carry optional generation provenance separately
+            </h3>
+            <p className="mt-2 text-sm text-text-2">
+              Generation provenance is an optional external companion to the
+              exact archive. It is not attribution, a license or authorship
+              declaration, human release approval, a ZIP member, or an installer
+              input. A copied archive and receipt can be verified read-only from
+              a separate consumer root; no provider is invoked.
+            </p>
+            <ol className="mt-4 space-y-3">
+              {releaseProvenanceCommands.map((command, index) => (
                 <li key={`${index}-${command}`}>
                   <CopyCode children={command} />
                 </li>

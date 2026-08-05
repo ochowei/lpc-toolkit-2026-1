@@ -51,18 +51,23 @@ The capability response must retain the exact shipped identifiers
 `asset-authoring-session.v1`, `sprite-drawing-contract.v1`,
 `asset-authoring-candidate-import.v1`, `asset-authoring-recovery.v1`, and
 `asset-authoring-release.v1`, `asset-authoring-draft-recovery.v1`, and
-`asset-authoring-consumer-install.v1`, plus the ten versioned authoring/release
+`asset-authoring-consumer-install.v1`, and
+`asset-authoring-release-provenance.v1`, plus the twelve versioned authoring/release
 schemas, including
 `lpc-toolkit.asset-authoring-formal-archive-receipt.v1` and
 `lpc-toolkit.asset-authoring-archive-inspection-receipt.v1` and
-`lpc-toolkit.asset-authoring-install-receipt.v1`.
+`lpc-toolkit.asset-authoring-install-receipt.v1`,
+`lpc-toolkit.asset-release-provenance.v1`, and
+`lpc-toolkit.asset-release-provenance-verification.v1`.
 Check that the CLI help lists `start`, `status`, `resume`, `contract`, `import`,
 `validate`, `preview`, `acknowledge`, `declare`, `accept-preview`, and
-`reconcile-manifest`, `draft`, `sync`, `pack`, `inspect`, and `install`, and that the CLI README, root README, landing copy, and
+`reconcile-manifest`, `draft`, `sync`, `pack`, `inspect`, `provenance`, and
+`install`, plus public `asset provenance verify`, and that the CLI README, root README, landing copy, and
 plugin compatibility references describe the same boundary. Plugin `0.2.1`
 must continue to document CLI range `>=0.2.0 <0.3.0`; the plugin intentionally
 does not claim or invoke the authoring-session release, draft-recovery,
-formal-pack, formal-inspect, manager-sync, or consumer-install capabilities.
+formal-pack, formal-inspect, manager-sync, consumer-install, or release-provenance
+capabilities.
 
 Phase 1's release boundary is still session evidence, not archive publication.
 The packed smoke must show `releaseGates.releaseReady: true` only after the
@@ -108,6 +113,19 @@ matching `CREDITS.csv`. Repeating an unchanged install must preserve the
 receipt and artist/archive bytes; consumer output drift must become stale
 evidence and remain available to the existing doctor/recovery policy.
 
+D1 adds an optional external generation-provenance gate after exact formal pack
+and inspect. `asset authoring provenance --session <id> --confirm` may publish a
+canonical companion receipt beside the archive, optionally from a strict
+`--records` array. The default output and any explicit `--output` must remain
+inside the session `release-artifacts/` root; unchanged publication is
+idempotent, while changed projections require a new contained path and preserve
+the previous receipt. `asset provenance verify --archive <archive>
+--provenance <receipt>` verifies copied exact archive, manifest, content, source,
+and projection bytes without a workspace or session mutation. It reports
+declaration/preview digests as bound evidence rather than recreated human
+approval. A missing companion does not affect ordinary inspect/install, and the
+receipt is never an archive member or installed input.
+
 The packed CLI smoke remains the release proof for the public contract. In a
 clean workspace, it must discover capabilities, create a strict-plan session,
 materialize the drawing contract, import a real transparent PNG through the
@@ -115,7 +133,9 @@ digest-bound trust boundary, validate, preview with PNG/metadata/TXT/CSV
 credits, and recover from interruption and external drift. It must also prove
 that checked-in assets, the managed base cache, generated overlay, installed
 source, unowned output, and dormant `upstream/` remain untouched. No provider
-invocation or Web bridge is part of this release gate.
+invocation or Web bridge is part of this release gate. It also runs formal pack,
+exact inspect, provenance generation, copied-archive verification from a clean
+consumer root, missing-receipt refusal, and ordinary-install compatibility.
 
 ## Release Candidate
 
@@ -178,6 +198,16 @@ installed catalog/render attribution, matching `CREDITS.csv`, doctor health,
 idempotent retry, and that artist/archive/protected sentinel bytes are
 unchanged. A session response is not a release archive. Record the capability JSON, plugin version/range, package version,
 published version, commands, and PASS/FAIL results with the workflow URLs.
+
+For a release that publishes generation provenance, copy the exact formal
+archive and its companion receipt into a clean consumer root and run:
+
+```sh
+lpc-toolkit asset provenance verify --archive ./release.lpc-assets.zip --provenance ./release-provenance.json --json
+```
+
+Record the verification response and confirm that ordinary install still
+consumes only the formal archive.
 
 Record workflow URLs, the published version, commands, and PASS/FAIL results.
 Never delete or retarget a pushed tag, overwrite a published npm version,

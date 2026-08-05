@@ -158,6 +158,7 @@ Every leaf command accepts `--help`; every command below also accepts `--json`.
 | `asset sync <pack-directory>` | Validate all active linked packs, rebuild the complete desired overlay, and link this source pack in the workspace registry. Optional: `--workspace`. |
 | `asset pack <pack-directory>` | Freshly validate source, complete PNGs, compatibility, acknowledgements, and attribution, then atomically publish `<pack-parent>/<pack-id>-<version>.lpc-assets.zip`. Optional: `--workspace`. |
 | `asset inspect <archive>` | Strictly inspect and validate an archive without installing it. This command has no workspace option; it reports schema `lpc-toolkit.asset-pack-inspection.v1`, digests, entry/byte counts, diagnostics, and acknowledgement records. |
+| `asset provenance verify --archive <archive> --provenance <receipt>` | Read-only verification of an exact copied formal archive and its optional external generation-provenance receipt. This command has no workspace option and never writes a session or consumer workspace. |
 | `asset install <archive>` | Inspect the immutable archive snapshot, stage it below manager state, compile all active packs, and publish the installed source, generated output, and registry together. Optional: `--workspace`. |
 | `asset list` | List active linked and installed entries in pack-ID order, including version, source kind/path, content digest, and installed archive digest. Optional: `--workspace`. It does not prepare base assets. |
 | `asset remove <pack-id>` | Deactivate one linked or installed pack and publish the remaining desired state. Optional: `--workspace`. Linked artist source is retained; an installed source is deleted only after output and registry publication. |
@@ -171,6 +172,9 @@ The Phase 2 `--json` success payloads are stable command reports:
   `archivePath`, available archive/pack/content digests and identity, `valid`,
   `entryCount`, `totalUncompressedBytes`, sorted diagnostics, and exact
   `acknowledgementRecords`.
+- `asset provenance verify`: schema
+  `lpc-toolkit.asset-release-provenance-verification.v1`, exact archive and
+  companion-receipt bindings, and bounded human-evidence flags. It is read-only.
 - `asset install`: `action`, identity/version/archive digest, absolute
   `installedDirectory`, `outputPath`, and generated-file count.
 - `asset list`: recovery action plus sorted entries with identity, version,
@@ -224,6 +228,7 @@ The advertisement includes these capability identifiers:
 - `asset-authoring-candidate-import.v1`
 - `asset-authoring-recovery.v1`
 - `asset-authoring-release.v1`
+- `asset-authoring-release-provenance.v1`
 - `asset-authoring-draft-recovery.v1`
 - `asset-authoring-consumer-install.v1`
 
@@ -239,6 +244,8 @@ and these schema identifiers:
 - `lpc-toolkit.asset-authoring-formal-archive-receipt.v1`
 - `lpc-toolkit.asset-authoring-archive-inspection-receipt.v1`
 - `lpc-toolkit.asset-authoring-install-receipt.v1`
+- `lpc-toolkit.asset-release-provenance.v1`
+- `lpc-toolkit.asset-release-provenance-verification.v1`
 
 The strict plan schema has three goals: `new-item`, `extend-item`, and
 `attach-pack`. New-item plans declare pack and asset identity, body types,
@@ -267,6 +274,7 @@ The public session commands are:
 | `asset authoring sync --session <session-id> [--confirm] [--workspace <directory>] [--json]` | Without `--confirm`, return one confirmation action without mutation. With confirmation, run the existing linked-sync transaction for the session pack and record the actual manager-owned output/registry generation. |
 | `asset authoring pack --session <session-id> [--output <archive>] --confirm [--workspace <directory>] [--json]` | After fresh validation and every release gate is current, publish a deterministic formal archive below the session's `release-artifacts/` root. Without `--confirm`, return the confirmation action without publication. |
 | `asset authoring inspect --session <session-id> --archive <archive> [--workspace <directory>] [--json]` | Inspect the exact formal archive bytes through the existing archive authority and record an inspection receipt only when its digest matches the current formal archive receipt. |
+| `asset authoring provenance --session <session-id> [--records <records.json>] [--output <receipt>] --confirm [--workspace <directory>] [--json]` | Publish an optional canonical generation-provenance companion receipt from current formal pack, inspection, declaration, preview, artifact, manifest, content, and source evidence. The default output is below the session's `release-artifacts/` root; an explicit output must remain there. |
 | `asset authoring install --session <session-id> --archive <archive> --consumer-workspace <directory> --confirm [--workspace <directory>] [--json]` | Optionally install the exact inspected formal archive into an already initialized, managed consumer workspace outside the artist and protected roots. Without `--confirm`, return the confirmation action without mutation; success records a verified installation receipt. |
 
 Each JSON command returns the normal `ok`, `command`, `data`, `warnings`, and
@@ -277,6 +285,7 @@ Each JSON command returns the normal `ok`, `command`, `data`, `warnings`, and
 `manifestDigest`, `sourceDigests`, `validation`, `preview`, `releaseGates`,
 `releaseDeclaration`, `previewAcceptance`, `draftArchive`, `syncReceipt`,
 `formalArchiveReceipt`, `inspectionReceipt`, `installationReceipt`,
+`releaseProvenanceReceipt`,
 `capabilities`, and
 `schemaVersions`. `releaseGates.gates` reports current, missing, stale, or
 blocked acknowledgement, validation, declaration, preview, preview-artifact,
@@ -407,6 +416,33 @@ different bytes remains a bounded mismatch and cannot become the session
 checkpoint. Formal pack and inspect do not install a consumer; `asset install`
 remains an independent later workflow.
 
+D1 adds optional generation provenance after the exact formal archive has been
+inspected. It is a canonical external companion file, written by default beside
+the formal archive as
+`release-artifacts/<pack-id>-<version>.release-provenance.json`:
+
+```sh
+lpc-toolkit asset authoring provenance --session <session-id> --confirm
+lpc-toolkit asset authoring provenance --session <session-id> --records <records.json> --confirm
+lpc-toolkit asset provenance verify --archive <archive> --provenance <receipt> --json
+```
+
+The optional `--records` input is a strict array of bounded
+`provider-output`, `external-input`, or `source-transformation` records. It
+contains only identifiers and digests; raw prompts, provider payloads, source
+paths, secrets, credits, and human approval claims are refused and never copied
+into the companion receipt. Publication requires current release evidence and
+`--confirm`; unchanged publication is idempotent, while a changed projection
+requires an explicit new output path contained by the session artifact root.
+
+The public verifier accepts copied archive and receipt bytes from a separate
+consumer root. It checks the exact formal ZIP, manifest, content, source, and
+projection bindings without initializing or mutating a workspace or session.
+Declaration and preview digests are reported as bound evidence, not as human
+approval recreated by the verifier. The companion receipt is never a ZIP member
+or an installed asset, and ordinary `asset inspect` and `asset install` remain
+valid when it is absent.
+
 Authoring sessions use the standalone workspace's artist source and managed
 state only. They never modify checked-in `assets/`, the verified base cache,
 generated `assets_custom/` output, installed archive snapshots, or the dormant
@@ -428,7 +464,8 @@ report but exits `1` when `data.healthy` is false.
 ### Deterministic archive contract and trust boundary
 
 The archive contains only `asset-pack.json`, `checksums.json`, and the exact
-referenced regular files below `sprites/`. `checksums.json` uses strict schema
+referenced regular files below `sprites/`. The optional generation-provenance
+companion is published beside the archive and is never a ZIP member. `checksums.json` uses strict schema
 `lpc-toolkit.asset-pack-checksums.v1`; its rows are sorted by `path` and contain
 `path`, uncompressed `size`, and a lowercase `sha256:<64-hex>` digest. Coverage
 must equal `asset-pack.json` plus every referenced sprite, with no omission or
