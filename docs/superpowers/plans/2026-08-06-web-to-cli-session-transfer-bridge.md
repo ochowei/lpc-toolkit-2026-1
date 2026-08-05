@@ -213,14 +213,33 @@ recovery state, or compatibility rule cannot be omitted from the matrix.
 
 ### 7. Documentation impact and final verification
 
-- [ ] Update CLI help, CLI README, root README, landing, architecture,
+- [x] Update CLI help, CLI README, root README, landing, architecture,
       engineering, and releasing documentation for the final public contract.
-- [ ] Reassess the complete impact matrix and record `update` or an exact
+- [x] Reassess the complete impact matrix and record `update` or an exact
       `N/A — reason` for every surface, including plugin.
-- [ ] Run focused Core/Web/CLI/response/packed acceptance tests, boundary
+- [x] Run focused Core/Web/CLI/response/packed acceptance tests, boundary
       checks, plugin verification, full repository verification, CLI docs
       policy/impact checks, and `rtk git diff --check`.
-- [ ] Record exact commands and PASS/FAIL results below before the PR handoff.
+- [x] Record exact commands and PASS/FAIL results below before the PR handoff.
+      - Documentation commit: `5f41e9baa90118e9e20e0d1d8cb36af9bc420b0e`
+      - Regression-test commit: `fd054facc0f66026d3706e8bd43050c1c74ffafd`
+      - Final CLI documentation impact matrix:
+        ```text
+        help: update
+        cli-readme: update
+        root-readme: update
+        landing: update
+        architecture: update
+        engineering: update
+        releasing: update
+        plugin: N/A — D3 adds no plugin capability, skill, or command; plugin remains the reviewed character/animation-audit contract
+        ```
+      - Verification: `rtk pnpm --filter @lpc-toolkit/core exec vitest run test/asset-authoring-web-handoff.test.ts` PASS (6 tests); `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/landing-page.test.tsx test/asset-pack-download.test.ts test/asset-pack-download-bar.test.tsx test/asset-pack-web-cli-handoff.test.ts test/asset-pack-workbench-shell.test.tsx` PASS (20 tests); `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/command-spec.test.ts test/asset-authoring-web-cli-handoff.test.ts test/asset-authoring-commands.test.ts test/main-json.test.ts test/main-human.test.ts test/response.test.ts` PASS (167 tests).
+      - Verification: `rtk pnpm --filter @lpc-toolkit/core exec tsc -p tsconfig.json --noEmit` PASS; `rtk pnpm --filter @lpc-toolkit/web exec tsc -p tsconfig.json --noEmit` PASS; `rtk pnpm --filter @lpc-toolkit/cli exec tsc -p tsconfig.json --noEmit` PASS.
+      - Verification: `rtk pnpm --filter @lpc-toolkit/cli build` PASS; `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS (`Packed CLI install smoke test passed.`).
+      - Verification: `rtk pnpm check:boundaries` PASS; `rtk pnpm verify:plugin` PASS (40 tests); `rtk pnpm verify:cli-docs-policy` PASS (19 tests); `rtk pnpm check:cli-docs-impact -- --base origin/main --head HEAD --body-file .d3-pr-body.tmp.md` PASS (`CLI documentation impact declaration is valid.`); `rtk git diff --check` PASS.
+      - Verification: `rtk pnpm verify` PASS. Final workspace suites: Core 32 files/428 tests, asset-pack-format 7 files/75 tests, presets 1 file/8 tests, Web 107 files/867 tests, CLI 67 files/1,233 passed/1 skipped.
+      - Note: the first full verify attempt before `fd054facc0f66026d3706e8bd43050c1c74ffafd` failed only because the unchanged status/resume regression assertion omitted the additive `webHandoff: null`; the focused regression test and final full verify passed after the expectation was updated.
 
 ## Protected-path and privacy assertions
 
