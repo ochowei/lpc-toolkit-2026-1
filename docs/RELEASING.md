@@ -52,22 +52,35 @@ The capability response must retain the exact shipped identifiers
 `asset-authoring-candidate-import.v1`, `asset-authoring-recovery.v1`, and
 `asset-authoring-release.v1`, `asset-authoring-draft-recovery.v1`, and
 `asset-authoring-consumer-install.v1`, and
-`asset-authoring-release-provenance.v1`, plus the twelve versioned authoring/release
+`asset-authoring-release-provenance.v1`, and must advertise the D2 contract
+identifiers `asset-authoring-provider-discovery.v1`,
+`asset-authoring-provider-invocation.v1`, and
+`agent-integration-packaging.v1` only when their public seams and packed tests
+are complete. The schema response must retain the existing authoring/release
 schemas, including
 `lpc-toolkit.asset-authoring-formal-archive-receipt.v1` and
 `lpc-toolkit.asset-authoring-archive-inspection-receipt.v1` and
 `lpc-toolkit.asset-authoring-install-receipt.v1`,
 `lpc-toolkit.asset-release-provenance.v1`, and
-`lpc-toolkit.asset-release-provenance-verification.v1`.
+`lpc-toolkit.asset-release-provenance-verification.v1`, and must include
+`lpc-toolkit.asset-provider-descriptor.v1`,
+`lpc-toolkit.asset-provider-discovery.v1`,
+`lpc-toolkit.asset-provider-invocation.v1`,
+`lpc-toolkit.asset-provider-result.v1`,
+`lpc-toolkit.asset-provider-refusal.v1`, and
+`lpc-toolkit.agent-integration-manifest.v1`.
 Check that the CLI help lists `start`, `status`, `resume`, `contract`, `import`,
 `validate`, `preview`, `acknowledge`, `declare`, `accept-preview`, and
 `reconcile-manifest`, `draft`, `sync`, `pack`, `inspect`, `provenance`, and
-`install`, plus public `asset provenance verify`, and that the CLI README, root README, landing copy, and
-plugin compatibility references describe the same boundary. Plugin `0.2.1`
-must continue to document CLI range `>=0.2.0 <0.3.0`; the plugin intentionally
-does not claim or invoke the authoring-session release, draft-recovery,
-formal-pack, formal-inspect, manager-sync, consumer-install, or release-provenance
-capabilities.
+`install`, plus the provider `discover`, `preflight`, `handoff`, and `result`
+commands, `agent integration check`, and public `asset provenance verify`.
+Help must explain explicit consent, stable refusal/recovery actions, logical
+session candidate staging, and the existing `asset authoring import`,
+validation, preview, and release boundary. The CLI README, root README,
+landing copy, architecture, engineering, and this runbook must describe the
+same provider-neutral boundary. Plugin `0.2.1` must continue to document CLI
+range `>=0.2.0 <0.3.0`; the plugin intentionally does not claim or invoke D2
+provider capabilities or add a provider skill.
 
 Phase 1's release boundary is still session evidence, not archive publication.
 The packed smoke must show `releaseGates.releaseReady: true` only after the
@@ -126,14 +139,38 @@ declaration/preview digests as bound evidence rather than recreated human
 approval. A missing companion does not affect ordinary inspect/install, and the
 receipt is never an archive member or installed input.
 
+### D2 provider-neutral release gate
+
+D2 release verification covers only the public contract and session trust
+boundary. In a clean packed install, run `agent integration check` against a
+local compatible manifest, pass explicitly supplied descriptors through
+discovery and read-only preflight, verify that missing `--confirm` returns one
+consent action, and persist a handoff only for an unchanged explicit scope.
+Use a deterministic fake adapter and real fixture PNG in tests to exercise
+result re-digestion, refusal recovery, session-owned candidate staging, and
+the next `asset authoring import` action. Verify that subsequent validation,
+attributed preview, human declaration, preview acceptance, formal pack,
+inspection, and installation still use their existing authorities.
+
+The release gate must also prove required capability/CLI-range refusal,
+optional external-author fallback, network/credential/protected-root refusal,
+stale/cancelled/timed-out result recovery, additive provider session receipts,
+and D1 `provider-output` projection without private paths or payloads. No real
+provider, provider registry, credential, network service, Agent skill, Web
+bridge, persistent browser state, archive member, manifest field, or npm
+publication is part of D2. The plugin remains on its separately reviewed
+character and animation-audit contract.
+
 The packed CLI smoke remains the release proof for the public contract. In a
 clean workspace, it must discover capabilities, create a strict-plan session,
 materialize the drawing contract, import a real transparent PNG through the
 digest-bound trust boundary, validate, preview with PNG/metadata/TXT/CSV
 credits, and recover from interruption and external drift. It must also prove
 that checked-in assets, the managed base cache, generated overlay, installed
-source, unowned output, and dormant `upstream/` remain untouched. No provider
-invocation or Web bridge is part of this release gate. It also runs formal pack,
+source, unowned output, and dormant `upstream/` remain untouched. No real
+provider invocation, credential, network service, or Web bridge is part of this
+release gate; provider result coverage uses only a deterministic local fixture.
+It also runs formal pack,
 exact inspect, provenance generation, copied-archive verification from a clean
 consumer root, missing-receipt refusal, and ordinary-install compatibility.
 
@@ -183,6 +220,12 @@ lpc-toolkit --help
 lpc-toolkit catalog audit-animations --animation walk --json
 lpc-toolkit asset workspace init ./authoring-smoke
 ```
+
+For a D2-capable release, also run the offline Agent manifest checker and
+provider discovery/preflight with checked-in local JSON fixtures. Confirm that
+the checker reports optional capability fallback, discovery does not enumerate
+or invoke anything, and preflight leaves the session unchanged. Do not supply
+credentials or enable network access in post-publication verification.
 
 Then run the packed authoring smoke's fixture plan through
 `asset authoring start`, `contract`, `import`, `validate`, and `preview`, then

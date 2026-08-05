@@ -108,12 +108,19 @@ describe('CLI and agent integration pages', () => {
       'lpc-toolkit asset authoring install --session <session-id> --archive <archive> --consumer-workspace <directory> --confirm',
       'lpc-toolkit asset authoring draft --session <session-id>',
       'lpc-toolkit asset authoring sync --session <session-id> --confirm',
+      'lpc-toolkit agent integration check --manifest manifest.json --json',
+      'lpc-toolkit asset authoring provider discover --session <session-id> --contract-digest <sha256> --descriptors providers.json --json',
+      'lpc-toolkit asset authoring provider preflight --session <session-id> --contract-digest <sha256> --descriptor provider.json --json',
+      'lpc-toolkit asset authoring provider handoff --session <session-id> --descriptor provider.json --consent consent.json --confirm --json',
+      'lpc-toolkit asset authoring provider result --session <session-id> --invocation invocation.json --result result.json --candidate candidate.png --workspace ./my-lpc-art --json',
     ]) expect(html).toContain(command);
     expect(html).toContain('These receipts govern the authoring session only. Formal archive publication and consumer installation remain separate CLI steps.');
     expect(html).toContain('formal pack writes a non-draft archive below the session-owned release-artifacts directory');
     expect(html).toContain('Optionally activate the exact archive in a consumer workspace');
     expect(html).toContain('records an installation receipt');
     expect(html).toContain('Recover or synchronize the session separately');
+    expect(html).toContain('Optionally hand off a candidate through a provider-neutral Agent integration');
+    expect(html).toContain('result bytes are re-digested before they enter the session-owned candidate staging root');
     expect(html).toContain('asset_pack_draft');
     expect(html).toContain('manager-owned output and registry generation');
     expect(html).toContain('You do not need to clone this repository');
@@ -132,6 +139,12 @@ describe('CLI and agent integration pages', () => {
 
     expect(html).toContain('Agent Integrations');
     expect(html).toContain('aria-current="page"');
+    expect(html).toContain('Provider-neutral boundary');
+    expect(html).toContain('Agent integrations coordinate; the CLI remains the authority');
+    expect(html).toContain('There is no built-in provider');
+    expect(html).toContain(
+      'lpc-toolkit agent integration check --manifest manifest.json --json',
+    );
     expect(html).toContain('Codex');
     expect(html).toContain('Step 1: Install the CLI prerequisite');
     expect(html).toContain('Steps 2–3: Install the Codex plugin');

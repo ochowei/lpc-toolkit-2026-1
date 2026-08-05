@@ -149,6 +149,14 @@ const releaseRecoveryCommands = [
   'lpc-toolkit asset authoring sync --session <session-id> --confirm',
 ] as const;
 
+const providerHandoffCommands = [
+  'lpc-toolkit agent integration check --manifest manifest.json --json',
+  'lpc-toolkit asset authoring provider discover --session <session-id> --contract-digest <sha256> --descriptors providers.json --json',
+  'lpc-toolkit asset authoring provider preflight --session <session-id> --contract-digest <sha256> --descriptor provider.json --json',
+  'lpc-toolkit asset authoring provider handoff --session <session-id> --descriptor provider.json --consent consent.json --confirm --json',
+  'lpc-toolkit asset authoring provider result --session <session-id> --invocation invocation.json --result result.json --candidate candidate.png --workspace ./my-lpc-art --json',
+] as const;
+
 const cliReadmeUrl =
   'https://github.com/ochowei/lpc-toolkit-2026-1/blob/main/packages/cli/README.md';
 
@@ -349,6 +357,27 @@ export function CliPage({ onNavigate }: ProductPageProps) {
                 </li>
               ))}
             </ol>
+            <h3 className="mt-5 text-lg font-semibold text-text">
+              Optionally hand off a candidate through a provider-neutral Agent integration
+            </h3>
+            <p className="mt-2 text-sm text-text-2">
+              The CLI has no built-in provider and does not trust or invoke one
+              automatically. An external integration may supply a bounded
+              descriptor, but discovery and preflight are read-only, handoff
+              requires explicit consent and <code>--confirm</code>, and result
+              bytes are re-digested before they enter the session-owned
+              candidate staging root. The existing import, validation, preview,
+              attribution, and human release gates remain authoritative.
+              Refusals preserve the last valid checkpoint and return one safe
+              next action.
+            </p>
+            <ol className="mt-4 space-y-3">
+              {providerHandoffCommands.map((command, index) => (
+                <li key={`${index}-${command}`}>
+                  <CopyCode children={command} />
+                </li>
+              ))}
+            </ol>
           </div>
           <p className="mt-4 text-sm text-text-2">
             Put PNGs under <code>artist-packs/&lt;pack-id&gt;/sprites/</code>.
@@ -484,6 +513,35 @@ export function AgentIntegrationsPage({ onNavigate }: ProductPageProps) {
             same attributed CLI output and credit metadata.
           </p>
         </header>
+
+        <section className="rounded-md border border-border bg-surface p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-mute">
+            Provider-neutral boundary
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold text-text">
+            Agent integrations coordinate; the CLI remains the authority
+          </h2>
+          <p className="mt-2 max-w-3xl text-sm text-text-2">
+            D2 exposes an optional public-CLI contract for explicitly supplied
+            provider descriptors. There is no built-in provider, remote
+            registry, credential collection, hidden network call, or persistent
+            browser authoring state. The integration checker reports required
+            capability mismatches and optional external-author fallback before
+            any authoring handoff.
+          </p>
+          <div className="mt-4 grid min-w-0 gap-3">
+            <CopyCode children="lpc-toolkit agent integration check --manifest manifest.json --json" />
+            <CopyCode children="lpc-toolkit asset authoring provider preflight --session <session-id> --contract-digest <sha256> --descriptor provider.json --json" />
+          </div>
+          <p className="mt-4 max-w-3xl text-sm text-text-2">
+            A confirmed handoff persists only a bounded invocation. A returned
+            PNG is re-digested and staged as a session candidate; the existing
+            import, validation, attributed preview, attribution, and human
+            release gates still decide whether it can become pack source or a
+            formal release. Provider identity is provenance evidence, not
+            authorship, licensing, consent, or approval.
+          </p>
+        </section>
 
         <section className="rounded-md border border-border bg-surface p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-mute">

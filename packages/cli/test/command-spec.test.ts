@@ -55,6 +55,8 @@ describe('helpForCommand', () => {
     expect(help).toContain('--invocation <invocation.json>');
     expect(help).toContain('--result <result.json>');
     expect(help).toContain('--candidate <candidate.png>');
+    expect(help).toContain('session-relative ID');
+    expect(help).toContain('one safe recovery action');
     expect(help).toContain('existing candidate-import boundary');
   });
 
@@ -317,6 +319,23 @@ describe('helpForCommand', () => {
     expect(helpForCommand(['agent', 'integration', 'check'])).toContain(
       '--manifest <manifest.json>',
     );
+    expect(helpForCommand(['agent', 'integration', 'check'])).toContain(
+      'optional gaps report external-author fallback',
+    );
+
+    const providerHelp = helpForCommand(['asset', 'authoring', 'provider']);
+    for (const command of ['discover', 'preflight', 'handoff', 'result']) {
+      expect(providerHelp).toContain(
+        `lpc-toolkit asset authoring provider ${command}`,
+      );
+    }
+    expect(providerHelp).toContain('the CLI never invokes a provider');
+    expect(helpForCommand(['asset', 'authoring', 'provider', 'handoff'])).toContain(
+      'only after explicit --confirm',
+    );
+    expect(helpForCommand(['asset', 'authoring', 'import'])).toContain(
+      'provider results must use this existing command',
+    );
 
     const authoringHelp = helpForCommand(['asset', 'authoring']);
     for (const command of [
@@ -382,7 +401,7 @@ describe('helpForCommand', () => {
     expect(consumerInstallHelp).toContain('--consumer-workspace <directory>');
     expect(consumerInstallHelp).toContain('--confirm');
     expect(helpForCommand(['asset', 'authoring'])).toContain(
-      'Create and resume provider-neutral asset authoring sessions from strict plans.',
+      'Create and resume provider-neutral asset authoring sessions from strict plans;',
     );
   });
 

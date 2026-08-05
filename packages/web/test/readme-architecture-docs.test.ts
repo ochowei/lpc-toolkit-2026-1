@@ -359,6 +359,36 @@ describe('CLI README character contract', () => {
   });
 });
 
+describe('provider-neutral D2 documentation contract', () => {
+  it('keeps the public handoff boundary synchronized across owned documents', () => {
+    for (const document of [readme, cliReadme, architecture, engineering, releasing]) {
+      expect(document).toContain('provider-neutral');
+      expect(document).toContain('provider');
+      expect(document).toContain('upstream/');
+    }
+
+    for (const phrase of [
+      'asset authoring provider discover',
+      'asset authoring provider preflight',
+      'asset authoring provider handoff',
+      'asset authoring provider result',
+      'asset authoring import',
+      'external-author fallback',
+    ]) {
+      expect(readme).toContain(phrase);
+      expect(cliReadme).toContain(phrase);
+    }
+
+    expect(architecture).toContain('receipts.providerInvocation');
+    expect(architecture).toContain('D1 `provider-output` provenance');
+    expect(engineering).toContain('deterministic fake adapter');
+    expect(engineering).toContain('protected-path sentinels');
+    expect(releasing).toContain('D2 provider-neutral release gate');
+    expect(releasing).toContain('No real');
+    expect(releasing).toContain('provider result coverage uses only a deterministic local fixture');
+  });
+});
+
 describe('architecture ownership contract', () => {
   it('documents CLI asset lifecycle and AssetStore ownership', () => {
     for (const phrase of [

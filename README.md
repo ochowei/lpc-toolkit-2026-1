@@ -236,6 +236,36 @@ provider invocation. The receipt stays outside the ZIP and is ignored by
 ordinary `asset inspect`/`asset install`; verification is read-only and does not
 require the authoring session, a provider, an Agent skill, or a Web bridge.
 
+An optional D2 provider-neutral Agent handoff can sit between the drawing
+contract and candidate import. The CLI has no built-in provider, provider
+registry, credential store, network client, or bundled authoring skill. An
+external integration may supply bounded provider descriptors and coordinate a
+provider, but the CLI performs the compatibility checks and remains the sole
+authority for session state, candidate inspection, source import, validation,
+attribution, and release approval:
+
+```sh
+lpc-toolkit agent integration check --manifest manifest.json --json
+lpc-toolkit asset authoring provider discover --session <session-id> --contract-digest <sha256> --descriptors providers.json --json
+lpc-toolkit asset authoring provider preflight --session <session-id> --contract-digest <sha256> --descriptor provider.json --json
+lpc-toolkit asset authoring provider handoff --session <session-id> --descriptor provider.json --consent consent.json --confirm --json
+lpc-toolkit asset authoring provider result --session <session-id> --invocation invocation.json --result result.json --candidate candidate.png --workspace ./my-lpc-art --json
+```
+
+Discovery reads only explicitly supplied descriptors; preflight is read-only;
+handoff requires explicit consent and `--confirm`; and result re-digests a
+bounded PNG before staging it below the session-owned provider-candidate root.
+Provider output never edits `asset-pack.json`, source PNGs, credits, archives,
+or release receipts directly. The existing `asset authoring import` command
+must perform the next candidate-to-source mutation, followed by the existing
+validation, attributed preview, human declaration, preview acceptance, formal
+pack, inspect, and install gates. Unsupported, stale, cancelled, timed-out, or
+scope-changing work preserves the last valid checkpoint and returns one safe
+next action; optional capability absence is reported as an external-author fallback
+and hands the work back to the user. The flow does not add persistent browser
+authoring state or a Web-to-CLI bridge, and no real provider is invoked by the
+shipped CLI.
+
 Give the resulting `<pack-id>-<version>.lpc-assets.zip` to a consumer. They use
 a separate standalone workspace and run the lifecycle in order:
 
