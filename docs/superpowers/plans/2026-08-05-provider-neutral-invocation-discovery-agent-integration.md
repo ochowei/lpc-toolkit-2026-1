@@ -758,9 +758,20 @@ commit hashes, not abbreviated hashes, and exact command results.
 - [x] Task 1 — Core D2 schemas, limits, compatibility, and refusal codes
   - Commit: a1f54c1e4e386fe35e84be08bb577c9a419758c6
   - Verification: focused Core tests, Core typecheck, full Core regression, and `rtk git diff --check` all PASS; repository verify failure evidence and RED evidence are recorded above.
-- [ ] Task 2 — Capability advertisement and Agent manifest compatibility
-  - Commit: pending
-  - Verification: pending
+- [x] Task 2 — Capability advertisement and Agent manifest compatibility
+  - Commit: c706db442493219c64b1e5f752968f747447c291
+  - Implementation: Advertised the three D2 capabilities and six schema versions in deterministic order; added the offline `agent integration check --manifest <manifest.json>` public CLI seam with strict Core parsing, compatibility refusal, optional fallback, privacy rejection, and JSON/human response parity. The checker does not prepare runtime assets, load workspace state, execute providers, or use a network.
+  - RED: `rtk pnpm exec vitest run packages/cli/test/main-json.test.ts -t "advertises stable authoring capabilities"` FAIL — the pre-feature capability advertisement ended with the existing release capabilities instead of the three D2 capability IDs.
+  - RED: `rtk pnpm exec vitest run packages/cli/test/agent-integration.test.ts` FAIL — the pre-feature command returned exit code 1 instead of the expected successful compatibility check.
+  - Verification: `rtk pnpm exec vitest run test/agent-integration.test.ts` PASS — 13 tests from `packages/cli`.
+  - Verification: `rtk pnpm exec vitest run test/command-spec.test.ts -t "fixed capability and asset authoring command surface"` PASS — 1 test from `packages/cli`.
+  - Verification: `rtk pnpm exec vitest run test/main-json.test.ts -t "advertises stable authoring capabilities"` PASS — 1 test from `packages/cli`.
+  - Verification: `rtk pnpm exec vitest run test/main-human.test.ts -t "human-readable CLI output"` PASS — 39 tests from `packages/cli`.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli typecheck` PASS.
+  - Verification: `rtk git diff --check` PASS.
+  - Verification: `rtk pnpm test` FAIL in the sandbox — 13 existing `web-server` tests could not bind `127.0.0.1` (`EPERM`); no Task 2 test failed.
+  - Verification: `rtk pnpm test` PASS in a loopback-enabled rerun — 64 files, 1,182 tests passed, 1 skipped.
+  - Documentation impact reassessment: `help: update` in `command-spec.ts`; `cli-readme`, `root-readme`, `landing`, `architecture`, `engineering`, and `releasing` remain owned by Task 8's complete D2 documentation pass; `plugin: N/A` because no bundled skill or plugin command was added.
 - [ ] Task 3 — Discovery and read-only session preflight
   - Commit: pending
   - Verification: pending
