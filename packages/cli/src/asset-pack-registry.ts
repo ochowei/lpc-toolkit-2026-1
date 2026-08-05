@@ -831,12 +831,10 @@ export function assetPackCompileProjectionFromRegistry(options: {
       packId: entry.packId,
     }))),
     credits: uniqueGeneratedCredits(options.entries),
-    ownership: options.entries
-      .filter((entry) => entry.generatedPaths.length > 0)
-      .map((entry) => ({
-        packId: entry.packId,
-        logicalPaths: entry.generatedPaths,
-      })),
+    ownership: options.entries.map((entry) => ({
+      packId: entry.packId,
+      logicalPaths: entry.generatedPaths,
+    })),
   };
 }
 
@@ -954,11 +952,22 @@ export function readAssetPackRegistry(options: {
     const definitions = readCompileDefinitions(options.workspace, entries);
     validateGeneratedEntryRelationships(entries, generatedDigests, definitions);
     const compileDigest = digestAt(record, 'compileDigest', 'Asset workspace registry');
-    if (compileDigest !== assetPackCompileDigest(assetPackCompileProjectionFromRegistry({
+    const registryProjection = assetPackCompileProjectionFromRegistry({
       workspace: options.workspace,
       entries,
       definitions,
-    }))) {
+    });
+    const normalizedRegistryProjection: AssetPackCompileProjection = {
+      ...registryProjection,
+      ownership: registryProjection.ownership.filter((entry) => entry.logicalPaths.length > 0),
+    };
+    // Older v2 writers included empty formal-pack ownership rows in the digest,
+    // while the compiler omits rows for packs with no generated paths. Accept
+    // both deterministic encodings without rewriting the caller's registry.
+    if (
+      compileDigest !== assetPackCompileDigest(registryProjection)
+      && compileDigest !== assetPackCompileDigest(normalizedRegistryProjection)
+    ) {
       throw new Error('Asset workspace registry compileDigest does not match the compiled registry state.');
     }
     const document: AssetPackRegistryDocument = { schema: ASSET_WORKSPACE_REGISTRY_SCHEMA, workspaceId, entries, generatedDigests, compileDigest };

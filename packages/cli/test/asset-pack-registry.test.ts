@@ -521,6 +521,37 @@ describe('readAssetPackRegistry', () => {
     expectInvalid(workspace, { ...v2Document(workspace, [entry]), compileDigest: digest });
   });
 
+  it('accepts the normalized compile digest for an empty formal pack', () => {
+    const workspace = workspaceFixture();
+    const entry = linkedEntry(workspace);
+    const emptyEntry = {
+      ...entry,
+      generatedPaths: [],
+      logicalDestinations: [],
+      generatedSprites: [],
+      generatedCredits: [],
+    };
+    const legacyDocument = v2Document(workspace, [emptyEntry]);
+    const normalizedDocument = {
+      ...legacyDocument,
+      compileDigest: assetPackCompileDigest({
+        definitions: [],
+        sprites: [],
+        credits: [],
+        ownership: [],
+      }),
+    };
+
+    writeRegistry(workspace, normalizedDocument);
+    expect(readAssetPackRegistry({
+      workspace,
+      markerWorkspaceId: workspaceId(workspace),
+    })).toMatchObject({
+      ok: true,
+      needsMigration: false,
+    });
+  });
+
   it('rejects linked source escapes and symlink traversal', () => {
     const workspace = workspaceFixture();
     const outside = mkdtempSync(path.join(os.tmpdir(), 'lpc-asset-pack-registry-outside-'));
