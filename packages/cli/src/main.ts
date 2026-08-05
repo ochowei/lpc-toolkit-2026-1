@@ -678,7 +678,9 @@ async function runCliWithRuntime(
       io,
       parsed.command[3] === 'import'
         ? 'Web-to-CLI handoff import completed.\n'
-        : 'Web-to-CLI handoff inspection completed.\n',
+        : parsed.command[3] === 'recover'
+          ? 'Web-to-CLI handoff recovery completed.\n'
+          : 'Web-to-CLI handoff inspection completed.\n',
     );
   }
 

@@ -11,7 +11,15 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { parseAssetAuthoringWebHandoffReceiptJson } from '@lpc-toolkit/core';
 import { afterEach, describe, expect, it } from 'vitest';
-import { initializeAssetWorkspace } from '../src/asset-workspace.js';
+import {
+  extractVerifiedAssetPackPayload,
+  readAssetPackArchive,
+} from '../src/asset-pack-archive-format.js';
+import { inspectAssetWebCliHandoff } from '../src/asset-authoring-web-cli-handoff.js';
+import {
+  createAssetPackInstallStagingRoot,
+  initializeAssetWorkspace,
+} from '../src/asset-workspace.js';
 import { runCli, type CliIo } from '../src/main.js';
 import { createD3WebCliFixtures } from './fixtures/d3-web-cli-fixtures.js';
 
@@ -55,6 +63,40 @@ function jsonData(stdout: readonly string[]): Readonly<Record<string, unknown>> 
     throw new Error('Expected a JSON data object.');
   }
   return data as Readonly<Record<string, unknown>>;
+}
+
+async function createInterruptedRecovery(
+  workspace: ReturnType<typeof initializeAssetWorkspace>,
+  directory: string,
+  fixtures: Awaited<ReturnType<typeof createD3WebCliFixtures>>,
+): Promise<{ readonly stagingPath: string; readonly markerPath: string }> {
+  const { handoffPath, archivePath } = writeInputs(directory, fixtures.handoffJson, fixtures.archiveBytes);
+  const inspected = await inspectAssetWebCliHandoff({ handoffPath, archivePath });
+  if (!inspected.ok || inspected.data.state !== 'current') {
+    throw new Error('Expected a current handoff fixture.');
+  }
+  const archive = await readAssetPackArchive({ archivePath });
+  if (!archive.ok) throw new Error('Expected a verified archive fixture.');
+  const stagingRoot = createAssetPackInstallStagingRoot(
+    workspace,
+    (targetDirectory) => extractVerifiedAssetPackPayload({
+      snapshot: archive.snapshot,
+      targetDirectory,
+    }),
+  );
+  const stagingPath = stagingRoot.path;
+  const markerPath = path.join(workspace.stagingRoot, 'web-handoff-recovery.json');
+  writeFileSync(markerPath, `${JSON.stringify({
+    schema: 'lpc-toolkit.asset-authoring-web-handoff-recovery.v1',
+    handoffId: fixtures.handoff.handoffId,
+    handoffDigest: inspected.data.binding.handoffDigest,
+    binding: inspected.data.binding,
+    plan: fixtures.attachPlan,
+    planDigest: fixtures.interruptedStaging.planDigest,
+    stagingDirectory: path.basename(stagingPath),
+    createdAt: '2026-08-06T12:00:00.000Z',
+  })}\n`);
+  return { stagingPath, markerPath };
 }
 
 afterEach(() => {
@@ -355,7 +397,7 @@ describe('asset authoring Web-to-CLI handoff inspection', () => {
       '--archive', archivePath,
       '--plan', planPath,
     ], pending.io);
-    expect(pendingCode).toBe(0);
+    if (pendingCode !== 0) throw new Error(`Pending recovery failed: ${pending.stdout.join('')} ${pending.stderr.join('')}`);
     expect(pending.stdout.join('')).toContain('ready for explicit CLI confirmation');
     expect(pending.stdout.join('')).toContain('Web handoff is not release approval.');
 
@@ -370,5 +412,134 @@ describe('asset authoring Web-to-CLI handoff inspection', () => {
     expect(importedCode).toBe(0);
     expect(imported.stdout.join('')).toContain('imported into a new CLI authoring session');
     expect(imported.stdout.join('')).toContain('Web handoff is not release approval.');
+  });
+
+  it('requires confirmation and discards only the exact pending staging directory', async () => {
+    const fixtures = await createD3WebCliFixtures();
+    const directory = createDirectory();
+    const workspace = initializeAssetWorkspace(path.join(directory, 'workspace'));
+    const { handoffPath, archivePath } = writeInputs(directory, fixtures.handoffJson, fixtures.archiveBytes);
+    const { stagingPath, markerPath } = await createInterruptedRecovery(workspace, directory, fixtures);
+    const sentinelPath = path.join(workspace.root, 'outside-sentinel.txt');
+    writeFileSync(sentinelPath, 'keep');
+    const handoffBefore = readFileSync(handoffPath);
+    const archiveBefore = readFileSync(archivePath);
+
+    const pending = ioFor(workspace.root);
+    const pendingCode = await runCli([
+      'asset', 'authoring', 'handoff', 'recover',
+      '--handoff', handoffPath,
+      '--archive', archivePath,
+      '--workspace', workspace.root,
+      '--action', 'discard',
+      '--json',
+    ], pending.io);
+    expect(pendingCode).toBe(0);
+    expect(jsonData(pending.stdout)).toMatchObject({
+      state: 'needs-user-action',
+      action: 'discard',
+      nextAction: { id: 'confirm-handoff-recovery' },
+    });
+    expect(existsSync(stagingPath)).toBe(true);
+    expect(existsSync(markerPath)).toBe(true);
+
+    const discarded = ioFor(workspace.root);
+    const discardedCode = await runCli([
+      'asset', 'authoring', 'handoff', 'recover',
+      '--handoff', handoffPath,
+      '--archive', archivePath,
+      '--workspace', workspace.root,
+      '--action', 'discard',
+      '--confirm',
+      '--json',
+    ], discarded.io);
+    expect(discardedCode).toBe(0);
+    expect(jsonData(discarded.stdout)).toMatchObject({
+      state: 'discarded',
+      action: 'discard',
+      nextAction: { id: 'import-handoff' },
+    });
+    expect(existsSync(stagingPath)).toBe(false);
+    expect(existsSync(markerPath)).toBe(false);
+    expect(readFileSync(handoffPath)).toEqual(handoffBefore);
+    expect(readFileSync(archivePath)).toEqual(archiveBefore);
+    expect(readFileSync(sentinelPath, 'utf8')).toBe('keep');
+    expect(readdirSync(workspace.packsRoot)).toEqual([]);
+  });
+
+  it('resumes exact pending staging into a new session and receipt', async () => {
+    const fixtures = await createD3WebCliFixtures();
+    const directory = createDirectory();
+    const workspace = initializeAssetWorkspace(path.join(directory, 'workspace'));
+    const { handoffPath, archivePath } = writeInputs(directory, fixtures.handoffJson, fixtures.archiveBytes);
+    const { stagingPath, markerPath } = await createInterruptedRecovery(workspace, directory, fixtures);
+    const output = ioFor(workspace.root);
+
+    const code = await runCli([
+      'asset', 'authoring', 'handoff', 'recover',
+      '--handoff', handoffPath,
+      '--archive', archivePath,
+      '--workspace', workspace.root,
+      '--action', 'resume',
+      '--confirm',
+      '--json',
+    ], output.io);
+
+    if (code !== 0) throw new Error(`Resume recovery failed: ${output.stdout.join('')} ${output.stderr.join('')}`);
+    const data = jsonData(output.stdout);
+    expect(data).toMatchObject({
+      state: 'resumed',
+      action: 'resume',
+      nextAction: { id: 'validate-handoff-session' },
+    });
+    const sessionId = data.sessionId;
+    if (typeof sessionId !== 'string') throw new Error('Expected a resumed session id.');
+    expect(existsSync(stagingPath)).toBe(false);
+    expect(existsSync(markerPath)).toBe(false);
+    const packRoot = path.join(workspace.packsRoot, fixtures.handoff.pack.id);
+    const sessionRoot = path.join(workspace.stateRoot, 'authoring-sessions', sessionId);
+    expect(existsSync(path.join(packRoot, 'asset-pack.json'))).toBe(true);
+    expect(existsSync(path.join(sessionRoot, 'web-handoff-receipt.json'))).toBe(true);
+  });
+
+  it('preserves pending recovery evidence when the selected archive is stale or staging is tampered', async () => {
+    const fixtures = await createD3WebCliFixtures();
+    const directory = createDirectory();
+    const workspace = initializeAssetWorkspace(path.join(directory, 'workspace'));
+    const { handoffPath, archivePath } = writeInputs(directory, fixtures.handoffJson, fixtures.archiveBytes);
+    const { stagingPath, markerPath } = await createInterruptedRecovery(workspace, directory, fixtures);
+    const staleArchivePath = path.join(directory, 'stale.lpc-assets.zip');
+    writeFileSync(staleArchivePath, fixtures.staleArchiveBytes);
+    const staleOutput = ioFor(workspace.root);
+
+    const staleCode = await runCli([
+      'asset', 'authoring', 'handoff', 'recover',
+      '--handoff', handoffPath,
+      '--archive', staleArchivePath,
+      '--workspace', workspace.root,
+      '--action', 'discard',
+      '--confirm',
+      '--json',
+    ], staleOutput.io);
+    expect(staleCode).toBe(1);
+    expect(jsonData(staleOutput.stdout)).toMatchObject({ state: 'stale' });
+    expect(existsSync(stagingPath)).toBe(true);
+    expect(existsSync(markerPath)).toBe(true);
+
+    writeFileSync(path.join(stagingPath, 'asset-pack.json'), '{}\n');
+    const tamperedOutput = ioFor(workspace.root);
+    const tamperedCode = await runCli([
+      'asset', 'authoring', 'handoff', 'recover',
+      '--handoff', handoffPath,
+      '--archive', archivePath,
+      '--workspace', workspace.root,
+      '--action', 'discard',
+      '--confirm',
+      '--json',
+    ], tamperedOutput.io);
+    expect(tamperedCode).toBe(1);
+    expect(JSON.parse(tamperedOutput.stdout.join(''))).toMatchObject({ ok: false });
+    expect(existsSync(stagingPath)).toBe(true);
+    expect(existsSync(markerPath)).toBe(true);
   });
 });

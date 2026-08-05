@@ -1550,6 +1550,31 @@ function formatWebCliHandoffImport(data: JsonRecord): string | undefined {
   return `${lines.join('\n')}\n`;
 }
 
+function formatWebCliHandoffRecovery(data: JsonRecord): string | undefined {
+  const state = stringValue(data, 'state');
+  const handoffId = stringValue(data, 'handoffId');
+  const action = stringValue(data, 'action');
+  const nextAction = isRecord(data['nextAction']) ? data['nextAction'] : undefined;
+  const summary = nextAction === undefined ? undefined : stringValue(nextAction, 'summary');
+  const command = nextAction === undefined ? undefined : stringValue(nextAction, 'command');
+  if (!state || !handoffId || !action || !summary || !command) return undefined;
+  const lines = [
+    state === 'resumed'
+      ? 'Web-to-CLI recovery resumed into a new CLI authoring session.'
+      : state === 'discarded'
+        ? 'Web-to-CLI recovery staging was discarded.'
+        : state === 'needs-user-action'
+          ? 'Web-to-CLI recovery is ready for explicit confirmation.'
+          : 'Web-to-CLI recovery is stale and was not changed.',
+    `Handoff: ${handoffId}`,
+    `Action: ${action}`,
+    'Web handoff is not release approval.',
+    `Next action: ${summary}`,
+    `Next command: ${command}`,
+  ];
+  return `${lines.join('\n')}\n`;
+}
+
 function formatHumanData(response: CliResponse<unknown>): string | undefined {
   const data = response.data;
   if (!isRecord(data)) return undefined;
@@ -1559,6 +1584,9 @@ function formatHumanData(response: CliResponse<unknown>): string | undefined {
   }
   if (response.command === 'asset authoring handoff import') {
     return formatWebCliHandoffImport(data);
+  }
+  if (response.command === 'asset authoring handoff recover') {
+    return formatWebCliHandoffRecovery(data);
   }
 
   const authoring = formatAuthoringResponse(response.command, data);

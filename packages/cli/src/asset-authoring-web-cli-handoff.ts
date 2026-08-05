@@ -56,6 +56,9 @@ import {
 
 const HANDOFF_JSON_LIMIT = 64 * 1_024;
 const DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/u;
+const HANDOFF_RECOVERY_MARKER_FILE = 'web-handoff-recovery.json' as const;
+const HANDOFF_RECOVERY_SCHEMA =
+  'lpc-toolkit.asset-authoring-web-handoff-recovery.v1' as const;
 
 export type AssetWebCliHandoffInspectionState = 'current' | 'stale';
 
@@ -80,7 +83,8 @@ export interface AssetWebCliHandoffNextAction {
     | 'import-handoff'
     | 'confirm-handoff-import'
     | 'export-fresh-handoff'
-    | 'validate-handoff-session';
+    | 'validate-handoff-session'
+    | 'confirm-handoff-recovery';
   readonly summary: string;
   readonly command: string;
 }
@@ -102,6 +106,27 @@ export interface AssetWebCliHandoffImportData {
   readonly mismatches: readonly string[];
   readonly receiptDigest?: string;
   readonly nextAction: AssetWebCliHandoffNextAction;
+}
+
+export interface AssetWebCliHandoffRecoveryData {
+  readonly state: 'needs-user-action' | 'stale' | 'resumed' | 'discarded';
+  readonly handoffId: string;
+  readonly sessionId: string | null;
+  readonly action: 'resume' | 'discard';
+  readonly binding: AssetWebCliHandoffInspectionBinding;
+  readonly mismatches: readonly string[];
+  readonly nextAction: AssetWebCliHandoffNextAction;
+}
+
+interface HandoffRecoveryMarker {
+  readonly schema: typeof HANDOFF_RECOVERY_SCHEMA;
+  readonly handoffId: string;
+  readonly handoffDigest: string;
+  readonly binding: AssetWebCliHandoffInspectionBinding;
+  readonly plan: AssetAuthoringPlan;
+  readonly planDigest: string;
+  readonly stagingDirectory: string;
+  readonly createdAt: string;
 }
 
 interface HandoffReadResult {
@@ -343,6 +368,22 @@ function validateImportedSessionNextAction(): AssetWebCliHandoffNextAction {
   };
 }
 
+function confirmRecoveryNextAction(action: 'resume' | 'discard'): AssetWebCliHandoffNextAction {
+  return {
+    id: 'confirm-handoff-recovery',
+    summary: `Confirm the exact ${action} action for the CLI-owned Web-handoff staging directory.`,
+    command: `asset authoring handoff recover --handoff <handoff.json> --archive <pack.lpc-assets.zip> --workspace <directory> --action ${action} --confirm`,
+  };
+}
+
+function recoveryImportNextAction(): AssetWebCliHandoffNextAction {
+  return {
+    id: 'import-handoff',
+    summary: 'Start a new explicit Web-to-CLI import after reviewing the discarded staging state.',
+    command: 'asset authoring handoff import --handoff <handoff.json> --archive <pack.lpc-assets.zip> --plan <attach-pack-plan.json> --confirm',
+  };
+}
+
 interface HandoffInspectionPair {
   readonly handoff: AssetWebCliHandoff;
   readonly handoffDigest: string;
@@ -441,6 +482,252 @@ function importConflictIssue(message: string, issuePath?: string): HandoffInspec
       ...(issuePath === undefined ? {} : { path: issuePath }),
     },
   };
+}
+
+const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+const RECOVERY_STAGING_NAME_PATTERN = /^(?:install-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|\.d3-handoff-pending)$/u;
+const ISO_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u;
+
+function isJsonRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function exactKeys(
+  value: Readonly<Record<string, unknown>>,
+  expected: readonly string[],
+): boolean {
+  const allowed = new Set(expected);
+  return Object.keys(value).every((key) => allowed.has(key))
+    && expected.every((key) => key in value);
+}
+
+function requiredString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function parseRecoveryBinding(value: unknown): AssetWebCliHandoffInspectionBinding | undefined {
+  if (!isJsonRecord(value) || !exactKeys(value, [
+    'handoffId',
+    'handoffDigest',
+    'archiveDigest',
+    'byteLength',
+    'packId',
+    'version',
+    'archiveKind',
+    'manifestDigest',
+    'contentDigest',
+    'releaseFingerprint',
+    'sourceDigests',
+    'creditDigest',
+    'acknowledgementDigest',
+  ])) return undefined;
+  const handoffId = requiredString(value.handoffId);
+  const handoffDigest = requiredString(value.handoffDigest);
+  const archiveDigest = requiredString(value.archiveDigest);
+  const packId = requiredString(value.packId);
+  const version = requiredString(value.version);
+  const manifestDigest = requiredString(value.manifestDigest);
+  const contentDigest = requiredString(value.contentDigest);
+  const releaseFingerprint = requiredString(value.releaseFingerprint);
+  const creditDigest = requiredString(value.creditDigest);
+  const acknowledgementDigest = requiredString(value.acknowledgementDigest);
+  if (
+    handoffId === undefined
+    || handoffDigest === undefined
+    || archiveDigest === undefined
+    || packId === undefined
+    || version === undefined
+    || manifestDigest === undefined
+    || contentDigest === undefined
+    || releaseFingerprint === undefined
+    || creditDigest === undefined
+    || acknowledgementDigest === undefined
+  ) return undefined;
+  if (!UUID_V4_PATTERN.test(handoffId)) return undefined;
+  if (
+    ![
+      handoffDigest,
+      archiveDigest,
+      manifestDigest,
+      contentDigest,
+      releaseFingerprint,
+      creditDigest,
+      acknowledgementDigest,
+    ].every((entry) => DIGEST_PATTERN.test(entry))
+    || (value.archiveKind !== 'draft' && value.archiveKind !== 'formal')
+    || typeof value.byteLength !== 'number'
+    || !Number.isSafeInteger(value.byteLength)
+    || value.byteLength < 0
+    || !Array.isArray(value.sourceDigests)
+  ) return undefined;
+  const sourceDigests: AssetWebCliHandoffSource[] = [];
+  for (const source of value.sourceDigests) {
+    if (!isJsonRecord(source) || !exactKeys(source, ['path', 'digest'])) return undefined;
+    const sourcePath = requiredString(source.path);
+    const digest = requiredString(source.digest);
+    if (
+      sourcePath === undefined
+      || digest === undefined
+      || !DIGEST_PATTERN.test(digest)
+      || path.isAbsolute(sourcePath)
+      || sourcePath.includes('\\')
+      || sourcePath.split('/').some((segment) => segment.length === 0 || segment === '.' || segment === '..')
+    ) return undefined;
+    sourceDigests.push({ path: sourcePath, digest });
+  }
+  if (new Set(sourceDigests.map((source) => source.path)).size !== sourceDigests.length) {
+    return undefined;
+  }
+  return {
+    handoffId,
+    handoffDigest,
+    archiveDigest,
+    byteLength: value.byteLength,
+    packId,
+    version,
+    archiveKind: value.archiveKind,
+    manifestDigest,
+    contentDigest,
+    releaseFingerprint,
+    sourceDigests,
+    creditDigest,
+    acknowledgementDigest,
+  };
+}
+
+function parseRecoveryMarker(value: unknown):
+  | { readonly ok: true; readonly marker: HandoffRecoveryMarker }
+  | { readonly ok: false; readonly message: string } {
+  if (!isJsonRecord(value) || !exactKeys(value, [
+    'schema',
+    'handoffId',
+    'handoffDigest',
+    'binding',
+    'plan',
+    'planDigest',
+    'stagingDirectory',
+    'createdAt',
+  ])) return { ok: false, message: 'Recovery marker has unknown or missing fields.' };
+  if (value.schema !== HANDOFF_RECOVERY_SCHEMA) {
+    return { ok: false, message: 'Recovery marker schema is unsupported.' };
+  }
+  const handoffId = requiredString(value.handoffId);
+  const handoffDigest = requiredString(value.handoffDigest);
+  const planDigest = requiredString(value.planDigest);
+  const stagingDirectory = requiredString(value.stagingDirectory);
+  const createdAt = requiredString(value.createdAt);
+  const binding = parseRecoveryBinding(value.binding);
+  const parsedPlan = parseAssetAuthoringPlan(value.plan);
+  if (
+    handoffId === undefined
+    || !UUID_V4_PATTERN.test(handoffId)
+    || handoffDigest === undefined
+    || !DIGEST_PATTERN.test(handoffDigest)
+    || planDigest === undefined
+    || !DIGEST_PATTERN.test(planDigest)
+    || stagingDirectory === undefined
+    || !RECOVERY_STAGING_NAME_PATTERN.test(stagingDirectory)
+    || createdAt === undefined
+    || !ISO_TIMESTAMP_PATTERN.test(createdAt)
+    || binding === undefined
+    || binding.handoffId !== handoffId
+    || binding.handoffDigest !== handoffDigest
+    || !parsedPlan.ok
+  ) return { ok: false, message: 'Recovery marker bindings are invalid.' };
+  if (digestJson(parsedPlan.plan) !== planDigest) {
+    return { ok: false, message: 'Recovery marker plan digest does not match its plan.' };
+  }
+  return {
+    ok: true,
+    marker: {
+      schema: HANDOFF_RECOVERY_SCHEMA,
+      handoffId,
+      handoffDigest,
+      binding,
+      plan: parsedPlan.plan,
+      planDigest,
+      stagingDirectory,
+      createdAt,
+    },
+  };
+}
+
+function recoveryMarkerPath(workspace: AssetWorkspace): string {
+  return path.join(workspace.stagingRoot, HANDOFF_RECOVERY_MARKER_FILE);
+}
+
+function readRecoveryMarker(workspace: AssetWorkspace):
+  | { readonly ok: true; readonly marker: HandoffRecoveryMarker }
+  | { readonly ok: true; readonly marker: undefined }
+  | HandoffInspectionFailure {
+  const markerPath = recoveryMarkerPath(workspace);
+  const status = lstatSync(markerPath, { throwIfNoEntry: false });
+  if (status === undefined) return { ok: true, marker: undefined };
+  if (status.isSymbolicLink() || !status.isFile()) {
+    return importBlockedIssue('The Web-handoff recovery marker is not a regular file.', markerPath);
+  }
+  const read = readRegularFile(markerPath, HANDOFF_JSON_LIMIT);
+  if (!read.ok) return importBlockedIssue(`Recovery marker could not be read: ${read.message}`, markerPath);
+  let input: unknown;
+  try {
+    input = JSON.parse(read.bytes.toString('utf8')) as unknown;
+  } catch {
+    return importBlockedIssue('Recovery marker must be valid JSON.', markerPath);
+  }
+  const parsed = parseRecoveryMarker(input);
+  if (!parsed.ok) return importBlockedIssue(parsed.message, markerPath);
+  return parsed;
+}
+
+function recoveryMarkerFor(
+  pair: HandoffInspectionPair,
+  plan: AssetAuthoringPlan,
+  planDigest: string,
+  stagingDirectory: string,
+): HandoffRecoveryMarker {
+  return {
+    schema: HANDOFF_RECOVERY_SCHEMA,
+    handoffId: pair.handoff.handoffId,
+    handoffDigest: pair.handoffDigest,
+    binding: publicBindingFor(pair.handoff.handoffId, pair.handoffDigest, pair.binding),
+    plan,
+    planDigest,
+    stagingDirectory,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function removeMatchingRecoveryMarker(
+  workspace: AssetWorkspace,
+  expected: HandoffRecoveryMarker,
+): void {
+  const markerPath = recoveryMarkerPath(workspace);
+  const status = lstatSync(markerPath, { throwIfNoEntry: false });
+  if (status === undefined) return;
+  if (status.isSymbolicLink() || !status.isFile()) {
+    throw new Error('Web-handoff recovery marker identity changed.');
+  }
+  const read = readRegularFile(markerPath, HANDOFF_JSON_LIMIT);
+  if (!read.ok) throw new Error(`Recovery marker changed: ${read.message}`);
+  let input: unknown;
+  try {
+    input = JSON.parse(read.bytes.toString('utf8')) as unknown;
+  } catch {
+    throw new Error('Recovery marker changed and is no longer valid JSON.');
+  }
+  const parsed = parseRecoveryMarker(input);
+  if (!parsed.ok || parsed.marker.handoffId !== expected.handoffId || parsed.marker.stagingDirectory !== expected.stagingDirectory) {
+    throw new Error('Recovery marker bindings changed.');
+  }
+  const confirmed = lstatSync(markerPath, { throwIfNoEntry: false });
+  if (
+    !confirmed
+    || confirmed.isSymbolicLink()
+    || !confirmed.isFile()
+    || confirmed.dev !== status.dev
+    || confirmed.ino !== status.ino
+  ) throw new Error('Recovery marker identity changed.');
+  rmSync(markerPath);
 }
 
 function readAttachPlan(planPath: string):
@@ -741,6 +1028,304 @@ function staleImportData(
   );
 }
 
+interface StagedImportCommitSuccess {
+  readonly ok: true;
+  readonly sessionId: string;
+  readonly receiptDigest: string;
+  readonly stagingPublished: true;
+}
+
+interface StagedImportCommitFailure {
+  readonly ok: false;
+  readonly issue: CliIssue;
+  readonly stagingPublished: boolean;
+}
+
+async function commitStagedImport(options: {
+  readonly workspace: AssetWorkspace;
+  readonly pair: HandoffInspectionPair;
+  readonly plan: AssetAuthoringPlan;
+  readonly packRoot: string;
+  readonly stagingPath: string;
+  readonly recoveryMarker: HandoffRecoveryMarker;
+}): Promise<StagedImportCommitSuccess | StagedImportCommitFailure> {
+  let publishedPack: OwnedDirectory | undefined;
+  let createdSession: OwnedDirectory | undefined;
+  let stagingPublished = false;
+  let completed = false;
+  try {
+    if (lstatSync(options.packRoot, { throwIfNoEntry: false }) !== undefined) {
+      return {
+        ok: false,
+        issue: importConflictIssue(
+          'The target pack appeared during staging; import will not overwrite it.',
+          options.packRoot,
+        ).issue,
+        stagingPublished: false,
+      };
+    }
+    renameSync(options.stagingPath, options.packRoot);
+    stagingPublished = true;
+    publishedPack = captureOwnedDirectory(options.packRoot);
+
+    const store = createAssetAuthoringSessionStore(options.workspace);
+    let session = store.create({ plan: options.plan, packRoot: options.packRoot });
+    const sessionDirectory = path.dirname(assetAuthoringSessionPath(options.workspace, session.sessionId));
+    createdSession = captureOwnedDirectory(sessionDirectory);
+    const manifestPath = path.join(options.packRoot, 'asset-pack.json');
+    const manifest = readRegularFile(manifestPath, HANDOFF_JSON_LIMIT);
+    if (!manifest.ok) {
+      return {
+        ok: false,
+        issue: importBlockedIssue(`The published pack manifest could not be read: ${manifest.message}`, manifestPath).issue,
+        stagingPublished,
+      };
+    }
+    const manifestDigest = sha256(manifest.bytes);
+    writeNewFileAtomically(path.join(sessionDirectory, 'manifest.snapshot.json'), manifest.bytes);
+    session = store.replace(session.sessionId, {
+      state: 'needs-user-action',
+      reason: 'pack-attached',
+      phase: 'scaffolded',
+      checkpointFreshness: 'current',
+      checkpoint: {
+        id: 'manifest',
+        phase: 'scaffolded',
+        digest: manifestDigest,
+        freshness: 'current',
+      },
+      manifestDigest,
+    });
+    const loaded = await loadAssetPackFiles(options.packRoot);
+    if (!loaded.ok) {
+      return {
+        ok: false,
+        issue: importBlockedIssue('The published pack no longer passes pack-file validation.').issue,
+        stagingPublished,
+      };
+    }
+    const publishedMismatches = stagedMismatches(loaded, options.pair.binding);
+    if (publishedMismatches.length > 0) {
+      return {
+        ok: false,
+        issue: importBlockedIssue(`The published pack changed during recovery: ${publishedMismatches.join(', ')}.`).issue,
+        stagingPublished,
+      };
+    }
+    const receipt: AssetAuthoringWebHandoffReceipt = {
+      schema: ASSET_AUTHORING_WEB_HANDOFF_RECEIPT_SCHEMA,
+      handoffId: options.pair.handoff.handoffId,
+      handoffDigest: options.pair.handoffDigest,
+      archiveDigest: options.pair.binding.archiveDigest,
+      sessionId: session.sessionId,
+      manifestDigest,
+      contentDigest: loaded.contentDigest,
+      sourceDigests: sourceDigestsFromMap(loaded.sourceDigests),
+      creditDigest: creditDigestFor(loaded.pack),
+      status: 'imported',
+      recordedAt: new Date().toISOString(),
+    };
+    writeNewFileAtomically(
+      path.join(sessionDirectory, 'web-handoff-receipt.json'),
+      Buffer.from(`${JSON.stringify(receipt)}\n`, 'utf8'),
+    );
+    removeMatchingRecoveryMarker(options.workspace, options.recoveryMarker);
+    completed = true;
+    return {
+      ok: true,
+      sessionId: session.sessionId,
+      receiptDigest: receiptDigest(receipt),
+      stagingPublished: true,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      issue: importBlockedIssue(
+        `Web-to-CLI handoff import could not be completed: ${error instanceof Error ? error.message : String(error)}.`,
+      ).issue,
+      stagingPublished,
+    };
+  } finally {
+    if (!completed) {
+      removeOwnedDirectory(createdSession);
+      removeOwnedDirectory(publishedPack);
+    }
+  }
+}
+
+function recoveryBindingMismatches(
+  pair: HandoffInspectionPair,
+  marker: HandoffRecoveryMarker,
+): readonly string[] {
+  const mismatches: string[] = [];
+  if (pair.handoff.handoffId !== marker.handoffId) mismatches.push('handoffId');
+  if (pair.handoffDigest !== marker.handoffDigest) mismatches.push('handoffDigest');
+  const actual = pair.binding;
+  const expected = marker.binding;
+  if (actual.archiveDigest !== expected.archiveDigest) mismatches.push('archiveDigest');
+  if (actual.byteLength !== expected.byteLength) mismatches.push('byteLength');
+  if (actual.packId !== expected.packId) mismatches.push('packId');
+  if (actual.version !== expected.version) mismatches.push('version');
+  if (actual.archiveKind !== expected.archiveKind) mismatches.push('archiveKind');
+  if (actual.manifestDigest !== expected.manifestDigest) mismatches.push('manifestDigest');
+  if (actual.contentDigest !== expected.contentDigest) mismatches.push('contentDigest');
+  if (actual.releaseFingerprint !== expected.releaseFingerprint) mismatches.push('releaseFingerprint');
+  if (!equalSources(actual.sourceDigests, expected.sourceDigests)) mismatches.push('sourceDigests');
+  if (actual.creditDigest !== expected.creditDigest) mismatches.push('creditDigest');
+  if (actual.acknowledgementDigest !== expected.acknowledgementDigest) {
+    mismatches.push('acknowledgementDigest');
+  }
+  return mismatches;
+}
+
+function recoveryDataFor(
+  pair: HandoffInspectionPair,
+  action: 'resume' | 'discard',
+  state: AssetWebCliHandoffRecoveryData['state'],
+  options: {
+    readonly sessionId?: string | null;
+    readonly mismatches?: readonly string[];
+    readonly nextAction?: AssetWebCliHandoffNextAction;
+  } = {},
+): AssetWebCliHandoffRecoveryData {
+  return {
+    state,
+    handoffId: pair.handoff.handoffId,
+    sessionId: options.sessionId ?? null,
+    action,
+    binding: publicBindingFor(pair.handoff.handoffId, pair.handoffDigest, pair.binding),
+    mismatches: options.mismatches ?? [],
+    nextAction: options.nextAction
+      ?? (state === 'stale' ? staleNextAction() : validateImportedSessionNextAction()),
+  };
+}
+
+async function recoverAssetWebCliHandoff(options: {
+  readonly handoffPath: string;
+  readonly archivePath: string;
+  readonly action: 'resume' | 'discard';
+  readonly confirm: boolean;
+  readonly workspace: AssetWorkspace;
+}): Promise<CliResponse<AssetWebCliHandoffRecoveryData | null>> {
+  const markerResult = readRecoveryMarker(options.workspace);
+  if (!markerResult.ok) return commandError('asset authoring handoff recover', markerResult.issue);
+  if (markerResult.marker === undefined) {
+    return commandError('asset authoring handoff recover', {
+      code: 'asset_web_cli_handoff_recovery_missing',
+      message: 'No CLI-owned Web-handoff recovery marker is pending in this workspace.',
+      path: recoveryMarkerPath(options.workspace),
+    });
+  }
+  const marker = markerResult.marker;
+  const inspected = await inspectHandoffPair({
+    handoffPath: options.handoffPath,
+    archivePath: options.archivePath,
+  });
+  if (!inspected.ok) return commandError('asset authoring handoff recover', inspected.issue);
+  if (inspected.pair.data.state === 'stale') {
+    return commandOk(
+      'asset authoring handoff recover',
+      recoveryDataFor(inspected.pair, options.action, 'stale', {
+        mismatches: inspected.pair.data.mismatches,
+      }),
+    );
+  }
+  const bindingMismatches = recoveryBindingMismatches(inspected.pair, marker);
+  if (bindingMismatches.length > 0) {
+    return commandError(
+      'asset authoring handoff recover',
+      importBlockedIssue(`Recovery marker does not match the selected handoff and archive: ${bindingMismatches.join(', ')}.`, recoveryMarkerPath(options.workspace)).issue,
+    );
+  }
+  const planIssue = validateAttachPlan(marker.plan, inspected.pair.binding, recoveryMarkerPath(options.workspace));
+  if (planIssue) return commandError('asset authoring handoff recover', planIssue.issue);
+
+  const stagingPath = path.join(options.workspace.stagingRoot, marker.stagingDirectory);
+  if (path.dirname(stagingPath) !== path.resolve(options.workspace.stagingRoot)) {
+    return commandError(
+      'asset authoring handoff recover',
+      importBlockedIssue('Recovery staging escapes the workspace staging root.', stagingPath).issue,
+    );
+  }
+  const stagingStatus = lstatSync(stagingPath, { throwIfNoEntry: false });
+  if (!stagingStatus || stagingStatus.isSymbolicLink() || !stagingStatus.isDirectory()) {
+    return commandError(
+      'asset authoring handoff recover',
+      importBlockedIssue('The exact recovery staging directory is missing or unsafe.', stagingPath).issue,
+    );
+  }
+  const staged = await loadAssetPackFiles(stagingPath);
+  if (!staged.ok) {
+    return commandError(
+      'asset authoring handoff recover',
+      importBlockedIssue('The pending recovery payload no longer passes pack-file validation.', stagingPath).issue,
+    );
+  }
+  const stagedMismatchList = stagedMismatches(staged, inspected.pair.binding);
+  if (stagedMismatchList.length > 0) {
+    return commandError(
+      'asset authoring handoff recover',
+      importBlockedIssue(`The pending recovery payload does not match its marker: ${stagedMismatchList.join(', ')}.`, stagingPath).issue,
+    );
+  }
+  if (!options.confirm) {
+    return commandOk(
+      'asset authoring handoff recover',
+      recoveryDataFor(inspected.pair, options.action, 'needs-user-action', {
+        nextAction: confirmRecoveryNextAction(options.action),
+      }),
+    );
+  }
+
+  if (options.action === 'discard') {
+    const ownedStaging: OwnedDirectory = {
+      path: stagingPath,
+      device: stagingStatus.dev,
+      inode: stagingStatus.ino,
+    };
+    removeOwnedDirectory(ownedStaging);
+    if (lstatSync(stagingPath, { throwIfNoEntry: false }) !== undefined) {
+      return commandError(
+        'asset authoring handoff recover',
+        importBlockedIssue('Recovery staging identity changed; it was not deleted.', stagingPath).issue,
+      );
+    }
+    try {
+      removeMatchingRecoveryMarker(options.workspace, marker);
+    } catch (error) {
+      return commandError(
+        'asset authoring handoff recover',
+        importBlockedIssue(`Recovery staging was discarded but its marker could not be cleared: ${error instanceof Error ? error.message : String(error)}.`).issue,
+      );
+    }
+    return commandOk(
+      'asset authoring handoff recover',
+      recoveryDataFor(inspected.pair, options.action, 'discarded', {
+        nextAction: recoveryImportNextAction(),
+      }),
+    );
+  }
+
+  const packRoot = destinationPackRoot(options.workspace, marker.binding.packId);
+  if (typeof packRoot !== 'string') return commandError('asset authoring handoff recover', packRoot.issue);
+  const committed = await commitStagedImport({
+    workspace: options.workspace,
+    pair: inspected.pair,
+    plan: marker.plan,
+    packRoot,
+    stagingPath,
+    recoveryMarker: marker,
+  });
+  if (!committed.ok) return commandError('asset authoring handoff recover', committed.issue);
+  return commandOk(
+    'asset authoring handoff recover',
+    recoveryDataFor(inspected.pair, options.action, 'resumed', {
+      sessionId: committed.sessionId,
+      nextAction: validateImportedSessionNextAction(),
+    }),
+  );
+}
+
 async function importAssetWebCliHandoff(options: {
   readonly handoffPath: string;
   readonly archivePath: string;
@@ -814,6 +1399,7 @@ async function importAssetWebCliHandoff(options: {
 
   let staging: AssetPackInstallStagingRoot | undefined;
   let stagingPublished = false;
+  let recoveryMarker: HandoffRecoveryMarker | undefined;
   let publishedPack: OwnedDirectory | undefined;
   let createdSession: OwnedDirectory | undefined;
   let completed = false;
@@ -824,6 +1410,16 @@ async function importAssetWebCliHandoff(options: {
         snapshot: latest.pair.snapshot,
         targetDirectory,
       }),
+    );
+    recoveryMarker = recoveryMarkerFor(
+      latest.pair,
+      latestPlan.plan,
+      latestPlan.planDigest,
+      path.basename(staging.path),
+    );
+    writeNewFileAtomically(
+      recoveryMarkerPath(options.workspace),
+      Buffer.from(`${JSON.stringify(recoveryMarker)}\n`, 'utf8'),
     );
     const staged = await loadAssetPackFiles(staging.path);
     if (!staged.ok) {
@@ -849,6 +1445,21 @@ async function importAssetWebCliHandoff(options: {
     renameSync(staging.path, packRoot);
     stagingPublished = true;
     publishedPack = captureOwnedDirectory(packRoot);
+
+    const published = await loadAssetPackFiles(packRoot);
+    if (!published.ok) {
+      return commandError(
+        'asset authoring handoff import',
+        importBlockedIssue('The published pack no longer passes pack-file validation.').issue,
+      );
+    }
+    const publishedMismatchList = stagedMismatches(published, latest.pair.binding);
+    if (publishedMismatchList.length > 0) {
+      return commandError(
+        'asset authoring handoff import',
+        importBlockedIssue(`The published pack changed during import: ${publishedMismatchList.join(', ')}.`).issue,
+      );
+    }
 
     const store = createAssetAuthoringSessionStore(options.workspace);
     let session = store.create({ plan: latestPlan.plan, packRoot });
@@ -876,9 +1487,9 @@ async function importAssetWebCliHandoff(options: {
       archiveDigest: latest.pair.binding.archiveDigest,
       sessionId: session.sessionId,
       manifestDigest,
-      contentDigest: staged.contentDigest,
-      sourceDigests: sourceDigestsFromMap(staged.sourceDigests),
-      creditDigest: creditDigestFor(staged.pack),
+      contentDigest: published.contentDigest,
+      sourceDigests: sourceDigestsFromMap(published.sourceDigests),
+      creditDigest: creditDigestFor(published.pack),
       status: 'imported',
       recordedAt: new Date().toISOString(),
     };
@@ -886,6 +1497,7 @@ async function importAssetWebCliHandoff(options: {
       path.join(sessionDirectory, 'web-handoff-receipt.json'),
       Buffer.from(`${JSON.stringify(receipt)}\n`, 'utf8'),
     );
+    removeMatchingRecoveryMarker(options.workspace, recoveryMarker);
     completed = true;
     return commandOk(
       'asset authoring handoff import',
@@ -903,6 +1515,13 @@ async function importAssetWebCliHandoff(options: {
     if (!completed) {
       removeOwnedDirectory(createdSession);
       removeOwnedDirectory(publishedPack);
+      if (recoveryMarker !== undefined) {
+        try {
+          removeMatchingRecoveryMarker(options.workspace, recoveryMarker);
+        } catch {
+          // Preserve a changed marker for explicit recovery inspection.
+        }
+      }
       if (staging !== undefined && !stagingPublished) {
         try {
           removeAssetPackInstallStagingRoot(options.workspace, staging);
@@ -918,7 +1537,7 @@ export async function runAssetAuthoringWebCliHandoffCommand(options: {
   readonly parsed: ParsedArgs;
   readonly cwd: string;
   readonly workspace?: AssetWorkspace;
-}): Promise<CliResponse<AssetWebCliHandoffInspectionData | AssetWebCliHandoffImportData | null>> {
+}): Promise<CliResponse<AssetWebCliHandoffInspectionData | AssetWebCliHandoffImportData | AssetWebCliHandoffRecoveryData | null>> {
   const subcommand = options.parsed.command[3];
   if (subcommand === 'import') {
     const handoffPath = flagString(options.parsed.flags, 'handoff');
@@ -941,6 +1560,35 @@ export async function runAssetAuthoringWebCliHandoffCommand(options: {
       handoffPath: path.resolve(options.cwd, handoffPath),
       archivePath: path.resolve(options.cwd, archivePath),
       planPath: path.resolve(options.cwd, planPath),
+      confirm: flagBoolean(options.parsed.flags, 'confirm'),
+      workspace: options.workspace,
+    });
+  }
+  if (subcommand === 'recover') {
+    const handoffPath = flagString(options.parsed.flags, 'handoff');
+    const archivePath = flagString(options.parsed.flags, 'archive');
+    const action = flagString(options.parsed.flags, 'action');
+    if (
+      handoffPath === undefined
+      || archivePath === undefined
+      || (action !== 'resume' && action !== 'discard')
+    ) {
+      return commandError('asset authoring handoff recover', {
+        code: 'missing_argument',
+        message: '--handoff, --archive, and --action resume|discard are required.',
+      });
+    }
+    if (options.workspace === undefined) {
+      return commandError('asset authoring handoff recover', {
+        code: 'asset_workspace_not_found',
+        message: 'An asset workspace is required for Web-to-CLI handoff recovery.',
+        path: '--workspace',
+      });
+    }
+    return recoverAssetWebCliHandoff({
+      handoffPath: path.resolve(options.cwd, handoffPath),
+      archivePath: path.resolve(options.cwd, archivePath),
+      action,
       confirm: flagBoolean(options.parsed.flags, 'confirm'),
       workspace: options.workspace,
     });
@@ -975,6 +1623,7 @@ export function isStaleAssetWebCliHandoffResponse(
     || (
       response.command !== 'asset authoring handoff inspect'
       && response.command !== 'asset authoring handoff import'
+      && response.command !== 'asset authoring handoff recover'
     )
   ) return false;
   const data = response.data;
