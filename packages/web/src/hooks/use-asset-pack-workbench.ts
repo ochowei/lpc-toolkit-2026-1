@@ -1,4 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
+import {
+  assetWebCliHandoffStateDigestInput,
+  type AssetWebCliHandoff,
+} from '@lpc-toolkit/core';
+import {
+  inspectAssetPackArchiveBytes,
+  type AssetPackFormatRuntime,
+  type AssetPackSha256,
+} from '@lpc-toolkit/asset-pack-format';
 import type { AssetPackWorkerBaseline, AssetPackWorkerResponse } from '../lib/asset-pack-worker-protocol';
 import {
   createAssetPackWorkerClient,
@@ -23,12 +32,29 @@ import {
   type AssetPackDownloadKind,
 } from '../lib/asset-pack-download';
 import { downloadBlob } from '../lib/download';
+import { createBrowserAssetPackFormatRuntime } from '../adapter/asset-pack-format-runtime';
+import {
+  assetPackWebCliHandoffFilename,
+  createAssetPackWebCliHandoffMetadata,
+  createAssetPackWebCliHandoffSnapshot,
+  serializeAssetPackWebCliHandoff,
+} from '../lib/asset-pack-web-cli-handoff';
 
 export interface AssetPackWorkbenchControllerOptions {
   readonly baseline: AssetPackWorkerBaseline;
   readonly workerFactory: AssetPackWorkerFactory;
   readonly onState?: (state: AssetPackWorkbenchState) => void;
   readonly downloadBlob?: (blob: Blob, filename: string) => void;
+  readonly runtime?: AssetPackFormatRuntime;
+  readonly confirmWebCliHandoff?: (message: string) => boolean;
+  readonly handoffIdFactory?: () => string;
+  readonly now?: () => string;
+}
+
+export interface AssetPackWebCliHandoffExportResult {
+  readonly handoff: AssetWebCliHandoff;
+  readonly archive: AssetPackAssembledResponse;
+  readonly sidecarText: string;
 }
 
 export class AssetPackFormalAssemblyBlockedError extends Error {
@@ -46,12 +72,26 @@ export class AssetPackWorkbenchController {
   private readonly workerFactory: AssetPackWorkerFactory;
   private onState: ((state: AssetPackWorkbenchState) => void) | undefined;
   private readonly download: (blob: Blob, filename: string) => void;
+  private readonly runtime: AssetPackFormatRuntime;
+  private readonly confirmWebCliHandoff: (message: string) => boolean;
+  private readonly handoffIdFactory: () => string;
+  private readonly now: () => string;
 
   constructor(options: AssetPackWorkbenchControllerOptions) {
     this.baseline = options.baseline;
     this.workerFactory = options.workerFactory;
     this.onState = options.onState;
     this.download = options.downloadBlob ?? downloadBlob;
+    this.runtime = options.runtime ?? createBrowserAssetPackFormatRuntime();
+    this.confirmWebCliHandoff = options.confirmWebCliHandoff ?? ((message) =>
+      typeof window !== 'undefined' ? window.confirm(message) : false);
+    this.handoffIdFactory = options.handoffIdFactory ?? (() => {
+      if (typeof globalThis.crypto?.randomUUID !== 'function') {
+        throw new Error('Browser crypto.randomUUID is required for a Web-to-CLI handoff.');
+      }
+      return globalThis.crypto.randomUUID();
+    });
+    this.now = options.now ?? (() => new Date().toISOString());
   }
 
   get state(): AssetPackWorkbenchState {
@@ -134,6 +174,96 @@ export class AssetPackWorkbenchController {
     downloadAssetPackArchive(result, this.download);
     this.dispatch({ type: 'downloaded', revision: result.revision });
     return result;
+  }
+
+  async exportForCli(
+    kind: AssetPackDownloadKind,
+  ): Promise<AssetPackWebCliHandoffExportResult | undefined> {
+    const confirmed = this.confirmWebCliHandoff(
+      `Export the current ${kind} archive and a local Web-to-CLI handoff sidecar for CLI review?\n\nThis creates two local files. It is not release approval.`,
+    );
+    if (!confirmed) return undefined;
+
+    const requestedRevision = this.currentState.revision;
+    const result = await this.assemble(kind);
+    if (result.type !== 'assembled') throw new Error('The Worker did not return an assembled archive.');
+    if (result.revision !== requestedRevision || result.revision !== this.currentState.revision) {
+      throw new Error('The Worker returned an archive for a stale revision.');
+    }
+    if (kind === 'formal') {
+      const blockers = this.currentFormalBlockers();
+      this.dispatch({ type: 'formal-blockers', blockers });
+      if (blockers.length > 0) throw new AssetPackFormalAssemblyBlockedError(blockers);
+      const candidate = this.currentState.workbench?.formalCandidate;
+      if (!candidate || candidate.revision !== this.currentState.revision) {
+        throw new Error('The current revision has no verified formal archive candidate.');
+      }
+      assertAssetPackDownloadMetadata(result, {
+        revision: this.currentState.revision,
+        kind,
+        archiveDigest: candidate.archiveDigest,
+      });
+    } else {
+      assertAssetPackDownloadMetadata(result, { revision: this.currentState.revision, kind });
+    }
+
+    const inspected = await inspectAssetPackArchiveBytes({
+      archiveBytes: new Uint8Array(result.archiveBytes),
+      runtime: this.runtime,
+    });
+    if (inspected.kind !== 'verified') {
+      throw new Error('The assembled archive could not be re-inspected as a verified asset pack.');
+    }
+    if (inspected.snapshot.archiveDigest !== result.archiveDigest) {
+      throw new Error('The assembled archive digest changed before Web-to-CLI export.');
+    }
+    const workbench = this.currentState.workbench;
+    if (!workbench?.releaseFingerprint) {
+      throw new Error('The current revision has no release fingerprint for Web-to-CLI export.');
+    }
+    const metadata = await createAssetPackWebCliHandoffMetadata({
+      snapshot: inspected.snapshot,
+      archiveKind: kind,
+      archiveFileName: result.filename,
+      releaseFingerprint: workbench.releaseFingerprint,
+      runtime: this.runtime,
+    });
+    const handoffBase = createAssetPackWebCliHandoffSnapshot({
+      revision: requestedRevision,
+      baselineReleaseTag: workbench.uploadMetadata.baselineReleaseTag,
+      handoffId: this.handoffIdFactory(),
+      createdAt: this.now(),
+      stateDigest: 'sha256:'.concat('0'.repeat(64)) as AssetPackSha256,
+      metadata,
+    });
+    const stateDigest = await this.runtime.sha256(
+      this.runtime.encodeUtf8(assetWebCliHandoffStateDigestInput(handoffBase)),
+    );
+    const handoff = createAssetPackWebCliHandoffSnapshot({
+      revision: requestedRevision,
+      baselineReleaseTag: workbench.uploadMetadata.baselineReleaseTag,
+      handoffId: handoffBase.handoffId,
+      createdAt: handoffBase.createdAt,
+      stateDigest,
+      metadata,
+    });
+    if (this.currentState.revision !== requestedRevision) {
+      throw new Error('The Workbench revision changed during Web-to-CLI export.');
+    }
+
+    const sidecarText = serializeAssetPackWebCliHandoff(handoff);
+    const sidecarFilename = assetPackWebCliHandoffFilename({
+      packId: metadata.packId,
+      version: metadata.version,
+      kind,
+    });
+    downloadAssetPackArchive(result, this.download);
+    this.download(
+      new Blob([this.runtime.encodeUtf8(sidecarText)], { type: 'application/json' }),
+      sidecarFilename,
+    );
+    this.dispatch({ type: 'downloaded', revision: result.revision });
+    return { handoff, archive: result, sidecarText };
   }
 
   navigate(panel: AssetPackWorkbenchPanel): void {
@@ -270,6 +400,7 @@ export function useAssetPackWorkbench(options: AssetPackWorkbenchControllerOptio
     removeSource: (path: string) => controller.removeSource(path),
     assemble: (kind: 'draft' | 'formal') => controller.assemble(kind),
     download: (kind: AssetPackDownloadKind) => controller.downloadArchive(kind),
+    exportForCli: (kind: AssetPackDownloadKind) => controller.exportForCli(kind),
     retry: () => controller.retry(),
     reset: () => controller.reset(),
     navigate: (panel: AssetPackWorkbenchPanel) => controller.navigate(panel),

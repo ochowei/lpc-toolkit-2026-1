@@ -20,6 +20,7 @@ export interface AssetPackWorkbenchShellProps {
   readonly onReplaceSource?: (path: string, file: File) => void;
   readonly onRemoveSource?: (path: string) => void;
   readonly onDownload?: (kind: AssetPackDownloadKind) => void;
+  readonly onExportForCli?: (kind: AssetPackDownloadKind) => void;
   readonly downloadError?: string;
 }
 
@@ -34,13 +35,14 @@ export function AssetPackWorkbenchShell({
   onReplaceSource,
   onRemoveSource,
   onDownload,
+  onExportForCli,
   downloadError,
 }: AssetPackWorkbenchShellProps) {
   return (
     <div className="min-h-screen bg-app text-text">
       <div className="grid min-h-screen lg:grid-cols-[220px_minmax(0,1fr)_320px]">
         <WorkbenchNav activePanel={state.activePanel} onNavigate={onNavigate} />
-        <WorkbenchPreview {...(baseline ? { baseline } : {})} state={state} onUpload={onUpload} onReset={onReset} onBack={onBack} onDownload={onDownload ?? (() => undefined)} {...(downloadError ? { downloadError } : {})} />
+        <WorkbenchPreview {...(baseline ? { baseline } : {})} state={state} onUpload={onUpload} onReset={onReset} onBack={onBack} onDownload={onDownload ?? (() => undefined)} {...(onExportForCli ? { onExportForCli } : {})} {...(downloadError ? { downloadError } : {})} />
         <WorkbenchEditor state={state} onReplaceManifest={onReplaceManifest} onReplaceSource={onReplaceSource} onRemoveSource={onRemoveSource} onNavigate={onNavigate} />
       </div>
     </div>
@@ -86,6 +88,13 @@ export function AssetPackWorkbenchHarness({
     });
   };
 
+  const handleExportForCli = (kind: AssetPackDownloadKind): void => {
+    setDownloadError(undefined);
+    void workbench.exportForCli(kind).catch((error: unknown) => {
+      setDownloadError(error instanceof Error ? error.message : 'The Web-to-CLI handoff export failed.');
+    });
+  };
+
   return (
     <AssetPackWorkbenchShell
       baseline={baseline}
@@ -98,6 +107,7 @@ export function AssetPackWorkbenchHarness({
       onReplaceSource={(path, file) => void workbench.replaceSource(path, file)}
       onRemoveSource={(path) => void workbench.removeSource(path)}
       onDownload={handleDownload}
+      onExportForCli={handleExportForCli}
       {...(downloadError ? { downloadError } : {})}
     />
   );

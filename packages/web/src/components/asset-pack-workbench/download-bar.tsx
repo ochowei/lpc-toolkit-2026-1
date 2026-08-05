@@ -24,6 +24,7 @@ function downloadStatusText(state: AssetPackWorkbenchState): string {
 export interface AssetPackDownloadBarProps {
   readonly state: AssetPackWorkbenchState;
   readonly onDownload: (kind: AssetPackDownloadKind) => void;
+  readonly onExportForCli?: (kind: AssetPackDownloadKind) => void;
   readonly confirmDraft?: (message: string) => boolean;
   readonly downloadError?: string;
 }
@@ -37,7 +38,7 @@ export function draftDiagnosticConfirmationMessage(
   return `Download the current draft archive?\n\nRemaining diagnostics:\n${details}`;
 }
 
-export function AssetPackDownloadBar({ state, onDownload, confirmDraft, downloadError }: AssetPackDownloadBarProps) {
+export function AssetPackDownloadBar({ state, onDownload, onExportForCli, confirmDraft, downloadError }: AssetPackDownloadBarProps) {
   const workbench = state.workbench;
   const diagnostics = state.diagnostics
     .filter(({ severity }) => severity === 'error' || severity === 'warning');
@@ -71,6 +72,14 @@ export function AssetPackDownloadBar({ state, onDownload, confirmDraft, download
         <Button type="button" variant="primary" disabled={!draftEnabled} onClick={downloadDraft}>Download draft archive</Button>
         <Button type="button" disabled={!formalEnabled} onClick={() => onDownload('formal')}>Download formal archive</Button>
       </div>
+      {onExportForCli ? <div className="mt-4 rounded-lg border border-border-strong p-3">
+        <p className="text-sm font-medium text-text">Export for CLI</p>
+        <p className="mt-1 text-sm text-text-2">Creates a local handoff sidecar for the CLI. This is not release approval.</p>
+        <div className="mt-3 flex flex-wrap gap-3">
+          <Button type="button" disabled={!draftEnabled} onClick={() => onExportForCli('draft')}>Export draft for CLI</Button>
+          <Button type="button" disabled={!formalEnabled} onClick={() => onExportForCli('formal')}>Export formal for CLI</Button>
+        </div>
+      </div> : null}
     </section>
   );
 }
