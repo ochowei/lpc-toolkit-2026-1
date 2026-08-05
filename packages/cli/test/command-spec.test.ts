@@ -50,6 +50,14 @@ describe('helpForCommand', () => {
     expect(help).not.toContain('lpc-toolkit character set');
   });
 
+  it('documents the provider result trust boundary and candidate import handoff', () => {
+    const help = helpForCommand(['asset', 'authoring', 'provider', 'result']);
+    expect(help).toContain('--invocation <invocation.json>');
+    expect(help).toContain('--result <result.json>');
+    expect(help).toContain('--candidate <candidate.png>');
+    expect(help).toContain('existing candidate-import boundary');
+  });
+
   it('describes catalog item animation capability inspection', () => {
     expect(helpForCommand(['catalog', 'item'])).toContain(
       'Show one catalog item with credits and animation capabilities.',

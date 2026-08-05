@@ -228,12 +228,13 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
   {
     command: ['asset', 'authoring', 'provider'],
     usage: 'lpc-toolkit asset authoring provider <command>',
-    description: 'Discover explicitly supplied providers, preflight, and persist consent-scoped handoffs.',
+    description: 'Discover explicitly supplied providers, preflight, persist handoffs, and stage bounded provider results.',
     options: [HELP_OPTION],
     examples: [
       'lpc-toolkit asset authoring provider discover --session session-id --contract-digest sha256:... --descriptors providers.json --json',
       'lpc-toolkit asset authoring provider preflight --session session-id --contract-digest sha256:... --descriptor provider.json --json',
       'lpc-toolkit asset authoring provider handoff --session session-id --descriptor provider.json --consent consent.json --confirm --json',
+      'lpc-toolkit asset authoring provider result --session session-id --invocation invocation.json --result result.json --candidate candidate.png --workspace ./my-lpc-art --json',
     ],
   },
   {
@@ -285,6 +286,23 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
     ],
     examples: [
       'lpc-toolkit asset authoring provider handoff --session session-id --descriptor provider.json --consent consent.json --confirm --json',
+    ],
+  },
+  {
+    command: ['asset', 'authoring', 'provider', 'result'],
+    usage: 'lpc-toolkit asset authoring provider result --session <session-id> --invocation <invocation.json> --result <result.json> [--candidate <candidate.png>] [--workspace <directory>] [--json]',
+    description: 'Validate a provider result or refusal, then stage only valid candidate bytes below the session-owned candidate root; the existing candidate-import boundary remains the source mutation authority.',
+    options: [
+      HELP_OPTION,
+      JSON_OPTION,
+      AUTHORING_SESSION_OPTION,
+      { name: 'invocation', kind: 'value', valueLabel: 'invocation.json', description: 'Read the exact invocation receipt returned to the provider.' },
+      { name: 'result', kind: 'value', valueLabel: 'result.json', description: 'Read one provider result or refusal envelope.' },
+      { name: 'candidate', kind: 'value', valueLabel: 'candidate.png', description: 'Read the external PNG candidate for a successful result.' },
+      PROVIDER_WORKSPACE_OPTION,
+    ],
+    examples: [
+      'lpc-toolkit asset authoring provider result --session session-id --invocation invocation.json --result result.json --candidate candidate.png --workspace ./my-lpc-art --json',
     ],
   },
   {

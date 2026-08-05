@@ -1,4 +1,5 @@
 import { createCanvas } from '@napi-rs/canvas';
+import { createHash } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
@@ -6,11 +7,16 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type {
+  AssetProviderInvocation,
+  SpriteDrawingTarget,
+} from '@lpc-toolkit/core';
 import { createDirectoryAssetStore } from '../src/asset-store.js';
 import { assetAuthoringContractMetadataPath } from '../src/asset-authoring-contract.js';
 import {
@@ -105,6 +111,31 @@ function writeRuntimeSource(filePath: string): void {
   writeFileSync(filePath, canvas.toBuffer('image/png'));
 }
 
+function sha256(bytes: Uint8Array): string {
+  return `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+}
+
+function writeValidCandidate(filePath: string, target: SpriteDrawingTarget): Buffer {
+  const canvas = createCanvas(target.geometry.canvasWidth, target.geometry.canvasHeight);
+  const context = canvas.getContext('2d');
+  context.fillStyle = 'rgb(80, 120, 160)';
+  target.geometry.rows.forEach((row, rowIndex) => {
+    row.cells.forEach((cell) => {
+      if (cell.policy !== 'required-drawn') return;
+      context.fillRect(
+        cell.sourceColumn * target.geometry.frameWidth + 1,
+        rowIndex * target.geometry.frameHeight + 1,
+        Math.min(4, target.geometry.frameWidth - 1),
+        Math.min(4, target.geometry.frameHeight - 1),
+      );
+    });
+  });
+  const bytes = canvas.toBuffer('image/png');
+  mkdirSync(path.dirname(filePath), { recursive: true });
+  writeFileSync(filePath, bytes);
+  return bytes;
+}
+
 function createRuntime(root: string, workspaceRoot: string): RuntimeAssets {
   const assetsRoot = path.join(root, 'assets');
   writeJson(root, path.join('assets', 'sheet_definitions', 'hair', 'fixture.json'), {
@@ -196,6 +227,74 @@ async function createContractFixture(): Promise<{
     contractDigest,
     contractPath,
     metadataPath,
+  };
+}
+
+async function createProviderInvocation(
+  fixture: Awaited<ReturnType<typeof createContractFixture>>,
+  label: string,
+): Promise<{ readonly invocation: AssetProviderInvocation; readonly digest: string }> {
+  const descriptorPath = writeJson(fixture.root, `${label}-provider.json`, VALID_DESCRIPTOR);
+  const consentPath = writeJson(fixture.root, `${label}-consent.json`, handoffConsent(fixture));
+  const handoff = await runJson([
+    'asset', 'authoring', 'provider', 'handoff',
+    '--session', fixture.sessionId,
+    '--descriptor', descriptorPath,
+    '--consent', consentPath,
+    '--workspace', fixture.workspace.root,
+    '--confirm',
+  ], fixture.workspace.root);
+  if (handoff.code !== 0) throw new Error(JSON.stringify(handoff.response));
+  const data = handoff.response.data as Record<string, unknown>;
+  const invocation = data.invocation as unknown as AssetProviderInvocation;
+  const digest = data.invocationDigest;
+  if (typeof digest !== 'string') throw new Error('Missing invocation digest.');
+  return { invocation, digest };
+}
+
+function providerResultEnvelope(
+  fixture: Awaited<ReturnType<typeof createContractFixture>>,
+  invocation: AssetProviderInvocation,
+  targetId: string,
+  candidateBytes: Uint8Array,
+): Record<string, unknown> {
+  return {
+    schema: 'lpc-toolkit.asset-provider-result.v1',
+    invocationDigest: `sha256:${'0'.repeat(64)}`,
+    sessionId: fixture.sessionId,
+    contractDigest: fixture.contractDigest,
+    operation: 'sprite-candidate.v1',
+    provider: invocation.provider,
+    targetId,
+    consentScopeDigest: invocation.consent.scopeDigest,
+    referenceDigests: invocation.consent.referenceDigests,
+    candidate: {
+      id: invocation.candidate.stagingId,
+      digest: sha256(candidateBytes),
+      byteLength: candidateBytes.byteLength,
+    },
+  };
+}
+
+function providerRefusalEnvelope(
+  fixture: Awaited<ReturnType<typeof createContractFixture>>,
+  invocation: AssetProviderInvocation,
+  digest: string,
+  code: string,
+  nextAction: string,
+): Record<string, unknown> {
+  return {
+    schema: 'lpc-toolkit.asset-provider-refusal.v1',
+    invocationDigest: digest,
+    sessionId: fixture.sessionId,
+    contractDigest: fixture.contractDigest,
+    operation: 'sprite-candidate.v1',
+    provider: invocation.provider,
+    targetIds: invocation.targetIds,
+    consentScopeDigest: invocation.consent.scopeDigest,
+    referenceDigests: invocation.consent.referenceDigests,
+    code,
+    nextAction,
   };
 }
 
@@ -796,5 +895,453 @@ describe('asset provider CLI', () => {
       expect.objectContaining({ code: 'asset_provider_contract_mismatch' }),
     ]);
     expect(readFileSync(sessionPath, 'utf8')).toBe(sessionAfterProviderChange);
+  });
+
+  it('stages a valid provider result without importing canonical source bytes', async () => {
+    const fixture = await createContractFixture();
+    const descriptorPath = writeJson(fixture.root, 'result-provider.json', VALID_DESCRIPTOR);
+    const consentPath = writeJson(fixture.root, 'result-consent.json', handoffConsent(fixture));
+    const handoff = await runJson([
+      'asset', 'authoring', 'provider', 'handoff',
+      '--session', fixture.sessionId,
+      '--descriptor', descriptorPath,
+      '--consent', consentPath,
+      '--workspace', fixture.workspace.root,
+      '--confirm',
+    ], fixture.workspace.root);
+    expect(handoff.code).toBe(0);
+    const handoffData = handoff.response.data as Record<string, unknown>;
+    const invocation = handoffData.invocation as unknown as AssetProviderInvocation;
+    const invocationDigest = handoffData.invocationDigest;
+    if (typeof invocationDigest !== 'string') throw new Error('Missing invocation digest.');
+
+    const contract = JSON.parse(readFileSync(fixture.contractPath, 'utf8')) as {
+      readonly targets: readonly SpriteDrawingTarget[];
+    };
+    const target = contract.targets[0];
+    if (target === undefined) throw new Error('Expected a provider result target.');
+    const candidatePath = path.join(fixture.workspace.root, 'provider-output.png');
+    const candidateBytes = writeValidCandidate(candidatePath, target);
+    const resultEnvelope = {
+      schema: 'lpc-toolkit.asset-provider-result.v1',
+      invocationDigest,
+      sessionId: fixture.sessionId,
+      contractDigest: fixture.contractDigest,
+      operation: 'sprite-candidate.v1',
+      provider: invocation.provider,
+      targetId: target.id,
+      consentScopeDigest: invocation.consent.scopeDigest,
+      referenceDigests: invocation.consent.referenceDigests,
+      candidate: {
+        id: invocation.candidate.stagingId,
+        digest: sha256(candidateBytes),
+        byteLength: candidateBytes.byteLength,
+      },
+    } as const;
+    const invocationPath = writeJson(fixture.root, 'invocation.json', invocation);
+    const resultPath = writeJson(fixture.root, 'result.json', resultEnvelope);
+    const sessionBefore = readFileSync(
+      assetAuthoringSessionPath(fixture.workspace, fixture.sessionId),
+      'utf8',
+    );
+    const session = createAssetAuthoringSessionStore(fixture.workspace).read(fixture.sessionId);
+    const manifestPath = path.join(session.packRoot, 'asset-pack.json');
+    const manifestBefore = readFileSync(manifestPath, 'utf8');
+    const targetPath = path.join(session.packRoot, target.path);
+
+    const staged = await runJson([
+      'asset', 'authoring', 'provider', 'result',
+      '--session', fixture.sessionId,
+      '--invocation', invocationPath,
+      '--result', resultPath,
+      '--candidate', candidatePath,
+      '--workspace', fixture.workspace.root,
+    ], fixture.workspace.root);
+
+    expect(staged.code).toBe(0);
+    expect(staged.response).toMatchObject({
+      ok: true,
+      command: 'asset authoring provider result',
+      data: {
+        schema: 'lpc-toolkit.asset-provider-result-response.v1',
+        status: 'staged',
+        invocationDigest,
+        result: resultEnvelope,
+        refusal: null,
+        candidate: resultEnvelope.candidate,
+        safety: 'safe',
+        nextActions: [
+          expect.objectContaining({
+            id: 'import-provider-candidate',
+            safety: 'safe',
+            command: expect.stringContaining('asset authoring import'),
+          }),
+        ],
+      },
+      warnings: [],
+      errors: [],
+    });
+    expect(JSON.stringify(staged.response)).not.toContain(fixture.workspace.root);
+    expect(readFileSync(assetAuthoringSessionPath(fixture.workspace, fixture.sessionId), 'utf8'))
+      .not.toBe(sessionBefore);
+    const sessionAfter = createAssetAuthoringSessionStore(fixture.workspace).read(fixture.sessionId);
+    expect(sessionAfter.receipts.providerInvocation).toEqual(invocation);
+    expect(sessionAfter.receipts.providerResult).toEqual(resultEnvelope);
+    expect(readFileSync(manifestPath, 'utf8')).toBe(manifestBefore);
+    expect(existsSync(targetPath)).toBe(false);
+    expect(existsSync(path.join(path.dirname(assetAuthoringSessionPath(fixture.workspace, fixture.sessionId)), 'provider-candidates')))
+      .toBe(true);
+
+    const status = await runJson([
+      'asset', 'authoring', 'status',
+      '--session', fixture.sessionId,
+      '--workspace', fixture.workspace.root,
+    ], fixture.workspace.root);
+    expect(status.response).toMatchObject({
+      ok: true,
+      data: {
+        provider: {
+          status: 'result-staged',
+          result: resultEnvelope,
+          refusal: null,
+          nextActions: [expect.objectContaining({ id: 'import-provider-candidate' })],
+        },
+      },
+    });
+
+    const stagedCandidatePath = path.join(
+      path.dirname(assetAuthoringSessionPath(fixture.workspace, fixture.sessionId)),
+      'provider-candidates',
+      invocationDigest.slice('sha256:'.length),
+      `${resultEnvelope.candidate.digest.slice('sha256:'.length)}.png`,
+    );
+    expect(readFileSync(stagedCandidatePath)).toEqual(candidateBytes);
+    const imported = await runJson([
+      'asset', 'authoring', 'import',
+      '--session', fixture.sessionId,
+      '--target', target.id,
+      '--candidate', stagedCandidatePath,
+      '--contract-digest', fixture.contractDigest,
+      '--workspace', fixture.workspace.root,
+    ], fixture.workspace.root);
+    expect(imported.code).toBe(0);
+    expect(readFileSync(targetPath)).toEqual(candidateBytes);
+  });
+
+  it.each([
+    ['reported digest mismatch', (envelope: Record<string, unknown>) => ({
+      ...envelope,
+      invocationDigest: `sha256:${'f'.repeat(64)}`,
+    }), 'asset_provider_result_stale'],
+    ['wrong target', (envelope: Record<string, unknown>) => ({
+      ...envelope,
+      invocationDigest: envelope.invocationDigest,
+      targetId: 'target.not-in-scope',
+    }), 'asset_provider_result_invalid'],
+    ['wrong contract', (envelope: Record<string, unknown>) => ({
+      ...envelope,
+      contractDigest: `sha256:${'b'.repeat(64)}`,
+    }), 'asset_provider_result_stale'],
+  ])('persists one refusal for %s without changing canonical evidence', async (_label, mutate, expectedCode) => {
+    const fixture = await createContractFixture();
+    const { invocation, digest } = await createProviderInvocation(fixture, 'mismatch');
+    const contract = JSON.parse(readFileSync(fixture.contractPath, 'utf8')) as {
+      readonly targets: readonly SpriteDrawingTarget[];
+    };
+    const target = contract.targets[0];
+    if (target === undefined) throw new Error('Expected a provider result target.');
+    const candidatePath = path.join(fixture.workspace.root, 'mismatch-candidate.png');
+    const candidateBytes = writeValidCandidate(candidatePath, target);
+    const resultEnvelope = mutate({
+      ...providerResultEnvelope(fixture, invocation, target.id, candidateBytes),
+      invocationDigest: digest,
+    });
+    const invocationPath = writeJson(fixture.root, 'mismatch-invocation.json', invocation);
+    const resultPath = writeJson(fixture.root, 'mismatch-result.json', resultEnvelope);
+    const sessionBefore = createAssetAuthoringSessionStore(fixture.workspace).read(fixture.sessionId);
+    const manifestPath = path.join(sessionBefore.packRoot, 'asset-pack.json');
+    const manifestBefore = readFileSync(manifestPath, 'utf8');
+
+    const refused = await runJson([
+      'asset', 'authoring', 'provider', 'result',
+      '--session', fixture.sessionId,
+      '--invocation', invocationPath,
+      '--result', resultPath,
+      '--candidate', candidatePath,
+      '--workspace', fixture.workspace.root,
+    ], fixture.workspace.root);
+
+    expect(refused.code).toBe(0);
+    expect(refused.response).toMatchObject({
+      ok: true,
+      data: {
+        status: 'refused',
+        refusal: { code: expectedCode },
+        nextActions: [expect.any(Object)],
+      },
+    });
+    const sessionAfter = createAssetAuthoringSessionStore(fixture.workspace).read(fixture.sessionId);
+    expect(sessionAfter.checkpoint).toEqual(sessionBefore.checkpoint);
+    expect(sessionAfter.checkpoints).toEqual(sessionBefore.checkpoints);
+    expect(readFileSync(manifestPath, 'utf8')).toBe(manifestBefore);
+    expect(existsSync(path.join(path.dirname(assetAuthoringSessionPath(fixture.workspace, fixture.sessionId)), 'provider-candidates')))
+      .toBe(false);
+  });
+
+  it.each([
+    ['malformed PNG', (fixture: Awaited<ReturnType<typeof createContractFixture>>, _target: SpriteDrawingTarget) => {
+      const candidatePath = path.join(fixture.workspace.root, 'invalid.png');
+      const bytes = Buffer.from('not a PNG');
+      writeFileSync(candidatePath, bytes);
+      return { candidatePath, bytes };
+    }],
+    ['geometry mismatch', (fixture: Awaited<ReturnType<typeof createContractFixture>>, target: SpriteDrawingTarget) => {
+      const candidatePath = path.join(fixture.workspace.root, 'wrong-geometry.png');
+      const canvas = createCanvas(
+        target.geometry.canvasWidth + target.geometry.frameWidth,
+        target.geometry.canvasHeight,
+      );
+      const bytes = canvas.toBuffer('image/png');
+      writeFileSync(candidatePath, bytes);
+      return { candidatePath, bytes };
+    }],
+    ['alpha policy mismatch', (fixture: Awaited<ReturnType<typeof createContractFixture>>, target: SpriteDrawingTarget) => {
+      const candidatePath = path.join(fixture.workspace.root, 'wrong-alpha.png');
+      const canvas = createCanvas(target.geometry.canvasWidth, target.geometry.canvasHeight);
+      const context = canvas.getContext('2d');
+      context.fillStyle = 'rgb(80, 120, 160)';
+      target.geometry.rows.forEach((row, rowIndex) => {
+        row.cells.forEach((cell) => {
+          if (cell.policy === 'required-drawn') {
+            context.fillRect(
+              cell.sourceColumn * target.geometry.frameWidth + 1,
+              rowIndex * target.geometry.frameHeight + 1,
+              Math.min(4, target.geometry.frameWidth - 1),
+              Math.min(4, target.geometry.frameHeight - 1),
+            );
+          }
+          if (cell.policy === 'required-transparent') {
+            context.fillRect(
+              cell.sourceColumn * target.geometry.frameWidth + 1,
+              rowIndex * target.geometry.frameHeight + 1,
+              Math.min(4, target.geometry.frameWidth - 1),
+              Math.min(4, target.geometry.frameHeight - 1),
+            );
+          }
+        });
+      });
+      const bytes = canvas.toBuffer('image/png');
+      writeFileSync(candidatePath, bytes);
+      return { candidatePath, bytes };
+    }],
+  ])('refuses a candidate with %s before staging', async (_label, writeCandidate) => {
+    const fixture = await createContractFixture();
+    const { invocation, digest } = await createProviderInvocation(fixture, 'candidate');
+    const contract = JSON.parse(readFileSync(fixture.contractPath, 'utf8')) as {
+      readonly targets: readonly SpriteDrawingTarget[];
+    };
+    const target = contract.targets[0];
+    if (target === undefined) throw new Error('Expected a provider result target.');
+    const candidate = writeCandidate(fixture, target);
+    const resultEnvelope = {
+      ...providerResultEnvelope(fixture, invocation, target.id, candidate.bytes),
+      invocationDigest: digest,
+    };
+    const invocationPath = writeJson(fixture.root, 'candidate-invocation.json', invocation);
+    const resultPath = writeJson(fixture.root, 'candidate-result.json', resultEnvelope);
+    const sessionBefore = createAssetAuthoringSessionStore(fixture.workspace).read(fixture.sessionId);
+    const refused = await runJson([
+      'asset', 'authoring', 'provider', 'result',
+      '--session', fixture.sessionId,
+      '--invocation', invocationPath,
+      '--result', resultPath,
+      '--candidate', candidate.candidatePath,
+      '--workspace', fixture.workspace.root,
+    ], fixture.workspace.root);
+
+    expect(refused.code).toBe(0);
+    expect(refused.response).toMatchObject({
+      ok: true,
+      data: {
+        status: 'refused',
+        refusal: { code: 'asset_provider_result_invalid' },
+        nextActions: [expect.any(Object)],
+      },
+    });
+    const sessionAfter = createAssetAuthoringSessionStore(fixture.workspace).read(fixture.sessionId);
+    expect(sessionAfter.checkpoint).toEqual(sessionBefore.checkpoint);
+    expect(existsSync(path.join(path.dirname(assetAuthoringSessionPath(fixture.workspace, fixture.sessionId)), 'provider-candidates')))
+      .toBe(false);
+  });
+
+  it('refuses candidate digests that do not match the inspected bytes', async () => {
+    const fixture = await createContractFixture();
+    const { invocation, digest } = await createProviderInvocation(fixture, 'digest');
+    const contract = JSON.parse(readFileSync(fixture.contractPath, 'utf8')) as {
+      readonly targets: readonly SpriteDrawingTarget[];
+    };
+    const target = contract.targets[0];
+    if (target === undefined) throw new Error('Expected a provider result target.');
+    const candidatePath = path.join(fixture.workspace.root, 'digest-candidate.png');
+    const candidateBytes = writeValidCandidate(candidatePath, target);
+    const resultEnvelope = {
+      ...providerResultEnvelope(fixture, invocation, target.id, candidateBytes),
+      invocationDigest: digest,
+      candidate: {
+        id: invocation.candidate.stagingId,
+        digest: `sha256:${'f'.repeat(64)}`,
+        byteLength: candidateBytes.byteLength,
+      },
+    };
+    const invocationPath = writeJson(fixture.root, 'digest-invocation.json', invocation);
+    const resultPath = writeJson(fixture.root, 'digest-result.json', resultEnvelope);
+    const refused = await runJson([
+      'asset', 'authoring', 'provider', 'result',
+      '--session', fixture.sessionId,
+      '--invocation', invocationPath,
+      '--result', resultPath,
+      '--candidate', candidatePath,
+      '--workspace', fixture.workspace.root,
+    ], fixture.workspace.root);
+    expect(refused.code).toBe(0);
+    expect(refused.response).toMatchObject({
+      data: { status: 'refused', refusal: { code: 'asset_provider_result_invalid' } },
+    });
+  });
+
+  it('rejects an out-of-root candidate and a symlink without staging bytes', async () => {
+    const fixture = await createContractFixture();
+    const { invocation, digest } = await createProviderInvocation(fixture, 'path');
+    const contract = JSON.parse(readFileSync(fixture.contractPath, 'utf8')) as {
+      readonly targets: readonly SpriteDrawingTarget[];
+    };
+    const target = contract.targets[0];
+    if (target === undefined) throw new Error('Expected a provider result target.');
+    const outsidePath = path.join(fixture.root, 'outside-candidate.png');
+    const outsideBytes = writeValidCandidate(outsidePath, target);
+    const resultEnvelope = {
+      ...providerResultEnvelope(fixture, invocation, target.id, outsideBytes),
+      invocationDigest: digest,
+    };
+    const invocationPath = writeJson(fixture.root, 'path-invocation.json', invocation);
+    const resultPath = writeJson(fixture.root, 'path-result.json', resultEnvelope);
+    const outOfRoot = await runJson([
+      'asset', 'authoring', 'provider', 'result',
+      '--session', fixture.sessionId,
+      '--invocation', invocationPath,
+      '--result', resultPath,
+      '--candidate', outsidePath,
+      '--workspace', fixture.workspace.root,
+    ], fixture.workspace.root);
+    expect(outOfRoot.response).toMatchObject({
+      ok: true,
+      data: { status: 'refused', refusal: { code: 'asset_provider_result_invalid' } },
+    });
+
+    const symlinkPath = path.join(fixture.workspace.root, 'symlink-candidate.png');
+    symlinkSync(outsidePath, symlinkPath);
+    const symlinked = await runJson([
+      'asset', 'authoring', 'provider', 'result',
+      '--session', fixture.sessionId,
+      '--invocation', invocationPath,
+      '--result', resultPath,
+      '--candidate', symlinkPath,
+      '--workspace', fixture.workspace.root,
+    ], fixture.workspace.root);
+    expect(symlinked.response).toMatchObject({
+      ok: true,
+      data: { status: 'refused', refusal: { code: 'asset_provider_result_invalid' } },
+    });
+    expect(existsSync(path.join(path.dirname(assetAuthoringSessionPath(fixture.workspace, fixture.sessionId)), 'provider-candidates')))
+      .toBe(false);
+  });
+
+  it('refuses a symlinked session-owned staging root without touching canonical bytes', async () => {
+    const fixture = await createContractFixture();
+    const { invocation, digest } = await createProviderInvocation(fixture, 'staging-root');
+    const contract = JSON.parse(readFileSync(fixture.contractPath, 'utf8')) as {
+      readonly targets: readonly SpriteDrawingTarget[];
+    };
+    const target = contract.targets[0];
+    if (target === undefined) throw new Error('Expected a provider result target.');
+    const candidatePath = path.join(fixture.workspace.root, 'staging-root-candidate.png');
+    const candidateBytes = writeValidCandidate(candidatePath, target);
+    const invocationPath = writeJson(fixture.root, 'staging-root-invocation.json', invocation);
+    const resultPath = writeJson(
+      fixture.root,
+      'staging-root-result.json',
+      {
+        ...providerResultEnvelope(fixture, invocation, target.id, candidateBytes),
+        invocationDigest: digest,
+      },
+    );
+    const sessionDirectory = path.dirname(assetAuthoringSessionPath(fixture.workspace, fixture.sessionId));
+    const outsideDirectory = path.join(fixture.root, 'outside-staging-root');
+    mkdirSync(outsideDirectory);
+    symlinkSync(outsideDirectory, path.join(sessionDirectory, 'provider-candidates'));
+    const sessionBefore = createAssetAuthoringSessionStore(fixture.workspace).read(fixture.sessionId);
+    const refused = await runJson([
+      'asset', 'authoring', 'provider', 'result',
+      '--session', fixture.sessionId,
+      '--invocation', invocationPath,
+      '--result', resultPath,
+      '--candidate', candidatePath,
+      '--workspace', fixture.workspace.root,
+    ], fixture.workspace.root);
+
+    expect(refused.response).toMatchObject({
+      ok: true,
+      data: {
+        status: 'refused',
+        refusal: {
+          code: 'asset_provider_scope_violation',
+          nextAction: 'resolve-precondition',
+        },
+        nextActions: [expect.any(Object)],
+      },
+    });
+    const sessionAfter = createAssetAuthoringSessionStore(fixture.workspace).read(fixture.sessionId);
+    expect(sessionAfter.checkpoint).toEqual(sessionBefore.checkpoint);
+    expect(existsSync(path.join(outsideDirectory, digest.slice('sha256:'.length)))).toBe(false);
+  });
+
+  it.each([
+    ['asset_provider_cancelled', 'retry-within-scope'],
+    ['asset_provider_timeout', 'retry-within-scope'],
+    ['asset_provider_unavailable', 'retry-within-scope'],
+    ['asset_provider_network_denied', 'resolve-precondition'],
+  ])('records a provider refusal for %s with exactly one next action', async (code, nextAction) => {
+    const fixture = await createContractFixture();
+    const { invocation, digest } = await createProviderInvocation(fixture, 'refusal');
+    const invocationPath = writeJson(fixture.root, 'refusal-invocation.json', invocation);
+    const resultPath = writeJson(
+      fixture.root,
+      'refusal-result.json',
+      providerRefusalEnvelope(fixture, invocation, digest, code, nextAction),
+    );
+    const sessionBefore = createAssetAuthoringSessionStore(fixture.workspace).read(fixture.sessionId);
+    const refused = await runJson([
+      'asset', 'authoring', 'provider', 'result',
+      '--session', fixture.sessionId,
+      '--invocation', invocationPath,
+      '--result', resultPath,
+      '--workspace', fixture.workspace.root,
+    ], fixture.workspace.root);
+
+    expect(refused.code).toBe(0);
+    expect(refused.response).toMatchObject({
+      ok: true,
+      data: {
+        status: 'refused',
+        refusal: { code, nextAction },
+        nextActions: [expect.any(Object)],
+      },
+    });
+    const data = refused.response.data as Record<string, unknown>;
+    const nextActions = data.nextActions;
+    expect(Array.isArray(nextActions) ? nextActions : []).toHaveLength(1);
+    const sessionAfter = createAssetAuthoringSessionStore(fixture.workspace).read(fixture.sessionId);
+    expect(sessionAfter.checkpoint).toEqual(sessionBefore.checkpoint);
+    expect(sessionAfter.receipts.providerResult).toMatchObject({ schema: 'lpc-toolkit.asset-provider-refusal.v1', code });
   });
 });

@@ -237,6 +237,7 @@ function preflightCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
         providerCommand !== 'discover'
         && providerCommand !== 'preflight'
         && providerCommand !== 'handoff'
+        && providerCommand !== 'result'
       )
     ) {
       return commandError(commandName, {
@@ -256,7 +257,9 @@ function preflightCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
       ? ['session', 'contract-digest', 'descriptors']
       : providerCommand === 'preflight'
         ? ['session', 'contract-digest', 'descriptor']
-        : ['session', 'descriptor', 'consent'];
+        : providerCommand === 'handoff'
+          ? ['session', 'descriptor', 'consent']
+          : ['session', 'invocation', 'result'];
     for (const name of requiredFlags) {
       const issue = requiredStringFlag(name);
       if (issue) return issue;
@@ -618,7 +621,11 @@ async function runCliWithRuntime(
     && parsed.command[2] === 'provider'
   ) {
     let workspace: AssetWorkspace | undefined;
-    if (parsed.command[3] === 'preflight' || parsed.command[3] === 'handoff') {
+    if (
+      parsed.command[3] === 'preflight'
+      || parsed.command[3] === 'handoff'
+      || parsed.command[3] === 'result'
+    ) {
       try {
         workspace = resolvedDependencies.findAssetWorkspace(
           io.cwd,
@@ -638,7 +645,7 @@ async function runCliWithRuntime(
       }
     }
     return writeResponse(
-      runAssetProviderCommand({ parsed, cwd: io.cwd, ...(workspace === undefined ? {} : { workspace }) }),
+      await runAssetProviderCommand({ parsed, cwd: io.cwd, ...(workspace === undefined ? {} : { workspace }) }),
       parsed,
       io,
       'Provider command completed.\n',

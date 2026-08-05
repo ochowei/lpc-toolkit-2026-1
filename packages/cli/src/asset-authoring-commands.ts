@@ -28,8 +28,10 @@ import {
   type AssetAuthoringReleaseGateFreshness,
   type AssetAuthoringReleaseGateProjection,
   type AssetReleaseDeclaration,
+  type AssetProviderRefusal,
   type NormalizedAssetPack,
   type AssetAuthoringPlan,
+  type AssetProviderResult,
 } from '@lpc-toolkit/core';
 import {
   flagBoolean,
@@ -491,8 +493,61 @@ function nextAction(
   };
 }
 
+function providerResultNextAction(
+  session: AssetAuthoringSession,
+  providerResult: AssetProviderResult | AssetProviderRefusal,
+): AuthoringNextAction {
+  if (providerResult.schema === 'lpc-toolkit.asset-provider-result.v1') {
+    return nextAction(
+      'import-provider-candidate',
+      'Review and import the staged provider candidate through the existing import boundary.',
+      `asset authoring import --session ${session.sessionId} --target ${providerResult.targetId} --candidate <session-owned-candidate.png> --contract-digest ${providerResult.contractDigest}`,
+      'safe',
+      [providerResult.contractDigest, providerResult.candidate.digest],
+      ['review'],
+    );
+  }
+  if (providerResult.nextAction === 'rematerialize-contract') {
+    return nextAction(
+      'rematerialize-provider-contract',
+      'Refresh the current drawing contract before retrying provider work.',
+      `asset authoring contract --session ${session.sessionId} --refresh`,
+      'safe',
+      [providerResult.contractDigest],
+      ['refresh'],
+    );
+  }
+  if (providerResult.nextAction === 'provide-external-candidate') {
+    return nextAction(
+      'provide-external-candidate',
+      'Provide a new contract-bound candidate through the existing import boundary.',
+      `asset authoring import --session ${session.sessionId} --target ${providerResult.targetIds[0] ?? '<target-id>'} --candidate <candidate.png> --contract-digest ${providerResult.contractDigest}`,
+      'safe',
+      [providerResult.contractDigest],
+      ['target', 'candidate'],
+    );
+  }
+  return nextAction(
+    providerResult.nextAction === 'retry-within-scope'
+      ? 'retry-provider-within-scope'
+      : 'resolve-provider-precondition',
+    providerResult.nextAction === 'retry-within-scope'
+      ? 'Retry the provider operation within the unchanged consent scope.'
+      : 'Resolve the provider precondition before submitting another result.',
+    `asset authoring provider handoff --session ${session.sessionId} --descriptor <descriptor.json> --consent <consent.json> --confirm`,
+    'requires-confirmation',
+    [providerResult.contractDigest],
+    ['descriptor', 'consent', 'confirm'],
+  );
+}
+
 function nextActionsFor(session: AssetAuthoringSession): readonly AuthoringNextAction[] {
   if (session.reason === 'missing-draft-credits') return [];
+
+  const providerResult = session.receipts.providerResult ?? null;
+  if (providerResult !== null && session.reason.startsWith('provider-result-')) {
+    return [providerResultNextAction(session, providerResult)];
+  }
 
   if (session.conflict !== null) {
     const expected = session.conflict.actualDigest;
@@ -940,22 +995,41 @@ function responseFor(
     provider: session.receipts.providerInvocation === null
       || session.receipts.providerInvocation === undefined
       ? null
-      : providerResponse(session.receipts.providerInvocation),
+      : providerResponse(
+        session,
+        session.receipts.providerInvocation,
+        session.receipts.providerResult ?? null,
+      ),
   };
   return authoringResponseProjection(input);
 }
 
 function providerResponse(
+  session: AssetAuthoringSession,
   invocation: NonNullable<AssetAuthoringSessionReceipts['providerInvocation']>,
+  providerResult: AssetProviderResult | AssetProviderRefusal | null,
 ): AuthoringProviderResponseInput {
+  const result = providerResult?.schema === 'lpc-toolkit.asset-provider-result.v1'
+    ? providerResult
+    : null;
+  const refusal = providerResult?.schema === 'lpc-toolkit.asset-provider-refusal.v1'
+    ? providerResult
+    : null;
+  const resultAction = providerResult === null
+    ? null
+    : providerResultNextAction(session, providerResult);
   return {
-    status: 'ready',
+    status: result === null && refusal === null
+      ? 'ready'
+      : result === null ? 'refused' : 'result-staged',
     invocation,
     invocationDigest: `sha256:${createHash('sha256')
       .update(assetProviderInvocationDigestInput(invocation), 'utf8')
       .digest('hex')}`,
-    safety: 'safe',
-    nextActions: [],
+    result,
+    refusal,
+    safety: resultAction?.safety ?? 'safe',
+    nextActions: resultAction === null ? [] : [resultAction],
   };
 }
 

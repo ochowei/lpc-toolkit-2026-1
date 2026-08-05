@@ -188,4 +188,45 @@ describe('response envelope', () => {
     expect(output).toContain('Next command: asset authoring provider handoff --confirm');
     expect(output).not.toContain('/private/');
   });
+
+  it('formats provider result staging and refusal without candidate paths', () => {
+    const output = formatHumanResponse(commandOk('asset authoring provider result', {
+      schema: 'lpc-toolkit.asset-provider-result-response.v1',
+      sessionId: '00000000-0000-4000-8000-000000000000',
+      contractDigest: `sha256:${'a'.repeat(64)}`,
+      provider: { id: 'provider.example', adapter: { id: 'agent-adapter.example', version: '1.0.0' } },
+      status: 'refused',
+      invocationDigest: `sha256:${'b'.repeat(64)}`,
+      result: null,
+      refusal: {
+        schema: 'lpc-toolkit.asset-provider-refusal.v1',
+        invocationDigest: `sha256:${'b'.repeat(64)}`,
+        sessionId: '00000000-0000-4000-8000-000000000000',
+        contractDigest: `sha256:${'a'.repeat(64)}`,
+        operation: 'sprite-candidate.v1',
+        provider: { id: 'provider.example', adapter: { id: 'agent-adapter.example', version: '1.0.0' } },
+        targetIds: ['sprites/moon-braid/foreground/walk.png'],
+        consentScopeDigest: `sha256:${'c'.repeat(64)}`,
+        referenceDigests: [],
+        code: 'asset_provider_timeout',
+        nextAction: 'retry-within-scope',
+      },
+      candidate: null,
+      safety: 'requires-confirmation',
+      nextActions: [{
+        id: 'retry-provider-within-scope',
+        summary: 'Retry the provider operation within the unchanged consent scope.',
+        command: 'asset authoring provider handoff --confirm',
+        safety: 'requires-confirmation',
+        requiredInputs: ['descriptor', 'consent', 'confirm'],
+        preconditionDigests: [`sha256:${'a'.repeat(64)}`],
+        expectedCheckpoint: null,
+      }],
+    }), 'fallback\n');
+
+    expect(output).toContain('Provider result: provider.example (refused)');
+    expect(output).toContain('Refusal: asset_provider_timeout');
+    expect(output).toContain('Next command: asset authoring provider handoff --confirm');
+    expect(output).not.toContain('/private/');
+  });
 });

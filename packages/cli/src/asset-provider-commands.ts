@@ -1,6 +1,14 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { lstatSync, readFileSync } from 'node:fs';
+import {
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import path from 'node:path';
+import { ASSET_PACK_ARCHIVE_LIMITS } from '@lpc-toolkit/asset-pack-format';
 import {
   ASSET_PROVIDER_CONTRACT_VERSION,
   ASSET_PROVIDER_LIMITS,
@@ -10,17 +18,25 @@ import {
   assetProviderDiscoveryEntry,
   assetProviderDiscoveryProjection,
   assetProviderInvocationDigestInput,
+  assetProviderRefusalBindingDiagnostics,
+  assetProviderResultBindingDiagnostics,
+  parseAssetProviderInvocation,
+  parseAssetProviderRefusal,
+  parseAssetProviderResult,
   parseAssetProviderDescriptor,
   parseAssetProviderDiscovery,
   type AssetProviderDescriptor,
   type AssetProviderDiagnostic,
   type AssetProviderInvocation,
   type AssetProviderRefusal,
+  type AssetProviderResult,
   type SpriteDrawingContract,
 } from '@lpc-toolkit/core';
 import {
   AssetAuthoringImportError,
+  inspectAssetAuthoringCandidate,
   readAssetAuthoringContractEvidence,
+  type AssetAuthoringCandidateInspection,
 } from './asset-authoring-import.js';
 import {
   assetAuthoringSessionPath,
@@ -51,9 +67,12 @@ type JsonRecord = Readonly<Record<string, unknown>>;
 type ProviderPreflightStatus = 'supported' | 'unsupported' | 'consent-required';
 type AssetProviderRefusalCode = AssetProviderRefusal['code'];
 type ProviderHandoffStatus = 'created' | 'reused' | 'consent-required' | 'unsupported';
+type ProviderResultStatus = 'staged' | 'refused';
 
 const ASSET_PROVIDER_HANDOFF_SCHEMA =
   'lpc-toolkit.asset-provider-handoff.v1' as const;
+const ASSET_PROVIDER_RESULT_RESPONSE_SCHEMA =
+  'lpc-toolkit.asset-provider-result-response.v1' as const;
 
 interface ProviderConsent {
   readonly targetIds: readonly string[];
@@ -78,6 +97,24 @@ export interface AssetProviderHandoffData {
   readonly refusal: {
     readonly code: AssetProviderRefusalCode;
     readonly message: string;
+  } | null;
+  readonly safety: AuthoringActionSafety;
+  readonly nextActions: readonly AuthoringNextAction[];
+}
+
+export interface AssetProviderResultData {
+  readonly schema: typeof ASSET_PROVIDER_RESULT_RESPONSE_SCHEMA;
+  readonly sessionId: string;
+  readonly contractDigest: string;
+  readonly provider: AssetProviderPreflightData['provider'];
+  readonly status: ProviderResultStatus;
+  readonly invocationDigest: string;
+  readonly result: AssetProviderResult | null;
+  readonly refusal: AssetProviderRefusal | null;
+  readonly candidate: {
+    readonly id: string;
+    readonly digest: string;
+    readonly byteLength: number;
   } | null;
   readonly safety: AuthoringActionSafety;
   readonly nextActions: readonly AuthoringNextAction[];
@@ -699,6 +736,220 @@ function refusalAction(
   };
 }
 
+function providerResultAction(
+  sessionId: string,
+  contractDigest: string,
+  nextAction: AssetProviderRefusal['nextAction'],
+  targetId: string | undefined,
+): AuthoringNextAction {
+  if (nextAction === 'rematerialize-contract') {
+    return {
+      id: 'rematerialize-provider-contract',
+      summary: 'Refresh the current drawing contract before retrying provider work.',
+      command: `asset authoring contract --session ${sessionId} --refresh`,
+      safety: 'safe',
+      requiredInputs: ['refresh'],
+      preconditionDigests: [contractDigest],
+      expectedCheckpoint: null,
+    };
+  }
+  if (nextAction === 'provide-external-candidate') {
+    return {
+      id: 'provide-external-candidate',
+      summary: 'Provide a new contract-bound candidate through the existing import boundary.',
+      command: `asset authoring import --session ${sessionId} --target ${targetId ?? '<target-id>'} --candidate <candidate.png> --contract-digest ${contractDigest}`,
+      safety: 'safe',
+      requiredInputs: ['target', 'candidate'],
+      preconditionDigests: [contractDigest],
+      expectedCheckpoint: null,
+    };
+  }
+  return {
+    id: nextAction === 'retry-within-scope' ? 'retry-provider-within-scope' : 'resolve-provider-precondition',
+    summary: nextAction === 'retry-within-scope'
+      ? 'Retry the provider operation within the unchanged consent scope.'
+      : 'Resolve the provider precondition before submitting another result.',
+    command: `asset authoring provider handoff --session ${sessionId} --descriptor <descriptor.json> --consent <consent.json> --confirm`,
+    safety: 'requires-confirmation',
+    requiredInputs: ['descriptor', 'consent', 'confirm'],
+    preconditionDigests: [contractDigest],
+    expectedCheckpoint: null,
+  };
+}
+
+function importCandidateAction(
+  sessionId: string,
+  contractDigest: string,
+  targetId: string,
+  relativeCandidatePath: string,
+  candidateDigest: string,
+): AuthoringNextAction {
+  return {
+    id: 'import-provider-candidate',
+    summary: 'Review and import the staged candidate through the existing candidate-import boundary.',
+    command: `asset authoring import --session ${sessionId} --target ${targetId} --candidate ${relativeCandidatePath} --contract-digest ${contractDigest}`,
+    safety: 'safe',
+    requiredInputs: ['review'],
+    preconditionDigests: [contractDigest, candidateDigest],
+    expectedCheckpoint: null,
+  };
+}
+
+function providerResultResponseData(options: {
+  readonly sessionId: string;
+  readonly contractDigest: string;
+  readonly provider: AssetProviderPreflightData['provider'];
+  readonly invocationDigest: string;
+  readonly status: ProviderResultStatus;
+  readonly result?: AssetProviderResult | null;
+  readonly refusal?: AssetProviderRefusal | null;
+  readonly candidate?: AssetProviderResultData['candidate'];
+  readonly safety: AuthoringActionSafety;
+  readonly nextActions: readonly AuthoringNextAction[];
+}): AssetProviderResultData {
+  return {
+    schema: ASSET_PROVIDER_RESULT_RESPONSE_SCHEMA,
+    sessionId: options.sessionId,
+    contractDigest: options.contractDigest,
+    provider: options.provider,
+    status: options.status,
+    invocationDigest: options.invocationDigest,
+    result: options.result === undefined ? null : options.result,
+    refusal: options.refusal === undefined ? null : options.refusal,
+    candidate: options.candidate === undefined ? null : options.candidate,
+    safety: options.safety,
+    nextActions: options.nextActions,
+  };
+}
+
+function createProviderRefusal(
+  invocation: AssetProviderInvocation,
+  code: AssetProviderRefusalCode,
+  nextAction: AssetProviderRefusal['nextAction'],
+): AssetProviderRefusal {
+  return {
+    schema: 'lpc-toolkit.asset-provider-refusal.v1',
+    invocationDigest: invocationDigest(invocation),
+    sessionId: invocation.sessionId,
+    contractDigest: invocation.contractDigest,
+    operation: invocation.operation,
+    provider: invocation.provider,
+    targetIds: [...invocation.targetIds],
+    consentScopeDigest: invocation.consent.scopeDigest,
+    referenceDigests: [...invocation.consent.referenceDigests],
+    code,
+    nextAction,
+  };
+}
+
+function providerResultFailureNextAction(
+  code: AssetProviderRefusalCode,
+): AssetProviderRefusal['nextAction'] {
+  if (code === 'asset_provider_result_stale' || code === 'asset_provider_contract_mismatch') {
+    return 'rematerialize-contract';
+  }
+  if (
+    code === 'asset_provider_result_invalid'
+  ) {
+    return 'provide-external-candidate';
+  }
+  if (
+    code === 'asset_provider_cancelled'
+    || code === 'asset_provider_timeout'
+    || code === 'asset_provider_unavailable'
+  ) {
+    return 'retry-within-scope';
+  }
+  return 'resolve-precondition';
+}
+
+function persistProviderResult(
+  workspace: AssetWorkspace,
+  session: AssetAuthoringSession,
+  result: AssetProviderResult,
+): AssetAuthoringSession {
+  return createAssetAuthoringSessionStore(workspace).replace(session.sessionId, {
+    state: 'needs-user-action',
+    reason: 'provider-result-staged',
+    phase: 'awaiting-candidate',
+    checkpointFreshness: 'current',
+    receipts: {
+      ...session.receipts,
+      providerResult: result,
+    },
+    provenance: [
+      ...session.provenance,
+      {
+        id: randomUUID(),
+        kind: 'provider',
+        occurredAt: new Date().toISOString(),
+        digest: result.candidate.digest,
+        summary: 'Provider result validated and staged below the session-owned candidate root.',
+      },
+    ],
+  });
+}
+
+function persistProviderRefusal(
+  workspace: AssetWorkspace,
+  session: AssetAuthoringSession,
+  refusalValue: AssetProviderRefusal,
+): AssetAuthoringSession {
+  return createAssetAuthoringSessionStore(workspace).replace(session.sessionId, {
+    state: 'needs-user-action',
+    reason: 'provider-result-refused',
+    phase: 'awaiting-candidate',
+    checkpointFreshness: 'current',
+    receipts: {
+      ...session.receipts,
+      providerResult: refusalValue,
+    },
+    provenance: [
+      ...session.provenance,
+      {
+        id: randomUUID(),
+        kind: 'provider',
+        occurredAt: new Date().toISOString(),
+        digest: refusalValue.invocationDigest,
+        summary: `Provider result refused with ${refusalValue.code}; canonical source was not changed.`,
+      },
+    ],
+  });
+}
+
+function providerResultRefusalResponse(options: {
+  readonly command: string;
+  readonly workspace: AssetWorkspace;
+  readonly session: AssetAuthoringSession;
+  readonly invocation: AssetProviderInvocation;
+  readonly code: AssetProviderRefusalCode;
+  readonly nextAction?: AssetProviderRefusal['nextAction'];
+}): CliResponse<AssetProviderResultData> {
+  const refusalValue = createProviderRefusal(
+    options.invocation,
+    options.code,
+    options.nextAction ?? providerResultFailureNextAction(options.code),
+  );
+  const persisted = persistProviderRefusal(options.workspace, options.session, refusalValue);
+  const targetId = refusalValue.targetIds[0];
+  const action = providerResultAction(
+    persisted.sessionId,
+    refusalValue.contractDigest,
+    refusalValue.nextAction,
+    targetId,
+  );
+  return commandOk(options.command, providerResultResponseData({
+    sessionId: persisted.sessionId,
+    contractDigest: refusalValue.contractDigest,
+    provider: refusalValue.provider,
+    invocationDigest: refusalValue.invocationDigest,
+    status: 'refused',
+    refusal: refusalValue,
+    safety: action.safety,
+    nextActions: [action],
+  }));
+}
+
 function handoffData(options: {
   readonly sessionId: string;
   readonly contractDigest: string;
@@ -758,6 +1009,85 @@ function hasUnsafePathComponent(root: string, candidate: string): boolean {
 function candidateStagingRoot(workspace: AssetWorkspace, sessionId: string): string {
   const sessionDirectory = path.dirname(assetAuthoringSessionPath(workspace, sessionId));
   return path.join(sessionDirectory, 'provider-candidates');
+}
+
+function ensureSessionDirectory(root: string, child: string): string {
+  const absoluteRoot = path.resolve(root);
+  let rootStats;
+  try {
+    rootStats = lstatSync(absoluteRoot);
+  } catch {
+    throw new Error('The session-owned candidate root is unavailable.');
+  }
+  if (rootStats.isSymbolicLink() || !rootStats.isDirectory()) {
+    throw new Error('The session-owned candidate root is not a safe directory.');
+  }
+  const childPath = path.resolve(absoluteRoot, child);
+  if (!isInsideRoot(absoluteRoot, childPath) || childPath === absoluteRoot) {
+    throw new Error('The session-owned candidate path is outside its root.');
+  }
+  const relative = path.relative(absoluteRoot, childPath);
+  let current = absoluteRoot;
+  for (const component of relative.split(path.sep)) {
+    current = path.join(current, component);
+    try {
+      const stats = lstatSync(current);
+      if (stats.isSymbolicLink() || !stats.isDirectory()) {
+        throw new Error('The session-owned candidate path is not a safe directory.');
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      mkdirSync(current, { recursive: false, mode: 0o700 });
+      const stats = lstatSync(current);
+      if (stats.isSymbolicLink() || !stats.isDirectory()) {
+        throw new Error('The session-owned candidate path is not a safe directory.');
+      }
+    }
+  }
+  return childPath;
+}
+
+function stageProviderCandidate(
+  workspace: AssetWorkspace,
+  sessionId: string,
+  invocationDigestValue: string,
+  inspection: AssetAuthoringCandidateInspection,
+): { readonly relativePath: string } {
+  const sessionDirectory = path.dirname(assetAuthoringSessionPath(workspace, sessionId));
+  const stagingRoot = ensureSessionDirectory(sessionDirectory, 'provider-candidates');
+  const invocationRoot = ensureSessionDirectory(
+    stagingRoot,
+    invocationDigestValue.slice('sha256:'.length),
+  );
+  const candidatePath = path.join(
+    invocationRoot,
+    `${inspection.candidateDigest.slice('sha256:'.length)}.png`,
+  );
+  try {
+    const existing = lstatSync(candidatePath);
+    if (existing.isSymbolicLink() || !existing.isFile()) {
+      throw new Error('The provider candidate staging file is not a regular file.');
+    }
+    if (!readFileSync(candidatePath).equals(inspection.bytes)) {
+      throw new Error('The provider candidate staging file already contains different bytes.');
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    const temporaryPath = path.join(invocationRoot, `.${randomUUID()}.tmp`);
+    try {
+      writeFileSync(temporaryPath, inspection.bytes, { flag: 'wx', mode: 0o600 });
+      renameSync(temporaryPath, candidatePath);
+    } finally {
+      rmSync(temporaryPath, { force: true });
+    }
+  }
+  const relativePath = path.relative(workspace.root, candidatePath).split(path.sep).join('/');
+  if (relativePath === '' || relativePath.startsWith('../') || path.isAbsolute(relativePath)) {
+    throw new Error('The provider candidate staging path is outside the workspace.');
+  }
+  return {
+    relativePath: `./${relativePath}`,
+  };
 }
 
 function safeContractError(error: unknown): { readonly code: string; readonly message: string } {
@@ -1048,6 +1378,196 @@ function runPreflight(
   return commandOk(command, data);
 }
 
+async function runResult(
+  parsed: ParsedArgs,
+  cwd: string,
+  workspace: AssetWorkspace | undefined,
+): Promise<CliResponse<AssetProviderResultData | null>> {
+  const command = 'asset authoring provider result';
+  const sessionId = flagString(parsed.flags, 'session');
+  const invocationPath = flagString(parsed.flags, 'invocation');
+  const resultPath = flagString(parsed.flags, 'result');
+  if (sessionId === undefined || invocationPath === undefined || resultPath === undefined) {
+    return issueResponse(
+      command,
+      'missing_argument',
+      'Provider result requires --session, --invocation, and --result.',
+    );
+  }
+  if (workspace === undefined) {
+    return issueResponse(
+      command,
+      'asset_workspace_not_found',
+      'An asset workspace is required for provider result.',
+      '--workspace',
+    );
+  }
+
+  let session: AssetAuthoringSession;
+  try {
+    session = createAssetAuthoringSessionStore(workspace).read(sessionId);
+  } catch (error) {
+    const safe = safeContractError(error);
+    return issueResponse(command, safe.code, safe.message, '--session');
+  }
+  const invocation = session.receipts.providerInvocation ?? null;
+  if (invocation === null) {
+    return issueResponse(
+      command,
+      'asset_provider_result_stale',
+      'The session has no current provider invocation to bind this result to.',
+      '--session',
+    );
+  }
+  const storedInvocationDigest = invocationDigest(invocation);
+
+  const refuse = (
+    code: AssetProviderRefusalCode,
+    nextAction?: AssetProviderRefusal['nextAction'],
+  ): CliResponse<AssetProviderResultData> => providerResultRefusalResponse({
+    command,
+    workspace,
+    session,
+    invocation,
+    code,
+    ...(nextAction === undefined ? {} : { nextAction }),
+  });
+
+  const invocationSource = readJsonFile(
+    cwd,
+    invocationPath,
+    '--invocation',
+    ASSET_PROVIDER_LIMITS.descriptorBytes,
+  );
+  if (!invocationSource.ok) return refuse('asset_provider_result_invalid');
+  const parsedInvocation = parseAssetProviderInvocation(invocationSource.value);
+  if (!parsedInvocation.ok) return refuse('asset_provider_result_invalid');
+  if (invocationDigest(parsedInvocation.invocation) !== storedInvocationDigest) {
+    return refuse('asset_provider_result_stale', 'rematerialize-contract');
+  }
+
+  let evidence: ReturnType<typeof readAssetAuthoringContractEvidence>;
+  try {
+    evidence = readAssetAuthoringContractEvidence({
+      workspace,
+      session,
+      contractDigest: invocation.contractDigest,
+    });
+  } catch {
+    return refuse('asset_provider_result_stale', 'rematerialize-contract');
+  }
+
+  const resultSource = readJsonFile(
+    cwd,
+    resultPath,
+    '--result',
+    ASSET_PROVIDER_LIMITS.descriptorBytes,
+  );
+  if (!resultSource.ok) return refuse('asset_provider_result_invalid');
+  const resultRecord = isRecord(resultSource.value) ? resultSource.value : undefined;
+
+  if (resultRecord?.schema === 'lpc-toolkit.asset-provider-refusal.v1') {
+    const parsedRefusal = parseAssetProviderRefusal(resultSource.value);
+    if (!parsedRefusal.ok) return refuse('asset_provider_result_invalid');
+    if (parsedRefusal.refusal.invocationDigest !== storedInvocationDigest) {
+      return refuse('asset_provider_result_stale', 'rematerialize-contract');
+    }
+    if (assetProviderRefusalBindingDiagnostics(invocation, parsedRefusal.refusal).length > 0) {
+      return refuse('asset_provider_result_stale', 'rematerialize-contract');
+    }
+    const refusalValue = parsedRefusal.refusal;
+    const persisted = persistProviderRefusal(workspace, session, refusalValue);
+    const action = providerResultAction(
+      persisted.sessionId,
+      refusalValue.contractDigest,
+      refusalValue.nextAction,
+      refusalValue.targetIds[0],
+    );
+    return commandOk(command, providerResultResponseData({
+      sessionId: persisted.sessionId,
+      contractDigest: refusalValue.contractDigest,
+      provider: refusalValue.provider,
+      invocationDigest: refusalValue.invocationDigest,
+      status: 'refused',
+      refusal: refusalValue,
+      safety: action.safety,
+      nextActions: [action],
+    }));
+  }
+
+  const parsedResult = parseAssetProviderResult(resultSource.value);
+  if (!parsedResult.ok) return refuse('asset_provider_result_invalid');
+  const result = parsedResult.result;
+  if (result.invocationDigest !== storedInvocationDigest) {
+    return refuse('asset_provider_result_stale', 'rematerialize-contract');
+  }
+  const bindingDiagnostics = assetProviderResultBindingDiagnostics(invocation, result);
+  if (bindingDiagnostics.length > 0) {
+    const invalidScope = bindingDiagnostics.some((diagnostic) =>
+      diagnostic.path === '$.targetId' || diagnostic.path === '$.candidate.id');
+    return refuse(
+      invalidScope ? 'asset_provider_result_invalid' : 'asset_provider_result_stale',
+      invalidScope ? 'provide-external-candidate' : 'rematerialize-contract',
+    );
+  }
+  const target = evidence.contract.targets.find((entry) => entry.id === result.targetId);
+  if (target === undefined) return refuse('asset_provider_result_invalid');
+  const candidateArgument = flagString(parsed.flags, 'candidate');
+  if (candidateArgument === undefined) return refuse('asset_provider_result_invalid');
+
+  let inspection: AssetAuthoringCandidateInspection;
+  try {
+    inspection = await inspectAssetAuthoringCandidate({
+      workspace,
+      candidatePath: path.resolve(cwd, candidateArgument),
+      target,
+      restrictedPaths: evidence.restrictedPaths,
+      restrictedDigests: evidence.restrictedDigests,
+      forbiddenRoots: [path.dirname(evidence.metadataPath)],
+      maximumBytes: Math.min(
+        invocation.limits.maxCandidateBytes,
+        ASSET_PACK_ARCHIVE_LIMITS.entryBytes,
+      ),
+      forbiddenPath: path.resolve(session.packRoot, target.path),
+    });
+  } catch {
+    return refuse('asset_provider_result_invalid', 'provide-external-candidate');
+  }
+  if (
+    inspection.candidateDigest !== result.candidate.digest
+    || inspection.byteLength !== result.candidate.byteLength
+    || inspection.decodedPixelCount > ASSET_PROVIDER_LIMITS.decodedCandidatePixels
+  ) {
+    return refuse('asset_provider_result_invalid', 'provide-external-candidate');
+  }
+
+  let staged: { readonly relativePath: string };
+  try {
+    staged = stageProviderCandidate(workspace, session.sessionId, storedInvocationDigest, inspection);
+  } catch {
+    return refuse('asset_provider_scope_violation', 'resolve-precondition');
+  }
+  const persisted = persistProviderResult(workspace, session, result);
+  const action = importCandidateAction(
+    persisted.sessionId,
+    result.contractDigest,
+    result.targetId,
+    staged.relativePath,
+    result.candidate.digest,
+  );
+  return commandOk(command, providerResultResponseData({
+    sessionId: persisted.sessionId,
+    contractDigest: result.contractDigest,
+    provider: result.provider,
+    invocationDigest: result.invocationDigest,
+    status: 'staged',
+    result,
+    candidate: result.candidate,
+    safety: action.safety,
+    nextActions: [action],
+  }));
+}
+
 function runHandoff(
   parsed: ParsedArgs,
   cwd: string,
@@ -1257,11 +1777,11 @@ function runHandoff(
   }));
 }
 
-export function runAssetProviderCommand(options: {
+export async function runAssetProviderCommand(options: {
   readonly parsed: ParsedArgs;
   readonly cwd: string;
   readonly workspace?: AssetWorkspace;
-}): CliResponse<unknown> {
+}): Promise<CliResponse<unknown>> {
   const providerCommand = options.parsed.command[3];
   if (providerCommand === 'discover') return runDiscovery(options.parsed, options.cwd);
   if (providerCommand === 'preflight') {
@@ -1269,6 +1789,9 @@ export function runAssetProviderCommand(options: {
   }
   if (providerCommand === 'handoff') {
     return runHandoff(options.parsed, options.cwd, options.workspace);
+  }
+  if (providerCommand === 'result') {
+    return runResult(options.parsed, options.cwd, options.workspace);
   }
   return issueResponse(
     `${PROVIDER_COMMAND} ${providerCommand ?? ''}`.trim(),

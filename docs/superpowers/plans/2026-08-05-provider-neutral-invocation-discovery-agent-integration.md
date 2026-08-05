@@ -805,9 +805,28 @@ commit hashes, not abbreviated hashes, and exact command results.
     releasing: N/A — Task 8 owns the complete D2 release documentation pass
     plugin: N/A — no provider skill or plugin command was added
     ```
-- [ ] Task 5 — Result/refusal validation and candidate staging
-  - Commit: pending
-  - Verification: pending
+- [x] Task 5 — Result/refusal validation and candidate staging
+  - Implementation: Added the public `asset authoring provider result` seam. It revalidates the stored invocation and exact contract, accepts a validated provider result or refusal, re-digests the supplied PNG through the existing bounded candidate authority, rejects stale/binding/PNG/geometry/alpha/path/symlink/resource failures without canonical-source mutation, stages valid bytes only below the session-owned provider-candidate root, persists one bounded receipt atomically, and exposes exactly one import/recovery next action. Existing `asset authoring import` now accepts the staged-result phase and remains the only candidate-to-source mutation authority. Session status and human/JSON response projections include result/refusal evidence without private candidate paths.
+  - RED: `rtk pnpm exec vitest run test/asset-provider-commands.test.ts` FAIL before implementation because the public result route was absent; the valid-result test then passed after the route, validation, staging, and import handoff were implemented.
+  - Commit: 185059261172e08884ebcd366713b80399aba156
+  - Verification: `rtk pnpm exec vitest run test/asset-provider-commands.test.ts test/asset-authoring-import.test.ts` PASS — 2 files, 39 tests.
+  - Verification: `rtk pnpm exec vitest run test/asset-authoring-session.test.ts test/response.test.ts test/command-spec.test.ts test/main-json.test.ts` PASS — 4 files, 120 tests.
+  - Verification: `rtk pnpm typecheck` PASS from `packages/cli`.
+  - Verification: `rtk pnpm check:boundaries` PASS.
+  - Verification: `rtk git diff --check` PASS.
+  - Verification: `rtk node scripts/check-cli-doc-impact.mjs --base origin/main --head HEAD --body-file /private/tmp/lpc-toolkit-pr165-body.md` PASS — the help surface declaration is valid for the CLI-sensitive diff.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test` PASS with loopback enabled — 65 files, 1,210 tests passed, 1 skipped. The sandbox-only run had 13 existing web-server bind `EPERM` failures; no non-web test failed.
+  - Documentation impact reassessment:
+    ```text
+    help: update — provider result command, candidate trust boundary, refusal, and import next-action help added in command-spec.ts
+    cli-readme: N/A — Task 8 owns the complete D2 CLI documentation pass
+    root-readme: N/A — Task 8 owns the complete D2 CLI documentation pass
+    landing: N/A — Task 8 owns the complete D2 CLI documentation pass
+    architecture: N/A — Task 8 owns the complete D2 architecture and ownership pass
+    engineering: N/A — Task 8 owns the complete D2 verification pass
+    releasing: N/A — Task 8 owns the complete D2 release documentation pass
+    plugin: N/A — no provider skill or plugin command was added
+    ```
 - [ ] Task 6 — Recovery, response, and D1 provenance binding
   - Commit: pending
   - Verification: pending
