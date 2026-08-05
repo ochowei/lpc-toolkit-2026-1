@@ -253,16 +253,27 @@ and update this matrix and the spec before implementation.
 
 ### 8. Public responses, help, documentation, and capability gate
 
-- [ ] Add public capability/schema identifiers only after Tasks 1–7 tests pass.
-- [ ] Add exact inspect/verify/fetch/install/rollback/post-publication CLI
+- [x] Add public capability/schema identifiers only after Tasks 1–7 tests pass.
+      - Implementation: advertised `asset-pack-remote-distribution.v1`, `asset-pack-signature-verification.v1`, `asset-pack-global-install.v1`, and `asset-pack-npm-publication.v1` only after the D4 local seams were green; added the additive release, verification, and trust-policy schema identifiers while retaining all prior capabilities and schemas.
+      - Commit: `3eac9773f971462b29170c75e02eb25f5834f62a`
+      - Verification: `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/asset-distribution-command.test.ts test/command-spec.test.ts test/main-json.test.ts test/main-human.test.ts` PASS (141 tests); `rtk pnpm --filter @lpc-toolkit/cli exec tsc -p tsconfig.json --noEmit` PASS; `rtk git diff --cached --check` PASS.
+- [x] Add exact inspect/verify/fetch/install/rollback/post-publication CLI
       response contracts only for approved local seams; no hidden publish path.
-- [ ] Update help, CLI README, root README, architecture, engineering, and
+      - Implementation: added `asset distribution` local fixture-only commands with bounded `lpc-toolkit.asset-distribution-verification.v1` JSON/human responses, stable state/next-action projections, deterministic verifier fixtures, fake package receipt verification, explicit temporary-prefix confirmation, and system-wide refusal. Responses redact absolute paths, raw archive bytes, credentials, and publication claims.
+      - Commit: `3eac9773f971462b29170c75e02eb25f5834f62a`
+      - Verification: `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/asset-distribution-command.test.ts` PASS (7 tests); `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/command-spec.test.ts test/main-json.test.ts test/main-human.test.ts` PASS (134 tests); `rtk pnpm --filter @lpc-toolkit/cli exec tsc -p tsconfig.json --noEmit` PASS; no registry, marketplace, key, token, network, npm, or system-wide prefix mutation.
+- [x] Update help, CLI README, root README, architecture, engineering, and
       releasing docs; retain the landing/plugin N/A reasons unless the public
       scope changes.
-- [ ] Reassess and record the complete CLI documentation impact matrix and
+      - Implementation: updated `packages/cli/README.md`, `README.md`, `docs/ARCHITECTURE.md`, `docs/ENGINEERING.md`, and `docs/RELEASING.md`; `packages/cli/src/command-spec.ts` owns the help update. Landing remains unchanged because D4 adds no Web distribution UI; plugin remains unchanged because D4 adds no plugin capability, skill, or command.
+      - Commit: recorded in the subsequent checked-in plan-record commit after the documentation commit.
+- [x] Reassess and record the complete CLI documentation impact matrix and
       live PR-body declaration.
-- [ ] Test JSON/human wording, stable next actions, privacy redaction, explicit
+      - CLI docs impact matrix: `help: update`; `cli-readme: update`; `root-readme: update`; `landing: N/A — D4 v1 is CLI/release trust work and adds no Web distribution UI`; `architecture: update`; `engineering: update`; `releasing: update`; `plugin: N/A — D4 adds no plugin capability, skill, or command`.
+      - PR body declaration: `CLI docs impact: updated`; `CLI docs surfaces: help, cli-readme, root-readme, landing, architecture, engineering, releasing, plugin`; `CLI docs reason: landing and plugin are explicitly not applicable to this CLI-only D4 scope.`
+- [x] Test JSON/human wording, stable next actions, privacy redaction, explicit
       confirmation, old capabilities, and no claim of real publication.
+      - Verification: `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/asset-distribution-command.test.ts test/command-spec.test.ts test/main-json.test.ts test/main-human.test.ts` PASS (141 tests); no absolute fixture path, raw archive bytes, credentials, real publication claim, or old capability/schema removal was observed.
 
 ### 9. Final verification and handoff
 

@@ -117,6 +117,37 @@ pnpm --filter @lpc-toolkit/web test -- asset-pack-download.test.ts asset-pack-do
 pnpm --filter @lpc-toolkit/cli test -- asset-authoring-web-cli-handoff.test.ts d3-web-cli-fixtures.test.ts command-spec.test.ts main-json.test.ts main-human.test.ts response.test.ts
 ```
 
+#### D4 local distribution and trust acceptance
+
+D4's public CLI surface is a local fixture contract. It does not add a network
+client, remote registry or marketplace mutation, key creation/enrollment,
+authentication, `npm publish`, or system-wide prefix mutation. Run the focused
+response/help/capability map with exact local record, archive, trust-policy,
+deterministic verifier, consumer-prefix, rollback, package-inspection, and
+fake-receipt fixtures:
+
+```sh
+pnpm --filter @lpc-toolkit/core test -- asset-distribution-schema.test.ts asset-distribution-trust.test.ts
+pnpm --filter @lpc-toolkit/core run typecheck
+pnpm --filter @lpc-toolkit/cli test -- asset-distribution-command.test.ts asset-distribution-transport.test.ts asset-distribution-release-evidence.test.ts asset-distribution-global-install.test.ts asset-distribution-package.test.ts asset-distribution-audit.test.ts command-spec.test.ts main-json.test.ts main-human.test.ts
+pnpm --filter @lpc-toolkit/cli run typecheck
+pnpm check:boundaries
+pnpm verify:cli-docs-policy
+pnpm verify:plugin
+```
+
+The public response schema is
+`lpc-toolkit.asset-distribution-verification.v1`; capabilities are
+`asset-pack-remote-distribution.v1`, `asset-pack-signature-verification.v1`,
+`asset-pack-global-install.v1`, and `asset-pack-npm-publication.v1`. Tests
+must assert exact digest/identity binding, stable `blocked`/`tampered`/
+`untrusted`/`withdrawn`/`recoverable` states, privacy-safe JSON and human
+wording, one safe next action, explicit `--confirm` before a temporary-prefix
+mutation, old capability retention, and the fact that a fake receipt never
+claims real publication. The existing v1 archive, manifest, install registry,
+matching `CREDITS.csv`, validation, preview, release gates, D1 provenance, D2
+provider evidence, and D3 handoff remain authoritative.
+
 ### CLI
 
 ```sh

@@ -72,6 +72,13 @@ schemas, including
 `lpc-toolkit.asset-provider-result.v1`,
 `lpc-toolkit.asset-provider-refusal.v1`, and
 `lpc-toolkit.agent-integration-manifest.v1`.
+The D4 local distribution contract additionally advertises
+`asset-pack-remote-distribution.v1`, `asset-pack-signature-verification.v1`,
+`asset-pack-global-install.v1`, and `asset-pack-npm-publication.v1`, plus
+`lpc-toolkit.asset-distribution-release.v1`,
+`lpc-toolkit.asset-distribution-verification.v1`, and
+`lpc-toolkit.asset-distribution-trust-policy.v1`, only when the local fake
+adapter, refusal, response, and packed acceptance tests are complete.
 Check that the CLI help lists `start`, `status`, `resume`, `contract`, `import`,
 `validate`, `preview`, `acknowledge`, `declare`, `accept-preview`, and
 `reconcile-manifest`, `draft`, `sync`, `pack`, `inspect`, `provenance`, and
@@ -207,6 +214,39 @@ pnpm --filter @lpc-toolkit/cli test -- asset-authoring-web-cli-handoff.test.ts d
 
 No real registry, marketplace, auth service, key, signing operation, npm
 publication, provider, or external service is part of D3 verification.
+
+### D4 local distribution and trust gate
+
+D4's public `asset distribution` commands are intentionally limited to
+caller-supplied local fixtures in this release cycle. Before any future
+external publication is considered, verify the exact record/archive capture,
+detached signature projection, local trust policy, namespace/key lifecycle,
+matching credits/license evidence, optional D1/D2/D3 bindings, and the
+existing archive inspection/release gates. Then exercise the public response
+contract:
+
+```sh
+pnpm --filter @lpc-toolkit/cli test -- asset-distribution-command.test.ts asset-distribution-transport.test.ts asset-distribution-release-evidence.test.ts asset-distribution-global-install.test.ts asset-distribution-package.test.ts asset-distribution-audit.test.ts command-spec.test.ts main-json.test.ts main-human.test.ts
+pnpm --filter @lpc-toolkit/cli run typecheck
+pnpm --filter @lpc-toolkit/cli build
+pnpm check:boundaries
+pnpm verify:cli-docs-policy
+pnpm verify:plugin
+pnpm verify
+```
+
+`asset distribution inspect|verify|fetch` reads only explicit local record and
+archive fixtures. `install` without `--confirm` must return
+`needs-user-action`; confirmation may delegate only to the existing installer
+for an explicitly named `temporary-consumer-prefix`, while
+`system-wide-prefix` is refused. `rollback` is an explicit prior verified
+selection with `mutation: none`. `post-publication` verifies only a fake npm or
+fake marketplace receipt and reports `fake-receipt-verified`, never real
+publication. No D4 verification may call `npm publish`, create/enroll a key,
+contact a registry/marketplace, use credentials, or mutate a system-wide
+prefix. The existing v1 archive/manifest/install behavior and all attribution,
+consent, validation, preview, release, provenance, provider, and handoff gates
+remain unchanged.
 
 ## Release Candidate
 

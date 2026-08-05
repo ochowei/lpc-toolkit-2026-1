@@ -160,6 +160,9 @@ not modify `upstream/`.
   status projection without changing the v1 session file
 - external generation-provenance companion publication from current formal
   archive evidence and a read-only verifier for copied archive/receipt bytes
+- D4 local distribution response contracts for exact record/archive capture,
+  trust-policy evaluation, temporary consumer-prefix confirmation, immutable
+  rollback selection, audit projection, and fake package-receipt verification
 
 CLI code may use Node APIs, `@napi-rs/canvas` (MIT), and `jszip` (MIT) because
 it is a Node runtime package. Those dependencies must not move into
@@ -829,6 +832,39 @@ data, including only identity/digest fields and logical source paths. Missing
 sidecars return `null`; malformed or session-mismatched sidecars are
 `blocked`; neither state can satisfy release gates. Human CLI confirmation is
 an import decision, not a release declaration or preview acceptance.
+
+### Remote distribution and trust boundary
+
+D4 adds an additive, detached distribution layer around the existing formal
+`asset-pack.v1` archive. The CLI's public `asset distribution` commands read
+only caller-supplied local fixtures during this implementation cycle:
+`inspect` captures an exact record/archive pair, `fetch` exercises a local
+fixture transport, `verify` evaluates an explicit trust policy through a
+deterministic verifier fixture, `install` delegates only an explicitly
+confirmed temporary consumer-prefix mutation to the existing transactional
+installer, `rollback` selects a prior verified identity with `mutation: none`,
+and `post-publication` verifies a fake package receipt read-only.
+
+The response schema is
+`lpc-toolkit.asset-distribution-verification.v1`. It reports bounded release
+identity, archive/record digests, trust status, stable decision states, and
+safe next actions without archive bytes, absolute paths, credentials, private
+keys, raw provider payloads, or approval text. `fake-receipt-verified` is
+explicitly distinct from real publication. D4 does not add a network client,
+registry or marketplace mutation, key creation/enrollment, `npm publish`, or
+system-wide prefix mutation. Remote registries, marketplaces, package
+integrity, signer identity, and npm authentication remain transport/evidence
+inputs rather than trust or attribution authorities.
+
+The detached distribution record binds namespace, pack identity/version, the
+exact formal archive digest and length, manifest/content/source digests,
+matching credits/license evidence, optional D1/D2/D3 evidence, and a detached
+signature projection. A local trust policy still decides namespace/key
+authorization and lifecycle state; a signature never proves LPC authorship,
+license authority, visual approval, consent, or release declaration. Existing
+archive inspection, matching `CREDITS.csv`, validation, preview, release
+gates, local manager registry, transaction recovery, D1 provenance, D2
+provider evidence, and D3 handoff remain authoritative and backward-readable.
 
 ### Provider-neutral Agent integration boundary
 
