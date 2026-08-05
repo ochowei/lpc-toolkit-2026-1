@@ -642,20 +642,20 @@ integration, and focused/e2e tests.
 `response.ts`, `asset-release-provenance.ts` only where delegation requires it,
 Core projection tests, and CLI tests.
 
-- [ ] Write RED tests for contract/source/manifest drift after handoff, result
+- [x] Write RED tests for contract/source/manifest drift after handoff, result
   drift after staging, provider switch, result refusal, resume, and status.
-- [ ] Extend `deriveAuthoringInvalidationDecisions` and the existing resume
+- [x] Extend `deriveAuthoringInvalidationDecisions` and the existing resume
   path with the minimum provider checkpoint/reason so provider evidence becomes
   stale without erasing unrelated valid release evidence.
-- [ ] Add a provider next-action path that leads to existing contract,
+- [x] Add a provider next-action path that leads to existing contract,
   external-candidate, import, validation, preview, and release commands; do
   not create a second lifecycle state machine.
-- [ ] Project a successful result through the pure D1 adapter and keep existing
+- [x] Project a successful result through the pure D1 adapter and keep existing
   `asset authoring provenance` publication, formal archive, inspect, and install
   semantics unchanged. Verify no D2 field enters `asset-pack.json` or a ZIP.
-- [ ] Assert that D1 output excludes prompt/payload/credential/private-path/
+- [x] Assert that D1 output excludes prompt/payload/credential/private-path/
   human-approval data and that provider identity is never an attribution author.
-- [ ] Run focused Core/CLI provenance, session, response, JSON, and human tests;
+- [x] Run focused Core/CLI provenance, session, response, JSON, and human tests;
   commit as `feat(cli): bind provider evidence to provenance recovery`.
 
 ### Task 7 — Prove the packed public CLI and Agent manifest boundary
@@ -827,9 +827,30 @@ commit hashes, not abbreviated hashes, and exact command results.
     releasing: N/A — Task 8 owns the complete D2 release documentation pass
     plugin: N/A — no provider skill or plugin command was added
     ```
-- [ ] Task 6 — Recovery, response, and D1 provenance binding
-  - Commit: pending
-  - Verification: pending
+- [x] Task 6 — Recovery, response, and D1 provenance binding
+  - Implementation: Added provider invocation/result evidence invalidation for contract, source, manifest, contract-target, and session-owned candidate-byte drift. Status/resume preserves existing release receipts while exposing stale provider evidence and routes recovery through the existing contract refresh, candidate import, validation, preview, archive, and provenance lifecycle. Human response now reports only provider evidence status and safe next commands. Successful staged results are projected through the pure D1 adapter during the existing provenance command; refusal results remain non-attribution evidence, and formal archive manifests/ZIP entries remain unchanged.
+  - RED: New public drift/status and D1 release assertions failed during the initial implementation iterations; the final green slice covered provider checkpoint/result drift, contract/source/manifest drift, stale candidate bytes, human response, and public archive/provenance publication.
+  - Commit: 794f735c9ccbe435c63e098af3ca7525b552ce74
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-authoring-session.test.ts asset-provider-commands.test.ts asset-authoring-release.test.ts response.test.ts main-json.test.ts main-human.test.ts` PASS — 6 files, 167 tests.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-provider-provenance.test.ts asset-release-provenance-schema.test.ts` PASS — 2 files, 14 tests.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+  - Verification: `rtk pnpm -r run typecheck` PASS.
+  - Verification: `rtk pnpm check:boundaries` PASS.
+  - Verification: `rtk git diff --check` PASS.
+  - Verification: `rtk pnpm check:cli-docs-impact -- --base origin/main --head HEAD --body-file /private/tmp/lpc-toolkit-task6-pr-body.txt` PASS — reproduction-mode declaration is valid for the CLI-sensitive diff.
+  - Verification: `rtk pnpm check:cli-docs-impact` FAIL locally when invoked in CI mode because `GITHUB_EVENT_PATH` is unavailable; the required reproduction-mode check above PASSed.
+  - Verification: `rtk pnpm verify` PASS with the required loopback/IPC permission — upstream pin, boundaries, CLI docs policy, plugin contract, workspace typecheck, Core 31 files/422 tests, CLI 65 files/1,216 tests plus 1 skipped, Web 106 files/861 tests, and remaining workspace packages passed.
+  - Documentation impact reassessment:
+    ```text
+    help: N/A — Task 6 changes response/status projection and reuses existing command help; Task 8 owns the complete D2 help pass
+    cli-readme: N/A — Task 8 owns the complete D2 CLI documentation pass
+    root-readme: N/A — Task 8 owns the complete D2 CLI documentation pass
+    landing: N/A — Task 8 owns the complete D2 CLI documentation pass
+    architecture: N/A — Task 8 owns the complete D2 architecture and ownership pass
+    engineering: N/A — Task 8 owns the complete D2 verification pass
+    releasing: N/A — Task 8 owns the complete D2 release documentation pass
+    plugin: N/A — no provider skill or plugin command was added
+    ```
 - [ ] Task 7 — Packed public CLI and Agent manifest boundary
   - Commit: pending
   - Verification: pending

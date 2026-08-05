@@ -15,6 +15,7 @@ import { createHash } from 'node:crypto';
 import { createCanvas } from '@napi-rs/canvas';
 import {
   standardAnimationGeometry,
+  type AssetProviderInvocation,
   type AssetReleaseProvenanceProjection,
 } from '@lpc-toolkit/core';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -23,6 +24,7 @@ import {
   createAssetAuthoringSessionStore,
   type AssetAuthoringSession,
 } from '../src/asset-authoring-session.js';
+import { assetAuthoringContractMetadataPath } from '../src/asset-authoring-contract.js';
 import { createDirectoryAssetStore } from '../src/asset-store.js';
 import { readAssetPackArchive } from '../src/asset-pack-archive-format.js';
 import { packAssetPack } from '../src/asset-pack-packaging.js';
@@ -222,6 +224,20 @@ function digest(bytes: Buffer): string {
   return `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
 }
 
+function canonicalizeJson(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map((entry) => canonicalizeJson(entry));
+  if (typeof value !== 'object' || value === null) return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entry]) => [key, canonicalizeJson(entry)] as const),
+  );
+}
+
+function canonicalJson(value: unknown): string {
+  return JSON.stringify(canonicalizeJson(value));
+}
+
 function encodeProvenanceProjection(
   projection: unknown,
 ): Buffer {
@@ -395,7 +411,9 @@ describe('session-aware release boundaries', () => {
       prepareRuntimeAssets: async () => fixture.runtime,
     });
     const archivePath = packed.response.data?.formalArchiveReceipt?.archivePath;
-    if (archivePath === undefined) throw new Error('Expected a formal archive.');
+    if (archivePath === undefined) {
+      throw new Error('Expected a formal archive.');
+    }
     const missingInspection = await runJson<null>([
       'asset', 'authoring', 'provenance', '--session', fixture.session.sessionId, '--confirm',
     ], fixture.workspaceRoot, {
@@ -1099,6 +1117,275 @@ describe('session-aware release boundaries', () => {
     expect(repeated.response.data?.releaseProvenanceReceipt).toEqual(provenanceReceipt);
     expect(readFileSync(sessionPath)).toEqual(sessionAfterPublish);
     expect(readFileSync(formalReceipt.archivePath)).toEqual(archiveBefore);
+  });
+
+  it('projects an imported provider result into D1 without changing the archive manifest', async () => {
+    const fixture = await createFormalReadyFixture();
+    const { workspaceRoot, workspace, runtime, packRoot, session } = fixture;
+    const contract = await runJson<{
+      readonly checkpoint: { readonly digest: string } | null;
+    }>(['asset', 'authoring', 'contract', '--session', session.sessionId], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    expect(contract.code).toBe(0);
+    const contractDigest = contract.response.data?.checkpoint?.digest;
+    if (contractDigest === undefined) throw new Error('Expected a current contract digest.');
+    const metadataPath = assetAuthoringContractMetadataPath(workspace, session.sessionId);
+    const contractPath = path.join(path.dirname(metadataPath), 'contract.json');
+    const contractDocument = JSON.parse(readFileSync(contractPath, 'utf8')) as {
+      readonly targets: readonly [{
+        readonly id: string;
+        readonly geometry: {
+          readonly canvasWidth: number;
+          readonly canvasHeight: number;
+          readonly frameWidth: number;
+          readonly frameHeight: number;
+          readonly rows: readonly {
+            readonly cells: readonly { readonly policy: string; readonly sourceColumn: number }[];
+          }[];
+        };
+      }];
+    };
+    const target = contractDocument.targets[0];
+    const targetId = target?.id;
+    if (targetId === undefined) throw new Error('Expected a contract target.');
+
+    const descriptor = {
+      schema: 'lpc-toolkit.asset-provider-descriptor.v1',
+      id: 'provider.release',
+      adapter: { id: 'agent-adapter.release', version: '1.0.0', cliRange: '>=0.2.0 <0.3.0' },
+      capabilities: ['sprite-candidate.v1'],
+      contractVersions: ['lpc-toolkit.sprite-drawing-contract.v1'],
+      limits: { maxCandidateBytes: 67108864, timeoutSeconds: 600, maxReferences: 8 },
+      network: { required: false, declaredHosts: [] },
+      credentials: { required: false, handledOutsideCli: true },
+    } as const;
+    const descriptorPath = path.join(fixture.root, 'release-provider.json');
+    const consentPath = path.join(fixture.root, 'release-consent.json');
+    writeJson(descriptorPath, descriptor);
+    writeJson(consentPath, {
+      targetIds: [targetId],
+      contractDigest,
+      referenceDigests: [],
+      network: { enabled: false, hosts: [] },
+      limits: descriptor.limits,
+      confirmed: true,
+    });
+    const handoff = await runJson<{
+      readonly invocation: AssetProviderInvocation;
+      readonly invocationDigest: string;
+    }>([
+      'asset', 'authoring', 'provider', 'handoff',
+      '--session', session.sessionId,
+      '--descriptor', descriptorPath,
+      '--consent', consentPath,
+      '--workspace', workspace.root,
+      '--confirm',
+    ], workspaceRoot);
+    expect(handoff.code).toBe(0);
+    const invocation = handoff.response.data?.invocation;
+    const invocationDigest = handoff.response.data?.invocationDigest;
+    if (invocation === undefined || invocationDigest === undefined) {
+      throw new Error('Expected a provider invocation.');
+    }
+    const sourcePath = path.join(packRoot, PLAN.scope.paths[0]);
+    const sourceDigest = digest(readFileSync(sourcePath));
+    const candidateCanvas = createCanvas(target.geometry.canvasWidth, target.geometry.canvasHeight);
+    const candidateContext = candidateCanvas.getContext('2d');
+    candidateContext.fillStyle = 'rgb(80, 120, 160)';
+    candidateContext.fillRect(0, 0, target.geometry.canvasWidth, target.geometry.canvasHeight);
+    target.geometry.rows.forEach((row, rowIndex) => row.cells.forEach((cell) => {
+      if (cell.policy === 'required-transparent') {
+        candidateContext.clearRect(
+          cell.sourceColumn * target.geometry.frameWidth,
+          rowIndex * target.geometry.frameHeight,
+          target.geometry.frameWidth,
+          target.geometry.frameHeight,
+        );
+        return;
+      }
+      candidateContext.fillRect(
+        cell.sourceColumn * target.geometry.frameWidth + 1,
+        rowIndex * target.geometry.frameHeight + 1,
+        Math.min(4, target.geometry.frameWidth - 1),
+        Math.min(4, target.geometry.frameHeight - 1),
+      );
+    }));
+    const candidateBytes = candidateCanvas.toBuffer('image/png');
+    const candidateDigest = digest(candidateBytes);
+    const invocationPath = path.join(fixture.root, 'release-invocation.json');
+    const candidatePath = path.join(workspace.root, 'release-provider.png');
+    const resultPath = path.join(fixture.root, 'release-result.json');
+    writeJson(invocationPath, invocation);
+    writeFileSync(candidatePath, candidateBytes);
+    writeJson(resultPath, {
+      schema: 'lpc-toolkit.asset-provider-result.v1',
+      invocationDigest,
+      sessionId: session.sessionId,
+      contractDigest,
+      operation: 'sprite-candidate.v1',
+      provider: invocation.provider,
+      targetId,
+      consentScopeDigest: invocation.consent.scopeDigest,
+      referenceDigests: [],
+      candidate: {
+        id: invocation.candidate.stagingId,
+        digest: candidateDigest,
+        byteLength: candidateBytes.byteLength,
+      },
+    });
+    const staged = await runJson([
+      'asset', 'authoring', 'provider', 'result',
+      '--session', session.sessionId,
+      '--invocation', invocationPath,
+      '--result', resultPath,
+      '--candidate', candidatePath,
+      '--workspace', workspace.root,
+    ], workspaceRoot);
+    expect(staged.code).toBe(0);
+    expect(staged.response, JSON.stringify(staged.response, null, 2)).toMatchObject({
+      data: { status: 'staged' },
+    });
+    const stagedCandidatePath = path.join(
+      path.dirname(assetAuthoringSessionPath(workspace, session.sessionId)),
+      'provider-candidates',
+      invocationDigest.slice('sha256:'.length),
+      `${candidateDigest.slice('sha256:'.length)}.png`,
+    );
+    const imported = await runJson([
+      'asset', 'authoring', 'import',
+      '--session', session.sessionId,
+      '--target', targetId,
+      '--candidate', stagedCandidatePath,
+      '--contract-digest', contractDigest,
+      '--replace-existing',
+      '--expected-target-digest', sourceDigest,
+      '--workspace', workspace.root,
+    ], workspaceRoot);
+    expect(imported.code, JSON.stringify(imported.response, null, 2)).toBe(0);
+    const validated = await runJson<null>([
+      'asset', 'authoring', 'validate', '--session', session.sessionId,
+    ], workspaceRoot, { prepareRuntimeAssets: async () => runtime });
+    expect(validated.code, JSON.stringify(validated.response, null, 2)).toBe(0);
+    const validationData = validated.response.data as {
+      readonly validation?: {
+        readonly acknowledgementRecords?: readonly Record<string, unknown>[];
+      };
+    } | null;
+    const acknowledgementTemplate = validationData?.validation?.acknowledgementRecords?.[0];
+    if (acknowledgementTemplate !== undefined) {
+      const acknowledgementPath = path.join(workspace.root, 'provider-acknowledgement.json');
+      writeJson(acknowledgementPath, {
+        ...acknowledgementTemplate,
+        reason: 'Reviewed the provider candidate padding-frame warning.',
+      });
+      const acknowledged = await runJson<null>([
+        'asset', 'authoring', 'acknowledge', '--session', session.sessionId,
+        '--acknowledgement', acknowledgementPath, '--confirm',
+      ], workspaceRoot, { prepareRuntimeAssets: async () => runtime });
+      expect(acknowledged.code, JSON.stringify(acknowledged.response, null, 2)).toBe(0);
+    }
+    const characterPath = path.join(workspace.root, 'provider-character.selection.json');
+    writeJson(characterPath, {
+      schema: 'lpc-toolkit.selection.v2',
+      name: PLAN.asset.localId,
+      bodyType: 'male',
+      items: {
+        hair: { name: `${PLAN.pack.id}--${PLAN.asset.localId}` },
+      },
+    });
+    const previewed = await runJson<null>([
+      'asset', 'authoring', 'preview', '--session', session.sessionId,
+      '--character', characterPath,
+    ], workspaceRoot, { prepareRuntimeAssets: async () => runtime });
+    expect(previewed.code, JSON.stringify(previewed.response, null, 2)).toBe(0);
+    const store = createAssetAuthoringSessionStore(workspace);
+    const currentAfterPreview = store.read(session.sessionId);
+    const validationReceipt = currentAfterPreview.receipts.validation;
+    const previewReceipt = currentAfterPreview.receipts.preview;
+    const previousDeclaration = currentAfterPreview.receipts.releaseDeclaration;
+    const acknowledgementReceipt = currentAfterPreview.receipts.acknowledgements;
+    if (validationReceipt === null || previewReceipt === null || previousDeclaration === null
+      || acknowledgementReceipt === null) {
+      throw new Error('Expected current validation, preview, and declaration evidence.');
+    }
+    const creditDigest = digest(Buffer.from(canonicalJson({
+      credits: PLAN.draftCredits,
+      creditOverrides: {},
+    }), 'utf8'));
+    const declarationPath = path.join(workspace.root, 'provider-declaration.json');
+    writeJson(declarationPath, {
+      schema: 'lpc-toolkit.asset-release-declaration.v1',
+      expectedManifestDigest: validationReceipt.manifestDigest,
+      declarant: previousDeclaration.declarant,
+      authorAndSource: {
+        confirmed: true,
+        creditDigest,
+      },
+      licenseAuthority: {
+        confirmed: true,
+        creditDigest,
+      },
+      acknowledgements: {
+        confirmed: true,
+        contentDigest: validationReceipt.id,
+        recordDigests: acknowledgementReceipt.recordDigests,
+      },
+    });
+    const declared = await runJson<null>([
+      'asset', 'authoring', 'declare', '--session', session.sessionId,
+      '--declaration', declarationPath, '--confirm',
+    ], workspaceRoot, { prepareRuntimeAssets: async () => runtime });
+    expect(declared.code, JSON.stringify(declared.response, null, 2)).toBe(0);
+    const currentAfterDeclaration = store.read(session.sessionId);
+    const previewDigest = currentAfterDeclaration.receipts.preview?.artifacts
+      ?.find((artifact) => artifact.id === 'preview:preview')?.digest;
+    if (previewDigest === undefined) throw new Error('Expected a current preview digest.');
+    const accepted = await runJson<null>([
+      'asset', 'authoring', 'accept-preview', '--session', session.sessionId,
+      '--preview-digest', previewDigest, '--confirm',
+    ], workspaceRoot, { prepareRuntimeAssets: async () => runtime });
+    expect(accepted.code, JSON.stringify(accepted.response, null, 2)).toBe(0);
+
+    const packed = await runJson<{
+      readonly formalArchiveReceipt: { readonly archivePath: string } | null;
+    }>(['asset', 'authoring', 'pack', '--session', session.sessionId, '--confirm'], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    const archivePath = packed.response.data?.formalArchiveReceipt?.archivePath;
+    if (archivePath === undefined) {
+      throw new Error('Expected a formal archive.');
+    }
+    const inspected = await runJson<null>([
+      'asset', 'authoring', 'inspect', '--session', session.sessionId, '--archive', archivePath,
+    ], workspaceRoot, { prepareRuntimeAssets: async () => runtime });
+    expect(inspected.code).toBe(0);
+    const published = await runJson<{
+      readonly releaseProvenanceReceipt: { readonly provenancePath: string } | null;
+    }>(['asset', 'authoring', 'provenance', '--session', session.sessionId, '--confirm'], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    expect(published.code, JSON.stringify(published.response, null, 2)).toBe(0);
+    const provenancePath = published.response.data?.releaseProvenanceReceipt?.provenancePath;
+    if (provenancePath === undefined) throw new Error('Expected a release provenance receipt.');
+    const provenance = JSON.parse(readFileSync(provenancePath, 'utf8')) as {
+      readonly projection: { readonly records: readonly Record<string, unknown>[] };
+    };
+    expect(provenance.projection.records).toEqual([{
+      kind: 'provider-output',
+      targetId,
+      contractDigest,
+      provider: { id: 'provider.release', tool: 'agent-adapter.release' },
+      referenceDigests: [],
+      resultDigest: candidateDigest,
+    }]);
+    const archive = await readAssetPackArchive({ archivePath });
+    expect(archive.ok).toBe(true);
+    if (!archive.ok) throw new Error('Expected a readable formal archive.');
+    expect(archive.snapshot.manifestBytes.toString('utf8')).not.toContain('provider.release');
+    expect(readFileSync(provenancePath, 'utf8')).not.toContain(fixture.root);
+    expect(readFileSync(provenancePath, 'utf8')).not.toContain('prompt');
+    expect(readFileSync(provenancePath, 'utf8')).not.toContain('credential');
   });
 
   it('accepts only release-bound optional provenance records and never copies the input path', async () => {

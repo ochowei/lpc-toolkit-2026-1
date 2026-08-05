@@ -11,7 +11,10 @@ import path from 'node:path';
 import {
   ASSET_AUTHORING_RELEASE_ARTIFACT_IDS,
   assetAuthoringReleaseReceiptDigestInput,
+  assetProviderRefusalDigestInput,
   assetProviderInvocationDigestInput,
+  assetProviderResultDigestInput,
+  assetProviderResultToReleaseProvenanceRecord,
   normalizeAssetPack,
   parseAssetAuthoringPlan,
   parseAssetReleaseDeclaration,
@@ -46,6 +49,7 @@ import {
 import {
   AssetAuthoringImportError,
   importAssetAuthoringCandidate,
+  readAssetAuthoringContractEvidence,
 } from './asset-authoring-import.js';
 import {
   AssetPackPreviewError,
@@ -70,6 +74,7 @@ import {
   type InstalledAssetPackRegistryEntry,
 } from './asset-pack-registry.js';
 import { PreviewError } from './preview.js';
+import { assetProviderCandidateStagingPath } from './asset-provider-commands.js';
 import { CLI_VERSION } from './package-info.js';
 import {
   assetAuthoringSessionPath,
@@ -497,6 +502,22 @@ function providerResultNextAction(
   session: AssetAuthoringSession,
   providerResult: AssetProviderResult | AssetProviderRefusal,
 ): AuthoringNextAction {
+  if (session.reason === 'provider-contract-stale') {
+    return providerContractStaleNextAction(session, providerResult.contractDigest);
+  }
+  if (
+    session.reason === 'provider-result-stale'
+    && providerResult.schema === 'lpc-toolkit.asset-provider-result.v1'
+  ) {
+    return nextAction(
+      'provide-external-candidate',
+      'Provide a new contract-bound candidate through the existing import boundary.',
+      `asset authoring import --session ${session.sessionId} --target ${providerResult.targetId} --candidate <candidate.png> --contract-digest ${providerResult.contractDigest}`,
+      'safe',
+      [providerResult.contractDigest],
+      ['target', 'candidate'],
+    );
+  }
   if (providerResult.schema === 'lpc-toolkit.asset-provider-result.v1') {
     return nextAction(
       'import-provider-candidate',
@@ -541,12 +562,38 @@ function providerResultNextAction(
   );
 }
 
+function providerContractStaleNextAction(
+  session: AssetAuthoringSession,
+  contractDigest: string,
+): AuthoringNextAction {
+  return nextAction(
+    'rematerialize-provider-contract',
+    'Refresh the current drawing contract before retrying provider work.',
+    `asset authoring contract --session ${session.sessionId} --refresh`,
+    'safe',
+    [contractDigest],
+    ['refresh'],
+  );
+}
+
 function nextActionsFor(session: AssetAuthoringSession): readonly AuthoringNextAction[] {
   if (session.reason === 'missing-draft-credits') return [];
 
   const providerResult = session.receipts.providerResult ?? null;
-  if (providerResult !== null && session.reason.startsWith('provider-result-')) {
+  if (
+    providerResult !== null
+    && (
+      session.reason.startsWith('provider-result-')
+      || session.reason === 'provider-contract-stale'
+    )
+  ) {
     return [providerResultNextAction(session, providerResult)];
+  }
+  if (session.reason === 'provider-contract-stale') {
+    const invocation = session.receipts.providerInvocation;
+    return invocation === null || invocation === undefined
+      ? []
+      : [providerContractStaleNextAction(session, invocation.contractDigest)];
   }
 
   if (session.conflict !== null) {
@@ -1016,12 +1063,17 @@ function providerResponse(
     ? providerResult
     : null;
   const resultAction = providerResult === null
-    ? null
+    ? session.reason === 'provider-contract-stale'
+      ? providerContractStaleNextAction(session, invocation.contractDigest)
+      : null
     : providerResultNextAction(session, providerResult);
   return {
-    status: result === null && refusal === null
-      ? 'ready'
-      : result === null ? 'refused' : 'result-staged',
+    status: session.reason === 'provider-contract-stale'
+      || session.reason === 'provider-result-stale'
+      ? 'stale'
+      : result === null && refusal === null
+        ? 'ready'
+        : result === null ? 'refused' : 'result-staged',
     invocation,
     invocationDigest: `sha256:${createHash('sha256')
       .update(assetProviderInvocationDigestInput(invocation), 'utf8')
@@ -1165,6 +1217,13 @@ function resumeSession(
   session: AssetAuthoringSession,
 ): AssetAuthoringSession {
   const store = createAssetAuthoringSessionStore(workspace);
+  const providerInvalidation = providerEvidenceInvalidationReason(workspace, session);
+  if (
+    providerInvalidation !== undefined
+    && session.reason !== providerInvalidation
+  ) {
+    return store.replace(session.sessionId, providerEvidenceStaleUpdate(session, providerInvalidation));
+  }
   const manifestPath = manifestPathFor(session);
   const currentManifestDigest = fileDigest(manifestPath);
   if (
@@ -1186,6 +1245,101 @@ function resumeSession(
   return pngUpdate === undefined
     ? session
     : store.replace(session.sessionId, pngUpdate);
+}
+
+function providerInvocationDigestFor(
+  invocation: NonNullable<AssetAuthoringSession['receipts']['providerInvocation']>,
+): string {
+  return sha256(Buffer.from(assetProviderInvocationDigestInput(invocation), 'utf8'));
+}
+
+function providerResultDigestFor(
+  result: NonNullable<AssetAuthoringSession['receipts']['providerResult']>,
+): string {
+  const digestInput = result.schema === 'lpc-toolkit.asset-provider-result.v1'
+    ? assetProviderResultDigestInput(result)
+    : assetProviderRefusalDigestInput(result);
+  return sha256(Buffer.from(digestInput, 'utf8'));
+}
+
+function providerEvidenceInvalidationReason(
+  workspace: AssetWorkspace,
+  session: AssetAuthoringSession,
+): 'provider-contract-stale' | 'provider-result-stale' | undefined {
+  const invocation = session.receipts.providerInvocation;
+  if (invocation === null || invocation === undefined) return undefined;
+
+  const manifestDigest = fileDigest(manifestPathFor(session));
+  if (session.manifestDigest !== null && manifestDigest !== session.manifestDigest) {
+    return 'provider-contract-stale';
+  }
+
+  for (const checkpoint of session.checkpoints) {
+    const expectedDigest = checkpoint.checkpoint?.digest;
+    if (expectedDigest === undefined) continue;
+    const sourcePath = sourcePathFor(session, checkpoint.targetId);
+    if (sourcePath === undefined) continue;
+    const actualBytes = readRegularFile(sourcePath);
+    if (actualBytes !== undefined && sha256(actualBytes) !== expectedDigest) {
+      return 'provider-contract-stale';
+    }
+  }
+
+  try {
+    const evidence = readAssetAuthoringContractEvidence({
+      workspace,
+      session,
+      contractDigest: invocation.contractDigest,
+    });
+    if (invocation.targetIds.some((targetId) =>
+      !evidence.contract.targets.some((target) => target.id === targetId))) {
+      return 'provider-contract-stale';
+    }
+  } catch {
+    return 'provider-contract-stale';
+  }
+
+  const result = session.receipts.providerResult;
+  if (result?.schema !== 'lpc-toolkit.asset-provider-result.v1') return undefined;
+  const candidatePath = assetProviderCandidateStagingPath(
+    workspace,
+    session.sessionId,
+    providerInvocationDigestFor(invocation),
+    result.candidate.digest,
+  );
+  const candidateBytes = readRegularFile(candidatePath);
+  return candidateBytes === undefined
+    || candidateBytes.byteLength !== result.candidate.byteLength
+    || sha256(candidateBytes) !== result.candidate.digest
+    ? 'provider-result-stale'
+    : undefined;
+}
+
+function providerEvidenceStaleUpdate(
+  session: AssetAuthoringSession,
+  reason: 'provider-contract-stale' | 'provider-result-stale',
+): AssetAuthoringSessionUpdate {
+  const invocation = session.receipts.providerInvocation;
+  const result = session.receipts.providerResult;
+  const digest = result === null || result === undefined
+    ? invocation === null || invocation === undefined
+      ? undefined
+      : providerInvocationDigestFor(invocation)
+    : providerResultDigestFor(result);
+  return {
+    state: 'needs-user-action',
+    reason,
+    phase: session.phase,
+    checkpointFreshness: session.checkpointFreshness,
+    provenance: appendProvenance(session, {
+      kind: 'provider',
+      occurredAt: new Date().toISOString(),
+      ...(digest === undefined ? {} : { digest }),
+      summary: reason === 'provider-result-stale'
+        ? 'Staged provider candidate evidence changed or disappeared before import.'
+        : 'Provider evidence no longer matches the current session contract or source scope.',
+    }),
+  };
 }
 
 function startSession(
@@ -1323,7 +1477,7 @@ async function statusSession(
     refreshInstallationState(
       workspace,
       store,
-      await refreshSyncReceiptState(workspace, store, store.status(sessionId)),
+      await refreshSyncReceiptState(workspace, store, resumeSession(workspace, store.status(sessionId))),
     ),
   );
   return commandOk('asset authoring status', responseFor(
@@ -1840,41 +1994,57 @@ function validationReceiptMatchesReport(
 
 function provenanceRecordsFor(
   context: AuthoringCommandContext,
+  session: AssetAuthoringSession,
   projection: AssetReleaseProvenanceProjection,
 ): readonly AssetReleaseProvenanceProjection['records'][number][] {
   const recordsArgument = flagString(context.parsed.flags, 'records');
-  if (recordsArgument === undefined) return [];
-  const recordsPath = path.resolve(context.cwd, recordsArgument);
-  const bytes = readRegularFile(recordsPath);
-  if (bytes === undefined) {
-    throw new AssetReleaseProvenanceFileError(
-      'asset_release_provenance_invalid',
-      'The provenance records input must be a regular file.',
-      recordsPath,
-    );
-  }
-  let value: unknown;
-  try {
-    value = JSON.parse(bytes.toString('utf8')) as unknown;
-  } catch (error) {
-    throw new AssetReleaseProvenanceFileError(
-      'asset_release_provenance_invalid',
-      `The provenance records input is not valid JSON: ${error instanceof Error ? error.message : String(error)}.`,
-      recordsPath,
-    );
-  }
-  try {
-    return parseAssetReleaseProvenanceRecords(value, projection);
-  } catch (error) {
-    if (error instanceof AssetReleaseProvenanceFileError) {
+  let records: readonly AssetReleaseProvenanceProjection['records'][number][] = [];
+  if (recordsArgument !== undefined) {
+    const recordsPath = path.resolve(context.cwd, recordsArgument);
+    const bytes = readRegularFile(recordsPath);
+    if (bytes === undefined) {
       throw new AssetReleaseProvenanceFileError(
-        error.code,
-        error.message,
+        'asset_release_provenance_invalid',
+        'The provenance records input must be a regular file.',
         recordsPath,
       );
     }
-    throw error;
+    let value: unknown;
+    try {
+      value = JSON.parse(bytes.toString('utf8')) as unknown;
+    } catch (error) {
+      throw new AssetReleaseProvenanceFileError(
+        'asset_release_provenance_invalid',
+        `The provenance records input is not valid JSON: ${error instanceof Error ? error.message : String(error)}.`,
+        recordsPath,
+      );
+    }
+    try {
+      records = parseAssetReleaseProvenanceRecords(value, projection);
+    } catch (error) {
+      if (error instanceof AssetReleaseProvenanceFileError) {
+        throw new AssetReleaseProvenanceFileError(
+          error.code,
+          error.message,
+          recordsPath,
+        );
+      }
+      throw error;
+    }
   }
+  const providerResult = session.reason === 'provider-contract-stale'
+    || session.reason === 'provider-result-stale'
+    ? null
+    : session.receipts.providerResult;
+  if (providerResult?.schema !== 'lpc-toolkit.asset-provider-result.v1') return records;
+  const projected = assetProviderResultToReleaseProvenanceRecord(providerResult);
+  if (!projected.ok) {
+    throw new AuthoringCommandError(
+      'The stored provider result cannot be projected into release provenance.',
+      { code: 'asset_release_provenance_invalid' },
+    );
+  }
+  return [...records, projected.record];
 }
 
 async function provenanceCommand(
@@ -1929,7 +2099,7 @@ async function provenanceCommand(
     archiveManifestDigest,
     [],
   );
-  const records = provenanceRecordsFor(context, baseProjection);
+  const records = provenanceRecordsFor(context, session, baseProjection);
   const projection = releaseProvenanceProjectionFor(
     session,
     formalArchive,

@@ -897,6 +897,69 @@ describe('asset provider CLI', () => {
     expect(readFileSync(sessionPath, 'utf8')).toBe(sessionAfterProviderChange);
   });
 
+  it.each(['contract', 'source', 'manifest'] as const)(
+    'marks provider evidence stale after %s drift and preserves a recovery action',
+    async (drift) => {
+      const fixture = await createContractFixture();
+      const { invocation } = await createProviderInvocation(fixture, `drift-${drift}`);
+      const sessionStore = createAssetAuthoringSessionStore(fixture.workspace);
+      const session = sessionStore.read(fixture.sessionId);
+
+      if (drift === 'contract') {
+        writeFileSync(fixture.contractPath, Buffer.concat([
+          readFileSync(fixture.contractPath),
+          Buffer.from(' '),
+        ]));
+      } else if (drift === 'manifest') {
+        const manifestPath = path.join(session.packRoot, 'asset-pack.json');
+        writeFileSync(manifestPath, Buffer.concat([
+          readFileSync(manifestPath),
+          Buffer.from(' '),
+        ]));
+      } else {
+        const sourcePath = path.join(session.packRoot, NEW_ITEM_PLAN.scope.paths[0]);
+        const sourceBytes = Buffer.from('source-before-provider-drift');
+        mkdirSync(path.dirname(sourcePath), { recursive: true });
+        writeFileSync(sourcePath, sourceBytes);
+        sessionStore.replace(fixture.sessionId, {
+          phase: 'imported',
+          checkpointFreshness: 'current',
+          checkpoints: session.checkpoints.map((checkpoint) => ({
+            ...checkpoint,
+            freshness: 'current',
+            checkpoint: {
+              id: 'import:source',
+              phase: 'imported',
+              digest: sha256(sourceBytes),
+              freshness: 'current',
+            },
+          })),
+        });
+        writeFileSync(sourcePath, Buffer.from('source-after-provider-drift'));
+      }
+
+      const status = await runJson([
+        'asset', 'authoring', 'status',
+        '--session', fixture.sessionId,
+        '--workspace', fixture.workspace.root,
+      ], fixture.workspace.root);
+      expect(status.response).toMatchObject({
+        ok: true,
+        data: {
+          reason: 'provider-contract-stale',
+          provider: {
+            status: 'stale',
+            invocation: {
+              provider: { id: invocation.provider.id },
+            },
+            nextActions: [expect.objectContaining({ id: 'rematerialize-provider-contract' })],
+          },
+          nextActions: [expect.objectContaining({ id: 'rematerialize-provider-contract' })],
+        },
+      });
+    },
+  );
+
   it('stages a valid provider result without importing canonical source bytes', async () => {
     const fixture = await createContractFixture();
     const descriptorPath = writeJson(fixture.root, 'result-provider.json', VALID_DESCRIPTOR);
@@ -1016,6 +1079,25 @@ describe('asset provider CLI', () => {
       `${resultEnvelope.candidate.digest.slice('sha256:'.length)}.png`,
     );
     expect(readFileSync(stagedCandidatePath)).toEqual(candidateBytes);
+
+    writeFileSync(stagedCandidatePath, Buffer.from('staged-candidate-drift'));
+    const staleStatus = await runJson([
+      'asset', 'authoring', 'status',
+      '--session', fixture.sessionId,
+      '--workspace', fixture.workspace.root,
+    ], fixture.workspace.root);
+    expect(staleStatus.response).toMatchObject({
+      ok: true,
+      data: {
+        reason: 'provider-result-stale',
+        provider: {
+          status: 'stale',
+          nextActions: [expect.objectContaining({ id: 'provide-external-candidate' })],
+        },
+      },
+    });
+    writeFileSync(stagedCandidatePath, candidateBytes);
+
     const imported = await runJson([
       'asset', 'authoring', 'import',
       '--session', fixture.sessionId,

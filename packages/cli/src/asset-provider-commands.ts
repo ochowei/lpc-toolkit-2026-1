@@ -1011,6 +1011,19 @@ function candidateStagingRoot(workspace: AssetWorkspace, sessionId: string): str
   return path.join(sessionDirectory, 'provider-candidates');
 }
 
+export function assetProviderCandidateStagingPath(
+  workspace: AssetWorkspace,
+  sessionId: string,
+  invocationDigestValue: string,
+  candidateDigest: string,
+): string {
+  return path.join(
+    candidateStagingRoot(workspace, sessionId),
+    invocationDigestValue.slice('sha256:'.length),
+    `${candidateDigest.slice('sha256:'.length)}.png`,
+  );
+}
+
 function ensureSessionDirectory(root: string, child: string): string {
   const absoluteRoot = path.resolve(root);
   let rootStats;
@@ -1059,9 +1072,11 @@ function stageProviderCandidate(
     stagingRoot,
     invocationDigestValue.slice('sha256:'.length),
   );
-  const candidatePath = path.join(
-    invocationRoot,
-    `${inspection.candidateDigest.slice('sha256:'.length)}.png`,
+  const candidatePath = assetProviderCandidateStagingPath(
+    workspace,
+    sessionId,
+    invocationDigestValue,
+    inspection.candidateDigest,
   );
   try {
     const existing = lstatSync(candidatePath);
