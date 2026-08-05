@@ -1,11 +1,14 @@
 import {
   AGENT_INTEGRATION_MANIFEST_SCHEMA,
+  ASSET_AUTHORING_WEB_HANDOFF_RECEIPT_SCHEMA,
   ASSET_PROVIDER_CAPABILITIES,
   ASSET_PROVIDER_DESCRIPTOR_SCHEMA,
   ASSET_PROVIDER_DISCOVERY_SCHEMA,
   ASSET_PROVIDER_INVOCATION_SCHEMA,
   ASSET_PROVIDER_REFUSAL_SCHEMA,
   ASSET_PROVIDER_RESULT_SCHEMA,
+  ASSET_WEB_CLI_HANDOFF_CAPABILITIES,
+  ASSET_WEB_CLI_HANDOFF_SCHEMA,
 } from '@lpc-toolkit/core';
 import { CLI_VERSION } from './package-info.js';
 
@@ -31,6 +34,8 @@ export const AUTHORING_SCHEMA_VERSIONS = [
   'lpc-toolkit.asset-authoring-install-receipt.v1',
   'lpc-toolkit.asset-release-provenance.v1',
   'lpc-toolkit.asset-release-provenance-verification.v1',
+  ASSET_WEB_CLI_HANDOFF_SCHEMA,
+  ASSET_AUTHORING_WEB_HANDOFF_RECEIPT_SCHEMA,
   ...PROVIDER_SCHEMA_VERSIONS,
 ] as const;
 
@@ -43,6 +48,7 @@ export const AUTHORING_CAPABILITIES = [
   'asset-authoring-draft-recovery.v1',
   'asset-authoring-consumer-install.v1',
   'asset-authoring-release-provenance.v1',
+  ...ASSET_WEB_CLI_HANDOFF_CAPABILITIES,
   ...ASSET_PROVIDER_CAPABILITIES,
 ] as const;
 

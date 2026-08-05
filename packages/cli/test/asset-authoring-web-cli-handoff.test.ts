@@ -345,6 +345,132 @@ describe('asset authoring Web-to-CLI handoff inspection', () => {
     expect(readdirSync(workspace.packsRoot)).toEqual([fixtures.handoff.pack.id]);
   });
 
+  it('projects bounded sidecar status without rewriting v1 session evidence', async () => {
+    const fixtures = await createD3WebCliFixtures();
+    const directory = createDirectory();
+    const workspace = initializeAssetWorkspace(path.join(directory, 'workspace'));
+    const { handoffPath, archivePath } = writeInputs(directory, fixtures.handoffJson, fixtures.archiveBytes);
+    const planPath = path.join(directory, 'attach-pack-plan.json');
+    writeFileSync(planPath, fixtures.attachPlanJson);
+    const imported = ioFor(workspace.root);
+    const importedCode = await runCli([
+      'asset', 'authoring', 'handoff', 'import',
+      '--handoff', handoffPath,
+      '--archive', archivePath,
+      '--plan', planPath,
+      '--confirm',
+      '--json',
+    ], imported.io);
+    expect(importedCode).toBe(0);
+    const importedData = jsonData(imported.stdout);
+    const sessionId = importedData.sessionId;
+    if (typeof sessionId !== 'string') throw new Error('Expected the imported session id.');
+    const sessionPath = path.join(workspace.stateRoot, 'authoring-sessions', sessionId, 'session.json');
+    const receiptPath = path.join(workspace.stateRoot, 'authoring-sessions', sessionId, 'web-handoff-receipt.json');
+    const sessionBeforeStatus = readFileSync(sessionPath);
+
+    const status = ioFor(workspace.root);
+    const statusCode = await runCli([
+      'asset', 'authoring', 'status',
+      '--session', sessionId,
+      '--workspace', workspace.root,
+      '--json',
+    ], status.io);
+    expect(statusCode).toBe(0);
+    const statusData = jsonData(status.stdout);
+    expect(statusData.webHandoff).toMatchObject({
+      schema: 'lpc-toolkit.asset-authoring-web-handoff-receipt.v1',
+      status: 'imported',
+      handoffId: fixtures.handoff.handoffId,
+      archiveDigest: fixtures.handoff.payload.archiveDigest,
+      manifestDigest: fixtures.handoff.pack.manifestDigest,
+      contentDigest: fixtures.handoff.pack.contentDigest,
+      creditDigest: fixtures.handoff.attribution.creditDigest,
+    });
+    expect(JSON.stringify(statusData.webHandoff)).not.toMatch(/\/Users\/|\/private\/|password|token|prompt|base64/iu);
+    const releaseGates = statusData.releaseGates;
+    if (typeof releaseGates !== 'object' || releaseGates === null || Array.isArray(releaseGates)) {
+      throw new Error('Expected release gates in the status response.');
+    }
+    expect((releaseGates as Readonly<Record<string, unknown>>).releaseReady).toBe(false);
+    expect(statusData.releaseDeclaration).toBeNull();
+    expect(statusData.previewAcceptance).toBeNull();
+    expect(readFileSync(sessionPath)).toEqual(sessionBeforeStatus);
+
+    const humanStatus = ioFor(workspace.root);
+    const humanStatusCode = await runCli([
+      'asset', 'authoring', 'status',
+      '--session', sessionId,
+      '--workspace', workspace.root,
+    ], humanStatus.io);
+    expect(humanStatusCode).toBe(0);
+    expect(humanStatus.stdout.join('')).toContain('Web handoff evidence: imported');
+    expect(humanStatus.stdout.join('')).toContain('Web handoff is not release approval.');
+
+    const mismatchedReceipt = JSON.parse(readFileSync(receiptPath, 'utf8')) as Record<string, unknown>;
+    mismatchedReceipt.sessionId = '00000000-0000-4000-8000-000000000000';
+    writeFileSync(receiptPath, `${JSON.stringify(mismatchedReceipt)}\n`);
+    const blockedStatus = ioFor(workspace.root);
+    const blockedStatusCode = await runCli([
+      'asset', 'authoring', 'status',
+      '--session', sessionId,
+      '--workspace', workspace.root,
+      '--json',
+    ], blockedStatus.io);
+    expect(blockedStatusCode).toBe(0);
+    expect(jsonData(blockedStatus.stdout).webHandoff).toMatchObject({
+      schema: 'lpc-toolkit.asset-authoring-web-handoff-receipt.v1',
+      status: 'blocked',
+      handoffId: null,
+      receiptDigest: null,
+    });
+
+    rmSync(receiptPath);
+    const olderSessionBytes = readFileSync(sessionPath);
+    const olderStatus = ioFor(workspace.root);
+    const olderStatusCode = await runCli([
+      'asset', 'authoring', 'status',
+      '--session', sessionId,
+      '--workspace', workspace.root,
+      '--json',
+    ], olderStatus.io);
+    expect(olderStatusCode).toBe(0);
+    expect(jsonData(olderStatus.stdout).webHandoff).toBeNull();
+    expect(readFileSync(sessionPath)).toEqual(olderSessionBytes);
+    const sessionDocument = JSON.parse(olderSessionBytes.toString('utf8')) as Readonly<Record<string, unknown>>;
+    expect(sessionDocument.receipts).not.toHaveProperty('webHandoff');
+  });
+
+  it('keeps stale handoff evidence outside candidate-import and release authority', async () => {
+    const fixtures = await createD3WebCliFixtures();
+    const directory = createDirectory();
+    const workspace = initializeAssetWorkspace(path.join(directory, 'workspace'));
+    const { handoffPath } = writeInputs(directory, fixtures.handoffJson, fixtures.staleArchiveBytes);
+    const archivePath = path.join(directory, 'stale-pack.lpc-assets.zip');
+    writeFileSync(archivePath, fixtures.staleArchiveBytes);
+    const planPath = path.join(directory, 'attach-pack-plan.json');
+    writeFileSync(planPath, fixtures.attachPlanJson);
+    const output = ioFor(workspace.root);
+
+    const code = await runCli([
+      'asset', 'authoring', 'handoff', 'import',
+      '--handoff', handoffPath,
+      '--archive', archivePath,
+      '--plan', planPath,
+      '--confirm',
+      '--json',
+    ], output.io);
+
+    expect(code).toBe(1);
+    expect(jsonData(output.stdout)).toMatchObject({
+      state: 'stale',
+      sessionId: null,
+      idempotent: false,
+    });
+    expect(readdirSync(workspace.packsRoot)).toEqual([]);
+    expect(existsSync(path.join(workspace.stateRoot, 'authoring-sessions'))).toBe(false);
+  });
+
   it('refuses a changed attach plan instead of overwriting the imported pack', async () => {
     const fixtures = await createD3WebCliFixtures();
     const directory = createDirectory();

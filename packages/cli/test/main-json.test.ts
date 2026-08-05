@@ -255,8 +255,16 @@ describe('main json behavior', () => {
     );
     expect(advertisement.data.capabilities).toContain('asset-authoring-consumer-install.v1');
     expect(advertisement.data.capabilities).toContain('asset-authoring-release-provenance.v1');
+    expect(advertisement.data.capabilities).toContain('asset-authoring-web-cli-handoff.v1');
+    expect(advertisement.data.capabilities).toContain('asset-authoring-web-cli-recovery.v1');
     expect(advertisement.data.schemaVersions).toContain(
       'lpc-toolkit.asset-authoring-install-receipt.v1',
+    );
+    expect(advertisement.data.schemaVersions).toContain(
+      'lpc-toolkit.web-cli-handoff.v1',
+    );
+    expect(advertisement.data.schemaVersions).toContain(
+      'lpc-toolkit.asset-authoring-web-handoff-receipt.v1',
     );
     expect(advertisement.data.schemaVersions).toContain(
       'lpc-toolkit.asset-release-provenance.v1',

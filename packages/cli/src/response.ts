@@ -26,6 +26,7 @@ import type {
   AssetAuthoringReleaseProvenanceReceipt,
   AssetAuthoringSyncReceipt,
 } from './asset-authoring-session.js';
+import type { AssetWebCliHandoffSessionProjection } from './asset-authoring-web-cli-handoff.js';
 
 export interface CliIssue {
   readonly code: string;
@@ -159,6 +160,7 @@ export interface AuthoringResponseProjectionInput {
   readonly inspectionReceipt?: AssetAuthoringArchiveInspectionReceipt | null;
   readonly installationReceipt?: AssetAuthoringInstallationReceipt | null;
   readonly provider?: AuthoringProviderResponseInput | null;
+  readonly webHandoff?: AssetWebCliHandoffSessionProjection | null;
 }
 
 export interface AuthoringResponseData extends Omit<
@@ -276,6 +278,14 @@ export function authoringResponseProjection(
           : { ...action.expectedCheckpoint },
       })),
     };
+  const webHandoff = input.webHandoff === undefined
+    ? undefined
+    : input.webHandoff === null
+      ? null
+      : {
+        ...input.webHandoff,
+        sourceDigests: input.webHandoff.sourceDigests.map((source) => ({ ...source })),
+      };
   if (releaseDeclaration !== null && releaseDeclaration.kind !== 'declaration') {
     throw new Error('Release declaration response receipt has the wrong kind.');
   }
@@ -322,6 +332,7 @@ export function authoringResponseProjection(
     inspectionReceipt,
     installationReceipt,
     provider,
+    ...(webHandoff === undefined ? {} : { webHandoff }),
     cliVersion: CLI_VERSION,
     capabilities: [...AUTHORING_CAPABILITIES],
     schemaVersions: [...AUTHORING_SCHEMA_VERSIONS],
@@ -548,6 +559,15 @@ function formatAuthoringResponse(
       const gateId = stringValue(gate, 'id');
       const freshness = stringValue(gate, 'freshness');
       if (gateId && freshness) lines.push(`Release gate ${gateId}: ${freshness}`);
+    }
+  }
+  if (data['webHandoff'] === null) {
+    lines.push('Web handoff evidence: none');
+  } else if (isRecord(data['webHandoff'])) {
+    const handoffStatus = stringValue(data['webHandoff'], 'status');
+    if (handoffStatus) {
+      lines.push(`Web handoff evidence: ${handoffStatus}`);
+      lines.push('Web handoff is not release approval.');
     }
   }
   const releaseDeclaration = data['releaseDeclaration'];

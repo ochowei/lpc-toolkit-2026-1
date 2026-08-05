@@ -118,6 +118,19 @@ export interface AssetWebCliHandoffRecoveryData {
   readonly nextAction: AssetWebCliHandoffNextAction;
 }
 
+export interface AssetWebCliHandoffSessionProjection {
+  readonly schema: typeof ASSET_AUTHORING_WEB_HANDOFF_RECEIPT_SCHEMA;
+  readonly status: 'imported' | 'blocked';
+  readonly handoffId: string | null;
+  readonly handoffDigest: string | null;
+  readonly archiveDigest: string | null;
+  readonly manifestDigest: string | null;
+  readonly contentDigest: string | null;
+  readonly sourceDigests: readonly AssetWebCliHandoffSource[];
+  readonly creditDigest: string | null;
+  readonly receiptDigest: string | null;
+}
+
 interface HandoffRecoveryMarker {
   readonly schema: typeof HANDOFF_RECOVERY_SCHEMA;
   readonly handoffId: string;
@@ -460,6 +473,62 @@ export async function inspectAssetWebCliHandoff(options: {
   const inspected = await inspectHandoffPair(options);
   if (!inspected.ok) return inspected;
   return { ok: true, data: inspected.pair.data };
+}
+
+function blockedSessionProjection(): AssetWebCliHandoffSessionProjection {
+  return {
+    schema: ASSET_AUTHORING_WEB_HANDOFF_RECEIPT_SCHEMA,
+    status: 'blocked',
+    handoffId: null,
+    handoffDigest: null,
+    archiveDigest: null,
+    manifestDigest: null,
+    contentDigest: null,
+    sourceDigests: [],
+    creditDigest: null,
+    receiptDigest: null,
+  };
+}
+
+export function readAssetWebCliHandoffSessionProjection(options: {
+  readonly workspace: AssetWorkspace;
+  readonly sessionId: string;
+}): AssetWebCliHandoffSessionProjection | null {
+  let sessionPath: string;
+  try {
+    sessionPath = assetAuthoringSessionPath(options.workspace, options.sessionId);
+  } catch {
+    return blockedSessionProjection();
+  }
+  const sessionDirectory = path.dirname(sessionPath);
+  const sessionDirectoryStatus = lstatSync(sessionDirectory, { throwIfNoEntry: false });
+  if (sessionDirectoryStatus === undefined) return null;
+  if (sessionDirectoryStatus.isSymbolicLink() || !sessionDirectoryStatus.isDirectory()) {
+    return blockedSessionProjection();
+  }
+  const receiptPath = path.join(sessionDirectory, 'web-handoff-receipt.json');
+  const status = lstatSync(receiptPath, { throwIfNoEntry: false });
+  if (status === undefined) return null;
+  if (status.isSymbolicLink() || !status.isFile()) return blockedSessionProjection();
+  const read = readRegularFile(receiptPath, HANDOFF_JSON_LIMIT);
+  if (!read.ok) return blockedSessionProjection();
+  const parsed = parseAssetAuthoringWebHandoffReceiptJson(read.bytes.toString('utf8'));
+  if (!parsed.ok || parsed.receipt.sessionId !== options.sessionId) {
+    return blockedSessionProjection();
+  }
+  return {
+    schema: ASSET_AUTHORING_WEB_HANDOFF_RECEIPT_SCHEMA,
+    status: 'imported',
+    handoffId: parsed.receipt.handoffId,
+    handoffDigest: parsed.receipt.handoffDigest,
+    archiveDigest: parsed.receipt.archiveDigest,
+    manifestDigest: parsed.receipt.manifestDigest,
+    contentDigest: parsed.receipt.contentDigest,
+    sourceDigests: [...parsed.receipt.sourceDigests]
+      .sort((left, right) => left.path.localeCompare(right.path)),
+    creditDigest: parsed.receipt.creditDigest,
+    receiptDigest: receiptDigest(parsed.receipt),
+  };
 }
 
 function importBlockedIssue(message: string, issuePath?: string): HandoffInspectionFailure {
