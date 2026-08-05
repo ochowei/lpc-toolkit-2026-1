@@ -140,16 +140,22 @@ Adjust only when existing ownership makes a smaller placement clearly better; re
 
 ### Task 1: Lock the pure provenance contract and canonical encoding
 
-- [ ] Record seam confirmation for the Core and canonical-format public seams before the first test commit.
-- [ ] Write failing Core tests for schema/record exact keys, digest syntax, pack/version identity, source/path rules, provider/operation allowlists, duplicate records, unbound-result chains, stable ordering, property-order invariance, privacy classes, and every resource limit.
-- [ ] Implement the minimum Core parser, diagnostics, normalized projection, record sorting, and binding predicates without I/O, timestamps, random IDs, environment reads, or provider behavior.
-- [ ] Add the canonical format encoder/digest-input seam using the existing canonical JSON authority; prove exact UTF-8 bytes and receipt size enforcement.
-- [ ] Verification: focused Core and asset-pack-format tests GREEN; Core/format typechecks PASS; `rtk git diff --check` PASS.
-- [ ] Commit the product slice with a conventional `feat(core): add release provenance contract` message.
+- [x] Record seam confirmation for the Core and canonical-format public seams before the first test commit.
+- [x] Write failing Core tests for schema/record exact keys, digest syntax, pack/version identity, source/path rules, provider/operation allowlists, duplicate records, unbound-result chains, stable ordering, property-order invariance, privacy classes, and every resource limit.
+- [x] Implement the minimum Core parser, diagnostics, normalized projection, record sorting, and binding predicates without I/O, timestamps, random IDs, environment reads, or provider behavior.
+- [x] Add the canonical format encoder/digest-input seam using the existing canonical JSON authority; prove exact UTF-8 bytes and receipt size enforcement.
+- [x] Verification: focused Core and asset-pack-format tests GREEN; Core/format typechecks PASS; `rtk git diff --check` PASS.
+- [x] Commit the product slice with a conventional `feat(core): add release provenance contract` message.
 
-Implementation note: 
-Verification: 
-Product commit: 
+Implementation note: PR #157 was merged before implementation, confirming the
+public Core and canonical-format seams recorded in this plan. The first RED
+slice observed the absent public parser export; subsequent vertical slices
+added strict receipt/record parsing, release-bound predecessor checks,
+canonical ordering, privacy/resource limits, and the external canonical UTF-8
+encoder. No private collaborator mocks, provider calls, timestamps, paths, or
+archive members were introduced.
+Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-release-provenance-schema.test.ts` PASS (11 tests); `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS; `rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- release-provenance.test.ts` PASS (3 tests); `rtk pnpm --filter @lpc-toolkit/asset-pack-format run typecheck` PASS; `rtk pnpm --filter @lpc-toolkit/core test -- asset-release-schema.test.ts` PASS (10 tests); `rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- archive.test.ts payload.test.ts compatibility.test.ts` PASS (48 tests); `rtk pnpm check:boundaries` PASS; `rtk git diff --check` PASS.
+Product commit: `2cd43a3fe3d77b30b311b344e797cf0b62f5471d`
 
 ### Task 2: Generate and persist a release-bound companion receipt
 
@@ -201,12 +207,12 @@ Product commit:
 
 ## Plan record
 
-- [ ] Task 1 — pure provenance contract and canonical encoding complete.
+- [x] Task 1 — pure provenance contract and canonical encoding complete.
 - [ ] Task 2 — release-bound companion generation and session persistence complete.
 - [ ] Task 3 — read-only verification and v1 compatibility complete.
 - [ ] Task 4 — packed acceptance, documentation, and handoff gate complete.
 
-Product commits: 
+Product commits: Task 1 — `2cd43a3fe3d77b30b311b344e797cf0b62f5471d`
 Plan-record commit: 
 
 ## CLI documentation impact matrix
