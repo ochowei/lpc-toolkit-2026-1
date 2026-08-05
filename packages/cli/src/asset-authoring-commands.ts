@@ -105,6 +105,7 @@ import {
   publishAssetReleaseProvenance,
 } from './asset-release-provenance.js';
 import { inspectAssetPackArchive } from './asset-pack-inspection.js';
+import { readAssetPackArchive } from './asset-pack-archive-format.js';
 import {
   assertManagedAssetOutput,
   findAssetWorkspace,
@@ -1501,6 +1502,7 @@ function archiveInspectionReceiptStale(
 function releaseProvenanceProjectionFor(
   session: AssetAuthoringSession,
   formalArchive: AssetAuthoringFormalArchiveReceipt,
+  manifestDigest: string,
   records: readonly AssetReleaseProvenanceProjection['records'][number][],
 ): AssetReleaseProvenanceProjection {
   const declaration = session.receipts.releaseDeclaration;
@@ -1518,7 +1520,7 @@ function releaseProvenanceProjectionFor(
     },
     releaseBindings: {
       archiveDigest: formalArchive.archiveDigest,
-      manifestDigest: formalArchive.manifestDigest,
+      manifestDigest,
       contentDigest: formalArchive.contentDigest,
       sourceDigests: formalArchive.sourceDigests,
       releaseDeclarationReceiptDigest: declaration.declarationDigest,
@@ -1547,10 +1549,10 @@ function sameProvenanceArtifactDigests(
   });
 }
 
-function releaseProvenanceReceiptStale(
+async function releaseProvenanceReceiptStale(
   receipt: AssetAuthoringReleaseProvenanceReceipt,
   session: AssetAuthoringSession,
-): string | undefined {
+): Promise<string | undefined> {
   const bytes = readRegularFile(receipt.provenancePath);
   if (bytes === undefined) return 'the recorded companion receipt is missing or not regular';
   if (assetReleaseProvenanceSha256(bytes) !== receipt.provenanceDigest) {
@@ -1590,13 +1592,17 @@ function releaseProvenanceReceiptStale(
   if (declaration === null || acceptance === null) {
     return 'the release declaration or preview acceptance receipt is missing';
   }
+  const archive = await readAssetPackArchive({ archivePath: formalArchive.archivePath });
+  if (!archive.ok || archive.snapshot.archiveDigest !== formalArchive.archiveDigest) {
+    return 'the formal archive bytes are unavailable or no longer match the formal archive receipt';
+  }
+  const archiveManifestDigest = assetReleaseProvenanceSha256(archive.snapshot.manifestBytes);
   const bindings = parsed.projection.releaseBindings;
   if (
     receipt.formalArchiveDigest !== formalArchive.archiveDigest
     || bindings.archiveDigest !== formalArchive.archiveDigest
     || bindings.archiveDigest !== inspection.archiveDigest
-    || bindings.manifestDigest !== formalArchive.manifestDigest
-    || bindings.manifestDigest !== inspection.manifestDigest
+    || bindings.manifestDigest !== archiveManifestDigest
     || bindings.contentDigest !== formalArchive.contentDigest
     || bindings.contentDigest !== inspection.contentDigest
     || !sourceDigestSetsEqual(bindings.sourceDigests, formalArchive.sourceDigests)
@@ -1815,9 +1821,27 @@ async function provenanceCommand(
     );
   }
 
-  const baseProjection = releaseProvenanceProjectionFor(session, formalArchive, []);
+  const archive = await readAssetPackArchive({ archivePath: formalArchive.archivePath });
+  if (!archive.ok || archive.snapshot.archiveDigest !== formalArchive.archiveDigest) {
+    throw new AuthoringCommandError(
+      'Release provenance requires the exact formal archive bytes recorded by the session.',
+      { code: 'asset_release_provenance_stale', path: formalArchive.archivePath },
+    );
+  }
+  const archiveManifestDigest = assetReleaseProvenanceSha256(archive.snapshot.manifestBytes);
+  const baseProjection = releaseProvenanceProjectionFor(
+    session,
+    formalArchive,
+    archiveManifestDigest,
+    [],
+  );
   const records = provenanceRecordsFor(context, baseProjection);
-  const projection = releaseProvenanceProjectionFor(session, formalArchive, records);
+  const projection = releaseProvenanceProjectionFor(
+    session,
+    formalArchive,
+    archiveManifestDigest,
+    records,
+  );
   const encoded = encodeAssetReleaseProvenance(
     projection,
     (value) => new TextEncoder().encode(value),
@@ -1832,7 +1856,7 @@ async function provenanceCommand(
   const previous = session.receipts.releaseProvenance;
   let previousStale: string | undefined;
   if (previous !== null && previous !== undefined) {
-    previousStale = releaseProvenanceReceiptStale(previous, session);
+    previousStale = await releaseProvenanceReceiptStale(previous, session);
     if (previousStale !== undefined && session.reason !== 'release-provenance-stale') {
       session = markReleaseProvenanceStale(
         store,

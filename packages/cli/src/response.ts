@@ -983,6 +983,57 @@ function formatAssetInspect(data: JsonRecord): string | undefined {
   return `${lines.join('\n')}\n`;
 }
 
+function formatAssetProvenanceVerification(data: JsonRecord): string | undefined {
+  const verified = data['verified'];
+  const archivePath = stringValue(data, 'archivePath');
+  const provenancePath = stringValue(data, 'provenancePath');
+  const packId = stringValue(data, 'packId');
+  const version = stringValue(data, 'version');
+  const archiveDigest = stringValue(data, 'archiveDigest');
+  const manifestDigest = stringValue(data, 'manifestDigest');
+  const contentDigest = stringValue(data, 'contentDigest');
+  const sourceDigests = recordArrayValue(data, 'sourceDigests');
+  const recordCount = numberValue(data, 'recordCount');
+  const declarationDigest = stringValue(data, 'releaseDeclarationReceiptDigest');
+  const previewDigest = stringValue(data, 'previewAcceptanceReceiptDigest');
+  const humanEvidence = isRecord(data['humanEvidence'])
+    ? data['humanEvidence']
+    : undefined;
+  if (
+    verified !== true
+    || !archivePath
+    || !provenancePath
+    || !packId
+    || !version
+    || !archiveDigest
+    || !manifestDigest
+    || !contentDigest
+    || !sourceDigests
+    || recordCount === undefined
+    || !declarationDigest
+    || !previewDigest
+    || humanEvidence === undefined
+  ) {
+    return undefined;
+  }
+  return [
+    'Release provenance verification: verified',
+    `Archive: ${archivePath}`,
+    `Provenance receipt: ${provenancePath}`,
+    `Pack: ${packId} ${version}`,
+    `Archive digest: ${archiveDigest}`,
+    `Manifest digest: ${manifestDigest}`,
+    `Content digest: ${contentDigest}`,
+    `Source digests: ${sourceDigests.length}`,
+    `Provenance records: ${recordCount}`,
+    `Bound release declaration receipt: ${declarationDigest}`,
+    `Bound preview acceptance receipt: ${previewDigest}`,
+    `Human release declaration recreated: ${humanEvidence['releaseDeclarationReceiptRecreated'] === false ? 'no' : 'unknown'}`,
+    `Human preview acceptance recreated: ${humanEvidence['previewAcceptanceReceiptRecreated'] === false ? 'no' : 'unknown'}`,
+    '',
+  ].join('\n');
+}
+
 function formatAssetInstall(data: JsonRecord): string | undefined {
   const action = stringValue(data, 'action');
   const packId = stringValue(data, 'packId');
@@ -1269,6 +1320,8 @@ function formatHumanData(response: CliResponse<unknown>): string | undefined {
       return formatAssetPack(data);
     case 'asset inspect':
       return formatAssetInspect(data);
+    case 'asset provenance verify':
+      return formatAssetProvenanceVerification(data);
     case 'asset install':
       return formatAssetInstall(data);
     case 'asset list':

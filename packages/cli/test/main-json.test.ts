@@ -254,8 +254,15 @@ describe('main json behavior', () => {
       'lpc-toolkit.asset-authoring-archive-inspection-receipt.v1',
     );
     expect(advertisement.data.capabilities).toContain('asset-authoring-consumer-install.v1');
+    expect(advertisement.data.capabilities).toContain('asset-authoring-release-provenance.v1');
     expect(advertisement.data.schemaVersions).toContain(
       'lpc-toolkit.asset-authoring-install-receipt.v1',
+    );
+    expect(advertisement.data.schemaVersions).toContain(
+      'lpc-toolkit.asset-release-provenance.v1',
+    );
+    expect(advertisement.data.schemaVersions).toContain(
+      'lpc-toolkit.asset-release-provenance-verification.v1',
     );
   });
 

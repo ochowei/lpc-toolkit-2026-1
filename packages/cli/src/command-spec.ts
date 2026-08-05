@@ -441,6 +441,25 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
     ],
   },
   {
+    command: ['asset', 'provenance'],
+    usage: 'lpc-toolkit asset provenance <command>',
+    description: 'Verify an external release provenance companion receipt without changing v1 archives or installations.',
+    options: [HELP_OPTION],
+    examples: ['lpc-toolkit asset provenance verify --archive release.lpc-assets.zip --provenance release-provenance.json --json'],
+  },
+  {
+    command: ['asset', 'provenance', 'verify'],
+    usage: 'lpc-toolkit asset provenance verify --archive <archive> --provenance <receipt> [--json]',
+    description: 'Verify exact archive and release provenance receipt bytes from a consumer root without a session or workspace.',
+    options: [
+      HELP_OPTION,
+      JSON_OPTION,
+      { name: 'archive', kind: 'value', valueLabel: 'archive', description: 'Read the exact formal asset-pack archive.' },
+      { name: 'provenance', kind: 'value', valueLabel: 'receipt', description: 'Read the canonical release provenance companion receipt.' },
+    ],
+    examples: ['lpc-toolkit asset provenance verify --archive release.lpc-assets.zip --provenance release-provenance.json --json'],
+  },
+  {
     command: ['asset', 'install'],
     usage: 'lpc-toolkit asset install <pack.lpc-assets.zip> [--workspace <directory>] [--json]',
     description: 'Install or update a verified asset-pack archive. Draft archives are rejected.',

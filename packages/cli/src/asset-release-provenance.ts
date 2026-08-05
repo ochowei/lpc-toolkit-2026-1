@@ -19,6 +19,8 @@ import {
   encodeAssetReleaseProvenanceProjection,
   encodeAssetReleaseProvenanceReceipt,
 } from '@lpc-toolkit/asset-pack-format';
+import { inspectAssetPackArchive } from './asset-pack-inspection.js';
+import type { RuntimeAssets } from './runtime-assets.js';
 
 const ZERO_DIGEST = `sha256:${'0'.repeat(64)}`;
 
@@ -59,6 +61,29 @@ export interface EncodedAssetReleaseProvenance {
 export interface PublishedAssetReleaseProvenance {
   readonly provenanceDigest: string;
   readonly reusedExistingFile: boolean;
+}
+
+export interface AssetReleaseProvenanceVerificationData {
+  readonly schema: 'lpc-toolkit.asset-release-provenance-verification.v1';
+  readonly verified: true;
+  readonly archivePath: string;
+  readonly provenancePath: string;
+  readonly provenanceDigest: string;
+  readonly projectionDigest: string;
+  readonly packId: string;
+  readonly version: string;
+  readonly archiveDigest: string;
+  readonly manifestDigest: string;
+  readonly contentDigest: string;
+  readonly sourceDigests: readonly { readonly path: string; readonly digest: string }[];
+  readonly recordCount: number;
+  readonly releaseDeclarationReceiptDigest: string;
+  readonly previewAcceptanceReceiptDigest: string;
+  readonly previewArtifacts: readonly { readonly id: string; readonly digest: string }[];
+  readonly humanEvidence: {
+    readonly releaseDeclarationReceiptRecreated: false;
+    readonly previewAcceptanceReceiptRecreated: false;
+  };
 }
 
 export function assetReleaseProvenanceSha256(bytes: Uint8Array): string {
@@ -212,4 +237,166 @@ export function publishAssetReleaseProvenance(
   } finally {
     rmSync(temporaryPath, { force: true });
   }
+}
+
+function sourceDigestBindings(
+  entries: ReadonlyMap<string, string>,
+): readonly { readonly path: string; readonly digest: string }[] {
+  return [...entries]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([path, digest]) => ({ path, digest }));
+}
+
+function sameDigestBindings(
+  left: readonly { readonly path: string; readonly digest: string }[],
+  right: readonly { readonly path: string; readonly digest: string }[],
+): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((entry, index) => {
+    const other = right[index];
+    return other !== undefined && entry.path === other.path && entry.digest === other.digest;
+  });
+}
+
+function requireRegularProvenanceFile(filePath: string): Buffer {
+  let stats: ReturnType<typeof lstatSync> | undefined;
+  try {
+    stats = lstatSync(filePath, { throwIfNoEntry: false });
+  } catch (error) {
+    throw new AssetReleaseProvenanceFileError(
+      'asset_release_provenance_invalid',
+      `Release provenance receipt could not be inspected: ${error instanceof Error ? error.message : String(error)}.`,
+      filePath,
+    );
+  }
+  if (stats === undefined || stats.isSymbolicLink() || !stats.isFile()) {
+    throw new AssetReleaseProvenanceFileError(
+      'asset_release_provenance_invalid',
+      `Release provenance receipt must be a regular file: ${filePath}.`,
+      filePath,
+    );
+  }
+  try {
+    return readFileSync(filePath);
+  } catch (error) {
+    throw new AssetReleaseProvenanceFileError(
+      'asset_release_provenance_invalid',
+      `Release provenance receipt could not be read: ${error instanceof Error ? error.message : String(error)}.`,
+      filePath,
+    );
+  }
+}
+
+function verificationMismatch(
+  message: string,
+  archivePath: string,
+): never {
+  throw new AssetReleaseProvenanceFileError(
+    'asset_release_provenance_digest_mismatch',
+    message,
+    archivePath,
+  );
+}
+
+function verificationStale(
+  message: string,
+  provenancePath: string,
+): never {
+  throw new AssetReleaseProvenanceFileError(
+    'asset_release_provenance_stale',
+    message,
+    provenancePath,
+  );
+}
+
+export async function verifyAssetReleaseProvenance(options: {
+  readonly archivePath: string;
+  readonly provenancePath: string;
+  readonly runtime: RuntimeAssets;
+}): Promise<AssetReleaseProvenanceVerificationData> {
+  const provenanceBytes = requireRegularProvenanceFile(options.provenancePath);
+  const receipt = parseAssetReleaseProvenanceBytes(provenanceBytes);
+  const encoded = encodeAssetReleaseProvenance(
+    receipt.projection,
+    (value) => new TextEncoder().encode(value),
+  );
+  if (encoded.projectionDigest !== receipt.projectionDigest) {
+    throw new AssetReleaseProvenanceFileError(
+      'asset_release_provenance_digest_mismatch',
+      'The release provenance projection digest does not match its canonical projection.',
+      options.provenancePath,
+    );
+  }
+  if (!Buffer.from(encoded.bytes).equals(provenanceBytes)) {
+    throw new AssetReleaseProvenanceFileError(
+      'asset_release_provenance_invalid',
+      'The release provenance receipt is not encoded as canonical UTF-8 JSON.',
+      options.provenancePath,
+    );
+  }
+
+  const inspected = await inspectAssetPackArchive({
+    archivePath: options.archivePath,
+    runtime: options.runtime,
+  });
+  if (!inspected.report.valid || inspected.snapshot === undefined) {
+    const diagnostic = inspected.report.diagnostics[0];
+    throw new AssetReleaseProvenanceFileError(
+      'asset_release_provenance_invalid',
+      diagnostic?.message ?? 'The formal archive is not a valid installable asset pack.',
+      diagnostic?.path ?? options.archivePath,
+    );
+  }
+
+  const snapshot = inspected.snapshot;
+  const bindings = receipt.projection.releaseBindings;
+  if (receipt.projection.pack.id !== snapshot.payload.pack.id) {
+    verificationStale(
+      `The provenance pack id ${receipt.projection.pack.id} does not match the archive pack id ${snapshot.payload.pack.id}.`,
+      options.provenancePath,
+    );
+  }
+  if (receipt.projection.pack.version !== snapshot.payload.pack.version) {
+    verificationStale(
+      `The provenance version ${receipt.projection.pack.version} does not match the archive version ${snapshot.payload.pack.version}.`,
+      options.provenancePath,
+    );
+  }
+  const manifestDigest = assetReleaseProvenanceSha256(snapshot.manifestBytes);
+  const sourceDigests = sourceDigestBindings(snapshot.payload.sourceDigests);
+  if (bindings.archiveDigest !== snapshot.archiveDigest) {
+    verificationMismatch('The provenance archive digest does not match the exact archive bytes.', options.archivePath);
+  }
+  if (bindings.manifestDigest !== manifestDigest) {
+    verificationMismatch('The provenance manifest digest does not match the archive manifest bytes.', options.archivePath);
+  }
+  if (bindings.contentDigest !== snapshot.payload.contentDigest) {
+    verificationMismatch('The provenance content digest does not match the archive content projection.', options.archivePath);
+  }
+  if (!sameDigestBindings(bindings.sourceDigests, sourceDigests)) {
+    verificationMismatch('The provenance source digest set does not match the archive source bytes.', options.archivePath);
+  }
+
+  return {
+    schema: 'lpc-toolkit.asset-release-provenance-verification.v1',
+    verified: true,
+    archivePath: options.archivePath,
+    provenancePath: options.provenancePath,
+    provenanceDigest: assetReleaseProvenanceSha256(provenanceBytes),
+    projectionDigest: receipt.projectionDigest,
+    packId: snapshot.payload.pack.id,
+    version: snapshot.payload.pack.version,
+    archiveDigest: snapshot.archiveDigest,
+    manifestDigest,
+    contentDigest: snapshot.payload.contentDigest,
+    sourceDigests,
+    recordCount: receipt.projection.records.length,
+    releaseDeclarationReceiptDigest: bindings.releaseDeclarationReceiptDigest,
+    previewAcceptanceReceiptDigest: bindings.previewAcceptanceReceiptDigest,
+    previewArtifacts: [...bindings.previewArtifacts],
+    humanEvidence: {
+      releaseDeclarationReceiptRecreated: false,
+      previewAcceptanceReceiptRecreated: false,
+    },
+  };
 }

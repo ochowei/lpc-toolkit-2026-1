@@ -464,7 +464,11 @@ async function runCliWithRuntime(
       || (
         parsed.command.length === 2
         && parsed.command[0] === 'asset'
-        && (parsed.command[1] === 'workspace' || parsed.command[1] === 'authoring')
+        && (
+          parsed.command[1] === 'workspace'
+          || parsed.command[1] === 'authoring'
+          || parsed.command[1] === 'provenance'
+        )
       )
     )
   ) {

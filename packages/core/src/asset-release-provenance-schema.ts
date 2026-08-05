@@ -731,7 +731,11 @@ export function parseAssetReleaseProvenance(
   if (input.schema !== ASSET_RELEASE_PROVENANCE_SCHEMA) {
     return {
       ok: false,
-      diagnostics: [invalid('$.schema', 'Unsupported release provenance schema.')],
+      diagnostics: [diagnostic(
+        'asset_release_provenance_unsupported',
+        '$.schema',
+        'Unsupported release provenance schema.',
+      )],
     };
   }
   const projectionDigest = requiredDigest(input.projectionDigest, '$.projectionDigest', diagnostics);

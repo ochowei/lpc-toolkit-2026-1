@@ -21,4 +21,39 @@ describe('release provenance public CLI seam', () => {
       errors: [{ code: 'missing_argument', path: '--session' }],
     });
   });
+
+  it('preflights consumer verification inputs without preparing a runtime or workspace', async () => {
+    const run = async (argv: readonly string[]) => {
+      const stdout: string[] = [];
+      const stderr: string[] = [];
+      const code = await runCli([...argv, '--json'], {
+        cwd: process.cwd(),
+        stdout: (text) => stdout.push(text),
+        stderr: (text) => stderr.push(text),
+      }, {
+        prepareRuntimeAssets: async () => {
+          throw new Error('verification preflight must not prepare runtime assets');
+        },
+      });
+      return { code, stderr, response: JSON.parse(stdout.join('')) as {
+        readonly command: string;
+        readonly errors: readonly { readonly code: string; readonly path?: string }[];
+      } };
+    };
+
+    const missingArchive = await run(['asset', 'provenance', 'verify', '--provenance', 'receipt.json']);
+    expect(missingArchive.code).toBe(1);
+    expect(missingArchive.stderr).toEqual([]);
+    expect(missingArchive.response).toMatchObject({
+      command: 'asset provenance verify',
+      errors: [{ code: 'missing_argument', path: '--archive' }],
+    });
+
+    const missingProvenance = await run(['asset', 'provenance', 'verify', '--archive', 'release.zip']);
+    expect(missingProvenance.code).toBe(1);
+    expect(missingProvenance.response).toMatchObject({
+      command: 'asset provenance verify',
+      errors: [{ code: 'missing_argument', path: '--provenance' }],
+    });
+  });
 });

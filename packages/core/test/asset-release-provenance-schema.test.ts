@@ -77,6 +77,22 @@ describe('asset release provenance schema', () => {
     );
   });
 
+  it('reports an unsupported receipt schema distinctly from malformed fields', () => {
+    const result = parseAssetReleaseProvenance({
+      ...VALID_RECEIPT,
+      schema: 'lpc-toolkit.asset-release-provenance.v2',
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      diagnostics: [{
+        code: 'asset_release_provenance_unsupported',
+        path: '$.schema',
+        message: 'Unsupported release provenance schema.',
+      }],
+    });
+  });
+
   it('rejects nested unknown fields and malformed release bindings', () => {
     const unknownField = parseAssetReleaseProvenance({
       ...VALID_RECEIPT,

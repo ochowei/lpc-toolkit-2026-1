@@ -76,6 +76,34 @@ describe('response envelope', () => {
     }), '')).toContain('Render complete. Artifacts (2)');
   });
 
+  it('formats release provenance verification as bound evidence, not recreated approval', () => {
+    const output = formatHumanResponse(commandOk('asset provenance verify', {
+      schema: 'lpc-toolkit.asset-release-provenance-verification.v1',
+      verified: true,
+      archivePath: '/consumer/release.lpc-assets.zip',
+      provenancePath: '/consumer/release-provenance.json',
+      packId: 'acme.hair',
+      version: '1.0.0',
+      archiveDigest: 'sha256:' + 'a'.repeat(64),
+      manifestDigest: 'sha256:' + 'b'.repeat(64),
+      contentDigest: 'sha256:' + 'c'.repeat(64),
+      sourceDigests: [],
+      recordCount: 2,
+      releaseDeclarationReceiptDigest: 'sha256:' + 'd'.repeat(64),
+      previewAcceptanceReceiptDigest: 'sha256:' + 'e'.repeat(64),
+      previewArtifacts: [],
+      humanEvidence: {
+        releaseDeclarationReceiptRecreated: false,
+        previewAcceptanceReceiptRecreated: false,
+      },
+    }), '');
+
+    expect(output).toContain('Release provenance verification: verified');
+    expect(output).toContain('Provenance records: 2');
+    expect(output).toContain('Human release declaration recreated: no');
+    expect(output).toContain('Human preview acceptance recreated: no');
+  });
+
   it('formats issue suggestions and available values from structured details', () => {
     const output = formatHumanResponse(commandError('character set', {
       code: 'unknown_item',

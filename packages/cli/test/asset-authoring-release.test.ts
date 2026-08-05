@@ -1,5 +1,6 @@
 import {
   existsSync,
+  copyFileSync,
   mkdirSync,
   mkdtempSync,
   realpathSync,
@@ -12,7 +13,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { createCanvas } from '@napi-rs/canvas';
-import { standardAnimationGeometry } from '@lpc-toolkit/core';
+import {
+  standardAnimationGeometry,
+  type AssetReleaseProvenanceProjection,
+} from '@lpc-toolkit/core';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   assetAuthoringSessionPath,
@@ -24,6 +28,7 @@ import { readAssetPackArchive } from '../src/asset-pack-archive-format.js';
 import { packAssetPack } from '../src/asset-pack-packaging.js';
 import { validateAssetPackDirectory } from '../src/asset-pack-validation.js';
 import { initializeAssetWorkspace } from '../src/asset-workspace.js';
+import { encodeAssetReleaseProvenance } from '../src/asset-release-provenance.js';
 import { runCli, type CliDependencies } from '../src/main.js';
 import { createRuntimeContext } from '../src/context.js';
 import type { RuntimeAssets } from '../src/runtime-assets.js';
@@ -215,6 +220,15 @@ function createPreparedSyncFixture(): ReturnType<typeof createDraftFixture> & {
 
 function digest(bytes: Buffer): string {
   return `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+}
+
+function encodeProvenanceProjection(
+  projection: unknown,
+): Buffer {
+  return encodeAssetReleaseProvenance(
+    projection as AssetReleaseProvenanceProjection,
+    (value) => new TextEncoder().encode(value),
+  ).bytes;
 }
 
 async function createFormalReadyFixture(): Promise<ReturnType<typeof createPreparedSyncFixture>> {
@@ -1137,6 +1151,207 @@ describe('session-aware release boundaries', () => {
     expect(JSON.parse(receiptText)).toMatchObject({
       projection: { records: [{ kind: 'external-input' }] },
     });
+  });
+
+  it('verifies copied archive and provenance bytes from a separate consumer root', async () => {
+    const fixture = await createFormalReadyFixture();
+    const { workspaceRoot, runtime, session } = fixture;
+    const packed = await runJson<{
+      readonly formalArchiveReceipt: { readonly archivePath: string } | null;
+    }>(['asset', 'authoring', 'pack', '--session', session.sessionId, '--confirm'], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    const archivePath = packed.response.data?.formalArchiveReceipt?.archivePath;
+    if (archivePath === undefined) throw new Error('Expected a formal archive.');
+    expect((await runJson<null>([
+      'asset', 'authoring', 'inspect', '--session', session.sessionId, '--archive', archivePath,
+    ], workspaceRoot, { prepareRuntimeAssets: async () => runtime })).code).toBe(0);
+    const generated = await runJson<{
+      readonly releaseProvenanceReceipt: { readonly provenancePath: string } | null;
+    }>(['asset', 'authoring', 'provenance', '--session', session.sessionId, '--confirm'], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    const provenancePath = generated.response.data?.releaseProvenanceReceipt?.provenancePath;
+    if (provenancePath === undefined) throw new Error('Expected a provenance receipt.');
+    const consumerRoot = path.join(fixture.root, 'consumer-copy');
+    mkdirSync(consumerRoot, { recursive: true });
+    const copiedArchive = path.join(consumerRoot, 'release.lpc-assets.zip');
+    const copiedProvenance = path.join(consumerRoot, 'release-provenance.json');
+    copyFileSync(archivePath, copiedArchive);
+    copyFileSync(provenancePath, copiedProvenance);
+    const before = readdirSync(consumerRoot).sort();
+    const verified = await runJson<{
+      readonly schema: string;
+      readonly verified: boolean;
+      readonly archivePath: string;
+      readonly provenancePath: string;
+      readonly recordCount: number;
+      readonly releaseDeclarationReceiptDigest: string;
+      readonly previewAcceptanceReceiptDigest: string;
+    }>([
+      'asset', 'provenance', 'verify', '--archive', copiedArchive, '--provenance', copiedProvenance,
+    ], consumerRoot, { prepareRuntimeAssets: async () => runtime });
+    expect(verified.code, JSON.stringify(verified.response, null, 2)).toBe(0);
+    expect(verified.response.data).toMatchObject({
+      schema: 'lpc-toolkit.asset-release-provenance-verification.v1',
+      verified: true,
+      archivePath: copiedArchive,
+      provenancePath: copiedProvenance,
+      recordCount: 0,
+      releaseDeclarationReceiptDigest: expect.stringMatching(/^sha256:[0-9a-f]{64}$/u),
+      previewAcceptanceReceiptDigest: expect.stringMatching(/^sha256:[0-9a-f]{64}$/u),
+    });
+    expect(readdirSync(consumerRoot).sort()).toEqual(before);
+
+    const ordinaryConsumerRoot = path.join(fixture.root, 'ordinary-consumer');
+    const ordinaryConsumerWorkspace = initializeAssetWorkspace(ordinaryConsumerRoot);
+    const inspected = await runJson<{ readonly valid: boolean }>([
+      'asset', 'inspect', copiedArchive,
+    ], ordinaryConsumerRoot, { prepareRuntimeAssets: async () => runtime });
+    expect(inspected.code).toBe(0);
+    expect(inspected.response.data).toMatchObject({ valid: true });
+    const installed = await runJson<{
+      readonly installedDirectory: string;
+    }>([
+      'asset', 'install', copiedArchive, '--workspace', ordinaryConsumerRoot,
+    ], ordinaryConsumerRoot, { prepareRuntimeAssets: async () => runtime });
+    expect(installed.code, JSON.stringify(installed.response, null, 2)).toBe(0);
+    const installedDirectory = installed.response.data?.installedDirectory;
+    if (installedDirectory === undefined) throw new Error('Expected an installed directory.');
+    expect(readdirSync(installedDirectory)).not.toContain('release-provenance.json');
+    expect(readdirSync(ordinaryConsumerWorkspace.outputRoot)).not.toContain('release-provenance.json');
+  });
+
+  it('rejects malformed, unsupported, and stale bindings without mutating copied inputs', async () => {
+    const fixture = await createFormalReadyFixture();
+    const { workspaceRoot, runtime, session } = fixture;
+    const packed = await runJson<{
+      readonly formalArchiveReceipt: { readonly archivePath: string } | null;
+    }>(['asset', 'authoring', 'pack', '--session', session.sessionId, '--confirm'], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    const archivePath = packed.response.data?.formalArchiveReceipt?.archivePath;
+    if (archivePath === undefined) throw new Error('Expected a formal archive.');
+    expect((await runJson<null>([
+      'asset', 'authoring', 'inspect', '--session', session.sessionId, '--archive', archivePath,
+    ], workspaceRoot, { prepareRuntimeAssets: async () => runtime })).code).toBe(0);
+    const generated = await runJson<{
+      readonly releaseProvenanceReceipt: { readonly provenancePath: string } | null;
+    }>(['asset', 'authoring', 'provenance', '--session', session.sessionId, '--confirm'], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    const provenancePath = generated.response.data?.releaseProvenanceReceipt?.provenancePath;
+    if (provenancePath === undefined) throw new Error('Expected a provenance receipt.');
+
+    const consumerRoot = path.join(fixture.root, 'consumer-failure-copy');
+    mkdirSync(consumerRoot, { recursive: true });
+    const copiedArchive = path.join(consumerRoot, 'release.lpc-assets.zip');
+    const copiedProvenance = path.join(consumerRoot, 'release-provenance.json');
+    copyFileSync(archivePath, copiedArchive);
+    copyFileSync(provenancePath, copiedProvenance);
+    const archiveBefore = readFileSync(copiedArchive);
+    const originalProvenance = readFileSync(copiedProvenance);
+    const directoryBefore = readdirSync(consumerRoot).sort();
+
+    const verify = async () => runJson<null>([
+      'asset', 'provenance', 'verify', '--archive', copiedArchive, '--provenance', copiedProvenance,
+    ], consumerRoot, { prepareRuntimeAssets: async () => runtime });
+
+    writeFileSync(copiedProvenance, Buffer.from('{not-json}\n'));
+    const malformed = await verify();
+    expect(malformed.code).toBe(1);
+    expect(malformed.response.errors).toEqual([
+      expect.objectContaining({ code: 'asset_release_provenance_invalid' }),
+    ]);
+
+    writeFileSync(copiedProvenance, Buffer.from(
+      originalProvenance.toString('utf8').replace(
+        'lpc-toolkit.asset-release-provenance.v1',
+        'lpc-toolkit.asset-release-provenance.v2',
+      ),
+    ));
+    const unsupported = await verify();
+    expect(unsupported.code).toBe(1);
+    expect(unsupported.response.errors).toEqual([
+      expect.objectContaining({ code: 'asset_release_provenance_unsupported' }),
+    ]);
+
+    writeFileSync(copiedProvenance, Buffer.from(originalProvenance));
+    const original = JSON.parse(originalProvenance.toString('utf8')) as {
+      readonly projection: {
+        readonly pack: { readonly id: string; readonly version: string };
+        readonly releaseBindings: {
+          readonly archiveDigest: string;
+          readonly manifestDigest: string;
+          readonly contentDigest: string;
+          readonly sourceDigests: readonly { readonly path: string; readonly digest: string }[];
+          readonly releaseDeclarationReceiptDigest: string;
+          readonly previewAcceptanceReceiptDigest: string;
+          readonly previewArtifacts: readonly { readonly id: string; readonly digest: string }[];
+        };
+        readonly records: readonly unknown[];
+      };
+    };
+    const wrongDigest = `sha256:${'f'.repeat(64)}`;
+    const mismatched = [
+      'archiveDigest',
+      'manifestDigest',
+      'contentDigest',
+    ] as const;
+    for (const field of mismatched) {
+      const bindings = {
+        ...original.projection.releaseBindings,
+        [field]: wrongDigest,
+      };
+      writeFileSync(copiedProvenance, encodeProvenanceProjection({
+        ...original.projection,
+        releaseBindings: bindings,
+      }));
+      const result = await verify();
+      expect(result.code, field).toBe(1);
+      expect(result.response.errors).toEqual([
+        expect.objectContaining({ code: 'asset_release_provenance_digest_mismatch' }),
+      ]);
+      writeFileSync(copiedProvenance, Buffer.from(originalProvenance));
+    }
+
+    writeFileSync(copiedProvenance, encodeProvenanceProjection({
+      ...original.projection,
+      pack: { ...original.projection.pack, version: '9.9.9' },
+    }));
+    const stale = await verify();
+    expect(stale.code).toBe(1);
+    expect(stale.response.errors).toEqual([
+      expect.objectContaining({ code: 'asset_release_provenance_stale' }),
+    ]);
+
+    writeFileSync(copiedProvenance, encodeProvenanceProjection({
+      ...original.projection,
+      releaseBindings: {
+        ...original.projection.releaseBindings,
+        sourceDigests: original.projection.releaseBindings.sourceDigests.map((entry) => ({
+          ...entry,
+          digest: wrongDigest,
+        })),
+      },
+    }));
+    const sourceMismatch = await verify();
+    expect(sourceMismatch.code).toBe(1);
+    expect(sourceMismatch.response.errors).toEqual([
+      expect.objectContaining({ code: 'asset_release_provenance_digest_mismatch' }),
+    ]);
+
+    writeFileSync(copiedProvenance, Buffer.from(originalProvenance));
+    writeFileSync(copiedArchive, Buffer.from('not-an-archive'));
+    const copiedArchiveMismatch = await verify();
+    expect(copiedArchiveMismatch.code).toBe(1);
+    expect(copiedArchiveMismatch.response.errors).toEqual([
+      expect.objectContaining({ code: 'asset_release_provenance_invalid' }),
+    ]);
+
+    expect(readFileSync(copiedArchive)).not.toEqual(archiveBefore);
+    expect(readFileSync(copiedProvenance)).toEqual(originalProvenance);
+    expect(readdirSync(consumerRoot).sort()).toEqual(directoryBefore);
   });
 
   it('rejects private or unsupported provenance record payloads before publication', async () => {

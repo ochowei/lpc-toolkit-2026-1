@@ -113,6 +113,7 @@ describe('asset preparation dispatch', () => {
     { argv: ['asset', 'authoring', 'status', '--session', 'session-id'], workspace: true, runtime: false },
     { argv: ['asset', 'authoring', 'resume', '--session', 'session-id'], workspace: true, runtime: false },
     { argv: ['asset', 'inspect', 'pack.lpc-assets.zip'], workspace: false, runtime: true },
+    { argv: ['asset', 'provenance', 'verify', '--archive', 'pack.lpc-assets.zip', '--provenance', 'receipt.json'], workspace: false, runtime: true },
     { argv: ['asset', 'list'], workspace: true, runtime: false },
     { argv: ['asset', 'init', '--new'], workspace: true, runtime: true },
     { argv: ['asset', 'validate', 'pack'], workspace: true, runtime: true },
