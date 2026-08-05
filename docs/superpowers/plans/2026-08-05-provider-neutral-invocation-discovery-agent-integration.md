@@ -508,25 +508,34 @@ body before implementation continues; do not silently broaden the plan.
 
 **Files:** Core files listed above.
 
-- [ ] Write failing Core tests through the public export seam for exact schema
+- [x] Write failing Core tests through the public export seam for exact schema
   identities, unknown-field rejection, canonical ordering, identifier/digest
   syntax, privacy rejection, all resource limits, duplicate set members,
   bounded host names, credential policy, and the exact refusal-code union.
-- [ ] Add failing tests for the fixed SemVer comparator grammar, required and
+- [x] Add failing tests for the fixed SemVer comparator grammar, required and
   optional capability comparison, contract-version matching, and deterministic
   discovery status projections.
-- [ ] Add failing tests for invocation/result binding to session, contract,
+- [x] Add failing tests for invocation/result binding to session, contract,
   provider, adapter, operation, target, reference, input, candidate, and
   consent-scope digests.
-- [ ] Implement the minimum pure parsers, normalized models, projections, and
+- [x] Implement the minimum pure parsers, normalized models, projections, and
   digest inputs in `asset-provider-schema.ts`; keep all I/O outside Core.
-- [ ] Implement the D2-to-D1 provider-output adapter in
+- [x] Implement the D2-to-D1 provider-output adapter in
   `asset-provider-provenance.ts`; reject any attempt to project a private path,
   prompt, payload, credential, or human approval claim.
-- [ ] Export only the approved types/functions from `packages/core/src/index.ts`.
-- [ ] Run the focused Core test and typecheck; record RED and GREEN evidence.
-- [ ] Commit the product slice with a conventional message such as
+- [x] Export only the approved types/functions from `packages/core/src/index.ts`.
+- [x] Run the focused Core test and typecheck; record RED and GREEN evidence.
+- [x] Commit the product slice with a conventional message such as
   `feat(core): add provider-neutral integration contracts`.
+
+  - Implementation: Added strict provider descriptor/discovery/invocation/result/refusal and Agent-manifest parsers, bounded SemVer and capability compatibility, canonical digest inputs, binding diagnostics, and the pure D1 provider-output projection. No I/O or provider execution enters Core.
+  - RED: `rtk pnpm --filter @lpc-toolkit/core test -- asset-provider-schema.test.ts` FAIL — `parseAssetProviderDescriptor is not a function`.
+  - RED: `rtk pnpm --filter @lpc-toolkit/core test -- asset-provider-provenance.test.ts` FAIL — `assetProviderResultToReleaseProvenanceRecord is not a function`.
+  - Commit: a1f54c1e4e386fe35e84be08bb577c9a419758c6
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-provider-schema.test.ts asset-provider-provenance.test.ts` PASS — 2 files, 10 tests.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core test` PASS — 31 files, 422 tests.
+  - Verification: `rtk git diff --check` PASS.
 
 ### Task 2 — Add capability advertisement and Agent manifest compatibility
 
@@ -744,9 +753,9 @@ gitlink. Parity verification remains a separate isolated-checkout workflow.
 Update this section after each completed implementation task. Record full
 commit hashes, not abbreviated hashes, and exact command results.
 
-- [ ] Task 1 — Core D2 schemas, limits, compatibility, and refusal codes
-  - Commit: pending
-  - Verification: pending
+- [x] Task 1 — Core D2 schemas, limits, compatibility, and refusal codes
+  - Commit: a1f54c1e4e386fe35e84be08bb577c9a419758c6
+  - Verification: focused Core tests, Core typecheck, full Core regression, and `rtk git diff --check` all PASS; RED evidence is recorded above.
 - [ ] Task 2 — Capability advertisement and Agent manifest compatibility
   - Commit: pending
   - Verification: pending
