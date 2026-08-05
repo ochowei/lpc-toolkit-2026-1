@@ -311,6 +311,29 @@ export {
   assetDistributionSignedProjectionDigestInput,
   parseAssetDistributionRelease,
 } from './asset-distribution-schema.js';
+export type {
+  AssetDistributionSignatureSigner,
+  AssetDistributionSignatureSigningInput,
+  AssetDistributionSignatureSigningResult,
+  AssetDistributionSignatureVerificationInput,
+  AssetDistributionSignatureVerificationResult,
+  AssetDistributionSignatureVerifier,
+  AssetDistributionTrustDecision,
+  AssetDistributionTrustEvaluationInput,
+  AssetDistributionTrustKey,
+  AssetDistributionTrustKeyStatus,
+  AssetDistributionTrustPolicy,
+  AssetDistributionTrustPolicyParseResult,
+  AssetDistributionTrustStatus,
+} from './asset-distribution-trust.js';
+export {
+  ASSET_DISTRIBUTION_TRUST_POLICY_SCHEMA,
+  assetDistributionTrustPolicyDigestInput,
+  evaluateAssetDistributionTrust,
+  parseAssetDistributionTrustPolicy,
+  signAssetDistributionRelease,
+  verifyAssetDistributionSignature,
+} from './asset-distribution-trust.js';
 
 export type {
   AssetPackCreditRecord,

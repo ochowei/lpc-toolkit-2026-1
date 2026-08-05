@@ -10,7 +10,14 @@ export type AssetDistributionDiagnosticCode =
   | 'asset_distribution_invalid'
   | 'asset_distribution_unsupported'
   | 'asset_distribution_limit_exceeded'
-  | 'asset_distribution_private_data';
+  | 'asset_distribution_private_data'
+  | 'asset_distribution_signature_invalid'
+  | 'asset_distribution_key_untrusted'
+  | 'asset_distribution_key_revoked'
+  | 'asset_distribution_key_expired'
+  | 'asset_distribution_namespace_unauthorized'
+  | 'asset_distribution_algorithm_unsupported'
+  | 'asset_distribution_policy_mismatch';
 
 export interface AssetDistributionDiagnostic {
   readonly code: AssetDistributionDiagnosticCode;
