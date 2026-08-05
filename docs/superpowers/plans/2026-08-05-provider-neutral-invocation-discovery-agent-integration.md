@@ -839,6 +839,7 @@ commit hashes, not abbreviated hashes, and exact command results.
   - Verification: `rtk git diff --check` PASS.
   - Verification: `rtk pnpm check:cli-docs-impact -- --base origin/main --head HEAD --body-file /private/tmp/lpc-toolkit-task6-pr-body.txt` PASS — reproduction-mode declaration is valid for the CLI-sensitive diff.
   - Verification: `rtk pnpm check:cli-docs-impact` FAIL locally when invoked in CI mode because `GITHUB_EVENT_PATH` is unavailable; the required reproduction-mode check above PASSed.
+  - Verification: `rtk pnpm verify` PASS with the required loopback/IPC permission — upstream pin, boundaries, CLI docs policy, plugin contract, workspace typecheck, Core 31 files/422 tests, CLI 65 files/1,216 tests plus 1 skipped, Web 106 files/861 tests, and remaining workspace packages passed.
   - Documentation impact reassessment:
     ```text
     help: N/A — Task 6 changes response/status projection and reuses existing command help; Task 8 owns the complete D2 help pass
