@@ -851,9 +851,30 @@ commit hashes, not abbreviated hashes, and exact command results.
     releasing: N/A — Task 8 owns the complete D2 release documentation pass
     plugin: N/A — no provider skill or plugin command was added
     ```
-- [ ] Task 7 — Packed public CLI and Agent manifest boundary
-  - Commit: pending
-  - Verification: pending
+- [x] Task 7 — Packed public CLI and Agent manifest boundary
+  - Implementation: Extended the clean-consumer packed CLI smoke through the public installed executable. The acceptance now covers all D2 capabilities and schema identifiers, compatible/incompatible Agent manifests with optional fallback, deterministic provider discovery, read-only preflight, consent-required and confirmed handoff, malformed-result refusal/recovery, deterministic fake PNG result re-digest and session-owned staging, the existing import/validate/preview path, old v1 sessions with missing D2 receipt slots, ordinary character and asset-pack commands, formal archive/install inspection, D1 `provider-output` projection, privacy exclusions, and checked-in/cache/unowned/upstream sentinels. No provider, credential, network, skill, registry, backend, or dependency was added.
+  - RED: `rtk pnpm --filter @lpc-toolkit/cli test:package` FAIL — the first packed assertion expected a different incompatible-Agent diagnostic message; the stable refusal code and path were correct.
+  - RED: `rtk pnpm --filter @lpc-toolkit/cli test:package` FAIL — an explicit workspace flag exposed the clean-process macOS `/var` versus `/private/var` lexical-path mismatch; the acceptance now relies on public cwd workspace discovery, matching the existing packed smoke seam.
+  - RED: `rtk pnpm --filter @lpc-toolkit/cli test:package` FAIL — the pre-existing `recordCount: 0` expectation exposed the newly covered successful D1 projection as `recordCount: 1`; the assertion now checks the normalized provider-output record and private-data exclusions.
+  - Commit: 180874df562e463515a9df9c97491e30ef0e1d97
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS — clean packed tarball installation and public-executable acceptance completed.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-provider-commands.test.ts agent-integration.test.ts asset-authoring-release.test.ts` PASS — 3 files, 67 tests.
+  - Verification: `rtk pnpm verify:plugin` PASS — 40 plugin/skill contract tests and plugin structure verification.
+  - Verification: `rtk pnpm check:boundaries` PASS.
+  - Verification: `rtk pnpm verify:cli-docs-policy` PASS — 19 CLI documentation policy tests.
+  - Verification: `rtk node --check packages/cli/scripts/smoke-packed-cli.mjs` PASS.
+  - Verification: `rtk git diff --check` PASS.
+  - Documentation impact reassessment:
+    ```text
+    help: N/A — this commit extends packed executable acceptance only; no help text or command contract changed
+    cli-readme: N/A — Task 8 owns the complete D2 CLI documentation pass
+    root-readme: N/A — Task 8 owns the complete D2 CLI documentation pass
+    landing: N/A — Task 8 owns the complete D2 landing-page documentation pass
+    architecture: N/A — Task 8 owns the complete D2 ownership and boundary documentation pass
+    engineering: N/A — Task 8 owns the complete D2 verification documentation pass
+    releasing: N/A — Task 8 owns the complete D2 release documentation pass
+    plugin: N/A — no bundled skill, plugin capability, or plugin command was added
+    ```
 - [ ] Task 8 — Documentation and final verification
   - Commit: pending
   - Verification: pending
