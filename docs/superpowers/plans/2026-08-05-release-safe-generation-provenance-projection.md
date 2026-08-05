@@ -159,16 +159,24 @@ Product commit: `2cd43a3fe3d77b30b311b344e797cf0b62f5471d`
 
 ### Task 2: Generate and persist a release-bound companion receipt
 
-- [ ] Add failing public `runCli` tests for missing/stale formal archive or inspection, incomplete declaration/preview evidence, invalid records, missing confirmation, unsafe output, output conflict, exact binding, idempotency, and protected-path immutability.
-- [ ] Add backward-readable strict `releaseProvenance` session receipt parsing, release-artifact containment, stale detection, and atomic persistence. Preserve the old artifact/session receipt on conflicts or failed/raced writes.
-- [ ] Implement `asset authoring provenance` with optional strict `--records`, deterministic default sibling output, explicit contained `--output` recovery, and `--confirm` publication gate. Reuse all existing release and archive authorities; do not call a provider.
-- [ ] Record only the companion file's exact bytes/path/digest in the session receipt; keep raw records outside the public receipt and reject any path/secret/payload leakage before writing.
-- [ ] Verification: focused authoring/session/response tests GREEN; CLI typecheck PASS; existing formal pack/inspect tests PASS.
-- [ ] Commit the product slice with a conventional `feat(cli): publish release provenance receipt` message.
+- [x] Add failing public `runCli` tests for missing/stale formal archive or inspection, incomplete declaration/preview evidence, invalid records, missing confirmation, unsafe output, output conflict, exact binding, idempotency, and protected-path immutability.
+- [x] Add backward-readable strict `releaseProvenance` session receipt parsing, release-artifact containment, stale detection, and atomic persistence. Preserve the old artifact/session receipt on conflicts or failed/raced writes.
+- [x] Implement `asset authoring provenance` with optional strict `--records`, deterministic default sibling output, explicit contained `--output` recovery, and `--confirm` publication gate. Reuse all existing release and archive authorities; do not call a provider.
+- [x] Record only the companion file's exact bytes/path/digest in the session receipt; keep raw records outside the public receipt and reject any path/secret/payload leakage before writing.
+- [x] Verification: focused authoring/session/response tests GREEN; CLI typecheck PASS; existing formal pack/inspect tests PASS.
+- [x] Commit the product slice with a conventional `feat(cli): publish release provenance receipt` message.
 
-Implementation note: 
-Verification: 
-Product commit: 
+Implementation note: The public CLI now generates the external canonical
+companion receipt only after current formal-archive, archive-inspection,
+declaration, preview-acceptance, artifact, manifest, content, and source
+evidence pass. `--records` is parsed through the Core privacy/limit/binding
+contract; publication is atomic, contained, confirmation-gated, conflict-safe,
+and idempotent. Session persistence is additive/backward-readable and stores
+only the companion path, exact file digest, projection digest, pack identity,
+formal archive digest, and timestamp. No provider is invoked and the v1 ZIP,
+manifest, installation, or attribution paths were changed.
+Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-release-provenance.test.ts asset-authoring-release.test.ts asset-authoring-session.test.ts asset-authoring-session-e2e.test.ts command-spec.test.ts main-json.test.ts main-human.test.ts response.test.ts` PASS (182 tests); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS; `rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- archive.test.ts payload.test.ts` PASS (45 tests); `rtk pnpm check:boundaries` PASS; `rtk git diff --check` PASS.
+Product commit: `d1f964f03e46cd39cb99501204bf95c996bdd787`
 
 ### Task 3: Add read-only provenance verification and compatibility refusal
 
@@ -208,11 +216,11 @@ Product commit:
 ## Plan record
 
 - [x] Task 1 — pure provenance contract and canonical encoding complete.
-- [ ] Task 2 — release-bound companion generation and session persistence complete.
+- [x] Task 2 — release-bound companion generation and session persistence complete.
 - [ ] Task 3 — read-only verification and v1 compatibility complete.
 - [ ] Task 4 — packed acceptance, documentation, and handoff gate complete.
 
-Product commits: Task 1 — `2cd43a3fe3d77b30b311b344e797cf0b62f5471d`
+Product commits: Task 1 — `2cd43a3fe3d77b30b311b344e797cf0b62f5471d`; Task 2 — `d1f964f03e46cd39cb99501204bf95c996bdd787`
 Plan-record commit: 
 
 ## CLI documentation impact matrix
