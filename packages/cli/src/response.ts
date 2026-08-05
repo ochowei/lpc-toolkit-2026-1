@@ -17,6 +17,7 @@ import type {
   AssetAuthoringDraftArchiveReceipt,
   AssetAuthoringFormalArchiveReceipt,
   AssetAuthoringInstallationReceipt,
+  AssetAuthoringReleaseProvenanceReceipt,
   AssetAuthoringSyncReceipt,
 } from './asset-authoring-session.js';
 
@@ -122,6 +123,7 @@ export interface AuthoringResponseProjectionInput {
   readonly previewAcceptance?: AssetAuthoringPreviewAcceptanceReceipt | null;
   readonly draftReceipt?: AssetAuthoringDraftArchiveReceipt | null;
   readonly syncReceipt?: AssetAuthoringSyncReceipt | null;
+  readonly releaseProvenanceReceipt?: AssetAuthoringReleaseProvenanceReceipt | null;
   readonly formalArchiveReceipt?: AssetAuthoringFormalArchiveReceipt | null;
   readonly inspectionReceipt?: AssetAuthoringArchiveInspectionReceipt | null;
   readonly installationReceipt?: AssetAuthoringInstallationReceipt | null;
@@ -131,6 +133,7 @@ export interface AuthoringResponseData extends Omit<
   AuthoringResponseProjectionInput,
   'releaseGates' | 'releaseDeclaration' | 'previewAcceptance' | 'draftReceipt' | 'syncReceipt'
   | 'formalArchiveReceipt' | 'inspectionReceipt' | 'installationReceipt'
+  | 'releaseProvenanceReceipt'
 > {
   readonly schema: 'lpc-toolkit.asset-authoring-response.v1';
   readonly cliVersion: string;
@@ -141,6 +144,7 @@ export interface AuthoringResponseData extends Omit<
   readonly previewAcceptance: AssetAuthoringPreviewAcceptanceReceipt | null;
   readonly draftReceipt: AssetAuthoringDraftArchiveReceipt | null;
   readonly syncReceipt: AssetAuthoringSyncReceipt | null;
+  readonly releaseProvenanceReceipt: AssetAuthoringReleaseProvenanceReceipt | null;
   readonly formalArchiveReceipt: AssetAuthoringFormalArchiveReceipt | null;
   readonly inspectionReceipt: AssetAuthoringArchiveInspectionReceipt | null;
   readonly installationReceipt: AssetAuthoringInstallationReceipt | null;
@@ -210,6 +214,10 @@ export function authoringResponseProjection(
           .sort(([left], [right]) => left.localeCompare(right)),
       ),
     };
+  const releaseProvenanceReceipt = input.releaseProvenanceReceipt === undefined
+    || input.releaseProvenanceReceipt === null
+    ? null
+    : { ...input.releaseProvenanceReceipt };
   if (releaseDeclaration !== null && releaseDeclaration.kind !== 'declaration') {
     throw new Error('Release declaration response receipt has the wrong kind.');
   }
@@ -251,6 +259,7 @@ export function authoringResponseProjection(
     previewAcceptance,
     draftReceipt,
     syncReceipt,
+    releaseProvenanceReceipt,
     formalArchiveReceipt,
     inspectionReceipt,
     installationReceipt,

@@ -460,6 +460,52 @@ export function resolveFormalArchivePath(options: FormalArchiveOptions): string 
   return requested;
 }
 
+export function resolveReleaseProvenancePath(options: {
+  readonly cwd: string;
+  readonly workspace: AssetWorkspace;
+  readonly session: AssetAuthoringSession;
+  readonly outputPath?: string;
+}): string {
+  const sessionDirectory = path.dirname(assetAuthoringSessionPath(
+    options.workspace,
+    options.session.sessionId,
+  ));
+  assertDirectory(
+    sessionDirectory,
+    'Authoring session directory',
+    'asset_authoring_release_provenance_path_invalid',
+  );
+  const artifactRoot = path.join(sessionDirectory, RELEASE_ARTIFACT_DIRECTORY);
+  const requested = options.outputPath === undefined
+    ? path.join(
+      artifactRoot,
+      `${options.session.plan.pack.id}-${options.session.plan.pack.version}.release-provenance.json`,
+    )
+    : path.resolve(options.cwd, options.outputPath);
+  if (requested === artifactRoot || !isInsideRoot(artifactRoot, requested)) {
+    throw new AssetAuthoringReleaseLifecycleError(
+      'asset_authoring_release_provenance_path_invalid',
+      `Release provenance output must stay inside the session-owned release-artifact root: ${requested}.`,
+      requested,
+    );
+  }
+  if (!existsSync(artifactRoot)) {
+    mkdirSync(artifactRoot, { mode: 0o700 });
+  }
+  assertDirectory(
+    artifactRoot,
+    'Authoring release-artifact root',
+    'asset_authoring_release_provenance_path_invalid',
+  );
+  ensureContainedDirectory(
+    artifactRoot,
+    path.dirname(requested),
+    'Release provenance parent',
+    'asset_authoring_release_provenance_path_invalid',
+  );
+  return requested;
+}
+
 function publishDraftArchive(
   archivePath: string,
   archiveBytes: Buffer,

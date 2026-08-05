@@ -281,6 +281,7 @@ describe('asset authoring session persistence', () => {
     delete oldDocument.receipts.previewAcceptance;
     delete oldDocument.receipts.draftArchive;
     delete oldDocument.receipts.sync;
+    delete oldDocument.receipts.releaseProvenance;
     writeFileSync(sessionPath, `${JSON.stringify(oldDocument, null, 2)}\n`);
 
     expect(store.read(session.sessionId).receipts.acknowledgements).toBeNull();
@@ -288,6 +289,7 @@ describe('asset authoring session persistence', () => {
     expect(store.read(session.sessionId).receipts.previewAcceptance).toBeNull();
     expect(store.read(session.sessionId).receipts.draftArchive).toBeNull();
     expect(store.read(session.sessionId).receipts.sync).toBeNull();
+    expect(store.read(session.sessionId).receipts.releaseProvenance).toBeNull();
     const replaced = store.replace(session.sessionId, {
       receipts: {
         validation: null,

@@ -210,6 +210,7 @@ function preflightCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
       && authoringCommand !== 'accept-preview'
       && authoringCommand !== 'draft'
       && authoringCommand !== 'pack'
+      && authoringCommand !== 'provenance'
       && authoringCommand !== 'inspect'
       && authoringCommand !== 'install'
       && authoringCommand !== 'sync'
@@ -239,6 +240,7 @@ function preflightCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
       || authoringCommand === 'validate'
       || authoringCommand === 'draft'
       || authoringCommand === 'pack'
+      || authoringCommand === 'provenance'
       || authoringCommand === 'sync'
       || authoringCommand === 'preview'
     ) {

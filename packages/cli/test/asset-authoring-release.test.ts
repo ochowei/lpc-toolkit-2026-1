@@ -360,6 +360,70 @@ afterEach(() => {
 });
 
 describe('session-aware release boundaries', () => {
+  it('refuses release provenance before a formal archive and inspection exist', async () => {
+    const fixture = await createFormalReadyFixture();
+    const sessionPath = assetAuthoringSessionPath(fixture.workspace, fixture.session.sessionId);
+    const sessionBefore = readFileSync(sessionPath);
+    const missingFormal = await runJson<null>([
+      'asset', 'authoring', 'provenance', '--session', fixture.session.sessionId, '--confirm',
+    ], fixture.workspaceRoot, {
+      prepareRuntimeAssets: async () => fixture.runtime,
+    });
+    expect(missingFormal.code).toBe(1);
+    expect(missingFormal.response.errors).toEqual([
+      expect.objectContaining({ code: 'asset_release_provenance_stale' }),
+    ]);
+    expect(readFileSync(sessionPath)).toEqual(sessionBefore);
+
+    const packed = await runJson<{
+      readonly formalArchiveReceipt: { readonly archivePath: string } | null;
+    }>(['asset', 'authoring', 'pack', '--session', fixture.session.sessionId, '--confirm'], fixture.workspaceRoot, {
+      prepareRuntimeAssets: async () => fixture.runtime,
+    });
+    const archivePath = packed.response.data?.formalArchiveReceipt?.archivePath;
+    if (archivePath === undefined) throw new Error('Expected a formal archive.');
+    const missingInspection = await runJson<null>([
+      'asset', 'authoring', 'provenance', '--session', fixture.session.sessionId, '--confirm',
+    ], fixture.workspaceRoot, {
+      prepareRuntimeAssets: async () => fixture.runtime,
+    });
+    expect(missingInspection.code).toBe(1);
+    expect(missingInspection.response.errors).toEqual([
+      expect.objectContaining({ code: 'asset_release_provenance_stale' }),
+    ]);
+    expect(existsSync(archivePath)).toBe(true);
+  });
+
+  it('refuses a formal release provenance request after declaration evidence becomes stale', async () => {
+    const fixture = await createFormalReadyFixture();
+    const { workspaceRoot, workspace, runtime, session } = fixture;
+    const packed = await runJson<{
+      readonly formalArchiveReceipt: { readonly archivePath: string } | null;
+    }>(['asset', 'authoring', 'pack', '--session', session.sessionId, '--confirm'], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    const archivePath = packed.response.data?.formalArchiveReceipt?.archivePath;
+    if (archivePath === undefined) throw new Error('Expected a formal archive.');
+    expect((await runJson<null>([
+      'asset', 'authoring', 'inspect', '--session', session.sessionId, '--archive', archivePath,
+    ], workspaceRoot, { prepareRuntimeAssets: async () => runtime })).code).toBe(0);
+    const stored = createAssetAuthoringSessionStore(workspace).read(session.sessionId);
+    createAssetAuthoringSessionStore(workspace).replace(session.sessionId, {
+      receipts: {
+        ...stored.receipts,
+        releaseDeclaration: null,
+      },
+    });
+    const result = await runJson<null>([
+      'asset', 'authoring', 'provenance', '--session', session.sessionId, '--confirm',
+    ], workspaceRoot, { prepareRuntimeAssets: async () => runtime });
+    expect(result.code).toBe(1);
+    expect(result.response.errors).toEqual([
+      expect.objectContaining({ code: 'asset_release_provenance_stale' }),
+    ]);
+    expect(existsSync(archivePath)).toBe(true);
+  });
+
   it('requires an exact archive for public consumer installation', async () => {
     const fixture = createDraftFixture();
     const response = await runJson<null>([
@@ -878,6 +942,352 @@ describe('session-aware release boundaries', () => {
     expect(humanStderr).toEqual([]);
     expect(humanStdout.join('')).toContain(`Formal archive: ${formalReceipt.archivePath}`);
     expect(humanStdout.join('')).toContain(`Archive inspection: ${inspectionReceipt.archivePath}`);
+  });
+
+  it('requires explicit confirmation before publishing release provenance', async () => {
+    const fixture = await createFormalReadyFixture();
+    const { workspaceRoot, runtime, session } = fixture;
+    const packed = await runJson<{
+      readonly formalArchiveReceipt: { readonly archivePath: string } | null;
+    }>(['asset', 'authoring', 'pack', '--session', session.sessionId, '--confirm'], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    const archivePath = packed.response.data?.formalArchiveReceipt?.archivePath;
+    if (archivePath === undefined) throw new Error('Expected a formal archive.');
+    const inspected = await runJson<null>([
+      'asset', 'authoring', 'inspect', '--session', session.sessionId, '--archive', archivePath,
+    ], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    expect(inspected.code).toBe(0);
+
+    const pending = await runJson<{
+      readonly state: string;
+      readonly reason: string;
+      readonly releaseProvenanceReceipt: null;
+      readonly nextActions: readonly { readonly id: string; readonly safety: string }[];
+    }>(['asset', 'authoring', 'provenance', '--session', session.sessionId], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    expect(pending.code).toBe(0);
+    expect(pending.response.errors).toEqual([]);
+    expect(pending.response.data).toMatchObject({
+      state: 'needs-user-action',
+      reason: 'release-provenance-confirmation-required',
+      releaseProvenanceReceipt: null,
+      nextActions: [{ id: 'publish-release-provenance', safety: 'requires-confirmation' }],
+    });
+  });
+
+  it('publishes an exact release provenance companion receipt and is idempotent', async () => {
+    const fixture = await createFormalReadyFixture();
+    const { workspaceRoot, workspace, runtime, session } = fixture;
+    const packed = await runJson<{
+      readonly formalArchiveReceipt: { readonly archivePath: string; readonly archiveDigest: string } | null;
+    }>(['asset', 'authoring', 'pack', '--session', session.sessionId, '--confirm'], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    const formalReceipt = packed.response.data?.formalArchiveReceipt;
+    if (formalReceipt === null || formalReceipt === undefined) {
+      throw new Error('Expected a formal archive.');
+    }
+    const inspected = await runJson<null>([
+      'asset', 'authoring', 'inspect', '--session', session.sessionId,
+      '--archive', formalReceipt.archivePath,
+    ], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    expect(inspected.code).toBe(0);
+    const sessionPath = assetAuthoringSessionPath(workspace, session.sessionId);
+    const archiveBefore = readFileSync(formalReceipt.archivePath);
+
+    const published = await runJson<{
+      readonly reason: string;
+      readonly releaseProvenanceReceipt: {
+        readonly schema: string;
+        readonly provenancePath: string;
+        readonly provenanceDigest: string;
+        readonly projectionDigest: string;
+        readonly formalArchiveDigest: string;
+      } | null;
+    }>([
+      'asset', 'authoring', 'provenance', '--session', session.sessionId, '--confirm',
+    ], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    expect(published.code, JSON.stringify(published.response, null, 2)).toBe(0);
+    expect(published.response.data).toMatchObject({
+      reason: 'release-provenance-current',
+      releaseProvenanceReceipt: {
+        schema: 'lpc-toolkit.asset-authoring-release-provenance-receipt.v1',
+        provenancePath: expect.stringContaining('.release-provenance.json'),
+        provenanceDigest: expect.stringMatching(/^sha256:[0-9a-f]{64}$/u),
+        projectionDigest: expect.stringMatching(/^sha256:[0-9a-f]{64}$/u),
+        formalArchiveDigest: formalReceipt.archiveDigest,
+      },
+    });
+    const provenanceReceipt = published.response.data?.releaseProvenanceReceipt;
+    if (provenanceReceipt === null || provenanceReceipt === undefined) {
+      throw new Error('Expected a release provenance receipt.');
+    }
+    expect(provenanceReceipt.provenancePath).toBe(
+      path.join(path.dirname(formalReceipt.archivePath), `${PLAN.pack.id}-${PLAN.pack.version}.release-provenance.json`),
+    );
+    expect(createAssetAuthoringSessionStore(workspace).read(session.sessionId).receipts.releaseProvenance)
+      .toEqual(provenanceReceipt);
+    const provenanceBytes = readFileSync(provenanceReceipt.provenancePath);
+    const document = JSON.parse(provenanceBytes.toString('utf8')) as {
+      readonly schema: string;
+      readonly projection: {
+        readonly pack: { readonly id: string; readonly version: string };
+        readonly releaseBindings: {
+          readonly archiveDigest: string;
+          readonly manifestDigest: string;
+          readonly contentDigest: string;
+          readonly sourceDigests: readonly { readonly path: string; readonly digest: string }[];
+          readonly releaseDeclarationReceiptDigest: string;
+          readonly previewAcceptanceReceiptDigest: string;
+          readonly previewArtifacts: readonly { readonly id: string; readonly digest: string }[];
+        };
+        readonly records: readonly unknown[];
+      };
+      readonly projectionDigest: string;
+    };
+    expect(document).toMatchObject({
+      schema: 'lpc-toolkit.asset-release-provenance.v1',
+      projection: {
+        pack: { id: PLAN.pack.id, version: PLAN.pack.version },
+        releaseBindings: {
+          archiveDigest: formalReceipt.archiveDigest,
+          manifestDigest: expect.stringMatching(/^sha256:[0-9a-f]{64}$/u),
+          contentDigest: expect.stringMatching(/^sha256:[0-9a-f]{64}$/u),
+          sourceDigests: expect.any(Array),
+          releaseDeclarationReceiptDigest: expect.stringMatching(/^sha256:[0-9a-f]{64}$/u),
+          previewAcceptanceReceiptDigest: expect.stringMatching(/^sha256:[0-9a-f]{64}$/u),
+          previewArtifacts: [
+            { id: 'preview:credits_csv' },
+            { id: 'preview:credits_txt' },
+            { id: 'preview:metadata' },
+            { id: 'preview:preview' },
+          ],
+        },
+        records: [],
+      },
+      projectionDigest: provenanceReceipt.projectionDigest,
+    });
+    const sessionAfterPublish = readFileSync(sessionPath);
+    const repeated = await runJson<{
+      readonly releaseProvenanceReceipt: typeof provenanceReceipt;
+    }>(['asset', 'authoring', 'provenance', '--session', session.sessionId], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    expect(repeated.code).toBe(0);
+    expect(repeated.response.data?.releaseProvenanceReceipt).toEqual(provenanceReceipt);
+    expect(readFileSync(sessionPath)).toEqual(sessionAfterPublish);
+    expect(readFileSync(formalReceipt.archivePath)).toEqual(archiveBefore);
+  });
+
+  it('accepts only release-bound optional provenance records and never copies the input path', async () => {
+    const fixture = await createFormalReadyFixture();
+    const { workspaceRoot, workspace, runtime, session } = fixture;
+    const packed = await runJson<{
+      readonly formalArchiveReceipt: {
+        readonly archivePath: string;
+        readonly sourceDigests: readonly { readonly path: string; readonly digest: string }[];
+      } | null;
+    }>(['asset', 'authoring', 'pack', '--session', session.sessionId, '--confirm'], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    const formalReceipt = packed.response.data?.formalArchiveReceipt;
+    if (formalReceipt === null || formalReceipt === undefined) {
+      throw new Error('Expected a formal archive.');
+    }
+    const inspected = await runJson<null>([
+      'asset', 'authoring', 'inspect', '--session', session.sessionId,
+      '--archive', formalReceipt.archivePath,
+    ], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    expect(inspected.code).toBe(0);
+    const recordsPath = path.join(fixture.root, 'records.json');
+    writeJson(recordsPath, [{
+      kind: 'external-input',
+      targetId: 'moon-braid/foreground/walk',
+      resultDigest: formalReceipt.sourceDigests[0]?.digest,
+    }]);
+    const outputPath = path.join(
+      path.dirname(assetAuthoringSessionPath(workspace, session.sessionId)),
+      'release-artifacts',
+      'with-records.release-provenance.json',
+    );
+    const published = await runJson<{
+      readonly releaseProvenanceReceipt: { readonly provenancePath: string } | null;
+    }>([
+      'asset', 'authoring', 'provenance', '--session', session.sessionId,
+      '--records', recordsPath, '--output', outputPath, '--confirm',
+    ], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    expect(published.code, JSON.stringify(published.response, null, 2)).toBe(0);
+    const provenancePath = published.response.data?.releaseProvenanceReceipt?.provenancePath;
+    if (provenancePath === undefined) throw new Error('Expected a provenance receipt.');
+    const receiptText = readFileSync(provenancePath, 'utf8');
+    expect(receiptText).toContain('external-input');
+    expect(receiptText).not.toContain(recordsPath);
+    expect(JSON.parse(receiptText)).toMatchObject({
+      projection: { records: [{ kind: 'external-input' }] },
+    });
+  });
+
+  it('rejects private or unsupported provenance record payloads before publication', async () => {
+    const fixture = await createFormalReadyFixture();
+    const { workspaceRoot, runtime, session } = fixture;
+    const packed = await runJson<{
+      readonly formalArchiveReceipt: {
+        readonly archivePath: string;
+        readonly sourceDigests: readonly { readonly digest: string }[];
+      } | null;
+    }>(['asset', 'authoring', 'pack', '--session', session.sessionId, '--confirm'], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    const formalReceipt = packed.response.data?.formalArchiveReceipt;
+    if (formalReceipt === null || formalReceipt === undefined) throw new Error('Expected a formal archive.');
+    expect((await runJson<null>([
+      'asset', 'authoring', 'inspect', '--session', session.sessionId, '--archive', formalReceipt.archivePath,
+    ], workspaceRoot, { prepareRuntimeAssets: async () => runtime })).code).toBe(0);
+    const recordsPath = path.join(fixture.root, 'private-records.json');
+    writeJson(recordsPath, [{
+      kind: 'provider-output',
+      targetId: 'moon-braid/foreground/walk',
+      contractDigest: `sha256:${'a'.repeat(64)}`,
+      provider: {
+        id: 'https://provider.example/api?token=secret',
+        tool: 'sprite-tool',
+      },
+      resultDigest: formalReceipt.sourceDigests[0]?.digest,
+    }]);
+    const result = await runJson<null>([
+      'asset', 'authoring', 'provenance', '--session', session.sessionId,
+      '--records', recordsPath, '--confirm',
+    ], workspaceRoot, { prepareRuntimeAssets: async () => runtime });
+    expect(result.code).toBe(1);
+    expect(result.response.errors).toEqual([
+      expect.objectContaining({ code: 'asset_release_provenance_private_data' }),
+    ]);
+  });
+
+  it('rejects an unsafe provenance output without mutating the session or escaped path', async () => {
+    const fixture = await createFormalReadyFixture();
+    const { workspaceRoot, workspace, runtime, session } = fixture;
+    const packed = await runJson<{
+      readonly formalArchiveReceipt: { readonly archivePath: string } | null;
+    }>(['asset', 'authoring', 'pack', '--session', session.sessionId, '--confirm'], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    const archivePath = packed.response.data?.formalArchiveReceipt?.archivePath;
+    if (archivePath === undefined) throw new Error('Expected a formal archive.');
+    expect((await runJson<null>([
+      'asset', 'authoring', 'inspect', '--session', session.sessionId, '--archive', archivePath,
+    ], workspaceRoot, { prepareRuntimeAssets: async () => runtime })).code).toBe(0);
+    const sessionPath = assetAuthoringSessionPath(workspace, session.sessionId);
+    const sessionBefore = readFileSync(sessionPath);
+    const escapedPath = path.join(fixture.root, 'escaped.release-provenance.json');
+    const result = await runJson<null>([
+      'asset', 'authoring', 'provenance', '--session', session.sessionId,
+      '--output', escapedPath, '--confirm',
+    ], workspaceRoot, { prepareRuntimeAssets: async () => runtime });
+    expect(result.code).toBe(1);
+    expect(result.response.errors).toEqual([
+      expect.objectContaining({ code: 'asset_authoring_release_provenance_path_invalid' }),
+    ]);
+    expect(existsSync(escapedPath)).toBe(false);
+    expect(readFileSync(sessionPath)).toEqual(sessionBefore);
+  });
+
+  it('preserves a published provenance receipt when a changed projection targets the default path', async () => {
+    const fixture = await createFormalReadyFixture();
+    const { workspaceRoot, workspace, runtime, session } = fixture;
+    const packed = await runJson<{
+      readonly formalArchiveReceipt: {
+        readonly archivePath: string;
+        readonly sourceDigests: readonly { readonly path: string; readonly digest: string }[];
+      } | null;
+    }>(['asset', 'authoring', 'pack', '--session', session.sessionId, '--confirm'], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    const formalReceipt = packed.response.data?.formalArchiveReceipt;
+    if (formalReceipt === null || formalReceipt === undefined) throw new Error('Expected a formal archive.');
+    expect((await runJson<null>([
+      'asset', 'authoring', 'inspect', '--session', session.sessionId, '--archive', formalReceipt.archivePath,
+    ], workspaceRoot, { prepareRuntimeAssets: async () => runtime })).code).toBe(0);
+    const first = await runJson<{
+      readonly releaseProvenanceReceipt: { readonly provenancePath: string } | null;
+    }>(['asset', 'authoring', 'provenance', '--session', session.sessionId, '--confirm'], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    const firstPath = first.response.data?.releaseProvenanceReceipt?.provenancePath;
+    if (firstPath === undefined) throw new Error('Expected a provenance receipt.');
+    const firstBytes = readFileSync(firstPath);
+    const sessionPath = assetAuthoringSessionPath(workspace, session.sessionId);
+    const sessionBefore = readFileSync(sessionPath);
+    const recordsPath = path.join(fixture.root, 'changed-records.json');
+    writeJson(recordsPath, [{
+      kind: 'external-input',
+      targetId: 'moon-braid/foreground/walk',
+      resultDigest: formalReceipt.sourceDigests[0]?.digest,
+    }]);
+    const conflict = await runJson<null>([
+      'asset', 'authoring', 'provenance', '--session', session.sessionId,
+      '--records', recordsPath, '--confirm',
+    ], workspaceRoot, { prepareRuntimeAssets: async () => runtime });
+    expect(conflict.code).toBe(1);
+    expect(conflict.response.errors).toEqual([
+      expect.objectContaining({ code: 'asset_release_provenance_conflict' }),
+    ]);
+    expect(readFileSync(firstPath)).toEqual(firstBytes);
+    expect(readFileSync(sessionPath)).toEqual(sessionBefore);
+  });
+
+  it('requires a new contained output path to recover a stale provenance receipt', async () => {
+    const fixture = await createFormalReadyFixture();
+    const { workspaceRoot, runtime, session } = fixture;
+    const packed = await runJson<{
+      readonly formalArchiveReceipt: { readonly archivePath: string } | null;
+    }>(['asset', 'authoring', 'pack', '--session', session.sessionId, '--confirm'], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    const archivePath = packed.response.data?.formalArchiveReceipt?.archivePath;
+    if (archivePath === undefined) throw new Error('Expected a formal archive.');
+    expect((await runJson<null>([
+      'asset', 'authoring', 'inspect', '--session', session.sessionId, '--archive', archivePath,
+    ], workspaceRoot, { prepareRuntimeAssets: async () => runtime })).code).toBe(0);
+    const first = await runJson<{
+      readonly releaseProvenanceReceipt: { readonly provenancePath: string } | null;
+    }>(['asset', 'authoring', 'provenance', '--session', session.sessionId, '--confirm'], workspaceRoot, {
+      prepareRuntimeAssets: async () => runtime,
+    });
+    const firstPath = first.response.data?.releaseProvenanceReceipt?.provenancePath;
+    if (firstPath === undefined) throw new Error('Expected a provenance receipt.');
+    const tampered = Buffer.from('tampered-release-provenance');
+    writeFileSync(firstPath, tampered);
+    const stale = await runJson<null>([
+      'asset', 'authoring', 'provenance', '--session', session.sessionId,
+    ], workspaceRoot, { prepareRuntimeAssets: async () => runtime });
+    expect(stale.code).toBe(1);
+    expect(stale.response.errors).toEqual([
+      expect.objectContaining({ code: 'asset_release_provenance_stale' }),
+    ]);
+    const recoveredPath = path.join(path.dirname(firstPath), 'recovered.release-provenance.json');
+    const recovered = await runJson<{
+      readonly releaseProvenanceReceipt: { readonly provenancePath: string } | null;
+    }>([
+      'asset', 'authoring', 'provenance', '--session', session.sessionId,
+      '--output', recoveredPath, '--confirm',
+    ], workspaceRoot, { prepareRuntimeAssets: async () => runtime });
+    expect(recovered.code, JSON.stringify(recovered.response, null, 2)).toBe(0);
+    expect(recovered.response.data?.releaseProvenanceReceipt?.provenancePath).toBe(recoveredPath);
+    expect(readFileSync(firstPath)).toEqual(tampered);
+    expect(existsSync(recoveredPath)).toBe(true);
   });
 
   it('requires explicit confirmation before installing the inspected archive into a consumer workspace', async () => {
