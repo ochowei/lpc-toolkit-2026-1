@@ -17,6 +17,7 @@ import type {
   AssetAuthoringDraftArchiveReceipt,
   AssetAuthoringFormalArchiveReceipt,
   AssetAuthoringInstallationReceipt,
+  AssetAuthoringReleaseProvenanceReceipt,
   AssetAuthoringSyncReceipt,
 } from './asset-authoring-session.js';
 
@@ -122,6 +123,7 @@ export interface AuthoringResponseProjectionInput {
   readonly previewAcceptance?: AssetAuthoringPreviewAcceptanceReceipt | null;
   readonly draftReceipt?: AssetAuthoringDraftArchiveReceipt | null;
   readonly syncReceipt?: AssetAuthoringSyncReceipt | null;
+  readonly releaseProvenanceReceipt?: AssetAuthoringReleaseProvenanceReceipt | null;
   readonly formalArchiveReceipt?: AssetAuthoringFormalArchiveReceipt | null;
   readonly inspectionReceipt?: AssetAuthoringArchiveInspectionReceipt | null;
   readonly installationReceipt?: AssetAuthoringInstallationReceipt | null;
@@ -131,6 +133,7 @@ export interface AuthoringResponseData extends Omit<
   AuthoringResponseProjectionInput,
   'releaseGates' | 'releaseDeclaration' | 'previewAcceptance' | 'draftReceipt' | 'syncReceipt'
   | 'formalArchiveReceipt' | 'inspectionReceipt' | 'installationReceipt'
+  | 'releaseProvenanceReceipt'
 > {
   readonly schema: 'lpc-toolkit.asset-authoring-response.v1';
   readonly cliVersion: string;
@@ -141,6 +144,7 @@ export interface AuthoringResponseData extends Omit<
   readonly previewAcceptance: AssetAuthoringPreviewAcceptanceReceipt | null;
   readonly draftReceipt: AssetAuthoringDraftArchiveReceipt | null;
   readonly syncReceipt: AssetAuthoringSyncReceipt | null;
+  readonly releaseProvenanceReceipt: AssetAuthoringReleaseProvenanceReceipt | null;
   readonly formalArchiveReceipt: AssetAuthoringFormalArchiveReceipt | null;
   readonly inspectionReceipt: AssetAuthoringArchiveInspectionReceipt | null;
   readonly installationReceipt: AssetAuthoringInstallationReceipt | null;
@@ -210,6 +214,10 @@ export function authoringResponseProjection(
           .sort(([left], [right]) => left.localeCompare(right)),
       ),
     };
+  const releaseProvenanceReceipt = input.releaseProvenanceReceipt === undefined
+    || input.releaseProvenanceReceipt === null
+    ? null
+    : { ...input.releaseProvenanceReceipt };
   if (releaseDeclaration !== null && releaseDeclaration.kind !== 'declaration') {
     throw new Error('Release declaration response receipt has the wrong kind.');
   }
@@ -251,6 +259,7 @@ export function authoringResponseProjection(
     previewAcceptance,
     draftReceipt,
     syncReceipt,
+    releaseProvenanceReceipt,
     formalArchiveReceipt,
     inspectionReceipt,
     installationReceipt,
@@ -974,6 +983,57 @@ function formatAssetInspect(data: JsonRecord): string | undefined {
   return `${lines.join('\n')}\n`;
 }
 
+function formatAssetProvenanceVerification(data: JsonRecord): string | undefined {
+  const verified = data['verified'];
+  const archivePath = stringValue(data, 'archivePath');
+  const provenancePath = stringValue(data, 'provenancePath');
+  const packId = stringValue(data, 'packId');
+  const version = stringValue(data, 'version');
+  const archiveDigest = stringValue(data, 'archiveDigest');
+  const manifestDigest = stringValue(data, 'manifestDigest');
+  const contentDigest = stringValue(data, 'contentDigest');
+  const sourceDigests = recordArrayValue(data, 'sourceDigests');
+  const recordCount = numberValue(data, 'recordCount');
+  const declarationDigest = stringValue(data, 'releaseDeclarationReceiptDigest');
+  const previewDigest = stringValue(data, 'previewAcceptanceReceiptDigest');
+  const humanEvidence = isRecord(data['humanEvidence'])
+    ? data['humanEvidence']
+    : undefined;
+  if (
+    verified !== true
+    || !archivePath
+    || !provenancePath
+    || !packId
+    || !version
+    || !archiveDigest
+    || !manifestDigest
+    || !contentDigest
+    || !sourceDigests
+    || recordCount === undefined
+    || !declarationDigest
+    || !previewDigest
+    || humanEvidence === undefined
+  ) {
+    return undefined;
+  }
+  return [
+    'Release provenance verification: verified',
+    `Archive: ${archivePath}`,
+    `Provenance receipt: ${provenancePath}`,
+    `Pack: ${packId} ${version}`,
+    `Archive digest: ${archiveDigest}`,
+    `Manifest digest: ${manifestDigest}`,
+    `Content digest: ${contentDigest}`,
+    `Source digests: ${sourceDigests.length}`,
+    `Provenance records: ${recordCount}`,
+    `Bound release declaration receipt: ${declarationDigest}`,
+    `Bound preview acceptance receipt: ${previewDigest}`,
+    `Human release declaration recreated: ${humanEvidence['releaseDeclarationReceiptRecreated'] === false ? 'no' : 'unknown'}`,
+    `Human preview acceptance recreated: ${humanEvidence['previewAcceptanceReceiptRecreated'] === false ? 'no' : 'unknown'}`,
+    '',
+  ].join('\n');
+}
+
 function formatAssetInstall(data: JsonRecord): string | undefined {
   const action = stringValue(data, 'action');
   const packId = stringValue(data, 'packId');
@@ -1260,6 +1320,8 @@ function formatHumanData(response: CliResponse<unknown>): string | undefined {
       return formatAssetPack(data);
     case 'asset inspect':
       return formatAssetInspect(data);
+    case 'asset provenance verify':
+      return formatAssetProvenanceVerification(data);
     case 'asset install':
       return formatAssetInstall(data);
     case 'asset list':

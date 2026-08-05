@@ -158,6 +158,30 @@ export {
 } from './asset-release-schema.js';
 
 export type {
+  AssetReleaseProvenanceArtifactDigest,
+  AssetReleaseProvenanceDiagnostic,
+  AssetReleaseProvenanceDiagnosticCode,
+  AssetReleaseProvenanceDigestBinding,
+  AssetReleaseProvenanceExternalInput,
+  AssetReleaseProvenanceOperation,
+  AssetReleaseProvenancePackIdentity,
+  AssetReleaseProvenanceParseResult,
+  AssetReleaseProvenanceProviderIdentifier,
+  AssetReleaseProvenanceProviderOutput,
+  AssetReleaseProvenanceProjection,
+  AssetReleaseProvenanceRecord,
+  AssetReleaseProvenanceReleaseBindings,
+  AssetReleaseProvenanceReceipt,
+  AssetReleaseProvenanceSourceTransformation,
+} from './asset-release-provenance-schema.js';
+export {
+  ASSET_RELEASE_PROVENANCE_SCHEMA,
+  assetReleaseProvenanceProjection,
+  assetReleaseProvenanceProjectionDigestInput,
+  parseAssetReleaseProvenance,
+} from './asset-release-provenance-schema.js';
+
+export type {
   AssetPackCreditRecord,
   NormalizedAssetPack,
   NormalizedAssetPackAsset,

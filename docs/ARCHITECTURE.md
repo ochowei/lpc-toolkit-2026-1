@@ -28,7 +28,9 @@ LPC behavior:
 - strict artist asset-pack schema, normalized models, validation decisions,
   warning acknowledgements, and deterministic compile plans
 - pure asset-release declaration and receipt schemas, canonical digest
-  projections, exact preview artifact identifiers, and release-gate predicates
+  projections, exact preview artifact identifiers, release-gate predicates, and
+  bounded release-provenance schemas, normalized projections, and release-binding
+  predicates
 - hash/token serialization and parsing
 - the canonical character document and pure upstream compatibility adapter
 - static asset validation
@@ -150,6 +152,8 @@ not modify `upstream/`.
 - strict release declaration and preview-acceptance input handling, session
   receipt persistence, current evidence collection, artifact re-digestion, and
   bounded human/JSON release-gate responses
+- external generation-provenance companion publication from current formal
+  archive evidence and a read-only verifier for copied archive/receipt bytes
 
 CLI code may use Node APIs, `@napi-rs/canvas` (MIT), and `jszip` (MIT) because
 it is a Node runtime package. Those dependencies must not move into
@@ -180,6 +184,13 @@ the newer authoring-session release capability. They do not claim or invoke
 commands; the installed CLI remains the sole owner of those release and
 archive receipts.
 
+The plugin also does not claim or invoke `asset-authoring-release-provenance.v1`,
+`lpc-toolkit.asset-release-provenance.v1`,
+`lpc-toolkit.asset-release-provenance-verification.v1`, or `asset provenance
+verify`. It does not publish or verify external release provenance, invoke a
+provider, or add a new skill; use the installed CLI's public command directly
+when an external consumer needs independent verification.
+
 ### Release evidence ownership
 
 Core owns the environment-agnostic declaration, discriminated receipt, exact
@@ -192,6 +203,23 @@ the CLI must expose current acknowledgement, validation, declaration, preview,
 four-artifact, and preview-acceptance gates before a session can report
 `releaseReady: true`. These Phase 1 receipts remain authoring-session state and
 do not create a formal archive, sync a generated overlay, or install a pack.
+
+### Release provenance projection ownership
+
+Core owns the strict, environment-agnostic provenance schema, privacy/resource
+limits, canonical normalized projection, record binding predicates, and digest
+inputs. `packages/asset-pack-format/` owns only canonical UTF-8 encoding and
+digest calculation for the external receipt; it adds no ZIP member or manifest
+field. The CLI owns current evidence collection, exact formal ZIP/manifest/
+content/source binding, atomic companion publication, output containment, and
+the read-only copied-archive verifier.
+
+Generation provenance is distinct from LPC credits, authorship/license
+authority, and human release approval. The verifier reports declaration and
+preview receipt digests as bound evidence rather than recreating those human
+decisions. Ordinary inspect and install ignore an absent companion receipt, and
+the shipped boundary adds no provider invocation, authentication, remote
+registry, signing, marketplace, or Web session bridge.
 
 ### Documentation and Governance
 

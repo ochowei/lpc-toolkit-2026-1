@@ -142,6 +142,8 @@ export const ASSET_AUTHORING_ARCHIVE_INSPECTION_RECEIPT_SCHEMA =
   'lpc-toolkit.asset-authoring-archive-inspection-receipt.v1' as const;
 export const ASSET_AUTHORING_INSTALLATION_RECEIPT_SCHEMA =
   'lpc-toolkit.asset-authoring-install-receipt.v1' as const;
+export const ASSET_AUTHORING_RELEASE_PROVENANCE_RECEIPT_SCHEMA =
+  'lpc-toolkit.asset-authoring-release-provenance-receipt.v1' as const;
 
 export interface AssetAuthoringDraftArchiveReceipt {
   readonly schema: typeof ASSET_AUTHORING_DRAFT_RECEIPT_SCHEMA;
@@ -220,6 +222,17 @@ export interface AssetAuthoringInstallationReceipt {
   readonly recordedAt: string;
 }
 
+export interface AssetAuthoringReleaseProvenanceReceipt {
+  readonly schema: typeof ASSET_AUTHORING_RELEASE_PROVENANCE_RECEIPT_SCHEMA;
+  readonly packId: string;
+  readonly version: string;
+  readonly provenancePath: string;
+  readonly provenanceDigest: string;
+  readonly projectionDigest: string;
+  readonly formalArchiveDigest: string;
+  readonly recordedAt: string;
+}
+
 export type AssetAuthoringReleaseDeclarationReceipt =
   CoreAssetAuthoringReleaseDeclarationReceipt;
 
@@ -237,6 +250,7 @@ export interface AssetAuthoringSessionReceipts {
   readonly formalArchive?: AssetAuthoringFormalArchiveReceipt | null;
   readonly archiveInspection?: AssetAuthoringArchiveInspectionReceipt | null;
   readonly installation?: AssetAuthoringInstallationReceipt | null;
+  readonly releaseProvenance?: AssetAuthoringReleaseProvenanceReceipt | null;
 }
 
 export interface AssetAuthoringSessionCheckpoint {
@@ -262,6 +276,7 @@ export type AssetAuthoringProvenanceKind =
   | 'formal-archive-recorded'
   | 'archive-inspection-recorded'
   | 'installation-receipt-recorded'
+  | 'release-provenance-recorded'
   | 'provider'
   | 'human-declaration'
   | 'human-preview-acceptance';
@@ -366,6 +381,7 @@ export interface AssetAuthoringEvidence {
   readonly formalArchiveReceipt?: AssetAuthoringFormalArchiveReceipt | null;
   readonly archiveInspectionReceipt?: AssetAuthoringArchiveInspectionReceipt | null;
   readonly installationReceipt?: AssetAuthoringInstallationReceipt | null;
+  readonly releaseProvenanceReceipt?: AssetAuthoringReleaseProvenanceReceipt | null;
   /** The newly requested preview input, separate from the last receipt. */
   readonly previewInputDigest?: string | null;
 }
@@ -382,7 +398,8 @@ export type AssetAuthoringInvalidationCheckpoint =
   | 'previewAcceptance'
   | 'formalArchive'
   | 'archiveInspection'
-  | 'installation';
+  | 'installation'
+  | 'releaseProvenance';
 
 export type AssetAuthoringInvalidationReason =
   | 'manifest-semantic-drift'
@@ -396,7 +413,8 @@ export type AssetAuthoringInvalidationReason =
   | 'preview-acceptance-stale'
   | 'formal-archive-stale'
   | 'archive-inspection-stale'
-  | 'installation-stale';
+  | 'installation-stale'
+  | 'release-provenance-stale';
 
 export interface AssetAuthoringInvalidationDecision {
   readonly checkpoint: AssetAuthoringInvalidationCheckpoint;
@@ -605,6 +623,7 @@ function parseReceipts(value: unknown): AssetAuthoringSessionReceipts {
       'formalArchive',
       'archiveInspection',
       'installation',
+      'releaseProvenance',
     ],
     'session.receipts',
   );
@@ -638,6 +657,9 @@ function parseReceipts(value: unknown): AssetAuthoringSessionReceipts {
   const installation = record.installation === undefined || record.installation === null
     ? null
     : parseInstallationReceipt(record.installation);
+  const releaseProvenance = record.releaseProvenance === undefined || record.releaseProvenance === null
+    ? null
+    : parseReleaseProvenanceReceipt(record.releaseProvenance);
   return {
     validation,
     preview,
@@ -649,6 +671,7 @@ function parseReceipts(value: unknown): AssetAuthoringSessionReceipts {
     formalArchive,
     archiveInspection,
     installation,
+    releaseProvenance,
   };
 }
 
@@ -875,6 +898,56 @@ function parseInstallationReceipt(value: unknown): AssetAuthoringInstallationRec
     recordedAt: requireTimestamp(
       record.recordedAt,
       'session.receipts.installation.recordedAt',
+    ),
+  };
+}
+
+function parseReleaseProvenanceReceipt(value: unknown): AssetAuthoringReleaseProvenanceReceipt {
+  const record = requireRecord(value, 'session.receipts.releaseProvenance');
+  assertExactKeys(
+    record,
+    [
+      'schema',
+      'packId',
+      'version',
+      'provenancePath',
+      'provenanceDigest',
+      'projectionDigest',
+      'formalArchiveDigest',
+      'recordedAt',
+    ],
+    'session.receipts.releaseProvenance',
+  );
+  if (record.schema !== ASSET_AUTHORING_RELEASE_PROVENANCE_RECEIPT_SCHEMA) {
+    fail(
+      'asset_authoring_session_tampered',
+      `Unknown release provenance receipt schema: ${String(record.schema)}.`,
+    );
+  }
+  return {
+    schema: ASSET_AUTHORING_RELEASE_PROVENANCE_RECEIPT_SCHEMA,
+    packId: requireString(record, 'packId', 'session.receipts.releaseProvenance'),
+    version: requireString(record, 'version', 'session.receipts.releaseProvenance'),
+    provenancePath: parseAbsoluteReceiptPath(
+      record,
+      'provenancePath',
+      'session.receipts.releaseProvenance',
+    ),
+    provenanceDigest: requireDigest(
+      record.provenanceDigest,
+      'session.receipts.releaseProvenance.provenanceDigest',
+    ),
+    projectionDigest: requireDigest(
+      record.projectionDigest,
+      'session.receipts.releaseProvenance.projectionDigest',
+    ),
+    formalArchiveDigest: requireDigest(
+      record.formalArchiveDigest,
+      'session.receipts.releaseProvenance.formalArchiveDigest',
+    ),
+    recordedAt: requireTimestamp(
+      record.recordedAt,
+      'session.receipts.releaseProvenance.recordedAt',
     ),
   };
 }
@@ -1196,6 +1269,7 @@ function parseProvenance(value: unknown): readonly AssetAuthoringProvenanceEvent
         'formal-archive-recorded',
         'archive-inspection-recorded',
         'installation-receipt-recorded',
+        'release-provenance-recorded',
         'provider',
         'human-declaration',
         'human-preview-acceptance',
@@ -1522,6 +1596,21 @@ function validateReceiptScope(
       }
     }
   }
+
+  const releaseProvenance = receipts.releaseProvenance;
+  if (releaseProvenance !== null && releaseProvenance !== undefined) {
+    const artifactRoot = path.join(
+      path.dirname(assetAuthoringSessionPath(workspace, sessionId)),
+      'release-artifacts',
+    );
+    if (!isInsideRoot(path.resolve(artifactRoot), path.resolve(releaseProvenance.provenancePath))) {
+      fail(
+        'asset_authoring_session_path_invalid',
+        'session.receipts.releaseProvenance.provenancePath must stay inside the session release-artifact root.',
+        releaseProvenance.provenancePath,
+      );
+    }
+  }
 }
 
 function serializeSession(session: AssetAuthoringSession): string {
@@ -1631,6 +1720,7 @@ class AssetAuthoringSessionStoreImpl implements AssetAuthoringSessionStore {
         formalArchive: null,
         archiveInspection: null,
         installation: null,
+        releaseProvenance: null,
       },
       provenance: [{
         id: this.eventId(),
@@ -1875,6 +1965,23 @@ function sameInstallationReceipts(
     && left.recordedAt === right.recordedAt;
 }
 
+function sameReleaseProvenanceReceipts(
+  left: AssetAuthoringReleaseProvenanceReceipt | null | undefined,
+  right: AssetAuthoringReleaseProvenanceReceipt | null | undefined,
+): boolean {
+  if (left === null || left === undefined || right === null || right === undefined) {
+    return left === right;
+  }
+  return left.schema === right.schema
+    && left.packId === right.packId
+    && left.version === right.version
+    && left.provenancePath === right.provenancePath
+    && left.provenanceDigest === right.provenanceDigest
+    && left.projectionDigest === right.projectionDigest
+    && left.formalArchiveDigest === right.formalArchiveDigest
+    && left.recordedAt === right.recordedAt;
+}
+
 function releaseReceiptDigest(
   receipt: AssetAuthoringReleaseDeclarationReceipt | AssetAuthoringPreviewAcceptanceReceipt,
 ): string {
@@ -2097,6 +2204,32 @@ export function deriveAuthoringInvalidationDecisions(
     )
   ) {
     decisions.push({ checkpoint: 'installation', reason: 'installation-stale' });
+  }
+
+  const previousReleaseProvenance = previous.releaseProvenanceReceipt;
+  const currentReleaseProvenance = current.releaseProvenanceReceipt;
+  const releaseEvidenceStale = decisions.some((decision) =>
+    decision.checkpoint === 'releaseDeclaration'
+    || decision.checkpoint === 'previewAcceptance'
+    || decision.checkpoint === 'formalArchive'
+    || decision.checkpoint === 'archiveInspection');
+  if (!sameReleaseProvenanceReceipts(previousReleaseProvenance, currentReleaseProvenance)) {
+    if (previousReleaseProvenance !== undefined && previousReleaseProvenance !== null) {
+      decisions.push({ checkpoint: 'releaseProvenance', reason: 'release-provenance-stale' });
+    }
+  } else if (
+    previousReleaseProvenance !== undefined
+    && previousReleaseProvenance !== null
+    && currentReleaseProvenance !== undefined
+    && currentReleaseProvenance !== null
+    && (
+      currentFormalArchive === undefined
+      || currentFormalArchive === null
+      || currentReleaseProvenance.formalArchiveDigest !== currentFormalArchive.archiveDigest
+      || releaseEvidenceStale
+    )
+  ) {
+    decisions.push({ checkpoint: 'releaseProvenance', reason: 'release-provenance-stale' });
   }
   return decisions;
 }

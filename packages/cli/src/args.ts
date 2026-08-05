@@ -29,7 +29,11 @@ function acceptsAnotherCommandToken(command: readonly string[]): boolean {
   if (command.length < 2) return true;
   return command.length === 2
     && command[0] === 'asset'
-    && (command[1] === 'workspace' || command[1] === 'authoring');
+    && (
+      command[1] === 'workspace'
+      || command[1] === 'authoring'
+      || command[1] === 'provenance'
+    );
 }
 
 function acceptsExplicitEmptyValues(command: readonly string[]): boolean {

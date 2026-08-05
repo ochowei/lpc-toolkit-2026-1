@@ -210,6 +210,7 @@ function preflightCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
       && authoringCommand !== 'accept-preview'
       && authoringCommand !== 'draft'
       && authoringCommand !== 'pack'
+      && authoringCommand !== 'provenance'
       && authoringCommand !== 'inspect'
       && authoringCommand !== 'install'
       && authoringCommand !== 'sync'
@@ -239,6 +240,7 @@ function preflightCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
       || authoringCommand === 'validate'
       || authoringCommand === 'draft'
       || authoringCommand === 'pack'
+      || authoringCommand === 'provenance'
       || authoringCommand === 'sync'
       || authoringCommand === 'preview'
     ) {
@@ -462,7 +464,11 @@ async function runCliWithRuntime(
       || (
         parsed.command.length === 2
         && parsed.command[0] === 'asset'
-        && (parsed.command[1] === 'workspace' || parsed.command[1] === 'authoring')
+        && (
+          parsed.command[1] === 'workspace'
+          || parsed.command[1] === 'authoring'
+          || parsed.command[1] === 'provenance'
+        )
       )
     )
   ) {

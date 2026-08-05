@@ -141,6 +141,7 @@ describe('helpForCommand', () => {
     expect(rootHelp).toContain('lpc-toolkit asset sync');
     expect(rootHelp).toContain('lpc-toolkit asset pack');
     expect(rootHelp).toContain('lpc-toolkit asset inspect');
+    expect(rootHelp).toContain('lpc-toolkit asset provenance <command>');
     expect(rootHelp).toContain('lpc-toolkit asset install');
     expect(rootHelp).toContain('lpc-toolkit asset list');
     expect(rootHelp).toContain('lpc-toolkit asset remove');
@@ -157,6 +158,17 @@ describe('helpForCommand', () => {
     expect(workspaceHelp).toContain(
       'lpc-toolkit asset workspace init <directory>',
     );
+  });
+
+  it('documents read-only provenance verification without session flags', () => {
+    const help = helpForCommand(['asset', 'provenance', 'verify']);
+    expect(help).toContain(
+      'lpc-toolkit asset provenance verify --archive <archive> --provenance <receipt> [--json]',
+    );
+    expect(help).toContain('--archive <archive>');
+    expect(help).toContain('--provenance <receipt>');
+    expect(help).not.toContain('--session');
+    expect(help).not.toContain('--workspace');
   });
 
   it('documents every Phase 1 asset leaf', () => {

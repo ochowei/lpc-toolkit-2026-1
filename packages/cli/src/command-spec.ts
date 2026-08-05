@@ -321,6 +321,21 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
     examples: ['lpc-toolkit asset authoring inspect --session session-id --archive release.lpc-assets.zip --json'],
   },
   {
+    command: ['asset', 'authoring', 'provenance'],
+    usage: 'lpc-toolkit asset authoring provenance --session <session-id> [--records <records.json>] [--output <receipt>] --confirm [--workspace <directory>] [--json]',
+    description: 'Publish a bounded release provenance companion receipt for the exact formal archive and inspection evidence.',
+    options: [
+      HELP_OPTION,
+      JSON_OPTION,
+      AUTHORING_SESSION_OPTION,
+      { name: 'records', kind: 'value', valueLabel: 'records.json', description: 'Read a strict JSON array of release-bound provenance records.' },
+      { name: 'output', kind: 'value', valueLabel: 'receipt', description: 'Write the receipt below the session release-artifact root.' },
+      { name: 'confirm', kind: 'boolean', description: 'Confirm companion receipt publication after reviewing release evidence.' },
+      ASSET_WORKSPACE_OPTION,
+    ],
+    examples: ['lpc-toolkit asset authoring provenance --session session-id --confirm --json'],
+  },
+  {
     command: ['asset', 'authoring', 'install'],
     usage: 'lpc-toolkit asset authoring install --session <session-id> --archive <archive> --consumer-workspace <directory> --confirm [--workspace <directory>] [--json]',
     description: 'Install the exact inspected formal archive in a separate consumer workspace and record the verified result.',
@@ -424,6 +439,25 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
     examples: [
       'lpc-toolkit asset inspect ./acme.hair-1.0.0.lpc-assets.zip --json',
     ],
+  },
+  {
+    command: ['asset', 'provenance'],
+    usage: 'lpc-toolkit asset provenance <command>',
+    description: 'Verify an external release provenance companion receipt without changing v1 archives or installations.',
+    options: [HELP_OPTION],
+    examples: ['lpc-toolkit asset provenance verify --archive release.lpc-assets.zip --provenance release-provenance.json --json'],
+  },
+  {
+    command: ['asset', 'provenance', 'verify'],
+    usage: 'lpc-toolkit asset provenance verify --archive <archive> --provenance <receipt> [--json]',
+    description: 'Verify exact archive and release provenance receipt bytes from a consumer root without a session or workspace.',
+    options: [
+      HELP_OPTION,
+      JSON_OPTION,
+      { name: 'archive', kind: 'value', valueLabel: 'archive', description: 'Read the exact formal asset-pack archive.' },
+      { name: 'provenance', kind: 'value', valueLabel: 'receipt', description: 'Read the canonical release provenance companion receipt.' },
+    ],
+    examples: ['lpc-toolkit asset provenance verify --archive release.lpc-assets.zip --provenance release-provenance.json --json'],
   },
   {
     command: ['asset', 'install'],

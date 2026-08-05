@@ -140,46 +140,60 @@ Adjust only when existing ownership makes a smaller placement clearly better; re
 
 ### Task 1: Lock the pure provenance contract and canonical encoding
 
-- [ ] Record seam confirmation for the Core and canonical-format public seams before the first test commit.
-- [ ] Write failing Core tests for schema/record exact keys, digest syntax, pack/version identity, source/path rules, provider/operation allowlists, duplicate records, unbound-result chains, stable ordering, property-order invariance, privacy classes, and every resource limit.
-- [ ] Implement the minimum Core parser, diagnostics, normalized projection, record sorting, and binding predicates without I/O, timestamps, random IDs, environment reads, or provider behavior.
-- [ ] Add the canonical format encoder/digest-input seam using the existing canonical JSON authority; prove exact UTF-8 bytes and receipt size enforcement.
-- [ ] Verification: focused Core and asset-pack-format tests GREEN; Core/format typechecks PASS; `rtk git diff --check` PASS.
-- [ ] Commit the product slice with a conventional `feat(core): add release provenance contract` message.
+- [x] Record seam confirmation for the Core and canonical-format public seams before the first test commit.
+- [x] Write failing Core tests for schema/record exact keys, digest syntax, pack/version identity, source/path rules, provider/operation allowlists, duplicate records, unbound-result chains, stable ordering, property-order invariance, privacy classes, and every resource limit.
+- [x] Implement the minimum Core parser, diagnostics, normalized projection, record sorting, and binding predicates without I/O, timestamps, random IDs, environment reads, or provider behavior.
+- [x] Add the canonical format encoder/digest-input seam using the existing canonical JSON authority; prove exact UTF-8 bytes and receipt size enforcement.
+- [x] Verification: focused Core and asset-pack-format tests GREEN; Core/format typechecks PASS; `rtk git diff --check` PASS.
+- [x] Commit the product slice with a conventional `feat(core): add release provenance contract` message.
 
-Implementation note: 
-Verification: 
-Product commit: 
+Implementation note: PR #157 was merged before implementation, confirming the
+public Core and canonical-format seams recorded in this plan. The first RED
+slice observed the absent public parser export; subsequent vertical slices
+added strict receipt/record parsing, release-bound predecessor checks,
+canonical ordering, privacy/resource limits, and the external canonical UTF-8
+encoder. No private collaborator mocks, provider calls, timestamps, paths, or
+archive members were introduced.
+Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-release-provenance-schema.test.ts` PASS (11 tests); `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS; `rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- release-provenance.test.ts` PASS (3 tests); `rtk pnpm --filter @lpc-toolkit/asset-pack-format run typecheck` PASS; `rtk pnpm --filter @lpc-toolkit/core test -- asset-release-schema.test.ts` PASS (10 tests); `rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- archive.test.ts payload.test.ts compatibility.test.ts` PASS (48 tests); `rtk pnpm check:boundaries` PASS; `rtk git diff --check` PASS.
+Product commit: `2cd43a3fe3d77b30b311b344e797cf0b62f5471d`
 
 ### Task 2: Generate and persist a release-bound companion receipt
 
-- [ ] Add failing public `runCli` tests for missing/stale formal archive or inspection, incomplete declaration/preview evidence, invalid records, missing confirmation, unsafe output, output conflict, exact binding, idempotency, and protected-path immutability.
-- [ ] Add backward-readable strict `releaseProvenance` session receipt parsing, release-artifact containment, stale detection, and atomic persistence. Preserve the old artifact/session receipt on conflicts or failed/raced writes.
-- [ ] Implement `asset authoring provenance` with optional strict `--records`, deterministic default sibling output, explicit contained `--output` recovery, and `--confirm` publication gate. Reuse all existing release and archive authorities; do not call a provider.
-- [ ] Record only the companion file's exact bytes/path/digest in the session receipt; keep raw records outside the public receipt and reject any path/secret/payload leakage before writing.
-- [ ] Verification: focused authoring/session/response tests GREEN; CLI typecheck PASS; existing formal pack/inspect tests PASS.
-- [ ] Commit the product slice with a conventional `feat(cli): publish release provenance receipt` message.
+- [x] Add failing public `runCli` tests for missing/stale formal archive or inspection, incomplete declaration/preview evidence, invalid records, missing confirmation, unsafe output, output conflict, exact binding, idempotency, and protected-path immutability.
+- [x] Add backward-readable strict `releaseProvenance` session receipt parsing, release-artifact containment, stale detection, and atomic persistence. Preserve the old artifact/session receipt on conflicts or failed/raced writes.
+- [x] Implement `asset authoring provenance` with optional strict `--records`, deterministic default sibling output, explicit contained `--output` recovery, and `--confirm` publication gate. Reuse all existing release and archive authorities; do not call a provider.
+- [x] Record only the companion file's exact bytes/path/digest in the session receipt; keep raw records outside the public receipt and reject any path/secret/payload leakage before writing.
+- [x] Verification: focused authoring/session/response tests GREEN; CLI typecheck PASS; existing formal pack/inspect tests PASS.
+- [x] Commit the product slice with a conventional `feat(cli): publish release provenance receipt` message.
 
-Implementation note: 
-Verification: 
-Product commit: 
+Implementation note: The public CLI now generates the external canonical
+companion receipt only after current formal-archive, archive-inspection,
+declaration, preview-acceptance, artifact, manifest, content, and source
+evidence pass. `--records` is parsed through the Core privacy/limit/binding
+contract; publication is atomic, contained, confirmation-gated, conflict-safe,
+and idempotent. Session persistence is additive/backward-readable and stores
+only the companion path, exact file digest, projection digest, pack identity,
+formal archive digest, and timestamp. No provider is invoked and the v1 ZIP,
+manifest, installation, or attribution paths were changed.
+Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-release-provenance.test.ts asset-authoring-release.test.ts asset-authoring-session.test.ts asset-authoring-session-e2e.test.ts command-spec.test.ts main-json.test.ts main-human.test.ts response.test.ts` PASS (182 tests); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS; `rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- archive.test.ts payload.test.ts` PASS (45 tests); `rtk pnpm check:boundaries` PASS; `rtk git diff --check` PASS.
+Product commit: `d1f964f03e46cd39cb99501204bf95c996bdd787`
 
 ### Task 3: Add read-only provenance verification and compatibility refusal
 
-- [ ] Add failing public argv tests for `asset provenance verify`, missing inputs, malformed/unsupported/stale receipts, archive/manifest/content/source mismatch, copied-archive mismatch, and successful exact-copy verification.
-- [ ] Implement the verifier as a no-workspace, no-session, no-mutation operation using existing archive inspection/payload/content-digest authorities. Verify the projection digest and all release bindings; report that declaration/preview receipt digests are bound evidence rather than re-created human approval.
-- [ ] Add capability/schema advertisement, command help, stable D1 diagnostic identifiers, JSON/human response projections, and ordinary v1 install/inspect regression assertions. A missing companion receipt must remain irrelevant to ordinary install.
-- [ ] Verification: focused CLI/format/archive tests GREEN; CLI package smoke PASS; existing ordinary install and archive conformance tests PASS.
-- [ ] Commit the product slice with a conventional `feat(cli): verify release provenance receipts` message.
+- [x] Add failing public argv tests for `asset provenance verify`, missing inputs, malformed/unsupported/stale receipts, archive/manifest/content/source mismatch, copied-archive mismatch, and successful exact-copy verification.
+- [x] Implement the verifier as a no-workspace, no-session, no-mutation operation using existing archive inspection/payload/content-digest authorities. Verify the projection digest and all release bindings; report that declaration/preview receipt digests are bound evidence rather than re-created human approval.
+- [x] Add capability/schema advertisement, command help, stable D1 diagnostic identifiers, JSON/human response projections, and ordinary v1 install/inspect regression assertions. A missing companion receipt must remain irrelevant to ordinary install.
+- [x] Verification: focused CLI/format/archive tests GREEN; CLI package smoke PASS; existing ordinary install and archive conformance tests PASS.
+- [x] Commit the product slice with a conventional `feat(cli): verify release provenance receipts` message.
 
-Implementation note: 
-Verification: 
-Product commit: 
+Implementation note: Added the public `asset provenance verify --archive <archive> --provenance <receipt>` command with runtime-only preparation and no workspace/session mutation. Verification reuses formal archive inspection and payload/content/source digest authorities, validates canonical receipt/projection digests, distinguishes malformed versus unsupported versus stale/mismatched evidence, and reports declaration/preview receipt digests as bound evidence with both human-recreation flags false. The generation path now binds the exact canonical `asset-pack.json` bytes inside the formal ZIP while preserving the existing formal-archive receipt semantics. Ordinary inspect/install remain unchanged and never install the external companion receipt.
+Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-release-provenance-schema.test.ts asset-release-schema.test.ts` PASS (22 tests); `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS; `rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- release-provenance.test.ts archive.test.ts payload.test.ts` PASS (48 tests); `rtk pnpm --filter @lpc-toolkit/asset-pack-format run typecheck` PASS; `rtk pnpm --filter @lpc-toolkit/cli test -- asset-release-provenance.test.ts asset-authoring-release.test.ts asset-authoring-session.test.ts asset-authoring-session-e2e.test.ts command-spec.test.ts main-json.test.ts main-human.test.ts response.test.ts main-assets.test.ts` PASS (314 tests); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS; `rtk pnpm check:boundaries` PASS; `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS (packed CLI install smoke); `rtk git diff --check` PASS.
+Product commit: `7784a44b8a4c5ca40e7aec735658caa975b965f7`
 
 ### Task 4: Complete packed acceptance, documentation, and handoff gate
 
-- [ ] Add packed acceptance for clean author formal pack → exact inspect → provenance generation, copied archive/receipt verification from a separate consumer root, unsupported/missing provenance refusal, ordinary install compatibility, and protected sentinels.
-- [ ] Reassess and update every CLI-sensitive surface:
+- [x] Add packed acceptance for clean author formal pack → exact inspect → provenance generation, copied archive/receipt verification from a separate consumer root, unsupported/missing provenance refusal, ordinary install compatibility, and protected sentinels.
+- [x] Reassess and update every CLI-sensitive surface:
 
 ```text
 help: update — add both provenance commands, exact prerequisites, confirmation, output containment, and refusal diagnostics
@@ -192,21 +206,31 @@ releasing: update — add companion receipt publication, conflict handling, and 
 plugin: update — document the capability/receipt boundary; do not add provider invocation or a new skill
 ```
 
-- [ ] Run the complete verification gate, including CLI docs policy, plugin policy, boundaries, all relevant typechecks/tests, package smoke, diff checks, and protected-path evidence.
-- [ ] Commit product changes and the separate plan record; record full hashes and exact PASS results here.
+- [x] Run the complete verification gate, including CLI docs policy, plugin policy, boundaries, all relevant typechecks/tests, package smoke, diff checks, and protected-path evidence.
+- [x] Commit product changes and the separate plan record; record full hashes and exact PASS results here.
 
-Implementation note: 
-Verification: 
-Product commit: 
+Implementation note: Added installed packed acceptance for formal pack → exact
+session inspect → release-provenance generation, then copied the exact archive
+and external receipt into a separate clean consumer root for read-only
+verification. The smoke asserts missing-receipt refusal, unsupported/malformed
+and stale refusal, no companion ZIP member or ordinary-install input, and
+unchanged sentinels for checked-in assets, base cache, artist source, archive,
+receipt, unowned output, and `upstream/`. Reassessed and updated all eight
+CLI-sensitive surfaces: help, CLI README, root README, landing, architecture,
+engineering, releasing, and plugin compatibility. The plugin remains a
+capability/receipt boundary only: it does not add a skill or provider
+invocation.
+Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-release-provenance-schema.test.ts asset-release-schema.test.ts` PASS (22 tests); `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS; `rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- release-provenance.test.ts archive.test.ts payload.test.ts` PASS (48 tests); `rtk pnpm --filter @lpc-toolkit/asset-pack-format run typecheck` PASS; `rtk pnpm --filter @lpc-toolkit/cli test -- asset-release-provenance.test.ts asset-authoring-release.test.ts asset-authoring-session.test.ts asset-authoring-session-e2e.test.ts command-spec.test.ts main-json.test.ts main-human.test.ts response.test.ts main-assets.test.ts` PASS (314 tests); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS; `rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifacts.test.ts` PASS (4 tests; elevated only for the sandbox `tsx` IPC pipe); `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS (`Packed CLI install smoke test passed.`); `rtk pnpm check:boundaries` PASS; `rtk pnpm verify:cli-docs-policy` PASS (19 tests); `rtk pnpm verify:plugin` PASS (40 tests); `rtk pnpm verify` PASS (core 412, presets 8, asset-pack-format 75, CLI 1171 passed/1 skipped, web 861 tests; all workspace typechecks); `rtk git diff --check` PASS; `rtk git status --short` PASS (clean); `rtk git status --short -- upstream` PASS (empty).
+Product commit: `d135030ba546adb1d32ade283a7c6a2728e729bb`
 
 ## Plan record
 
-- [ ] Task 1 — pure provenance contract and canonical encoding complete.
-- [ ] Task 2 — release-bound companion generation and session persistence complete.
-- [ ] Task 3 — read-only verification and v1 compatibility complete.
-- [ ] Task 4 — packed acceptance, documentation, and handoff gate complete.
+- [x] Task 1 — pure provenance contract and canonical encoding complete.
+- [x] Task 2 — release-bound companion generation and session persistence complete.
+- [x] Task 3 — read-only verification and v1 compatibility complete.
+- [x] Task 4 — packed acceptance, documentation, and handoff gate complete.
 
-Product commits: 
+Product commits: Task 1 — `2cd43a3fe3d77b30b311b344e797cf0b62f5471d`; Task 2 — `d1f964f03e46cd39cb99501204bf95c996bdd787`; Task 3 — `7784a44b8a4c5ca40e7aec735658caa975b965f7`; Task 4 — `d135030ba546adb1d32ade283a7c6a2728e729bb`
 Plan-record commit: 
 
 ## CLI documentation impact matrix
@@ -233,8 +257,9 @@ rtk pnpm --filter @lpc-toolkit/core test -- asset-release-provenance-schema.test
 rtk pnpm --filter @lpc-toolkit/core run typecheck
 rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- release-provenance.test.ts archive.test.ts payload.test.ts
 rtk pnpm --filter @lpc-toolkit/asset-pack-format run typecheck
-rtk pnpm --filter @lpc-toolkit/cli test -- asset-release-provenance.test.ts asset-authoring-session.test.ts asset-authoring-session-e2e.test.ts command-spec.test.ts main-json.test.ts main-human.test.ts response.test.ts
+rtk pnpm --filter @lpc-toolkit/cli test -- asset-release-provenance.test.ts asset-authoring-release.test.ts asset-authoring-session.test.ts asset-authoring-session-e2e.test.ts command-spec.test.ts main-json.test.ts main-human.test.ts response.test.ts main-assets.test.ts
 rtk pnpm --filter @lpc-toolkit/cli run typecheck
+rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifacts.test.ts
 rtk pnpm --filter @lpc-toolkit/cli test:package
 rtk pnpm check:boundaries
 rtk pnpm verify:cli-docs-policy

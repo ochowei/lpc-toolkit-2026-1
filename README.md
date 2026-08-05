@@ -221,6 +221,21 @@ install against unchanged consumer state returns the same installation receipt
 without rewriting it; version replacement and downgrade behavior remain owned
 by the ordinary `asset install` lifecycle policy.
 
+After exact formal pack and inspection, an author may publish optional
+generation provenance as a separate companion receipt and a consumer may verify
+copied archive/receipt bytes independently:
+
+```sh
+lpc-toolkit asset authoring provenance --session <session-id> [--records <records.json>] --confirm
+lpc-toolkit asset provenance verify --archive <archive> --provenance <receipt> --json
+```
+
+This evidence describes bounded generation inputs and transformations; it is
+not LPC credits, authorship or license authority, human release approval, or a
+provider invocation. The receipt stays outside the ZIP and is ignored by
+ordinary `asset inspect`/`asset install`; verification is read-only and does not
+require the authoring session, a provider, an Agent skill, or a Web bridge.
+
 Give the resulting `<pack-id>-<version>.lpc-assets.zip` to a consumer. They use
 a separate standalone workspace and run the lifecycle in order:
 

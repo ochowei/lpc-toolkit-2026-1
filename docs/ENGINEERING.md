@@ -308,6 +308,29 @@ render attribution, and packed recovery/doctor health. The authoring wrapper
 must continue to delegate install policy and transaction recovery to the
 existing lifecycle authorities.
 
+D1 release-provenance projection changes add this focused red/green map:
+
+```sh
+pnpm --filter @lpc-toolkit/core test -- asset-release-provenance-schema.test.ts asset-release-schema.test.ts
+pnpm --filter @lpc-toolkit/core run typecheck
+pnpm --filter @lpc-toolkit/asset-pack-format test -- release-provenance.test.ts archive.test.ts payload.test.ts
+pnpm --filter @lpc-toolkit/asset-pack-format run typecheck
+pnpm --filter @lpc-toolkit/cli test -- asset-release-provenance.test.ts asset-authoring-release.test.ts asset-authoring-session.test.ts asset-authoring-session-e2e.test.ts command-spec.test.ts main-json.test.ts main-human.test.ts response.test.ts main-assets.test.ts
+pnpm --filter @lpc-toolkit/cli run typecheck
+pnpm --filter @lpc-toolkit/cli test:package
+pnpm check:boundaries
+pnpm verify:cli-docs-policy
+pnpm verify:plugin
+```
+
+These tests use public Core, canonical-format, `runCli`, copied-consumer, and
+installed-package seams. They prove strict record privacy/limits and binding,
+stale/conflict refusal, exact ZIP `asset-pack.json` authority, read-only
+verification, missing/unsupported receipt diagnostics, ordinary inspect/install
+compatibility, and packed protected-path sentinels. Tests must not invoke a
+provider, mock private collaborators, or treat declaration/preview digests as
+recreated human approval.
+
 The final documentation and release-contract map is:
 
 ```sh
@@ -324,8 +347,9 @@ pnpm verify
 These checks prove the advertised capability/schema identifiers, public
 command/help wording, plugin-version alignment, landing distinction between
 composition and asset publication, optional exact-archive consumer activation,
-and the clean packed-CLI authoring flow. They do not add provider invocation,
-a Web session bridge, or remote release infrastructure to the shipped product.
+the optional external provenance companion and copied-consumer verification, and
+the clean packed-CLI authoring flow. They do not add provider invocation, a Web
+session bridge, or remote release infrastructure to the shipped product.
 
 Run `pnpm check:boundaries` for every asset-pack architecture change. Run
 the packed CLI smoke conditionally whenever CLI package metadata, build output,
@@ -333,7 +357,9 @@ or `packages/cli/scripts/` changes; it installs the produced tarball in a clean
 consumer directory. After preparing one pinned cache, it proves no-repository
 workspace init, fixture authoring/validation/packing, exact session inspect and
 explicit second-workspace install, installed attributed preview/render/list,
-doctor, and removal through the installed package without `upstream/`:
+  doctor, removal, formal provenance generation, copied-consumer verification,
+  and ordinary-install compatibility through the installed package without
+  `upstream/`:
 
 ```sh
 pnpm --filter @lpc-toolkit/cli test:package

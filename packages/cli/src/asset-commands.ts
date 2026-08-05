@@ -16,6 +16,10 @@ import { inspectAssetPackArchive } from './asset-pack-inspection.js';
 import { installAssetPack } from './asset-pack-install.js';
 import { packAssetPack } from './asset-pack-packaging.js';
 import {
+  AssetReleaseProvenanceFileError,
+  verifyAssetReleaseProvenance,
+} from './asset-release-provenance.js';
+import {
   scaffoldAuditAssetPack,
   scaffoldNewAssetPack,
 } from './asset-pack-scaffold.js';
@@ -92,6 +96,9 @@ export function assetCommandRequirements(
   if (parsed.command[0] !== 'asset') return undefined;
   if (parsed.command[1] === 'workspace' && parsed.command[2] === 'init') {
     return NO_ASSET_COMMAND_REQUIREMENTS;
+  }
+  if (parsed.command[1] === 'provenance' && parsed.command[2] === 'verify') {
+    return INSPECTION_REQUIREMENTS;
   }
   if (parsed.command[1] === 'authoring') {
     return parsed.command[2] === 'contract'
@@ -376,6 +383,34 @@ export function preflightAssetCommand(
     return undefined;
   }
 
+  if (subcommand === 'provenance') {
+    if (parsed.command[2] !== 'verify') {
+      return commandError(parsed.command.join(' ') || 'asset provenance', issue(
+        'unknown_command',
+        `Unknown asset provenance command: ${parsed.command.join(' ')}`,
+      ));
+    }
+    const archive = flagString(parsed.flags, 'archive');
+    if (archive === undefined) {
+      return commandError('asset provenance verify', issue(
+        'missing_argument',
+        '--archive is required.',
+        '--archive',
+      ));
+    }
+    if (flagString(parsed.flags, 'provenance') === undefined) {
+      return commandError('asset provenance verify', issue(
+        'missing_argument',
+        '--provenance is required.',
+        '--provenance',
+      ));
+    }
+    const positionalIssue = noPositionalIssue(parsed);
+    return positionalIssue
+      ? commandError('asset provenance verify', positionalIssue)
+      : undefined;
+  }
+
   if (subcommand === 'init') {
     const initInputIssue = initIssue(parsed);
     return initInputIssue ? commandError('asset init', initInputIssue) : undefined;
@@ -650,6 +685,22 @@ export async function runAssetCommand(
       });
       return commandOk('asset inspect', result.report);
     }
+    if (subcommand === 'provenance' && parsed.command[2] === 'verify') {
+      const { runtime } = requireRuntime(context);
+      const archive = flagString(parsed.flags, 'archive');
+      const provenance = flagString(parsed.flags, 'provenance');
+      if (archive === undefined || provenance === undefined) {
+        return commandError('asset provenance verify', issue(
+          'missing_argument',
+          '--archive and --provenance are required.',
+        ));
+      }
+      return commandOk('asset provenance verify', await verifyAssetReleaseProvenance({
+        archivePath: path.resolve(cwd, archive),
+        provenancePath: path.resolve(cwd, provenance),
+        runtime,
+      }));
+    }
     if (subcommand === 'install') {
       const { workspace, runtime } = requireWorkspaceRuntime(context);
       const result = await installAssetPack({
@@ -699,6 +750,12 @@ export async function runAssetCommand(
     }
   } catch (error) {
     if (subcommand === 'preview') return previewErrorResponse(error);
+    if (error instanceof AssetReleaseProvenanceFileError) {
+      return commandError(
+        'asset provenance verify',
+        issue(error.code, error.message, error.path),
+      );
+    }
     return commandError(`asset ${subcommand ?? ''}`.trim(), issue(
       `asset_${subcommand ?? 'command'}_failed`,
       error instanceof Error ? error.message : 'Asset command failed.',

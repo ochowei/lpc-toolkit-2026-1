@@ -11,6 +11,8 @@ export const AUTHORING_SCHEMA_VERSIONS = [
   'lpc-toolkit.asset-authoring-formal-archive-receipt.v1',
   'lpc-toolkit.asset-authoring-archive-inspection-receipt.v1',
   'lpc-toolkit.asset-authoring-install-receipt.v1',
+  'lpc-toolkit.asset-release-provenance.v1',
+  'lpc-toolkit.asset-release-provenance-verification.v1',
 ] as const;
 
 export const AUTHORING_CAPABILITIES = [
@@ -21,6 +23,7 @@ export const AUTHORING_CAPABILITIES = [
   'asset-authoring-release.v1',
   'asset-authoring-draft-recovery.v1',
   'asset-authoring-consumer-install.v1',
+  'asset-authoring-release-provenance.v1',
 ] as const;
 
 export interface CapabilityAdvertisement {

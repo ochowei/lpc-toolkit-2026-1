@@ -16,7 +16,9 @@ import {
   parseAssetReleaseDeclaration,
   parseAssetPackSource,
   assetAuthoringReleaseGateProjection,
+  assetReleaseProvenanceProjection,
   assetReleaseDeclarationDigestInput,
+  type AssetReleaseProvenanceProjection,
   type AssetPackAcknowledgement,
   type AssetAuthoringPreviewAcceptanceReceipt,
   type AssetAuthoringReleaseArtifactDigest,
@@ -81,6 +83,7 @@ import {
   type AssetAuthoringArchiveInspectionReceipt,
   type AssetAuthoringFormalArchiveReceipt,
   type AssetAuthoringInstallationReceipt,
+  type AssetAuthoringReleaseProvenanceReceipt,
   type AssetAuthoringValidationReceipt,
 } from './asset-authoring-session.js';
 import {
@@ -89,10 +92,20 @@ import {
   assetAuthoringReleaseArtifactRoot,
   captureSyncReceipt,
   resolveFormalArchivePath,
+  resolveReleaseProvenancePath,
   syncReceiptStaleReason,
   AssetAuthoringReleaseLifecycleError,
 } from './asset-authoring-release-lifecycle.js';
+import {
+  AssetReleaseProvenanceFileError,
+  assetReleaseProvenanceSha256,
+  encodeAssetReleaseProvenance,
+  parseAssetReleaseProvenanceBytes,
+  parseAssetReleaseProvenanceRecords,
+  publishAssetReleaseProvenance,
+} from './asset-release-provenance.js';
 import { inspectAssetPackArchive } from './asset-pack-inspection.js';
+import { readAssetPackArchive } from './asset-pack-archive-format.js';
 import {
   assertManagedAssetOutput,
   findAssetWorkspace,
@@ -563,6 +576,40 @@ function nextActionsFor(session: AssetAuthoringSession): readonly AuthoringNextA
   }
 
   if (
+    session.reason === 'release-provenance-confirmation-required'
+    || session.reason === 'release-provenance-stale'
+  ) {
+    return [nextAction(
+      'publish-release-provenance',
+      'Confirm publication of the bounded release provenance companion receipt for the exact formal archive.',
+      `asset authoring provenance --session ${session.sessionId} --output <receipt> --confirm`,
+      'requires-confirmation',
+      session.receipts.formalArchive === null || session.receipts.formalArchive === undefined
+        ? []
+        : [session.receipts.formalArchive.archiveDigest],
+      ['confirm'],
+    )];
+  }
+
+  if (
+    session.receipts.releaseProvenance === null
+    && session.receipts.formalArchive !== null
+    && session.receipts.formalArchive !== undefined
+    && session.receipts.archiveInspection !== null
+    && session.receipts.archiveInspection !== undefined
+    && session.reason === 'archive-inspection-current'
+  ) {
+    return [nextAction(
+      'publish-release-provenance',
+      'Publish the bounded release provenance companion receipt for the exact formal archive.',
+      `asset authoring provenance --session ${session.sessionId} --confirm`,
+      'requires-confirmation',
+      [session.receipts.formalArchive.archiveDigest],
+      ['confirm'],
+    )];
+  }
+
+  if (
     session.reason === 'archive-inspection-current'
     || session.reason === 'installation-stale'
     || session.reason === 'installation-confirmation-required'
@@ -878,6 +925,7 @@ function responseFor(
     previewAcceptance: session.receipts.previewAcceptance,
     draftReceipt: session.receipts.draftArchive ?? null,
     syncReceipt: session.receipts.sync ?? null,
+    releaseProvenanceReceipt: session.receipts.releaseProvenance ?? null,
     formalArchiveReceipt: options.formalArchiveReceipt === undefined
       ? session.receipts.formalArchive ?? null
       : options.formalArchiveReceipt,
@@ -1451,6 +1499,151 @@ function archiveInspectionReceiptStale(
   return undefined;
 }
 
+function releaseProvenanceProjectionFor(
+  session: AssetAuthoringSession,
+  formalArchive: AssetAuthoringFormalArchiveReceipt,
+  manifestDigest: string,
+  records: readonly AssetReleaseProvenanceProjection['records'][number][],
+): AssetReleaseProvenanceProjection {
+  const declaration = session.receipts.releaseDeclaration;
+  const acceptance = session.receipts.previewAcceptance;
+  if (declaration === null || acceptance === null) {
+    throw new AuthoringCommandError(
+      'Release provenance requires the current release declaration and preview acceptance receipts.',
+      { code: 'asset_release_provenance_stale' },
+    );
+  }
+  return assetReleaseProvenanceProjection({
+    pack: {
+      id: formalArchive.packId,
+      version: formalArchive.version,
+    },
+    releaseBindings: {
+      archiveDigest: formalArchive.archiveDigest,
+      manifestDigest,
+      contentDigest: formalArchive.contentDigest,
+      sourceDigests: formalArchive.sourceDigests,
+      releaseDeclarationReceiptDigest: declaration.declarationDigest,
+      previewAcceptanceReceiptDigest: releaseReceiptDigest(acceptance),
+      previewArtifacts: formalArchive.previewArtifacts.map((artifact) => ({
+        id: artifact.id,
+        digest: artifact.digest,
+      })),
+    },
+    records,
+  });
+}
+
+function sameProvenanceArtifactDigests(
+  left: readonly { readonly id: string; readonly digest: string }[],
+  right: readonly { readonly id: string; readonly digest: string }[],
+): boolean {
+  if (left.length !== right.length) return false;
+  const sortedLeft = [...left].sort((a, b) => a.id.localeCompare(b.id));
+  const sortedRight = [...right].sort((a, b) => a.id.localeCompare(b.id));
+  return sortedLeft.every((artifact, index) => {
+    const other = sortedRight[index];
+    return other !== undefined
+      && artifact.id === other.id
+      && artifact.digest === other.digest;
+  });
+}
+
+async function releaseProvenanceReceiptStale(
+  receipt: AssetAuthoringReleaseProvenanceReceipt,
+  session: AssetAuthoringSession,
+): Promise<string | undefined> {
+  const bytes = readRegularFile(receipt.provenancePath);
+  if (bytes === undefined) return 'the recorded companion receipt is missing or not regular';
+  if (assetReleaseProvenanceSha256(bytes) !== receipt.provenanceDigest) {
+    return 'the recorded companion receipt bytes changed externally';
+  }
+
+  let parsed;
+  try {
+    parsed = parseAssetReleaseProvenanceBytes(bytes);
+  } catch (error) {
+    return `the recorded companion receipt is invalid: ${error instanceof Error ? error.message : String(error)}`;
+  }
+  const encoded = encodeAssetReleaseProvenance(
+    parsed.projection,
+    (value) => new TextEncoder().encode(value),
+  );
+  if (encoded.projectionDigest !== parsed.projectionDigest) {
+    return 'the companion receipt projection digest does not match its canonical projection';
+  }
+  if (parsed.projection.pack.id !== receipt.packId || parsed.projection.pack.version !== receipt.version) {
+    return 'the companion receipt pack identity changed externally';
+  }
+  if (parsed.projectionDigest !== receipt.projectionDigest) {
+    return 'the session provenance receipt projection digest changed externally';
+  }
+
+  const formalArchive = session.receipts.formalArchive;
+  const inspection = session.receipts.archiveInspection;
+  const declaration = session.receipts.releaseDeclaration;
+  const acceptance = session.receipts.previewAcceptance;
+  if (formalArchive === null || formalArchive === undefined) {
+    return 'the formal archive receipt is missing';
+  }
+  if (inspection === null || inspection === undefined) {
+    return 'the archive inspection receipt is missing';
+  }
+  if (declaration === null || acceptance === null) {
+    return 'the release declaration or preview acceptance receipt is missing';
+  }
+  const archive = await readAssetPackArchive({ archivePath: formalArchive.archivePath });
+  if (!archive.ok || archive.snapshot.archiveDigest !== formalArchive.archiveDigest) {
+    return 'the formal archive bytes are unavailable or no longer match the formal archive receipt';
+  }
+  const archiveManifestDigest = assetReleaseProvenanceSha256(archive.snapshot.manifestBytes);
+  const bindings = parsed.projection.releaseBindings;
+  if (
+    receipt.formalArchiveDigest !== formalArchive.archiveDigest
+    || bindings.archiveDigest !== formalArchive.archiveDigest
+    || bindings.archiveDigest !== inspection.archiveDigest
+    || bindings.manifestDigest !== archiveManifestDigest
+    || bindings.contentDigest !== formalArchive.contentDigest
+    || bindings.contentDigest !== inspection.contentDigest
+    || !sourceDigestSetsEqual(bindings.sourceDigests, formalArchive.sourceDigests)
+    || !sourceDigestSetsEqual(bindings.sourceDigests, inspection.sourceDigests)
+    || bindings.releaseDeclarationReceiptDigest !== declaration.declarationDigest
+    || bindings.previewAcceptanceReceiptDigest !== releaseReceiptDigest(acceptance)
+    || !sameProvenanceArtifactDigests(bindings.previewArtifacts, formalArchive.previewArtifacts)
+  ) {
+    return 'the companion receipt no longer matches the current formal release evidence';
+  }
+  for (const artifact of acceptance.artifacts) {
+    const artifactBytes = readRegularFile(artifact.path);
+    if (artifactBytes === undefined || sha256(artifactBytes) !== artifact.digest) {
+      return 'the accepted preview artifact bytes changed externally';
+    }
+  }
+  return undefined;
+}
+
+function markReleaseProvenanceStale(
+  store: ReturnType<typeof createAssetAuthoringSessionStore>,
+  session: AssetAuthoringSession,
+  summary: string,
+): AssetAuthoringSession {
+  return store.replace(session.sessionId, {
+    state: 'needs-user-action',
+    reason: 'release-provenance-stale',
+    phase: session.phase,
+    checkpoint: session.checkpoint,
+    checkpointFreshness: session.checkpointFreshness,
+    provenance: appendProvenance(session, {
+      kind: 'checkpoint-invalidated',
+      occurredAt: new Date().toISOString(),
+      ...(session.receipts.releaseProvenance?.provenanceDigest === undefined
+        ? {}
+        : { digest: session.receipts.releaseProvenance.provenanceDigest }),
+      summary,
+    }),
+  });
+}
+
 function markFormalArchiveStale(
   store: ReturnType<typeof createAssetAuthoringSessionStore>,
   session: AssetAuthoringSession,
@@ -1549,6 +1742,210 @@ function validationReceiptMatchesReport(
     && validation.id === report.contentDigest
     && validation.manifestDigest === report.manifestDigest
     && sourceDigestSetsEqual(validation.sourceDigests, report.sourceDigests);
+}
+
+function provenanceRecordsFor(
+  context: AuthoringCommandContext,
+  projection: AssetReleaseProvenanceProjection,
+): readonly AssetReleaseProvenanceProjection['records'][number][] {
+  const recordsArgument = flagString(context.parsed.flags, 'records');
+  if (recordsArgument === undefined) return [];
+  const recordsPath = path.resolve(context.cwd, recordsArgument);
+  const bytes = readRegularFile(recordsPath);
+  if (bytes === undefined) {
+    throw new AssetReleaseProvenanceFileError(
+      'asset_release_provenance_invalid',
+      'The provenance records input must be a regular file.',
+      recordsPath,
+    );
+  }
+  let value: unknown;
+  try {
+    value = JSON.parse(bytes.toString('utf8')) as unknown;
+  } catch (error) {
+    throw new AssetReleaseProvenanceFileError(
+      'asset_release_provenance_invalid',
+      `The provenance records input is not valid JSON: ${error instanceof Error ? error.message : String(error)}.`,
+      recordsPath,
+    );
+  }
+  try {
+    return parseAssetReleaseProvenanceRecords(value, projection);
+  } catch (error) {
+    if (error instanceof AssetReleaseProvenanceFileError) {
+      throw new AssetReleaseProvenanceFileError(
+        error.code,
+        error.message,
+        recordsPath,
+      );
+    }
+    throw error;
+  }
+}
+
+async function provenanceCommand(
+  context: AuthoringCommandContext,
+  sessionId: string,
+): Promise<CliResponse<AuthoringResponseData>> {
+  const store = createAssetAuthoringSessionStore(context.workspace);
+  let session = await refreshFormalArchiveState(
+    store,
+    resumeSession(context.workspace, store.read(sessionId)),
+  );
+  if (session.reason === 'formal-archive-stale' || session.reason === 'archive-inspection-stale') {
+    throw new AuthoringCommandError(
+      'Release provenance requires a current formal archive and archive inspection receipt.',
+      { code: 'asset_release_provenance_stale', path: assetAuthoringSessionPath(context.workspace, sessionId) },
+    );
+  }
+
+  const formalArchive = session.receipts.formalArchive;
+  if (formalArchive === null || formalArchive === undefined) {
+    throw new AuthoringCommandError(
+      'Release provenance requires a current formal archive receipt.',
+      { code: 'asset_release_provenance_stale', path: assetAuthoringSessionPath(context.workspace, sessionId) },
+    );
+  }
+  const inspection = session.receipts.archiveInspection;
+  if (inspection === null || inspection === undefined) {
+    throw new AuthoringCommandError(
+      'Release provenance requires a current archive inspection receipt.',
+      { code: 'asset_release_provenance_stale', path: assetAuthoringSessionPath(context.workspace, sessionId) },
+    );
+  }
+  const releaseGates = releaseGateFreshness(session);
+  if (!releaseGates.releaseReady) {
+    throw new AuthoringCommandError(
+      'Release provenance requires current declaration, preview, artifact, and release evidence.',
+      { code: 'asset_release_provenance_stale', path: assetAuthoringSessionPath(context.workspace, sessionId) },
+    );
+  }
+
+  const archive = await readAssetPackArchive({ archivePath: formalArchive.archivePath });
+  if (!archive.ok || archive.snapshot.archiveDigest !== formalArchive.archiveDigest) {
+    throw new AuthoringCommandError(
+      'Release provenance requires the exact formal archive bytes recorded by the session.',
+      { code: 'asset_release_provenance_stale', path: formalArchive.archivePath },
+    );
+  }
+  const archiveManifestDigest = assetReleaseProvenanceSha256(archive.snapshot.manifestBytes);
+  const baseProjection = releaseProvenanceProjectionFor(
+    session,
+    formalArchive,
+    archiveManifestDigest,
+    [],
+  );
+  const records = provenanceRecordsFor(context, baseProjection);
+  const projection = releaseProvenanceProjectionFor(
+    session,
+    formalArchive,
+    archiveManifestDigest,
+    records,
+  );
+  const encoded = encodeAssetReleaseProvenance(
+    projection,
+    (value) => new TextEncoder().encode(value),
+  );
+  const outputArgument = flagString(context.parsed.flags, 'output');
+  const outputPath = resolveReleaseProvenancePath({
+    cwd: context.cwd,
+    workspace: context.workspace,
+    session,
+    ...(outputArgument === undefined ? {} : { outputPath: outputArgument }),
+  });
+  const previous = session.receipts.releaseProvenance;
+  let previousStale: string | undefined;
+  if (previous !== null && previous !== undefined) {
+    previousStale = await releaseProvenanceReceiptStale(previous, session);
+    if (previousStale !== undefined && session.reason !== 'release-provenance-stale') {
+      session = markReleaseProvenanceStale(
+        store,
+        session,
+        `Release provenance receipt invalidated: ${previousStale}.`,
+      );
+    }
+    const sameProjection = previous.projectionDigest === encoded.projectionDigest
+      && previous.packId === encoded.receipt.projection.pack.id
+      && previous.version === encoded.receipt.projection.pack.version
+      && previous.formalArchiveDigest === formalArchive.archiveDigest;
+    if (
+      previousStale === undefined
+      && sameProjection
+      && previous.provenancePath === outputPath
+    ) {
+      return commandOk('asset authoring provenance', responseFor(session, {
+        artifacts: [{
+          id: 'release-provenance',
+          path: previous.provenancePath,
+          digest: previous.provenanceDigest,
+        }],
+      }));
+    }
+    if (previousStale !== undefined && outputArgument === undefined) {
+      throw new AuthoringCommandError(
+        `The recorded release provenance is stale: ${previousStale}. Publish to a new contained output path after review.`,
+        { code: 'asset_release_provenance_stale', path: previous.provenancePath },
+      );
+    }
+    if (previous.provenancePath === outputPath) {
+      throw new AuthoringCommandError(
+        previousStale === undefined
+          ? 'The existing release provenance output contains a different projection.'
+          : 'The existing release provenance output is stale and cannot be overwritten in place.',
+        { code: 'asset_release_provenance_conflict', path: outputPath },
+      );
+    }
+  }
+
+  if (!flagBoolean(context.parsed.flags, 'confirm')) {
+    const pending: AssetAuthoringSession = {
+      ...session,
+      state: 'needs-user-action',
+      reason: 'release-provenance-confirmation-required',
+    };
+    return commandOk('asset authoring provenance', responseFor(pending));
+  }
+
+  const published = publishAssetReleaseProvenance(outputPath, encoded.bytes);
+  const receipt: AssetAuthoringReleaseProvenanceReceipt = {
+    schema: 'lpc-toolkit.asset-authoring-release-provenance-receipt.v1',
+    packId: encoded.receipt.projection.pack.id,
+    version: encoded.receipt.projection.pack.version,
+    provenancePath: outputPath,
+    provenanceDigest: published.provenanceDigest,
+    projectionDigest: encoded.projectionDigest,
+    formalArchiveDigest: formalArchive.archiveDigest,
+    recordedAt: new Date().toISOString(),
+  };
+  const next = store.replace(sessionId, {
+    state: 'completed',
+    reason: 'release-provenance-current',
+    phase: session.phase,
+    checkpoint: {
+      id: 'releaseProvenance',
+      phase: session.phase,
+      digest: receipt.provenanceDigest,
+      freshness: 'current',
+    },
+    checkpointFreshness: 'current',
+    receipts: {
+      ...session.receipts,
+      releaseProvenance: receipt,
+    },
+    provenance: appendProvenance(session, {
+      kind: 'release-provenance-recorded',
+      occurredAt: receipt.recordedAt,
+      digest: receipt.provenanceDigest,
+      summary: 'Bounded release provenance companion receipt recorded for the exact formal archive.',
+    }),
+  });
+  return commandOk('asset authoring provenance', responseFor(next, {
+    artifacts: [{
+      id: 'release-provenance',
+      path: receipt.provenancePath,
+      digest: receipt.provenanceDigest,
+    }],
+  }));
 }
 
 async function packCommand(
@@ -4077,6 +4474,7 @@ export async function runAssetAuthoringCommand(
     if (authoringCommand === 'accept-preview') return await acceptPreviewCommand(context, sessionId);
     if (authoringCommand === 'draft') return await draftCommand(context, sessionId);
     if (authoringCommand === 'pack') return await packCommand(context, sessionId);
+    if (authoringCommand === 'provenance') return await provenanceCommand(context, sessionId);
     if (authoringCommand === 'inspect') return await inspectCommand(context, sessionId);
     if (authoringCommand === 'install') return await installCommand(context, sessionId);
     if (authoringCommand === 'sync') return await syncCommand(context, sessionId);
@@ -4119,6 +4517,13 @@ export async function runAssetAuthoringCommand(
       ));
     }
     if (error instanceof AssetAuthoringReleaseLifecycleError) {
+      return commandError(command, issue(
+        error.code,
+        error.message,
+        error.path,
+      ));
+    }
+    if (error instanceof AssetReleaseProvenanceFileError) {
       return commandError(command, issue(
         error.code,
         error.message,
