@@ -11,6 +11,7 @@ import path from 'node:path';
 import {
   ASSET_AUTHORING_RELEASE_ARTIFACT_IDS,
   assetAuthoringReleaseReceiptDigestInput,
+  assetProviderInvocationDigestInput,
   normalizeAssetPack,
   parseAssetAuthoringPlan,
   parseAssetReleaseDeclaration,
@@ -122,6 +123,7 @@ import {
   type AuthoringNextAction,
   type AuthoringPreviewData,
   type AuthoringPreviewInput,
+  type AuthoringProviderResponseInput,
   type AuthoringResponseData,
   type AuthoringResponseProjectionInput,
   type CliIssue,
@@ -935,8 +937,26 @@ function responseFor(
     installationReceipt: options.installationReceipt === undefined
       ? session.receipts.installation ?? null
       : options.installationReceipt,
+    provider: session.receipts.providerInvocation === null
+      || session.receipts.providerInvocation === undefined
+      ? null
+      : providerResponse(session.receipts.providerInvocation),
   };
   return authoringResponseProjection(input);
+}
+
+function providerResponse(
+  invocation: NonNullable<AssetAuthoringSessionReceipts['providerInvocation']>,
+): AuthoringProviderResponseInput {
+  return {
+    status: 'ready',
+    invocation,
+    invocationDigest: `sha256:${createHash('sha256')
+      .update(assetProviderInvocationDigestInput(invocation), 'utf8')
+      .digest('hex')}`,
+    safety: 'safe',
+    nextActions: [],
+  };
 }
 
 function missingCreditsResponse(session: AssetAuthoringSession): AuthoringResponseData {
@@ -4210,6 +4230,8 @@ function refreshContractSession(
       previewAcceptance: session.receipts.previewAcceptance,
       draftArchive: session.receipts.draftArchive ?? null,
       sync: session.receipts.sync ?? null,
+      providerInvocation: null,
+      providerResult: null,
     },
     provenance: appendProvenance(session, {
       kind: 'checkpoint-invalidated',

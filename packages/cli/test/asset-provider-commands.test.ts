@@ -13,7 +13,10 @@ import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDirectoryAssetStore } from '../src/asset-store.js';
 import { assetAuthoringContractMetadataPath } from '../src/asset-authoring-contract.js';
-import { assetAuthoringSessionPath } from '../src/asset-authoring-session.js';
+import {
+  assetAuthoringSessionPath,
+  createAssetAuthoringSessionStore,
+} from '../src/asset-authoring-session.js';
 import { initializeAssetWorkspace } from '../src/asset-workspace.js';
 import { createRuntimeContext } from '../src/context.js';
 import { runCli } from '../src/main.js';
@@ -193,6 +196,24 @@ async function createContractFixture(): Promise<{
     contractDigest,
     contractPath,
     metadataPath,
+  };
+}
+
+function handoffConsent(
+  fixture: Awaited<ReturnType<typeof createContractFixture>>,
+  overrides: Readonly<Record<string, unknown>> = {},
+): Record<string, unknown> {
+  const contract = JSON.parse(readFileSync(fixture.contractPath, 'utf8')) as {
+    readonly targets: readonly { readonly id: string }[];
+  };
+  return {
+    targetIds: contract.targets.map((target) => target.id),
+    contractDigest: fixture.contractDigest,
+    referenceDigests: [],
+    network: { enabled: false, hosts: [] },
+    limits: { ...VALID_DESCRIPTOR.limits },
+    confirmed: true,
+    ...overrides,
   };
 }
 
@@ -528,5 +549,252 @@ describe('asset provider CLI', () => {
     expect(missing.response.errors).toEqual([
       expect.objectContaining({ code: 'asset_provider_contract_missing' }),
     ]);
+  });
+
+  it('requires the consent file and explicit confirmation without mutating the session', async () => {
+    const fixture = await createContractFixture();
+    const descriptorPath = writeJson(fixture.root, 'handoff-provider.json', VALID_DESCRIPTOR);
+    const consentPath = writeJson(fixture.root, 'handoff-consent.json', handoffConsent(fixture));
+    const sessionPath = assetAuthoringSessionPath(fixture.workspace, fixture.sessionId);
+    const sessionBefore = readFileSync(sessionPath, 'utf8');
+
+    const missingConsent = await runJson([
+      'asset', 'authoring', 'provider', 'handoff',
+      '--session', fixture.sessionId,
+      '--descriptor', descriptorPath,
+      '--workspace', fixture.workspace.root,
+    ], fixture.workspace.root);
+    expect(missingConsent.code).toBe(1);
+    expect(missingConsent.response.errors).toEqual([
+      expect.objectContaining({ code: 'missing_argument', path: '--consent' }),
+    ]);
+
+    const missingConfirmation = await runJson([
+      'asset', 'authoring', 'provider', 'handoff',
+      '--session', fixture.sessionId,
+      '--descriptor', descriptorPath,
+      '--consent', consentPath,
+      '--workspace', fixture.workspace.root,
+    ], fixture.workspace.root);
+    expect(missingConfirmation.code).toBe(0);
+    expect(missingConfirmation.response).toMatchObject({
+      ok: true,
+      command: 'asset authoring provider handoff',
+      data: {
+        status: 'consent-required',
+        safety: 'requires-confirmation',
+        invocation: null,
+        nextActions: [
+          expect.objectContaining({
+            safety: 'requires-confirmation',
+            requiredInputs: ['confirm'],
+          }),
+        ],
+      },
+      warnings: [],
+      errors: [],
+    });
+    expect(readFileSync(sessionPath, 'utf8')).toBe(sessionBefore);
+    expect(createAssetAuthoringSessionStore(fixture.workspace).read(fixture.sessionId).receipts)
+      .toMatchObject({ providerInvocation: null, providerResult: null });
+    expect(existsSync(path.join(path.dirname(sessionPath), 'provider-candidates'))).toBe(false);
+  });
+
+  it('persists one bounded invocation and reuses it for an unchanged scope', async () => {
+    const fixture = await createContractFixture();
+    const descriptorPath = writeJson(fixture.root, 'handoff-provider.json', VALID_DESCRIPTOR);
+    const consentPath = writeJson(fixture.root, 'handoff-consent.json', handoffConsent(fixture));
+    const handoff = async (extra: readonly string[] = []) => runJson([
+      'asset', 'authoring', 'provider', 'handoff',
+      '--session', fixture.sessionId,
+      '--descriptor', descriptorPath,
+      '--consent', consentPath,
+      '--workspace', fixture.workspace.root,
+      '--confirm',
+      ...extra,
+    ], fixture.workspace.root);
+
+    const created = await handoff();
+    expect(created.code).toBe(0);
+    expect(created.response).toMatchObject({
+      ok: true,
+      command: 'asset authoring provider handoff',
+      data: {
+        status: 'created',
+        safety: 'safe',
+        invocationDigest: expect.stringMatching(/^sha256:[0-9a-f]{64}$/u),
+        invocation: {
+          schema: 'lpc-toolkit.asset-provider-invocation.v1',
+          sessionId: fixture.sessionId,
+          contractDigest: fixture.contractDigest,
+          provider: {
+            id: VALID_DESCRIPTOR.id,
+            adapter: {
+              id: VALID_DESCRIPTOR.adapter.id,
+              version: VALID_DESCRIPTOR.adapter.version,
+            },
+          },
+          targetIds: [expect.any(String)],
+          consent: {
+            confirmed: true,
+            network: { enabled: false, hosts: [] },
+            referenceDigests: [],
+          },
+          candidate: {
+            stagingId: `${VALID_DESCRIPTOR.id}/${fixture.sessionId}`,
+            targetIds: [expect.any(String)],
+          },
+        },
+        nextActions: [],
+      },
+    });
+    const createdData = created.response.data as Record<string, unknown>;
+    const createdInvocation = createdData.invocation as Record<string, unknown>;
+    const sessionAfterCreate = createAssetAuthoringSessionStore(fixture.workspace).read(fixture.sessionId);
+    expect(sessionAfterCreate.receipts.providerInvocation).toEqual(createdInvocation);
+    expect(sessionAfterCreate.receipts.providerResult).toBeNull();
+
+    const sessionBeforeRetry = readFileSync(
+      assetAuthoringSessionPath(fixture.workspace, fixture.sessionId),
+      'utf8',
+    );
+    const reused = await handoff();
+    expect(reused.code).toBe(0);
+    expect(reused.response).toMatchObject({
+      ok: true,
+      data: {
+        status: 'reused',
+        invocation: createdInvocation,
+        invocationDigest: createdData.invocationDigest,
+        safety: 'safe',
+        nextActions: [],
+      },
+    });
+    expect(readFileSync(assetAuthoringSessionPath(fixture.workspace, fixture.sessionId), 'utf8'))
+      .toBe(sessionBeforeRetry);
+  });
+
+  it('requires new consent for provider changes and refuses expanded scopes', async () => {
+    const fixture = await createContractFixture();
+    const descriptorPath = writeJson(fixture.root, 'handoff-provider.json', VALID_DESCRIPTOR);
+    const consentPath = writeJson(fixture.root, 'handoff-consent.json', handoffConsent(fixture));
+    const initial = await runJson([
+      'asset', 'authoring', 'provider', 'handoff',
+      '--session', fixture.sessionId,
+      '--descriptor', descriptorPath,
+      '--consent', consentPath,
+      '--workspace', fixture.workspace.root,
+      '--confirm',
+    ], fixture.workspace.root);
+    expect(initial.code).toBe(0);
+    const sessionPath = assetAuthoringSessionPath(fixture.workspace, fixture.sessionId);
+    const sessionBeforeChanges = readFileSync(sessionPath, 'utf8');
+
+    const changedDescriptorPath = writeJson(fixture.root, 'changed-provider.json', {
+      ...VALID_DESCRIPTOR,
+      id: 'provider.changed',
+      adapter: { ...VALID_DESCRIPTOR.adapter, id: 'agent-adapter.changed', version: '2.0.0' },
+    });
+    const changedProviderConsentPath = writeJson(
+      fixture.root,
+      'changed-provider-consent.json',
+      handoffConsent(fixture, { confirmed: false }),
+    );
+    const changedProvider = await runJson([
+      'asset', 'authoring', 'provider', 'handoff',
+      '--session', fixture.sessionId,
+      '--descriptor', changedDescriptorPath,
+      '--consent', changedProviderConsentPath,
+      '--workspace', fixture.workspace.root,
+    ], fixture.workspace.root);
+    expect(changedProvider.code).toBe(0);
+    expect(changedProvider.response).toMatchObject({
+      data: { status: 'consent-required', safety: 'requires-confirmation', invocation: null },
+    });
+    expect(readFileSync(sessionPath, 'utf8')).toBe(sessionBeforeChanges);
+
+    const expandedCases: readonly [string, Record<string, unknown>, string][] = [
+      ['reference', { referenceDigests: [`sha256:${'b'.repeat(64)}`] }, 'asset_provider_scope_violation'],
+      ['network', { network: { enabled: true, hosts: ['provider.example'] } }, 'asset_provider_network_denied'],
+      ['target', { targetIds: [
+        ...(JSON.parse(readFileSync(fixture.contractPath, 'utf8')) as {
+          readonly targets: readonly { readonly id: string }[];
+        }).targets.map((target) => target.id),
+        'acme.provider-fixture/acme.provider-fixture--moon-braid/foreground/male/extra/extra/default',
+      ] }, 'asset_provider_scope_violation'],
+      ['limit', { limits: { ...VALID_DESCRIPTOR.limits, maxCandidateBytes: VALID_DESCRIPTOR.limits.maxCandidateBytes } }, 'asset_provider_scope_violation'],
+    ];
+    const limitedDescriptorPath = writeJson(fixture.root, 'limited-provider.json', {
+      ...VALID_DESCRIPTOR,
+      limits: { ...VALID_DESCRIPTOR.limits, maxCandidateBytes: VALID_DESCRIPTOR.limits.maxCandidateBytes - 1 },
+    });
+    for (const [label, overrides, code] of expandedCases) {
+      const expandedConsentPath = writeJson(
+        fixture.root,
+        `expanded-${label}.json`,
+        handoffConsent(fixture, overrides),
+      );
+      const expanded = await runJson([
+        'asset', 'authoring', 'provider', 'handoff',
+        '--session', fixture.sessionId,
+        '--descriptor', label === 'limit' ? limitedDescriptorPath : descriptorPath,
+        '--consent', expandedConsentPath,
+        '--workspace', fixture.workspace.root,
+        '--confirm',
+      ], fixture.workspace.root);
+      expect(expanded.code, label).toBe(0);
+      expect(expanded.response).toMatchObject({
+        ok: true,
+        data: { status: 'unsupported', refusal: { code } },
+      });
+      expect(readFileSync(sessionPath, 'utf8'), label).toBe(sessionBeforeChanges);
+    }
+
+    const changedProviderConfirmedPath = writeJson(
+      fixture.root,
+      'changed-provider-confirmed-consent.json',
+      handoffConsent(fixture),
+    );
+    const changedProviderConfirmed = await runJson([
+      'asset', 'authoring', 'provider', 'handoff',
+      '--session', fixture.sessionId,
+      '--descriptor', changedDescriptorPath,
+      '--consent', changedProviderConfirmedPath,
+      '--workspace', fixture.workspace.root,
+      '--confirm',
+    ], fixture.workspace.root);
+    expect(changedProviderConfirmed.code).toBe(0);
+    expect(changedProviderConfirmed.response).toMatchObject({
+      data: {
+        status: 'created',
+        invocation: {
+          provider: {
+            id: 'provider.changed',
+            adapter: { id: 'agent-adapter.changed', version: '2.0.0' },
+          },
+        },
+      },
+    });
+    const sessionAfterProviderChange = readFileSync(sessionPath, 'utf8');
+    expect(sessionAfterProviderChange).not.toBe(sessionBeforeChanges);
+
+    const staleContractConsentPath = writeJson(
+      fixture.root,
+      'stale-contract-consent.json',
+      handoffConsent(fixture, { contractDigest: CONTRACT_DIGEST }),
+    );
+    const staleContract = await runJson([
+      'asset', 'authoring', 'provider', 'handoff',
+      '--session', fixture.sessionId,
+      '--descriptor', descriptorPath,
+      '--consent', staleContractConsentPath,
+      '--workspace', fixture.workspace.root,
+      '--confirm',
+    ], fixture.workspace.root);
+    expect(staleContract.code).toBe(1);
+    expect(staleContract.response.errors).toEqual([
+      expect.objectContaining({ code: 'asset_provider_contract_mismatch' }),
+    ]);
+    expect(readFileSync(sessionPath, 'utf8')).toBe(sessionAfterProviderChange);
   });
 });

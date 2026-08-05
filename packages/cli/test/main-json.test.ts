@@ -479,6 +479,68 @@ describe('main json behavior', () => {
     });
   });
 
+  it('projects provider handoff evidence as a bounded additive field without paths', () => {
+    const providerInvocation = {
+      schema: 'lpc-toolkit.asset-provider-invocation.v1',
+      sessionId: '00000000-0000-4000-8000-000000000000',
+      contractDigest: `sha256:${'a'.repeat(64)}`,
+      operation: 'sprite-candidate.v1',
+      provider: {
+        id: 'provider.example',
+        adapter: { id: 'agent-adapter.example', version: '1.0.0' },
+      },
+      targetIds: ['sprites/moon-braid/foreground/walk.png'],
+      consent: {
+        confirmed: true,
+        scopeDigest: `sha256:${'b'.repeat(64)}`,
+        network: { enabled: false, hosts: [] },
+        referenceDigests: [],
+      },
+      limits: {
+        maxCandidateBytes: 67108864,
+        timeoutSeconds: 600,
+        maxReferences: 8,
+      },
+      candidate: {
+        stagingId: 'provider.example/00000000-0000-4000-8000-000000000000',
+        targetIds: ['sprites/moon-braid/foreground/walk.png'],
+      },
+    } as const;
+    const projected = authoringResponseProjection({
+      sessionId: providerInvocation.sessionId,
+      goal: 'new-item',
+      state: 'needs-user-action',
+      reason: 'provider-invocation-current',
+      phase: 'awaiting-candidate',
+      checkpoint: null,
+      checkpointFreshness: 'current',
+      diagnostics: [],
+      artifacts: [],
+      inputsNeeded: [],
+      nextActions: [],
+      retrySafety: 'safe',
+      manifestDigest: null,
+      sourceDigests: [],
+      provider: {
+        status: 'ready',
+        invocation: providerInvocation,
+        invocationDigest: `sha256:${'c'.repeat(64)}`,
+        safety: 'safe',
+        nextActions: [],
+      },
+    });
+
+    expect(projected.provider).toMatchObject({
+      schema: 'lpc-toolkit.asset-provider-response.v1',
+      status: 'ready',
+      invocation: providerInvocation,
+      invocationDigest: `sha256:${'c'.repeat(64)}`,
+      safety: 'safe',
+      nextActions: [],
+    });
+    expect(JSON.stringify(projected.provider)).not.toContain('/private/');
+  });
+
   it('keeps validation and preview receipts bounded in the JSON projection', () => {
     const validation = {
       schema: 'lpc-toolkit.asset-pack-validation.v1',
