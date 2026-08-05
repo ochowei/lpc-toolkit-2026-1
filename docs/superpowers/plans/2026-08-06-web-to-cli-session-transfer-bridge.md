@@ -113,9 +113,11 @@ recovery state, or compatibility rule cannot be omitted from the matrix.
       after confirmation.
       - Branch: `codex/issue-170-web-to-cli-bridge-implementation`
       - Base: `ee4798e2e19b2355a1aa5d9df817493f0e1aa218`
-- [ ] Add local-only handoff, archive, attach-plan, stale-pair, tamper,
+- [x] Add local-only handoff, archive, attach-plan, stale-pair, tamper,
       attribution, and interrupted-staging fixtures. Fixtures contain no
       credentials, private URLs, real provider output, or `upstream/` checkout.
+      - Commit: `a720ac80ded0472e475dab4e5adef353de9c2941`
+      - Verification: `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/d3-web-cli-fixtures.test.ts` PASS (1 test); `rtk pnpm --filter @lpc-toolkit/cli exec tsc -p tsconfig.json --noEmit` PASS; `rtk git diff --check` PASS.
 
 ### 1. Core strict handoff contract (red → green)
 
@@ -135,17 +137,19 @@ recovery state, or compatibility rule cannot be omitted from the matrix.
 
 ### 2. Web explicit snapshot and export (red → green)
 
-- [ ] Add a pure snapshot builder from the current Workbench revision and the
+- [x] Add a pure snapshot builder from the current Workbench revision and the
       existing assembled archive response.
-- [ ] Verify assembly and sidecar creation are bound to one unchanged revision;
+- [x] Verify assembly and sidecar creation are bound to one unchanged revision;
       reject a race without downloading a stale pair.
-- [ ] Add the explicit `Export for CLI` action and confirmation UI for draft
+- [x] Add the explicit `Export for CLI` action and confirmation UI for draft
       and formal archive choices, using two downloads and the existing browser
       download adapter.
-- [ ] Keep the Workbench state memory-only. Add tests proving reset/refresh
+- [x] Keep the Workbench state memory-only. Add tests proving reset/refresh
       does not recover hidden state and export never uploads or persists it.
-- [ ] Preserve credits, acknowledgement digest, and attribution-required
+- [x] Preserve credits, acknowledgement digest, and attribution-required
       evidence; do not add Web release approval or provider payloads.
+      - Commit: `a720ac80ded0472e475dab4e5adef353de9c2941`
+      - Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/asset-pack-download.test.ts test/asset-pack-download-bar.test.tsx test/asset-pack-web-cli-handoff.test.ts test/asset-pack-workbench-shell.test.tsx` PASS (17 tests); `rtk pnpm --filter @lpc-toolkit/web exec tsc -p tsconfig.json --noEmit` PASS; `rtk git diff --check` PASS.
 
 ### 3. CLI read-only handoff inspection (red → green)
 
