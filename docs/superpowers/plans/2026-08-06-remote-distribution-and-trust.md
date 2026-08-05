@@ -144,17 +144,20 @@ and update this matrix and the spec before implementation.
 
 ### 2. Trust policy, signing, verification, and key lifecycle (red → green)
 
-- [ ] Add injected signer/verifier and trust-policy interfaces without making
+- [x] Add injected signer/verifier and trust-policy interfaces without making
       Core or public code discover keys, create keys, or call a network.
-- [ ] Evaluate algorithm allowlists, namespace authorization, key fingerprint,
+- [x] Evaluate algorithm allowlists, namespace authorization, key fingerprint,
       valid-from/until, rotation/grandfathering, revocation, compromise, and
       policy digest deterministically.
-- [ ] Verify signatures only over canonical release bytes and distinguish
-      `untrusted`, `signature-invalid`, `key-revoked`, and `namespace-unauthorized`.
-- [ ] Test deterministic fake signatures, unknown keys, mismatched public-key
+- [x] Verify signatures only over canonical release bytes and distinguish
+      `key-untrusted`, `signature-invalid`, `key-revoked`, and
+      `namespace-unauthorized`.
+- [x] Test deterministic fake signatures, unknown keys, mismatched public-key
       fingerprints, disallowed algorithms, rotation, revocation, expiry,
       policy changes, and no private-key persistence.
-- [ ] Record full implementation commit and exact focused tests before Task 3.
+- [x] Record full implementation commit and exact focused tests before Task 3.
+      - Commits: `dbb130a7004d093f67511bc8441fffdabe0d4b74`, `820e23738b4bd87b70cd10e2ddb8bdeaff8ae36c`
+      - Verification: `rtk pnpm --filter @lpc-toolkit/core exec vitest run test/asset-distribution-trust.test.ts` FAIL (red: `parseAssetDistributionTrustPolicy is not a function`); same command PASS (6 tests); `rtk pnpm --filter @lpc-toolkit/core exec tsc -p tsconfig.json --noEmit` PASS; `rtk git diff --check` PASS.
 
 ### 3. Fake registry and marketplace transport (red → green)
 
