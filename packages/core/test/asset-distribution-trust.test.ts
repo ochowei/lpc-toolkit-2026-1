@@ -140,6 +140,20 @@ describe('asset distribution trust policy', () => {
 
     expect(evaluateAssetDistributionTrust({
       release: RELEASE,
+      policy: {
+        ...parsed.policy,
+        keys: [{ ...parsed.policy.keys[0], status: 'compromised' }],
+      },
+      signatureValid: true,
+      publicKeyFingerprint: DIGEST_E,
+      observedAt: '2026-08-06T00:00:00.000Z',
+    })).toMatchObject({
+      status: 'key-revoked',
+      code: 'asset_distribution_key_revoked',
+    });
+
+    expect(evaluateAssetDistributionTrust({
+      release: RELEASE,
       policy: parsed.policy,
       signatureValid: true,
       publicKeyFingerprint: DIGEST_E,
@@ -177,6 +191,50 @@ describe('asset distribution trust policy', () => {
       publicKeyFingerprint: DIGEST_E,
       observedAt: '2026-08-06T00:00:00.000Z',
     })).toMatchObject({ status: 'trusted' });
+  });
+
+  it('allows additive key rotation and enforces valid-until', () => {
+    const rotated = parseAssetDistributionTrustPolicy({
+      ...POLICY,
+      keys: [
+        POLICY.keys[0],
+        {
+          keyId: DIGEST_F,
+          fingerprint: DIGEST_A,
+          namespace: 'example',
+          status: 'active',
+          validFrom: '2026-06-01T00:00:00.000Z',
+          validUntil: '2026-12-01T00:00:00.000Z',
+        },
+      ],
+    });
+    expect(rotated.ok).toBe(true);
+    if (!rotated.ok) throw new Error('Expected rotated trust policy fixture to parse.');
+
+    expect(evaluateAssetDistributionTrust({
+      release: {
+        ...RELEASE,
+        signature: { ...RELEASE.signature, keyId: DIGEST_F },
+      },
+      policy: rotated.policy,
+      signatureValid: true,
+      publicKeyFingerprint: DIGEST_A,
+      observedAt: '2026-08-06T00:00:00.000Z',
+    })).toMatchObject({ status: 'trusted' });
+
+    expect(evaluateAssetDistributionTrust({
+      release: {
+        ...RELEASE,
+        signature: { ...RELEASE.signature, keyId: DIGEST_F },
+      },
+      policy: rotated.policy,
+      signatureValid: true,
+      publicKeyFingerprint: DIGEST_A,
+      observedAt: '2027-01-01T00:00:00.000Z',
+    })).toMatchObject({
+      status: 'key-expired',
+      code: 'asset_distribution_key_expired',
+    });
   });
 
   it('injects canonical bytes into signer and verifier adapters', () => {
