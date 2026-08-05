@@ -226,6 +226,11 @@ prompts, provider payloads, and raw pixel/archive bytes.
   - Issue: https://github.com/ochowei/lpc-toolkit-2026-1/issues/170
 - [x] Branch created from merged D2 `origin/main`.
   - Base: `c289e7e9808b8b66f3bf968f64f34eff1eb073a3`
+- [x] Added the D3 specification and implementation plan with the two-file
+      handoff, sidecar receipt, stale-state, ownership, privacy, attribution,
+      human approval, recovery, and no-browser-persistence decisions.
+  - Commit: `eadcef3199e7321ad99458967893bd9ce919c278`
+  - Verification: `rtk git diff --cached --check` PASS; `rtk rg -n "Issue #170|lpc-toolkit.web-cli-handoff.v1|CLI documentation impact|No product-code test commit" docs/superpowers/specs/2026-08-06-web-to-cli-session-transfer-bridge.md docs/superpowers/plans/2026-08-06-web-to-cli-session-transfer-bridge.md` PASS.
 - [ ] Spec and plan reviewed by the user.
 - [ ] Public seams confirmed by the user.
 - [ ] Docs-only verification command and commit recorded after the files are added.
@@ -241,4 +246,3 @@ prompts, provider payloads, and raw pixel/archive bytes.
 D3 is not complete until the implementation PR has passed CI and been merged.
 After merge, wait for explicit user confirmation before starting D4. Do not
 start D4 from an open or unmerged D3 PR.
-
