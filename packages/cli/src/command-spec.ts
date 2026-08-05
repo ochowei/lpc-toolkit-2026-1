@@ -80,6 +80,13 @@ const AUTHORING_SESSION_OPTION: CommandOptionSpec = {
   description: 'Use this workspace-local authoring session.',
 };
 
+const AGENT_MANIFEST_OPTION: CommandOptionSpec = {
+  name: 'manifest',
+  kind: 'value',
+  valueLabel: 'manifest.json',
+  description: 'Read the strict Agent integration manifest.',
+};
+
 const ASSET_PREVIEW_OPTIONS: readonly CommandOptionSpec[] = [
   ASSET_WORKSPACE_OPTION,
   { name: 'asset', kind: 'value', valueLabel: 'local-id', description: 'Preview this pack asset.' },
@@ -133,6 +140,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
       'lpc-toolkit --version',
       'lpc-toolkit -V',
       'lpc-toolkit capabilities --json',
+      'lpc-toolkit agent integration check --manifest manifest.json --json',
       'lpc-toolkit catalog types',
       'lpc-toolkit character create hero',
       'lpc-toolkit character search hero --type hair --query braid --limit 20 --json',
@@ -150,6 +158,27 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
       'lpc-toolkit asset install ./dist/acme.hair-1.0.0.lpc-assets.zip',
       'lpc-toolkit asset doctor --json',
     ],
+  },
+  {
+    command: ['agent'],
+    usage: 'lpc-toolkit agent <command>',
+    description: 'Check Agent integration packaging and capability compatibility.',
+    options: [HELP_OPTION],
+    examples: ['lpc-toolkit agent integration check --manifest manifest.json --json'],
+  },
+  {
+    command: ['agent', 'integration'],
+    usage: 'lpc-toolkit agent integration <command>',
+    description: 'Run offline Agent integration compatibility checks.',
+    options: [HELP_OPTION],
+    examples: ['lpc-toolkit agent integration check --manifest manifest.json --json'],
+  },
+  {
+    command: ['agent', 'integration', 'check'],
+    usage: 'lpc-toolkit agent integration check --manifest <manifest.json> [--json]',
+    description: 'Validate an Agent integration manifest against this CLI without loading assets or providers.',
+    options: [HELP_OPTION, JSON_OPTION, AGENT_MANIFEST_OPTION],
+    examples: ['lpc-toolkit agent integration check --manifest manifest.json --json'],
   },
   {
     command: ['asset', 'workspace'],
@@ -825,7 +854,10 @@ export function helpForCommand(command: readonly string[]): string {
 export function validateCommandArguments(parsed: ParsedArgs): CliIssue | undefined {
   const isCapabilities = parsed.command.length === 1 && parsed.command[0] === 'capabilities';
   const isAuthoring = parsed.command[0] === 'asset' && parsed.command[1] === 'authoring';
-  if (!isCapabilities && !isAuthoring) return undefined;
+  const isAgentIntegrationCheck = parsed.command[0] === 'agent'
+    && parsed.command[1] === 'integration'
+    && parsed.command[2] === 'check';
+  if (!isCapabilities && !isAuthoring && !isAgentIntegrationCheck) return undefined;
   if (parsed.positionals.length === 0) return undefined;
   const positional = parsed.positionals[0]!;
   return {

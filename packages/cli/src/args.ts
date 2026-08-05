@@ -28,11 +28,16 @@ const BOOLEAN_FLAGS = new Set([
 function acceptsAnotherCommandToken(command: readonly string[]): boolean {
   if (command.length < 2) return true;
   return command.length === 2
-    && command[0] === 'asset'
     && (
-      command[1] === 'workspace'
-      || command[1] === 'authoring'
-      || command[1] === 'provenance'
+      (
+        command[0] === 'asset'
+        && (
+          command[1] === 'workspace'
+          || command[1] === 'authoring'
+          || command[1] === 'provenance'
+        )
+      )
+      || (command[0] === 'agent' && command[1] === 'integration')
     );
 }
 
