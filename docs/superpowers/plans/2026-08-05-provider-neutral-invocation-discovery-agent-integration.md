@@ -875,9 +875,31 @@ commit hashes, not abbreviated hashes, and exact command results.
     releasing: N/A — Task 8 owns the complete D2 release documentation pass
     plugin: N/A — no bundled skill, plugin capability, or plugin command was added
     ```
-- [ ] Task 8 — Documentation and final verification
-  - Commit: pending
-  - Verification: pending
+- [x] Task 8 — Documentation and final verification
+  - Implementation: Completed the D2 documentation pass across CLI help, CLI README, root README, landing pages, architecture, engineering, and releasing guidance. The documentation records the provider-neutral boundary, offline Agent manifest checking, descriptor discovery, read-only preflight, explicit consent and confirmation, bounded result re-digest/staging, stale/refusal recovery, external-author fallback, candidate import authority, session-relative evidence, D1 projection, attribution/privacy boundaries, protected roots, fake-provider packed acceptance, and the continued separation from archive, manifest, install, and formal release authority. Added focused help and web documentation assertions. No bundled plugin capability or command was added.
+  - Commit: a4037051f139e34b345d905a070c2d8485c69f32
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-provider-schema.test.ts asset-provider-provenance.test.ts` PASS — 2 files, 10 tests.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-provider-commands.test.ts asset-authoring-session.test.ts asset-authoring-session-e2e.test.ts asset-release-provenance.test.ts command-spec.test.ts main-json.test.ts main-human.test.ts response.test.ts` PASS — 8 files, 189 tests.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx readme-architecture-docs.test.ts` FAIL in the restricted sandbox because the existing `tsx` IPC pipe cannot bind (`EPERM`); the same command PASSed with controlled IPC-enabled permissions — 2 files, 26 tests, with all 17 upstream-pin fixture files matching `9c190fb596f855d1adc253454786536993829b84`.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS with controlled package-cache/filesystem permissions — clean packed tarball installation and public-executable acceptance completed.
+  - Verification: `rtk pnpm check:boundaries` PASS.
+  - Verification: `rtk pnpm verify:cli-docs-policy` PASS — 19 tests.
+  - Verification: `rtk pnpm verify:plugin` PASS — 40 tests and plugin structure validation.
+  - Verification: `rtk pnpm verify` PASS with controlled IPC permissions — upstream pin, boundaries, CLI docs policy, plugin contract, workspace typecheck, Core 31 files/422 tests, CLI 65 files/1,216 tests plus 1 skipped, Web 106 files/862 tests, and the remaining workspace packages passed.
+  - Verification: `rtk git diff --check` PASS.
+  - Documentation impact reassessment:
+    ```text
+    help: update — provider discover/preflight/handoff/result, Agent integration check, consent, refusal, session-relative evidence, and safe next-action help
+    cli-readme: update — public D2 commands, JSON schemas, provider-neutral boundary, candidate import handoff, session receipts, privacy, and external-author fallback
+    root-readme: update — optional Agent/provider integration remains separate from composition, attribution, and release authority
+    landing: update — provider/Agent integration is optional; no provider, registry, credential store, network client, or trust is built in by default
+    architecture: update — Core/CLI/Agent/provider ownership, session receipts, protected roots, no-private-source boundary, and D1 projection
+    engineering: update — focused Core/CLI/web tests, deterministic fake-provider packed acceptance, protected-path sentinels, and CI mapping
+    releasing: update — D2 capability/schema compatibility and local fake acceptance remain separate from formal archive/manifest/install/release gates
+    plugin: N/A — D2 adds no bundled skill, plugin capability, or plugin command; a future skill package requires a separate reviewed PR
+    ```
 
 ## Delivery protocol
 
