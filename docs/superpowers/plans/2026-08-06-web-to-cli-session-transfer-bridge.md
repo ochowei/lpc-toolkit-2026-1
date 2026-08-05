@@ -281,9 +281,14 @@ prompts, provider payloads, and raw pixel/archive bytes.
 
 ### Implementation branch
 
-- [ ] Implementation branch and PR created only after review confirmation.
-- [ ] No implementation task may be marked complete before its focused red →
+- [x] Implementation branch and PR created only after review confirmation.
+  - Branch: `codex/issue-170-web-to-cli-bridge-implementation`
+  - PR: https://github.com/ochowei/lpc-toolkit-2026-1/pull/172 (Draft)
+  - Verification: `rtk gh pr view 172 --repo ochowei/lpc-toolkit-2026-1 --json number,url,state,isDraft,headRefName,baseRefName,title` PASS (`OPEN`, `isDraft: true`, base `main`); `rtk git status --short --branch` PASS after push.
+  - Initial CI snapshot: `CLI documentation impact` PASS; `Detect changes` PASS; `Unit tests` pending; Vercel deployment pending at handoff.
+- [x] No implementation task may be marked complete before its focused red →
       green test and exact verification command are recorded.
+  - Verification: Task 1 through Task 7 each contain the related implementation commit and focused PASS evidence above.
 
 ## Handoff criteria
 
