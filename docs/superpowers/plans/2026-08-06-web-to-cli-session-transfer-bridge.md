@@ -153,16 +153,19 @@ recovery state, or compatibility rule cannot be omitted from the matrix.
 
 ### 3. CLI read-only handoff inspection (red → green)
 
-- [ ] Add public command specification/help for
+- [x] Add public command specification/help for
       `asset authoring handoff inspect` and its exact options.
-- [ ] Read both inputs as regular files with existing limits and no symlink or
+- [x] Read both inputs as regular files with existing limits and no symlink or
       traversal acceptance.
-- [ ] Reuse existing archive inspection and re-compute archive, manifest,
+- [x] Reuse existing archive inspection and re-compute archive, manifest,
       content, source, credit, acknowledgement, and pack identity bindings.
-- [ ] Return deterministic `current`, `stale`, `blocked`, or
-      `needs-user-action` data without creating sessions or writing files.
-- [ ] Add human and JSON response tests with bounded digest comparisons and
+- [x] Return deterministic `current`, `stale`, or `blocked` inspection data
+      without creating sessions or writing files, with an explicit next action
+      for the later `needs-user-action` import boundary.
+- [x] Add human and JSON response tests with bounded digest comparisons and
       actionable re-export/repair commands.
+      - Commit: `62fc4c0181408684e0cdeb068a044a95f4c35184`
+      - Verification: `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/asset-authoring-web-cli-handoff.test.ts test/d3-web-cli-fixtures.test.ts test/command-spec.test.ts` PASS (56 tests); `rtk pnpm --filter @lpc-toolkit/cli exec tsc -p tsconfig.json --noEmit` PASS; `rtk pnpm --filter @lpc-toolkit/cli exec vitest run` FAIL in the sandbox only because 13 existing `web-server.test.ts` cases cannot bind loopback (`listen EPERM`), with 1,211 tests passed; `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/web-server.test.ts` PASS (22 tests) with loopback permission; `rtk git diff --check` PASS.
 
 ### 4. CLI explicit import and sidecar receipt (red → green)
 
