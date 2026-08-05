@@ -187,14 +187,16 @@ recovery state, or compatibility rule cannot be omitted from the matrix.
 
 ### 5. Explicit recovery (red → green)
 
-- [ ] Add `asset authoring handoff recover --action resume|discard` with exact
+- [x] Add `asset authoring handoff recover --action resume|discard` with exact
       handoff/archive/workspace bindings and required confirmation.
-- [ ] Simulate interruption during staging/commit and prove prior user-owned
+- [x] Simulate interruption during staging/commit and prove prior user-owned
       files, existing packs, sentinels, and session bytes remain unchanged.
-- [ ] Resume only matching pending staging; discard only the matching
+- [x] Resume only matching pending staging; discard only the matching
       CLI-owned temporary directory. Never delete inputs or broad roots.
-- [ ] Preserve stale/pending evidence and return one safe next action after a
+- [x] Preserve stale/pending evidence and return one safe next action after a
       failed or raced recovery.
+      - Commit: `78f7622ab7677433e4c469035c1280a01b0b3eae`
+      - Verification: `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/asset-authoring-web-cli-handoff.test.ts` PASS (13 tests); `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/asset-authoring-web-cli-handoff.test.ts test/d3-web-cli-fixtures.test.ts test/command-spec.test.ts` PASS (63 tests); `rtk pnpm --filter @lpc-toolkit/cli exec tsc -p tsconfig.json --noEmit` PASS; `rtk pnpm --filter @lpc-toolkit/cli exec vitest run` FAIL in the sandbox only because 13 existing `web-server.test.ts` cases cannot bind loopback (`listen EPERM`), with 1,218 tests passed and 1 skipped; `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/web-server.test.ts` PASS (22 tests) with loopback permission; `rtk git diff --check` PASS.
 
 ### 6. Session/receipt compatibility and capability projection
 
