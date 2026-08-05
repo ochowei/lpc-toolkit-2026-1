@@ -215,16 +215,20 @@ and update this matrix and the spec before implementation.
 
 ### 6. npm package publication and post-publication verification (red → green)
 
-- [ ] Add a local `pnpm pack`/tarball inspection seam for package name/version,
+- [x] Add a local `pnpm pack`/tarball inspection seam for package name/version,
       package integrity, entrypoint/help/version behavior, release commit/tag
       evidence, and optional D4 asset-release binding.
-- [ ] Add a fake publisher and fake npm/marketplace receipt adapter that can
+- [x] Add a fake publisher and fake npm/marketplace receipt adapter that can
       return success, metadata drift, integrity drift, version conflict, and
       unavailable states without `npm publish`.
-- [ ] Verify a clean-prefix post-publication report is read-only and clearly
+- [x] Verify a clean-prefix post-publication report is read-only and clearly
       distinguishes package transport/auth evidence from LPC archive trust.
-- [ ] Test no token creation, no OIDC/Trusted Publisher mutation, no real
+- [x] Test no token creation, no OIDC/Trusted Publisher mutation, no real
       registry access, and no accidental asset publication.
+      - Implementation: `inspectAssetDistributionPackage` verifies local tarball bytes, npm-style SHA-512 integrity, strict package metadata/bin/ESM/license, packed entrypoint/help/version behavior, commit/tag/CI evidence, and optional D4 asset-release evidence without retaining payload bytes. `verifyAssetDistributionPackageReceipt` is read-only and accepts only bounded fake npm/fake marketplace receipt transport; package transport/auth evidence is separate from the optional LPC archive binding.
+      - Tests: fake publisher and receipt-adapter seams cover one verified fake npm receipt, one verified fake marketplace receipt, metadata/integrity/version/unavailable refusal states, receipt digest drift, credential refusal, asset-binding drift, and accidental `.lpc-assets.zip`/private payload refusal. No production code invokes `npm`, a registry, network, token, OIDC, or Trusted Publisher mutation.
+      - Commit: `94fcd3a94d7a923d126dec341493e6f3feb076d6`
+      - Verification: `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/asset-distribution-package.test.ts` FAIL (red: package inspection module was missing), then PASS (8 tests); `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/asset-distribution-package.test.ts test/asset-distribution-global-install.test.ts test/asset-distribution-release-evidence.test.ts test/asset-distribution-transport.test.ts` PASS (20 tests); `rtk pnpm --filter @lpc-toolkit/cli exec tsc -p tsconfig.json --noEmit` PASS; `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/package-metadata.test.ts test/release-workflows.test.ts` PASS (23 tests); `rtk pnpm pack --pack-destination /private/tmp/lpc-d4-cli-pack` PASS; tarball-only `rtk pnpm exec node --input-type=module -e "...inspectAssetDistributionPackage(...)..."` PASS; `rtk pnpm run test:package` was intentionally interrupted with exit 130 because its internal `npm install` would access a real registry, outside the D4 fake-only boundary; `rtk git diff --check` PASS.
 
 ### 7. Tamper detection, withdrawal, rollback, recovery, and audit evidence
     (red → green)
