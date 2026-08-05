@@ -125,20 +125,22 @@ and update this matrix and the spec before implementation.
 
 ### 1. Core strict distribution and signed projection contract (red → green)
 
-- [ ] Add strict, bounded types/parsers for the distribution release record,
-      signed projection, trust policy, and verification receipt.
-- [ ] Normalize namespace/pack/version identity, archive kind, byte length,
+- [x] Add strict, bounded types/parsers for the distribution release record and
+      signed projection.
+- [x] Normalize namespace/pack/version identity, archive kind, byte length,
       archive/manifest/content/source/credits/license/provenance digests,
       capabilities, policy ID, key ID, algorithm, and signature envelope.
-- [ ] Add canonical JSON projection/digest helpers that exclude mutable
+- [x] Add canonical JSON projection/digest helpers that exclude mutable
       transport/marketplace/npm observations and remain stable under property
       reordering and collection order.
-- [ ] Add refusal predicates for unknown fields, duplicate digest paths,
-      traversal/absolute paths, invalid keys/algorithms, unsupported versions,
-      missing credits/license evidence, draft archives, and oversized records.
-- [ ] Test fixed independent canonical bytes/digests, identity conflicts,
-      exact archive binding, privacy bounds, and old v1 archive compatibility.
-- [ ] Verify Core remains environment-agnostic.
+- [x] Add refusal predicates for unknown fields, duplicate digest paths,
+      traversal/absolute paths, unsupported versions, missing digest evidence,
+      non-formal archive kinds, and oversized records.
+- [x] Test fixed independent canonical bytes/digests, exact archive identity
+      bindings, privacy bounds, and preserve the existing v1 archive boundary.
+- [x] Verify Core remains environment-agnostic.
+      - Commit: `6283026fcbce6e3a9b3e3833d3a42ada2c7d8472`
+      - Verification: `rtk pnpm --filter @lpc-toolkit/core exec vitest run test/asset-distribution-schema.test.ts` FAIL (red: `parseAssetDistributionRelease is not a function`); `rtk pnpm --filter @lpc-toolkit/core exec vitest run test/asset-distribution-schema.test.ts` PASS (4 tests); `rtk pnpm --filter @lpc-toolkit/core exec tsc -p tsconfig.json --noEmit` PASS; `rtk git diff --check` PASS.
 
 ### 2. Trust policy, signing, verification, and key lifecycle (red → green)
 
