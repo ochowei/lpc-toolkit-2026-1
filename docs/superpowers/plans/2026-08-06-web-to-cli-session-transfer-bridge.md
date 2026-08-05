@@ -169,19 +169,21 @@ recovery state, or compatibility rule cannot be omitted from the matrix.
 
 ### 4. CLI explicit import and sidecar receipt (red → green)
 
-- [ ] Require an explicit strict `attach-pack` plan and exact pack identity/
+- [x] Require an explicit strict `attach-pack` plan and exact pack identity/
       version match; never infer a workspace or scope from the sidecar.
-- [ ] Add `asset authoring handoff import` with no-confirm pause and explicit
+- [x] Add `asset authoring handoff import` with no-confirm pause and explicit
       `--confirm` mutation boundary.
-- [ ] Stage the existing archive payload under a contained, new CLI workspace
+- [x] Stage the existing archive payload under a contained, new CLI workspace
       destination; reuse existing pack/session authorities and fail closed on
       existing destinations or races.
-- [ ] Create a new CLI session without reusing a Web/session ID and without
+- [x] Create a new CLI session without reusing a Web/session ID and without
       marking validation, preview, release, provider, D1, or import receipts
       current.
-- [ ] Persist the D3 web-handoff receipt only after atomic completion. Prove
+- [x] Persist the D3 web-handoff receipt only after atomic completion. Prove
       repeat import idempotency for unchanged bindings and explicit conflict
       for changed bindings.
+      - Commit: `90cc84e79e52a4677679074f6e5f5f6e759a6d97`
+      - Verification: `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/asset-authoring-web-cli-handoff.test.ts` PASS (10 tests); `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/asset-authoring-web-cli-handoff.test.ts test/d3-web-cli-fixtures.test.ts test/command-spec.test.ts` PASS (60 tests); `rtk pnpm --filter @lpc-toolkit/cli exec tsc -p tsconfig.json --noEmit` PASS; `rtk pnpm --filter @lpc-toolkit/cli exec vitest run` FAIL in the sandbox only because 13 existing `web-server.test.ts` cases cannot bind loopback (`listen EPERM`), with 1,214 tests passed and 1 skipped; `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/web-server.test.ts` PASS (22 tests) with loopback permission; `rtk git diff --check` PASS.
 
 ### 5. Explicit recovery (red → green)
 
