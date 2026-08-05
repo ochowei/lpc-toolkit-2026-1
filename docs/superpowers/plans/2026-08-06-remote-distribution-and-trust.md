@@ -294,8 +294,13 @@ and update this matrix and the spec before implementation.
       the explicit statement that no external mutation occurred.
       - Commit: `c07527d1d13426c2bcd8dbf085e570a78beb7c3e` records the empty-pack registry compatibility regression fix; this final plan record records the complete verification cycle.
       - Boundary statement: no real registry, marketplace, key creation/registration, signing service, auth credential, npm publication, tag/release mutation, external service, system-wide prefix, or `upstream/` mutation occurred. Tests used local fixtures/fakes and a temporary consumer prefix only.
-- [ ] Create, push, and open the independent D4 implementation Draft PR only
+- [x] Create, push, and open the independent D4 implementation Draft PR only
       after all local verification passes; do not merge automatically.
+      - Branch: `codex/issue-173-d4-remote-distribution-trust-implementation`.
+      - Push: `rtk git push -u origin codex/issue-173-d4-remote-distribution-trust-implementation` PASS.
+      - Draft PR: https://github.com/ochowei/lpc-toolkit-2026-1/pull/175
+      - PR verification: `rtk gh pr view 175 --repo ochowei/lpc-toolkit-2026-1 --json number,url,state,isDraft,headRefName,baseRefName,mergeStateStatus` PASS (`OPEN`, `isDraft: true`, base `main`); `rtk gh pr checks 175 --repo ochowei/lpc-toolkit-2026-1` PASS (8 checks passed, 0 failed after the final workflow set).
+      - Merge gate: no automatic merge; D4 remains pending user review and merge confirmation before D5.
 
 ## Spec/plan review record
 
