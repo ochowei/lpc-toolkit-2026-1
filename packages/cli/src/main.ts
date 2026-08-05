@@ -37,6 +37,7 @@ import {
 import {
   createCapabilityAdvertisement,
 } from './capabilities.js';
+import { runAgentIntegrationCommand } from './agent-integration-commands.js';
 import { materializePreset, runPresetCommand } from './preset-commands.js';
 import { CLI_VERSION } from './package-info.js';
 import { renderSelection } from './render.js';
@@ -163,6 +164,7 @@ export function commandNeedsAssets(parsed: ParsedArgs): boolean {
   if (parsed.command[0] === 'preset') return parsed.command[1] !== 'list';
   if (parsed.command[0] === 'character') return characterCommandNeedsAssets(parsed);
   if (parsed.command[0] === 'web') return true;
+  if (parsed.command[0] === 'agent') return false;
   return false;
 }
 
@@ -191,6 +193,27 @@ function preflightCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
       return commandError(parsed.command.join(' '), {
         code: 'unknown_command',
         message: `Unknown capabilities command: ${parsed.command.join(' ')}`,
+      });
+    }
+  }
+
+  if (command === 'agent') {
+    const commandName = parsed.command.join(' ');
+    if (
+      parsed.command.length !== 3
+      || subcommand !== 'integration'
+      || parsed.command[2] !== 'check'
+    ) {
+      return commandError(commandName, {
+        code: 'unknown_command',
+        message: `Unknown Agent command: ${commandName}`,
+      });
+    }
+    if (!flagString(parsed.flags, 'manifest')) {
+      return commandError(commandName, {
+        code: 'missing_argument',
+        message: '--manifest is required.',
+        path: '--manifest',
       });
     }
   }
@@ -461,6 +484,7 @@ async function runCliWithRuntime(
     parsed.flags.size === 0
     && (
       (parsed.command.length === 1 && parsed.command[0] === 'asset')
+      || (parsed.command.length === 1 && parsed.command[0] === 'agent')
       || (
         parsed.command.length === 2
         && parsed.command[0] === 'asset'
@@ -469,6 +493,11 @@ async function runCliWithRuntime(
           || parsed.command[1] === 'authoring'
           || parsed.command[1] === 'provenance'
         )
+      )
+      || (
+        parsed.command.length === 2
+        && parsed.command[0] === 'agent'
+        && parsed.command[1] === 'integration'
       )
     )
   ) {
@@ -501,7 +530,8 @@ async function runCliWithRuntime(
   }
 
   const preflightResponse = preflightCommand(parsed)
-    ?? (parsed.command[0] === 'asset' && parsed.command[1] === 'authoring'
+    ?? ((parsed.command[0] === 'asset' && parsed.command[1] === 'authoring')
+      || parsed.command[0] === 'agent'
       ? undefined
       : preflightAssetCommand(parsed));
   if (preflightResponse !== undefined) {
@@ -514,6 +544,19 @@ async function runCliWithRuntime(
       parsed,
       io,
       'Capabilities advertised.\n',
+    );
+  }
+
+  if (
+    parsed.command[0] === 'agent'
+    && parsed.command[1] === 'integration'
+    && parsed.command[2] === 'check'
+  ) {
+    return writeResponse(
+      runAgentIntegrationCommand(parsed, io.cwd),
+      parsed,
+      io,
+      'Agent integration is compatible.\n',
     );
   }
 

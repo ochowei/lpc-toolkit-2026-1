@@ -1298,6 +1298,32 @@ function formatAnimationAudit(data: JsonRecord): string | undefined {
   return `${lines.join('\n')}\n`;
 }
 
+function formatAgentIntegrationCheck(data: JsonRecord): string | undefined {
+  const manifest = data['manifest'];
+  const manifestRecord = isRecord(manifest) ? manifest : undefined;
+  const id = manifestRecord === undefined ? undefined : stringValue(manifestRecord, 'id');
+  const version = manifestRecord === undefined ? undefined : stringValue(manifestRecord, 'version');
+  const cliVersion = stringValue(data, 'cliVersion');
+  const missingRequiredCapabilities = stringArrayValue(data, 'missingRequiredCapabilities');
+  const missingOptionalCapabilities = stringArrayValue(data, 'missingOptionalCapabilities');
+  const compatible = data['compatible'];
+  if (
+    !id
+    || !version
+    || !cliVersion
+    || missingRequiredCapabilities === undefined
+    || missingOptionalCapabilities === undefined
+    || typeof compatible !== 'boolean'
+  ) return undefined;
+  return [
+    `Agent integration: ${compatible ? 'compatible' : 'incompatible'}`,
+    `Manifest: ${id} ${version}`,
+    `CLI version: ${cliVersion}`,
+    `Missing required capabilities: ${formatCsv(missingRequiredCapabilities)}`,
+    `Optional fallback: ${formatCsv(missingOptionalCapabilities)}`,
+  ].join('\n') + '\n';
+}
+
 function formatHumanData(response: CliResponse<unknown>): string | undefined {
   const data = response.data;
   if (!isRecord(data)) return undefined;
@@ -1338,6 +1364,8 @@ function formatHumanData(response: CliResponse<unknown>): string | undefined {
       return formatCatalogItem(data);
     case 'catalog audit-animations':
       return formatAnimationAudit(data);
+    case 'agent integration check':
+      return formatAgentIntegrationCheck(data);
     case 'token encode':
       return formatTokenEncode(data);
     case 'token decode':

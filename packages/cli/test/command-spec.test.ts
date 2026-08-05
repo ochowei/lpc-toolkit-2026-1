@@ -293,8 +293,21 @@ describe('helpForCommand', () => {
 
   it('documents the fixed capability and asset authoring command surface', () => {
     expect(helpForCommand([])).toContain('lpc-toolkit capabilities --json');
+    expect(helpForCommand([])).toContain(
+      'lpc-toolkit agent integration check --manifest manifest.json --json',
+    );
     expect(helpForCommand(['capabilities'])).toContain(
       'lpc-toolkit capabilities --json',
+    );
+
+    expect(helpForCommand(['agent'])).toContain(
+      'lpc-toolkit agent integration <command>',
+    );
+    expect(helpForCommand(['agent', 'integration'])).toContain(
+      'lpc-toolkit agent integration check --manifest manifest.json --json',
+    );
+    expect(helpForCommand(['agent', 'integration', 'check'])).toContain(
+      '--manifest <manifest.json>',
     );
 
     const authoringHelp = helpForCommand(['asset', 'authoring']);
