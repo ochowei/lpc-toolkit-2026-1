@@ -180,15 +180,15 @@ Product commit: `d1f964f03e46cd39cb99501204bf95c996bdd787`
 
 ### Task 3: Add read-only provenance verification and compatibility refusal
 
-- [ ] Add failing public argv tests for `asset provenance verify`, missing inputs, malformed/unsupported/stale receipts, archive/manifest/content/source mismatch, copied-archive mismatch, and successful exact-copy verification.
-- [ ] Implement the verifier as a no-workspace, no-session, no-mutation operation using existing archive inspection/payload/content-digest authorities. Verify the projection digest and all release bindings; report that declaration/preview receipt digests are bound evidence rather than re-created human approval.
-- [ ] Add capability/schema advertisement, command help, stable D1 diagnostic identifiers, JSON/human response projections, and ordinary v1 install/inspect regression assertions. A missing companion receipt must remain irrelevant to ordinary install.
-- [ ] Verification: focused CLI/format/archive tests GREEN; CLI package smoke PASS; existing ordinary install and archive conformance tests PASS.
-- [ ] Commit the product slice with a conventional `feat(cli): verify release provenance receipts` message.
+- [x] Add failing public argv tests for `asset provenance verify`, missing inputs, malformed/unsupported/stale receipts, archive/manifest/content/source mismatch, copied-archive mismatch, and successful exact-copy verification.
+- [x] Implement the verifier as a no-workspace, no-session, no-mutation operation using existing archive inspection/payload/content-digest authorities. Verify the projection digest and all release bindings; report that declaration/preview receipt digests are bound evidence rather than re-created human approval.
+- [x] Add capability/schema advertisement, command help, stable D1 diagnostic identifiers, JSON/human response projections, and ordinary v1 install/inspect regression assertions. A missing companion receipt must remain irrelevant to ordinary install.
+- [x] Verification: focused CLI/format/archive tests GREEN; CLI package smoke PASS; existing ordinary install and archive conformance tests PASS.
+- [x] Commit the product slice with a conventional `feat(cli): verify release provenance receipts` message.
 
-Implementation note: 
-Verification: 
-Product commit: 
+Implementation note: Added the public `asset provenance verify --archive <archive> --provenance <receipt>` command with runtime-only preparation and no workspace/session mutation. Verification reuses formal archive inspection and payload/content/source digest authorities, validates canonical receipt/projection digests, distinguishes malformed versus unsupported versus stale/mismatched evidence, and reports declaration/preview receipt digests as bound evidence with both human-recreation flags false. The generation path now binds the exact canonical `asset-pack.json` bytes inside the formal ZIP while preserving the existing formal-archive receipt semantics. Ordinary inspect/install remain unchanged and never install the external companion receipt.
+Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-release-provenance-schema.test.ts asset-release-schema.test.ts` PASS (22 tests); `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS; `rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- release-provenance.test.ts archive.test.ts payload.test.ts` PASS (48 tests); `rtk pnpm --filter @lpc-toolkit/asset-pack-format run typecheck` PASS; `rtk pnpm --filter @lpc-toolkit/cli test -- asset-release-provenance.test.ts asset-authoring-release.test.ts asset-authoring-session.test.ts asset-authoring-session-e2e.test.ts command-spec.test.ts main-json.test.ts main-human.test.ts response.test.ts main-assets.test.ts` PASS (314 tests); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS; `rtk pnpm check:boundaries` PASS; `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS (packed CLI install smoke); `rtk git diff --check` PASS.
+Product commit: `7784a44b8a4c5ca40e7aec735658caa975b965f7`
 
 ### Task 4: Complete packed acceptance, documentation, and handoff gate
 
@@ -217,10 +217,10 @@ Product commit:
 
 - [x] Task 1 — pure provenance contract and canonical encoding complete.
 - [x] Task 2 — release-bound companion generation and session persistence complete.
-- [ ] Task 3 — read-only verification and v1 compatibility complete.
+- [x] Task 3 — read-only verification and v1 compatibility complete.
 - [ ] Task 4 — packed acceptance, documentation, and handoff gate complete.
 
-Product commits: Task 1 — `2cd43a3fe3d77b30b311b344e797cf0b62f5471d`; Task 2 — `d1f964f03e46cd39cb99501204bf95c996bdd787`
+Product commits: Task 1 — `2cd43a3fe3d77b30b311b344e797cf0b62f5471d`; Task 2 — `d1f964f03e46cd39cb99501204bf95c996bdd787`; Task 3 — `7784a44b8a4c5ca40e7aec735658caa975b965f7`
 Plan-record commit: 
 
 ## CLI documentation impact matrix
