@@ -52,7 +52,8 @@ The capability response must retain the exact shipped identifiers
 `asset-authoring-candidate-import.v1`, `asset-authoring-recovery.v1`, and
 `asset-authoring-release.v1`, `asset-authoring-draft-recovery.v1`, and
 `asset-authoring-consumer-install.v1`, and
-`asset-authoring-release-provenance.v1`, and must advertise the D2 contract
+`asset-authoring-release-provenance.v1`, `asset-authoring-web-cli-handoff.v1`,
+and `asset-authoring-web-cli-recovery.v1`, and must advertise the D2 contract
 identifiers `asset-authoring-provider-discovery.v1`,
 `asset-authoring-provider-invocation.v1`, and
 `agent-integration-packaging.v1` only when their public seams and packed tests
@@ -63,6 +64,8 @@ schemas, including
 `lpc-toolkit.asset-authoring-install-receipt.v1`,
 `lpc-toolkit.asset-release-provenance.v1`, and
 `lpc-toolkit.asset-release-provenance-verification.v1`, and must include
+`lpc-toolkit.web-cli-handoff.v1` and
+`lpc-toolkit.asset-authoring-web-handoff-receipt.v1`, plus
 `lpc-toolkit.asset-provider-descriptor.v1`,
 `lpc-toolkit.asset-provider-discovery.v1`,
 `lpc-toolkit.asset-provider-invocation.v1`,
@@ -72,15 +75,17 @@ schemas, including
 Check that the CLI help lists `start`, `status`, `resume`, `contract`, `import`,
 `validate`, `preview`, `acknowledge`, `declare`, `accept-preview`, and
 `reconcile-manifest`, `draft`, `sync`, `pack`, `inspect`, `provenance`, and
-`install`, plus the provider `discover`, `preflight`, `handoff`, and `result`
+`install`, plus the `handoff inspect`, `handoff import`, and `handoff recover`
+commands and the provider `discover`, `preflight`, `handoff`, and `result`
 commands, `agent integration check`, and public `asset provenance verify`.
 Help must explain explicit consent, stable refusal/recovery actions, logical
-session candidate staging, and the existing `asset authoring import`,
-validation, preview, and release boundary. The CLI README, root README,
-landing copy, architecture, engineering, and this runbook must describe the
-same provider-neutral boundary. Plugin `0.2.1` must continue to document CLI
-range `>=0.2.0 <0.3.0`; the plugin intentionally does not claim or invoke D2
-provider capabilities or add a provider skill.
+session candidate staging, the two-file Web-to-CLI handoff, and the existing
+`asset authoring import`, validation, preview, and release boundary. The CLI
+README, root README, landing copy, architecture, engineering, and this runbook
+must describe the same provider-neutral and one-way local-file boundaries.
+Plugin `0.2.1` must continue to document CLI range `>=0.2.0 <0.3.0`; the plugin
+intentionally does not claim or invoke D2 provider or D3 Web-handoff
+capabilities or add a new skill.
 
 Phase 1's release boundary is still session evidence, not archive publication.
 The packed smoke must show `releaseGates.releaseReady: true` only after the
@@ -173,6 +178,35 @@ release gate; provider result coverage uses only a deterministic local fixture.
 It also runs formal pack,
 exact inspect, provenance generation, copied-archive verification from a clean
 consumer root, missing-receipt refusal, and ordinary-install compatibility.
+
+### D3 Web-to-CLI release gate
+
+D3 release verification uses only local archive, sidecar, attach-plan, and
+workspace fixtures. The Web export must prove that one unchanged in-memory
+revision produces the existing archive and strict
+`lpc-toolkit.web-cli-handoff.v1` sidecar, with no browser persistence, upload,
+backend, or reverse live session. The CLI smoke must then prove read-only
+`handoff inspect`, stale/blocked refusal before mutation, explicit plan and
+`--confirm` import, separate
+`lpc-toolkit.asset-authoring-web-handoff-receipt.v1` creation, repeat-import
+idempotency, and exact `recover resume|discard` ownership.
+
+The smoke must assert that the handoff does not alter the existing v1 session
+file or D1 provenance, D2 provider, validation, preview, candidate-import,
+attribution, or release authority. `asset authoring status` may project only
+bounded optional `webHandoff` data; old sessions without the sidecar remain
+readable, malformed sidecars are blocked, and stale handoff evidence cannot
+make `releaseGates.releaseReady` true or replace candidate import. Use the
+focused local test map before the packed CLI smoke:
+
+```sh
+pnpm --filter @lpc-toolkit/core test -- asset-authoring-web-handoff.test.ts
+pnpm --filter @lpc-toolkit/web test -- asset-pack-download.test.ts asset-pack-download-bar.test.tsx asset-pack-web-cli-handoff.test.ts asset-pack-workbench-shell.test.tsx
+pnpm --filter @lpc-toolkit/cli test -- asset-authoring-web-cli-handoff.test.ts d3-web-cli-fixtures.test.ts command-spec.test.ts main-json.test.ts main-human.test.ts response.test.ts
+```
+
+No real registry, marketplace, auth service, key, signing operation, npm
+publication, provider, or external service is part of D3 verification.
 
 ## Release Candidate
 

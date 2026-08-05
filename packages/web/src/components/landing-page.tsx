@@ -157,6 +157,12 @@ const providerHandoffCommands = [
   'lpc-toolkit asset authoring provider result --session <session-id> --invocation invocation.json --result result.json --candidate candidate.png --workspace ./my-lpc-art --json',
 ] as const;
 
+const webCliHandoffCommands = [
+  'lpc-toolkit asset authoring handoff inspect --handoff handoff.json --archive pack.lpc-assets.zip --json',
+  'lpc-toolkit asset authoring handoff import --handoff handoff.json --archive pack.lpc-assets.zip --plan attach-pack-plan.json --workspace ./my-lpc-art --confirm --json',
+  'lpc-toolkit asset authoring handoff recover --handoff handoff.json --archive pack.lpc-assets.zip --workspace ./my-lpc-art --action resume --confirm --json',
+] as const;
+
 const cliReadmeUrl =
   'https://github.com/ochowei/lpc-toolkit-2026-1/blob/main/packages/cli/README.md';
 
@@ -372,12 +378,38 @@ export function CliPage({ onNavigate }: ProductPageProps) {
               next action.
             </p>
             <ol className="mt-4 space-y-3">
-              {providerHandoffCommands.map((command, index) => (
+            {providerHandoffCommands.map((command, index) => (
                 <li key={`${index}-${command}`}>
                   <CopyCode children={command} />
                 </li>
               ))}
             </ol>
+            <h3 className="mt-5 text-lg font-semibold text-text">
+              Transfer one Web revision to the CLI explicitly
+            </h3>
+            <p className="mt-2 text-sm text-text-2">
+              The Workbench <strong>Export for CLI</strong> action downloads the
+              existing asset archive and a strict handoff sidecar from one
+              stable in-memory revision. It never uploads or persists browser
+              authoring state. Inspect the pair first, then choose an explicit
+              attach-pack plan and CLI confirmation; stale pairs stop before
+              mutation, and the handoff never satisfies validation, preview,
+              candidate-import, attribution, or release gates.
+            </p>
+            <ol className="mt-4 space-y-3">
+              {webCliHandoffCommands.map((command, index) => (
+                <li key={`${index}-${command}`}>
+                  <CopyCode children={command} />
+                </li>
+              ))}
+            </ol>
+            <p className="mt-4 text-sm text-text-2">
+              A successful import records a separate
+              <code>web-handoff-receipt.json</code> sidecar. Older sessions
+              remain readable, and <code>asset authoring status</code> exposes
+              only bounded optional <code>webHandoff</code> evidence. Web handoff
+              is not release approval.
+            </p>
           </div>
           <p className="mt-4 text-sm text-text-2">
             Put PNGs under <code>artist-packs/&lt;pack-id&gt;/sprites/</code>.

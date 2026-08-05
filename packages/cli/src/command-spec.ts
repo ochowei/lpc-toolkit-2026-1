@@ -387,7 +387,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
   {
     command: ['asset', 'authoring', 'status'],
     usage: 'lpc-toolkit asset authoring status --session <session-id> [--workspace <directory>] [--json]',
-    description: 'Read the current state and safe next actions for a session.',
+    description: 'Read the current state, safe next actions, and optional bounded Web-handoff sidecar evidence for a session; the sidecar is not release approval and does not change the v1 session file.',
     options: [HELP_OPTION, JSON_OPTION, AUTHORING_SESSION_OPTION, ASSET_WORKSPACE_OPTION],
     examples: ['lpc-toolkit asset authoring status --session session-id --json'],
   },

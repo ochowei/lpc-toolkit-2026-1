@@ -263,8 +263,32 @@ pack, inspect, and install gates. Unsupported, stale, cancelled, timed-out, or
 scope-changing work preserves the last valid checkpoint and returns one safe
 next action; optional capability absence is reported as an external-author fallback
 and hands the work back to the user. The flow does not add persistent browser
-authoring state or a Web-to-CLI bridge, and no real provider is invoked by the
-shipped CLI.
+authoring state, and no real provider is invoked by the shipped CLI.
+
+### Web-to-CLI handoff
+
+The Web Asset Pack Workbench can explicitly export one stable in-memory
+revision as the existing asset archive plus a strict
+`lpc-toolkit.web-cli-handoff.v1` sidecar. This is a one-way local-file bridge:
+it does not upload, add a backend, or persist browser authoring state.
+
+Review and import the pair in a standalone CLI workspace:
+
+```sh
+lpc-toolkit asset authoring handoff inspect --handoff handoff.json --archive pack.lpc-assets.zip --json
+lpc-toolkit asset authoring handoff import --handoff handoff.json --archive pack.lpc-assets.zip --plan attach-pack-plan.json --workspace ./my-lpc-art --confirm --json
+lpc-toolkit asset authoring handoff recover --handoff handoff.json --archive pack.lpc-assets.zip --workspace ./my-lpc-art --action resume --confirm --json
+```
+
+Inspection is read-only; import requires a matching attach-pack plan and
+separate human confirmation. Recovery can resume or discard only the exact
+CLI-owned staging directory. A successful import writes a separate
+`web-handoff-receipt.json` sidecar and leaves the existing v1 session,
+validation, preview, candidate-import, D1 provenance, provider, attribution,
+and release authorities unchanged. `asset authoring status` may show bounded
+`webHandoff` evidence, but stale handoff data is rejected before mutation and
+Web handoff is never release approval. Older sessions without the sidecar
+remain readable with `webHandoff: null`.
 
 Give the resulting `<pack-id>-<version>.lpc-assets.zip` to a consumer. They use
 a separate standalone workspace and run the lifecycle in order:

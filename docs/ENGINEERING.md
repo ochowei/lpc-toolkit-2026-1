@@ -105,6 +105,18 @@ pnpm --filter @lpc-toolkit/web test:e2e -- asset-pack-workbench.spec.ts
 covers attributed formal/draft downloads, draft inspect/install rejection
 without workspace mutation, formal install, and doctor containment.
 
+The D3 Web-to-CLI acceptance is a separate local-file boundary. It covers one
+stable in-memory Web export, strict sidecar/archive binding, stale and blocked
+refusal before mutation, explicit attach-pack import, session-owned receipt
+creation, and exact interruption recovery. It does not use browser storage,
+uploads, a backend, or a live reverse session:
+
+```sh
+pnpm --filter @lpc-toolkit/core test -- asset-authoring-web-handoff.test.ts
+pnpm --filter @lpc-toolkit/web test -- asset-pack-download.test.ts asset-pack-download-bar.test.tsx asset-pack-web-cli-handoff.test.ts asset-pack-workbench-shell.test.tsx
+pnpm --filter @lpc-toolkit/cli test -- asset-authoring-web-cli-handoff.test.ts d3-web-cli-fixtures.test.ts command-spec.test.ts main-json.test.ts main-human.test.ts response.test.ts
+```
+
 ### CLI
 
 ```sh
@@ -216,7 +228,8 @@ pnpm --filter @lpc-toolkit/core run typecheck
 
 CLI tests cover session persistence, command orchestration, contract artifacts,
 candidate trust/replacement, receipt invalidation, JSON/human projections, the
-public packed-argv acceptance, command help, and the intentionally bounded
+public packed-argv acceptance, command help, Web-to-CLI handoff/recovery, and
+the intentionally bounded
 Codex plugin contract:
 
 ```sh
@@ -261,8 +274,9 @@ Agent manifests, no-provider fallback, formal candidate import/validation/
 preview continuity, D1 evidence binding, and unchanged checked-in assets,
 managed base cache, artist source, formal archive, receipt, unowned output,
 and `upstream/` sentinels. No real provider, credential, network, plugin
-skill, backend, Web bridge, or persistent browser authoring state is part of
-this check. The existing CI mapping remains the same: the CLI package job
+skill, backend, or persistent browser authoring state is part of this D2
+check; D3's local archive/sidecar bridge is verified by the separate map above.
+The existing CI mapping remains the same: the CLI package job
 covers build/typecheck/tests/package smoke, while `Unit tests` runs
 `pnpm verify` and the docs/plugin policy gates.
 
