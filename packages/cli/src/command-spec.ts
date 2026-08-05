@@ -228,11 +228,12 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
   {
     command: ['asset', 'authoring', 'provider'],
     usage: 'lpc-toolkit asset authoring provider <command>',
-    description: 'Discover explicitly supplied providers and preflight a session-bound handoff.',
+    description: 'Discover explicitly supplied providers, preflight, and persist consent-scoped handoffs.',
     options: [HELP_OPTION],
     examples: [
       'lpc-toolkit asset authoring provider discover --session session-id --contract-digest sha256:... --descriptors providers.json --json',
       'lpc-toolkit asset authoring provider preflight --session session-id --contract-digest sha256:... --descriptor provider.json --json',
+      'lpc-toolkit asset authoring provider handoff --session session-id --descriptor provider.json --consent consent.json --confirm --json',
     ],
   },
   {
@@ -267,6 +268,23 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
     ],
     examples: [
       'lpc-toolkit asset authoring provider preflight --session session-id --contract-digest sha256:... --descriptor provider.json --workspace ./my-lpc-art --json',
+    ],
+  },
+  {
+    command: ['asset', 'authoring', 'provider', 'handoff'],
+    usage: 'lpc-toolkit asset authoring provider handoff --session <session-id> --descriptor <descriptor.json> --consent <consent.json> [--confirm] [--workspace <directory>] [--json]',
+    description: 'Persist a consent-scoped provider invocation without executing a provider or mutating pack source.',
+    options: [
+      HELP_OPTION,
+      JSON_OPTION,
+      AUTHORING_SESSION_OPTION,
+      PROVIDER_DESCRIPTOR_OPTION,
+      { name: 'consent', kind: 'value', valueLabel: 'consent.json', description: 'Read the bounded explicit consent scope.' },
+      { name: 'confirm', kind: 'boolean', description: 'Confirm the exact provider handoff scope.' },
+      PROVIDER_WORKSPACE_OPTION,
+    ],
+    examples: [
+      'lpc-toolkit asset authoring provider handoff --session session-id --descriptor provider.json --consent consent.json --confirm --json',
     ],
   },
   {

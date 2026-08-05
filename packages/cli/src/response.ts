@@ -1,10 +1,12 @@
 import path from 'node:path';
 import {
+  assetProviderInvocationProjection,
   assetAuthoringReleaseGateProjection,
   assetAuthoringReleaseReceiptProjection,
   type AssetAuthoringPreviewAcceptanceReceipt,
   type AssetAuthoringReleaseDeclarationReceipt,
   type AssetAuthoringReleaseGateProjection,
+  type AssetProviderInvocation,
 } from '@lpc-toolkit/core';
 import { CLI_VERSION } from './package-info.js';
 import {
@@ -53,6 +55,9 @@ export type AuthoringPhase =
 export type AuthoringCheckpointFreshness = 'missing' | 'current' | 'stale' | 'blocked';
 export type AuthoringActionSafety = 'safe' | 'requires-confirmation' | 'blocked';
 
+export const ASSET_AUTHORING_PROVIDER_RESPONSE_SCHEMA =
+  'lpc-toolkit.asset-provider-response.v1' as const;
+
 export interface AuthoringCheckpoint {
   readonly id: string;
   readonly digest: string;
@@ -77,6 +82,20 @@ export interface AuthoringNextAction {
   readonly requiredInputs: readonly string[];
   readonly preconditionDigests: readonly string[];
   readonly expectedCheckpoint: AuthoringCheckpoint | null;
+}
+
+export type AuthoringProviderResponseStatus = 'ready' | 'consent-required' | 'unsupported';
+
+export interface AuthoringProviderResponseInput {
+  readonly status: AuthoringProviderResponseStatus;
+  readonly invocation: AssetProviderInvocation | null;
+  readonly invocationDigest: string | null;
+  readonly safety: AuthoringActionSafety;
+  readonly nextActions: readonly AuthoringNextAction[];
+}
+
+export interface AuthoringProviderResponseData extends AuthoringProviderResponseInput {
+  readonly schema: typeof ASSET_AUTHORING_PROVIDER_RESPONSE_SCHEMA;
 }
 
 export interface AuthoringSourceDigest {
@@ -127,13 +146,14 @@ export interface AuthoringResponseProjectionInput {
   readonly formalArchiveReceipt?: AssetAuthoringFormalArchiveReceipt | null;
   readonly inspectionReceipt?: AssetAuthoringArchiveInspectionReceipt | null;
   readonly installationReceipt?: AssetAuthoringInstallationReceipt | null;
+  readonly provider?: AuthoringProviderResponseInput | null;
 }
 
 export interface AuthoringResponseData extends Omit<
   AuthoringResponseProjectionInput,
   'releaseGates' | 'releaseDeclaration' | 'previewAcceptance' | 'draftReceipt' | 'syncReceipt'
   | 'formalArchiveReceipt' | 'inspectionReceipt' | 'installationReceipt'
-  | 'releaseProvenanceReceipt'
+  | 'releaseProvenanceReceipt' | 'provider'
 > {
   readonly schema: 'lpc-toolkit.asset-authoring-response.v1';
   readonly cliVersion: string;
@@ -148,6 +168,7 @@ export interface AuthoringResponseData extends Omit<
   readonly formalArchiveReceipt: AssetAuthoringFormalArchiveReceipt | null;
   readonly inspectionReceipt: AssetAuthoringArchiveInspectionReceipt | null;
   readonly installationReceipt: AssetAuthoringInstallationReceipt | null;
+  readonly provider: AuthoringProviderResponseData | null;
 }
 
 export function authoringResponseProjection(
@@ -218,6 +239,25 @@ export function authoringResponseProjection(
     || input.releaseProvenanceReceipt === null
     ? null
     : { ...input.releaseProvenanceReceipt };
+  const provider = input.provider === undefined || input.provider === null
+    ? null
+    : {
+      schema: ASSET_AUTHORING_PROVIDER_RESPONSE_SCHEMA,
+      status: input.provider.status,
+      invocation: input.provider.invocation === null
+        ? null
+        : assetProviderInvocationProjection(input.provider.invocation),
+      invocationDigest: input.provider.invocationDigest,
+      safety: input.provider.safety,
+      nextActions: input.provider.nextActions.map((action) => ({
+        ...action,
+        requiredInputs: [...action.requiredInputs],
+        preconditionDigests: [...action.preconditionDigests],
+        expectedCheckpoint: action.expectedCheckpoint === null
+          ? null
+          : { ...action.expectedCheckpoint },
+      })),
+    };
   if (releaseDeclaration !== null && releaseDeclaration.kind !== 'declaration') {
     throw new Error('Release declaration response receipt has the wrong kind.');
   }
@@ -263,6 +303,7 @@ export function authoringResponseProjection(
     formalArchiveReceipt,
     inspectionReceipt,
     installationReceipt,
+    provider,
     cliVersion: CLI_VERSION,
     capabilities: [...AUTHORING_CAPABILITIES],
     schemaVersions: [...AUTHORING_SCHEMA_VERSIONS],
@@ -1360,6 +1401,36 @@ function formatProviderPreflight(data: JsonRecord): string | undefined {
   return `${lines.join('\n')}\n`;
 }
 
+function formatProviderHandoff(data: JsonRecord): string | undefined {
+  const provider = isRecord(data['provider']) ? data['provider'] : undefined;
+  const id = provider === undefined ? undefined : stringValue(provider, 'id');
+  const status = stringValue(data, 'status');
+  const contractDigest = stringValue(data, 'contractDigest');
+  const safety = stringValue(data, 'safety');
+  if (!id || !status || !contractDigest || !safety) return undefined;
+  const invocationDigest = nullableStringValue(data, 'invocationDigest');
+  const lines = [
+    `Provider handoff: ${id} (${status})`,
+    `Contract: ${contractDigest}`,
+    `Safety: ${safety}`,
+    `Invocation: ${invocationDigest ?? 'none'}`,
+  ];
+  const refusal = data['refusal'];
+  if (isRecord(refusal)) {
+    const code = stringValue(refusal, 'code');
+    const message = stringValue(refusal, 'message');
+    if (code && message) lines.push(`Result: ${code}: ${message}`);
+  }
+  const actions = recordArrayValue(data, 'nextActions') ?? [];
+  for (const action of actions) {
+    const summary = stringValue(action, 'summary');
+    const command = stringValue(action, 'command');
+    if (summary) lines.push(`Next action: ${summary}`);
+    if (command) lines.push(`Next command: ${command}`);
+  }
+  return `${lines.join('\n')}\n`;
+}
+
 function formatHumanData(response: CliResponse<unknown>): string | undefined {
   const data = response.data;
   if (!isRecord(data)) return undefined;
@@ -1406,6 +1477,8 @@ function formatHumanData(response: CliResponse<unknown>): string | undefined {
       return formatProviderDiscovery(data);
     case 'asset authoring provider preflight':
       return formatProviderPreflight(data);
+    case 'asset authoring provider handoff':
+      return formatProviderHandoff(data);
     case 'token encode':
       return formatTokenEncode(data);
     case 'token decode':

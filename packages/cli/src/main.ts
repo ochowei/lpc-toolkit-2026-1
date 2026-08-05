@@ -233,7 +233,11 @@ function preflightCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
     const providerCommand = parsed.command[3];
     if (
       parsed.command.length !== 4
-      || (providerCommand !== 'discover' && providerCommand !== 'preflight')
+      || (
+        providerCommand !== 'discover'
+        && providerCommand !== 'preflight'
+        && providerCommand !== 'handoff'
+      )
     ) {
       return commandError(commandName, {
         code: 'unknown_command',
@@ -248,9 +252,12 @@ function preflightCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
         path: `--${name}`,
       });
     };
-    for (const name of providerCommand === 'discover'
+    const requiredFlags = providerCommand === 'discover'
       ? ['session', 'contract-digest', 'descriptors']
-      : ['session', 'contract-digest', 'descriptor']) {
+      : providerCommand === 'preflight'
+        ? ['session', 'contract-digest', 'descriptor']
+        : ['session', 'descriptor', 'consent'];
+    for (const name of requiredFlags) {
       const issue = requiredStringFlag(name);
       if (issue) return issue;
     }
@@ -611,7 +618,7 @@ async function runCliWithRuntime(
     && parsed.command[2] === 'provider'
   ) {
     let workspace: AssetWorkspace | undefined;
-    if (parsed.command[3] === 'preflight') {
+    if (parsed.command[3] === 'preflight' || parsed.command[3] === 'handoff') {
       try {
         workspace = resolvedDependencies.findAssetWorkspace(
           io.cwd,
@@ -619,9 +626,9 @@ async function runCliWithRuntime(
         );
       } catch {
         return writeResponse(
-          commandError('asset authoring provider preflight', {
+          commandError(`asset authoring provider ${parsed.command[3]}`, {
             code: 'asset_workspace_not_found',
-            message: 'An asset workspace is required for provider preflight.',
+            message: `An asset workspace is required for provider ${parsed.command[3]}.`,
             path: '--workspace',
           }),
           parsed,

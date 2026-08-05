@@ -282,6 +282,8 @@ describe('asset authoring session persistence', () => {
     delete oldDocument.receipts.draftArchive;
     delete oldDocument.receipts.sync;
     delete oldDocument.receipts.releaseProvenance;
+    delete oldDocument.receipts.providerInvocation;
+    delete oldDocument.receipts.providerResult;
     writeFileSync(sessionPath, `${JSON.stringify(oldDocument, null, 2)}\n`);
 
     expect(store.read(session.sessionId).receipts.acknowledgements).toBeNull();
@@ -290,6 +292,8 @@ describe('asset authoring session persistence', () => {
     expect(store.read(session.sessionId).receipts.draftArchive).toBeNull();
     expect(store.read(session.sessionId).receipts.sync).toBeNull();
     expect(store.read(session.sessionId).receipts.releaseProvenance).toBeNull();
+    expect(store.read(session.sessionId).receipts.providerInvocation).toBeNull();
+    expect(store.read(session.sessionId).receipts.providerResult).toBeNull();
     const replaced = store.replace(session.sessionId, {
       receipts: {
         validation: null,
@@ -317,6 +321,62 @@ describe('asset authoring session persistence', () => {
       }],
       recordDigests: [DIGEST_C, DIGEST_D],
     });
+  });
+
+  it('persists only session-bound provider invocation evidence and rejects private staging values', () => {
+    const workspace = createWorkspace();
+    const store = createStore(workspace);
+    const session = store.create({ plan: PLAN, packRoot: packRoot(workspace) });
+    const targetId = PLAN.scope.paths[0]!;
+    const invocation = {
+      schema: 'lpc-toolkit.asset-provider-invocation.v1',
+      sessionId: session.sessionId,
+      contractDigest: DIGEST_A,
+      operation: 'sprite-candidate.v1',
+      provider: {
+        id: 'provider.example',
+        adapter: { id: 'agent-adapter.example', version: '1.0.0' },
+      },
+      targetIds: [targetId],
+      consent: {
+        confirmed: true,
+        scopeDigest: DIGEST_B,
+        network: { enabled: false, hosts: [] },
+        referenceDigests: [],
+      },
+      limits: {
+        maxCandidateBytes: 67108864,
+        timeoutSeconds: 600,
+        maxReferences: 8,
+      },
+      candidate: {
+        stagingId: `provider.example/${session.sessionId}`,
+        targetIds: [targetId],
+      },
+    } as const;
+    const replaced = store.replace(session.sessionId, {
+      receipts: {
+        ...session.receipts,
+        providerInvocation: invocation,
+        providerResult: null,
+      },
+    });
+    expect(replaced.receipts.providerInvocation).toEqual(invocation);
+    expect(store.read(session.sessionId).receipts.providerInvocation).toEqual(invocation);
+
+    const sessionPath = assetAuthoringSessionPath(workspace, session.sessionId);
+    const document = JSON.parse(readFileSync(sessionPath, 'utf8')) as {
+      readonly receipts: Record<string, unknown>;
+    };
+    document.receipts.providerInvocation = {
+      ...invocation,
+      candidate: {
+        ...invocation.candidate,
+        stagingId: '/private/provider-candidate',
+      },
+    };
+    writeFileSync(sessionPath, `${JSON.stringify(document, null, 2)}\n`);
+    expect(() => store.read(session.sessionId)).toThrow(/provider invocation|private|staging/i);
   });
 
   it('persists and reads the bounded consumer installation receipt', () => {

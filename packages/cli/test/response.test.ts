@@ -160,4 +160,32 @@ describe('response envelope', () => {
     expect(output).toContain('Compatible items (0 of 0)');
     expect(output).toContain('Suggestions:\n- hair/Braids [braids]');
   });
+
+  it('formats consent-scoped provider handoff status and next action without paths', () => {
+    const output = formatHumanResponse(commandOk('asset authoring provider handoff', {
+      schema: 'lpc-toolkit.asset-provider-handoff.v1',
+      sessionId: '00000000-0000-4000-8000-000000000000',
+      contractDigest: `sha256:${'a'.repeat(64)}`,
+      provider: { id: 'provider.example', adapter: { id: 'agent-adapter.example', version: '1.0.0' } },
+      status: 'consent-required',
+      invocation: null,
+      invocationDigest: null,
+      refusal: null,
+      safety: 'requires-confirmation',
+      nextActions: [{
+        id: 'confirm-provider-handoff',
+        summary: 'Confirm the exact provider scope.',
+        command: 'asset authoring provider handoff --confirm',
+        safety: 'requires-confirmation',
+        requiredInputs: ['confirm'],
+        preconditionDigests: [`sha256:${'a'.repeat(64)}`],
+        expectedCheckpoint: null,
+      }],
+    }), 'fallback\n');
+
+    expect(output).toContain('Provider handoff: provider.example (consent-required)');
+    expect(output).toContain('Safety: requires-confirmation');
+    expect(output).toContain('Next command: asset authoring provider handoff --confirm');
+    expect(output).not.toContain('/private/');
+  });
 });

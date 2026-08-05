@@ -13,12 +13,19 @@ import path from 'node:path';
 import {
   ASSET_AUTHORING_RELEASE_ARTIFACT_IDS,
   assetAuthoringReleaseReceiptDigestInput,
+  assetProviderInvocationDigestInput,
+  parseAssetProviderInvocation,
+  parseAssetProviderRefusal,
+  parseAssetProviderResult,
   parseAssetAuthoringPlan,
   parseAssetAuthoringReleaseReceipt,
   type AssetAuthoringPlan,
   type AssetAuthoringPreviewAcceptanceReceipt as CoreAssetAuthoringPreviewAcceptanceReceipt,
   type AssetAuthoringReleaseArtifactDigest,
   type AssetAuthoringReleaseDeclarationReceipt as CoreAssetAuthoringReleaseDeclarationReceipt,
+  type AssetProviderInvocation,
+  type AssetProviderRefusal,
+  type AssetProviderResult,
 } from '@lpc-toolkit/core';
 import { CLI_VERSION } from './package-info.js';
 import {
@@ -251,6 +258,8 @@ export interface AssetAuthoringSessionReceipts {
   readonly archiveInspection?: AssetAuthoringArchiveInspectionReceipt | null;
   readonly installation?: AssetAuthoringInstallationReceipt | null;
   readonly releaseProvenance?: AssetAuthoringReleaseProvenanceReceipt | null;
+  readonly providerInvocation?: AssetProviderInvocation | null;
+  readonly providerResult?: AssetProviderResult | AssetProviderRefusal | null;
 }
 
 export interface AssetAuthoringSessionCheckpoint {
@@ -608,7 +617,144 @@ function parseTargetCheckpoints(value: unknown): readonly AssetAuthoringTargetCh
   return result;
 }
 
-function parseReceipts(value: unknown): AssetAuthoringSessionReceipts {
+function parseProviderInvocation(
+  value: unknown,
+  sessionId: string,
+  plan: AssetAuthoringPlan,
+): AssetProviderInvocation {
+  const parsed = parseAssetProviderInvocation(value);
+  if (!parsed.ok) {
+    fail(
+      'asset_authoring_session_tampered',
+      `session.receipts.providerInvocation is invalid: ${parsed.diagnostics.map((diagnostic) => diagnostic.message).join(' ')}`,
+    );
+  }
+  const invocation = parsed.invocation;
+  if (invocation.sessionId !== sessionId) {
+    fail(
+      'asset_authoring_session_tampered',
+      'session.receipts.providerInvocation.sessionId must match the session.',
+    );
+  }
+  if (!invocation.consent.confirmed) {
+    fail(
+      'asset_authoring_session_tampered',
+      'session.receipts.providerInvocation.consent.confirmed must be true.',
+    );
+  }
+  const targetIds = new Set(plan.scope.paths);
+  const contractAssetId = plan.goal === 'new-item'
+    ? `${plan.pack.id}--${plan.asset.localId}`
+    : plan.goal === 'extend-item'
+      ? plan.asset.itemId
+      : undefined;
+  const contractTargetPrefix = `${plan.pack.id}/${contractAssetId ?? ''}`;
+  if (invocation.targetIds.some((targetId) =>
+    !targetIds.has(targetId) && !targetId.startsWith(contractTargetPrefix))) {
+    fail(
+      'asset_authoring_session_path_invalid',
+      'session.receipts.providerInvocation.targetIds must stay inside the session plan scope.',
+    );
+  }
+  if (invocation.candidate.stagingId !== `${invocation.provider.id}/${sessionId}`) {
+    fail(
+      'asset_authoring_session_path_invalid',
+      'session.receipts.providerInvocation.candidate.stagingId must be the session-relative provider staging id.',
+    );
+  }
+  if (!invocation.consent.network.enabled && invocation.consent.network.hosts.length > 0) {
+    fail(
+      'asset_authoring_session_tampered',
+      'session.receipts.providerInvocation.consent.network.hosts must be empty when network is disabled.',
+    );
+  }
+  return invocation;
+}
+
+function sameProviderIdentity(
+  left: AssetProviderInvocation['provider'],
+  right: AssetProviderInvocation['provider'],
+): boolean {
+  return left.id === right.id
+    && left.adapter.id === right.adapter.id
+    && left.adapter.version === right.adapter.version;
+}
+
+function providerInvocationDigest(invocation: AssetProviderInvocation): string {
+  return `sha256:${createHash('sha256')
+    .update(assetProviderInvocationDigestInput(invocation), 'utf8')
+    .digest('hex')}`;
+}
+
+function parseProviderResult(
+  value: unknown,
+  sessionId: string,
+  plan: AssetAuthoringPlan,
+  invocation: AssetProviderInvocation | null,
+): AssetProviderResult | AssetProviderRefusal {
+  const record = requireRecord(value, 'session.receipts.providerResult');
+  const schema = record.schema;
+  const isRefusal = schema === 'lpc-toolkit.asset-provider-refusal.v1';
+  let result: AssetProviderResult | AssetProviderRefusal;
+  if (isRefusal) {
+    const parsed = parseAssetProviderRefusal(value);
+    if (!parsed.ok) {
+      fail(
+        'asset_authoring_session_tampered',
+        `session.receipts.providerResult is invalid: ${parsed.diagnostics.map((diagnostic) => diagnostic.message).join(' ')}`,
+      );
+    }
+    result = parsed.refusal;
+  } else {
+    const parsed = parseAssetProviderResult(value);
+    if (!parsed.ok) {
+      fail(
+        'asset_authoring_session_tampered',
+        `session.receipts.providerResult is invalid: ${parsed.diagnostics.map((diagnostic) => diagnostic.message).join(' ')}`,
+      );
+    }
+    result = parsed.result;
+  }
+  if (result.sessionId !== sessionId) {
+    fail('asset_authoring_session_tampered', 'session.receipts.providerResult.sessionId must match the session.');
+  }
+  if (invocation === null) {
+    fail('asset_authoring_session_tampered', 'session.receipts.providerResult requires providerInvocation.');
+  }
+  const boundInvocation = invocation;
+  if (result.invocationDigest !== providerInvocationDigest(boundInvocation)) {
+    fail('asset_authoring_session_tampered', 'session.receipts.providerResult.invocationDigest must match providerInvocation.');
+  }
+  if (result.contractDigest !== boundInvocation.contractDigest) {
+    fail('asset_authoring_session_tampered', 'session.receipts.providerResult.contractDigest must match providerInvocation.');
+  }
+  if (!sameProviderIdentity(result.provider, boundInvocation.provider)) {
+    fail('asset_authoring_session_tampered', 'session.receipts.providerResult.provider must match providerInvocation.');
+  }
+  const targetIds = new Set(plan.scope.paths);
+  if (result.schema === 'lpc-toolkit.asset-provider-result.v1') {
+    if (!targetIds.has(result.targetId) || !boundInvocation.targetIds.includes(result.targetId)) {
+      fail('asset_authoring_session_path_invalid', 'session.receipts.providerResult.targetId must stay inside the invocation scope.');
+    }
+    if (result.consentScopeDigest !== boundInvocation.consent.scopeDigest) {
+      fail('asset_authoring_session_tampered', 'session.receipts.providerResult.consentScopeDigest must match providerInvocation.');
+    }
+  } else {
+    if (result.targetIds.some((targetId) => !targetIds.has(targetId) || !boundInvocation.targetIds.includes(targetId))) {
+      fail('asset_authoring_session_path_invalid', 'session.receipts.providerResult.targetIds must stay inside the invocation scope.');
+    }
+    if (result.consentScopeDigest !== boundInvocation.consent.scopeDigest) {
+      fail('asset_authoring_session_tampered', 'session.receipts.providerResult.consentScopeDigest must match providerInvocation.');
+    }
+  }
+  return result;
+}
+
+function parseReceipts(
+  value: unknown,
+  sessionId: string,
+  plan: AssetAuthoringPlan,
+): AssetAuthoringSessionReceipts {
   const record = requireRecord(value, 'session.receipts');
   assertExactKeys(
     record,
@@ -624,6 +770,8 @@ function parseReceipts(value: unknown): AssetAuthoringSessionReceipts {
       'archiveInspection',
       'installation',
       'releaseProvenance',
+      'providerInvocation',
+      'providerResult',
     ],
     'session.receipts',
   );
@@ -660,6 +808,12 @@ function parseReceipts(value: unknown): AssetAuthoringSessionReceipts {
   const releaseProvenance = record.releaseProvenance === undefined || record.releaseProvenance === null
     ? null
     : parseReleaseProvenanceReceipt(record.releaseProvenance);
+  const providerInvocation = record.providerInvocation === undefined || record.providerInvocation === null
+    ? null
+    : parseProviderInvocation(record.providerInvocation, sessionId, plan);
+  const providerResult = record.providerResult === undefined || record.providerResult === null
+    ? null
+    : parseProviderResult(record.providerResult, sessionId, plan, providerInvocation);
   return {
     validation,
     preview,
@@ -672,6 +826,8 @@ function parseReceipts(value: unknown): AssetAuthoringSessionReceipts {
     archiveInspection,
     installation,
     releaseProvenance,
+    providerInvocation,
+    providerResult,
   };
 }
 
@@ -1477,7 +1633,7 @@ function parseSessionDocument(
     'session',
   );
   const checkpoints = parseTargetCheckpoints(record.checkpoints);
-  const receipts = parseReceipts(record.receipts);
+  const receipts = parseReceipts(record.receipts, sessionId, planResult.plan);
   validateReceiptScope(receipts, workspace, sessionId, packRoot);
   const provenance = parseProvenance(record.provenance);
   const conflict = parseConflict(record.conflict);
@@ -1721,6 +1877,8 @@ class AssetAuthoringSessionStoreImpl implements AssetAuthoringSessionStore {
         archiveInspection: null,
         installation: null,
         releaseProvenance: null,
+        providerInvocation: null,
+        providerResult: null,
       },
       provenance: [{
         id: this.eventId(),
