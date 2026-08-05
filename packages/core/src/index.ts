@@ -293,6 +293,26 @@ export type { AssetProviderProvenanceProjectionResult } from './asset-provider-p
 export { assetProviderResultToReleaseProvenanceRecord } from './asset-provider-provenance.js';
 
 export type {
+  AssetDistributionDiagnostic,
+  AssetDistributionDiagnosticCode,
+  AssetDistributionDigestBinding,
+  AssetDistributionRelease,
+  AssetDistributionReleaseAuthorization,
+  AssetDistributionReleaseIdentity,
+  AssetDistributionReleaseParseResult,
+  AssetDistributionReleaseSignature,
+  AssetDistributionSignatureAlgorithm,
+  AssetDistributionSignedProjection,
+} from './asset-distribution-schema.js';
+export {
+  ASSET_DISTRIBUTION_RELEASE_SCHEMA,
+  ASSET_DISTRIBUTION_SIGNATURE_ALGORITHM,
+  assetDistributionSignedProjection,
+  assetDistributionSignedProjectionDigestInput,
+  parseAssetDistributionRelease,
+} from './asset-distribution-schema.js';
+
+export type {
   AssetPackCreditRecord,
   NormalizedAssetPack,
   NormalizedAssetPackAsset,
