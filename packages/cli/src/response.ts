@@ -1525,12 +1525,40 @@ function formatWebCliHandoffInspection(data: JsonRecord): string | undefined {
   return `${lines.join('\n')}\n`;
 }
 
+function formatWebCliHandoffImport(data: JsonRecord): string | undefined {
+  const state = stringValue(data, 'state');
+  const handoffId = stringValue(data, 'handoffId');
+  const sessionId = stringValue(data, 'sessionId');
+  const binding = isRecord(data['binding']) ? data['binding'] : undefined;
+  const packId = binding === undefined ? undefined : stringValue(binding, 'packId');
+  const version = binding === undefined ? undefined : stringValue(binding, 'version');
+  const nextAction = isRecord(data['nextAction']) ? data['nextAction'] : undefined;
+  const summary = nextAction === undefined ? undefined : stringValue(nextAction, 'summary');
+  const command = nextAction === undefined ? undefined : stringValue(nextAction, 'command');
+  if (!state || !handoffId || !packId || !version || !summary || !command) return undefined;
+  const lines = [
+    state === 'imported'
+      ? 'Web-to-CLI handoff was imported into a new CLI authoring session.'
+      : state === 'needs-user-action'
+        ? 'Web-to-CLI handoff is ready for explicit CLI confirmation.'
+        : 'Web-to-CLI handoff is stale and was not imported.',
+    `Handoff: ${handoffId}`,
+    `Pack: ${packId}@${version}`,
+  ];
+  if (sessionId) lines.push(`Session: ${sessionId}`);
+  lines.push('Web handoff is not release approval.', `Next action: ${summary}`, `Next command: ${command}`);
+  return `${lines.join('\n')}\n`;
+}
+
 function formatHumanData(response: CliResponse<unknown>): string | undefined {
   const data = response.data;
   if (!isRecord(data)) return undefined;
 
   if (response.command === 'asset authoring handoff inspect') {
     return formatWebCliHandoffInspection(data);
+  }
+  if (response.command === 'asset authoring handoff import') {
+    return formatWebCliHandoffImport(data);
   }
 
   const authoring = formatAuthoringResponse(response.command, data);

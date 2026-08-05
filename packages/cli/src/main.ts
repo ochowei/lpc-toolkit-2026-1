@@ -648,11 +648,37 @@ async function runCliWithRuntime(
     && parsed.command[1] === 'authoring'
     && parsed.command[2] === 'handoff'
   ) {
+    let workspace: AssetWorkspace | undefined;
+    if (parsed.command[3] !== 'inspect') {
+      try {
+        workspace = resolvedDependencies.findAssetWorkspace(
+          io.cwd,
+          flagString(parsed.flags, 'workspace'),
+        );
+      } catch {
+        return writeResponse(
+          commandError(`asset authoring handoff ${parsed.command[3] ?? ''}`.trim(), {
+            code: 'asset_workspace_not_found',
+            message: 'An asset workspace is required for this Web-to-CLI handoff command.',
+            path: '--workspace',
+          }),
+          parsed,
+          io,
+          '',
+        );
+      }
+    }
     return writeResponse(
-      await runAssetAuthoringWebCliHandoffCommand({ parsed, cwd: io.cwd }),
+      await runAssetAuthoringWebCliHandoffCommand({
+        parsed,
+        cwd: io.cwd,
+        ...(workspace === undefined ? {} : { workspace }),
+      }),
       parsed,
       io,
-      'Web-to-CLI handoff inspection completed.\n',
+      parsed.command[3] === 'import'
+        ? 'Web-to-CLI handoff import completed.\n'
+        : 'Web-to-CLI handoff inspection completed.\n',
     );
   }
 

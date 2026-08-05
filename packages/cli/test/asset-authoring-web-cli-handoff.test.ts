@@ -1,12 +1,17 @@
 import {
+  existsSync,
   mkdtempSync,
+  readFileSync,
+  readdirSync,
   rmSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { parseAssetAuthoringWebHandoffReceiptJson } from '@lpc-toolkit/core';
 import { afterEach, describe, expect, it } from 'vitest';
+import { initializeAssetWorkspace } from '../src/asset-workspace.js';
 import { runCli, type CliIo } from '../src/main.js';
 import { createD3WebCliFixtures } from './fixtures/d3-web-cli-fixtures.js';
 
@@ -213,5 +218,157 @@ describe('asset authoring Web-to-CLI handoff inspection', () => {
     expect(code).toBe(0);
     expect(output.stdout.join('')).toContain('Web-to-CLI handoff is current.');
     expect(output.stdout.join('')).toContain('Next action: Import only after reviewing the pair and selecting an attach-pack plan.');
+  });
+
+  it('pauses import without --confirm and leaves the selected workspace unchanged', async () => {
+    const fixtures = await createD3WebCliFixtures();
+    const directory = createDirectory();
+    const workspace = initializeAssetWorkspace(path.join(directory, 'workspace'));
+    const { handoffPath, archivePath } = writeInputs(directory, fixtures.handoffJson, fixtures.archiveBytes);
+    const planPath = path.join(directory, 'attach-pack-plan.json');
+    writeFileSync(planPath, fixtures.attachPlanJson);
+    const output = ioFor(workspace.root);
+
+    const code = await runCli([
+      'asset', 'authoring', 'handoff', 'import',
+      '--handoff', handoffPath,
+      '--archive', archivePath,
+      '--plan', planPath,
+      '--json',
+    ], output.io);
+
+    expect(code).toBe(0);
+    const data = jsonData(output.stdout);
+    expect(data.state).toBe('needs-user-action');
+    expect(data.sessionId).toBeNull();
+    expect(data.nextAction).toEqual(expect.objectContaining({ id: 'confirm-handoff-import' }));
+    expect(existsSync(path.join(workspace.packsRoot, fixtures.handoff.pack.id))).toBe(false);
+    expect(existsSync(path.join(workspace.stateRoot, 'authoring-sessions'))).toBe(false);
+  });
+
+  it('imports into a new attach-pack session, writes a separate receipt, and is idempotent', async () => {
+    const fixtures = await createD3WebCliFixtures();
+    const directory = createDirectory();
+    const workspace = initializeAssetWorkspace(path.join(directory, 'workspace'));
+    const { handoffPath, archivePath } = writeInputs(directory, fixtures.handoffJson, fixtures.archiveBytes);
+    const planPath = path.join(directory, 'attach-pack-plan.json');
+    writeFileSync(planPath, fixtures.attachPlanJson);
+
+    const runImport = async () => {
+      const output = ioFor(workspace.root);
+      const code = await runCli([
+        'asset', 'authoring', 'handoff', 'import',
+        '--handoff', handoffPath,
+        '--archive', archivePath,
+        '--plan', planPath,
+        '--confirm',
+        '--json',
+      ], output.io);
+      return { code, data: jsonData(output.stdout), output };
+    };
+
+    const first = await runImport();
+    expect(first.code).toBe(0);
+    expect(first.data.state).toBe('imported');
+    expect(first.data.idempotent).toBe(false);
+    const sessionId = first.data.sessionId;
+    if (typeof sessionId !== 'string') throw new Error('Expected the imported session id.');
+    const packRoot = path.join(workspace.packsRoot, fixtures.handoff.pack.id);
+    const sessionRoot = path.join(workspace.stateRoot, 'authoring-sessions', sessionId);
+    expect(readFileSync(path.join(packRoot, 'asset-pack.json'))).toEqual(expect.any(Buffer));
+    expect(existsSync(path.join(sessionRoot, 'session.json'))).toBe(true);
+    expect(existsSync(path.join(sessionRoot, 'manifest.snapshot.json'))).toBe(true);
+    const receiptPath = path.join(sessionRoot, 'web-handoff-receipt.json');
+    expect(existsSync(receiptPath)).toBe(true);
+    const receipt = parseAssetAuthoringWebHandoffReceiptJson(readFileSync(receiptPath, 'utf8'));
+    expect(receipt.ok).toBe(true);
+    if (!receipt.ok) throw new Error('Expected a valid Web-handoff receipt.');
+    expect(receipt.receipt).toMatchObject({
+      handoffId: fixtures.handoff.handoffId,
+      archiveDigest: fixtures.handoff.payload.archiveDigest,
+      sessionId,
+      status: 'imported',
+    });
+    expect(JSON.stringify(receipt.receipt)).not.toMatch(/\/Users\/|\/private\/|password|token|prompt/iu);
+    const session = JSON.parse(readFileSync(path.join(sessionRoot, 'session.json'), 'utf8')) as Readonly<Record<string, unknown>>;
+    expect(session.receipts).not.toHaveProperty('webHandoff');
+    expect(session.phase).toBe('scaffolded');
+    expect(session.reason).toBe('pack-attached');
+
+    const second = await runImport();
+    expect(second.code).toBe(0);
+    expect(second.data.state).toBe('imported');
+    expect(second.data.idempotent).toBe(true);
+    expect(second.data.sessionId).toBe(sessionId);
+    expect(readdirSync(workspace.packsRoot)).toEqual([fixtures.handoff.pack.id]);
+  });
+
+  it('refuses a changed attach plan instead of overwriting the imported pack', async () => {
+    const fixtures = await createD3WebCliFixtures();
+    const directory = createDirectory();
+    const workspace = initializeAssetWorkspace(path.join(directory, 'workspace'));
+    const { handoffPath, archivePath } = writeInputs(directory, fixtures.handoffJson, fixtures.archiveBytes);
+    const planPath = path.join(directory, 'attach-pack-plan.json');
+    writeFileSync(planPath, fixtures.attachPlanJson);
+    const firstOutput = ioFor(workspace.root);
+    await runCli([
+      'asset', 'authoring', 'handoff', 'import',
+      '--handoff', handoffPath,
+      '--archive', archivePath,
+      '--plan', planPath,
+      '--confirm',
+      '--json',
+    ], firstOutput.io);
+    const originalManifest = readFileSync(path.join(workspace.packsRoot, fixtures.handoff.pack.id, 'asset-pack.json'));
+    const changedPlan = { ...fixtures.attachPlan, pack: { ...fixtures.attachPlan.pack, displayName: 'Changed plan label' } };
+    writeFileSync(planPath, `${JSON.stringify(changedPlan)}\n`);
+    const output = ioFor(workspace.root);
+
+    const code = await runCli([
+      'asset', 'authoring', 'handoff', 'import',
+      '--handoff', handoffPath,
+      '--archive', archivePath,
+      '--plan', planPath,
+      '--confirm',
+      '--json',
+    ], output.io);
+
+    expect(code).toBe(1);
+    expect(JSON.parse(output.stdout.join('')).errors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'asset_web_cli_handoff_import_conflict' }),
+    ]));
+    expect(readFileSync(path.join(workspace.packsRoot, fixtures.handoff.pack.id, 'asset-pack.json'))).toEqual(originalManifest);
+  });
+
+  it('describes the pending and imported boundaries in human output', async () => {
+    const fixtures = await createD3WebCliFixtures();
+    const directory = createDirectory();
+    const workspace = initializeAssetWorkspace(path.join(directory, 'workspace'));
+    const { handoffPath, archivePath } = writeInputs(directory, fixtures.handoffJson, fixtures.archiveBytes);
+    const planPath = path.join(directory, 'attach-pack-plan.json');
+    writeFileSync(planPath, fixtures.attachPlanJson);
+
+    const pending = ioFor(workspace.root);
+    const pendingCode = await runCli([
+      'asset', 'authoring', 'handoff', 'import',
+      '--handoff', handoffPath,
+      '--archive', archivePath,
+      '--plan', planPath,
+    ], pending.io);
+    expect(pendingCode).toBe(0);
+    expect(pending.stdout.join('')).toContain('ready for explicit CLI confirmation');
+    expect(pending.stdout.join('')).toContain('Web handoff is not release approval.');
+
+    const imported = ioFor(workspace.root);
+    const importedCode = await runCli([
+      'asset', 'authoring', 'handoff', 'import',
+      '--handoff', handoffPath,
+      '--archive', archivePath,
+      '--plan', planPath,
+      '--confirm',
+    ], imported.io);
+    expect(importedCode).toBe(0);
+    expect(imported.stdout.join('')).toContain('imported into a new CLI authoring session');
+    expect(imported.stdout.join('')).toContain('Web handoff is not release approval.');
   });
 });
