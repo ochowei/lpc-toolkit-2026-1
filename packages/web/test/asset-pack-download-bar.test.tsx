@@ -69,4 +69,14 @@ describe('AssetPackDownloadBar', () => {
     expect(html).toContain(current);
     expect(html).not.toContain(stale);
   });
+
+  it('offers explicit draft and formal CLI handoff exports without changing archive downloads', () => {
+    const html = renderToStaticMarkup(<AssetPackDownloadBar state={state()} onDownload={vi.fn()} onExportForCli={vi.fn()} />);
+
+    expect(html).toContain('Export for CLI');
+    expect(html).toContain('Creates a local handoff sidecar for the CLI. This is not release approval.');
+    expect(html).toContain('Export draft for CLI');
+    expect(html).toContain('Export formal for CLI');
+    expect(html.match(/<button[^>]*>/g)).toHaveLength(4);
+  });
 });

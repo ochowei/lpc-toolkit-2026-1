@@ -155,6 +155,9 @@ not modify `upstream/`.
 - provider-neutral descriptor discovery, contract-bound preflight, explicit
   consent handoff, candidate result/refusal staging, provider evidence
   invalidation, and additive Agent-integration compatibility checks
+- Web-to-CLI handoff inspection, archive binding, contained import staging,
+  session-owned handoff receipts, explicit interruption recovery, and bounded
+  status projection without changing the v1 session file
 - external generation-provenance companion publication from current formal
   archive evidence and a read-only verifier for copied archive/receipt bytes
 
@@ -193,6 +196,10 @@ The plugin also does not claim or invoke `asset-authoring-release-provenance.v1`
 verify`. It does not publish or verify external release provenance, invoke a
 provider, or add a new skill; use the installed CLI's public command directly
 when an external consumer needs independent verification.
+
+D3's Web-to-CLI file handoff is likewise not a plugin capability or skill. The
+plugin does not export browser state, read handoff sidecars, import packs, or
+perform recovery; users invoke the reviewed public CLI commands directly.
 
 ### Release evidence ownership
 
@@ -647,7 +654,10 @@ over official paths; and release fingerprints/formal candidates gate exact
 revision downloads. Draft output adds `status: "draft"`; formal output must
 clear it and preserve governed acknowledgements. Attribution remains attached
 to preview, draft, formal, and CLI lifecycle paths. The Web reuses the Core
-schema and does not introduce an alternate manifest format.
+schema and does not introduce an alternate manifest format. Its explicit
+`Export for CLI` action captures one stable in-memory revision and downloads
+the existing archive plus a strict handoff sidecar; it does not upload to a
+CLI/backend service or persist browser authoring state.
 
 ### Strict authoring session foundation
 
@@ -664,12 +674,15 @@ existing validation/preview leaf commands.
 `asset-authoring-session.v1`, `sprite-drawing-contract.v1`,
 `asset-authoring-candidate-import.v1`, `asset-authoring-recovery.v1`,
 `asset-authoring-release.v1`, `asset-authoring-draft-recovery.v1`, and
-`asset-authoring-consumer-install.v1`.
+`asset-authoring-consumer-install.v1`, `asset-authoring-web-cli-handoff.v1`,
+and `asset-authoring-web-cli-recovery.v1`.
 Their public schema set is
 `lpc-toolkit.asset-authoring-plan.v1`,
 `lpc-toolkit.asset-authoring-session.v1`,
 `lpc-toolkit.asset-authoring-response.v1`, and
 `lpc-toolkit.sprite-drawing-contract.v1`,
+`lpc-toolkit.web-cli-handoff.v1`, and
+`lpc-toolkit.asset-authoring-web-handoff-receipt.v1`,
 `lpc-toolkit.asset-release-declaration.v1`,
 `lpc-toolkit.asset-authoring-release-receipt.v1`, and
 `lpc-toolkit.asset-authoring-draft-receipt.v1`,
@@ -690,6 +703,14 @@ first two goals and explicitly refuses to publish a drawing contract for
 publishable source remains the ordinary
 `artist-packs/<pack-id>/asset-pack.json` and `sprites/` tree. Session state is
 not silently embedded in a formal archive.
+
+The separate D3 handoff flow is `asset authoring handoff inspect|import|recover`.
+It reads the Web archive and sidecar as untrusted regular files, requires an
+explicit attach-pack plan and import confirmation, and keeps recovery bound to
+the exact CLI-owned staging marker. Its `web-handoff-receipt.json` is a
+session-owned sidecar; `status` projects it as optional bounded evidence and
+never treats it as a current validation, preview, provider, provenance, or
+release receipt.
 
 Contract generation writes `contract.json`, metadata, transparent templates,
 guides, and any attributed working/reference artifacts in a session-owned
@@ -773,13 +794,41 @@ Animation audit remains read-only and provider-neutral.
 inspection-error findings without writing; only a complete report can feed
 `asset init --from-audit` or explicit extend-item remediation evidence. The Web
 Workbench remains an in-memory archive repair/download surface for draft or
-formal archives, not a bridge to the CLI authoring session. Session evidence
-and draft publication stay in the standalone workspace. Confirmed authoring
-sync is the narrowly scoped exception: it publishes only the existing
+formal archives. D3 adds only the explicit two-file Web-to-CLI handoff; it is
+not a live reverse bridge or persistent browser session. Session evidence and
+draft publication stay in the standalone workspace. Confirmed authoring sync
+is the narrowly scoped exception: it publishes only the existing
 manager-owned `assets_custom/` output and registry through the linked-sync
 transaction. Neither path modifies checked-in assets, the verified base cache,
 installed snapshots, unowned output, or the dormant read-only `upstream/`
 gitlink.
+
+### Web-to-CLI handoff bridge
+
+D3 is a one-way local-file bridge between the Web Asset Pack Workbench and the
+CLI. Web owns stable in-memory revision capture and two explicit downloads:
+the existing asset archive and the strict
+`lpc-toolkit.web-cli-handoff.v1` sidecar. It does not create a persistent
+browser authoring session, upload to a backend, or infer CLI ownership.
+
+The CLI owns regular-file checks, strict sidecar parsing, archive re-inspection,
+pack/manifest/content/source/credit/acknowledgement binding, attach-plan
+validation, contained staging, atomic publication, and exact interruption
+recovery. `asset authoring handoff inspect` is read-only; `import` requires a
+matching `attach-pack` plan and separate `--confirm`; `recover` can resume or
+discard only the exact CLI-owned staging directory after the same bindings are
+rechecked. A stale or blocked pair cannot create a pack or candidate source.
+
+Successful imports write the separate
+`lpc-toolkit.asset-authoring-web-handoff-receipt.v1` sidecar in the new session
+directory. The existing `lpc-toolkit.asset-authoring-session.v1` JSON remains
+unchanged and backward-readable: the handoff is not copied into validation,
+preview, candidate-import, provider, D1 provenance, attribution, or release
+authority. `asset authoring status` may project bounded optional `webHandoff`
+data, including only identity/digest fields and logical source paths. Missing
+sidecars return `null`; malformed or session-mismatched sidecars are
+`blocked`; neither state can satisfy release gates. Human CLI confirmation is
+an import decision, not a release declaration or preview acceptance.
 
 ### Provider-neutral Agent integration boundary
 

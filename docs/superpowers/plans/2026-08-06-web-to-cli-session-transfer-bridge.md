@@ -8,9 +8,9 @@
 
 **Goal:** Implement the reviewed [D3 Issue #170](https://github.com/ochowei/lpc-toolkit-2026-1) Web-to-CLI handoff contract under roadmap [Issue #153](https://github.com/ochowei/lpc-toolkit-2026-1/issues/153), without a backend, authentication, persistent browser state, new dependency, custom archive format, or weakened attribution/release authority.
 
-**Base:** `origin/main` at `c289e7e9808b8b66f3bf968f64f34eff1eb073a3`, containing merged D2 implementation PR #169. Normative specification: [`2026-08-06-web-to-cli-session-transfer-bridge.md`](../specs/2026-08-06-web-to-cli-session-transfer-bridge.md).
+**Base:** `origin/main` at `ee4798e2e19b2355a1aa5d9df817493f0e1aa218`, containing the merged D3 spec/plan review PR #171 and D2 implementation PR #169. Normative specification: [`2026-08-06-web-to-cli-session-transfer-bridge.md`](../specs/2026-08-06-web-to-cli-session-transfer-bridge.md).
 
-**Implementation branch:** `codex/issue-170-web-to-cli-bridge-implementation` (to be created only after spec/plan review).
+**Implementation branch:** `codex/issue-170-web-to-cli-bridge-implementation` (created after spec/plan review and active for D3 implementation).
 
 **Implementation PR:** separate D3 implementation PR; do not combine with D4–D6.
 
@@ -48,10 +48,11 @@
   verification commands. Commit plan records separately when required by
   `AGENTS.md`.
 
-## Public TDD seams — pending review confirmation
+## Public TDD seams — confirmed by review
 
 The TDD skill requires agreement on public seams before implementation tests
-are written. The following seams are proposed for user review:
+are written. The following seams were reviewed and confirmed by the user
+through the merged docs-only PR #171:
 
 1. **Core handoff contract seam** — exported strict parser,
    canonical projection/digest, privacy predicate, and stale-state predicate
@@ -76,8 +77,8 @@ are written. The following seams are proposed for user review:
    `formatHumanResponse`. Assert bounded D3 fields, privacy redaction, stable
    human wording, and existing response compatibility.
 
-**Seam confirmation:** pending user review of the D3 specification and this
-plan. No product-code test commit is authorized before confirmation.
+**Seam confirmation:** the user merged PR #171 on 2026-08-06. The five seams
+remain the implementation boundary; product-code TDD work is authorized.
 
 ## CLI documentation impact matrix
 
@@ -104,103 +105,141 @@ recovery state, or compatibility rule cannot be omitted from the matrix.
 
 ### 0. Review gate and fixture boundary
 
-- [ ] Review the D3 specification and this plan with the user.
-- [ ] Confirm the five public TDD seams above, or record the user's changes.
-- [ ] Create implementation branch from the merged D3 spec/plan base only
+- [x] Review the D3 specification and this plan with the user.
+      - Confirmation: user merged the docs-only review PR #171 on 2026-08-06.
+- [x] Confirm the five public TDD seams above through the user's merge of the
+      reviewed spec/plan PR; no seam changes were requested.
+- [x] Create implementation branch from the merged D3 spec/plan base only
       after confirmation.
-- [ ] Add local-only handoff, archive, attach-plan, stale-pair, tamper,
+      - Branch: `codex/issue-170-web-to-cli-bridge-implementation`
+      - Base: `ee4798e2e19b2355a1aa5d9df817493f0e1aa218`
+- [x] Add local-only handoff, archive, attach-plan, stale-pair, tamper,
       attribution, and interrupted-staging fixtures. Fixtures contain no
       credentials, private URLs, real provider output, or `upstream/` checkout.
+      - Commit: `a720ac80ded0472e475dab4e5adef353de9c2941`
+      - Verification: `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/d3-web-cli-fixtures.test.ts` PASS (1 test); `rtk pnpm --filter @lpc-toolkit/cli exec tsc -p tsconfig.json --noEmit` PASS; `rtk git diff --check` PASS.
 
 ### 1. Core strict handoff contract (red → green)
 
-- [ ] Add the versioned handoff and receipt types, strict parser, exact-key
+- [x] Add the versioned handoff and receipt types, strict parser, exact-key
       validation, UUID/digest/path/size constraints, and canonical projection.
-- [ ] Add deterministic `stateDigest` and handoff digest helpers using the
+- [x] Add deterministic `stateDigest` and handoff digest helpers using the
       existing canonical Core conventions.
-- [ ] Add stale-state, privacy, attribution-required, and compatibility
+- [x] Add stale-state, privacy, attribution-required, and compatibility
       predicates. A handoff is provenance of transfer only, never release or
       authorship authority.
-- [ ] Test unknown fields, duplicate sources, traversal/absolute paths,
+- [x] Test unknown fields, duplicate sources, traversal/absolute paths,
       unsupported status, missing credits, privacy violations, digest stability,
       property-order stability, and fixed independent digest fixtures.
-- [ ] Verify `packages/core/` remains environment-agnostic.
+- [x] Verify `packages/core/` remains environment-agnostic.
+      - Commit: `eba3fa2d64842b0af66c653e57d163e911381c26`
+      - Verification: `rtk pnpm --filter @lpc-toolkit/core test` PASS (32 files, 428 tests); `rtk pnpm --filter @lpc-toolkit/core build` PASS; `rtk pnpm check:boundaries` PASS; `rtk git diff --check` PASS.
 
 ### 2. Web explicit snapshot and export (red → green)
 
-- [ ] Add a pure snapshot builder from the current Workbench revision and the
+- [x] Add a pure snapshot builder from the current Workbench revision and the
       existing assembled archive response.
-- [ ] Verify assembly and sidecar creation are bound to one unchanged revision;
+- [x] Verify assembly and sidecar creation are bound to one unchanged revision;
       reject a race without downloading a stale pair.
-- [ ] Add the explicit `Export for CLI` action and confirmation UI for draft
+- [x] Add the explicit `Export for CLI` action and confirmation UI for draft
       and formal archive choices, using two downloads and the existing browser
       download adapter.
-- [ ] Keep the Workbench state memory-only. Add tests proving reset/refresh
+- [x] Keep the Workbench state memory-only. Add tests proving reset/refresh
       does not recover hidden state and export never uploads or persists it.
-- [ ] Preserve credits, acknowledgement digest, and attribution-required
+- [x] Preserve credits, acknowledgement digest, and attribution-required
       evidence; do not add Web release approval or provider payloads.
+      - Commit: `a720ac80ded0472e475dab4e5adef353de9c2941`
+      - Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/asset-pack-download.test.ts test/asset-pack-download-bar.test.tsx test/asset-pack-web-cli-handoff.test.ts test/asset-pack-workbench-shell.test.tsx` PASS (17 tests); `rtk pnpm --filter @lpc-toolkit/web exec tsc -p tsconfig.json --noEmit` PASS; `rtk git diff --check` PASS.
 
 ### 3. CLI read-only handoff inspection (red → green)
 
-- [ ] Add public command specification/help for
+- [x] Add public command specification/help for
       `asset authoring handoff inspect` and its exact options.
-- [ ] Read both inputs as regular files with existing limits and no symlink or
+- [x] Read both inputs as regular files with existing limits and no symlink or
       traversal acceptance.
-- [ ] Reuse existing archive inspection and re-compute archive, manifest,
+- [x] Reuse existing archive inspection and re-compute archive, manifest,
       content, source, credit, acknowledgement, and pack identity bindings.
-- [ ] Return deterministic `current`, `stale`, `blocked`, or
-      `needs-user-action` data without creating sessions or writing files.
-- [ ] Add human and JSON response tests with bounded digest comparisons and
+- [x] Return deterministic `current`, `stale`, or `blocked` inspection data
+      without creating sessions or writing files, with an explicit next action
+      for the later `needs-user-action` import boundary.
+- [x] Add human and JSON response tests with bounded digest comparisons and
       actionable re-export/repair commands.
+      - Commit: `62fc4c0181408684e0cdeb068a044a95f4c35184`
+      - Verification: `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/asset-authoring-web-cli-handoff.test.ts test/d3-web-cli-fixtures.test.ts test/command-spec.test.ts` PASS (56 tests); `rtk pnpm --filter @lpc-toolkit/cli exec tsc -p tsconfig.json --noEmit` PASS; `rtk pnpm --filter @lpc-toolkit/cli exec vitest run` FAIL in the sandbox only because 13 existing `web-server.test.ts` cases cannot bind loopback (`listen EPERM`), with 1,211 tests passed; `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/web-server.test.ts` PASS (22 tests) with loopback permission; `rtk git diff --check` PASS.
 
 ### 4. CLI explicit import and sidecar receipt (red → green)
 
-- [ ] Require an explicit strict `attach-pack` plan and exact pack identity/
+- [x] Require an explicit strict `attach-pack` plan and exact pack identity/
       version match; never infer a workspace or scope from the sidecar.
-- [ ] Add `asset authoring handoff import` with no-confirm pause and explicit
+- [x] Add `asset authoring handoff import` with no-confirm pause and explicit
       `--confirm` mutation boundary.
-- [ ] Stage the existing archive payload under a contained, new CLI workspace
+- [x] Stage the existing archive payload under a contained, new CLI workspace
       destination; reuse existing pack/session authorities and fail closed on
       existing destinations or races.
-- [ ] Create a new CLI session without reusing a Web/session ID and without
+- [x] Create a new CLI session without reusing a Web/session ID and without
       marking validation, preview, release, provider, D1, or import receipts
       current.
-- [ ] Persist the D3 web-handoff receipt only after atomic completion. Prove
+- [x] Persist the D3 web-handoff receipt only after atomic completion. Prove
       repeat import idempotency for unchanged bindings and explicit conflict
       for changed bindings.
+      - Commit: `90cc84e79e52a4677679074f6e5f5f6e759a6d97`
+      - Verification: `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/asset-authoring-web-cli-handoff.test.ts` PASS (10 tests); `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/asset-authoring-web-cli-handoff.test.ts test/d3-web-cli-fixtures.test.ts test/command-spec.test.ts` PASS (60 tests); `rtk pnpm --filter @lpc-toolkit/cli exec tsc -p tsconfig.json --noEmit` PASS; `rtk pnpm --filter @lpc-toolkit/cli exec vitest run` FAIL in the sandbox only because 13 existing `web-server.test.ts` cases cannot bind loopback (`listen EPERM`), with 1,214 tests passed and 1 skipped; `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/web-server.test.ts` PASS (22 tests) with loopback permission; `rtk git diff --check` PASS.
 
 ### 5. Explicit recovery (red → green)
 
-- [ ] Add `asset authoring handoff recover --action resume|discard` with exact
+- [x] Add `asset authoring handoff recover --action resume|discard` with exact
       handoff/archive/workspace bindings and required confirmation.
-- [ ] Simulate interruption during staging/commit and prove prior user-owned
+- [x] Simulate interruption during staging/commit and prove prior user-owned
       files, existing packs, sentinels, and session bytes remain unchanged.
-- [ ] Resume only matching pending staging; discard only the matching
+- [x] Resume only matching pending staging; discard only the matching
       CLI-owned temporary directory. Never delete inputs or broad roots.
-- [ ] Preserve stale/pending evidence and return one safe next action after a
+- [x] Preserve stale/pending evidence and return one safe next action after a
       failed or raced recovery.
+      - Commit: `78f7622ab7677433e4c469035c1280a01b0b3eae`
+      - Verification: `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/asset-authoring-web-cli-handoff.test.ts` PASS (13 tests); `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/asset-authoring-web-cli-handoff.test.ts test/d3-web-cli-fixtures.test.ts test/command-spec.test.ts` PASS (63 tests); `rtk pnpm --filter @lpc-toolkit/cli exec tsc -p tsconfig.json --noEmit` PASS; `rtk pnpm --filter @lpc-toolkit/cli exec vitest run` FAIL in the sandbox only because 13 existing `web-server.test.ts` cases cannot bind loopback (`listen EPERM`), with 1,218 tests passed and 1 skipped; `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/web-server.test.ts` PASS (22 tests) with loopback permission; `rtk git diff --check` PASS.
 
 ### 6. Session/receipt compatibility and capability projection
 
-- [ ] Project optional D3 sidecar state from `asset authoring status` without
+- [x] Project optional D3 sidecar state from `asset authoring status` without
       changing the v1 session file shape or exposing private paths.
-- [ ] Add D3 capabilities and schema identifiers only after public commands,
+- [x] Add D3 capabilities and schema identifiers only after public commands,
       refusal behavior, and tests are complete.
-- [ ] Prove older session fixtures without a sidecar remain readable and that
+- [x] Prove older session fixtures without a sidecar remain readable and that
       D2 provider receipts and D1 provenance are not rewritten.
-- [ ] Prove stale Web handoff evidence cannot satisfy existing release gates or
+- [x] Prove stale Web handoff evidence cannot satisfy existing release gates or
       replace candidate-import authority.
+      - Implementation commit: `a78332cff8762ab94173d93f2f4524cd9f4e3bbe`
+      - Verification: `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/asset-authoring-web-cli-handoff.test.ts test/d3-web-cli-fixtures.test.ts test/command-spec.test.ts test/main-json.test.ts test/main-human.test.ts test/response.test.ts` PASS (160 tests); `rtk pnpm --filter @lpc-toolkit/cli exec tsc -p tsconfig.json --noEmit` PASS; `rtk git diff --check` PASS.
 
 ### 7. Documentation impact and final verification
 
-- [ ] Update CLI help, CLI README, root README, landing, architecture,
+- [x] Update CLI help, CLI README, root README, landing, architecture,
       engineering, and releasing documentation for the final public contract.
-- [ ] Reassess the complete impact matrix and record `update` or an exact
+- [x] Reassess the complete impact matrix and record `update` or an exact
       `N/A — reason` for every surface, including plugin.
-- [ ] Run focused Core/Web/CLI/response/packed acceptance tests, boundary
+- [x] Run focused Core/Web/CLI/response/packed acceptance tests, boundary
       checks, plugin verification, full repository verification, CLI docs
       policy/impact checks, and `rtk git diff --check`.
-- [ ] Record exact commands and PASS/FAIL results below before the PR handoff.
+- [x] Record exact commands and PASS/FAIL results below before the PR handoff.
+      - Documentation commit: `5f41e9baa90118e9e20e0d1d8cb36af9bc420b0e`
+      - Regression-test commit: `fd054facc0f66026d3706e8bd43050c1c74ffafd`
+      - Final CLI documentation impact matrix:
+        ```text
+        help: update
+        cli-readme: update
+        root-readme: update
+        landing: update
+        architecture: update
+        engineering: update
+        releasing: update
+        plugin: N/A — D3 adds no plugin capability, skill, or command; plugin remains the reviewed character/animation-audit contract
+        ```
+      - Verification: `rtk pnpm --filter @lpc-toolkit/core exec vitest run test/asset-authoring-web-handoff.test.ts` PASS (6 tests); `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/landing-page.test.tsx test/asset-pack-download.test.ts test/asset-pack-download-bar.test.tsx test/asset-pack-web-cli-handoff.test.ts test/asset-pack-workbench-shell.test.tsx` PASS (20 tests); `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/command-spec.test.ts test/asset-authoring-web-cli-handoff.test.ts test/asset-authoring-commands.test.ts test/main-json.test.ts test/main-human.test.ts test/response.test.ts` PASS (167 tests).
+      - Verification: `rtk pnpm --filter @lpc-toolkit/core exec tsc -p tsconfig.json --noEmit` PASS; `rtk pnpm --filter @lpc-toolkit/web exec tsc -p tsconfig.json --noEmit` PASS; `rtk pnpm --filter @lpc-toolkit/cli exec tsc -p tsconfig.json --noEmit` PASS.
+      - Verification: `rtk pnpm --filter @lpc-toolkit/cli build` PASS; `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS (`Packed CLI install smoke test passed.`).
+      - Verification: `rtk pnpm check:boundaries` PASS; `rtk pnpm verify:plugin` PASS (40 tests); `rtk pnpm verify:cli-docs-policy` PASS (19 tests); `rtk pnpm check:cli-docs-impact -- --base origin/main --head HEAD --body-file .d3-pr-body.tmp.md` PASS (`CLI documentation impact declaration is valid.`); `rtk git diff --check` PASS.
+      - Verification: `rtk pnpm verify` PASS. Final workspace suites: Core 32 files/428 tests, asset-pack-format 7 files/75 tests, presets 1 file/8 tests, Web 107 files/867 tests, CLI 67 files/1,233 passed/1 skipped.
+      - Note: the first full verify attempt before `fd054facc0f66026d3706e8bd43050c1c74ffafd` failed only because the unchanged status/resume regression assertion omitted the additive `webHandoff: null`; the focused regression test and final full verify passed after the expectation was updated.
 
 ## Protected-path and privacy assertions
 
@@ -231,15 +270,25 @@ prompts, provider payloads, and raw pixel/archive bytes.
       human approval, recovery, and no-browser-persistence decisions.
   - Commit: `eadcef3199e7321ad99458967893bd9ce919c278`
   - Verification: `rtk git diff --cached --check` PASS; `rtk rg -n "Issue #170|lpc-toolkit.web-cli-handoff.v1|CLI documentation impact|No product-code test commit" docs/superpowers/specs/2026-08-06-web-to-cli-session-transfer-bridge.md docs/superpowers/plans/2026-08-06-web-to-cli-session-transfer-bridge.md` PASS.
-- [ ] Spec and plan reviewed by the user.
-- [ ] Public seams confirmed by the user.
-- [ ] Docs-only verification command and commit recorded after the files are added.
+- [x] Spec and plan reviewed by the user by merging PR #171.
+- [x] Public seams confirmed by the user by merging PR #171.
+- [x] Implementation branch created after review confirmation.
+  - Branch: `codex/issue-170-web-to-cli-bridge-implementation`
+  - Verification: `rtk git show -s --format=%H%n%s origin/main` PASS (`ee4798e2e19b2355a1aa5d9df817493f0e1aa218`, merge PR #171); `rtk git status --short --branch` PASS on the new branch.
+- [x] Docs-only verification command and commit recorded after the files are added.
+  - Commit: `ee4798e2e19b2355a1aa5d9df817493f0e1aa218` (merged PR #171)
+  - Verification: `rtk git show -s --format=%H%n%s origin/main` PASS; `rtk git status --short --branch` PASS.
 
 ### Implementation branch
 
-- [ ] Implementation branch and PR created only after review confirmation.
-- [ ] No implementation task may be marked complete before its focused red →
+- [x] Implementation branch and PR created only after review confirmation.
+  - Branch: `codex/issue-170-web-to-cli-bridge-implementation`
+  - PR: https://github.com/ochowei/lpc-toolkit-2026-1/pull/172 (Draft)
+  - Verification: `rtk gh pr view 172 --repo ochowei/lpc-toolkit-2026-1 --json number,url,state,isDraft,headRefName,baseRefName,title` PASS (`OPEN`, `isDraft: true`, base `main`); `rtk git status --short --branch` PASS after push.
+  - Initial CI snapshot: `CLI documentation impact` PASS; `Detect changes` PASS; `Unit tests` pending; Vercel deployment pending at handoff.
+- [x] No implementation task may be marked complete before its focused red →
       green test and exact verification command are recorded.
+  - Verification: Task 1 through Task 7 each contain the related implementation commit and focused PASS evidence above.
 
 ## Handoff criteria
 

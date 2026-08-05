@@ -94,6 +94,7 @@ my-lpc-art/
     └── authoring-sessions/
         └── <session-id>/
             ├── provider-candidates/   session-owned, re-digested result PNGs
+            ├── web-handoff-receipt.json  optional Web-to-CLI import sidecar
             └── release-artifacts/     deterministic draft/formal/provenance outputs
 ```
 
@@ -233,6 +234,8 @@ The advertisement includes these capability identifiers:
 - `agent-integration-packaging.v1`
 - `asset-authoring-release.v1`
 - `asset-authoring-release-provenance.v1`
+- `asset-authoring-web-cli-handoff.v1`
+- `asset-authoring-web-cli-recovery.v1`
 - `asset-authoring-draft-recovery.v1`
 - `asset-authoring-consumer-install.v1`
 
@@ -241,6 +244,8 @@ and these schema identifiers:
 - `lpc-toolkit.asset-authoring-plan.v1`
 - `lpc-toolkit.asset-authoring-session.v1`
 - `lpc-toolkit.asset-authoring-response.v1`
+- `lpc-toolkit.web-cli-handoff.v1`
+- `lpc-toolkit.asset-authoring-web-handoff-receipt.v1`
 - `lpc-toolkit.sprite-drawing-contract.v1`
 - `lpc-toolkit.asset-provider-descriptor.v1`
 - `lpc-toolkit.asset-provider-discovery.v1`
@@ -313,6 +318,42 @@ authority, human consent, or release approval. No raw prompt, provider
 payload, credential, private path, or human identity enters the public D2
 envelopes or D1 receipt.
 
+### Explicit Web-to-CLI handoff
+
+D3 provides a one-way local-file bridge from the Web Asset Pack Workbench to a
+CLI workspace. The Web `Export for CLI` action captures one stable in-memory
+revision and downloads the existing archive plus a strict
+`lpc-toolkit.web-cli-handoff.v1` JSON sidecar. It does not upload, use a
+backend, or persist browser authoring state. The sidecar contains only bounded
+identity and digest bindings; it never replaces credits, consent, validation,
+preview, candidate import, human approval, or release authority.
+
+Inspect the pair before choosing an attach-pack plan:
+
+```sh
+lpc-toolkit asset authoring handoff inspect --handoff handoff.json --archive pack.lpc-assets.zip --json
+lpc-toolkit asset authoring handoff import --handoff handoff.json --archive pack.lpc-assets.zip --plan attach-pack-plan.json --workspace ./my-lpc-art --confirm --json
+```
+
+`handoff inspect` is read-only. `handoff import` requires a matching explicit
+attach-pack plan and a separate CLI `--confirm`; it creates a new contained
+session and writes `web-handoff-receipt.json` only after the existing archive
+inspection and staging authorities complete. Repeated unchanged imports are
+idempotent. An interrupted import can be resumed or discarded only through
+the exact digest-bound recovery action:
+
+```sh
+lpc-toolkit asset authoring handoff recover --handoff handoff.json --archive pack.lpc-assets.zip --workspace ./my-lpc-art --action resume --confirm --json
+lpc-toolkit asset authoring handoff recover --handoff handoff.json --archive pack.lpc-assets.zip --workspace ./my-lpc-art --action discard --confirm --json
+```
+
+`asset authoring status` may project the sidecar as bounded optional
+`webHandoff` data. Sessions created before D3 return `webHandoff: null`; a
+malformed or mismatched sidecar is `blocked`. The sidecar is not copied into
+`session.json`, provider receipts, D1 provenance, validation/preview receipts,
+candidate-import state, or release gates. A stale pair is rejected before
+candidate or pack mutation, and Web handoff is never release approval.
+
 The strict plan schema has three goals: `new-item`, `extend-item`, and
 `attach-pack`. New-item plans declare pack and asset identity, body types,
 animations, layers, paths, human draft credits, and optional consent/provider
@@ -326,13 +367,16 @@ The public session commands are:
 | Command | Contract |
 | --- | --- |
 | `asset authoring start --plan <plan.json> [--workspace <directory>] [--json]` | Strictly parse the plan, create or attach the artist pack, and return a session response. |
-| `asset authoring status --session <session-id> [--workspace <directory>] [--json]` | Read state, checkpoint freshness, bounded diagnostics, artifacts, and safe next actions. |
+| `asset authoring status --session <session-id> [--workspace <directory>] [--json]` | Read state, checkpoint freshness, bounded diagnostics, optional Web-handoff sidecar evidence, and safe next actions; the sidecar is not release approval. |
 | `asset authoring resume --session <session-id> [--workspace <directory>] [--json]` | Reconcile current manifest/PNG/receipt evidence and return the next safe action. |
 | `asset authoring contract --session <session-id> [--refresh] [--workspace <directory>] [--json]` | Materialize or inspect the provider-neutral drawing contract and non-importable artifacts. |
 | `asset authoring provider discover --session <session-id> --contract-digest <sha256> --descriptors <providers.json> [--json]` | Normalize only explicitly supplied provider descriptors; no provider is selected, invoked, enumerated, or written. |
 | `asset authoring provider preflight --session <session-id> --contract-digest <sha256> --descriptor <descriptor.json> [options]` | Read the current contract and return bounded compatibility, scope, network, credential, and protected-root checks without mutation. |
 | `asset authoring provider handoff --session <session-id> --descriptor <descriptor.json> --consent <consent.json> [--confirm] [--workspace <directory>] [--json]` | Persist a consent-scoped invocation only after explicit confirmation; no provider executes and no pack source changes. |
 | `asset authoring provider result --session <session-id> --invocation <invocation.json> --result <result.json> [--candidate <candidate.png>] [--workspace <directory>] [--json]` | Re-digest a bounded result, stage valid candidate bytes below the session-owned root, or preserve one refusal/recovery action. It does not import source. |
+| `asset authoring handoff inspect --handoff <handoff.json> --archive <pack.lpc-assets.zip> [--json]` | Read-only inspect the Web sidecar/archive pair and report current, stale, or blocked digest bindings without creating a session. |
+| `asset authoring handoff import --handoff <handoff.json> --archive <pack.lpc-assets.zip> --plan <attach-pack-plan.json> [--workspace <directory>] --confirm [--json]` | Import one current pair into a new attach-pack session after explicit plan selection and confirmation; it does not mark release or candidate evidence current. |
+| `asset authoring handoff recover --handoff <handoff.json> --archive <pack.lpc-assets.zip> --workspace <directory> --action <resume\|discard> --confirm [--json]` | Resume or discard only the exact CLI-owned interrupted staging directory after digest re-check and confirmation. |
 | `asset authoring import --session <session-id> --target <target-id> --candidate <png> --contract-digest <sha256> [--replace-existing --expected-target-digest <sha256>] [--workspace <directory>] [--json]` | Import one contract-bound candidate through the trust boundary; this remains the only provider-result-to-source mutation step. |
 | `asset authoring validate --session <session-id> [--workspace <directory>] [--json]` | Validate the session-owned pack and record a digest-bound validation receipt. |
 | `asset authoring preview --session <session-id> [existing preview options] [--workspace <directory>] [--json]` | Render an attributed preview from the current validation receipt. |
@@ -356,6 +400,7 @@ Each JSON command returns the normal `ok`, `command`, `data`, `warnings`, and
 `releaseDeclaration`, `previewAcceptance`, `draftArchive`, `syncReceipt`,
 `formalArchiveReceipt`, `inspectionReceipt`, `installationReceipt`,
 `releaseProvenanceReceipt`, and additive `provider` evidence,
+optional `webHandoff` sidecar evidence,
 `capabilities`, and
 `schemaVersions`. `releaseGates.gates` reports current, missing, stale, or
 blocked acknowledgement, validation, declaration, preview, preview-artifact,
@@ -374,6 +419,12 @@ status, refusal code, candidate ID, and safe next actions. The session receipts
 readable and become stale when the contract, source, manifest, invocation
 scope, or staged candidate bytes drift. Absolute candidate paths and provider
 payloads are never exposed.
+
+The optional `webHandoff` projection reports only the receipt schema, imported
+or blocked status, handoff/archive/session binding digests, logical source
+paths, and the sidecar receipt digest. It never exposes the sidecar file path,
+archive bytes, browser state, provider payloads, credentials, or inferred human
+identity. It is informational evidence only and cannot satisfy release gates.
 
 The state and checkpoint fields are recovery data, not asset identity:
 

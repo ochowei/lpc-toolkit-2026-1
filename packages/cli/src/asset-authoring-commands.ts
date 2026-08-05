@@ -115,6 +115,10 @@ import {
 import { inspectAssetPackArchive } from './asset-pack-inspection.js';
 import { readAssetPackArchive } from './asset-pack-archive-format.js';
 import {
+  readAssetWebCliHandoffSessionProjection,
+  type AssetWebCliHandoffSessionProjection,
+} from './asset-authoring-web-cli-handoff.js';
+import {
   assertManagedAssetOutput,
   findAssetWorkspace,
   type AssetWorkspace,
@@ -174,6 +178,7 @@ interface ResponseOptions {
   readonly formalArchiveReceipt?: AssetAuthoringFormalArchiveReceipt | null;
   readonly inspectionReceipt?: AssetAuthoringArchiveInspectionReceipt | null;
   readonly installationReceipt?: AssetAuthoringInstallationReceipt | null;
+  readonly webHandoff?: AssetWebCliHandoffSessionProjection | null;
 }
 
 function issue(
@@ -1039,6 +1044,7 @@ function responseFor(
     installationReceipt: options.installationReceipt === undefined
       ? session.receipts.installation ?? null
       : options.installationReceipt,
+    ...(options.webHandoff === undefined ? {} : { webHandoff: options.webHandoff }),
     provider: session.receipts.providerInvocation === null
       || session.receipts.providerInvocation === undefined
       ? null
@@ -1482,12 +1488,13 @@ async function statusSession(
   );
   return commandOk('asset authoring status', responseFor(
     session,
-    session.reason === 'missing-draft-credits'
-      ? { inputsNeeded: [
+    {
+      ...(session.reason === 'missing-draft-credits' ? { inputsNeeded: [
         { id: 'author', summary: 'Provide the human attribution author.' },
         { id: 'license', summary: 'Provide the human attribution license.' },
-      ] }
-      : {},
+      ] } : {}),
+      webHandoff: readAssetWebCliHandoffSessionProjection({ workspace, sessionId }),
+    },
   ));
 }
 

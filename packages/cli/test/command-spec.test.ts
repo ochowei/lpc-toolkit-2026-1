@@ -60,6 +60,17 @@ describe('helpForCommand', () => {
     expect(help).toContain('existing candidate-import boundary');
   });
 
+  it('documents the read-only Web-to-CLI handoff inspection boundary', () => {
+    const help = helpForCommand(['asset', 'authoring', 'handoff', 'inspect']);
+    expect(help).toContain(
+      'lpc-toolkit asset authoring handoff inspect --handoff <handoff.json> --archive <pack.lpc-assets.zip> [--json]',
+    );
+    expect(help).toContain('--handoff <handoff.json>');
+    expect(help).toContain('--archive <pack.lpc-assets.zip>');
+    expect(help).not.toContain('--workspace');
+    expect(help).toContain('without creating a session or writing files');
+  });
+
   it('describes catalog item animation capability inspection', () => {
     expect(helpForCommand(['catalog', 'item'])).toContain(
       'Show one catalog item with credits and animation capabilities.',

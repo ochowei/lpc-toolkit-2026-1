@@ -26,6 +26,7 @@ import type {
   AssetAuthoringReleaseProvenanceReceipt,
   AssetAuthoringSyncReceipt,
 } from './asset-authoring-session.js';
+import type { AssetWebCliHandoffSessionProjection } from './asset-authoring-web-cli-handoff.js';
 
 export interface CliIssue {
   readonly code: string;
@@ -159,6 +160,7 @@ export interface AuthoringResponseProjectionInput {
   readonly inspectionReceipt?: AssetAuthoringArchiveInspectionReceipt | null;
   readonly installationReceipt?: AssetAuthoringInstallationReceipt | null;
   readonly provider?: AuthoringProviderResponseInput | null;
+  readonly webHandoff?: AssetWebCliHandoffSessionProjection | null;
 }
 
 export interface AuthoringResponseData extends Omit<
@@ -276,6 +278,14 @@ export function authoringResponseProjection(
           : { ...action.expectedCheckpoint },
       })),
     };
+  const webHandoff = input.webHandoff === undefined
+    ? undefined
+    : input.webHandoff === null
+      ? null
+      : {
+        ...input.webHandoff,
+        sourceDigests: input.webHandoff.sourceDigests.map((source) => ({ ...source })),
+      };
   if (releaseDeclaration !== null && releaseDeclaration.kind !== 'declaration') {
     throw new Error('Release declaration response receipt has the wrong kind.');
   }
@@ -322,6 +332,7 @@ export function authoringResponseProjection(
     inspectionReceipt,
     installationReceipt,
     provider,
+    ...(webHandoff === undefined ? {} : { webHandoff }),
     cliVersion: CLI_VERSION,
     capabilities: [...AUTHORING_CAPABILITIES],
     schemaVersions: [...AUTHORING_SCHEMA_VERSIONS],
@@ -548,6 +559,15 @@ function formatAuthoringResponse(
       const gateId = stringValue(gate, 'id');
       const freshness = stringValue(gate, 'freshness');
       if (gateId && freshness) lines.push(`Release gate ${gateId}: ${freshness}`);
+    }
+  }
+  if (data['webHandoff'] === null) {
+    lines.push('Web handoff evidence: none');
+  } else if (isRecord(data['webHandoff'])) {
+    const handoffStatus = stringValue(data['webHandoff'], 'status');
+    if (handoffStatus) {
+      lines.push(`Web handoff evidence: ${handoffStatus}`);
+      lines.push('Web handoff is not release approval.');
     }
   }
   const releaseDeclaration = data['releaseDeclaration'];
@@ -1503,9 +1523,91 @@ function formatProviderResult(data: JsonRecord): string | undefined {
   return `${lines.join('\n')}\n`;
 }
 
+function formatWebCliHandoffInspection(data: JsonRecord): string | undefined {
+  const state = stringValue(data, 'state');
+  const handoffId = stringValue(data, 'handoffId');
+  const binding = isRecord(data['binding']) ? data['binding'] : undefined;
+  const archiveDigest = binding === undefined ? undefined : stringValue(binding, 'archiveDigest');
+  const packId = binding === undefined ? undefined : stringValue(binding, 'packId');
+  const version = binding === undefined ? undefined : stringValue(binding, 'version');
+  const nextAction = isRecord(data['nextAction']) ? data['nextAction'] : undefined;
+  const summary = nextAction === undefined ? undefined : stringValue(nextAction, 'summary');
+  const command = nextAction === undefined ? undefined : stringValue(nextAction, 'command');
+  if (!state || !handoffId || !archiveDigest || !packId || !version || !summary || !command) return undefined;
+  const lines = [
+    state === 'current' ? 'Web-to-CLI handoff is current.' : 'Web-to-CLI handoff is stale.',
+    `Handoff: ${handoffId}`,
+    `Archive: ${packId}@${version} (${archiveDigest})`,
+  ];
+  const mismatches = stringArrayValue(data, 'mismatches') ?? [];
+  if (mismatches.length > 0) lines.push(`Mismatched bindings: ${mismatches.join(', ')}`);
+  lines.push(`Next action: ${summary}`, `Next command: ${command}`);
+  return `${lines.join('\n')}\n`;
+}
+
+function formatWebCliHandoffImport(data: JsonRecord): string | undefined {
+  const state = stringValue(data, 'state');
+  const handoffId = stringValue(data, 'handoffId');
+  const sessionId = stringValue(data, 'sessionId');
+  const binding = isRecord(data['binding']) ? data['binding'] : undefined;
+  const packId = binding === undefined ? undefined : stringValue(binding, 'packId');
+  const version = binding === undefined ? undefined : stringValue(binding, 'version');
+  const nextAction = isRecord(data['nextAction']) ? data['nextAction'] : undefined;
+  const summary = nextAction === undefined ? undefined : stringValue(nextAction, 'summary');
+  const command = nextAction === undefined ? undefined : stringValue(nextAction, 'command');
+  if (!state || !handoffId || !packId || !version || !summary || !command) return undefined;
+  const lines = [
+    state === 'imported'
+      ? 'Web-to-CLI handoff was imported into a new CLI authoring session.'
+      : state === 'needs-user-action'
+        ? 'Web-to-CLI handoff is ready for explicit CLI confirmation.'
+        : 'Web-to-CLI handoff is stale and was not imported.',
+    `Handoff: ${handoffId}`,
+    `Pack: ${packId}@${version}`,
+  ];
+  if (sessionId) lines.push(`Session: ${sessionId}`);
+  lines.push('Web handoff is not release approval.', `Next action: ${summary}`, `Next command: ${command}`);
+  return `${lines.join('\n')}\n`;
+}
+
+function formatWebCliHandoffRecovery(data: JsonRecord): string | undefined {
+  const state = stringValue(data, 'state');
+  const handoffId = stringValue(data, 'handoffId');
+  const action = stringValue(data, 'action');
+  const nextAction = isRecord(data['nextAction']) ? data['nextAction'] : undefined;
+  const summary = nextAction === undefined ? undefined : stringValue(nextAction, 'summary');
+  const command = nextAction === undefined ? undefined : stringValue(nextAction, 'command');
+  if (!state || !handoffId || !action || !summary || !command) return undefined;
+  const lines = [
+    state === 'resumed'
+      ? 'Web-to-CLI recovery resumed into a new CLI authoring session.'
+      : state === 'discarded'
+        ? 'Web-to-CLI recovery staging was discarded.'
+        : state === 'needs-user-action'
+          ? 'Web-to-CLI recovery is ready for explicit confirmation.'
+          : 'Web-to-CLI recovery is stale and was not changed.',
+    `Handoff: ${handoffId}`,
+    `Action: ${action}`,
+    'Web handoff is not release approval.',
+    `Next action: ${summary}`,
+    `Next command: ${command}`,
+  ];
+  return `${lines.join('\n')}\n`;
+}
+
 function formatHumanData(response: CliResponse<unknown>): string | undefined {
   const data = response.data;
   if (!isRecord(data)) return undefined;
+
+  if (response.command === 'asset authoring handoff inspect') {
+    return formatWebCliHandoffInspection(data);
+  }
+  if (response.command === 'asset authoring handoff import') {
+    return formatWebCliHandoffImport(data);
+  }
+  if (response.command === 'asset authoring handoff recover') {
+    return formatWebCliHandoffRecovery(data);
+  }
 
   const authoring = formatAuthoringResponse(response.command, data);
   if (authoring) return authoring;

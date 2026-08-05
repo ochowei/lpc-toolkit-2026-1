@@ -113,6 +113,9 @@ describe('CLI and agent integration pages', () => {
       'lpc-toolkit asset authoring provider preflight --session <session-id> --contract-digest <sha256> --descriptor provider.json --json',
       'lpc-toolkit asset authoring provider handoff --session <session-id> --descriptor provider.json --consent consent.json --confirm --json',
       'lpc-toolkit asset authoring provider result --session <session-id> --invocation invocation.json --result result.json --candidate candidate.png --workspace ./my-lpc-art --json',
+      'lpc-toolkit asset authoring handoff inspect --handoff handoff.json --archive pack.lpc-assets.zip --json',
+      'lpc-toolkit asset authoring handoff import --handoff handoff.json --archive pack.lpc-assets.zip --plan attach-pack-plan.json --workspace ./my-lpc-art --confirm --json',
+      'lpc-toolkit asset authoring handoff recover --handoff handoff.json --archive pack.lpc-assets.zip --workspace ./my-lpc-art --action resume --confirm --json',
     ]) expect(html).toContain(command);
     expect(html).toContain('These receipts govern the authoring session only. Formal archive publication and consumer installation remain separate CLI steps.');
     expect(html).toContain('formal pack writes a non-draft archive below the session-owned release-artifacts directory');
@@ -121,6 +124,10 @@ describe('CLI and agent integration pages', () => {
     expect(html).toContain('Recover or synchronize the session separately');
     expect(html).toContain('Optionally hand off a candidate through a provider-neutral Agent integration');
     expect(html).toContain('result bytes are re-digested before they enter the session-owned candidate staging root');
+    expect(html).toContain('Transfer one Web revision to the CLI explicitly');
+    expect(html).toContain('Export for CLI');
+    expect(html).toContain('web-handoff-receipt.json');
+    expect(html).toContain('Web handoff is not release approval.');
     expect(html).toContain('asset_pack_draft');
     expect(html).toContain('manager-owned output and registry generation');
     expect(html).toContain('You do not need to clone this repository');

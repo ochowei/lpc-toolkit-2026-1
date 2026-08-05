@@ -125,6 +125,36 @@ export {
   parseAssetAuthoringPlan,
 } from './asset-authoring-schema.js';
 export type {
+  AssetAuthoringWebHandoffReceipt,
+  AssetAuthoringWebHandoffReceiptParseResult,
+  AssetWebCliHandoff,
+  AssetWebCliHandoffArchiveKind,
+  AssetWebCliHandoffDiagnostic,
+  AssetWebCliHandoffDiagnosticCode,
+  AssetWebCliHandoffParseResult,
+  AssetWebCliHandoffStateProjection,
+  AssetWebCliHandoffSource,
+} from './asset-authoring-web-handoff.js';
+export {
+  ASSET_AUTHORING_WEB_HANDOFF_RECEIPT_SCHEMA,
+  ASSET_WEB_CLI_HANDOFF_CAPABILITIES,
+  ASSET_WEB_CLI_HANDOFF_SCHEMA,
+  assetAuthoringWebHandoffReceiptDigestInput,
+  assetAuthoringWebHandoffReceiptProjection,
+  assetWebCliHandoffAttributionIsRequired,
+  assetWebCliCapabilitiesCompatible,
+  assetWebCliCapabilitiesMissing,
+  assetWebCliHandoffDigestInput,
+  assetWebCliHandoffPrivacyIsSafe,
+  assetWebCliHandoffStateDigestInput,
+  assetWebCliHandoffStateIsStale,
+  assetWebCliHandoffStateProjection,
+  parseAssetAuthoringWebHandoffReceipt,
+  parseAssetAuthoringWebHandoffReceiptJson,
+  parseAssetWebCliHandoff,
+  parseAssetWebCliHandoffJson,
+} from './asset-authoring-web-handoff.js';
+export type {
   AssetAuthoringPreviewAcceptanceReceipt,
   AssetAuthoringReleaseArtifactDigest,
   AssetAuthoringReleaseArtifactId,

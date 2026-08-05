@@ -80,6 +80,20 @@ const AUTHORING_SESSION_OPTION: CommandOptionSpec = {
   description: 'Use this workspace-local authoring session.',
 };
 
+const WEB_CLI_HANDOFF_OPTION: CommandOptionSpec = {
+  name: 'handoff',
+  kind: 'value',
+  valueLabel: 'handoff.json',
+  description: 'Read the strict Web-to-CLI handoff sidecar as an untrusted regular file.',
+};
+
+const WEB_CLI_ARCHIVE_OPTION: CommandOptionSpec = {
+  name: 'archive',
+  kind: 'value',
+  valueLabel: 'pack.lpc-assets.zip',
+  description: 'Read the existing asset-pack archive selected for this handoff.',
+};
+
 const AGENT_MANIFEST_OPTION: CommandOptionSpec = {
   name: 'manifest',
   kind: 'value',
@@ -238,6 +252,59 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
     ],
   },
   {
+    command: ['asset', 'authoring', 'handoff'],
+    usage: 'lpc-toolkit asset authoring handoff <command>',
+    description: 'Inspect and explicitly import a local Web-to-CLI handoff; the handoff never replaces validation, preview, release, or human approval gates.',
+    options: [HELP_OPTION],
+    examples: [
+      'lpc-toolkit asset authoring handoff inspect --handoff handoff.json --archive pack.lpc-assets.zip --json',
+      'lpc-toolkit asset authoring handoff import --handoff handoff.json --archive pack.lpc-assets.zip --plan attach-pack-plan.json --confirm --json',
+    ],
+  },
+  {
+    command: ['asset', 'authoring', 'handoff', 'inspect'],
+    usage: 'lpc-toolkit asset authoring handoff inspect --handoff <handoff.json> --archive <pack.lpc-assets.zip> [--json]',
+    description: 'Read-only inspect a Web handoff and existing archive pair; report current or stale digest bindings without creating a session or writing files.',
+    options: [HELP_OPTION, JSON_OPTION, WEB_CLI_HANDOFF_OPTION, WEB_CLI_ARCHIVE_OPTION],
+    examples: [
+      'lpc-toolkit asset authoring handoff inspect --handoff handoff.json --archive pack.lpc-assets.zip --json',
+    ],
+  },
+  {
+    command: ['asset', 'authoring', 'handoff', 'import'],
+    usage: 'lpc-toolkit asset authoring handoff import --handoff <handoff.json> --archive <pack.lpc-assets.zip> --plan <attach-pack-plan.json> [--workspace <directory>] --confirm [--json]',
+    description: 'Import a current Web handoff into a new CLI-owned attach-pack session only after explicit plan selection and --confirm.',
+    options: [
+      HELP_OPTION,
+      JSON_OPTION,
+      WEB_CLI_HANDOFF_OPTION,
+      WEB_CLI_ARCHIVE_OPTION,
+      { name: 'plan', kind: 'value', valueLabel: 'attach-pack-plan.json', description: 'Read the strict attach-pack authoring plan.' },
+      ASSET_WORKSPACE_OPTION,
+      { name: 'confirm', kind: 'boolean', description: 'Confirm the exact handoff import into the selected CLI workspace.' },
+    ],
+    examples: [
+      'lpc-toolkit asset authoring handoff import --handoff handoff.json --archive pack.lpc-assets.zip --plan attach-pack-plan.json --workspace ./my-lpc-art --confirm --json',
+    ],
+  },
+  {
+    command: ['asset', 'authoring', 'handoff', 'recover'],
+    usage: 'lpc-toolkit asset authoring handoff recover --handoff <handoff.json> --archive <pack.lpc-assets.zip> --workspace <directory> --action <resume|discard> --confirm [--json]',
+    description: 'Resume or discard one exact CLI-owned interrupted handoff staging directory after digest re-check and explicit confirmation.',
+    options: [
+      HELP_OPTION,
+      JSON_OPTION,
+      WEB_CLI_HANDOFF_OPTION,
+      WEB_CLI_ARCHIVE_OPTION,
+      ASSET_WORKSPACE_OPTION,
+      { name: 'action', kind: 'value', valueLabel: 'resume|discard', allowedValues: ['resume', 'discard'], description: 'Choose the exact recovery action.' },
+      { name: 'confirm', kind: 'boolean', description: 'Confirm the exact recovery mutation.' },
+    ],
+    examples: [
+      'lpc-toolkit asset authoring handoff recover --handoff handoff.json --archive pack.lpc-assets.zip --workspace ./my-lpc-art --action resume --confirm --json',
+    ],
+  },
+  {
     command: ['asset', 'authoring', 'provider', 'discover'],
     usage: 'lpc-toolkit asset authoring provider discover --session <session-id> --contract-digest <sha256> --descriptors <providers.json> [--json]',
     description: 'Normalize explicitly supplied provider descriptors without selecting, invoking, enumerating, or writing a provider; unsupported entries remain explicit refusal/fallback results.',
@@ -320,7 +387,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
   {
     command: ['asset', 'authoring', 'status'],
     usage: 'lpc-toolkit asset authoring status --session <session-id> [--workspace <directory>] [--json]',
-    description: 'Read the current state and safe next actions for a session.',
+    description: 'Read the current state, safe next actions, and optional bounded Web-handoff sidecar evidence for a session; the sidecar is not release approval and does not change the v1 session file.',
     options: [HELP_OPTION, JSON_OPTION, AUTHORING_SESSION_OPTION, ASSET_WORKSPACE_OPTION],
     examples: ['lpc-toolkit asset authoring status --session session-id --json'],
   },
