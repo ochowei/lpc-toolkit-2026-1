@@ -10,7 +10,7 @@
 
 **Base:** `origin/main` at `ee4798e2e19b2355a1aa5d9df817493f0e1aa218`, containing the merged D3 spec/plan review PR #171 and D2 implementation PR #169. Normative specification: [`2026-08-06-web-to-cli-session-transfer-bridge.md`](../specs/2026-08-06-web-to-cli-session-transfer-bridge.md).
 
-**Implementation branch:** `codex/issue-170-web-to-cli-bridge-implementation` (to be created only after spec/plan review).
+**Implementation branch:** `codex/issue-170-web-to-cli-bridge-implementation` (created after spec/plan review and active for D3 implementation).
 
 **Implementation PR:** separate D3 implementation PR; do not combine with D4–D6.
 
@@ -48,10 +48,11 @@
   verification commands. Commit plan records separately when required by
   `AGENTS.md`.
 
-## Public TDD seams — pending review confirmation
+## Public TDD seams — confirmed by review
 
 The TDD skill requires agreement on public seams before implementation tests
-are written. The following seams are proposed for user review:
+are written. The following seams were reviewed and confirmed by the user
+through the merged docs-only PR #171:
 
 1. **Core handoff contract seam** — exported strict parser,
    canonical projection/digest, privacy predicate, and stale-state predicate
@@ -76,8 +77,8 @@ are written. The following seams are proposed for user review:
    `formatHumanResponse`. Assert bounded D3 fields, privacy redaction, stable
    human wording, and existing response compatibility.
 
-**Seam confirmation:** pending user review of the D3 specification and this
-plan. No product-code test commit is authorized before confirmation.
+**Seam confirmation:** the user merged PR #171 on 2026-08-06. The five seams
+remain the implementation boundary; product-code TDD work is authorized.
 
 ## CLI documentation impact matrix
 
@@ -118,17 +119,19 @@ recovery state, or compatibility rule cannot be omitted from the matrix.
 
 ### 1. Core strict handoff contract (red → green)
 
-- [ ] Add the versioned handoff and receipt types, strict parser, exact-key
+- [x] Add the versioned handoff and receipt types, strict parser, exact-key
       validation, UUID/digest/path/size constraints, and canonical projection.
-- [ ] Add deterministic `stateDigest` and handoff digest helpers using the
+- [x] Add deterministic `stateDigest` and handoff digest helpers using the
       existing canonical Core conventions.
-- [ ] Add stale-state, privacy, attribution-required, and compatibility
+- [x] Add stale-state, privacy, attribution-required, and compatibility
       predicates. A handoff is provenance of transfer only, never release or
       authorship authority.
-- [ ] Test unknown fields, duplicate sources, traversal/absolute paths,
+- [x] Test unknown fields, duplicate sources, traversal/absolute paths,
       unsupported status, missing credits, privacy violations, digest stability,
       property-order stability, and fixed independent digest fixtures.
-- [ ] Verify `packages/core/` remains environment-agnostic.
+- [x] Verify `packages/core/` remains environment-agnostic.
+      - Commit: `eba3fa2d64842b0af66c653e57d163e911381c26`
+      - Verification: `rtk pnpm --filter @lpc-toolkit/core test` PASS (32 files, 428 tests); `rtk pnpm --filter @lpc-toolkit/core build` PASS; `rtk pnpm check:boundaries` PASS; `rtk git diff --check` PASS.
 
 ### 2. Web explicit snapshot and export (red → green)
 
@@ -240,7 +243,9 @@ prompts, provider payloads, and raw pixel/archive bytes.
 - [x] Implementation branch created after review confirmation.
   - Branch: `codex/issue-170-web-to-cli-bridge-implementation`
   - Verification: `rtk git show -s --format=%H%n%s origin/main` PASS (`ee4798e2e19b2355a1aa5d9df817493f0e1aa218`, merge PR #171); `rtk git status --short --branch` PASS on the new branch.
-- [ ] Docs-only verification command and commit recorded after the files are added.
+- [x] Docs-only verification command and commit recorded after the files are added.
+  - Commit: `ee4798e2e19b2355a1aa5d9df817493f0e1aa218` (merged PR #171)
+  - Verification: `rtk git show -s --format=%H%n%s origin/main` PASS; `rtk git status --short --branch` PASS.
 
 ### Implementation branch
 
