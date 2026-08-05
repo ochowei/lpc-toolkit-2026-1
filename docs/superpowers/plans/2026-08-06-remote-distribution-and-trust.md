@@ -178,18 +178,20 @@ and update this matrix and the spec before implementation.
 ### 4. Provenance, attribution, license, and release authorization binding
     (red → green)
 
-- [ ] Reuse exact formal archive inspection and existing `CREDITS.csv`/license
+- [x] Reuse exact formal archive inspection and existing `CREDITS.csv`/license
       authorities; bind their digests without synthesizing authors or licenses.
-- [ ] Verify optional D1 provenance receipt against the exact archive,
+- [x] Verify optional D1 provenance receipt against the exact archive,
       manifest, content, source, preview, and release evidence digests.
-- [ ] Preserve D2 provider/result/refusal evidence as bounded provenance only;
+- [x] Preserve D2 provider/result/refusal evidence as bounded provenance only;
       preserve D3 handoff as local transfer evidence only.
-- [ ] Require existing validation, preview acceptance, explicit release
+- [x] Require existing validation, preview acceptance, explicit release
       declaration, and human approval before a release record can be marked
       publishable/trusted for an external mutation.
-- [ ] Test missing/changed credits, contradictory/unsupported licenses,
+- [x] Test missing/changed credits, contradictory/unsupported licenses,
       provenance mismatch, provider-as-author refusal, and signature-without-
       approval refusal.
+      - Commit: `5df3bb1db8ed9e54f544490f22467828593ce6f2`
+      - Verification: `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/asset-distribution-release-evidence.test.ts` FAIL (red: module `../src/asset-distribution-release-evidence.js` was missing); same command PASS (3 tests); `rtk pnpm --filter @lpc-toolkit/cli exec tsc -p tsconfig.json --noEmit` PASS; `rtk git diff --check` PASS.
 
 ### 5. Global installation and compatibility (red → green)
 
