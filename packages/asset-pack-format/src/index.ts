@@ -1,5 +1,6 @@
 export * from './runtime.js';
 export * from './canonical-json.js';
+export * from './release-provenance.js';
 export * from './payload.js';
 export * from './png.js';
 export * from './compatibility.js';
