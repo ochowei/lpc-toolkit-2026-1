@@ -161,17 +161,19 @@ and update this matrix and the spec before implementation.
 
 ### 3. Fake registry and marketplace transport (red → green)
 
-- [ ] Add a CLI-owned adapter boundary for retrieving immutable records and
+- [x] Add a CLI-owned adapter boundary for retrieving immutable records and
       exact archive bytes from a registry fixture; transport metadata remains
       non-authoritative.
-- [ ] Add marketplace listing/reference fixtures that point to an exact
+- [x] Add marketplace listing/reference fixtures that point to an exact
       namespace/version/archive digest without becoming a signing or license
       authority.
-- [ ] Verify capture-before-trust, record/archive mismatch detection, same
+- [x] Verify capture-before-trust, record/archive mismatch detection, same
       version/different digest conflicts, mirror disagreement, listing digest
       drift, withdrawn status, and no overwrite of prior evidence.
-- [ ] Test registry/marketplace adapters with no live HTTP, auth, account,
+- [x] Test registry/marketplace adapters with no live HTTP, auth, account,
       backend, or remote mutation.
+      - Commit: `3b9952177b61622d3b9c0f4b8540280cc0480212`
+      - Verification: `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/asset-distribution-transport.test.ts` FAIL (red: module `../src/asset-distribution-transport.js` was missing); same command PASS (4 tests); `rtk pnpm --filter @lpc-toolkit/cli exec tsc -p tsconfig.json --noEmit` PASS; `rtk git diff --check` PASS.
 
 ### 4. Provenance, attribution, license, and release authorization binding
     (red → green)
