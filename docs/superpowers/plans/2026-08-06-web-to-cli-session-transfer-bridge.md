@@ -8,7 +8,7 @@
 
 **Goal:** Implement the reviewed [D3 Issue #170](https://github.com/ochowei/lpc-toolkit-2026-1) Web-to-CLI handoff contract under roadmap [Issue #153](https://github.com/ochowei/lpc-toolkit-2026-1/issues/153), without a backend, authentication, persistent browser state, new dependency, custom archive format, or weakened attribution/release authority.
 
-**Base:** `origin/main` at `c289e7e9808b8b66f3bf968f64f34eff1eb073a3`, containing merged D2 implementation PR #169. Normative specification: [`2026-08-06-web-to-cli-session-transfer-bridge.md`](../specs/2026-08-06-web-to-cli-session-transfer-bridge.md).
+**Base:** `origin/main` at `ee4798e2e19b2355a1aa5d9df817493f0e1aa218`, containing the merged D3 spec/plan review PR #171 and D2 implementation PR #169. Normative specification: [`2026-08-06-web-to-cli-session-transfer-bridge.md`](../specs/2026-08-06-web-to-cli-session-transfer-bridge.md).
 
 **Implementation branch:** `codex/issue-170-web-to-cli-bridge-implementation` (to be created only after spec/plan review).
 
@@ -104,10 +104,14 @@ recovery state, or compatibility rule cannot be omitted from the matrix.
 
 ### 0. Review gate and fixture boundary
 
-- [ ] Review the D3 specification and this plan with the user.
-- [ ] Confirm the five public TDD seams above, or record the user's changes.
-- [ ] Create implementation branch from the merged D3 spec/plan base only
+- [x] Review the D3 specification and this plan with the user.
+      - Confirmation: user merged the docs-only review PR #171 on 2026-08-06.
+- [x] Confirm the five public TDD seams above through the user's merge of the
+      reviewed spec/plan PR; no seam changes were requested.
+- [x] Create implementation branch from the merged D3 spec/plan base only
       after confirmation.
+      - Branch: `codex/issue-170-web-to-cli-bridge-implementation`
+      - Base: `ee4798e2e19b2355a1aa5d9df817493f0e1aa218`
 - [ ] Add local-only handoff, archive, attach-plan, stale-pair, tamper,
       attribution, and interrupted-staging fixtures. Fixtures contain no
       credentials, private URLs, real provider output, or `upstream/` checkout.
@@ -231,8 +235,11 @@ prompts, provider payloads, and raw pixel/archive bytes.
       human approval, recovery, and no-browser-persistence decisions.
   - Commit: `eadcef3199e7321ad99458967893bd9ce919c278`
   - Verification: `rtk git diff --cached --check` PASS; `rtk rg -n "Issue #170|lpc-toolkit.web-cli-handoff.v1|CLI documentation impact|No product-code test commit" docs/superpowers/specs/2026-08-06-web-to-cli-session-transfer-bridge.md docs/superpowers/plans/2026-08-06-web-to-cli-session-transfer-bridge.md` PASS.
-- [ ] Spec and plan reviewed by the user.
-- [ ] Public seams confirmed by the user.
+- [x] Spec and plan reviewed by the user by merging PR #171.
+- [x] Public seams confirmed by the user by merging PR #171.
+- [x] Implementation branch created after review confirmation.
+  - Branch: `codex/issue-170-web-to-cli-bridge-implementation`
+  - Verification: `rtk git show -s --format=%H%n%s origin/main` PASS (`ee4798e2e19b2355a1aa5d9df817493f0e1aa218`, merge PR #171); `rtk git status --short --branch` PASS on the new branch.
 - [ ] Docs-only verification command and commit recorded after the files are added.
 
 ### Implementation branch
