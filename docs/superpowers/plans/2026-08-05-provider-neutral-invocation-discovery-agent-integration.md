@@ -536,6 +536,8 @@ body before implementation continues; do not silently broaden the plan.
   - Verification: `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS.
   - Verification: `rtk pnpm --filter @lpc-toolkit/core test` PASS — 31 files, 422 tests.
   - Verification: `rtk git diff --check` PASS.
+  - Verification: `rtk pnpm verify` FAIL — sandboxed `tsx prepare-assets` could not create its IPC pipe (`listen EPERM`).
+  - Verification: `rtk pnpm verify` (escalated rerun) FAIL — all pre-test gates and typechecks passed, then an existing CLI Vitest worker exited unexpectedly after 1,138 passed tests and 1 skipped test.
 
 ### Task 2 — Add capability advertisement and Agent manifest compatibility
 
@@ -755,7 +757,7 @@ commit hashes, not abbreviated hashes, and exact command results.
 
 - [x] Task 1 — Core D2 schemas, limits, compatibility, and refusal codes
   - Commit: a1f54c1e4e386fe35e84be08bb577c9a419758c6
-  - Verification: focused Core tests, Core typecheck, full Core regression, and `rtk git diff --check` all PASS; RED evidence is recorded above.
+  - Verification: focused Core tests, Core typecheck, full Core regression, and `rtk git diff --check` all PASS; repository verify failure evidence and RED evidence are recorded above.
 - [ ] Task 2 — Capability advertisement and Agent manifest compatibility
   - Commit: pending
   - Verification: pending
