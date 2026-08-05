@@ -590,23 +590,23 @@ and focused CLI tests.
 **Files:** `asset-provider-commands.ts`, `asset-authoring-session.ts`,
 `asset-authoring-commands.ts`, `response.ts`, and focused tests.
 
-- [ ] Write RED tests for missing consent, missing `--confirm`, changed
+- [x] Write RED tests for missing consent, missing `--confirm`, changed
   provider/adapter, changed contract, added reference, network expansion,
   target expansion, limit expansion, and unchanged-scope retry.
-- [ ] Extend the additive session receipt parser to accept
+- [x] Extend the additive session receipt parser to accept
   `providerInvocation` and `providerResult` as `null` for older sessions while
   rejecting malformed or out-of-scope values.
-- [ ] Implement `provider handoff` only after read-only preflight and exact
+- [x] Implement `provider handoff` only after read-only preflight and exact
   explicit consent. Persist the invocation atomically below the session root;
   never modify `asset-pack.json`, source PNGs, archives, credits, or release
   receipts.
-- [ ] Bind retry idempotency to provider ID, adapter ID/version, CLI range,
+- [x] Bind retry idempotency to provider ID, adapter ID/version, CLI range,
   contract digest, target IDs, reference digests, network hosts, and limits.
   Changing any binding requires new consent and a new invocation.
-- [ ] Add a bounded provider response projection containing only IDs, digests,
+- [x] Add a bounded provider response projection containing only IDs, digests,
   status, safety, and next actions. Do not expose invocation file absolute
   paths in the D2 field.
-- [ ] Run focused session/command/response tests and record atomic failure
+- [x] Run focused session/command/response tests and record atomic failure
   evidence; commit as `feat(cli): persist consent-scoped provider handoffs`.
 
 ### Task 5 — Validate result/refusal and stage candidate bytes
@@ -784,9 +784,27 @@ commit hashes, not abbreviated hashes, and exact command results.
   - Verification: `rtk pnpm --filter @lpc-toolkit/cli test` FAIL in the sandbox — 64 files and 1,175 tests passed with 1 skipped; 13 existing `web-server` tests could not bind `127.0.0.1` (`EPERM`).
   - Verification: `rtk pnpm --filter @lpc-toolkit/cli test` PASS in a loopback-enabled rerun — 65 files, 1,188 tests passed, 1 skipped.
   - Documentation impact reassessment: `help: update` in `command-spec.ts`; `cli-readme`, `root-readme`, `landing`, `architecture`, `engineering`, and `releasing` remain owned by Task 8's complete D2 documentation pass; `plugin: N/A` because no provider skill or plugin command was added.
-- [ ] Task 4 — Consent-scoped invocation handoff
-  - Commit: pending
-  - Verification: pending
+- [x] Task 4 — Consent-scoped invocation handoff
+  - Implementation: Added strict consent-file parsing, read-only contract-bound handoff preflight, explicit `--confirm` gating, atomic session receipt persistence, unchanged-scope idempotent reuse, new-consent enforcement for provider/adapter/contract/reference/network/target/limit changes, additive provider response projection, human formatting, and old-session receipt compatibility. Handoff records only the bounded invocation and never executes a provider or mutates pack source, archives, credits, or release receipts.
+  - RED: `rtk pnpm exec vitest run test/asset-provider-commands.test.ts test/asset-authoring-session.test.ts test/main-json.test.ts` FAIL before implementation — 6 expected failures covering the absent handoff route, missing additive receipt slots, and provider response projection.
+  - Commit: 5b74e9213420ea0af965d1028c1f6df0652d246d
+  - Verification: `rtk pnpm exec vitest run test/asset-provider-commands.test.ts test/asset-authoring-session.test.ts test/main-json.test.ts test/response.test.ts test/command-spec.test.ts test/main-human.test.ts test/args.test.ts` PASS — 7 files, 174 tests.
+  - Verification: `rtk pnpm exec tsc -p tsconfig.json --noEmit` PASS from `packages/cli`.
+  - Verification: `rtk pnpm check:boundaries` PASS.
+  - Verification: `rtk git diff --check` PASS.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test` FAIL in the sandbox — 64 files passed and 1 failed; 1,181 tests passed, 1 skipped, and 13 existing `web-server` tests could not bind `127.0.0.1` (`EPERM`).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test` PASS in a loopback-enabled rerun — 65 files, 1,194 tests passed, 1 skipped.
+  - Documentation impact reassessment:
+    ```text
+    help: update — provider handoff command, consent, confirmation, refusal, and next-action help added in command-spec.ts
+    cli-readme: N/A — Task 8 owns the complete D2 CLI documentation pass
+    root-readme: N/A — Task 8 owns the complete D2 CLI documentation pass
+    landing: N/A — Task 8 owns the complete D2 CLI documentation pass
+    architecture: N/A — Task 8 owns the complete D2 CLI documentation pass
+    engineering: N/A — Task 8 owns the complete D2 CLI documentation and verification pass
+    releasing: N/A — Task 8 owns the complete D2 release documentation pass
+    plugin: N/A — no provider skill or plugin command was added
+    ```
 - [ ] Task 5 — Result/refusal validation and candidate staging
   - Commit: pending
   - Verification: pending
