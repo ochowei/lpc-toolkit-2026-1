@@ -84,16 +84,17 @@ my-lpc-art/
 ├── assets_custom/
 │   └── .lpc-toolkit-managed.json
 └── .lpc-toolkit/
-    └── asset-packs/
-        ├── registry.json              created by first successful publication
-        ├── installed/                 verified installed archive snapshots
-        ├── transaction.json           present only during active/recoverable work
-        ├── transactions/              operation staging/backups while journaled
-        ├── validation/
-        └── staging/
-    authoring-sessions/
+    ├── asset-packs/
+    │   ├── registry.json              created by first successful publication
+    │   ├── installed/                 verified installed archive snapshots
+    │   ├── transaction.json           present only during active/recoverable work
+    │   ├── transactions/              operation staging/backups while journaled
+    │   ├── validation/
+    │   └── staging/
+    └── authoring-sessions/
         └── <session-id>/
-            └── release-artifacts/     deterministic draft recovery archives
+            ├── provider-candidates/   session-owned, re-digested result PNGs
+            └── release-artifacts/     deterministic draft/formal/provenance outputs
 ```
 
 The workspace config uses schema `lpc-toolkit.asset-workspace.v1` and records
@@ -227,6 +228,9 @@ The advertisement includes these capability identifiers:
 - `sprite-drawing-contract.v1`
 - `asset-authoring-candidate-import.v1`
 - `asset-authoring-recovery.v1`
+- `asset-authoring-provider-discovery.v1`
+- `asset-authoring-provider-invocation.v1`
+- `agent-integration-packaging.v1`
 - `asset-authoring-release.v1`
 - `asset-authoring-release-provenance.v1`
 - `asset-authoring-draft-recovery.v1`
@@ -238,6 +242,12 @@ and these schema identifiers:
 - `lpc-toolkit.asset-authoring-session.v1`
 - `lpc-toolkit.asset-authoring-response.v1`
 - `lpc-toolkit.sprite-drawing-contract.v1`
+- `lpc-toolkit.asset-provider-descriptor.v1`
+- `lpc-toolkit.asset-provider-discovery.v1`
+- `lpc-toolkit.asset-provider-invocation.v1`
+- `lpc-toolkit.asset-provider-result.v1`
+- `lpc-toolkit.asset-provider-refusal.v1`
+- `lpc-toolkit.agent-integration-manifest.v1`
 - `lpc-toolkit.asset-release-declaration.v1`
 - `lpc-toolkit.asset-authoring-release-receipt.v1`
 - `lpc-toolkit.asset-authoring-draft-receipt.v1`
@@ -246,6 +256,62 @@ and these schema identifiers:
 - `lpc-toolkit.asset-authoring-install-receipt.v1`
 - `lpc-toolkit.asset-release-provenance.v1`
 - `lpc-toolkit.asset-release-provenance-verification.v1`
+
+### Optional provider-neutral Agent handoff
+
+D2 adds an explicit, provider-neutral handoff around the drawing contract and
+candidate stages. The CLI does not ship a provider, provider registry,
+credential store, network client, or Agent skill. An external Agent integration
+may supply bounded descriptors and coordinate a provider, but the CLI remains
+the authority for the contract, session paths, candidate inspection, import,
+validation, attribution, and release gates.
+
+Check an integration manifest without loading assets, provider code, or a
+workspace:
+
+```sh
+lpc-toolkit agent integration check --manifest manifest.json --json
+```
+
+Required capability or CLI-range mismatches fail with a stable refusal;
+optional capability absence is reported as an external-author fallback. The
+manifest checker never installs or executes an integration.
+
+The provider handoff is a bounded sequence:
+
+```sh
+lpc-toolkit asset authoring provider discover --session <session-id> --contract-digest <sha256> --descriptors providers.json --json
+lpc-toolkit asset authoring provider preflight --session <session-id> --contract-digest <sha256> --descriptor provider.json --workspace ./my-lpc-art --json
+lpc-toolkit asset authoring provider handoff --session <session-id> --descriptor provider.json --consent consent.json --confirm --json
+lpc-toolkit asset authoring provider result --session <session-id> --invocation invocation.json --result result.json --candidate candidate.png --workspace ./my-lpc-art --json
+lpc-toolkit asset authoring import --session <session-id> --target <target-id> --candidate <candidate.png> --contract-digest <sha256> --json
+```
+
+`discover` consumes only explicitly supplied descriptors and reports supported,
+unsupported, unavailable, or consent-required entries; it never enumerates or
+selects a provider. `preflight` is read-only and checks the current contract,
+capabilities, limits, target/reference scope, credential policy, protected
+roots, and declared network requirements. Network is disabled by default.
+
+`handoff` persists only a bounded invocation envelope after the exact consent
+scope and `--confirm` are present; it does not execute a provider or mutate
+pack source. `result` validates the result/refusal envelope, re-digests the
+candidate PNG, and stages it under the session-owned
+`.lpc-toolkit/asset-packs/authoring-sessions/<session-id>/provider-candidates/`
+root using a logical candidate ID. It never writes `asset-pack.json`, source
+PNGs, credits, an archive, or a release receipt. A refused, stale, cancelled,
+timed-out, or scope-changing result preserves the last valid checkpoint and
+returns one safe next action. The existing `asset authoring import` command is
+the only candidate-to-source mutation authority; validation, attributed
+preview, human release declaration, preview acceptance, formal pack, inspect,
+and install remain separate gates.
+
+Successful provider results can later be projected into D1's bounded
+`provider-output` provenance record. Provider identity is evidence of a
+reported production input, never LPC attribution, authorship/license
+authority, human consent, or release approval. No raw prompt, provider
+payload, credential, private path, or human identity enters the public D2
+envelopes or D1 receipt.
 
 The strict plan schema has three goals: `new-item`, `extend-item`, and
 `attach-pack`. New-item plans declare pack and asset identity, body types,
@@ -263,7 +329,11 @@ The public session commands are:
 | `asset authoring status --session <session-id> [--workspace <directory>] [--json]` | Read state, checkpoint freshness, bounded diagnostics, artifacts, and safe next actions. |
 | `asset authoring resume --session <session-id> [--workspace <directory>] [--json]` | Reconcile current manifest/PNG/receipt evidence and return the next safe action. |
 | `asset authoring contract --session <session-id> [--refresh] [--workspace <directory>] [--json]` | Materialize or inspect the provider-neutral drawing contract and non-importable artifacts. |
-| `asset authoring import --session <session-id> --target <target-id> --candidate <png> --contract-digest <sha256> [--replace-existing --expected-target-digest <sha256>] [--workspace <directory>] [--json]` | Import one contract-bound candidate through the trust boundary. |
+| `asset authoring provider discover --session <session-id> --contract-digest <sha256> --descriptors <providers.json> [--json]` | Normalize only explicitly supplied provider descriptors; no provider is selected, invoked, enumerated, or written. |
+| `asset authoring provider preflight --session <session-id> --contract-digest <sha256> --descriptor <descriptor.json> [options]` | Read the current contract and return bounded compatibility, scope, network, credential, and protected-root checks without mutation. |
+| `asset authoring provider handoff --session <session-id> --descriptor <descriptor.json> --consent <consent.json> [--confirm] [--workspace <directory>] [--json]` | Persist a consent-scoped invocation only after explicit confirmation; no provider executes and no pack source changes. |
+| `asset authoring provider result --session <session-id> --invocation <invocation.json> --result <result.json> [--candidate <candidate.png>] [--workspace <directory>] [--json]` | Re-digest a bounded result, stage valid candidate bytes below the session-owned root, or preserve one refusal/recovery action. It does not import source. |
+| `asset authoring import --session <session-id> --target <target-id> --candidate <png> --contract-digest <sha256> [--replace-existing --expected-target-digest <sha256>] [--workspace <directory>] [--json]` | Import one contract-bound candidate through the trust boundary; this remains the only provider-result-to-source mutation step. |
 | `asset authoring validate --session <session-id> [--workspace <directory>] [--json]` | Validate the session-owned pack and record a digest-bound validation receipt. |
 | `asset authoring preview --session <session-id> [existing preview options] [--workspace <directory>] [--json]` | Render an attributed preview from the current validation receipt. |
 | `asset authoring acknowledge --session <session-id> --acknowledgement <record.json> [--confirm] [--workspace <directory>] [--json]` | Persist one exact warning acknowledgement with its non-empty human reason; without `--confirm`, return the pending action without mutation. |
@@ -285,7 +355,7 @@ Each JSON command returns the normal `ok`, `command`, `data`, `warnings`, and
 `manifestDigest`, `sourceDigests`, `validation`, `preview`, `releaseGates`,
 `releaseDeclaration`, `previewAcceptance`, `draftArchive`, `syncReceipt`,
 `formalArchiveReceipt`, `inspectionReceipt`, `installationReceipt`,
-`releaseProvenanceReceipt`,
+`releaseProvenanceReceipt`, and additive `provider` evidence,
 `capabilities`, and
 `schemaVersions`. `releaseGates.gates` reports current, missing, stale, or
 blocked acknowledgement, validation, declaration, preview, preview-artifact,
@@ -297,6 +367,13 @@ existing transactional `asset install` authority commits and the consumer
 generation is re-verified. The response deliberately projects bounded
 evidence; it does not make session internals or provider output part of the
 publishable pack.
+
+The additive `provider` response projection reports only bounded IDs, digests,
+status, refusal code, candidate ID, and safe next actions. The session receipts
+`receipts.providerInvocation` and `receipts.providerResult` are backward-
+readable and become stale when the contract, source, manifest, invocation
+scope, or staged candidate bytes drift. Absolute candidate paths and provider
+payloads are never exposed.
 
 The state and checkpoint fields are recovery data, not asset identity:
 

@@ -152,6 +152,9 @@ not modify `upstream/`.
 - strict release declaration and preview-acceptance input handling, session
   receipt persistence, current evidence collection, artifact re-digestion, and
   bounded human/JSON release-gate responses
+- provider-neutral descriptor discovery, contract-bound preflight, explicit
+  consent handoff, candidate result/refusal staging, provider evidence
+  invalidation, and additive Agent-integration compatibility checks
 - external generation-provenance companion publication from current formal
   archive evidence and a read-only verifier for copied archive/receipt bytes
 
@@ -217,9 +220,10 @@ the read-only copied-archive verifier.
 Generation provenance is distinct from LPC credits, authorship/license
 authority, and human release approval. The verifier reports declaration and
 preview receipt digests as bound evidence rather than recreating those human
-decisions. Ordinary inspect and install ignore an absent companion receipt, and
-the shipped boundary adds no provider invocation, authentication, remote
-registry, signing, marketplace, or Web session bridge.
+decisions. Ordinary inspect and install ignore an absent companion receipt. D1
+does not execute a provider or add authentication, remote registry, signing,
+marketplace, or Web session behavior; D2 adds only the separate provider-
+neutral handoff contracts described below.
 
 ### Documentation and Governance
 
@@ -776,6 +780,57 @@ manager-owned `assets_custom/` output and registry through the linked-sync
 transaction. Neither path modifies checked-in assets, the verified base cache,
 installed snapshots, unowned output, or the dormant read-only `upstream/`
 gitlink.
+
+### Provider-neutral Agent integration boundary
+
+D2 adds a bounded handoff around the existing drawing-contract and candidate
+stages. It does not add a provider runtime. The CLI has no provider registry,
+provider process executor, credential store, hidden network client, bundled
+Agent skill, or persistent browser authoring state.
+
+Ownership is split as follows:
+
+- Core owns strict provider descriptor, discovery, invocation, result/refusal,
+  and Agent-manifest values; canonical projections; bounded SemVer and
+  capability predicates; stable refusal codes; and the pure adapter from a
+  successful result to D1 `provider-output` provenance. Core performs no I/O,
+  provider discovery, authentication, invocation, or sandboxing.
+- The CLI owns the public `capabilities`, `agent integration check`, and
+  `asset authoring provider discover|preflight|handoff|result` commands. It
+  reads only explicitly supplied descriptor/consent/result files, re-reads the
+  current session contract through the existing authority, enforces limits,
+  protected roots, and network/credential policy, and persists only bounded
+  session evidence.
+- An Agent integration may present consent and coordinate an external provider,
+  but it consumes public CLI responses only. It may not read asset caches or
+  private session files directly, edit manifests/credits/source PNGs, collect
+  credentials, silently install the CLI, or claim authorship or release
+  approval. Optional capability absence falls back to an external-author
+  handoff; missing required capabilities fail closed.
+- A provider receives only an exact contract and explicitly approved scope. It
+  has no authority over the manifest, source ownership, attribution, warning
+  acknowledgement, human declaration, preview acceptance, archive, registry,
+  installation, or release gate.
+
+The additive session receipts `receipts.providerInvocation` and
+`receipts.providerResult` are backward-readable. Contract, source, manifest,
+provider, reference, scope, or staged-candidate drift invalidates provider
+evidence while preserving unrelated valid release evidence. A successful
+`provider result` re-digests a regular transparent PNG and stages it under
+`.lpc-toolkit/asset-packs/authoring-sessions/<session-id>/provider-candidates/`
+using a logical candidate ID; it never writes canonical pack source. The
+existing `asset authoring import` command remains the only candidate-to-source
+mutation authority, followed by the existing validation, attribution, preview,
+declaration, archive, inspection, and installation gates. Refusal, cancellation,
+timeout, or stale evidence preserves the last valid checkpoint and exposes one
+safe recovery action.
+
+The D2 result can be projected through D1 as bounded generation provenance. It
+does not become LPC credit metadata, authorship/license authority, human
+consent, preview acceptance, or a signature. No D2 field enters the v1
+`asset-pack.json`, formal ZIP, registry, or ordinary installation receipt, and
+the dormant `upstream/` gitlink, checked-in assets, verified base cache, and
+unowned output remain protected.
 
 Production asset resolution uses the local tree or pinned managed cache.
 `upstream/` is an optional read-only provenance dormant gitlink that preserves source

@@ -197,7 +197,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
   {
     command: ['agent', 'integration', 'check'],
     usage: 'lpc-toolkit agent integration check --manifest <manifest.json> [--json]',
-    description: 'Validate an Agent integration manifest against this CLI without loading assets or providers.',
+    description: 'Validate an Agent integration manifest offline; required capability gaps refuse with a stable diagnostic and optional gaps report external-author fallback.',
     options: [HELP_OPTION, JSON_OPTION, AGENT_MANIFEST_OPTION],
     examples: ['lpc-toolkit agent integration check --manifest manifest.json --json'],
   },
@@ -218,7 +218,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
   {
     command: ['asset', 'authoring'],
     usage: 'lpc-toolkit asset authoring <command>',
-    description: 'Create and resume provider-neutral asset authoring sessions from strict plans.',
+    description: 'Create and resume provider-neutral asset authoring sessions from strict plans; provider handoffs remain optional and never replace import or release gates.',
     options: [HELP_OPTION],
     examples: [
       'lpc-toolkit asset authoring start --plan plan.json --json',
@@ -228,7 +228,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
   {
     command: ['asset', 'authoring', 'provider'],
     usage: 'lpc-toolkit asset authoring provider <command>',
-    description: 'Discover explicitly supplied providers, preflight, persist handoffs, and stage bounded provider results.',
+    description: 'Discover explicitly supplied providers, preflight without mutation, persist consent-scoped handoffs, and stage bounded results for the existing candidate-import boundary; the CLI never invokes a provider.',
     options: [HELP_OPTION],
     examples: [
       'lpc-toolkit asset authoring provider discover --session session-id --contract-digest sha256:... --descriptors providers.json --json',
@@ -240,7 +240,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
   {
     command: ['asset', 'authoring', 'provider', 'discover'],
     usage: 'lpc-toolkit asset authoring provider discover --session <session-id> --contract-digest <sha256> --descriptors <providers.json> [--json]',
-    description: 'Normalize explicitly supplied provider descriptors without selecting, invoking, or writing a provider.',
+    description: 'Normalize explicitly supplied provider descriptors without selecting, invoking, enumerating, or writing a provider; unsupported entries remain explicit refusal/fallback results.',
     options: [
       HELP_OPTION,
       JSON_OPTION,
@@ -255,7 +255,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
   {
     command: ['asset', 'authoring', 'provider', 'preflight'],
     usage: 'lpc-toolkit asset authoring provider preflight --session <session-id> --contract-digest <sha256> --descriptor <descriptor.json> [options]',
-    description: 'Read the current drawing contract and check one provider descriptor without mutating the session or pack.',
+    description: 'Read the current drawing contract and check one provider descriptor without mutating the session or pack; refusal data includes the safe precondition or next action.',
     options: [
       HELP_OPTION,
       JSON_OPTION,
@@ -274,7 +274,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
   {
     command: ['asset', 'authoring', 'provider', 'handoff'],
     usage: 'lpc-toolkit asset authoring provider handoff --session <session-id> --descriptor <descriptor.json> --consent <consent.json> [--confirm] [--workspace <directory>] [--json]',
-    description: 'Persist a consent-scoped provider invocation without executing a provider or mutating pack source.',
+    description: 'Persist a consent-scoped provider invocation only after explicit --confirm; without confirmation it returns a pending action, and it never executes a provider or mutates pack source.',
     options: [
       HELP_OPTION,
       JSON_OPTION,
@@ -291,7 +291,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
   {
     command: ['asset', 'authoring', 'provider', 'result'],
     usage: 'lpc-toolkit asset authoring provider result --session <session-id> --invocation <invocation.json> --result <result.json> [--candidate <candidate.png>] [--workspace <directory>] [--json]',
-    description: 'Validate a provider result or refusal, then stage only valid candidate bytes below the session-owned candidate root; the existing candidate-import boundary remains the source mutation authority.',
+    description: 'Re-digest and validate a provider result or refusal, stage valid candidate bytes by session-relative ID below the session-owned candidate root, preserve one safe recovery action on refusal, and leave the existing candidate-import boundary as the source mutation authority.',
     options: [
       HELP_OPTION,
       JSON_OPTION,
@@ -347,7 +347,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
   {
     command: ['asset', 'authoring', 'import'],
     usage: 'lpc-toolkit asset authoring import --session <session-id> --target <target-id> --candidate <png> --contract-digest <sha256> [--replace-existing --expected-target-digest <sha256>] [--workspace <directory>] [--json]',
-    description: 'Import one contract-bound candidate PNG through the session trust boundary.',
+    description: 'Import one contract-bound candidate PNG through the session trust boundary; provider results must use this existing command before validation, preview, or release.',
     options: [
       HELP_OPTION,
       JSON_OPTION,

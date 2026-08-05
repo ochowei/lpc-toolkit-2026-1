@@ -226,6 +226,46 @@ pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifacts.t
 node --test scripts/verify-codex-plugin.test.mjs
 ```
 
+#### Provider-neutral Agent integration
+
+D2 provider work is contract-only: the production CLI never invokes a provider,
+loads a provider registry, collects credentials, or enables network access.
+Use the public Core/CLI seams and deterministic local fixtures to verify
+descriptor compatibility, explicit consent, result/refusal recovery, and the
+candidate-to-source import boundary:
+
+```sh
+pnpm --filter @lpc-toolkit/core test -- asset-provider-schema.test.ts asset-provider-provenance.test.ts
+pnpm --filter @lpc-toolkit/core run typecheck
+pnpm --filter @lpc-toolkit/cli test -- asset-provider-commands.test.ts asset-authoring-session.test.ts asset-authoring-session-e2e.test.ts asset-release-provenance.test.ts command-spec.test.ts main-json.test.ts main-human.test.ts response.test.ts
+pnpm --filter @lpc-toolkit/cli run typecheck
+pnpm check:boundaries
+pnpm verify:cli-docs-policy
+pnpm verify:plugin
+pnpm --filter @lpc-toolkit/cli test:package
+```
+
+The focused CLI tests must exercise only explicitly supplied descriptors and
+real temporary workspaces. They cover `agent integration check`, stable
+discovery/preflight statuses, consent-scoped handoff, network/credential and
+protected-root refusal, stale/cancelled/timed-out/invalid results, candidate
+PNG re-digestion, additive session receipts, D1 provider-output projection,
+human/JSON response parity, and one safe next action per refusal. A valid
+result is staged below the session-owned provider-candidate root; the existing
+`asset authoring import`, validation, attributed preview, and human release
+gates remain the only source/release authorities.
+
+The packed CLI smoke uses a deterministic fake adapter in the test fixture and
+the installed public executable only. It must prove compatible/incompatible
+Agent manifests, no-provider fallback, formal candidate import/validation/
+preview continuity, D1 evidence binding, and unchanged checked-in assets,
+managed base cache, artist source, formal archive, receipt, unowned output,
+and `upstream/` sentinels. No real provider, credential, network, plugin
+skill, backend, Web bridge, or persistent browser authoring state is part of
+this check. The existing CI mapping remains the same: the CLI package job
+covers build/typecheck/tests/package smoke, while `Unit tests` runs
+`pnpm verify` and the docs/plugin policy gates.
+
 Phase 1 release-boundary changes add a focused red/green map:
 
 ```sh
@@ -345,11 +385,13 @@ pnpm verify
 ```
 
 These checks prove the advertised capability/schema identifiers, public
-command/help wording, plugin-version alignment, landing distinction between
-composition and asset publication, optional exact-archive consumer activation,
-the optional external provenance companion and copied-consumer verification, and
-the clean packed-CLI authoring flow. They do not add provider invocation, a Web
-session bridge, or remote release infrastructure to the shipped product.
+command/help wording, provider descriptor/preflight/consent/refusal contracts,
+plugin-version alignment, landing distinction between composition and asset
+publication, optional exact-archive consumer activation, the optional external
+provenance companion and copied-consumer verification, and the clean packed-CLI
+authoring flow. They execute only deterministic local fixtures; they do not
+execute a real provider or add credentials, network services, a Web session
+bridge, or remote release infrastructure to the shipped product.
 
 Run `pnpm check:boundaries` for every asset-pack architecture change. Run
 the packed CLI smoke conditionally whenever CLI package metadata, build output,
