@@ -105,6 +105,31 @@ function writeAuthoringCandidate(filePath, target, colorOffset = 0) {
   return bytes;
 }
 
+const PACKED_PROVIDER_DESCRIPTOR = {
+  schema: 'lpc-toolkit.asset-provider-descriptor.v1',
+  id: 'provider.packed.example',
+  adapter: {
+    id: 'agent-adapter.packed.example',
+    version: '1.0.0',
+    cliRange: '>=0.2.0 <0.3.0',
+  },
+  capabilities: ['sprite-candidate.v1'],
+  contractVersions: ['lpc-toolkit.sprite-drawing-contract.v1'],
+  limits: {
+    maxCandidateBytes: 67108864,
+    timeoutSeconds: 600,
+    maxReferences: 8,
+  },
+  network: {
+    required: false,
+    declaredHosts: [],
+  },
+  credentials: {
+    required: true,
+    handledOutsideCli: true,
+  },
+};
+
 async function writeDraftArchive(formalArchivePath, draftArchivePath) {
   const archive = await JSZip.loadAsync(readFileSync(formalArchivePath));
   const files = new Map();
@@ -183,6 +208,12 @@ try {
   packDir = mkdtempSync(path.join(os.tmpdir(), 'lpc-toolkit-pack-'));
   installPrefix = mkdtempSync(path.join(os.tmpdir(), 'lpc-toolkit-install-'));
   emptyCwd = mkdtempSync(path.join(os.tmpdir(), 'lpc-toolkit-empty-cwd-'));
+  const checkedInCreditsPath = path.join(repoRoot, 'assets', 'CREDITS.csv');
+  const checkedInCreditsDigestBefore = existsSync(checkedInCreditsPath)
+    ? digestFile(checkedInCreditsPath)
+    : null;
+  const checkedInUpstreamPath = path.join(repoRoot, 'upstream');
+  const checkedInUpstreamPresentBefore = existsSync(checkedInUpstreamPath);
 
   rmSync(path.join(packageRoot, 'dist'), { recursive: true, force: true });
 
@@ -555,8 +586,81 @@ try {
   assert.ok(capabilitiesOutput.data?.capabilities.includes('asset-authoring-session.v1'));
   assert.ok(capabilitiesOutput.data?.capabilities.includes('asset-authoring-consumer-install.v1'));
   assert.ok(capabilitiesOutput.data?.capabilities.includes('sprite-drawing-contract.v1'));
+  for (const capability of [
+    'asset-authoring-provider-discovery.v1',
+    'asset-authoring-provider-invocation.v1',
+    'agent-integration-packaging.v1',
+  ]) {
+    assert.ok(capabilitiesOutput.data?.capabilities.includes(capability), `packed capabilities are missing ${capability}`);
+  }
   assert.ok(capabilitiesOutput.data?.schemaVersions.includes('lpc-toolkit.asset-authoring-plan.v1'));
   assert.ok(capabilitiesOutput.data?.schemaVersions.includes('lpc-toolkit.asset-authoring-install-receipt.v1'));
+  for (const schema of [
+    'lpc-toolkit.asset-provider-descriptor.v1',
+    'lpc-toolkit.asset-provider-discovery.v1',
+    'lpc-toolkit.asset-provider-invocation.v1',
+    'lpc-toolkit.asset-provider-result.v1',
+    'lpc-toolkit.asset-provider-refusal.v1',
+    'lpc-toolkit.agent-integration-manifest.v1',
+  ]) {
+    assert.ok(capabilitiesOutput.data?.schemaVersions.includes(schema), `packed schemas are missing ${schema}`);
+  }
+
+  const compatibleAgentManifestPath = path.join(emptyCwd, 'packed-agent-compatible.json');
+  const incompatibleAgentManifestPath = path.join(emptyCwd, 'packed-agent-incompatible.json');
+  writeJson(compatibleAgentManifestPath, {
+    schema: 'lpc-toolkit.agent-integration-manifest.v1',
+    id: 'agent.packed.example',
+    version: '1.0.0',
+    cliRange: '>=0.2.0 <0.3.0',
+    requiredCapabilities: [
+      'asset-authoring-session.v1',
+      'asset-authoring-provider-invocation.v1',
+    ],
+    optionalCapabilities: ['future-provider-capability.v1'],
+    supportedGoals: ['new-item'],
+    providerAdapters: [],
+  });
+  writeJson(incompatibleAgentManifestPath, {
+    schema: 'lpc-toolkit.agent-integration-manifest.v1',
+    id: 'agent.packed.incompatible',
+    version: '1.0.0',
+    cliRange: '>=0.2.0 <0.3.0',
+    requiredCapabilities: ['future-required-capability.v1'],
+    optionalCapabilities: [],
+    supportedGoals: ['new-item'],
+    providerAdapters: [],
+  });
+  const agentDirectoryBefore = readdirSync(emptyCwd).sort();
+  const compatibleAgentOutput = runInstalledJson([
+    'agent', 'integration', 'check', '--manifest', compatibleAgentManifestPath,
+  ], emptyCwd);
+  assert.equal(compatibleAgentOutput.ok, true);
+  assert.deepEqual(compatibleAgentOutput.data, {
+    manifest: {
+      id: 'agent.packed.example',
+      version: '1.0.0',
+    },
+    cliVersion: '0.2.0',
+    compatible: true,
+    missingRequiredCapabilities: [],
+    missingOptionalCapabilities: ['future-provider-capability.v1'],
+    optionalFallback: true,
+    refusal: null,
+  });
+  assert.equal(JSON.stringify(compatibleAgentOutput).includes(compatibleAgentManifestPath), false);
+  const incompatibleAgentResult = runInstalledResult([
+    'agent', 'integration', 'check', '--manifest', incompatibleAgentManifestPath,
+  ], emptyCwd);
+  assert.equal(incompatibleAgentResult.status, 1);
+  const incompatibleAgentOutput = JSON.parse(incompatibleAgentResult.stdout);
+  assert.deepEqual(incompatibleAgentOutput.errors, [{
+    code: 'agent_integration_capability_unsupported',
+    message: 'The CLI is missing a required Agent integration capability. Missing required capabilities: future-required-capability.v1.',
+    path: '$.requiredCapabilities',
+  }]);
+  assert.equal(incompatibleAgentResult.stdout.includes(incompatibleAgentManifestPath), false);
+  assert.deepEqual(readdirSync(emptyCwd).sort(), agentDirectoryBefore);
 
   const authoringPlanPath = path.join(emptyCwd, 'packed-authoring-plan.json');
   writeJson(authoringPlanPath, {
@@ -602,6 +706,24 @@ try {
   assert.deepEqual(authoringStartData?.nextActions.map(({ id }) => id), ['create-contract']);
   assert.equal(typeof authoringStartData?.sessionId, 'string');
   const authoringSessionId = authoringStartData.sessionId;
+  const legacySessionFilePath = path.join(
+    realpathSync.native(workspaceRoot),
+    '.lpc-toolkit',
+    'asset-packs',
+    'authoring-sessions',
+    authoringSessionId,
+    'session.json',
+  );
+  const legacySessionDocument = JSON.parse(readFileSync(legacySessionFilePath, 'utf8'));
+  delete legacySessionDocument.receipts.providerInvocation;
+  delete legacySessionDocument.receipts.providerResult;
+  writeJson(legacySessionFilePath, legacySessionDocument);
+  const legacySessionStatus = runInstalledJson([
+    'asset', 'authoring', 'status', '--session', authoringSessionId,
+  ], workspaceRoot);
+  assert.equal(legacySessionStatus.ok, true);
+  assert.equal(legacySessionStatus.data?.phase, 'scaffolded');
+  assert.equal(legacySessionStatus.data?.provider, null);
   const authoringPackRoot = realpathSync.native(path.join(
     workspaceRoot,
     'artist-packs',
@@ -636,7 +758,253 @@ try {
   const authoringTarget = authoringContract.targets[0];
   assert.ok(authoringTarget);
   assert.deepEqual(authoringTarget.bodyTypes, ['male', 'female']);
-  const authoringContractDigest = authoringContractArtifact.digest;
+  let authoringContractDigest = authoringContractArtifact.digest;
+  const authoringTargetPath = path.join(authoringPackRoot, ...authoringTarget.path.split('/'));
+
+  function runPackedProviderJourney() {
+  const providerDescriptorPath = path.join(emptyCwd, 'packed-provider.json');
+  const providerConsentPath = path.join(emptyCwd, 'packed-provider-consent.json');
+  const providerDiscoveryPath = path.join(emptyCwd, 'packed-provider-discovery.json');
+  writeJson(providerDescriptorPath, PACKED_PROVIDER_DESCRIPTOR);
+  writeJson(providerConsentPath, {
+    targetIds: [authoringTarget.id],
+    contractDigest: authoringContractDigest,
+    referenceDigests: [],
+    network: { enabled: false, hosts: [] },
+    limits: PACKED_PROVIDER_DESCRIPTOR.limits,
+    confirmed: true,
+  });
+  writeJson(providerDiscoveryPath, [
+    { availability: 'available', descriptor: PACKED_PROVIDER_DESCRIPTOR },
+    {
+      availability: 'available',
+      descriptor: {
+        ...PACKED_PROVIDER_DESCRIPTOR,
+        id: 'provider.network.example',
+        network: { required: true, declaredHosts: ['provider.example'] },
+      },
+    },
+    {
+      availability: 'unavailable',
+      descriptor: { ...PACKED_PROVIDER_DESCRIPTOR, id: 'provider.unavailable.example' },
+    },
+    {
+      availability: 'available',
+      descriptor: {
+        ...PACKED_PROVIDER_DESCRIPTOR,
+        id: 'provider.unsupported.example',
+        capabilities: ['other-operation.v1'],
+      },
+    },
+  ]);
+  const providerSessionPath = path.join(
+    canonicalWorkspaceRoot,
+    '.lpc-toolkit',
+    'asset-packs',
+    'authoring-sessions',
+    authoringSessionId,
+    'session.json',
+  );
+  const providerCandidatesRoot = path.join(path.dirname(providerSessionPath), 'provider-candidates');
+  const sourceBeforeProvider = readFileSync(authoringTargetPath);
+  const sourceDigestBeforeProvider = sha256(sourceBeforeProvider);
+  const sessionBeforeProviderPreflight = readFileSync(providerSessionPath);
+  const contractBeforeProvider = readFileSync(authoringContractArtifact.path);
+  const manifestBeforeProvider = readFileSync(authoringManifestPath);
+  const discoveryBefore = readFileSync(providerDiscoveryPath);
+  const providerDiscoveryOutput = runInstalledJson([
+    'asset', 'authoring', 'provider', 'discover',
+    '--session', authoringSessionId,
+    '--contract-digest', authoringContractDigest,
+    '--descriptors', providerDiscoveryPath,
+  ], workspaceRoot);
+  assert.equal(providerDiscoveryOutput.ok, true);
+  assert.deepEqual(
+    providerDiscoveryOutput.data?.entries.map(({ id, status }) => ({ id, status })),
+    [
+      { id: 'provider.network.example', status: 'consent-required' },
+      { id: 'provider.packed.example', status: 'supported' },
+      { id: 'provider.unavailable.example', status: 'unavailable' },
+      { id: 'provider.unsupported.example', status: 'unsupported' },
+    ],
+  );
+  assert.deepEqual(readFileSync(providerDiscoveryPath), discoveryBefore);
+  assert.deepEqual(readFileSync(providerSessionPath), sessionBeforeProviderPreflight);
+  assert.equal(existsSync(providerCandidatesRoot), false);
+
+  const providerPreflightOutput = runInstalledJson([
+    'asset', 'authoring', 'provider', 'preflight',
+    '--session', authoringSessionId,
+    '--contract-digest', authoringContractDigest,
+    '--descriptor', providerDescriptorPath,
+  ], workspaceRoot);
+  assert.equal(providerPreflightOutput.ok, true);
+  assert.equal(providerPreflightOutput.data?.schema, 'lpc-toolkit.asset-provider-preflight.v1');
+  assert.equal(providerPreflightOutput.data?.status, 'supported');
+  assert.deepEqual(providerPreflightOutput.data?.provider, {
+    id: PACKED_PROVIDER_DESCRIPTOR.id,
+    adapter: {
+      id: PACKED_PROVIDER_DESCRIPTOR.adapter.id,
+      version: PACKED_PROVIDER_DESCRIPTOR.adapter.version,
+    },
+  });
+  assert.deepEqual(providerPreflightOutput.data?.targetIds, [authoringTarget.id]);
+  assert.deepEqual(providerPreflightOutput.data?.referenceDigests, []);
+  assert.deepEqual(providerPreflightOutput.data?.checks, {
+    cliRange: true,
+    capability: true,
+    contractVersion: true,
+    candidateBytes: true,
+    references: true,
+    targetScope: true,
+    referenceScope: true,
+    credentials: true,
+    protectedRoot: true,
+    network: true,
+  });
+  assert.equal(providerPreflightOutput.data?.refusal, null);
+  assert.match(providerPreflightOutput.data?.descriptorDigest ?? '', /^sha256:[0-9a-f]{64}$/u);
+  assert.deepEqual(readFileSync(providerSessionPath), sessionBeforeProviderPreflight);
+  assert.deepEqual(readFileSync(authoringContractArtifact.path), contractBeforeProvider);
+  assert.deepEqual(readFileSync(authoringManifestPath), manifestBeforeProvider);
+  assert.equal(existsSync(providerCandidatesRoot), false);
+
+  const pendingHandoffOutput = runInstalledJson([
+    'asset', 'authoring', 'provider', 'handoff',
+    '--session', authoringSessionId,
+    '--descriptor', providerDescriptorPath,
+    '--consent', providerConsentPath,
+  ], workspaceRoot);
+  assert.equal(pendingHandoffOutput.ok, true);
+  assert.equal(pendingHandoffOutput.data?.status, 'consent-required');
+  assert.equal(pendingHandoffOutput.data?.safety, 'requires-confirmation');
+  assert.equal(pendingHandoffOutput.data?.invocation, null);
+  assert.deepEqual(
+    pendingHandoffOutput.data?.nextActions.map(({ id, safety }) => ({ id, safety })),
+    [{ id: 'confirm-provider-handoff', safety: 'requires-confirmation' }],
+  );
+  assert.equal(JSON.stringify(pendingHandoffOutput).includes(workspaceRoot), false);
+  assert.deepEqual(readFileSync(providerSessionPath), sessionBeforeProviderPreflight);
+  assert.equal(existsSync(providerCandidatesRoot), false);
+
+  const handoffOutput = runInstalledJson([
+    'asset', 'authoring', 'provider', 'handoff',
+    '--session', authoringSessionId,
+    '--descriptor', providerDescriptorPath,
+    '--consent', providerConsentPath,
+    '--confirm',
+  ], workspaceRoot);
+  assert.equal(handoffOutput.ok, true);
+  assert.equal(handoffOutput.data?.status, 'created');
+  assert.equal(handoffOutput.data?.safety, 'safe');
+  assert.match(handoffOutput.data?.invocationDigest ?? '', /^sha256:[0-9a-f]{64}$/u);
+  assert.deepEqual(handoffOutput.data?.nextActions, []);
+  const providerInvocation = handoffOutput.data?.invocation;
+  assert.ok(providerInvocation);
+  assert.equal(providerInvocation.schema, 'lpc-toolkit.asset-provider-invocation.v1');
+  assert.equal(providerInvocation.operation, 'sprite-candidate.v1');
+  assert.deepEqual(providerInvocation.targetIds, [authoringTarget.id]);
+  assert.equal(providerInvocation.provider.id, PACKED_PROVIDER_DESCRIPTOR.id);
+  assert.equal(providerInvocation.consent.confirmed, true);
+  assert.equal(JSON.stringify(handoffOutput).includes(workspaceRoot), false);
+  assert.equal(existsSync(providerCandidatesRoot), false);
+
+  const providerInvocationPath = path.join(emptyCwd, 'packed-provider-invocation.json');
+  const invalidProviderResultPath = path.join(emptyCwd, 'packed-provider-invalid-result.json');
+  writeJson(providerInvocationPath, providerInvocation);
+  writeJson(invalidProviderResultPath, {
+    schema: 'lpc-toolkit.asset-provider-result.v1',
+  });
+  const refusalOutput = runInstalledJson([
+    'asset', 'authoring', 'provider', 'result',
+    '--session', authoringSessionId,
+    '--invocation', providerInvocationPath,
+    '--result', invalidProviderResultPath,
+  ], workspaceRoot);
+  assert.equal(refusalOutput.ok, true);
+  assert.equal(refusalOutput.data?.status, 'refused');
+  assert.equal(refusalOutput.data?.refusal?.code, 'asset_provider_result_invalid');
+  assert.equal(refusalOutput.data?.candidate, null);
+  assert.deepEqual(
+    refusalOutput.data?.nextActions.map(({ id, safety }) => ({ id, safety })),
+    [{ id: 'provide-external-candidate', safety: 'safe' }],
+  );
+  assert.equal(JSON.stringify(refusalOutput).includes(workspaceRoot), false);
+  assert.equal(existsSync(providerCandidatesRoot), false);
+  assert.deepEqual(readFileSync(authoringTargetPath), sourceBeforeProvider);
+  assert.deepEqual(readFileSync(authoringManifestPath), manifestBeforeProvider);
+
+  const providerCandidatePath = path.join(canonicalWorkspaceRoot, 'provider-output.png');
+  const providerCandidateBytes = writeAuthoringCandidate(providerCandidatePath, authoringTarget, 19);
+  const providerCandidateDigest = sha256(providerCandidateBytes);
+  const providerResultPath = path.join(emptyCwd, 'packed-provider-result.json');
+  writeJson(providerResultPath, {
+    schema: 'lpc-toolkit.asset-provider-result.v1',
+    invocationDigest: handoffOutput.data.invocationDigest,
+    sessionId: authoringSessionId,
+    contractDigest: authoringContractDigest,
+    operation: 'sprite-candidate.v1',
+    provider: providerInvocation.provider,
+    targetId: authoringTarget.id,
+    consentScopeDigest: providerInvocation.consent.scopeDigest,
+    referenceDigests: providerInvocation.consent.referenceDigests,
+    candidate: {
+      id: providerInvocation.candidate.stagingId,
+      digest: providerCandidateDigest,
+      byteLength: providerCandidateBytes.byteLength,
+    },
+  });
+  const providerResultOutput = runInstalledJson([
+    'asset', 'authoring', 'provider', 'result',
+    '--session', authoringSessionId,
+    '--invocation', providerInvocationPath,
+    '--result', providerResultPath,
+    '--candidate', providerCandidatePath,
+  ], workspaceRoot);
+  assert.equal(providerResultOutput.ok, true);
+  assert.equal(providerResultOutput.data?.status, 'staged');
+  assert.equal(providerResultOutput.data?.refusal, null);
+  assert.equal(providerResultOutput.data?.candidate?.digest, providerCandidateDigest);
+  assert.deepEqual(
+    providerResultOutput.data?.nextActions.map(({ id, safety }) => ({ id, safety })),
+    [{ id: 'import-provider-candidate', safety: 'safe' }],
+  );
+  assert.equal(JSON.stringify(providerResultOutput).includes(canonicalWorkspaceRoot), false);
+  const providerStagedCandidatePath = path.join(
+    providerCandidatesRoot,
+    handoffOutput.data.invocationDigest.slice('sha256:'.length),
+    `${providerCandidateDigest.slice('sha256:'.length)}.png`,
+  );
+  assert.equal(existsSync(providerStagedCandidatePath), true);
+  assert.deepEqual(readFileSync(providerStagedCandidatePath), providerCandidateBytes);
+  assert.deepEqual(readFileSync(authoringTargetPath), sourceBeforeProvider);
+  assert.deepEqual(readFileSync(authoringManifestPath), manifestBeforeProvider);
+
+  const authoringImportOutput = runInstalledJson([
+    'asset', 'authoring', 'import',
+    '--session', authoringSessionId,
+    '--target', authoringTarget.id,
+    '--candidate', providerStagedCandidatePath,
+    '--contract-digest', authoringContractDigest,
+    '--replace-existing',
+    '--expected-target-digest', sourceDigestBeforeProvider,
+  ], workspaceRoot);
+  assert.equal(authoringImportOutput.ok, true);
+  const authoringImportData = authoringImportOutput.data;
+  assert.equal(authoringImportData?.phase, 'imported');
+  assert.equal(authoringImportData?.reason, 'candidate-imported');
+  assert.equal(Array.isArray(authoringImportData?.nextActions), true);
+  assert.deepEqual(authoringImportData?.nextActions.map(({ id }) => id), ['validate-session']);
+  const importedCandidateArtifact = authoringImportData?.artifacts.find(({ id }) => id === 'candidate');
+  const importedTargetArtifact = authoringImportData?.artifacts.find(({ id }) => id === `target:${authoringTarget.id}`);
+  assert.equal(importedCandidateArtifact?.digest, providerCandidateDigest);
+  assert.ok(importedTargetArtifact);
+  assert.equal(importedTargetArtifact.digest, digestFile(authoringTargetPath));
+  assert.equal(authoringImportData.checkpoint?.digest, importedTargetArtifact.digest);
+
+  return { providerCandidateDigest };
+  }
+
   const authoringCandidatePath = path.join(
     canonicalWorkspaceRoot,
     'authoring-candidates',
@@ -644,7 +1012,6 @@ try {
   );
   writeAuthoringCandidate(authoringCandidatePath, authoringTarget);
   const authoringCandidateDigest = digestFile(authoringCandidatePath);
-
   const authoringImportOutput = runInstalledJson([
     'asset', 'authoring', 'import',
     '--session', authoringSessionId,
@@ -662,7 +1029,6 @@ try {
   const importedTargetArtifact = authoringImportData?.artifacts.find(({ id }) => id === `target:${authoringTarget.id}`);
   assert.equal(importedCandidateArtifact?.digest, authoringCandidateDigest);
   assert.ok(importedTargetArtifact);
-  const authoringTargetPath = path.join(authoringPackRoot, ...authoringTarget.path.split('/'));
   assert.equal(importedTargetArtifact.digest, digestFile(authoringTargetPath));
   assert.equal(authoringImportData.checkpoint?.digest, importedTargetArtifact.digest);
 
@@ -847,7 +1213,67 @@ try {
     '--animation', 'walk',
   ], workspaceRoot);
   assert.equal(currentPreviewOutput.ok, true);
-  const currentPreviewData = currentPreviewOutput.data;
+  let currentPreviewData = currentPreviewOutput.data;
+  assert.equal(currentPreviewData?.phase, 'previewed');
+  assert.equal(currentPreviewData?.reason, 'preview-current');
+  assert.equal(currentPreviewData?.preview?.input.bodyType, 'female');
+  assert.equal(currentPreviewData?.preview?.input.animation, 'walk');
+  assert.equal(currentPreviewData?.preview?.artifacts.length, 4);
+  for (const artifact of currentPreviewData.preview.artifacts) {
+    assert.equal(digestFile(artifact.path), artifact.digest);
+  }
+
+  const refreshedContractOutput = runInstalledJson([
+    'asset', 'authoring', 'contract',
+    '--session', authoringSessionId,
+    '--refresh',
+  ], workspaceRoot);
+  assert.equal(refreshedContractOutput.ok, true);
+  assert.equal(refreshedContractOutput.data?.phase, 'contract-ready');
+  assert.match(refreshedContractOutput.data?.checkpoint?.digest ?? '', /^sha256:[0-9a-f]{64}$/u);
+  authoringContractDigest = refreshedContractOutput.data.checkpoint.digest;
+  const { providerCandidateDigest } = runPackedProviderJourney();
+
+  let providerValidationOutput = runInstalledJson([
+    'asset', 'authoring', 'validate', '--session', authoringSessionId,
+  ], workspaceRoot);
+  assert.equal(providerValidationOutput.ok, true);
+  let providerValidationData = providerValidationOutput.data;
+  if (!providerValidationData?.validation?.valid) {
+    assert.ok(providerValidationData?.validation?.acknowledgementRecords.length > 0);
+    const providerAcknowledgementPath = path.join(
+      canonicalWorkspaceRoot,
+      'packed-provider-acknowledgement.json',
+    );
+    writeJson(providerAcknowledgementPath, {
+      ...providerValidationData.validation.acknowledgementRecords[0],
+      reason: 'Reviewed the packed provider candidate validation evidence.',
+    });
+    providerValidationOutput = runInstalledJson([
+      'asset', 'authoring', 'acknowledge',
+      '--session', authoringSessionId,
+      '--acknowledgement', providerAcknowledgementPath,
+      '--confirm',
+    ], workspaceRoot);
+    assert.equal(providerValidationOutput.ok, true);
+    providerValidationData = providerValidationOutput.data;
+  }
+  assert.equal(providerValidationData?.validation?.valid, true, JSON.stringify(providerValidationData));
+  assert.equal(providerValidationData?.phase, 'validated');
+  assert.equal(
+    providerValidationData?.validation?.sourceDigests?.[0]?.digest,
+    digestFile(authoringTargetPath),
+  );
+  currentValidationData = providerValidationData;
+
+  const providerPreviewOutput = runInstalledJson([
+    'asset', 'authoring', 'preview',
+    '--session', authoringSessionId,
+    '--body-type', 'female',
+    '--animation', 'walk',
+  ], workspaceRoot);
+  assert.equal(providerPreviewOutput.ok, true);
+  currentPreviewData = providerPreviewOutput.data;
   assert.equal(currentPreviewData?.phase, 'previewed');
   assert.equal(currentPreviewData?.reason, 'preview-current');
   assert.equal(currentPreviewData?.preview?.input.bodyType, 'female');
@@ -950,6 +1376,14 @@ try {
     await formalZip.file('asset-pack.json').async('string'),
   );
   assert.equal(formalManifest.status, undefined);
+  const formalManifestText = JSON.stringify(formalManifest);
+  for (const privateValue of [
+    PACKED_PROVIDER_DESCRIPTOR.id,
+    PACKED_PROVIDER_DESCRIPTOR.adapter.id,
+    canonicalWorkspaceRoot,
+  ]) {
+    assert.equal(formalManifestText.includes(privateValue), false);
+  }
 
   const authoringInspectionOutput = runInstalledJson([
     'asset', 'authoring', 'inspect',
@@ -1007,6 +1441,21 @@ try {
     readFileSync(provenanceReceipt.provenancePath, 'utf8'),
   );
   assert.equal(provenanceDocument.schema, 'lpc-toolkit.asset-release-provenance.v1');
+  assert.deepEqual(provenanceDocument.projection.records, [{
+    kind: 'provider-output',
+    targetId: authoringTarget.id,
+    contractDigest: authoringContractDigest,
+    provider: {
+      id: PACKED_PROVIDER_DESCRIPTOR.id,
+      tool: PACKED_PROVIDER_DESCRIPTOR.adapter.id,
+    },
+    referenceDigests: [],
+    resultDigest: providerCandidateDigest,
+  }]);
+  const provenanceText = readFileSync(provenanceReceipt.provenancePath, 'utf8');
+  assert.equal(provenanceText.includes(canonicalWorkspaceRoot), false);
+  assert.equal(provenanceText.includes('prompt'), false);
+  assert.equal(provenanceText.includes('credential'), false);
   assert.equal(provenanceDocument.projection.pack.id, formalReceipt.packId);
   assert.equal(provenanceDocument.projection.pack.version, formalReceipt.version);
   assert.equal(
@@ -1056,7 +1505,7 @@ try {
     manifestDigest: provenanceDocument.projection.releaseBindings.manifestDigest,
     contentDigest: formalReceipt.contentDigest,
     sourceDigests: provenanceDocument.projection.releaseBindings.sourceDigests,
-    recordCount: 0,
+    recordCount: 1,
     releaseDeclarationReceiptDigest:
       provenanceDocument.projection.releaseBindings.releaseDeclarationReceiptDigest,
     previewAcceptanceReceiptDigest:
@@ -1202,6 +1651,11 @@ try {
     readFileSync(unownedOutputPath, 'utf8'),
     'user-owned output must remain untouched\n',
   );
+  assert.equal(
+    checkedInCreditsDigestBefore === null ? existsSync(checkedInCreditsPath) : digestFile(checkedInCreditsPath),
+    checkedInCreditsDigestBefore === null ? false : checkedInCreditsDigestBefore,
+  );
+  assert.equal(existsSync(checkedInUpstreamPath), checkedInUpstreamPresentBefore);
   assert.equal(existsSync(path.join(emptyCwd, 'assets')), false);
   assert.equal(existsSync(path.join(emptyCwd, 'upstream')), false);
 
