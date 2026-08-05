@@ -192,6 +192,27 @@ describe('helpForCommand', () => {
     expect(help).not.toContain('--workspace');
   });
 
+  it('documents the local-only D4 distribution response contract', () => {
+    const rootHelp = helpForCommand(['asset', 'distribution']);
+    expect(rootHelp).toContain('lpc-toolkit asset distribution inspect');
+    expect(rootHelp).toContain('lpc-toolkit asset distribution post-publication');
+    expect(rootHelp).toContain('without remote publication or hidden network access');
+
+    const verifyHelp = helpForCommand(['asset', 'distribution', 'verify']);
+    expect(verifyHelp).toContain('--trust-policy <policy.json>');
+    expect(verifyHelp).toContain('--verifier <verifier.json>');
+    expect(verifyHelp).toContain('deterministic local verifier fixture');
+
+    const installHelp = helpForCommand(['asset', 'distribution', 'install']);
+    expect(installHelp).toContain('--prefix-kind <temporary-consumer-prefix|system-wide-prefix>');
+    expect(installHelp).toContain('--confirm');
+    expect(installHelp).toContain('System-wide mutation is refused');
+
+    const publicationHelp = helpForCommand(['asset', 'distribution', 'post-publication']);
+    expect(publicationHelp).toContain('--transport <fake-npm|fake-marketplace>');
+    expect(publicationHelp).toContain('never claims or performs real publication');
+  });
+
   it('documents every Phase 1 asset leaf', () => {
     expect(helpForCommand(['asset', 'workspace', 'init'])).toContain(
       'lpc-toolkit asset workspace init <directory>',

@@ -257,6 +257,17 @@ describe('main json behavior', () => {
     expect(advertisement.data.capabilities).toContain('asset-authoring-release-provenance.v1');
     expect(advertisement.data.capabilities).toContain('asset-authoring-web-cli-handoff.v1');
     expect(advertisement.data.capabilities).toContain('asset-authoring-web-cli-recovery.v1');
+    expect(advertisement.data.capabilities).toEqual(expect.arrayContaining([
+      'asset-pack-remote-distribution.v1',
+      'asset-pack-signature-verification.v1',
+      'asset-pack-global-install.v1',
+      'asset-pack-npm-publication.v1',
+    ]));
+    expect(advertisement.data.schemaVersions).toEqual(expect.arrayContaining([
+      'lpc-toolkit.asset-distribution-release.v1',
+      'lpc-toolkit.asset-distribution-verification.v1',
+      'lpc-toolkit.asset-distribution-trust-policy.v1',
+    ]));
     expect(advertisement.data.schemaVersions).toContain(
       'lpc-toolkit.asset-authoring-install-receipt.v1',
     );
@@ -272,18 +283,25 @@ describe('main json behavior', () => {
     expect(advertisement.data.schemaVersions).toContain(
       'lpc-toolkit.asset-release-provenance-verification.v1',
     );
-    expect(advertisement.data.capabilities.slice(-3)).toEqual([
+    expect(advertisement.data.capabilities.slice(-7)).toEqual([
       'asset-authoring-provider-discovery.v1',
       'asset-authoring-provider-invocation.v1',
       'agent-integration-packaging.v1',
+      'asset-pack-remote-distribution.v1',
+      'asset-pack-signature-verification.v1',
+      'asset-pack-global-install.v1',
+      'asset-pack-npm-publication.v1',
     ]);
-    expect(advertisement.data.schemaVersions.slice(-6)).toEqual([
+    expect(advertisement.data.schemaVersions.slice(-9)).toEqual([
       'lpc-toolkit.asset-provider-descriptor.v1',
       'lpc-toolkit.asset-provider-discovery.v1',
       'lpc-toolkit.asset-provider-invocation.v1',
       'lpc-toolkit.asset-provider-result.v1',
       'lpc-toolkit.asset-provider-refusal.v1',
       'lpc-toolkit.agent-integration-manifest.v1',
+      'lpc-toolkit.asset-distribution-release.v1',
+      'lpc-toolkit.asset-distribution-verification.v1',
+      'lpc-toolkit.asset-distribution-trust-policy.v1',
     ]);
   });
 

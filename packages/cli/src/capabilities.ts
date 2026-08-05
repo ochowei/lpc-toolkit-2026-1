@@ -11,6 +11,10 @@ import {
   ASSET_WEB_CLI_HANDOFF_SCHEMA,
 } from '@lpc-toolkit/core';
 import { CLI_VERSION } from './package-info.js';
+import {
+  ASSET_DISTRIBUTION_CAPABILITIES,
+  ASSET_DISTRIBUTION_SCHEMA_VERSIONS,
+} from './asset-distribution-contract.js';
 
 const PROVIDER_SCHEMA_VERSIONS = [
   ASSET_PROVIDER_DESCRIPTOR_SCHEMA,
@@ -37,6 +41,7 @@ export const AUTHORING_SCHEMA_VERSIONS = [
   ASSET_WEB_CLI_HANDOFF_SCHEMA,
   ASSET_AUTHORING_WEB_HANDOFF_RECEIPT_SCHEMA,
   ...PROVIDER_SCHEMA_VERSIONS,
+  ...ASSET_DISTRIBUTION_SCHEMA_VERSIONS,
 ] as const;
 
 export const AUTHORING_CAPABILITIES = [
@@ -50,6 +55,7 @@ export const AUTHORING_CAPABILITIES = [
   'asset-authoring-release-provenance.v1',
   ...ASSET_WEB_CLI_HANDOFF_CAPABILITIES,
   ...ASSET_PROVIDER_CAPABILITIES,
+  ...ASSET_DISTRIBUTION_CAPABILITIES,
 ] as const;
 
 export interface CapabilityAdvertisement {

@@ -14,6 +14,7 @@ export interface ParsedArgs {
 
 const BOOLEAN_FLAGS = new Set([
   'advanced',
+  'allow-downgrade',
   'all',
   'allow-partial',
   'confirm',
@@ -35,6 +36,7 @@ function acceptsAnotherCommandToken(command: readonly string[]): boolean {
           command[1] === 'workspace'
           || command[1] === 'authoring'
           || command[1] === 'provenance'
+          || command[1] === 'distribution'
         )
       )
       || (command[0] === 'agent' && command[1] === 'integration')
