@@ -263,6 +263,11 @@ and update this matrix and the spec before implementation.
       approval, and local-fake-only boundaries.
   - Commit: `937f63ff737a28affe53bf296993e462a8192c14`
   - Verification: `rtk git diff --check HEAD^ HEAD` PASS; `rtk rg -n "remote registr|signing|verification|marketplace|global installation|npm publication|trust policy|key lifecycle|post-publication|rollback|tamper|provenance|license|Issue #173|PR #172|Mutation approval table|CLI documentation impact" docs/superpowers/specs/2026-08-06-remote-distribution-and-trust.md docs/superpowers/plans/2026-08-06-remote-distribution-and-trust.md` PASS.
+- [x] Pushed the spec/plan branch and opened the independent review Draft PR.
+  - Branch: `codex/issue-173-d4-remote-distribution-trust`
+  - PR: https://github.com/ochowei/lpc-toolkit-2026-1/pull/174 (Draft)
+  - Verification: `rtk gh pr view 174 --repo ochowei/lpc-toolkit-2026-1 --json number,url,state,isDraft,headRefName,baseRefName,title` PASS (`OPEN`, `isDraft: true`, base `main`); `rtk git status --short --branch` PASS after push.
+  - Initial CI snapshot: `CLI documentation impact` PASS; `Detect changes` PASS; `Vercel Preview Comments` PASS; `Unit tests` pending; Vercel deployment pending.
 - [ ] User review and merge of the D4 spec/plan review PR.
 
 ## Mutation approval table
