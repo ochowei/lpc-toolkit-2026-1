@@ -233,19 +233,23 @@ and update this matrix and the spec before implementation.
 ### 7. Tamper detection, withdrawal, rollback, recovery, and audit evidence
     (red → green)
 
-- [ ] Add stable state/diagnostic projections for invalid, untrusted,
+- [x] Add stable state/diagnostic projections for invalid, untrusted,
       tampered, conflict, withdrawn, recoverable, and verified outcomes.
-- [ ] Model non-destructive withdrawal/quarantine and explicit selection of a
+- [x] Model non-destructive withdrawal/quarantine and explicit selection of a
       prior verified immutable version; never delete, overwrite, retag, or
       mutate an external artifact in local code.
-- [ ] Reuse existing local transaction claims/recovery for staging and
+- [x] Reuse existing local transaction claims/recovery for staging and
       consumer installation; preserve the old receipt and exact prior bytes on
       interruption or drift.
-- [ ] Emit bounded, privacy-safe local verification/audit evidence containing
+- [x] Emit bounded, privacy-safe local verification/audit evidence containing
       exact digests, policy/key identifiers, decision, and recovery action.
-- [ ] Test archive tamper, record tamper, key compromise, listing drift,
+- [x] Test archive tamper, record tamper, key compromise, listing drift,
       failed publish/fetch/install, rollback selection, repeated recovery, and
       protected-path preservation.
+      - Implementation: `projectAssetDistributionOutcome` maps bounded diagnostic codes to stable states and next actions; `quarantineAssetDistributionRelease` preserves exact withdrawn/compromised evidence without deleting or rewriting it; `selectAssetDistributionRollbackRelease` requires one explicit prior verified identity and returns `mutation: none`; `recoverAssetDistributionConsumerPrefix` delegates confirmed local recovery to the existing transaction claim/recovery authority and returns privacy-safe audit evidence.
+      - Tests: stable state projections, record/archive/listing drift, revoked key, version conflict, withdrawal quarantine, failed publish/fetch/install, explicit rollback selection, withdrawn rollback refusal, repeated recovery no-op, prior receipt binding, protected-path/no-mutation assertions, and existing transaction/doctor recovery suites.
+      - Commit: `62b592d9a62a797e726e77c938fd3aa3fb66446c`
+      - Verification: `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/asset-distribution-audit.test.ts` FAIL (red: audit module was missing), then PASS (12 tests); `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/asset-distribution-audit.test.ts test/asset-pack-install.test.ts test/asset-pack-doctor.test.ts` PASS (82 tests); `rtk pnpm --filter @lpc-toolkit/cli exec tsc -p tsconfig.json --noEmit` PASS; `rtk git diff --check` PASS. No external artifact, registry, key, token, or system-wide prefix was mutated.
 
 ### 8. Public responses, help, documentation, and capability gate
 
