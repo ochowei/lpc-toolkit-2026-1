@@ -642,6 +642,27 @@ describe('asset authoring checkpoint invalidation', () => {
     })).toEqual([]);
   });
 
+  it('invalidates provider evidence when the provider or staged result binding drifts', () => {
+    const baseline = evidence({
+      providerInvocationDigest: DIGEST_A,
+      providerResultDigest: DIGEST_B,
+    });
+
+    expect(deriveAuthoringInvalidationDecisions(baseline, {
+      ...baseline,
+      providerInvocationDigest: DIGEST_C,
+    })).toEqual([
+      { checkpoint: 'provider', reason: 'provider-contract-stale' },
+    ]);
+
+    expect(deriveAuthoringInvalidationDecisions(baseline, {
+      ...baseline,
+      providerResultDigest: DIGEST_D,
+    })).toEqual([
+      { checkpoint: 'provider', reason: 'provider-result-stale' },
+    ]);
+  });
+
   it('invalidates a preview when its validation revision changes', () => {
     const baseline = evidence();
     const current = {

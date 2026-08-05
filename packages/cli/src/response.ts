@@ -93,6 +93,7 @@ export type AuthoringProviderResponseStatus =
   | 'consent-required'
   | 'unsupported'
   | 'result-staged'
+  | 'stale'
   | 'refused';
 
 export interface AuthoringProviderResponseInput {
@@ -624,6 +625,23 @@ function formatAuthoringResponse(
       lines.push(
         `Consumer installation: ${workspaceRoot}${archiveDigest ? ` (${archiveDigest})` : ''}`,
       );
+    }
+  }
+  const provider = data['provider'];
+  if (isRecord(provider)) {
+    const status = stringValue(provider, 'status');
+    const invocationDigest = stringValue(provider, 'invocationDigest');
+    if (status) {
+      lines.push(
+        `Provider evidence: ${status}${invocationDigest ? ` (${invocationDigest})` : ''}`,
+      );
+    }
+    const providerActions = recordArrayValue(provider, 'nextActions') ?? [];
+    for (const action of providerActions) {
+      const summary = stringValue(action, 'summary');
+      const actionCommand = stringValue(action, 'command');
+      if (summary) lines.push(`Next action: ${summary}`);
+      if (actionCommand) lines.push(`Next command: ${actionCommand}`);
     }
   }
   const validation = data['validation'];

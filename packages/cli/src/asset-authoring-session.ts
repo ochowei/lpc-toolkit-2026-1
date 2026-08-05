@@ -382,6 +382,10 @@ export interface AssetAuthoringEvidence {
   readonly manifestDigest: string | null;
   readonly contractDigest: string | null;
   readonly sourceDigests: readonly AssetAuthoringSourceDigest[];
+  /** Normalized provider handoff digest, when provider evidence is present. */
+  readonly providerInvocationDigest?: string | null;
+  /** Normalized provider result/refusal digest, when provider evidence is present. */
+  readonly providerResultDigest?: string | null;
   readonly validationReceipt: AssetAuthoringValidationReceipt | null;
   readonly previewReceipt: AssetAuthoringPreviewReceipt | null;
   readonly acknowledgementsReceipt?: AssetAuthoringAcknowledgementReceipt | null;
@@ -399,6 +403,7 @@ export type AssetAuthoringInvalidationCheckpoint =
   | 'manifest'
   | 'contract'
   | 'source'
+  | 'provider'
   | 'acknowledgements'
   | 'validation'
   | 'preview'
@@ -414,6 +419,8 @@ export type AssetAuthoringInvalidationReason =
   | 'manifest-semantic-drift'
   | 'contract-replaced'
   | 'png-drift'
+  | 'provider-contract-stale'
+  | 'provider-result-stale'
   | 'acknowledgement-receipt-stale'
   | 'validation-receipt-stale'
   | 'preview-receipt-stale'
@@ -2152,6 +2159,21 @@ export function deriveAuthoringInvalidationDecisions(
   current: AssetAuthoringEvidence,
 ): readonly AssetAuthoringInvalidationDecision[] {
   const decisions: AssetAuthoringInvalidationDecision[] = [];
+  const previousProviderInvocationDigest = previous.providerInvocationDigest ?? null;
+  const currentProviderInvocationDigest = current.providerInvocationDigest ?? null;
+  const previousProviderResultDigest = previous.providerResultDigest ?? null;
+  const currentProviderResultDigest = current.providerResultDigest ?? null;
+  if (
+    previousProviderInvocationDigest !== null
+    && previousProviderInvocationDigest !== currentProviderInvocationDigest
+  ) {
+    decisions.push({ checkpoint: 'provider', reason: 'provider-contract-stale' });
+  } else if (
+    previousProviderResultDigest !== null
+    && previousProviderResultDigest !== currentProviderResultDigest
+  ) {
+    decisions.push({ checkpoint: 'provider', reason: 'provider-result-stale' });
+  }
   if (
     previous.manifestDigest !== null
     && current.manifestDigest !== null

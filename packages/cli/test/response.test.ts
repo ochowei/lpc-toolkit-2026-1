@@ -229,4 +229,60 @@ describe('response envelope', () => {
     expect(output).toContain('Next command: asset authoring provider handoff --confirm');
     expect(output).not.toContain('/private/');
   });
+
+  it('formats stale provider evidence as a recovery status without private paths', () => {
+    const output = formatHumanResponse(commandOk('asset authoring status', {
+      schema: 'lpc-toolkit.asset-authoring-response.v1',
+      sessionId: '00000000-0000-4000-8000-000000000000',
+      goal: 'new-item',
+      state: 'needs-user-action',
+      reason: 'provider-result-stale',
+      phase: 'awaiting-candidate',
+      checkpoint: null,
+      checkpointFreshness: 'current',
+      diagnostics: [],
+      artifacts: [],
+      inputsNeeded: [],
+      nextActions: [],
+      retrySafety: 'safe',
+      manifestDigest: null,
+      sourceDigests: [],
+      releaseGates: { releaseReady: false, gates: [] },
+      releaseDeclaration: null,
+      previewAcceptance: null,
+      draftReceipt: null,
+      syncReceipt: null,
+      releaseProvenanceReceipt: null,
+      formalArchiveReceipt: null,
+      inspectionReceipt: null,
+      installationReceipt: null,
+      provider: {
+        schema: 'lpc-toolkit.asset-provider-response.v1',
+        status: 'stale',
+        invocation: null,
+        invocationDigest: `sha256:${'a'.repeat(64)}`,
+        result: null,
+        refusal: null,
+        safety: 'safe',
+        nextActions: [{
+          id: 'provide-external-candidate',
+          summary: 'Provide a new contract-bound candidate.',
+          command: 'asset authoring import --candidate <candidate.png>',
+          safety: 'safe',
+          requiredInputs: ['candidate'],
+          preconditionDigests: [`sha256:${'b'.repeat(64)}`],
+          expectedCheckpoint: null,
+        }],
+      },
+      cliVersion: '0.2.0',
+      capabilities: [],
+      schemaVersions: [],
+    }), 'fallback\n');
+
+    expect(output).toContain('Workflow state: needs-user-action');
+    expect(output).toContain('Reason: provider-result-stale');
+    expect(output).toContain('Next action: Provide a new contract-bound candidate.');
+    expect(output).toContain('Next command: asset authoring import --candidate <candidate.png>');
+    expect(output).not.toContain('/private/');
+  });
 });
