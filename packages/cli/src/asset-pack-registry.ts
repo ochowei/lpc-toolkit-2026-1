@@ -831,10 +831,12 @@ export function assetPackCompileProjectionFromRegistry(options: {
       packId: entry.packId,
     }))),
     credits: uniqueGeneratedCredits(options.entries),
-    ownership: options.entries.map((entry) => ({
-      packId: entry.packId,
-      logicalPaths: entry.generatedPaths,
-    })),
+    ownership: options.entries
+      .filter((entry) => entry.generatedPaths.length > 0)
+      .map((entry) => ({
+        packId: entry.packId,
+        logicalPaths: entry.generatedPaths,
+      })),
   };
 }
 
