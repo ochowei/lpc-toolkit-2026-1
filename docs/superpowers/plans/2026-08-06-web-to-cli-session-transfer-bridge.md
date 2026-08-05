@@ -200,14 +200,16 @@ recovery state, or compatibility rule cannot be omitted from the matrix.
 
 ### 6. Session/receipt compatibility and capability projection
 
-- [ ] Project optional D3 sidecar state from `asset authoring status` without
+- [x] Project optional D3 sidecar state from `asset authoring status` without
       changing the v1 session file shape or exposing private paths.
-- [ ] Add D3 capabilities and schema identifiers only after public commands,
+- [x] Add D3 capabilities and schema identifiers only after public commands,
       refusal behavior, and tests are complete.
-- [ ] Prove older session fixtures without a sidecar remain readable and that
+- [x] Prove older session fixtures without a sidecar remain readable and that
       D2 provider receipts and D1 provenance are not rewritten.
-- [ ] Prove stale Web handoff evidence cannot satisfy existing release gates or
+- [x] Prove stale Web handoff evidence cannot satisfy existing release gates or
       replace candidate-import authority.
+      - Implementation commit: `a78332cff8762ab94173d93f2f4524cd9f4e3bbe`
+      - Verification: `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/asset-authoring-web-cli-handoff.test.ts test/d3-web-cli-fixtures.test.ts test/command-spec.test.ts test/main-json.test.ts test/main-human.test.ts test/response.test.ts` PASS (160 tests); `rtk pnpm --filter @lpc-toolkit/cli exec tsc -p tsconfig.json --noEmit` PASS; `rtk git diff --check` PASS.
 
 ### 7. Documentation impact and final verification
 
