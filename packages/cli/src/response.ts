@@ -1,12 +1,16 @@
 import path from 'node:path';
 import {
   assetProviderInvocationProjection,
+  assetProviderRefusalProjection,
+  assetProviderResultProjection,
   assetAuthoringReleaseGateProjection,
   assetAuthoringReleaseReceiptProjection,
   type AssetAuthoringPreviewAcceptanceReceipt,
   type AssetAuthoringReleaseDeclarationReceipt,
   type AssetAuthoringReleaseGateProjection,
+  type AssetProviderRefusal,
   type AssetProviderInvocation,
+  type AssetProviderResult,
 } from '@lpc-toolkit/core';
 import { CLI_VERSION } from './package-info.js';
 import {
@@ -84,12 +88,19 @@ export interface AuthoringNextAction {
   readonly expectedCheckpoint: AuthoringCheckpoint | null;
 }
 
-export type AuthoringProviderResponseStatus = 'ready' | 'consent-required' | 'unsupported';
+export type AuthoringProviderResponseStatus =
+  | 'ready'
+  | 'consent-required'
+  | 'unsupported'
+  | 'result-staged'
+  | 'refused';
 
 export interface AuthoringProviderResponseInput {
   readonly status: AuthoringProviderResponseStatus;
   readonly invocation: AssetProviderInvocation | null;
   readonly invocationDigest: string | null;
+  readonly result?: AssetProviderResult | null;
+  readonly refusal?: AssetProviderRefusal | null;
   readonly safety: AuthoringActionSafety;
   readonly nextActions: readonly AuthoringNextAction[];
 }
@@ -248,6 +259,12 @@ export function authoringResponseProjection(
         ? null
         : assetProviderInvocationProjection(input.provider.invocation),
       invocationDigest: input.provider.invocationDigest,
+      result: input.provider.result === undefined || input.provider.result === null
+        ? null
+        : assetProviderResultProjection(input.provider.result),
+      refusal: input.provider.refusal === undefined || input.provider.refusal === null
+        ? null
+        : assetProviderRefusalProjection(input.provider.refusal),
       safety: input.provider.safety,
       nextActions: input.provider.nextActions.map((action) => ({
         ...action,
@@ -1431,6 +1448,43 @@ function formatProviderHandoff(data: JsonRecord): string | undefined {
   return `${lines.join('\n')}\n`;
 }
 
+function formatProviderResult(data: JsonRecord): string | undefined {
+  const provider = isRecord(data['provider']) ? data['provider'] : undefined;
+  const id = provider === undefined ? undefined : stringValue(provider, 'id');
+  const status = stringValue(data, 'status');
+  const contractDigest = stringValue(data, 'contractDigest');
+  const invocationDigest = stringValue(data, 'invocationDigest');
+  const safety = stringValue(data, 'safety');
+  if (!id || !status || !contractDigest || !invocationDigest || !safety) return undefined;
+  const lines = [
+    `Provider result: ${id} (${status})`,
+    `Contract: ${contractDigest}`,
+    `Invocation: ${invocationDigest}`,
+    `Safety: ${safety}`,
+  ];
+  const candidate = isRecord(data['candidate']) ? data['candidate'] : undefined;
+  if (candidate !== undefined) {
+    const digest = stringValue(candidate, 'digest');
+    const byteLength = numberValue(candidate, 'byteLength');
+    if (digest && byteLength !== undefined) lines.push(`Candidate: ${digest} (${byteLength} bytes)`);
+  }
+  const refusal = isRecord(data['refusal']) ? data['refusal'] : undefined;
+  if (refusal !== undefined) {
+    const code = stringValue(refusal, 'code');
+    const nextAction = stringValue(refusal, 'nextAction');
+    if (code) lines.push(`Refusal: ${code}`);
+    if (nextAction) lines.push(`Provider next action: ${nextAction}`);
+  }
+  const actions = recordArrayValue(data, 'nextActions') ?? [];
+  for (const action of actions) {
+    const summary = stringValue(action, 'summary');
+    const command = stringValue(action, 'command');
+    if (summary) lines.push(`Next action: ${summary}`);
+    if (command) lines.push(`Next command: ${command}`);
+  }
+  return `${lines.join('\n')}\n`;
+}
+
 function formatHumanData(response: CliResponse<unknown>): string | undefined {
   const data = response.data;
   if (!isRecord(data)) return undefined;
@@ -1479,6 +1533,8 @@ function formatHumanData(response: CliResponse<unknown>): string | undefined {
       return formatProviderPreflight(data);
     case 'asset authoring provider handoff':
       return formatProviderHandoff(data);
+    case 'asset authoring provider result':
+      return formatProviderResult(data);
     case 'token encode':
       return formatTokenEncode(data);
     case 'token decode':

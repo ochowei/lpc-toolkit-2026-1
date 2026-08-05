@@ -689,7 +689,6 @@ function providerInvocationDigest(invocation: AssetProviderInvocation): string {
 function parseProviderResult(
   value: unknown,
   sessionId: string,
-  plan: AssetAuthoringPlan,
   invocation: AssetProviderInvocation | null,
 ): AssetProviderResult | AssetProviderRefusal {
   const record = requireRecord(value, 'session.receipts.providerResult');
@@ -731,7 +730,7 @@ function parseProviderResult(
   if (!sameProviderIdentity(result.provider, boundInvocation.provider)) {
     fail('asset_authoring_session_tampered', 'session.receipts.providerResult.provider must match providerInvocation.');
   }
-  const targetIds = new Set(plan.scope.paths);
+  const targetIds = new Set(boundInvocation.targetIds);
   if (result.schema === 'lpc-toolkit.asset-provider-result.v1') {
     if (!targetIds.has(result.targetId) || !boundInvocation.targetIds.includes(result.targetId)) {
       fail('asset_authoring_session_path_invalid', 'session.receipts.providerResult.targetId must stay inside the invocation scope.');
@@ -813,7 +812,7 @@ function parseReceipts(
     : parseProviderInvocation(record.providerInvocation, sessionId, plan);
   const providerResult = record.providerResult === undefined || record.providerResult === null
     ? null
-    : parseProviderResult(record.providerResult, sessionId, plan, providerInvocation);
+    : parseProviderResult(record.providerResult, sessionId, providerInvocation);
   return {
     validation,
     preview,

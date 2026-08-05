@@ -88,6 +88,15 @@ export interface AssetAuthoringContractEvidence {
   readonly restrictedDigests: ReadonlySet<Sha256Digest>;
 }
 
+export interface AssetAuthoringCandidateInspection {
+  readonly candidatePath: string;
+  readonly candidateDigest: Sha256Digest;
+  readonly identity: string;
+  readonly byteLength: number;
+  readonly decodedPixelCount: number;
+  readonly bytes: Buffer;
+}
+
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -703,17 +712,82 @@ function verifyCellPolicies(
 function readCandidate(
   workspace: AssetWorkspace,
   candidatePath: string,
+  maximumBytes: number = MAX_CANDIDATE_BYTES,
 ): AssetPackBoundedFileSnapshot {
   try {
     return readBoundedAssetPackFile({
       root: workspace.root,
       filePath: candidatePath,
       label: 'Authoring candidate',
-      maximumBytes: MAX_CANDIDATE_BYTES,
+      maximumBytes,
     });
   } catch (error) {
     captureFailure(error, 'candidate');
   }
+}
+
+/**
+ * Inspect a candidate through the same PNG, geometry, alpha-policy, and
+ * bounded-file authority used by import, without publishing it to pack source.
+ */
+export async function inspectAssetAuthoringCandidate(options: {
+  readonly workspace: AssetWorkspace;
+  readonly candidatePath: string;
+  readonly target: SpriteDrawingTarget;
+  readonly restrictedPaths?: ReadonlySet<string>;
+  readonly restrictedDigests?: ReadonlySet<Sha256Digest>;
+  readonly forbiddenRoots?: readonly string[];
+  readonly maximumBytes?: number;
+  readonly forbiddenPath?: string;
+}): Promise<AssetAuthoringCandidateInspection> {
+  const candidatePath = path.resolve(options.candidatePath);
+  const maximumBytes = options.maximumBytes ?? MAX_CANDIDATE_BYTES;
+  if (!isInsideRoot(options.workspace.root, candidatePath)) {
+    fail('asset_authoring_candidate_outside_workspace', 'Candidate must remain inside the workspace.', candidatePath);
+  }
+  if (options.forbiddenPath !== undefined && candidatePath === path.resolve(options.forbiddenPath)) {
+    fail('asset_authoring_candidate_target_conflict', 'Candidate staging path must not be the contract destination.', candidatePath);
+  }
+  if (options.forbiddenRoots?.some((root) => isInsideRoot(root, candidatePath))) {
+    fail('asset_authoring_candidate_artifact_confusion', 'Contract artifacts are not candidate staging files.', candidatePath);
+  }
+  const candidateSnapshot = readCandidate(options.workspace, candidatePath, maximumBytes);
+  const candidateDigest = sha256(candidateSnapshot.bytes);
+  if (
+    options.restrictedPaths?.has(candidatePath)
+    || options.restrictedDigests?.has(candidateDigest)
+  ) {
+    fail('asset_authoring_candidate_artifact_confusion', 'Candidate bytes or path match a non-importable contract artifact.', candidatePath);
+  }
+
+  const decoded = await decodeCandidate(options.target, candidateSnapshot.bytes, candidatePath);
+  verifyCellPolicies(decoded, options.target, candidatePath);
+
+  let candidateAfterValidation: AssetPackBoundedFileSnapshot;
+  try {
+    candidateAfterValidation = readBoundedAssetPackFile({
+      root: options.workspace.root,
+      filePath: candidatePath,
+      label: 'Authoring candidate',
+      maximumBytes,
+    });
+  } catch (error) {
+    captureFailure(error, 'candidate');
+  }
+  if (
+    candidateAfterValidation.identity !== candidateSnapshot.identity
+    || !candidateAfterValidation.bytes.equals(candidateSnapshot.bytes)
+  ) {
+    fail('asset_authoring_candidate_changed', 'Candidate bytes changed during inspection.', candidatePath);
+  }
+  return {
+    candidatePath,
+    candidateDigest,
+    identity: candidateSnapshot.identity,
+    byteLength: candidateSnapshot.bytes.byteLength,
+    decodedPixelCount: decoded.width * decoded.height,
+    bytes: candidateSnapshot.bytes,
+  };
 }
 
 function readCurrentTarget(
@@ -762,7 +836,11 @@ export async function importAssetAuthoringCandidate(options: {
     !externalPngCorrection
     && (
       options.session.checkpointFreshness !== 'current'
-      || (options.session.phase !== 'contract-ready' && options.session.phase !== 'imported')
+      || (
+        options.session.phase !== 'contract-ready'
+        && options.session.phase !== 'awaiting-candidate'
+        && options.session.phase !== 'imported'
+      )
     )
   ) {
     fail('asset_authoring_contract_stale', 'The authoring session does not have a current drawing contract.');
@@ -802,23 +880,6 @@ export async function importAssetAuthoringCandidate(options: {
 
   const candidatePath = path.resolve(options.candidatePath);
   const contractArtifactsRoot = path.dirname(contractFiles.metadataPath);
-  if (!isInsideRoot(options.workspace.root, candidatePath)) {
-    fail('asset_authoring_candidate_outside_workspace', 'Candidate must remain inside the workspace.', candidatePath);
-  }
-  if (isInsideRoot(contractArtifactsRoot, candidatePath)) {
-    fail('asset_authoring_candidate_artifact_confusion', 'Contract artifacts are not candidate staging files.', candidatePath);
-  }
-  if (candidatePath === destinationPath) {
-    fail('asset_authoring_candidate_target_conflict', 'Candidate staging path must not be the contract destination.', candidatePath);
-  }
-  const candidateSnapshot = readCandidate(options.workspace, candidatePath);
-  const candidateDigest = sha256(candidateSnapshot.bytes);
-  if (
-    metadata.restrictedPaths.has(candidatePath)
-    || metadata.restrictedDigests.has(candidateDigest)
-  ) {
-    fail('asset_authoring_candidate_artifact_confusion', 'Candidate bytes or path match a non-importable contract artifact.', candidatePath);
-  }
 
   const manifestPath = path.join(options.session.packRoot, 'asset-pack.json');
   let manifestSnapshot: AssetPackBoundedFileSnapshot;
@@ -839,8 +900,16 @@ export async function importAssetAuthoringCandidate(options: {
     fail('asset_authoring_manifest_stale', 'The asset-pack manifest no longer matches the session revision.', manifestPath);
   }
 
-  const decoded = await decodeCandidate(target, candidateSnapshot.bytes, candidatePath);
-  verifyCellPolicies(decoded, target, candidatePath);
+  const inspection = await inspectAssetAuthoringCandidate({
+    workspace: options.workspace,
+    candidatePath,
+    target,
+    restrictedPaths: metadata.restrictedPaths,
+    restrictedDigests: metadata.restrictedDigests,
+    forbiddenRoots: [contractArtifactsRoot],
+    forbiddenPath: destinationPath,
+  });
+  const candidateDigest = inspection.candidateDigest;
 
   const currentTarget = readCurrentTarget(options.session, destinationPath);
   const currentDigest = currentTarget === undefined ? null : sha256(currentTarget.bytes);
@@ -871,30 +940,12 @@ export async function importAssetAuthoringCandidate(options: {
     fail('asset_authoring_target_digest_mismatch', 'Replacement authorization was supplied for a missing target.', destinationPath);
   }
 
-  let candidateAfterValidation: AssetPackBoundedFileSnapshot;
-  try {
-    candidateAfterValidation = readBoundedAssetPackFile({
-      root: options.workspace.root,
-      filePath: candidatePath,
-      label: 'Authoring candidate',
-      maximumBytes: MAX_CANDIDATE_BYTES,
-    });
-  } catch (error) {
-    captureFailure(error, 'candidate');
-  }
-  if (
-    candidateAfterValidation.identity !== candidateSnapshot.identity
-    || !candidateAfterValidation.bytes.equals(candidateSnapshot.bytes)
-  ) {
-    fail('asset_authoring_candidate_changed', 'Candidate bytes changed during inspection.', candidatePath);
-  }
-
   let publication: { readonly targetPath: string; readonly digest: Sha256Digest };
   try {
     publication = atomicallyReplaceAssetPackSource({
       root: options.session.packRoot,
       sourcePath: target.path,
-      bytes: candidateSnapshot.bytes,
+      bytes: inspection.bytes,
       maximumBytes: MAX_CANDIDATE_BYTES,
       expectedTargetDigest: currentDigest,
     });
