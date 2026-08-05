@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import {
+  assetPackSourceFromNormalized,
   assetWebCliHandoffStateDigestInput,
   type AssetAuthoringPlan,
   type AssetWebCliHandoff,
@@ -14,7 +15,6 @@ import { nodeAssetPackFormatRuntime } from '../../src/asset-pack-node-runtime.js
 const FIXTURE_HANDOFF_ID = '550e8400-e29b-41d4-a716-446655440000';
 const FIXTURE_CREATED_AT = '2026-08-06T12:00:00.000Z';
 const FIXTURE_BASELINE_RELEASE_TAG = 'd3-local-fixture';
-const FIXTURE_RELEASE_FINGERPRINT = `sha256:${'f'.repeat(64)}`;
 
 export const D3_ATTACH_PACK_PLAN = {
   schema: 'lpc-toolkit.asset-authoring-plan.v1',
@@ -74,6 +74,13 @@ function handoffForSnapshot(
   const acknowledgementDigest = sha256(
     new TextEncoder().encode(canonicalJson(snapshot.payload.pack.acknowledgements)),
   );
+  const source = assetPackSourceFromNormalized(snapshot.payload.pack);
+  const { version: _version, status: _status, ...releaseManifest } = source;
+  const releaseFingerprint = sha256(new TextEncoder().encode(canonicalJson({
+    manifest: releaseManifest,
+    sources: [...snapshot.payload.sourceDigests]
+      .map(([sourcePath, digest]) => ({ sourcePath, digest })),
+  })));
   const sourceDigests = [...snapshot.payload.sourceDigests]
     .map(([path, digest]) => ({ path, digest }))
     .sort((left, right) => left.path.localeCompare(right.path));
@@ -94,7 +101,7 @@ function handoffForSnapshot(
       archiveKind: 'formal' as const,
       manifestDigest: sha256(snapshot.manifestBytes),
       contentDigest: snapshot.payload.contentDigest,
-      releaseFingerprint: FIXTURE_RELEASE_FINGERPRINT,
+      releaseFingerprint,
     },
     payload: {
       fileName: archiveFileName,

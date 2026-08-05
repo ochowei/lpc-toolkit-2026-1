@@ -1503,9 +1503,35 @@ function formatProviderResult(data: JsonRecord): string | undefined {
   return `${lines.join('\n')}\n`;
 }
 
+function formatWebCliHandoffInspection(data: JsonRecord): string | undefined {
+  const state = stringValue(data, 'state');
+  const handoffId = stringValue(data, 'handoffId');
+  const binding = isRecord(data['binding']) ? data['binding'] : undefined;
+  const archiveDigest = binding === undefined ? undefined : stringValue(binding, 'archiveDigest');
+  const packId = binding === undefined ? undefined : stringValue(binding, 'packId');
+  const version = binding === undefined ? undefined : stringValue(binding, 'version');
+  const nextAction = isRecord(data['nextAction']) ? data['nextAction'] : undefined;
+  const summary = nextAction === undefined ? undefined : stringValue(nextAction, 'summary');
+  const command = nextAction === undefined ? undefined : stringValue(nextAction, 'command');
+  if (!state || !handoffId || !archiveDigest || !packId || !version || !summary || !command) return undefined;
+  const lines = [
+    state === 'current' ? 'Web-to-CLI handoff is current.' : 'Web-to-CLI handoff is stale.',
+    `Handoff: ${handoffId}`,
+    `Archive: ${packId}@${version} (${archiveDigest})`,
+  ];
+  const mismatches = stringArrayValue(data, 'mismatches') ?? [];
+  if (mismatches.length > 0) lines.push(`Mismatched bindings: ${mismatches.join(', ')}`);
+  lines.push(`Next action: ${summary}`, `Next command: ${command}`);
+  return `${lines.join('\n')}\n`;
+}
+
 function formatHumanData(response: CliResponse<unknown>): string | undefined {
   const data = response.data;
   if (!isRecord(data)) return undefined;
+
+  if (response.command === 'asset authoring handoff inspect') {
+    return formatWebCliHandoffInspection(data);
+  }
 
   const authoring = formatAuthoringResponse(response.command, data);
   if (authoring) return authoring;

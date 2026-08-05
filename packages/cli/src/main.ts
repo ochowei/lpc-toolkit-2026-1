@@ -39,6 +39,10 @@ import {
 } from './capabilities.js';
 import { runAgentIntegrationCommand } from './agent-integration-commands.js';
 import { runAssetProviderCommand } from './asset-provider-commands.js';
+import {
+  isStaleAssetWebCliHandoffResponse,
+  runAssetAuthoringWebCliHandoffCommand,
+} from './asset-authoring-web-cli-handoff.js';
 import { materializePreset, runPresetCommand } from './preset-commands.js';
 import { CLI_VERSION } from './package-info.js';
 import { renderSelection } from './render.js';
@@ -142,7 +146,8 @@ function writeResponse(
     && response.data !== null
     && 'healthy' in response.data
     && response.data.healthy === false;
-  const exitCode = response.ok && !reportFailed && !doctorFailed ? 0 : 1;
+  const handoffStale = isStaleAssetWebCliHandoffResponse(response);
+  const exitCode = response.ok && !reportFailed && !doctorFailed && !handoffStale ? 0 : 1;
   if (flagBoolean(parsed.flags, 'json')) {
     io.stdout(formatJsonResponse(response));
   } else if (exitCode === 0) {
@@ -269,6 +274,42 @@ function preflightCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
   if (command === 'asset' && subcommand === 'authoring') {
     const authoringCommand = parsed.command[2];
     const commandName = parsed.command.join(' ');
+    if (authoringCommand === 'handoff') {
+      const handoffCommand = parsed.command[3];
+      if (
+        parsed.command.length !== 4
+        || (handoffCommand !== 'inspect' && handoffCommand !== 'import' && handoffCommand !== 'recover')
+      ) {
+        return commandError(commandName, {
+          code: 'unknown_command',
+          message: `Unknown asset authoring handoff command: ${commandName}`,
+        });
+      }
+      const requiredStringFlag = (name: string): CliResponse<null> | undefined => {
+        if (flagString(parsed.flags, name)) return undefined;
+        return commandError(commandName, {
+          code: 'missing_argument',
+          message: `--${name} is required.`,
+          path: `--${name}`,
+        });
+      };
+      for (const name of handoffCommand === 'recover'
+        ? ['handoff', 'archive', 'workspace', 'action']
+        : handoffCommand === 'import'
+          ? ['handoff', 'archive', 'plan']
+          : ['handoff', 'archive']) {
+        const issue = requiredStringFlag(name);
+        if (issue) return issue;
+      }
+      if (handoffCommand === 'recover' && flagString(parsed.flags, 'workspace') === undefined) {
+        return commandError(commandName, {
+          code: 'missing_argument',
+          message: '--workspace is required.',
+          path: '--workspace',
+        });
+      }
+      return undefined;
+    }
     if (
       authoringCommand !== 'start'
       && authoringCommand !== 'status'
@@ -552,7 +593,7 @@ async function runCliWithRuntime(
         parsed.command.length === 3
         && parsed.command[0] === 'asset'
         && parsed.command[1] === 'authoring'
-        && parsed.command[2] === 'provider'
+        && (parsed.command[2] === 'provider' || parsed.command[2] === 'handoff')
       )
     )
   ) {
@@ -599,6 +640,19 @@ async function runCliWithRuntime(
       parsed,
       io,
       'Capabilities advertised.\n',
+    );
+  }
+
+  if (
+    parsed.command[0] === 'asset'
+    && parsed.command[1] === 'authoring'
+    && parsed.command[2] === 'handoff'
+  ) {
+    return writeResponse(
+      await runAssetAuthoringWebCliHandoffCommand({ parsed, cwd: io.cwd }),
+      parsed,
+      io,
+      'Web-to-CLI handoff inspection completed.\n',
     );
   }
 
