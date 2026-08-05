@@ -192,8 +192,8 @@ Product commit: `7784a44b8a4c5ca40e7aec735658caa975b965f7`
 
 ### Task 4: Complete packed acceptance, documentation, and handoff gate
 
-- [ ] Add packed acceptance for clean author formal pack → exact inspect → provenance generation, copied archive/receipt verification from a separate consumer root, unsupported/missing provenance refusal, ordinary install compatibility, and protected sentinels.
-- [ ] Reassess and update every CLI-sensitive surface:
+- [x] Add packed acceptance for clean author formal pack → exact inspect → provenance generation, copied archive/receipt verification from a separate consumer root, unsupported/missing provenance refusal, ordinary install compatibility, and protected sentinels.
+- [x] Reassess and update every CLI-sensitive surface:
 
 ```text
 help: update — add both provenance commands, exact prerequisites, confirmation, output containment, and refusal diagnostics
@@ -206,21 +206,31 @@ releasing: update — add companion receipt publication, conflict handling, and 
 plugin: update — document the capability/receipt boundary; do not add provider invocation or a new skill
 ```
 
-- [ ] Run the complete verification gate, including CLI docs policy, plugin policy, boundaries, all relevant typechecks/tests, package smoke, diff checks, and protected-path evidence.
-- [ ] Commit product changes and the separate plan record; record full hashes and exact PASS results here.
+- [x] Run the complete verification gate, including CLI docs policy, plugin policy, boundaries, all relevant typechecks/tests, package smoke, diff checks, and protected-path evidence.
+- [x] Commit product changes and the separate plan record; record full hashes and exact PASS results here.
 
-Implementation note: 
-Verification: 
-Product commit: 
+Implementation note: Added installed packed acceptance for formal pack → exact
+session inspect → release-provenance generation, then copied the exact archive
+and external receipt into a separate clean consumer root for read-only
+verification. The smoke asserts missing-receipt refusal, unsupported/malformed
+and stale refusal, no companion ZIP member or ordinary-install input, and
+unchanged sentinels for checked-in assets, base cache, artist source, archive,
+receipt, unowned output, and `upstream/`. Reassessed and updated all eight
+CLI-sensitive surfaces: help, CLI README, root README, landing, architecture,
+engineering, releasing, and plugin compatibility. The plugin remains a
+capability/receipt boundary only: it does not add a skill or provider
+invocation.
+Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-release-provenance-schema.test.ts asset-release-schema.test.ts` PASS (22 tests); `rtk pnpm --filter @lpc-toolkit/core run typecheck` PASS; `rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- release-provenance.test.ts archive.test.ts payload.test.ts` PASS (48 tests); `rtk pnpm --filter @lpc-toolkit/asset-pack-format run typecheck` PASS; `rtk pnpm --filter @lpc-toolkit/cli test -- asset-release-provenance.test.ts asset-authoring-release.test.ts asset-authoring-session.test.ts asset-authoring-session-e2e.test.ts command-spec.test.ts main-json.test.ts main-human.test.ts response.test.ts main-assets.test.ts` PASS (314 tests); `rtk pnpm --filter @lpc-toolkit/cli run typecheck` PASS; `rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifacts.test.ts` PASS (4 tests; elevated only for the sandbox `tsx` IPC pipe); `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS (`Packed CLI install smoke test passed.`); `rtk pnpm check:boundaries` PASS; `rtk pnpm verify:cli-docs-policy` PASS (19 tests); `rtk pnpm verify:plugin` PASS (40 tests); `rtk pnpm verify` PASS (core 412, presets 8, asset-pack-format 75, CLI 1171 passed/1 skipped, web 861 tests; all workspace typechecks); `rtk git diff --check` PASS; `rtk git status --short` PASS (clean); `rtk git status --short -- upstream` PASS (empty).
+Product commit: `d135030ba546adb1d32ade283a7c6a2728e729bb`
 
 ## Plan record
 
 - [x] Task 1 — pure provenance contract and canonical encoding complete.
 - [x] Task 2 — release-bound companion generation and session persistence complete.
 - [x] Task 3 — read-only verification and v1 compatibility complete.
-- [ ] Task 4 — packed acceptance, documentation, and handoff gate complete.
+- [x] Task 4 — packed acceptance, documentation, and handoff gate complete.
 
-Product commits: Task 1 — `2cd43a3fe3d77b30b311b344e797cf0b62f5471d`; Task 2 — `d1f964f03e46cd39cb99501204bf95c996bdd787`; Task 3 — `7784a44b8a4c5ca40e7aec735658caa975b965f7`
+Product commits: Task 1 — `2cd43a3fe3d77b30b311b344e797cf0b62f5471d`; Task 2 — `d1f964f03e46cd39cb99501204bf95c996bdd787`; Task 3 — `7784a44b8a4c5ca40e7aec735658caa975b965f7`; Task 4 — `d135030ba546adb1d32ade283a7c6a2728e729bb`
 Plan-record commit: 
 
 ## CLI documentation impact matrix
@@ -247,8 +257,9 @@ rtk pnpm --filter @lpc-toolkit/core test -- asset-release-provenance-schema.test
 rtk pnpm --filter @lpc-toolkit/core run typecheck
 rtk pnpm --filter @lpc-toolkit/asset-pack-format test -- release-provenance.test.ts archive.test.ts payload.test.ts
 rtk pnpm --filter @lpc-toolkit/asset-pack-format run typecheck
-rtk pnpm --filter @lpc-toolkit/cli test -- asset-release-provenance.test.ts asset-authoring-session.test.ts asset-authoring-session-e2e.test.ts command-spec.test.ts main-json.test.ts main-human.test.ts response.test.ts
+rtk pnpm --filter @lpc-toolkit/cli test -- asset-release-provenance.test.ts asset-authoring-release.test.ts asset-authoring-session.test.ts asset-authoring-session-e2e.test.ts command-spec.test.ts main-json.test.ts main-human.test.ts response.test.ts main-assets.test.ts
 rtk pnpm --filter @lpc-toolkit/cli run typecheck
+rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifacts.test.ts
 rtk pnpm --filter @lpc-toolkit/cli test:package
 rtk pnpm check:boundaries
 rtk pnpm verify:cli-docs-policy
