@@ -195,19 +195,23 @@ and update this matrix and the spec before implementation.
 
 ### 5. Global installation and compatibility (red → green)
 
-- [ ] Add a local-only explicit global-prefix/consumer operation that delegates
+- [x] Add a local-only explicit global-prefix/consumer operation that delegates
       payload publication, receipt, attribution, and transaction recovery to
       the existing install authority.
-- [ ] Require exact record/archive selection, successful trust/provenance/
+- [x] Require exact record/archive selection, successful trust/provenance/
       license/credit verification, initialized protected-prefix checks, and
       explicit `--confirm` before mutation.
-- [ ] Refuse draft/untrusted/tampered/withdrawn/incompatible records, same
+- [x] Refuse draft/untrusted/tampered/withdrawn/incompatible records, same
       version replacement, unsafe paths/symlinks, and automatic downgrade.
-- [ ] Test repeated exact install as a verified no-op, explicit permitted
+- [x] Test repeated exact install as a verified no-op, explicit permitted
       downgrade, failed preflight with no mutation, interrupted staging,
       protected sentinels, old local v1 install, and matching `CREDITS.csv`.
-- [ ] Never mutate a real OS-wide prefix in tests or infer that a temp prefix
+- [x] Never mutate a real OS-wide prefix in tests or infer that a temp prefix
       proves global installation.
+      - Implementation: `installAssetDistributionToConsumerPrefix` accepts only the explicit temporary consumer-prefix mutation seam, performs exact capture/archive/trust/evidence/capability/preflight checks, requires confirmation, and delegates successful mutation to `installAssetPack`; system-wide prefixes are refused. The empty-output registry projection is normalized to match the existing compiler projection so valid empty formal packs remain transactionally installable.
+      - Tests: the focused consumer-prefix suite covers no-confirm/no-mutation, system-wide refusal, trust/withdrawal/archive/capability refusal, explicit downgrade gating, exact install, repeated verified no-op, and matching generated credits. Existing install-authority regression coverage supplies same-version conflict, protected sentinels, old v1 registry handling, interrupted staging, rollback, and recovery evidence.
+      - Commit: `22e8fed37382dceb98543791c7ae6584bd1ffc68`
+      - Verification: `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/asset-distribution-global-install.test.ts` FAIL (initial actual-installer slice exposed an empty-pack registry compileDigest mismatch), then PASS (5 tests); `rtk pnpm --filter @lpc-toolkit/cli exec tsc -p tsconfig.json --noEmit` PASS; `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/asset-pack-install.test.ts test/asset-pack-registry.test.ts` PASS (44 tests); `rtk pnpm --filter @lpc-toolkit/core exec vitest run test/asset-pack-compile.test.ts` PASS (14 tests); `rtk git diff --check` PASS.
 
 ### 6. npm package publication and post-publication verification (red → green)
 
