@@ -567,22 +567,22 @@ body before implementation continues; do not silently broaden the plan.
 `asset-authoring-session.ts` only where current-contract evidence is needed,
 and focused CLI tests.
 
-- [ ] Write RED public `runCli` tests for `provider discover` with stable
+- [x] Write RED public `runCli` tests for `provider discover` with stable
   sorting, all four statuses, duplicate descriptor handling, invalid input,
   32-descriptor limit, and no filesystem mutation.
-- [ ] Write RED tests for `provider preflight` with current/stale/missing
+- [x] Write RED tests for `provider preflight` with current/stale/missing
   contract, CLI range mismatch, missing capability, limit mismatch, declared
   network, credential policy, target/reference scope, and protected-root
   refusal.
-- [ ] Read the current contract and its existing artifact metadata through the
+- [x] Read the current contract and its existing artifact metadata through the
   existing session/contract authorities; do not rederive geometry or read
   caches directly.
-- [ ] Implement discovery as a bounded normalization of explicitly supplied
+- [x] Implement discovery as a bounded normalization of explicitly supplied
   descriptors. It must not enumerate processes, directories, registries, or
   remote services.
-- [ ] Implement preflight as read-only. It must not write `session.json`,
+- [x] Implement preflight as read-only. It must not write `session.json`,
   contract artifacts, candidate bytes, manifests, receipts, or provenance.
-- [ ] Run focused tests, CLI typecheck, and `rtk pnpm check:boundaries`; commit
+- [x] Run focused tests, CLI typecheck, and `rtk pnpm check:boundaries`; commit
   as `feat(cli): add provider discovery and preflight`.
 
 ### Task 4 — Persist explicit-consent invocation handoff
@@ -772,9 +772,18 @@ commit hashes, not abbreviated hashes, and exact command results.
   - Verification: `rtk pnpm test` FAIL in the sandbox — 13 existing `web-server` tests could not bind `127.0.0.1` (`EPERM`); no Task 2 test failed.
   - Verification: `rtk pnpm test` PASS in a loopback-enabled rerun — 64 files, 1,182 tests passed, 1 skipped.
   - Documentation impact reassessment: `help: update` in `command-spec.ts`; `cli-readme`, `root-readme`, `landing`, `architecture`, `engineering`, and `releasing` remain owned by Task 8's complete D2 documentation pass; `plugin: N/A` because no bundled skill or plugin command was added.
-- [ ] Task 3 — Discovery and read-only session preflight
-  - Commit: pending
-  - Verification: pending
+- [x] Task 3 — Discovery and read-only session preflight
+  - Implementation: Added the public `asset authoring provider discover` and `preflight` seams. Discovery reads only an explicitly supplied bounded descriptor array, normalizes all four Core statuses with stable ordering, rejects duplicate/invalid/over-limit input, and never prepares runtime assets. Preflight reads the current session contract and artifact metadata through the existing bounded import authority, checks CLI range, operation capability, contract version, candidate/reference limits, target/reference scope, credential/network policy, and session-owned protected staging roots, and returns a bounded refusal result without writing session, contract, pack, receipt, manifest, or provenance bytes. The current-contract helper in `asset-authoring-import.ts` is read-only and shares the existing validation authority.
+  - RED: `rtk pnpm exec vitest run test/asset-provider-commands.test.ts` FAIL — the pre-feature CLI returned exit code 1 because the provider command route and public discovery seam were absent.
+  - Commit: ddabb4ca6449a10848acb16681a1d923154f37ab
+  - Verification: `rtk pnpm exec vitest run test/asset-provider-commands.test.ts` PASS — 1 file, 4 tests.
+  - Verification: `rtk pnpm exec vitest run test/command-spec.test.ts test/main-json.test.ts test/main-human.test.ts test/response.test.ts` PASS — 4 files, 138 tests.
+  - Verification: `rtk pnpm exec tsc -p tsconfig.json --noEmit` PASS from `packages/cli`.
+  - Verification: `rtk pnpm check:boundaries` PASS.
+  - Verification: `rtk git diff --check` PASS.
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test` FAIL in the sandbox — 64 files and 1,175 tests passed with 1 skipped; 13 existing `web-server` tests could not bind `127.0.0.1` (`EPERM`).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test` PASS in a loopback-enabled rerun — 65 files, 1,188 tests passed, 1 skipped.
+  - Documentation impact reassessment: `help: update` in `command-spec.ts`; `cli-readme`, `root-readme`, `landing`, `architecture`, `engineering`, and `releasing` remain owned by Task 8's complete D2 documentation pass; `plugin: N/A` because no provider skill or plugin command was added.
 - [ ] Task 4 — Consent-scoped invocation handoff
   - Commit: pending
   - Verification: pending

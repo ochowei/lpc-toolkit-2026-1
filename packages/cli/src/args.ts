@@ -27,8 +27,8 @@ const BOOLEAN_FLAGS = new Set([
 
 function acceptsAnotherCommandToken(command: readonly string[]): boolean {
   if (command.length < 2) return true;
-  return command.length === 2
-    && (
+  if (command.length === 2) {
+    return (
       (
         command[0] === 'asset'
         && (
@@ -39,6 +39,11 @@ function acceptsAnotherCommandToken(command: readonly string[]): boolean {
       )
       || (command[0] === 'agent' && command[1] === 'integration')
     );
+  }
+  return command.length === 3
+    && command[0] === 'asset'
+    && command[1] === 'authoring'
+    && command[2] === 'provider';
 }
 
 function acceptsExplicitEmptyValues(command: readonly string[]): boolean {

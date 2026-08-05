@@ -87,6 +87,27 @@ const AGENT_MANIFEST_OPTION: CommandOptionSpec = {
   description: 'Read the strict Agent integration manifest.',
 };
 
+const PROVIDER_CONTRACT_DIGEST_OPTION: CommandOptionSpec = {
+  name: 'contract-digest',
+  kind: 'value',
+  valueLabel: 'sha256',
+  description: 'Bind the provider operation to this exact drawing contract digest.',
+};
+
+const PROVIDER_DESCRIPTOR_OPTION: CommandOptionSpec = {
+  name: 'descriptor',
+  kind: 'value',
+  valueLabel: 'descriptor.json',
+  description: 'Read one strict provider descriptor.',
+};
+
+const PROVIDER_WORKSPACE_OPTION: CommandOptionSpec = {
+  name: 'workspace',
+  kind: 'value',
+  valueLabel: 'directory',
+  description: 'Use this asset workspace for session-bound provider preflight.',
+};
+
 const ASSET_PREVIEW_OPTIONS: readonly CommandOptionSpec[] = [
   ASSET_WORKSPACE_OPTION,
   { name: 'asset', kind: 'value', valueLabel: 'local-id', description: 'Preview this pack asset.' },
@@ -202,6 +223,50 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
     examples: [
       'lpc-toolkit asset authoring start --plan plan.json --json',
       'lpc-toolkit asset authoring status --session session-id --json',
+    ],
+  },
+  {
+    command: ['asset', 'authoring', 'provider'],
+    usage: 'lpc-toolkit asset authoring provider <command>',
+    description: 'Discover explicitly supplied providers and preflight a session-bound handoff.',
+    options: [HELP_OPTION],
+    examples: [
+      'lpc-toolkit asset authoring provider discover --session session-id --contract-digest sha256:... --descriptors providers.json --json',
+      'lpc-toolkit asset authoring provider preflight --session session-id --contract-digest sha256:... --descriptor provider.json --json',
+    ],
+  },
+  {
+    command: ['asset', 'authoring', 'provider', 'discover'],
+    usage: 'lpc-toolkit asset authoring provider discover --session <session-id> --contract-digest <sha256> --descriptors <providers.json> [--json]',
+    description: 'Normalize explicitly supplied provider descriptors without selecting, invoking, or writing a provider.',
+    options: [
+      HELP_OPTION,
+      JSON_OPTION,
+      AUTHORING_SESSION_OPTION,
+      PROVIDER_CONTRACT_DIGEST_OPTION,
+      { name: 'descriptors', kind: 'value', valueLabel: 'providers.json', description: 'Read a bounded JSON array of provider discovery inputs.' },
+    ],
+    examples: [
+      'lpc-toolkit asset authoring provider discover --session session-id --contract-digest sha256:... --descriptors providers.json --json',
+    ],
+  },
+  {
+    command: ['asset', 'authoring', 'provider', 'preflight'],
+    usage: 'lpc-toolkit asset authoring provider preflight --session <session-id> --contract-digest <sha256> --descriptor <descriptor.json> [options]',
+    description: 'Read the current drawing contract and check one provider descriptor without mutating the session or pack.',
+    options: [
+      HELP_OPTION,
+      JSON_OPTION,
+      AUTHORING_SESSION_OPTION,
+      PROVIDER_CONTRACT_DIGEST_OPTION,
+      PROVIDER_DESCRIPTOR_OPTION,
+      { name: 'target', kind: 'repeatable', valueLabel: 'target-id', description: 'Restrict the provider target scope; may be repeated.' },
+      { name: 'reference', kind: 'repeatable', valueLabel: 'sha256', description: 'Restrict the approved reference digest scope; may be repeated.' },
+      { name: 'candidate-root', kind: 'value', valueLabel: 'directory', description: 'Check a candidate staging root without creating it.' },
+      PROVIDER_WORKSPACE_OPTION,
+    ],
+    examples: [
+      'lpc-toolkit asset authoring provider preflight --session session-id --contract-digest sha256:... --descriptor provider.json --workspace ./my-lpc-art --json',
     ],
   },
   {
