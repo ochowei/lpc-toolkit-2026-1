@@ -248,6 +248,23 @@ and update this matrix and the spec before implementation.
 - [ ] Create, push, and open the independent D4 implementation Draft PR only
       after all local verification passes; do not merge automatically.
 
+## Spec/plan review record
+
+- [x] D4 Issue created and linked to roadmap #153.
+  - Issue: https://github.com/ochowei/lpc-toolkit-2026-1/issues/173
+  - Verification: `rtk gh issue view 173 --repo ochowei/lpc-toolkit-2026-1 --json number,url,title,state,labels` PASS (`OPEN`, `enhancement`, `ready-for-agent`).
+- [x] Spec/plan branch created from the merged D3 implementation.
+  - Branch: `codex/issue-173-d4-remote-distribution-trust`
+  - Base: `dd6379dabbabb8728f6a3ebf69b775977bf89f72`
+  - Verification: `rtk git show -s --format=%H%n%P%n%s origin/main` PASS; `rtk git status --short --branch` PASS.
+- [x] Added the D4 spec and separate implementation plan with registry,
+      signing/verification, trust/key policy, marketplace, global install,
+      npm, provenance/license, post-publication, rollback/tamper, human
+      approval, and local-fake-only boundaries.
+  - Commit: `937f63ff737a28affe53bf296993e462a8192c14`
+  - Verification: `rtk git diff --check HEAD^ HEAD` PASS; `rtk rg -n "remote registr|signing|verification|marketplace|global installation|npm publication|trust policy|key lifecycle|post-publication|rollback|tamper|provenance|license|Issue #173|PR #172|Mutation approval table|CLI documentation impact" docs/superpowers/specs/2026-08-06-remote-distribution-and-trust.md docs/superpowers/plans/2026-08-06-remote-distribution-and-trust.md` PASS.
+- [ ] User review and merge of the D4 spec/plan review PR.
+
 ## Mutation approval table
 
 | Operation | D4 default verification behavior | Additional explicit approval required |
