@@ -127,6 +127,13 @@ the provider, inputs, references, contract, and result digests. It is distinct
 from authorship and license declarations.
 _Avoid_: Credits, author, acknowledgement
 
+**Release provenance projection**:
+A versioned, bounded, deterministic subset of generation provenance that is
+explicitly bound to one formal asset-pack release and its review evidence. It
+is evidence about production history, not a credit, authorship declaration,
+license authority, acknowledgement reason, or release approval.
+_Avoid_: Generation credit, release approval, inferred author
+
 **Attribution author**:
 The person or organization named in credits and responsible for the claimed
 contribution. An automated generation provider is not an attribution author
