@@ -103,17 +103,25 @@ and update this matrix and the spec before implementation.
 
 ### 0. Review gate and local fixture boundary
 
-- [ ] Link Issue #173 to roadmap #153 and confirm D3 merge base.
-- [ ] Review this spec, this plan, all seven public seams, the mutation
+- [x] Link Issue #173 to roadmap #153 and confirm D3 merge base.
+      - Issue: https://github.com/ochowei/lpc-toolkit-2026-1/issues/173
+      - Verification: `rtk gh issue view 173 --repo ochowei/lpc-toolkit-2026-1 --json number,url,title,state,labels` PASS; D3 merge base is `dd6379dabbabb8728f6a3ebf69b775977bf89f72`.
+- [x] Review this spec, this plan, all seven public seams, the mutation
       approval table, and the CLI impact matrix.
-- [ ] After user confirmation, create the separate implementation branch from
+- [x] After user confirmation, create the separate implementation branch from
       merged `origin/main`.
+      - Review PR: https://github.com/ochowei/lpc-toolkit-2026-1/pull/174
+      - Merge commit: `8a3e445b33628b030c17038f8a8d43d15278ea51`
+      - Branch: `codex/issue-173-d4-remote-distribution-trust-implementation`
+      - Base: `8a3e445b33628b030c17038f8a8d43d15278ea51`
+      - Verification: `rtk gh pr view 174 --repo ochowei/lpc-toolkit-2026-1 --json number,url,state,isDraft,mergedAt,mergeCommit,headRefName,baseRefName,title` PASS (`MERGED`, `isDraft: false`); `rtk git show -s --format=%H%n%P%n%s origin/main` PASS; `rtk git status --short --branch` PASS.
 - [ ] Add local-only formal archive, D1 provenance, D2 provider, D3 handoff,
       trust policy, release record, fake registry, fake marketplace, fake npm
       receipt, tampered record, revoked-key, conflict, withdrawal, and
       temporary-prefix fixtures. Assert no credentials/private paths/payloads
       and no `upstream/` access.
-- [ ] Record the review PR merge/base commit before product TDD begins.
+- [x] Record the review PR merge/base commit before product TDD begins.
+      - Product implementation authorization: user confirmed the merge of PR #174.
 
 ### 1. Core strict distribution and signed projection contract (red → green)
 
