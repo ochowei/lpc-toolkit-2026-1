@@ -384,7 +384,10 @@ describe('asset authoring command application', () => {
 
     expect(status.code).toBe(0);
     expect(resumed.code).toBe(0);
-    expect(resumed.response.data).toEqual(status.response.data);
+    const statusData = dataOf(status.response);
+    const { webHandoff, ...statusDataWithoutHandoff } = statusData;
+    expect(webHandoff).toBeNull();
+    expect(dataOf(resumed.response)).toEqual(statusDataWithoutHandoff);
     expect(readFileSync(sessionPath, 'utf8')).toBe(before);
   });
 
