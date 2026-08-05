@@ -1324,6 +1324,42 @@ function formatAgentIntegrationCheck(data: JsonRecord): string | undefined {
   ].join('\n') + '\n';
 }
 
+function formatProviderDiscovery(data: JsonRecord): string | undefined {
+  const entries = recordArrayValue(data, 'entries');
+  const sessionId = stringValue(data, 'sessionId');
+  if (!entries || !sessionId) return undefined;
+  const lines = [`Provider discovery for session ${sessionId} (${entries.length})`];
+  for (const entry of entries) {
+    const id = stringValue(entry, 'id');
+    const status = stringValue(entry, 'status');
+    if (id && status) lines.push(`- ${id}: ${status}`);
+  }
+  return `${lines.join('\n')}\n`;
+}
+
+function formatProviderPreflight(data: JsonRecord): string | undefined {
+  const provider = isRecord(data['provider']) ? data['provider'] : undefined;
+  const id = provider === undefined ? undefined : stringValue(provider, 'id');
+  const status = stringValue(data, 'status');
+  const contractDigest = stringValue(data, 'contractDigest');
+  const targetIds = stringArrayValue(data, 'targetIds');
+  if (!id || !status || !contractDigest || !targetIds) return undefined;
+  const lines = [
+    `Provider preflight: ${id} (${status})`,
+    `Contract: ${contractDigest}`,
+    `Targets: ${targetIds.length}`,
+  ];
+  const references = stringArrayValue(data, 'referenceDigests');
+  if (references) lines.push(`References: ${references.length}`);
+  const refusal = data['refusal'];
+  if (isRecord(refusal)) {
+    const code = stringValue(refusal, 'code');
+    const message = stringValue(refusal, 'message');
+    if (code && message) lines.push(`Result: ${code}: ${message}`);
+  }
+  return `${lines.join('\n')}\n`;
+}
+
 function formatHumanData(response: CliResponse<unknown>): string | undefined {
   const data = response.data;
   if (!isRecord(data)) return undefined;
@@ -1366,6 +1402,10 @@ function formatHumanData(response: CliResponse<unknown>): string | undefined {
       return formatAnimationAudit(data);
     case 'agent integration check':
       return formatAgentIntegrationCheck(data);
+    case 'asset authoring provider discover':
+      return formatProviderDiscovery(data);
+    case 'asset authoring provider preflight':
+      return formatProviderPreflight(data);
     case 'token encode':
       return formatTokenEncode(data);
     case 'token decode':

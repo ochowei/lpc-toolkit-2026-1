@@ -38,6 +38,7 @@ import {
   createCapabilityAdvertisement,
 } from './capabilities.js';
 import { runAgentIntegrationCommand } from './agent-integration-commands.js';
+import { runAssetProviderCommand } from './asset-provider-commands.js';
 import { materializePreset, runPresetCommand } from './preset-commands.js';
 import { CLI_VERSION } from './package-info.js';
 import { renderSelection } from './render.js';
@@ -154,6 +155,11 @@ function writeResponse(
 
 export function commandNeedsAssets(parsed: ParsedArgs): boolean {
   if (parsed.flags.has('help')) return false;
+  if (
+    parsed.command[0] === 'asset'
+    && parsed.command[1] === 'authoring'
+    && parsed.command[2] === 'provider'
+  ) return false;
   if (parsed.command[0] === 'asset') {
     return assetCommandRequirements(parsed)?.runtime ?? false;
   }
@@ -218,6 +224,38 @@ function preflightCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
     }
   }
 
+  if (
+    command === 'asset'
+    && subcommand === 'authoring'
+    && parsed.command[2] === 'provider'
+  ) {
+    const commandName = parsed.command.join(' ');
+    const providerCommand = parsed.command[3];
+    if (
+      parsed.command.length !== 4
+      || (providerCommand !== 'discover' && providerCommand !== 'preflight')
+    ) {
+      return commandError(commandName, {
+        code: 'unknown_command',
+        message: `Unknown asset provider command: ${commandName}`,
+      });
+    }
+    const requiredStringFlag = (name: string): CliResponse<null> | undefined => {
+      if (flagString(parsed.flags, name)) return undefined;
+      return commandError(commandName, {
+        code: 'missing_argument',
+        message: `--${name} is required.`,
+        path: `--${name}`,
+      });
+    };
+    for (const name of providerCommand === 'discover'
+      ? ['session', 'contract-digest', 'descriptors']
+      : ['session', 'contract-digest', 'descriptor']) {
+      const issue = requiredStringFlag(name);
+      if (issue) return issue;
+    }
+  }
+
   if (command === 'asset' && subcommand === 'authoring') {
     const authoringCommand = parsed.command[2];
     const commandName = parsed.command.join(' ');
@@ -239,6 +277,7 @@ function preflightCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
       && authoringCommand !== 'sync'
       && authoringCommand !== 'preview'
       && authoringCommand !== 'reconcile-manifest'
+      && authoringCommand !== 'provider'
     ) {
       return commandError(commandName, {
         code: 'unknown_command',
@@ -499,6 +538,12 @@ async function runCliWithRuntime(
         && parsed.command[0] === 'agent'
         && parsed.command[1] === 'integration'
       )
+      || (
+        parsed.command.length === 3
+        && parsed.command[0] === 'asset'
+        && parsed.command[1] === 'authoring'
+        && parsed.command[2] === 'provider'
+      )
     )
   ) {
     io.stdout(helpForCommand(parsed.command));
@@ -557,6 +602,39 @@ async function runCliWithRuntime(
       parsed,
       io,
       'Agent integration is compatible.\n',
+    );
+  }
+
+  if (
+    parsed.command[0] === 'asset'
+    && parsed.command[1] === 'authoring'
+    && parsed.command[2] === 'provider'
+  ) {
+    let workspace: AssetWorkspace | undefined;
+    if (parsed.command[3] === 'preflight') {
+      try {
+        workspace = resolvedDependencies.findAssetWorkspace(
+          io.cwd,
+          flagString(parsed.flags, 'workspace'),
+        );
+      } catch {
+        return writeResponse(
+          commandError('asset authoring provider preflight', {
+            code: 'asset_workspace_not_found',
+            message: 'An asset workspace is required for provider preflight.',
+            path: '--workspace',
+          }),
+          parsed,
+          io,
+          '',
+        );
+      }
+    }
+    return writeResponse(
+      runAssetProviderCommand({ parsed, cwd: io.cwd, ...(workspace === undefined ? {} : { workspace }) }),
+      parsed,
+      io,
+      'Provider command completed.\n',
     );
   }
 

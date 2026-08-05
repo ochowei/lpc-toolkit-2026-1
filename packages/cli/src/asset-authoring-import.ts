@@ -78,6 +78,16 @@ interface ArtifactMetadataSummary {
   readonly digest: Sha256Digest;
 }
 
+export interface AssetAuthoringContractEvidence {
+  readonly contractPath: string;
+  readonly contractDigest: Sha256Digest;
+  readonly metadataPath: string;
+  readonly metadataDigest: Sha256Digest;
+  readonly contract: SpriteDrawingContract;
+  readonly restrictedPaths: ReadonlySet<string>;
+  readonly restrictedDigests: ReadonlySet<Sha256Digest>;
+}
+
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -459,6 +469,44 @@ function readMetadata(
     restrictedPaths,
     restrictedDigests,
     digest: sha256(metadataSnapshot.bytes),
+  };
+}
+
+/**
+ * Read the current contract and its artifact metadata through the same
+ * bounded, session-bound authority used by candidate import. This helper is
+ * intentionally read-only so provider preflight cannot create or mutate
+ * contract artifacts.
+ */
+export function readAssetAuthoringContractEvidence(options: {
+  readonly workspace: AssetWorkspace;
+  readonly session: AssetAuthoringSession;
+  readonly contractDigest: string;
+}): AssetAuthoringContractEvidence {
+  if (!DIGEST_PATTERN.test(options.contractDigest)) {
+    fail(
+      'invalid_option',
+      '--contract-digest must be a sha256 digest.',
+      '--contract-digest',
+    );
+  }
+  const expectedDigest = options.contractDigest as Sha256Digest;
+  const contractFiles = readContractFile(options.workspace, options.session, expectedDigest);
+  const metadata = readMetadata(
+    options.workspace,
+    options.session,
+    contractFiles.metadataPath,
+    expectedDigest,
+    contractFiles.contractPath,
+  );
+  return {
+    contractPath: contractFiles.contractPath,
+    contractDigest: expectedDigest,
+    metadataPath: contractFiles.metadataPath,
+    metadataDigest: metadata.digest,
+    contract: contractFiles.contract,
+    restrictedPaths: metadata.restrictedPaths,
+    restrictedDigests: metadata.restrictedDigests,
   };
 }
 
