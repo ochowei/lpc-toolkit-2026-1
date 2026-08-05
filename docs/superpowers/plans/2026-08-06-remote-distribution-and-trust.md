@@ -266,7 +266,8 @@ and update this matrix and the spec before implementation.
       releasing docs; retain the landing/plugin N/A reasons unless the public
       scope changes.
       - Implementation: updated `packages/cli/README.md`, `README.md`, `docs/ARCHITECTURE.md`, `docs/ENGINEERING.md`, and `docs/RELEASING.md`; `packages/cli/src/command-spec.ts` owns the help update. Landing remains unchanged because D4 adds no Web distribution UI; plugin remains unchanged because D4 adds no plugin capability, skill, or command.
-      - Commit: recorded in the subsequent checked-in plan-record commit after the documentation commit.
+      - Commit: `cabb4bdc541b1b898d13f1403482784ad69210a6`
+      - Verification: `rtk pnpm --filter @lpc-toolkit/web exec vitest run test/readme-architecture-docs.test.ts test/landing-page.test.tsx test/landing-artifacts.test.ts` PASS (27 tests); `rtk pnpm --filter @lpc-toolkit/cli exec vitest run test/asset-distribution-command.test.ts test/command-spec.test.ts test/main-json.test.ts test/main-human.test.ts` PASS (141 tests); `rtk git diff --cached --check` PASS.
 - [x] Reassess and record the complete CLI documentation impact matrix and
       live PR-body declaration.
       - CLI docs impact matrix: `help: update`; `cli-readme: update`; `root-readme: update`; `landing: N/A — D4 v1 is CLI/release trust work and adds no Web distribution UI`; `architecture: update`; `engineering: update`; `releasing: update`; `plugin: N/A — D4 adds no plugin capability, skill, or command`.
