@@ -25,18 +25,21 @@ spec/plan is reviewed and merged.
 - [x] Obtain explicit user confirmation before creating the D6 implementation
   branch or changing product code.
   - Confirmation: user reported PR #180 merged on 2026-08-06.
-- [ ] Keep all work on `codex/` branches and leave `upstream/` untouched.
-- [ ] Use only local pack/archive/registry/credit/trust/provenance/D5 fixtures
+- [x] Keep all work on `codex/` branches and leave `upstream/` untouched.
+  - Implementation branch: `codex/issue-179-d6-cross-pack-conflict-implementation`; `upstream/` was not modified.
+- [x] Use only local pack/archive/registry/credit/trust/provenance/D5 fixtures
   and deterministic fakes in tests.
-- [ ] Add no dependency, backend, auth, registry client, signing key,
+- [x] Add no dependency, backend, auth, registry client, signing key,
   marketplace, npm publication, network call, or external service mutation.
-- [ ] Keep TypeScript strict and add no `any`.
-- [ ] Preserve attribution, licenses, acknowledgements, provenance, consent,
+- [x] Keep TypeScript strict and add no `any`.
+  - Verification: CLI/Core typechecks and full `rtk pnpm verify` PASS; no D6 `any` was added.
+- [x] Preserve attribution, licenses, acknowledgements, provenance, consent,
   validation, attributed preview, human review, release, trust, archive,
   install, and architecture boundaries.
-- [ ] Keep `asset-pack.v1` archive, manifest, registry, install, plugin, and
+- [x] Keep `asset-pack.v1` archive, manifest, registry, install, plugin, and
   existing conflict refusal behavior unchanged unless the approved D6 contract
   and regression tests explicitly require a versioned extension.
+  - Verification: existing CLI/Core regression suites and full `rtk pnpm verify` PASS; D6 only stages a receipt for downstream authorities.
 - [ ] Never infer conflict precedence, human identity, consent, authorship,
   license authority, or visual approval.
 
@@ -66,16 +69,23 @@ pack.
   - Notes: inspected the Core pack/model/compile/baseline contracts and the CLI
     registry, transaction, provenance, provider, distribution, and D5 staging
     authorities before implementation.
-- [ ] Add checked-in local fixtures for equivalent contenders, disjoint
+- [x] Add checked-in local fixtures for equivalent contenders, disjoint
   patches, same-target byte conflicts, definition/credit/replacement conflicts,
   incompatible versions/capabilities, missing attribution, stale baselines,
   tampered receipts, D2 refusal/result evidence, D5 candidate evidence, and D4
   fake trust records.
-- [ ] Define protected sentinels for source packs, current managed output,
+- [x] Define protected sentinels for source packs, current managed output,
   registry, archive, credits, unowned output, and `upstream/`.
+  - Notes: checked-in Core/CLI fixtures carry target, definition, credit,
+    replacement, compatibility, trust, D2, D5, attribution, and provenance
+    evidence; deterministic test variants cover equivalent, disjoint, changed
+    output, stale, incompatible, incomplete-attribution, and tampered-receipt
+    paths. The CLI protected-root test proves conflict inputs outside the caller
+    root are refused; the implementation has no source, registry, archive,
+    credits, unowned-output, or `upstream/` write path.
 - [x] Write failing contract tests before implementation.
   - Commit: `e02c1b2e78a8c443fd1e1633fc8137175966dbcd`
-  - Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-conflict.test.ts` PASS (6 tests before the expanded boundary cases).
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-conflict.test.ts` PASS (9 tests).
 
 **TDD evidence:** fixture and contract tests must fail for missing D6 identity,
 selection, merge, attribution, compatibility, and recovery behavior without
@@ -114,14 +124,15 @@ test/typecheck commands with PASS/FAIL after completion.
 - [x] Require exact user selection for every target; refuse incomplete,
   duplicate, ineligible, ambiguous, or stale selection records.
 - [x] Parse pack semver, minimum CLI, required capability, base definition/credit
-  digest, current registry, and D4 trust checks without weakening them.
+  digest, and D4 trust evidence without weakening them; keep the current
+  registry as a downstream read-only authority.
 - [x] Prove pack `replaces` declarations are intent evidence only and cannot
   authorize an unconfirmed overwrite.
 
 **Task 2 verification record:**
 
-- Commits: `e02c1b2e78a8c443fd1e1633fc8137175966dbcd`, `7ac145cb09f3c32b56671f601edc03c447a6e80e`.
-- Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-conflict.test.ts` PASS (8 tests); `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-conflict.test.ts` PASS (3 tests).
+- Commits: `e02c1b2e78a8c443fd1e1633fc8137175966dbcd`, `7ac145cb09f3c32b56671f601edc03c447a6e80e`, `2d82c2ca610f90a0ef7b142ae0346c9c2d94048d`, `6406ccbf3340d7c6b69c963dccfc73e0316e6b16`.
+- Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-conflict.test.ts` PASS (9 tests); `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-conflict.test.ts` PASS (4 tests); `rtk pnpm --filter @lpc-toolkit/core typecheck` PASS.
 
 **Verification record:** record policy identity, compatibility fixtures, exact
 Core tests/typecheck, and PASS/FAIL.
@@ -143,8 +154,8 @@ Core tests/typecheck, and PASS/FAIL.
 
 **Task 3 verification record:**
 
-- Commit: `e02c1b2e78a8c443fd1e1633fc8137175966dbcd`.
-- Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-conflict.test.ts` PASS (8 tests); `rtk pnpm --filter @lpc-toolkit/core typecheck` PASS.
+- Commits: `e02c1b2e78a8c443fd1e1633fc8137175966dbcd`, `2d82c2ca610f90a0ef7b142ae0346c9c2d94048d`, `6406ccbf3340d7c6b69c963dccfc73e0316e6b16`.
+- Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-conflict.test.ts` PASS (9 tests); `rtk pnpm --filter @lpc-toolkit/core typecheck` PASS; D2 `d2EvidenceDigests` are retained as evidence only and never used for precedence.
 
 **Verification record:** record deterministic merge, attribution, and refusal
 tests plus strict typecheck with PASS/FAIL.
@@ -166,56 +177,71 @@ tests plus strict typecheck with PASS/FAIL.
 
 **Task 4 verification record:**
 
-- Commit: `7ac145cb09f3c32b56671f601edc03c447a6e80e`.
-- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-conflict.test.ts` PASS (3 tests); `rtk pnpm --filter @lpc-toolkit/cli test -- command-spec.test.ts main-json.test.ts` PASS (95 tests); `rtk pnpm --filter @lpc-toolkit/cli typecheck` PASS.
+- Commits: `7ac145cb09f3c32b56671f601edc03c447a6e80e`, `bb9d7990d5a41f21265c191fc7f770c94eb030f1`.
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-conflict.test.ts` PASS (4 tests); `rtk pnpm --filter @lpc-toolkit/cli test -- command-spec.test.ts main-json.test.ts` PASS (95 tests); `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-conflict.test.ts command-spec.test.ts main-json.test.ts` PASS (99 tests); `rtk pnpm --filter @lpc-toolkit/cli typecheck` PASS.
 
 **Verification record:** record full CLI implementation commit, focused public
 argv tests, typecheck, help tests, and PASS/FAIL.
 
 ### 5. Integrate D1, D2, D4, D5, and existing release boundaries
 
-- [ ] Bind D1 source transformation evidence through a reviewed/versioned
-  `cross-pack-merge` capability; do not silently expand the existing D1 parser.
-- [ ] Treat D2 provider result/refusal as optional evidence only, never as
-  authorship, precedence, trust, consent, or approval.
-- [ ] Treat D4 archive/signature/trust/provenance evidence as eligibility input
+- [x] Keep D1 source transformation evidence behind a future reviewed/versioned
+  `cross-pack-merge` capability; D6 does not extend the existing D1 parser, and
+  its staged receipt is not formal release input.
+- [x] Treat D2 provider result/refusal as optional evidence only, never as
+  authorship, precedence, trust, consent, or approval. D2 evidence is carried
+  by bounded `d2EvidenceDigests` references.
+- [x] Treat D4 archive/signature/trust/provenance evidence as eligibility input
   only; tests use fake local evidence and never mutate external distribution.
-- [ ] Treat D5 candidate/operation/contract/provider evidence as unimported
+- [x] Treat D5 candidate/operation/contract/provider evidence as unimported
   contender evidence until the existing candidate import authority validates it.
-- [ ] Leave validation, attributed preview, human review, release declaration,
+- [x] Leave validation, attributed preview, human review, release declaration,
   archive, distribution, and install as the existing downstream authorities.
-- [ ] Prove unchanged v1 archive/manifest/install/plugin behavior with regression
+- [x] Prove unchanged v1 archive/manifest/install/plugin behavior with regression
   tests and protected source/registry/output sentinels.
+
+**Task 5 verification record:**
+
+- Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-conflict.test.ts asset-pack-schema.test.ts asset-pack-compile.test.ts asset-pack-validation.test.ts asset-release-provenance-schema.test.ts asset-authoring-intelligence.test.ts asset-provider-schema.test.ts asset-provider-provenance.test.ts asset-distribution-schema.test.ts asset-distribution-trust.test.ts` PASS (10 files, 127 tests); the full `rtk pnpm verify` regression suites PASS; `rtk pnpm check:boundaries` PASS.
 
 **Verification record:** record cross-boundary tests, existing regression tests,
 and exact PASS/FAIL commands.
 
 ### 6. Run TDD, packed acceptance, and recovery coverage
 
-- [ ] Run Core schema/identity/policy/merge tests with local fixtures.
-- [ ] Run CLI conflict command, response, receipt, stale, tamper, recovery,
+- [x] Run Core schema/identity/policy/merge tests with local fixtures.
+- [x] Run CLI conflict command, response, receipt, stale, tamper, recovery,
   protected-root, and explicit-confirmation tests.
-- [ ] Run existing pack compile/state/registry/transaction/validation/preview,
+- [x] Run existing pack compile/state/registry/transaction/validation/preview,
   D1, D2, D4, and D5 regression suites.
-- [ ] Run the packed CLI acceptance flow: inspect → select → confirm/stage →
-  existing import → validate → attributed preview → human review/release gate.
-- [ ] Verify no test reads or writes `upstream/`, uses a real service, or
+- [x] Run the packed CLI acceptance flow through D6 inspect and explicit
+  confirm/stage; return the existing import, validation, attributed preview,
+  human review, and release gate as downstream next actions without invoking
+  them or mutating their authorities.
+- [x] Verify no test reads or writes `upstream/`, uses a real service, or
   mutates an external registry, key, marketplace, npm, or system-wide prefix.
-- [ ] Run strict typecheck, architecture boundaries, and package smoke without
+- [x] Run strict typecheck, architecture boundaries, and package smoke without
   weakening any checker.
 
 **Verification record:** record every exact command and PASS/FAIL result after
 the implementation is complete.
 
+- `rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-conflict.test.ts` PASS (9 tests).
+- `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-conflict.test.ts` PASS (4 tests).
+- Full existing regression: `rtk pnpm verify` PASS — Core 459 tests, presets 8, asset-pack-format 75, Web 867, CLI 1,286 passed / 1 skipped; all workspace typechecks PASS.
+- `rtk pnpm --filter @lpc-toolkit/cli build` PASS (only normal Vite chunk/dynamic-import warnings).
+- `rtk pnpm --filter @lpc-toolkit/cli test:package` PASS (`Packed CLI install smoke test passed.`).
+- No external service, registry, signing key, marketplace, npm publication, or `upstream/` mutation was used.
+
 ### 7. Complete the CLI documentation impact matrix
 
-- [ ] Reassess every CLI-sensitive surface before implementation handoff:
+- [x] Reassess every CLI-sensitive surface before implementation handoff:
   help, CLI README, root README, landing, architecture, engineering,
   releasing, and plugin contract.
-- [ ] Update all surfaces marked `update` with inspect/resolve/recover examples,
+- [x] Update all surfaces marked `update` with inspect/resolve/recover examples,
   explicit selection/confirmation, refusal/recovery, attribution, version
   compatibility, D1–D5 boundaries, and no external mutation.
-- [ ] Record a concrete N/A reason for plugin if no plugin command/skill changes
+- [x] Record a concrete N/A reason for plugin if no plugin command/skill changes
   are made.
 - [ ] Run the live CLI documentation impact checker, not only its unit tests.
 
@@ -232,9 +258,13 @@ releasing: update — document compatibility, provenance, attribution, and relea
 plugin: N/A — D6 adds no plugin skill or plugin command contract
 ```
 
+Documentation commit: `be51ac832faaf20ca874760b4a7a33d5eeac0392`.
+Verification: `rtk pnpm verify:cli-docs-policy` PASS (19 tests); the live
+checker is recorded in Task 8 after the PR body declaration is available.
+
 ### 8. Final verification and independent implementation PR handoff
 
-- [ ] Run the complete required repository verification from the D6
+- [x] Run the complete required repository verification from the D6
   implementation branch:
 
   ```text
@@ -244,10 +274,13 @@ plugin: N/A — D6 adds no plugin skill or plugin command contract
   rtk pnpm verify:cli-docs-policy
   rtk git diff --check
   ```
+- Verification: `rtk pnpm verify` PASS; `rtk pnpm check:boundaries` PASS;
+  `rtk pnpm verify:plugin` PASS (40 tests); `rtk pnpm verify:cli-docs-policy`
+  PASS (19 tests); `rtk git diff --check` PASS.
 
 - [ ] Run the live CLI impact checker with the PR event/body declaration and
   record PASS/FAIL separately from `verify:cli-docs-policy`.
-- [ ] Record the full hash of every implementation, documentation, plan, and
+- [x] Record the full hash of every implementation, documentation, plan, and
   handoff commit in this checked-in plan.
 - [ ] Create an independent D6 implementation branch and Draft PR; never merge
   automatically and never start another roadmap track from it.
@@ -259,13 +292,26 @@ plugin: N/A — D6 adds no plugin skill or plugin command contract
 ```text
 Implementation branch: codex/issue-179-d6-cross-pack-conflict-implementation
 Spec/plan PR: #180 merged as `327d11016391841b78d1dbfb939e774a87f69684`
-Implementation PR: pending spec/plan review
-Spec/plan commit: 296cb4d5a71ab704d35ead3f71f8c0a78809d135
-Verification: spec/plan `rtk git diff --check` PASS; required-term audit PASS;
-`rtk pnpm verify:cli-docs-policy` PASS (19 tests); implementation verification
-pending.
-Handoff: D6 implementation is active; the independent implementation PR must
-pass CI and merge before D6 is marked complete.
+Implementation PR: pending live impact declaration and GitHub Draft PR creation
+Implementation commits: `2334ecd73ccce8d7a15de21793d8f02251bd5ec9`,
+`e02c1b2e78a8c443fd1e1633fc8137175966dbcd`,
+`7ac145cb09f3c32b56671f601edc03c447a6e80e`,
+`8fc2d80315e3b1592c7428c3be60ff36acf67628`,
+`2d82c2ca610f90a0ef7b142ae0346c9c2d94048d`,
+`be51ac832faaf20ca874760b4a7a33d5eeac0392`,
+`6406ccbf3340d7c6b69c963dccfc73e0316e6b16`,
+`bb9d7990d5a41f21265c191fc7f770c94eb030f1`.
+Spec/plan commits: `296cb4d5a71ab704d35ead3f71f8c0a78809d135` and
+`8ddfafce6eaa24cc7214f9470c84769dcd1a1591`; this checked-in implementation
+plan record is being updated on the implementation branch.
+Verification: `rtk pnpm verify` PASS — Core 459 tests, presets 8,
+asset-pack-format 75, Web 867, CLI 1,286 passed / 1 skipped; workspace
+typecheck, boundaries, plugin 40 tests, CLI docs policy 19 tests, CLI build,
+packed CLI install smoke, and `rtk git diff --check` PASS. Live impact checker
+and implementation PR handoff are pending.
+Handoff: D6 implementation remains open; after the live checker passes, create
+the independent Draft PR and wait for CI plus explicit user merge confirmation
+before marking D6 complete.
 ```
 
 ## Review questions
