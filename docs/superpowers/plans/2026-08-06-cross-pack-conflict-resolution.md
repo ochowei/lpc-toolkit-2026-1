@@ -1,6 +1,6 @@
 # D6 — Cross-pack Conflict Resolution Implementation Plan
 
-**Status:** D6 implementation PR #181 open as Draft — CI and user merge confirmation pending  
+**Status:** D6 implementation complete — PR #181 merged; plan-record closure pending
 **Issue:** [#179](https://github.com/ochowei/lpc-toolkit-2026-1/issues/179)  
 **Roadmap:** [#153](https://github.com/ochowei/lpc-toolkit-2026-1/issues/153)  
 **Spec:** [D6 — Cross-pack Conflict Resolution](../specs/2026-08-06-cross-pack-conflict-resolution.md)  
@@ -260,8 +260,8 @@ plugin: N/A — D6 adds no plugin skill or plugin command contract
 ```
 
 Documentation commit: `be51ac832faaf20ca874760b4a7a33d5eeac0392`.
-Verification: `rtk pnpm verify:cli-docs-policy` PASS (19 tests); the live
-checker is recorded in Task 8 after the PR body declaration is available.
+Verification: `rtk pnpm verify:cli-docs-policy` PASS (19 tests); live impact
+checker PASS with the PR body declaration.
 
 ### 8. Final verification and independent implementation PR handoff
 
@@ -286,16 +286,18 @@ checker is recorded in Task 8 after the PR body declaration is available.
   handoff commit in this checked-in plan.
 - [x] Create an independent D6 implementation branch and Draft PR; never merge
   automatically and never start another roadmap track from it.
-  - PR: [#181](https://github.com/ochowei/lpc-toolkit-2026-1/pull/181), open Draft; head `5cd203e26a38d4cad55508a57ca0de632ab7636a`.
-- [ ] Wait for CI and user confirmation of the D6 implementation PR merge before
+  - PR: [#181](https://github.com/ochowei/lpc-toolkit-2026-1/pull/181), merged; head `f80c4a3300e920b603afd8671a5d6e5cd2cf8737`.
+- [x] Wait for CI and user confirmation of the D6 implementation PR merge before
   marking D6 complete.
+  - Merge: PR #181, merge commit `e92a623ea513ba90e2011ed7c6d55e2cb6a92b70`.
+  - CI: workflow run #403 completed with conclusion `success`.
 
 **Final implementation record:**
 
 ```text
 Implementation branch: codex/issue-179-d6-cross-pack-conflict-implementation
 Spec/plan PR: #180 merged as `327d11016391841b78d1dbfb939e774a87f69684`
-Implementation PR: [#181](https://github.com/ochowei/lpc-toolkit-2026-1/pull/181) open as Draft
+Implementation PR: [#181](https://github.com/ochowei/lpc-toolkit-2026-1/pull/181) merged as `e92a623ea513ba90e2011ed7c6d55e2cb6a92b70`
 Implementation commits: `2334ecd73ccce8d7a15de21793d8f02251bd5ec9`,
 `e02c1b2e78a8c443fd1e1633fc8137175966dbcd`,
 `7ac145cb09f3c32b56671f601edc03c447a6e80e`,
@@ -307,8 +309,8 @@ Implementation commits: `2334ecd73ccce8d7a15de21793d8f02251bd5ec9`,
 Spec/plan commits: `296cb4d5a71ab704d35ead3f71f8c0a78809d135` and
 `8ddfafce6eaa24cc7214f9470c84769dcd1a1591`.
 Checked-in implementation-plan commits: `a6410a3690233cdce124b57e0f1a44008c485bc9`
-and `5cd203e26a38d4cad55508a57ca0de632ab7636a`; this PR handoff record is the
-next plan commit.
+and `5cd203e26a38d4cad55508a57ca0de632ab7636a`, with the merged PR handoff
+record at `f80c4a3300e920b603afd8671a5d6e5cd2cf8737`.
 Verification: `rtk pnpm verify` PASS — Core 459 tests, presets 8,
 asset-pack-format 75, Web 867, CLI 1,286 passed / 1 skipped; workspace
 typecheck, boundaries, plugin 40 tests, CLI docs policy 19 tests, CLI build,
@@ -316,9 +318,10 @@ packed CLI install smoke, `rtk git diff --check`, and live CLI documentation
 impact checker PASS. Live checker command:
 `rtk pnpm check:cli-docs-impact -- --base origin/main --head HEAD --body-file
 /private/tmp/d6-pr-body.md` → `CLI documentation impact declaration is valid.`
-Implementation PR handoff is pending.
-Handoff: D6 implementation PR #181 is open as Draft. Wait for CI plus explicit
-user merge confirmation before marking D6 complete.
+Implementation PR handoff is complete; CI workflow run #403 passed and the user
+confirmed the merge.
+Handoff: D6 is complete. The remaining action is to merge this docs-only
+plan-record closure PR; there is no D7 roadmap track.
 ```
 
 ## Review questions
