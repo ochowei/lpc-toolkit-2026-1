@@ -1,7 +1,7 @@
 # D5 — Authoring Intelligence Implementation Plan
 
-**Status:** D5 implementation Draft PR #178 open — CI, merge, and user
-confirmation pending
+**Status:** D5 implementation complete — PR #178 merged; CI run #397 and
+Vercel verification passed
 **Issue:** [#176](https://github.com/ochowei/lpc-toolkit-2026-1/issues/176)
 **Roadmap:** [#153](https://github.com/ochowei/lpc-toolkit-2026-1/issues/153)
 **Spec:** [D5 — Authoring Intelligence](../specs/2026-08-06-authoring-intelligence.md)
@@ -389,8 +389,8 @@ final policy result is `rtk pnpm verify:cli-docs-policy` PASS (19 tests).
   record full commit hashes, not abbreviated hashes.
 - [x] Use an independent D5 implementation commit/branch/PR. Do not merge
   automatically and do not begin D6 until the D5 implementation PR is merged
-  and the user confirms it. The independent branch is ready; the Draft PR is
-  the remaining handoff action.
+  and the user confirms it. PR #178 is merged and the user has confirmed the
+  merge; D6 spec/plan work now proceeds on its own branch.
 - [x] Report current D5 task, completed work, commit/PR, verification,
   next step, and blockers without claiming completion before CI and merge.
 
@@ -399,7 +399,7 @@ final policy result is `rtk pnpm verify:cli-docs-policy` PASS (19 tests).
 ```text
 Implementation branch: codex/issue-176-d5-authoring-intelligence-implementation
 Implementation PR: [#178](https://github.com/ochowei/lpc-toolkit-2026-1/pull/178)
-  (Draft; CI, merge, and user confirmation pending)
+  (merged as `a7442dd85cfc6ac07bf218032b7fb73e3ecf717f`)
 Commits:
   20ce883a041d34ccfa7c37e94182d8b90f233db5
   35126c98c3fbacebc9b85e45ce453aae5fd5c3f2
@@ -420,8 +420,9 @@ Verification:
   rtk pnpm verify:cli-docs-policy — PASS (19 tests)
   rtk git diff --check — PASS
 Handoff:
-  Draft PR #178 is open and not merged; D6 is blocked until CI passes, PR #178
-  is merged, and the user confirms the merge.
+  PR #178 merged after CI run #397 completed successfully; its CLI documentation
+  impact job passed, the other run #396 jobs passed, and Vercel status passed.
+  User confirmed the merge; D6 spec/plan review is tracked in Issue #179.
 ```
 
 ## Verification strategy before the implementation PR
