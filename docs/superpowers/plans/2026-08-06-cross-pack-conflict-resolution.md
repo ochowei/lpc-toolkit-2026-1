@@ -1,11 +1,12 @@
 # D6 — Cross-pack Conflict Resolution Implementation Plan
 
-**Status:** Proposed implementation plan — review and merge required before product implementation  
+**Status:** Spec/plan Draft PR #180 open — review, merge, and user confirmation required before product implementation  
 **Issue:** [#179](https://github.com/ochowei/lpc-toolkit-2026-1/issues/179)  
 **Roadmap:** [#153](https://github.com/ochowei/lpc-toolkit-2026-1/issues/153)  
 **Spec:** [D6 — Cross-pack Conflict Resolution](../specs/2026-08-06-cross-pack-conflict-resolution.md)  
 **Base:** D5 implementation merge commit `a7442dd85cfc6ac07bf218032b7fb73e3ecf717f` ([PR #178](https://github.com/ochowei/lpc-toolkit-2026-1/pull/178))  
 **Spec/plan branch:** `codex/issue-179-d6-cross-pack-conflict-spec`  
+**Spec/plan PR:** [#180](https://github.com/ochowei/lpc-toolkit-2026-1/pull/180)  
 **Implementation branch:** to be created only after this spec/plan review PR is merged and the user confirms the review gate
 
 This plan is limited to D6 cross-pack conflict identity, selection, merge,
@@ -227,12 +228,14 @@ plugin: N/A — D6 adds no plugin skill or plugin command contract
 
 ```text
 Implementation branch: pending spec/plan review
-Spec/plan PR: pending
+Spec/plan PR: #180 (Draft; review, CI, merge, and user confirmation pending)
 Implementation PR: pending spec/plan review
-Commits: pending
-Verification: pending implementation
-Handoff: D6 remains blocked until its independent spec/plan review is merged
-and confirmed, then its independent implementation PR passes CI and merges.
+Spec/plan commit: 296cb4d5a71ab704d35ead3f71f8c0a78809d135
+Verification: `rtk git diff --check` PASS; required-term audit PASS;
+`rtk pnpm verify:cli-docs-policy` PASS (19 tests); live PR checker pending
+PR event/body declaration and implementation changes.
+Handoff: D6 remains blocked until Draft PR #180 is reviewed, merged, and
+confirmed, then its independent implementation PR passes CI and merges.
 ```
 
 ## Review questions
