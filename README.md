@@ -309,6 +309,37 @@ Import, validation, attributed preview, human review, release, archive, and
 installation remain separate existing gates. D2 provider results are optional
 validated evidence only, and D3 remains an explicit file-scoped handoff.
 
+### D6 cross-pack conflict review
+
+D6 handles competing pack/version contributions through an explicit, local-file
+workflow. `asset conflict inspect` is read-only and reports the canonical
+conflict identity, contenders, compatibility/trust eligibility, attribution,
+policy, audit evidence, and one safe next action. It never chooses a winner
+from version, filesystem order, provider, Agent, `replaces`, or D1/D2/D4/D5
+evidence.
+
+```sh
+lpc-toolkit asset conflict inspect --conflict conflict.json --json
+lpc-toolkit asset conflict resolve --conflict conflict.json --selection selection.json --workspace ./my-lpc-art --confirm --json
+lpc-toolkit asset conflict recover --receipt .lpc-toolkit/asset-packs/staging/conflict-resolutions/<conflict-id>/receipt.json --action resume --workspace ./my-lpc-art --confirm --json
+```
+
+`resolve` accepts only a complete digest-bound user selection and review
+evidence, then stages a receipt below the owned workspace staging root. It does
+not import a candidate, rewrite a source pack or `CREDITS.csv`, publish an
+archive, modify the registry, install output, or satisfy validation, attributed
+preview, human review, or release gates. `recover` resumes an exact receipt or
+discards only its D6 staging directory after `--confirm`; stale, tampered,
+blocked, and refused outcomes remain auditable. Equivalent contenders may be
+coalesced only with retained evidence; disjoint merge still requires explicit
+selection and a shared digest-bound base.
+
+D6 uses local fixtures/fakes only. It adds no remote registry, signing/key
+operation, marketplace, backend, authentication, network, npm publication, or
+persistent browser authoring state. Existing v1 archive/manifest/install/plugin
+behavior and the D1 parser remain unchanged; D6 evidence stays session/workspace
+evidence until a separate versioned downstream contract accepts it.
+
 ### Web-to-CLI handoff
 
 The Web Asset Pack Workbench can explicitly export one stable in-memory
