@@ -163,6 +163,9 @@ not modify `upstream/`.
 - D4 local distribution response contracts for exact record/archive capture,
   trust-policy evaluation, temporary consumer-prefix confirmation, immutable
   rollback selection, audit projection, and fake package-receipt verification
+- D6 cross-pack conflict inspection, explicit selection, digest-bound
+  disjoint-resolution staging, protected-root recovery, and audit projection;
+  it never becomes an import, release, registry, or installation authority
 
 CLI code may use Node APIs, `@napi-rs/canvas` (MIT), and `jszip` (MIT) because
 it is a Node runtime package. Those dependencies must not move into
@@ -234,6 +237,34 @@ decisions. Ordinary inspect and install ignore an absent companion receipt. D1
 does not execute a provider or add authentication, remote registry, signing,
 marketplace, or Web session behavior; D2 adds only the separate provider-
 neutral handoff contracts described below.
+
+### Cross-pack conflict ownership
+
+The D6 conflict model is split across the same core-first boundary. Core owns
+the strict `lpc-toolkit.asset-pack-conflict.v1` and selection/resolution
+projections, bounded parsing, canonical identity inputs, eligibility gates,
+explicit policy outcomes, deterministic disjoint-merge checks, retained
+attribution evidence, and refusal semantics. Core remains environment-agnostic
+and never reads a workspace, registry, archive, browser session, or user
+identity. Trust, provenance, compatibility, D2 provider evidence, and D5
+candidate evidence can filter eligibility or explain a contender; none ranks or
+selects an eligible winner.
+
+The CLI owns local JSON loading, SHA-256 calculation, path containment, owned
+staging, receipt persistence, `asset conflict inspect|resolve|recover`, and
+append-only audit evidence. `resolve` requires a complete user selection and
+`--confirm`; it stages only a candidate/receipt for the existing candidate
+import, validation, attributed preview, human review, release, archive,
+distribution, and install authorities. `recover` can resume one exact receipt
+or discard only its D6 staging directory. It cannot rewrite source packs,
+`asset-pack.json`, `CREDITS.csv`, managed output, registries, archives, or
+system-wide prefixes.
+
+D6 deliberately does not add `cross-pack-merge` to the existing D1 parser.
+Until a separately reviewed D1 capability/schema accepts that operation, a D6
+receipt is session/workspace evidence and cannot be projected into a formal
+release. Web has no persistent conflict-authoring state and the plugin has no
+D6 skill or command contract; both remain outside the conflict authority.
 
 ### Documentation and Governance
 

@@ -438,6 +438,36 @@ export function CliPage({ onNavigate }: ProductPageProps) {
               only bounded optional <code>webHandoff</code> evidence. Web handoff
               is not release approval.
             </p>
+            <h3 className="mt-5 text-lg font-semibold text-text">
+              Review cross-pack conflicts explicitly
+            </h3>
+            <p className="mt-2 text-sm text-text-2">
+              D6 makes competing pack or version evidence inspectable without
+              choosing an automatic winner. Inspect is read-only; resolve
+              requires a complete user selection, review evidence, and
+              <code>--confirm</code> before writing only a workspace-owned
+              staging receipt. Existing candidate import, validation,
+              attributed preview, human review, and release gates remain
+              downstream authorities.
+            </p>
+            <ol className="mt-4 space-y-3">
+              <li>
+                <CopyCode children="lpc-toolkit asset conflict inspect --conflict conflict.json --json" />
+              </li>
+              <li>
+                <CopyCode children="lpc-toolkit asset conflict resolve --conflict conflict.json --selection selection.json --workspace ./my-lpc-art --confirm --json" />
+              </li>
+              <li>
+                <CopyCode children="lpc-toolkit asset conflict recover --receipt .lpc-toolkit/asset-packs/staging/conflict-resolutions/<conflict-id>/receipt.json --action resume --workspace ./my-lpc-art --confirm --json" />
+              </li>
+            </ol>
+            <p className="mt-4 text-sm text-text-2">
+              Stale, tampered, incompatible, missing-attribution, and refused
+              records return one safe next action. D1/D2/D4/D5 evidence is
+              retained as evidence only; D6 adds no remote registry, signing,
+              backend, authentication, npm publication, or persistent browser
+              authoring state.
+            </p>
           </div>
           <p className="mt-4 text-sm text-text-2">
             Put PNGs under <code>artist-packs/&lt;pack-id&gt;/sprites/</code>.

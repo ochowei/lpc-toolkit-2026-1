@@ -162,6 +162,7 @@ Every leaf command accepts `--help`; every command below also accepts `--json`.
 | `asset pack <pack-directory>` | Freshly validate source, complete PNGs, compatibility, acknowledgements, and attribution, then atomically publish `<pack-parent>/<pack-id>-<version>.lpc-assets.zip`. Optional: `--workspace`. |
 | `asset inspect <archive>` | Strictly inspect and validate an archive without installing it. This command has no workspace option; it reports schema `lpc-toolkit.asset-pack-inspection.v1`, digests, entry/byte counts, diagnostics, and acknowledgement records. |
 | `asset provenance verify --archive <archive> --provenance <receipt>` | Read-only verification of an exact copied formal archive and its optional external generation-provenance receipt. This command has no workspace option and never writes a session or consumer workspace. |
+| `asset conflict inspect|resolve|recover` | Inspect a bounded cross-pack conflict, stage only an explicit digest-bound resolution, or resume/discard one exact staging receipt. No automatic winner, import, release, or installation is implied. |
 | `asset install <archive>` | Inspect the immutable archive snapshot, stage it below manager state, compile all active packs, and publish the installed source, generated output, and registry together. Optional: `--workspace`. |
 | `asset distribution inspect|verify|fetch` | Read only caller-supplied local D4 record/archive fixtures. `inspect` captures exact bytes without trust; `fetch` uses only the local fixture transport; `verify` evaluates an explicit trust policy and deterministic verifier fixture. No network adapter is available. |
 | `asset distribution install` | After the same exact record/archive/trust/evidence checks, return confirmation or delegate to the existing installer only for `--prefix-kind temporary-consumer-prefix`. `system-wide-prefix` is always refused. |
@@ -286,6 +287,7 @@ The advertisement includes these capability identifiers:
 - `asset-authoring-deterministic-operations.v1`
 - `asset-authoring-custom-geometry.v1`
 - `asset-authoring-multi-layer-candidates.v1`
+- `asset-pack-conflict-resolution.v1`
 
 and these schema identifiers:
 
@@ -317,6 +319,11 @@ and these schema identifiers:
 - `lpc-toolkit.asset-authoring-intelligence-receipt.v1`
 - `lpc-toolkit.asset-authoring-intelligence-consent.v1`
 - `lpc-toolkit.sprite-drawing-contract.v2`
+- `lpc-toolkit.asset-pack-conflict.v1`
+- `lpc-toolkit.asset-pack-conflict-selection.v1`
+- `lpc-toolkit.asset-pack-conflict-policy.v1`
+- `lpc-toolkit.asset-pack-resolution.v1`
+- `lpc-toolkit.asset-pack-conflict-audit.v1`
 
 ### Optional provider-neutral Agent handoff
 
@@ -427,6 +434,45 @@ Recovery is exact-operation and session scoped. D5 does not import, edit
 install, or alter D3's explicit file-scoped Web-to-CLI handoff. Existing v1
 archive, manifest, install, plugin, attribution, consent, preview, release,
 D1, D2, and D3 behavior remains authoritative.
+
+### D6 cross-pack conflict review
+
+The CLI exposes the local, explicit D6 conflict boundary through three commands:
+
+```sh
+lpc-toolkit asset conflict inspect --conflict conflict.json --json
+lpc-toolkit asset conflict resolve --conflict conflict.json --selection selection.json --workspace ./my-lpc-art --confirm --json
+lpc-toolkit asset conflict recover --receipt .lpc-toolkit/asset-packs/staging/conflict-resolutions/<conflict-id>/receipt.json --action resume --workspace ./my-lpc-art --confirm --json
+```
+
+`inspect` reads one bounded `lpc-toolkit.asset-pack-conflict.v1` record and
+reports the canonical identity, contenders, compatibility/trust eligibility,
+attribution evidence, policy, audit evidence, and exactly one safe next action.
+It is read-only and never infers a winner from version, filesystem order,
+provider, Agent, `replaces`, or D1/D2/D4/D5 evidence. Equivalent contenders are
+reported as equivalent; a changed baseline, incompatible evidence, missing
+credits/license/provenance, or stale identity is a refusal rather than a merge.
+
+`resolve` requires the exact conflict and selection records, a complete
+digest-bound target selection, review evidence and reason, and `--confirm`. It
+writes only an owned receipt below the workspace staging root using schema
+`lpc-toolkit.asset-pack-conflict-receipt.v1`; the resolution and audit records
+retain source, credit, license, acknowledgement, provenance, D2, D4, and D5
+evidence digests. The output is a staged candidate with one next action for the
+existing candidate import, validation, attributed preview, human review, and
+release gates. It does not edit source packs, `asset-pack.json`, `CREDITS.csv`,
+the current managed output, an archive, a registry, or an installation.
+
+`recover --action resume` rechecks the exact receipt and optionally the current
+conflict evidence. `recover --action discard` removes only the exact D6 staging
+directory; both actions require `--confirm`. Tampered, stale, blocked, and
+refused records return a stable `status`, `code`, `mutation`, and one
+`nextAction`, without absolute paths or raw payloads. D6 uses only local
+fixtures/fakes: it adds no registry client, signing/key operation, marketplace,
+backend, authentication, network call, npm publication, or persistent browser
+authoring state. The existing v1 archive/manifest/install/plugin behavior and
+the D1 parser remain unchanged; D6 evidence cannot become a formal release
+until a separately versioned downstream contract accepts it.
 
 ### Explicit Web-to-CLI handoff
 

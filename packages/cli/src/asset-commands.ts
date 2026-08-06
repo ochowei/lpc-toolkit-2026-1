@@ -29,6 +29,7 @@ import {
   AssetPackPreviewError,
   previewAssetPack,
 } from './asset-pack-preview.js';
+import { runAssetConflictCommand } from './asset-pack-conflict-commands.js';
 import { listAssetPacks, removeAssetPack } from './asset-pack-remove.js';
 import { syncLinkedAssetPack } from './asset-pack-sync.js';
 import {
@@ -100,6 +101,11 @@ export function assetCommandRequirements(
   }
   if (parsed.command[1] === 'provenance' && parsed.command[2] === 'verify') {
     return INSPECTION_REQUIREMENTS;
+  }
+  if (parsed.command[1] === 'conflict') {
+    return parsed.command[2] === 'inspect'
+      ? NO_ASSET_COMMAND_REQUIREMENTS
+      : LIST_REQUIREMENTS;
   }
   if (parsed.command[1] === 'distribution') {
     return parsed.command[2] === 'install'
@@ -420,6 +426,33 @@ export function preflightAssetCommand(
       : undefined;
   }
 
+  if (subcommand === 'conflict') {
+    const action = parsed.command[2];
+    if (action !== 'inspect' && action !== 'resolve' && action !== 'recover') {
+      return commandError(parsed.command.join(' ') || 'asset conflict', issue(
+        'unknown_command',
+        `Unknown asset conflict command: ${parsed.command.join(' ')}`,
+      ));
+    }
+    if (action === 'inspect' && !flagString(parsed.flags, 'conflict')) {
+      return commandError('asset conflict inspect', missingFlag('conflict'));
+    }
+    if (action === 'resolve') {
+      for (const name of ['conflict', 'selection'] as const) {
+        if (!flagString(parsed.flags, name)) return commandError('asset conflict resolve', missingFlag(name));
+      }
+    }
+    if (action === 'recover') {
+      for (const name of ['receipt', 'action'] as const) {
+        if (!flagString(parsed.flags, name)) return commandError('asset conflict recover', missingFlag(name));
+      }
+    }
+    const positionalIssue = noPositionalIssue(parsed);
+    return positionalIssue
+      ? commandError(`asset conflict ${action}`, positionalIssue)
+      : undefined;
+  }
+
   if (subcommand === 'init') {
     const initInputIssue = initIssue(parsed);
     return initInputIssue ? commandError('asset init', initInputIssue) : undefined;
@@ -614,6 +647,13 @@ export async function runAssetCommand(
   const { parsed, cwd } = context;
   const subcommand = parsed.command[1];
   try {
+    if (subcommand === 'conflict') {
+      return runAssetConflictCommand({
+        parsed,
+        cwd,
+        ...(context.workspace === undefined ? {} : { workspace: context.workspace }),
+      });
+    }
     if (subcommand === 'authoring') {
       if (parsed.command[2] === 'intelligence') {
         return runAssetAuthoringIntelligenceCommand({

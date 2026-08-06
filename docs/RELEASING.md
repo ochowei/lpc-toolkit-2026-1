@@ -107,6 +107,25 @@ README, root README, landing copy, architecture, engineering, and this runbook
 must describe the same provider-neutral, deterministic D5, and one-way local-file
 boundaries. D5 documentation must not imply model invocation, automatic import,
 automatic publication, or persistent browser authoring state.
+The D6 cross-pack conflict contract additionally advertises
+`asset-pack-conflict-resolution.v1` and the schemas
+`lpc-toolkit.asset-pack-conflict.v1`,
+`lpc-toolkit.asset-pack-conflict-selection.v1`,
+`lpc-toolkit.asset-pack-conflict-policy.v1`,
+`lpc-toolkit.asset-pack-resolution.v1`, and
+`lpc-toolkit.asset-pack-conflict-audit.v1` only when the local conflict parser,
+eligibility/refusal, explicit selection, attribution, protected-root recovery,
+receipt tamper, and CLI acceptance tests are complete. The help must list
+`asset conflict inspect`, `asset conflict resolve`, and
+`asset conflict recover`, and must say that inspect is read-only, no automatic
+winner is inferred, resolve requires explicit selection and `--confirm`, and
+existing import/validation/preview/human-review/release gates remain
+downstream. D6 evidence is session/workspace evidence until a separately
+versioned D1 `cross-pack-merge` contract is approved; the current D1 parser is
+not extended by a release. No D6 release check may contact a registry or
+marketplace, create a key, call `npm publish`, use a backend/auth service, or
+write persistent browser authoring state. The plugin deliberately has no D6
+skill or command contract.
 Plugin `0.2.1` must continue to document CLI range `>=0.2.0 <0.3.0`; the plugin
 intentionally does not claim or invoke D2 provider or D3 Web-handoff
 capabilities or add a new skill.
@@ -296,6 +315,38 @@ access, create signing keys, contact a registry or marketplace, call
 authoring state. The existing v1 archive, manifest, install, plugin,
 attribution, consent, preview, release, and D1–D4 trust boundaries remain
 unchanged.
+
+### D6 cross-pack conflict resolution release gate
+
+D6 is a review-and-staging boundary, not a publication or installation step.
+The release candidate must exercise the bounded Core conflict and selection
+parsers, canonical identity independent of discovery order, equivalent and
+incompatible contenders, explicit `retain-current`, `select-contender`,
+`merge-disjoint`, and `decline` outcomes, stale baseline refusal, complete
+attribution evidence, D2/D4/D5 evidence retention, protected-root containment,
+receipt tamper detection, and exact resume/discard recovery:
+
+```sh
+pnpm --filter @lpc-toolkit/core test -- asset-pack-conflict.test.ts
+pnpm --filter @lpc-toolkit/core run typecheck
+pnpm --filter @lpc-toolkit/cli test -- asset-pack-conflict.test.ts command-spec.test.ts main-json.test.ts
+pnpm --filter @lpc-toolkit/cli run typecheck
+pnpm check:boundaries
+pnpm verify:cli-docs-policy
+pnpm verify:plugin
+```
+
+The CLI acceptance must prove `asset conflict inspect` is read-only,
+`resolve` requires a complete user selection and `--confirm`, and `recover`
+can mutate only the owned D6 staging receipt. It must not import a candidate,
+rewrite source or `CREDITS.csv`, publish an archive, modify a registry, install
+output, accept a preview, declare a release, sign, contact a registry or
+marketplace, create a key, call `npm publish`, use backend/auth/network state,
+or persist browser authoring state. Existing v1 archive/manifest/install/plugin
+behavior, D1 parser, D2 provider evidence, D4 trust evidence, D5 candidate
+import, attribution, consent, validation, preview, human review, and release
+gates remain authoritative. Until a separately reviewed D1 capability accepts
+`cross-pack-merge`, the D6 receipt is not a formal release input.
 
 ## Release Candidate
 

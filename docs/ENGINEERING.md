@@ -343,6 +343,41 @@ manifest, install, plugin, attribution, and release behavior. No D5 test may
 write source-pack files, modify `asset-pack.json`, accept a preview, publish,
 install, or resolve D6 cross-pack conflicts.
 
+#### D6 cross-pack conflict resolution
+
+D6 uses public Core and `runCli` seams with local JSON/pack/trust/credit and D5
+candidate fixtures only. Core tests cover bounded schema parsing, canonical
+identity independent of discovery/set order, equivalent contenders, explicit
+policy, compatibility/trust eligibility, digest-bound disjoint merge,
+attribution preservation, stale baseline refusal, D2/D4/D5 evidence boundaries,
+and no automatic precedence:
+
+```sh
+pnpm --filter @lpc-toolkit/core test -- asset-pack-conflict.test.ts
+pnpm --filter @lpc-toolkit/core run typecheck
+```
+
+CLI tests cover `asset conflict inspect|resolve|recover`, stable JSON/help
+responses, explicit confirmation, workspace-only staging, protected-root
+refusal, idempotent receipt writes, tamper detection, exact resume/discard,
+and one safe next action:
+
+```sh
+pnpm --filter @lpc-toolkit/cli test -- asset-pack-conflict.test.ts command-spec.test.ts main-json.test.ts
+pnpm --filter @lpc-toolkit/cli run typecheck
+pnpm check:boundaries
+pnpm verify:cli-docs-policy
+pnpm verify:plugin
+```
+
+D6 must not read or write `upstream/`, invoke a provider, use a real registry,
+create a signing key, publish to npm/marketplaces, add a backend/auth service,
+or create persistent browser authoring state. The staged receipt remains
+downstream candidate evidence; existing import, validation, attributed preview,
+human review, release, archive, distribution, and install authorities remain
+unchanged. The existing D1 parser is regression-tested rather than silently
+extended with `cross-pack-merge`.
+
 Phase 1 release-boundary changes add a focused red/green map:
 
 ```sh
