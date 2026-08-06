@@ -1,7 +1,7 @@
 # D5 — Authoring Intelligence Implementation Plan
 
-**Status:** Implementation in progress — D5 product slice complete; documentation,
-full regression, and final handoff gates pending
+**Status:** D5 implementation Draft PR #178 open — CI, merge, and user
+confirmation pending
 **Issue:** [#176](https://github.com/ochowei/lpc-toolkit-2026-1/issues/176)
 **Roadmap:** [#153](https://github.com/ochowei/lpc-toolkit-2026-1/issues/153)
 **Spec:** [D5 — Authoring Intelligence](../specs/2026-08-06-authoring-intelligence.md)
@@ -391,14 +391,15 @@ final policy result is `rtk pnpm verify:cli-docs-policy` PASS (19 tests).
   automatically and do not begin D6 until the D5 implementation PR is merged
   and the user confirms it. The independent branch is ready; the Draft PR is
   the remaining handoff action.
-- [ ] Report current D5 task, completed work, commit/PR, verification,
+- [x] Report current D5 task, completed work, commit/PR, verification,
   next step, and blockers without claiming completion before CI and merge.
 
 **Final implementation record:**
 
 ```text
 Implementation branch: codex/issue-176-d5-authoring-intelligence-implementation
-Implementation PR: pending review gate
+Implementation PR: [#178](https://github.com/ochowei/lpc-toolkit-2026-1/pull/178)
+  (Draft; CI, merge, and user confirmation pending)
 Commits:
   20ce883a041d34ccfa7c37e94182d8b90f233db5
   35126c98c3fbacebc9b85e45ce453aae5fd5c3f2
@@ -409,6 +410,7 @@ Commits:
   e45a2855f9cbffe2585fa47cce1af292c83b9f1b
   c4d3620de02aa26580eda6266f479458a7ae8c33
   b1a2d748e4aee28443bc301b63a172ccc5ae295e
+  e85d2d4e0eb8577f8cb89c876783cab924f180de
 Verification:
   rtk pnpm verify — PASS; Core 450, asset-pack-format 75, presets 8,
     CLI 1282 passed/1 skipped, Web 867; all workspace typechecks PASS
@@ -416,6 +418,9 @@ Verification:
   rtk pnpm verify:plugin — PASS (40 tests; plugin structure valid)
   rtk pnpm verify:cli-docs-policy — PASS (19 tests)
   rtk git diff --check — PASS
+Handoff:
+  Draft PR #178 is open and not merged; D6 is blocked until CI passes, PR #178
+  is merged, and the user confirms the merge.
 ```
 
 ## Verification strategy before the implementation PR
