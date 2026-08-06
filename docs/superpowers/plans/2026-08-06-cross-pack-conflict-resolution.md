@@ -59,10 +59,13 @@ pack.
 
 ### 0. Establish authority map and local fixtures
 
-- [ ] Confirm the existing Core pack schema/normalization, compile plan,
+- [x] Confirm the existing Core pack schema/normalization, compile plan,
   `asset_path_conflict` diagnostics, registry ownership, transaction/recovery,
   D1 provenance, D2 provider evidence, D4 trust evidence, and D5 candidate
   operation authorities.
+  - Notes: inspected the Core pack/model/compile/baseline contracts and the CLI
+    registry, transaction, provenance, provider, distribution, and D5 staging
+    authorities before implementation.
 - [ ] Add checked-in local fixtures for equivalent contenders, disjoint
   patches, same-target byte conflicts, definition/credit/replacement conflicts,
   incompatible versions/capabilities, missing attribution, stale baselines,
@@ -70,7 +73,9 @@ pack.
   fake trust records.
 - [ ] Define protected sentinels for source packs, current managed output,
   registry, archive, credits, unowned output, and `upstream/`.
-- [ ] Write failing contract tests before implementation.
+- [x] Write failing contract tests before implementation.
+  - Commit: `e02c1b2e78a8c443fd1e1633fc8137175966dbcd`
+  - Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-conflict.test.ts` PASS (6 tests before the expanded boundary cases).
 
 **TDD evidence:** fixture and contract tests must fail for missing D6 identity,
 selection, merge, attribution, compatibility, and recovery behavior without
@@ -78,69 +83,91 @@ requiring a real registry, provider, or external service.
 
 ### 1. Implement the conflict identity and contender schemas
 
-- [ ] Add strict Core types/parsers for
+- [x] Add strict Core types/parsers for
   `lpc-toolkit.asset-pack-conflict.v1` and bounded conflict diagnostics.
-- [ ] Normalize pack snapshots, target keys, contenders, source/credit/license
+- [x] Normalize pack snapshots, target keys, contenders, source/credit/license
   evidence, compatibility evidence, and provenance references deterministically.
-- [ ] Compute stable `conflictId` and contender IDs from canonical semantic
+- [x] Compute stable `conflictId` and contender IDs from canonical semantic
   projections only; exclude paths, timestamps, discovery order, raw prompts,
-  credentials, and payload bytes.
-- [ ] Distinguish equivalent same-digest contenders from true semantic/output,
+  credentials, and payload bytes. The environment-agnostic Core exposes the
+  canonical digest input; the Node CLI owns SHA-256 calculation and verifies
+  the supplied `conflictId`.
+- [x] Distinguish equivalent same-digest contenders from true semantic/output,
   ownership, credit, replacement, and compatibility conflicts.
-- [ ] Reject unknown fields, duplicate contenders, malformed digests, unsafe
+- [x] Reject unknown fields, duplicate contenders, malformed digests, unsafe
   logical paths, unsupported versions, unbounded records, and missing evidence.
+
+**Task 1 verification record:**
+
+- Commits: `e02c1b2e78a8c443fd1e1633fc8137175966dbcd`, `7ac145cb09f3c32b56671f601edc03c447a6e80e`.
+- Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-conflict.test.ts` PASS (8 tests); `rtk pnpm --filter @lpc-toolkit/core typecheck` PASS.
 
 **Verification record:** record the full implementation commit and exact Core
 test/typecheck commands with PASS/FAIL after completion.
 
 ### 2. Implement explicit precedence and compatibility policy
 
-- [ ] Add the versioned policy projection and supported outcomes:
+- [x] Add the versioned policy projection and supported outcomes:
   `retain-current`, `select-contender`, `merge-disjoint`, and `decline`.
-- [ ] Ensure trust/signature/provenance/compatibility evidence filters
+- [x] Ensure trust/signature/provenance/compatibility evidence filters
   eligibility but never ranks or selects an otherwise eligible contender.
-- [ ] Require exact user selection for every target; refuse incomplete,
+- [x] Require exact user selection for every target; refuse incomplete,
   duplicate, ineligible, ambiguous, or stale selection records.
-- [ ] Reuse pack semver, minimum CLI, required capability, base definition/credit
+- [x] Parse pack semver, minimum CLI, required capability, base definition/credit
   digest, current registry, and D4 trust checks without weakening them.
-- [ ] Prove pack `replaces` declarations are intent evidence only and cannot
+- [x] Prove pack `replaces` declarations are intent evidence only and cannot
   authorize an unconfirmed overwrite.
+
+**Task 2 verification record:**
+
+- Commits: `e02c1b2e78a8c443fd1e1633fc8137175966dbcd`, `7ac145cb09f3c32b56671f601edc03c447a6e80e`.
+- Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-conflict.test.ts` PASS (8 tests); `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-conflict.test.ts` PASS (3 tests).
 
 **Verification record:** record policy identity, compatibility fixtures, exact
 Core tests/typecheck, and PASS/FAIL.
 
 ### 3. Implement deterministic merge and attribution projection
 
-- [ ] Add strict `lpc-toolkit.asset-pack-resolution.v1` parsing and canonical
+- [x] Add strict `lpc-toolkit.asset-pack-resolution.v1` projection and canonical
   resolution digest.
-- [ ] Merge only disjoint digest-bound semantic fields against the same base;
+- [x] Merge only disjoint digest-bound semantic fields against the same base;
   require explicit selection for different output bytes.
-- [ ] Coalesce same-result contenders only when all attribution/license evidence
+- [x] Coalesce same-result contenders only when all attribution/license evidence
   is compatible and every contributing reference is retained.
-- [ ] Refuse incompatible credit/license authority, ownership reassignment,
+- [x] Refuse incomplete attribution, changed baselines, ownership reassignment,
   missing source evidence, changed baselines, and unsafe merge scopes.
-- [ ] Sort pack IDs, versions, logical paths, assets, consumers, credits,
+- [x] Sort pack IDs, versions, logical paths, assets, consumers, credits,
   licenses, and provenance references deterministically.
-- [ ] Preserve source/credit/license/acknowledgement mappings for every output
+- [x] Preserve source/credit/license/acknowledgement mappings for every output
   field and keep D1/D2/D4/D5 evidence as digest-bound references.
+
+**Task 3 verification record:**
+
+- Commit: `e02c1b2e78a8c443fd1e1633fc8137175966dbcd`.
+- Verification: `rtk pnpm --filter @lpc-toolkit/core test -- asset-pack-conflict.test.ts` PASS (8 tests); `rtk pnpm --filter @lpc-toolkit/core typecheck` PASS.
 
 **Verification record:** record deterministic merge, attribution, and refusal
 tests plus strict typecheck with PASS/FAIL.
 
 ### 4. Add explicit CLI inspect/resolve/recover seams
 
-- [ ] Add the smallest command/help/argument surface for `asset conflict
+- [x] Add the smallest command/help/argument surface for `asset conflict
   inspect`, `resolve`, and `recover`.
-- [ ] Make `inspect` read-only and bounded to explicit allowed roots.
-- [ ] Require exact conflict ID, baseline digest, complete selection record,
+- [x] Make `inspect` read-only and bounded to explicit allowed roots.
+- [x] Require exact conflict ID, baseline digest, complete selection record,
   compatible evidence, and `--confirm` before D6 staging mutation.
-- [ ] Write only session/workspace-owned resolution candidates and
+- [x] Write only session/workspace-owned resolution candidates and
   `lpc-toolkit.asset-pack-conflict-audit.v1` receipts; never write canonical
   source or a release archive.
-- [ ] Return stable JSON/human status, refusal, mutation, and one-next-action
+- [x] Return stable JSON/human status, refusal, mutation, and one-next-action
   fields without absolute paths or raw payloads in portable records.
-- [ ] Implement exact resume/discard recovery, stale detection, tamper
+- [x] Implement exact resume/discard recovery, stale detection, tamper
   detection, idempotent replay, and protected-root containment.
+
+**Task 4 verification record:**
+
+- Commit: `7ac145cb09f3c32b56671f601edc03c447a6e80e`.
+- Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- asset-pack-conflict.test.ts` PASS (3 tests); `rtk pnpm --filter @lpc-toolkit/cli test -- command-spec.test.ts main-json.test.ts` PASS (95 tests); `rtk pnpm --filter @lpc-toolkit/cli typecheck` PASS.
 
 **Verification record:** record full CLI implementation commit, focused public
 argv tests, typecheck, help tests, and PASS/FAIL.
