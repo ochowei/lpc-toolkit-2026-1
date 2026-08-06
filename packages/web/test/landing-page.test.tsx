@@ -113,6 +113,9 @@ describe('CLI and agent integration pages', () => {
       'lpc-toolkit asset authoring provider preflight --session <session-id> --contract-digest <sha256> --descriptor provider.json --json',
       'lpc-toolkit asset authoring provider handoff --session <session-id> --descriptor provider.json --consent consent.json --confirm --json',
       'lpc-toolkit asset authoring provider result --session <session-id> --invocation invocation.json --result result.json --candidate candidate.png --workspace ./my-lpc-art --json',
+      'lpc-toolkit asset authoring intelligence route --request "Use hair braid" --catalog catalog-snapshot.json --json',
+      'lpc-toolkit asset authoring intelligence stage --session <session-id> --operation operation.json --candidate candidate.png --consent consent.json --workspace ./my-lpc-art --confirm --json',
+      'lpc-toolkit asset authoring intelligence recover --session <session-id> --operation-digest <sha256> --action resume --workspace ./my-lpc-art --json',
       'lpc-toolkit asset authoring handoff inspect --handoff handoff.json --archive pack.lpc-assets.zip --json',
       'lpc-toolkit asset authoring handoff import --handoff handoff.json --archive pack.lpc-assets.zip --plan attach-pack-plan.json --workspace ./my-lpc-art --confirm --json',
       'lpc-toolkit asset authoring handoff recover --handoff handoff.json --archive pack.lpc-assets.zip --workspace ./my-lpc-art --action resume --confirm --json',
@@ -124,6 +127,9 @@ describe('CLI and agent integration pages', () => {
     expect(html).toContain('Recover or synchronize the session separately');
     expect(html).toContain('Optionally hand off a candidate through a provider-neutral Agent integration');
     expect(html).toContain('result bytes are re-digested before they enter the session-owned candidate staging root');
+    expect(html).toContain('Route and stage deterministic authoring candidates');
+    expect(html).toContain('Authoring intelligence is catalog-first and deterministic.');
+    expect(html).toContain('D3 remains a file-scoped handoff.');
     expect(html).toContain('Transfer one Web revision to the CLI explicitly');
     expect(html).toContain('Export for CLI');
     expect(html).toContain('web-handoff-receipt.json');

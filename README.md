@@ -286,6 +286,29 @@ next action; optional capability absence is reported as an external-author fallb
 and hands the work back to the user. The flow does not add persistent browser
 authoring state, and no real provider is invoked by the shipped CLI.
 
+### D5 deterministic authoring intelligence
+
+D5 adds deterministic, catalog-first authoring routing above the existing
+session and candidate-import authorities. It can explain a bounded request and
+prepare digest-bound variant, recolor, explicit `sprite-drawing-contract.v2`,
+or multi-layer candidate operations. It does not require a model, provider,
+backend, authentication, network access, or persistent browser authoring state.
+
+```sh
+lpc-toolkit asset authoring intelligence route --request "Use hair braid" --catalog catalog-snapshot.json --json
+lpc-toolkit asset authoring intelligence stage --session <session-id> --operation operation.json --candidate candidate.png --consent consent.json --workspace ./my-lpc-art --confirm --json
+lpc-toolkit asset authoring intelligence recover --session <session-id> --operation-digest <sha256> --action resume --workspace ./my-lpc-art --json
+```
+
+Route is read-only. Stage requires exact session, catalog/contract/input,
+target, resource, and explicit consent bindings, writes only session-owned
+candidate bytes and receipts, and returns `re-import-candidate` rather than
+calling import. Replays are verified no-ops; changed inputs, contracts, output
+bytes, attribution evidence, or layer scope stop with one safe recovery action.
+Import, validation, attributed preview, human review, release, archive, and
+installation remain separate existing gates. D2 provider results are optional
+validated evidence only, and D3 remains an explicit file-scoped handoff.
+
 ### Web-to-CLI handoff
 
 The Web Asset Pack Workbench can explicitly export one stable in-memory

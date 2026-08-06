@@ -666,12 +666,13 @@ CLI/backend service or persist browser authoring state.
 
 The shipped authoring foundation is a provider-neutral CLI application layer
 around the pure Core plan and drawing contracts. Core owns strict parsing for
-`lpc-toolkit.asset-authoring-plan.v1` and deterministic planning for
-`lpc-toolkit.sprite-drawing-contract.v1`; it receives plan, catalog, geometry,
-credit, and source-evidence values as inputs and never reads a workspace,
-invokes a provider, or writes a PNG. The CLI owns the Node filesystem session,
-candidate trust boundary, digest checkpoints, receipt invalidation, and the
-existing validation/preview leaf commands.
+`lpc-toolkit.asset-authoring-plan.v1`, deterministic D5 request routing and
+operation planning, and `lpc-toolkit.sprite-drawing-contract.v1`; it receives
+plan, catalog, geometry, credit, and source-evidence values as inputs and never
+reads a workspace, invokes a provider, or writes a PNG. The CLI owns the Node
+filesystem session, candidate trust boundary, digest checkpoints, receipt
+invalidation, deterministic D5 materialization, and the existing
+validation/preview leaf commands.
 
 `lpc-toolkit capabilities --json` advertises the shipped capability identifiers
 `asset-authoring-session.v1`, `sprite-drawing-contract.v1`,
@@ -694,6 +695,53 @@ Their public schema set is
 `lpc-toolkit.asset-authoring-install-receipt.v1`. Contract artifact metadata is
 session-local and uses `lpc-toolkit.asset-authoring-artifact-metadata.v1`; it
 is not a publishable asset-pack schema.
+
+### D5 deterministic authoring-intelligence boundary
+
+D5 is a catalog-first, deterministic layer above the existing session and
+candidate-import authorities. Core owns bounded request normalization,
+privacy-safe route projections, stable catalog ordering, operation-plan
+validation, recolor materialization through the existing palette authority,
+explicit `sprite-drawing-contract.v2` geometry validation, and bounded
+multi-layer DAG predicates. The advertised D5 capabilities are
+`asset-authoring-intelligence-routing.v1`,
+`asset-authoring-deterministic-operations.v1`,
+`asset-authoring-custom-geometry.v1`, and
+`asset-authoring-multi-layer-candidates.v1`; their request/route/operation,
+candidate-set/receipt/consent, and v2 geometry schemas are session-side
+contracts, not `asset-pack.v1` members.
+
+The CLI owns the three public D5 seams:
+
+```text
+asset authoring intelligence route
+  -> read-only bounded catalog route
+asset authoring intelligence stage
+  -> explicit consent and digest-bound session-owned candidate staging
+asset authoring intelligence recover
+  -> exact-operation receipt verification or confirmed discard
+```
+
+`stage` never calls the private import implementation, writes canonical source,
+updates a manifest or credits file, accepts a preview, declares a release,
+publishes, installs, or changes D3 handoff state. It returns the existing
+public `asset authoring import` action, after which validation, attributed
+preview, human review, release, provenance, distribution, and installation
+remain the existing authorities. Identical operation/input/output bytes are a
+verified no-op; changed inputs, contracts, outputs, attribution evidence, or
+layer scope produce bounded stale/refusal/recovery evidence. D1 receives
+`source-transformation` records with operation and optional validated D2
+provider-evidence digests; provider evidence remains optional user-visible
+input, never approval. D3 remains an explicit file-scoped handoff and D5 adds
+no persistent browser authoring state.
+
+The D5 CLI does not require a model SDK, provider runtime, backend, auth,
+network, registry, signing key, marketplace, npm publication, or new
+dependency. Custom geometry is accepted only when the explicit v2 contract is
+valid and compatible with the current v1 compiler target; v1 archive and
+manifest behavior remains unchanged. Multi-layer candidates remain independent
+contract-bound outputs and do not resolve cross-pack conflicts, which remains
+D6 scope.
 
 The public session flow is `start`, `status`, `resume`, `contract`, `import`,
 `validate`, `preview`, `acknowledge`, `declare`, `accept-preview`,

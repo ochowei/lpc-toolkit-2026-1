@@ -311,6 +311,38 @@ The existing CI mapping remains the same: the CLI package job
 covers build/typecheck/tests/package smoke, while `Unit tests` runs
 `pnpm verify` and the docs/plugin policy gates.
 
+#### D5 deterministic authoring intelligence
+
+D5 is catalog-first and deterministic. Core normalizes bounded requests and
+validates operation, candidate, consent, and geometry contracts; the CLI owns
+session-scoped staging and exact-operation recovery. The route is read-only,
+stage requires explicit consent and `--confirm`, and every staged candidate
+must continue through the existing public import, validation, attributed
+preview, human review, release, and provenance gates. D5 uses local PNG/catalog
+fixtures only and does not require a model, provider, backend, auth, network,
+or persistent browser authoring state. D2 evidence is optional and user-visible;
+D3 remains an explicit file-scoped handoff.
+
+Run the focused D5 map before the repository-wide verification:
+
+```sh
+pnpm --filter @lpc-toolkit/core test -- asset-authoring-intelligence.test.ts asset-release-provenance-schema.test.ts
+pnpm --filter @lpc-toolkit/core run typecheck
+pnpm --filter @lpc-toolkit/cli test -- asset-authoring-intelligence.test.ts asset-authoring-import.test.ts asset-authoring-receipts.test.ts asset-authoring-session-e2e.test.ts asset-provider-commands.test.ts asset-authoring-web-cli-handoff.test.ts d3-web-cli-fixtures.test.ts command-spec.test.ts main-json.test.ts main-assets.test.ts
+pnpm --filter @lpc-toolkit/cli run typecheck
+pnpm check:boundaries
+pnpm verify:cli-docs-policy
+pnpm verify:plugin
+```
+
+The focused tests must prove deterministic variant/recolor, explicit v2 custom
+geometry compatibility, independently digest-bound multi-layer candidates,
+privacy-safe receipts, consent/refusal/recovery, replay and tamper detection,
+and the explicit import boundary. They must also preserve the v1 archive,
+manifest, install, plugin, attribution, and release behavior. No D5 test may
+write source-pack files, modify `asset-pack.json`, accept a preview, publish,
+install, or resolve D6 cross-pack conflicts.
+
 Phase 1 release-boundary changes add a focused red/green map:
 
 ```sh

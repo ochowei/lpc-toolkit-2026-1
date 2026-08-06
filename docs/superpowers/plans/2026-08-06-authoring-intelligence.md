@@ -1,15 +1,14 @@
 # D5 — Authoring Intelligence Implementation Plan
 
-**Status:** Proposed implementation plan — review and merge required before
-product implementation
+**Status:** Implementation in progress — D5 product slice complete; documentation,
+full regression, and final handoff gates pending
 **Issue:** [#176](https://github.com/ochowei/lpc-toolkit-2026-1/issues/176)
 **Roadmap:** [#153](https://github.com/ochowei/lpc-toolkit-2026-1/issues/153)
 **Spec:** [D5 — Authoring Intelligence](../specs/2026-08-06-authoring-intelligence.md)
 **Base:** D4 implementation merge commit
 `3a3665c84396ed80fb6c4d0c7476fccdebb2913d` ([PR #175](https://github.com/ochowei/lpc-toolkit-2026-1/pull/175))
 **Spec/plan branch:** `codex/issue-176-d5-authoring-intelligence`
-**Implementation branch:** to be created only after this spec/plan review PR
-is merged and the user confirms the review gate
+**Implementation branch:** `codex/issue-176-d5-authoring-intelligence-implementation`
 
 This plan is intentionally limited to the D5 track. It does not implement D6,
 modify the D4 publication/trust boundary, or combine the work with another
@@ -23,18 +22,18 @@ any product code, public capability, or public CLI command is added.
 - [x] Merge the independent spec/plan review PR.
 - [x] Obtain explicit confirmation before creating the D5 implementation
   branch or changing product code.
-- [ ] Keep all work on `codex/` branches and leave `upstream/` untouched.
-- [ ] Do not add dependencies, a model SDK/runtime, provider, backend, auth,
+- [x] Keep all work on `codex/` branches and leave `upstream/` untouched.
+- [x] Do not add dependencies, a model SDK/runtime, provider, backend, auth,
   network service, registry, signing key, marketplace mutation, npm
   publication, or external service mutation.
-- [ ] Use local deterministic fixtures/fakes for all tests; no real provider,
+- [x] Use local deterministic fixtures/fakes for all tests; no real provider,
   model, registry, marketplace, key, or publication call.
-- [ ] Keep TypeScript strict and add no `any`.
-- [ ] Preserve attribution, consent, validation, attributed preview, human
+- [x] Keep TypeScript strict and add no `any`.
+- [x] Preserve attribution, consent, validation, attributed preview, human
   authority, release gates, provenance, trust, and architecture boundaries.
-- [ ] Keep `asset-pack.v1` bytes/manifest/install/plugin behavior unchanged;
+- [x] Keep `asset-pack.v1` bytes/manifest/install/plugin behavior unchanged;
   prove compatibility with regression tests before handoff.
-- [ ] Do not introduce persistent browser authoring state. D3 remains an
+- [x] Do not introduce persistent browser authoring state. D3 remains an
   explicit file handoff and recovery boundary.
 
 ## Public behavior and mutation boundary
@@ -83,14 +82,14 @@ capability; revisit it if the implementation changes that scope.
 
 ### 0. Reviewable contract and fixture boundary
 
-- [ ] Confirm the spec, this plan, Issue #176, and the D1–D4 integration
+- [x] Confirm the spec, this plan, Issue #176, and the D1–D4 integration
   boundaries agree.
-- [ ] Identify existing Core, CLI, Web, and session authorities to extend;
+- [x] Identify existing Core, CLI, Web, and session authorities to extend;
   do not duplicate them.
-- [ ] Define checked-in local fixtures for catalog snapshots, palettes,
+- [x] Define checked-in local fixtures for catalog snapshots, palettes,
   drawing contracts, candidate inputs, attribution, explicit geometry, and
   bounded layer graphs.
-- [ ] Define the public capability/schema declaration point, but do not
+- [x] Define the public capability/schema declaration point, but do not
   advertise a reserved D5 identifier before implementation and tests pass.
 
 **TDD evidence:** fixture and contract tests must fail for missing behavior
@@ -98,6 +97,19 @@ before implementation, then pass without a provider/model/network dependency.
 
 **Plan record:** record the implementation commit, exact test commands, and
 PASS/FAIL result here after completion.
+
+**Implementation record:** The reviewed Core/CLI authority map and deterministic
+local fixtures are implemented in
+`0ccd3d65d15fecf83ece65f42e9d218b8f2b8452`; the multi-layer fixture type
+correction is in `13112a2052122fe31c6fc8dd1114285a7c1c66ee`.
+
+**Verification:** `rtk pnpm --dir packages/core test --
+asset-authoring-intelligence.test.ts asset-release-provenance-schema.test.ts
+asset-provider-schema.test.ts asset-provider-provenance.test.ts
+asset-authoring-web-handoff.test.ts` PASS (40 tests); `rtk pnpm --dir
+packages/cli test -- asset-authoring-intelligence.test.ts` PASS (5 tests);
+`rtk pnpm --dir packages/core typecheck` PASS; `rtk pnpm --dir packages/cli
+typecheck` PASS; `rtk git diff --check` PASS.
 
 ### 1. Implement the deterministic request and routing contracts
 
@@ -167,15 +179,15 @@ PASS/FAIL result here after completion.
 
 ### 3. Add session-owned CLI staging and safe operation execution
 
-- [ ] Add only the smallest public route/stage command surface required by the
+- [x] Add only the smallest public route/stage command surface required by the
   reviewed contract, with stable human and JSON output.
-- [ ] Require the existing session scope, exact catalog/contract/input
+- [x] Require the existing session scope, exact catalog/contract/input
   digests, explicit consent, and bounded operation limits before staging.
-- [ ] Materialize only below the current session-owned candidate staging root;
+- [x] Materialize only below the current session-owned candidate staging root;
   store logical relative IDs and operation/contract/input/output digests.
-- [ ] Make identical replay a verified no-op and changed input/output a stale
+- [x] Make identical replay a verified no-op and changed input/output a stale
   or conflict response; never overwrite automatically.
-- [ ] Ensure receipts exclude raw prompts, credentials, absolute paths,
+- [x] Ensure receipts exclude raw prompts, credentials, absolute paths,
   provider payloads, and raw candidate bytes.
 
 **TDD evidence:** CLI tests cover consent, staging-root containment, receipt
@@ -185,19 +197,30 @@ resource limits, and refusal/recovery output using local fixtures.
 **Plan record:** record the implementation commit, exact test commands, and
 PASS/FAIL result here after completion.
 
+**Implementation record:** `0ccd3d65d15fecf83ece65f42e9d218b8f2b8452` adds the
+read-only route, consent-bound stage, digest-bound replay, bounded PNG
+materialization, privacy projection, and explicit recovery. The fixture type
+correction is recorded in `13112a2052122fe31c6fc8dd1114285a7c1c66ee`.
+
+**Verification:** `rtk pnpm --dir packages/cli test --
+asset-authoring-intelligence.test.ts` PASS (5 tests, including consent,
+variant, recolor, custom geometry, multi-layer, replay, input drift, and
+tampered recovery); `rtk pnpm --dir packages/cli typecheck` PASS; `rtk git
+diff --check` PASS.
+
 ### 4. Integrate with candidate import, validation, preview, and human review
 
-- [ ] Keep existing `asset authoring import` as the sole candidate import
+- [x] Keep existing `asset authoring import` as the sole candidate import
   authority; D5 staging must produce an explicit next action rather than
   importing.
-- [ ] Reuse existing contract-bound import checks, PNG inspection, asset
+- [x] Reuse existing contract-bound import checks, PNG inspection, asset
   identity checks, attribution/credit checks, validation, and attributed
   preview.
-- [ ] Keep preview acceptance, declaration, packing, installation, and
+- [x] Keep preview acceptance, declaration, packing, installation, and
   publication behind their existing human/release gates.
-- [ ] Preserve sibling layers and untouched source assets when a candidate
+- [x] Preserve sibling layers and untouched source assets when a candidate
   targets one layer or one explicit output identity.
-- [ ] Add recovery commands/actions for re-import, discard staged candidate,
+- [x] Add recovery commands/actions for re-import, discard staged candidate,
   refresh exact inputs, review route, resolve layer scope, and resume only
   from a valid checkpoint.
 
@@ -208,20 +231,32 @@ recovery is deterministic and stale state is surfaced.
 **Plan record:** record the implementation commit, exact test commands, and
 PASS/FAIL result here after completion.
 
+**Implementation record:** `0ccd3d65d15fecf83ece65f42e9d218b8f2b8452` keeps D5
+staging before the existing public import authority and adds resume/discard
+recovery without touching source, validation, preview, declaration, release,
+or install receipts.
+
+**Verification:** `rtk pnpm --dir packages/cli test --
+asset-authoring-intelligence.test.ts asset-authoring-import.test.ts
+asset-authoring-receipts.test.ts asset-authoring-session-e2e.test.ts` PASS;
+`rtk pnpm --dir packages/cli test --
+asset-authoring-web-cli-handoff.test.ts d3-web-cli-fixtures.test.ts` PASS; the
+focused D5 suite passed 5 tests and the existing import suite remained green.
+
 ### 5. Connect D1 provenance, D2 provider evidence, and D3 handoff boundaries
 
-- [ ] Emit D1-compatible `source-transformation` provenance for deterministic
+- [x] Emit D1-compatible `source-transformation` provenance for deterministic
   operations, binding source identity, operation digest, contract digest,
   output digest, and attribution references.
-- [ ] Preserve source credits and license obligations through variants,
+- [x] Preserve source credits and license obligations through variants,
   recolors, custom geometry, and multi-layer candidates; missing evidence
   refuses or requires explicit user action.
-- [ ] Accept D2 provider results only as optional, validated, user-visible
+- [x] Accept D2 provider results only as optional, validated, user-visible
   hints or candidate inputs; never treat provider output as approval or as a
   source/import authority.
-- [ ] Keep D3 transfer receipts file-scoped, explicit, privacy-safe, and
+- [x] Keep D3 transfer receipts file-scoped, explicit, privacy-safe, and
   recoverable; do not add persistent browser authoring state.
-- [ ] Leave D4 distribution, signing, trust, provenance verification,
+- [x] Leave D4 distribution, signing, trust, provenance verification,
   publication, rollback, and install behavior downstream and unchanged.
 
 **TDD evidence:** cross-boundary tests cover attribution preservation,
@@ -231,17 +266,31 @@ recovery, and no authority escalation.
 **Plan record:** record the implementation commit, exact test commands, and
 PASS/FAIL result here after completion.
 
+**Implementation record:** `0ccd3d65d15fecf83ece65f42e9d218b8f2b8452` extends
+the D1 operation vocabulary for D5 transformations, binds operation/provider
+evidence by digest in `referenceDigests`, and leaves D2 session receipts and
+D3 handoff sidecars under their existing authorities. D5 never treats a
+provider result or Web handoff as approval or import authority.
+
+**Verification:** `rtk pnpm --dir packages/core test --
+asset-release-provenance-schema.test.ts asset-provider-schema.test.ts
+asset-provider-provenance.test.ts asset-authoring-web-handoff.test.ts` PASS
+(39 tests); `rtk pnpm --dir packages/cli test -- asset-provider-commands.test.ts
+asset-authoring-web-cli-handoff.test.ts d3-web-cli-fixtures.test.ts` PASS (40
+tests); no provider, browser state, network, backend, or external service was
+used.
+
 ### 6. Advertise capabilities only with complete contract coverage
 
-- [ ] Add the reserved D5 capability/schema identifiers only after their
+- [x] Add the reserved D5 capability/schema identifiers only after their
   implementation, validation, privacy projection, and compatibility tests are
   complete.
-- [ ] Make unsupported older integrations return a stable response and fall
+- [x] Make unsupported older integrations return a stable response and fall
   back to the existing manual/external-author workflow.
-- [ ] Document route outcomes, consent, staging, explicit import, preview,
+- [x] Document route outcomes, consent, staging, explicit import, preview,
   review, refusal, recovery, and compatibility without implying automatic
   authoring or publishing.
-- [ ] Update the CLI help and capability output in the same implementation
+- [x] Update the CLI help and capability output in the same implementation
   change as the public behavior.
 
 **TDD evidence:** packed CLI tests assert the advertised contract, stable
@@ -251,36 +300,74 @@ fields.
 **Plan record:** record the implementation commit, exact test commands, and
 PASS/FAIL result here after completion.
 
+**Implementation record:** `0ccd3d65d15fecf83ece65f42e9d218b8f2b8452` adds the
+four D5 capabilities, eight D5 schemas including explicit consent and v2
+geometry, and the public route/stage/recover help contract.
+
+**Verification:** `rtk pnpm --dir packages/cli test -- command-spec.test.ts
+main-json.test.ts main-assets.test.ts asset-authoring-intelligence.test.ts`
+PASS (270 tests); `rtk pnpm --dir packages/cli typecheck` PASS.
+
 ### 7. Run regression and packed acceptance coverage
 
-- [ ] Run focused Core and CLI TDD suites with real PNG fixtures and local
+- [x] Run focused Core, CLI, and Web TDD suites with real PNG fixtures and local
   fake/session data.
 - [ ] Run existing v1 archive, manifest, install, plugin, composition,
   attribution, consent, preview, release-gate, D1, D2, D3, and D4 regression
   suites.
-- [ ] Verify no test initializes or reads `upstream/`, writes outside the
+- [x] Verify no test initializes or reads `upstream/`, writes outside the
   approved session fixture roots, or calls an external service.
-- [ ] Verify strict TypeScript and boundary checks; fix violations in the
+- [x] Verify strict TypeScript and boundary checks; fix violations in the
   implementation rather than weakening the checker.
 
-**Plan record:** record the implementation commit, exact test commands, and
-PASS/FAIL result here after completion.
+**Plan record:** `20ce883a041d34ccfa7c37e94182d8b90f233db5`,
+`5f9b787ac4e664002a551d1d89238d383983d97d`,
+`0ccd3d65d15fecf83ece65f42e9d218b8f2b8452`, and
+`13112a2052122fe31c6fc8dd1114285a7c1c66ee` implement the D5 product slice.
+`rtk pnpm --dir packages/core test -- asset-authoring-intelligence.test.ts
+asset-release-provenance-schema.test.ts` PASS (24 tests);
+`rtk pnpm --dir packages/cli test -- asset-authoring-intelligence.test.ts
+asset-authoring-import.test.ts asset-authoring-receipts.test.ts
+asset-authoring-session-e2e.test.ts asset-provider-commands.test.ts
+asset-authoring-web-cli-handoff.test.ts d3-web-cli-fixtures.test.ts
+command-spec.test.ts main-json.test.ts main-assets.test.ts` PASS (303 tests);
+`rtk pnpm --dir packages/web test -- landing-page.test.tsx
+landing-artifacts.test.ts` PASS (4 tests; required escalated local `tsx` IPC
+socket permission). `rtk pnpm --dir packages/core typecheck` PASS;
+`rtk pnpm --dir packages/cli typecheck` PASS; `rtk pnpm check:boundaries` PASS;
+`rtk git diff --check` PASS. Full legacy regression remains pending Task 9.
 
 ### 8. Complete documentation impact matrix and handoff evidence
 
-- [ ] Reassess every CLI-sensitive surface and record the final matrix:
+- [x] Reassess every CLI-sensitive surface and record the final matrix:
   `help`, CLI README, root README, landing, architecture, engineering,
   releasing, and plugin contract.
-- [ ] Update every surface marked `update`; record a precise N/A reason for
+- [x] Update every surface marked `update`; record a precise N/A reason for
   any surface that remains out of scope.
-- [ ] Add examples that show route → consent → staging → explicit import →
+- [x] Add examples that show route → consent → staging → explicit import →
   validation → attributed preview → human review, including refusal/recovery.
-- [ ] Explain that D5 uses deterministic operations and has no required model,
+- [x] Explain that D5 uses deterministic operations and has no required model,
   provider, backend, auth, network, or persistent browser authoring state.
-- [ ] Ensure public docs preserve existing v1 and release compatibility notes.
+- [x] Ensure public docs preserve existing v1 and release compatibility notes.
 
-**Plan record:** record the documentation commit, exact documentation policy
-command, and PASS/FAIL result here after completion.
+**Final documentation impact matrix:**
+
+```text
+help: update — route, stage, and recover are public D5 command groups
+cli-readme: update — document D5 capabilities, schemas, workflow, and boundaries
+root-readme: update — document the deterministic route/stage/import workflow
+landing: update — expose route/stage/recover examples and no-provider boundary
+architecture: update — record Core/CLI ownership and D1–D4/D6 boundaries
+engineering: update — add focused D5 verification and local-only constraints
+releasing: update — add D5 capability/schema and pre-import release gates
+plugin: N/A — D5 does not change the installed plugin contract or skill surface
+```
+
+**Plan record:** Documentation updates are in `README.md`,
+`packages/cli/README.md`, `packages/web/src/components/landing-page.tsx`,
+`docs/ARCHITECTURE.md`, `docs/ENGINEERING.md`, and `docs/RELEASING.md`; the
+documentation commit hash and final policy result are recorded immediately
+after commit. `rtk pnpm verify:cli-docs-policy` PASS (19 tests).
 
 ### 9. Final verification and independent PR handoff
 

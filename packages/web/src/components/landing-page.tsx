@@ -157,6 +157,12 @@ const providerHandoffCommands = [
   'lpc-toolkit asset authoring provider result --session <session-id> --invocation invocation.json --result result.json --candidate candidate.png --workspace ./my-lpc-art --json',
 ] as const;
 
+const authoringIntelligenceCommands = [
+  'lpc-toolkit asset authoring intelligence route --request "Use hair braid" --catalog catalog-snapshot.json --json',
+  'lpc-toolkit asset authoring intelligence stage --session <session-id> --operation operation.json --candidate candidate.png --consent consent.json --workspace ./my-lpc-art --confirm --json',
+  'lpc-toolkit asset authoring intelligence recover --session <session-id> --operation-digest <sha256> --action resume --workspace ./my-lpc-art --json',
+] as const;
+
 const webCliHandoffCommands = [
   'lpc-toolkit asset authoring handoff inspect --handoff handoff.json --archive pack.lpc-assets.zip --json',
   'lpc-toolkit asset authoring handoff import --handoff handoff.json --archive pack.lpc-assets.zip --plan attach-pack-plan.json --workspace ./my-lpc-art --confirm --json',
@@ -379,6 +385,28 @@ export function CliPage({ onNavigate }: ProductPageProps) {
             </p>
             <ol className="mt-4 space-y-3">
             {providerHandoffCommands.map((command, index) => (
+                <li key={`${index}-${command}`}>
+                  <CopyCode children={command} />
+                </li>
+              ))}
+            </ol>
+            <h3 className="mt-5 text-lg font-semibold text-text">
+              Route and stage deterministic authoring candidates
+            </h3>
+            <p className="mt-2 text-sm text-text-2">
+              Authoring intelligence is catalog-first and deterministic. It can
+              route a bounded request, prepare a variant, recolor, explicit
+              geometry, or multi-layer candidate, but it does not require a
+              model, provider, backend, network, authentication, or persistent
+              browser state. Route is read-only; staging requires exact consent
+              and <code>--confirm</code>, writes only session-owned candidate
+              evidence, and returns an explicit next action for the existing
+              import, validation, attributed preview, and human review gates.
+              Refusal and stale state remain recoverable; D2 evidence is
+              optional and D3 remains a file-scoped handoff.
+            </p>
+            <ol className="mt-4 space-y-3">
+              {authoringIntelligenceCommands.map((command, index) => (
                 <li key={`${index}-${command}`}>
                   <CopyCode children={command} />
                 </li>

@@ -94,6 +94,7 @@ my-lpc-art/
     └── authoring-sessions/
         └── <session-id>/
             ├── provider-candidates/   session-owned, re-digested result PNGs
+            ├── intelligence-receipts/ deterministic D5 operation evidence
             ├── web-handoff-receipt.json  optional Web-to-CLI import sidecar
             └── release-artifacts/     deterministic draft/formal/provenance outputs
 ```
@@ -281,6 +282,10 @@ The advertisement includes these capability identifiers:
 - `asset-authoring-web-cli-recovery.v1`
 - `asset-authoring-draft-recovery.v1`
 - `asset-authoring-consumer-install.v1`
+- `asset-authoring-intelligence-routing.v1`
+- `asset-authoring-deterministic-operations.v1`
+- `asset-authoring-custom-geometry.v1`
+- `asset-authoring-multi-layer-candidates.v1`
 
 and these schema identifiers:
 
@@ -304,6 +309,14 @@ and these schema identifiers:
 - `lpc-toolkit.asset-authoring-install-receipt.v1`
 - `lpc-toolkit.asset-release-provenance.v1`
 - `lpc-toolkit.asset-release-provenance-verification.v1`
+- `lpc-toolkit.asset-authoring-intelligence-request.v1`
+- `lpc-toolkit.asset-authoring-intelligence-route.v1`
+- `lpc-toolkit.asset-authoring-operation-plan.v1`
+- `lpc-toolkit.asset-authoring-candidate-operation.v1`
+- `lpc-toolkit.asset-authoring-candidate-set.v1`
+- `lpc-toolkit.asset-authoring-intelligence-receipt.v1`
+- `lpc-toolkit.asset-authoring-intelligence-consent.v1`
+- `lpc-toolkit.sprite-drawing-contract.v2`
 
 ### Optional provider-neutral Agent handoff
 
@@ -361,6 +374,60 @@ authority, human consent, or release approval. No raw prompt, provider
 payload, credential, private path, or human identity enters the public D2
 envelopes or D1 receipt.
 
+### D5 deterministic authoring intelligence
+
+D5 adds a catalog-first, deterministic authoring-intelligence boundary. It
+normalizes a bounded request and explains whether the existing catalog can
+compose, extend, derive a variant, recolor, use an explicit custom-geometry
+contract, or prepare a bounded multi-layer candidate set. It does not require
+a model, provider, backend, authentication, network access, or persistent
+browser authoring state.
+
+Route a request with a caller-supplied local catalog snapshot:
+
+```sh
+lpc-toolkit asset authoring intelligence route --request "Use hair braid" --catalog catalog-snapshot.json --json
+```
+
+Route responses contain the request/catalog digests, bounded logical
+candidates, required capabilities, a stable outcome, and one safe next action.
+They never return the raw request, private paths, credentials, provider
+payloads, or candidate pixels. Ambiguous, unsupported, stale, attribution, and
+resource conditions remain `needs-user-action` or refusal states.
+
+To materialize an explicit operation, supply a digest-bound operation plan,
+candidate inputs, and a separate D5 consent record. `--confirm` is required for
+the session-owned staging mutation:
+
+```sh
+lpc-toolkit asset authoring intelligence stage --session <session-id> --operation operation.json --candidate candidate.png --consent consent.json --workspace ./my-lpc-art --confirm --json
+```
+
+Variant, recolor, explicit `sprite-drawing-contract.v2` geometry, and
+multi-layer operations are bounded by exact target/contract/input digests and
+fixed PNG, canvas, layer, and total-byte limits. Repeated identical staging is
+a verified no-op; changed bytes or stale contracts return a recovery action and
+never overwrite an existing candidate. D5 writes only session-owned
+`provider-candidates/` bytes and an `intelligence-receipts/` sidecar. D2
+provider evidence is optional, validated evidence only; it is never approval or
+an import authority.
+
+Staging stops before source mutation. Import each output through the existing
+candidate-import authority, then run the existing validation, attributed
+preview, human declaration/review, release, archive, and installation gates:
+
+```sh
+lpc-toolkit asset authoring import --session <session-id> --target <target-id> --candidate <staged-candidate.png> --contract-digest <sha256> --workspace ./my-lpc-art --json
+lpc-toolkit asset authoring intelligence recover --session <session-id> --operation-digest <sha256> --action resume --workspace ./my-lpc-art --json
+lpc-toolkit asset authoring intelligence recover --session <session-id> --operation-digest <sha256> --action discard --workspace ./my-lpc-art --confirm --json
+```
+
+Recovery is exact-operation and session scoped. D5 does not import, edit
+`asset-pack.json`, rewrite credits, accept a preview, declare release, publish,
+install, or alter D3's explicit file-scoped Web-to-CLI handoff. Existing v1
+archive, manifest, install, plugin, attribution, consent, preview, release,
+D1, D2, and D3 behavior remains authoritative.
+
 ### Explicit Web-to-CLI handoff
 
 D3 provides a one-way local-file bridge from the Web Asset Pack Workbench to a
@@ -413,6 +480,9 @@ The public session commands are:
 | `asset authoring status --session <session-id> [--workspace <directory>] [--json]` | Read state, checkpoint freshness, bounded diagnostics, optional Web-handoff sidecar evidence, and safe next actions; the sidecar is not release approval. |
 | `asset authoring resume --session <session-id> [--workspace <directory>] [--json]` | Reconcile current manifest/PNG/receipt evidence and return the next safe action. |
 | `asset authoring contract --session <session-id> [--refresh] [--workspace <directory>] [--json]` | Materialize or inspect the provider-neutral drawing contract and non-importable artifacts. |
+| `asset authoring intelligence route --request <text> --catalog <catalog.json> [options]` | Read-only deterministic catalog-first routing; it never prepares runtime assets or persists the raw request. |
+| `asset authoring intelligence stage --session <session-id> --operation <operation.json> --candidate <candidate.png> --consent <consent.json> [--confirm] [options]` | Consent-bound deterministic candidate staging below the session-owned root; it never imports, validates, previews, releases, or publishes. |
+| `asset authoring intelligence recover --session <session-id> --operation-digest <sha256> --action <resume\|discard> [--confirm] [options]` | Verify or explicitly discard one exact D5 staging operation without touching source-pack bytes. |
 | `asset authoring provider discover --session <session-id> --contract-digest <sha256> --descriptors <providers.json> [--json]` | Normalize only explicitly supplied provider descriptors; no provider is selected, invoked, enumerated, or written. |
 | `asset authoring provider preflight --session <session-id> --contract-digest <sha256> --descriptor <descriptor.json> [options]` | Read the current contract and return bounded compatibility, scope, network, credential, and protected-root checks without mutation. |
 | `asset authoring provider handoff --session <session-id> --descriptor <descriptor.json> --consent <consent.json> [--confirm] [--workspace <directory>] [--json]` | Persist a consent-scoped invocation only after explicit confirmation; no provider executes and no pack source changes. |
