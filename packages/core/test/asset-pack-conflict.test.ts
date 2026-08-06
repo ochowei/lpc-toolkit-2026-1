@@ -26,6 +26,7 @@ const basePack = {
     requiredCapabilities: ['asset-pack.v1'],
   },
   generatedOwnership: ['spritesheets/hair/item/walk/male/layer_1.png'],
+  replacementIntentDigests: [],
   creditDigests: [digest('d')],
   licenseDigests: [digest('e')],
   acknowledgementDigests: [],
@@ -307,5 +308,70 @@ describe('asset-pack conflict contract', () => {
       digest('e'),
       digest('f'),
     ]);
+  });
+
+  it('coalesces same-result contenders without using contender order as precedence', () => {
+    const sameResult = {
+      ...conflictFixture,
+      contenders: conflictFixture.contenders.map((contender) => ({
+        ...contender,
+        resultDigest: digest('e'),
+        semanticPatches: contender.semanticPatches.map((patch) => ({
+          ...patch,
+          ...(contender.contenderId === 'bravo.pack@1.0.0'
+            ? { path: 'definition.layer_1' }
+            : {}),
+          resultDigest: digest('e'),
+        })),
+      })),
+    };
+    const result = resolveAssetPackConflict(
+      sameResult,
+      {
+        ...selection('merge-disjoint', [
+          'alpha.pack@1.0.0',
+          'bravo.pack@1.0.0',
+        ]),
+        targets: [{
+          ...selection('merge-disjoint', [
+            'alpha.pack@1.0.0',
+            'bravo.pack@1.0.0',
+          ]).targets[0]!,
+          resultDigest: digest('e'),
+        }],
+      },
+      { confirmed: true },
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('Expected same-result contenders to coalesce.');
+    expect(result.resolution.targets[0]?.resultDigest).toBe(digest('e'));
+  });
+
+  it('blocks incomplete attribution and keeps D5 evidence non-authoritative', () => {
+    const incomplete = {
+      ...conflictFixture,
+      attribution: { ...conflictFixture.attribution, complete: false },
+    };
+    expect(evaluateAssetPackConflict(incomplete)).toMatchObject({
+      status: 'blocked',
+      nextAction: 'review-attribution',
+    });
+
+    const d5WithoutEvidence = {
+      ...conflictFixture,
+      contenders: conflictFixture.contenders.map((contender) =>
+        contender.origin === 'd5-candidate'
+          ? { ...contender, d5EvidenceDigests: [] }
+          : contender),
+    };
+    expect(resolveAssetPackConflict(
+      d5WithoutEvidence,
+      selection('select-contender', ['bravo.pack@1.0.0']),
+      { confirmed: true },
+    )).toMatchObject({
+      ok: false,
+      code: 'conflict_incompatible_pack',
+      nextAction: 'remove-incompatible-contender',
+    });
   });
 });

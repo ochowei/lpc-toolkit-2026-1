@@ -289,7 +289,7 @@ describe('main json behavior', () => {
     expect(advertisement.data.schemaVersions).toContain(
       'lpc-toolkit.asset-release-provenance-verification.v1',
     );
-    expect(advertisement.data.capabilities.slice(-8)).toEqual([
+    expect(advertisement.data.capabilities.slice(-9)).toEqual([
       'asset-authoring-intelligence-routing.v1',
       'asset-authoring-deterministic-operations.v1',
       'asset-authoring-custom-geometry.v1',
@@ -298,8 +298,9 @@ describe('main json behavior', () => {
       'asset-pack-signature-verification.v1',
       'asset-pack-global-install.v1',
       'asset-pack-npm-publication.v1',
+      'asset-pack-conflict-resolution.v1',
     ]);
-    expect(advertisement.data.schemaVersions.slice(-11)).toEqual([
+    expect(advertisement.data.schemaVersions.slice(-16)).toEqual([
       'lpc-toolkit.asset-authoring-intelligence-request.v1',
       'lpc-toolkit.asset-authoring-intelligence-route.v1',
       'lpc-toolkit.asset-authoring-operation-plan.v1',
@@ -311,6 +312,11 @@ describe('main json behavior', () => {
       'lpc-toolkit.asset-distribution-release.v1',
       'lpc-toolkit.asset-distribution-verification.v1',
       'lpc-toolkit.asset-distribution-trust-policy.v1',
+      'lpc-toolkit.asset-pack-conflict.v1',
+      'lpc-toolkit.asset-pack-conflict-selection.v1',
+      'lpc-toolkit.asset-pack-conflict-policy.v1',
+      'lpc-toolkit.asset-pack-resolution.v1',
+      'lpc-toolkit.asset-pack-conflict-audit.v1',
     ]);
   });
 

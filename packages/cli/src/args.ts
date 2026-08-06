@@ -36,6 +36,7 @@ function acceptsAnotherCommandToken(command: readonly string[]): boolean {
           command[1] === 'workspace'
           || command[1] === 'authoring'
           || command[1] === 'provenance'
+          || command[1] === 'conflict'
           || command[1] === 'distribution'
         )
       )

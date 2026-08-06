@@ -92,6 +92,7 @@ export interface AssetPackConflictPackSnapshot {
   readonly trustReceiptDigest?: string;
   readonly compatibility: AssetPackConflictCompatibility;
   readonly generatedOwnership: readonly string[];
+  readonly replacementIntentDigests: readonly string[];
   readonly creditDigests: readonly string[];
   readonly licenseDigests: readonly string[];
   readonly acknowledgementDigests: readonly string[];
@@ -369,6 +370,19 @@ export function assetPackConflictResolutionDigestInput(
 export function evaluateAssetPackConflict(
   conflict: AssetPackConflict,
 ): AssetPackConflictEvaluation {
+  if (conflict.compatibility.status !== 'compatible') {
+    return {
+      status: 'blocked',
+      eligibleContenderIds: [],
+      equivalentContenderIds: [],
+      nextAction: 'remove-incompatible-contender',
+      diagnostics: [{
+        code: 'conflict_incompatible_pack',
+        message: 'The conflict compatibility report blocks resolution.',
+        targetKey: conflict.target.key,
+      }],
+    };
+  }
   if (!conflict.attribution.complete) {
     return {
       status: 'blocked',
@@ -386,10 +400,12 @@ export function evaluateAssetPackConflict(
   const compatible = conflict.contenders.filter((contender) =>
     contender.compatibility.status === 'compatible'
     && contender.trust.status === 'verified'
+    && contender.trust.receiptDigests.length > 0
     && contender.sourceReferenceDigests.length > 0
     && contender.creditReferenceDigests.length > 0
     && contender.licenseReferenceDigests.length > 0
-    && contender.provenanceReferenceDigests.length > 0);
+    && contender.provenanceReferenceDigests.length > 0
+    && (contender.origin !== 'd5-candidate' || contender.d5EvidenceDigests.length > 0));
   const eligibleContenderIds = compatible
     .map((contender) => contender.contenderId)
     .sort(compareUtf8);
@@ -422,9 +438,9 @@ export function evaluateAssetPackConflict(
       diagnostics: diagnosticsForIneligible(ineligible, conflict.target.key),
     };
   }
-  if (resultDigests.size === 1) {
+  if (resultDigests.size === 1 && compatible[0]?.resultDigest !== conflict.baseline.resultDigest) {
     return {
-      status: 'equivalent',
+      status: 'selection-required',
       eligibleContenderIds,
       equivalentContenderIds,
       nextAction: 'select-all-targets',
@@ -443,7 +459,7 @@ export function evaluateAssetPackConflict(
 export function resolveAssetPackConflict(
   conflict: AssetPackConflict,
   selection: AssetPackConflictSelection,
-  options: { readonly confirmed: boolean },
+  options: { readonly confirmed: boolean; readonly selectionDigest?: string },
 ): AssetPackConflictResolutionResult {
   if (selection.conflictId !== conflict.conflictId) {
     return refusal(
@@ -543,7 +559,21 @@ export function resolveAssetPackConflict(
       'select-all-targets',
     );
   }
+  if ((selected.resolution === 'retain-current' || selected.resolution === 'decline') && selectedContenders.length > 0) {
+    return refusal(
+      'conflict_invalid_selection',
+      `${selected.resolution} must not name a contender.`,
+      'select-all-targets',
+    );
+  }
   if (selected.resolution === 'merge-disjoint') {
+    if (selectedContenders.length < 2) {
+      return refusal(
+        'conflict_invalid_selection',
+        'merge-disjoint requires at least two eligible contenders.',
+        'select-all-targets',
+      );
+    }
     const mergeRefusal = validateDisjointMerge(conflict, selectedContenders);
     if (mergeRefusal !== undefined) return mergeRefusal;
     if (selected.resultDigest === undefined) {
@@ -572,7 +602,7 @@ export function resolveAssetPackConflict(
     schema: ASSET_PACK_RESOLUTION_SCHEMA,
     conflictId: conflict.conflictId,
     baselineDigest: conflict.workspaceBaselineDigest,
-    selectionDigest: assetPackConflictSelectionDigestInput(selection),
+    selectionDigest: options.selectionDigest ?? assetPackConflictSelectionDigestInput(selection),
     status: selected.resolution === 'decline' ? 'declined' : 'resolved',
     targets: [{
       targetKey: conflict.target.key,
@@ -595,6 +625,7 @@ function validateDisjointMerge(
   contenders: readonly AssetPackConflictContender[],
 ): Extract<AssetPackConflictResolutionResult, { readonly ok: false }> | undefined {
   const paths = new Set<string>();
+  const resultDigests = new Set(contenders.map((contender) => contender.resultDigest));
   for (const contender of contenders) {
     if (contender.baseSnapshotDigest !== conflict.baseline.snapshotDigest) {
       return refusal(
@@ -604,7 +635,14 @@ function validateDisjointMerge(
       );
     }
     for (const patch of contender.semanticPatches) {
-      if (paths.has(patch.path)) {
+      if (patch.baseDigest !== conflict.baseline.snapshotDigest) {
+        return refusal(
+          'conflict_baseline_stale',
+          `The merge patch at ${patch.path} is bound to a different baseline.`,
+          'refresh-conflict',
+        );
+      }
+      if (paths.has(patch.path) && resultDigests.size !== 1) {
         return refusal(
           'conflict_merge_overlap',
           `Disjoint merge patches overlap at ${patch.path}.`,
@@ -896,6 +934,7 @@ function parsePackSnapshot(
     'manifestDigest',
     'compatibility',
     'generatedOwnership',
+    'replacementIntentDigests',
     'creditDigests',
     'licenseDigests',
     'acknowledgementDigests',
@@ -911,11 +950,12 @@ function parsePackSnapshot(
   const trustReceiptDigest = optionalDigest(record.trustReceiptDigest, `${path}.trustReceiptDigest`, diagnostics);
   const compatibility = parsePackCompatibility(record.compatibility, `${path}.compatibility`, diagnostics);
   const generatedOwnership = sortedLogicalPaths(record.generatedOwnership, `${path}.generatedOwnership`, diagnostics, false);
+  const replacementIntentDigests = sortedDigests(record.replacementIntentDigests, `${path}.replacementIntentDigests`, diagnostics, false);
   const creditDigests = sortedDigests(record.creditDigests, `${path}.creditDigests`, diagnostics, true);
   const licenseDigests = sortedDigests(record.licenseDigests, `${path}.licenseDigests`, diagnostics, true);
   const acknowledgementDigests = sortedDigests(record.acknowledgementDigests, `${path}.acknowledgementDigests`, diagnostics, false);
   const provenanceReferenceDigests = sortedDigests(record.provenanceReferenceDigests, `${path}.provenanceReferenceDigests`, diagnostics, false);
-  if (packId === undefined || version === undefined || contentDigest === undefined || sourceDigestSet === undefined || manifestDigest === undefined || compatibility === undefined || generatedOwnership === undefined || creditDigests === undefined || licenseDigests === undefined || acknowledgementDigests === undefined || provenanceReferenceDigests === undefined) return undefined;
+  if (packId === undefined || version === undefined || contentDigest === undefined || sourceDigestSet === undefined || manifestDigest === undefined || compatibility === undefined || generatedOwnership === undefined || replacementIntentDigests === undefined || creditDigests === undefined || licenseDigests === undefined || acknowledgementDigests === undefined || provenanceReferenceDigests === undefined) return undefined;
   return {
     packId,
     version,
@@ -927,6 +967,7 @@ function parsePackSnapshot(
     ...(trustReceiptDigest === undefined ? {} : { trustReceiptDigest }),
     compatibility,
     generatedOwnership,
+    replacementIntentDigests,
     creditDigests,
     licenseDigests,
     acknowledgementDigests,

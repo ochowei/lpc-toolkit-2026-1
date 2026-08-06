@@ -668,6 +668,7 @@ async function runCliWithRuntime(
           parsed.command[1] === 'workspace'
           || parsed.command[1] === 'authoring'
           || parsed.command[1] === 'provenance'
+          || parsed.command[1] === 'conflict'
           || parsed.command[1] === 'distribution'
         )
       )
