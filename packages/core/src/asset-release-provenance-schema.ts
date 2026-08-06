@@ -77,6 +77,9 @@ export type AssetReleaseProvenanceOperation =
   | 'crop'
   | 'resize'
   | 'recolor'
+  | 'variant'
+  | 'custom-geometry'
+  | 'multi-layer'
   | 'format-conversion'
   | 'manual-edit';
 
@@ -119,6 +122,9 @@ const PROVENANCE_OPERATIONS: readonly AssetReleaseProvenanceOperation[] = [
   'crop',
   'resize',
   'recolor',
+  'variant',
+  'custom-geometry',
+  'multi-layer',
   'format-conversion',
   'manual-edit',
 ];

@@ -109,6 +109,9 @@ describe('asset preparation dispatch', () => {
   it.each([
     { argv: ['asset', 'workspace', 'init', 'workspace'], workspace: false, runtime: false },
     { argv: ['asset', 'authoring', 'start', '--plan', 'plan.json'], workspace: true, runtime: false },
+    { argv: ['asset', 'authoring', 'intelligence', 'route', '--request', 'request', '--catalog', 'catalog.json'], workspace: false, runtime: false },
+    { argv: ['asset', 'authoring', 'intelligence', 'stage', '--session', 'session-id', '--operation', 'operation.json', '--candidate', 'candidate.png', '--consent', 'consent.json'], workspace: true, runtime: false },
+    { argv: ['asset', 'authoring', 'intelligence', 'recover', '--session', 'session-id', '--operation-digest', 'sha256:digest', '--action', 'resume'], workspace: true, runtime: false },
     { argv: ['asset', 'authoring', 'contract', '--session', 'session-id'], workspace: true, runtime: true },
     { argv: ['asset', 'authoring', 'status', '--session', 'session-id'], workspace: true, runtime: false },
     { argv: ['asset', 'authoring', 'resume', '--session', 'session-id'], workspace: true, runtime: false },

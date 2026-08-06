@@ -79,17 +79,34 @@ The D4 local distribution contract additionally advertises
 `lpc-toolkit.asset-distribution-verification.v1`, and
 `lpc-toolkit.asset-distribution-trust-policy.v1`, only when the local fake
 adapter, refusal, response, and packed acceptance tests are complete.
+The D5 deterministic authoring-intelligence contract additionally advertises
+`asset-authoring-intelligence-routing.v1`,
+`asset-authoring-deterministic-operations.v1`,
+`asset-authoring-custom-geometry.v1`, and
+`asset-authoring-multi-layer-candidates.v1`, plus
+`lpc-toolkit.asset-authoring-intelligence-request.v1`,
+`lpc-toolkit.asset-authoring-intelligence-route.v1`,
+`lpc-toolkit.asset-authoring-operation-plan.v1`,
+`lpc-toolkit.asset-authoring-candidate-operation.v1`,
+`lpc-toolkit.asset-authoring-candidate-set.v1`,
+`lpc-toolkit.asset-authoring-intelligence-receipt.v1`,
+`lpc-toolkit.asset-authoring-intelligence-consent.v1`, and
+`lpc-toolkit.sprite-drawing-contract.v2`, only when the deterministic route,
+consent, staging, receipt, recovery, and compatibility tests are complete.
 Check that the CLI help lists `start`, `status`, `resume`, `contract`, `import`,
 `validate`, `preview`, `acknowledge`, `declare`, `accept-preview`, and
 `reconcile-manifest`, `draft`, `sync`, `pack`, `inspect`, `provenance`, and
 `install`, plus the `handoff inspect`, `handoff import`, and `handoff recover`
 commands and the provider `discover`, `preflight`, `handoff`, and `result`
-commands, `agent integration check`, and public `asset provenance verify`.
+commands, `agent integration check`, public `asset provenance verify`, and
+`intelligence route`, `intelligence stage`, and `intelligence recover`.
 Help must explain explicit consent, stable refusal/recovery actions, logical
 session candidate staging, the two-file Web-to-CLI handoff, and the existing
 `asset authoring import`, validation, preview, and release boundary. The CLI
 README, root README, landing copy, architecture, engineering, and this runbook
-must describe the same provider-neutral and one-way local-file boundaries.
+must describe the same provider-neutral, deterministic D5, and one-way local-file
+boundaries. D5 documentation must not imply model invocation, automatic import,
+automatic publication, or persistent browser authoring state.
 Plugin `0.2.1` must continue to document CLI range `>=0.2.0 <0.3.0`; the plugin
 intentionally does not claim or invoke D2 provider or D3 Web-handoff
 capabilities or add a new skill.
@@ -247,6 +264,38 @@ contact a registry/marketplace, use credentials, or mutate a system-wide
 prefix. The existing v1 archive/manifest/install behavior and all attribution,
 consent, validation, preview, release, provenance, provider, and handoff gates
 remain unchanged.
+
+### D5 deterministic authoring intelligence release gate
+
+D5 is a pre-import candidate preparation boundary. A release candidate may use
+the route output and consent-bound staged bytes only as inputs to the existing
+public `asset authoring import` command. Validation, attributed preview, human
+review, release declaration, provenance, archive, distribution, and installation
+remain downstream gates. Identical operation/input/output bytes are a verified
+no-op; stale contracts, changed bytes, missing attribution evidence, and
+tampered receipts must refuse or return an explicit recovery action. Multi-layer
+outputs remain independently digest-bound and D6 conflict resolution is out of
+scope.
+
+Run the local D5 acceptance map:
+
+```sh
+pnpm --filter @lpc-toolkit/core test -- asset-authoring-intelligence.test.ts asset-release-provenance-schema.test.ts
+pnpm --filter @lpc-toolkit/cli test -- asset-authoring-intelligence.test.ts asset-authoring-import.test.ts asset-authoring-receipts.test.ts asset-authoring-session-e2e.test.ts command-spec.test.ts main-json.test.ts main-assets.test.ts
+pnpm --filter @lpc-toolkit/cli run typecheck
+pnpm check:boundaries
+pnpm verify:cli-docs-policy
+pnpm verify:plugin
+pnpm verify
+```
+
+These tests use only checked-in/local fixtures and fake session evidence. They
+must not invoke a model or provider, contact a backend, use auth or network
+access, create signing keys, contact a registry or marketplace, call
+`npm publish`, mutate a system-wide prefix, or create persistent browser
+authoring state. The existing v1 archive, manifest, install, plugin,
+attribution, consent, preview, release, and D1–D4 trust boundaries remain
+unchanged.
 
 ## Release Candidate
 
