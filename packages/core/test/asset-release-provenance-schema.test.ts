@@ -183,6 +183,20 @@ describe('asset release provenance schema', () => {
     expect(result.ok).toBe(true);
   });
 
+  it('accepts D5 deterministic source-transformation operations', () => {
+    for (const operation of ['variant', 'custom-geometry', 'multi-layer'] as const) {
+      const result = parseAssetReleaseProvenance(receiptWithRecords([{
+        kind: 'source-transformation',
+        targetId: 'item-animation-layer',
+        inputDigests: [DIGEST_D],
+        referenceDigests: [DIGEST_C],
+        operation,
+        resultDigest: DIGEST_F,
+      }]));
+      expect(result.ok).toBe(true);
+    }
+  });
+
   it('rejects unsupported operations and unbound result digests', () => {
     const unsupportedOperation = parseAssetReleaseProvenance(receiptWithRecords([{
       kind: 'source-transformation',

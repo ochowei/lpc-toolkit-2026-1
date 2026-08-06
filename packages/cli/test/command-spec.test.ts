@@ -383,11 +383,27 @@ describe('helpForCommand', () => {
       'pack',
       'inspect',
       'install',
-      'preview',
-      'reconcile-manifest',
-    ]) {
+    'preview',
+    'reconcile-manifest',
+  ]) {
       expect(authoringHelp).toContain(`lpc-toolkit asset authoring ${command}`);
     }
+
+    const intelligenceHelp = helpForCommand(['asset', 'authoring', 'intelligence']);
+    for (const command of ['route', 'stage', 'recover']) {
+      expect(intelligenceHelp).toContain(
+        `lpc-toolkit asset authoring intelligence ${command}`,
+      );
+    }
+    expect(helpForCommand(['asset', 'authoring', 'intelligence', 'route'])).toContain(
+      '--catalog <catalog.json>',
+    );
+    expect(helpForCommand(['asset', 'authoring', 'intelligence', 'stage'])).toContain(
+      '--consent <consent.json>',
+    );
+    expect(helpForCommand(['asset', 'authoring', 'intelligence', 'recover'])).toContain(
+      '--action <resume|discard>',
+    );
 
     expect(helpForCommand(['asset', 'authoring', 'start'])).toContain(
       'lpc-toolkit asset authoring start --plan <plan.json>',

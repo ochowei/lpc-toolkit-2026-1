@@ -258,6 +258,12 @@ describe('main json behavior', () => {
     expect(advertisement.data.capabilities).toContain('asset-authoring-web-cli-handoff.v1');
     expect(advertisement.data.capabilities).toContain('asset-authoring-web-cli-recovery.v1');
     expect(advertisement.data.capabilities).toEqual(expect.arrayContaining([
+      'asset-authoring-intelligence-routing.v1',
+      'asset-authoring-deterministic-operations.v1',
+      'asset-authoring-custom-geometry.v1',
+      'asset-authoring-multi-layer-candidates.v1',
+    ]));
+    expect(advertisement.data.capabilities).toEqual(expect.arrayContaining([
       'asset-pack-remote-distribution.v1',
       'asset-pack-signature-verification.v1',
       'asset-pack-global-install.v1',
@@ -283,22 +289,25 @@ describe('main json behavior', () => {
     expect(advertisement.data.schemaVersions).toContain(
       'lpc-toolkit.asset-release-provenance-verification.v1',
     );
-    expect(advertisement.data.capabilities.slice(-7)).toEqual([
-      'asset-authoring-provider-discovery.v1',
-      'asset-authoring-provider-invocation.v1',
-      'agent-integration-packaging.v1',
+    expect(advertisement.data.capabilities.slice(-8)).toEqual([
+      'asset-authoring-intelligence-routing.v1',
+      'asset-authoring-deterministic-operations.v1',
+      'asset-authoring-custom-geometry.v1',
+      'asset-authoring-multi-layer-candidates.v1',
       'asset-pack-remote-distribution.v1',
       'asset-pack-signature-verification.v1',
       'asset-pack-global-install.v1',
       'asset-pack-npm-publication.v1',
     ]);
-    expect(advertisement.data.schemaVersions.slice(-9)).toEqual([
-      'lpc-toolkit.asset-provider-descriptor.v1',
-      'lpc-toolkit.asset-provider-discovery.v1',
-      'lpc-toolkit.asset-provider-invocation.v1',
-      'lpc-toolkit.asset-provider-result.v1',
-      'lpc-toolkit.asset-provider-refusal.v1',
-      'lpc-toolkit.agent-integration-manifest.v1',
+    expect(advertisement.data.schemaVersions.slice(-11)).toEqual([
+      'lpc-toolkit.asset-authoring-intelligence-request.v1',
+      'lpc-toolkit.asset-authoring-intelligence-route.v1',
+      'lpc-toolkit.asset-authoring-operation-plan.v1',
+      'lpc-toolkit.asset-authoring-candidate-operation.v1',
+      'lpc-toolkit.asset-authoring-candidate-set.v1',
+      'lpc-toolkit.asset-authoring-intelligence-receipt.v1',
+      'lpc-toolkit.asset-authoring-intelligence-consent.v1',
+      'lpc-toolkit.sprite-drawing-contract.v2',
       'lpc-toolkit.asset-distribution-release.v1',
       'lpc-toolkit.asset-distribution-verification.v1',
       'lpc-toolkit.asset-distribution-trust-policy.v1',

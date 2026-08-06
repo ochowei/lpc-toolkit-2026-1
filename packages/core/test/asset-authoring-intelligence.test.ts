@@ -192,7 +192,7 @@ describe('authoring intelligence routing', () => {
       type_name: 'hair',
       animations: ['walk'],
       variants: ['long', 'short'],
-      credits: [],
+      credits: [{ file: 'hair/braid.png', authors: ['Fixture Artist'], licenses: ['CC-BY-SA 4.0'] }],
     };
     const route = routeAuthoringIntelligence({
       request: createAuthoringIntelligenceRequest({
@@ -309,11 +309,36 @@ describe('authoring intelligence routing', () => {
         kind: 'custom-geometry',
         contract: validGeometryContract(),
       },
-      outputTargetIdentities: ['hair/moon-braid'],
+      outputTargetIdentities: ['target-walk'],
       operationDigest: REQUEST_DIGEST,
     });
 
     const parsed = parseAuthoringIntelligenceOperationPlan(JSON.parse(JSON.stringify(operation)) as unknown);
     expect(parsed).toMatchObject({ ok: true, value: { operationKind: 'custom-geometry' } });
+  });
+
+  it('refuses a derived route when attribution evidence is incomplete', () => {
+    const route = routeAuthoringIntelligence({
+      request: createAuthoringIntelligenceRequest({
+        requestText: 'Make the long variant of hair braid.',
+        requestDigest: REQUEST_DIGEST,
+        catalogSnapshotDigest: CATALOG_DIGEST,
+        explicitHints: { variant: 'long' },
+      }),
+      catalog: catalogWith({
+        itemId: 'hair/braid',
+        name: 'braid',
+        type_name: 'hair',
+        animations: ['walk'],
+        variants: ['long'],
+        credits: [],
+      }),
+    });
+
+    expect(route.outcome).toBe('needs-user-action');
+    expect(route.refusal).toMatchObject({
+      code: 'asset_authoring_intelligence_attribution_incomplete',
+      nextAction: 'confirm-attribution',
+    });
   });
 });

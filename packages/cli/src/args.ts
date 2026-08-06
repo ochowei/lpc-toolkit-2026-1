@@ -45,7 +45,7 @@ function acceptsAnotherCommandToken(command: readonly string[]): boolean {
   return command.length === 3
     && command[0] === 'asset'
     && command[1] === 'authoring'
-    && (command[2] === 'provider' || command[2] === 'handoff');
+    && (command[2] === 'provider' || command[2] === 'handoff' || command[2] === 'intelligence');
 }
 
 function acceptsExplicitEmptyValues(command: readonly string[]): boolean {

@@ -279,6 +279,36 @@ function preflightCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
   if (command === 'asset' && subcommand === 'authoring') {
     const authoringCommand = parsed.command[2];
     const commandName = parsed.command.join(' ');
+    if (authoringCommand === 'intelligence') {
+      const intelligenceCommand = parsed.command[3];
+      if (
+        parsed.command.length !== 4
+        || (intelligenceCommand !== 'route' && intelligenceCommand !== 'stage' && intelligenceCommand !== 'recover')
+      ) {
+        return commandError(commandName, {
+          code: 'unknown_command',
+          message: `Unknown asset authoring intelligence command: ${commandName}`,
+        });
+      }
+      const requiredStringFlag = (name: string): CliResponse<null> | undefined => {
+        if (flagString(parsed.flags, name)) return undefined;
+        return commandError(commandName, {
+          code: 'missing_argument',
+          message: `--${name} is required.`,
+          path: `--${name}`,
+        });
+      };
+      const requiredFlags = intelligenceCommand === 'route'
+        ? ['request', 'catalog']
+        : intelligenceCommand === 'stage'
+          ? ['session', 'operation', 'candidate', 'consent']
+          : ['session', 'operation-digest', 'action'];
+      for (const name of requiredFlags) {
+        const issue = requiredStringFlag(name);
+        if (issue) return issue;
+      }
+      return undefined;
+    }
     if (authoringCommand === 'handoff') {
       const handoffCommand = parsed.command[3];
       if (
@@ -334,6 +364,7 @@ function preflightCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
       && authoringCommand !== 'preview'
       && authoringCommand !== 'reconcile-manifest'
       && authoringCommand !== 'provider'
+      && authoringCommand !== 'intelligence'
     ) {
       return commandError(commandName, {
         code: 'unknown_command',
@@ -649,7 +680,7 @@ async function runCliWithRuntime(
         parsed.command.length === 3
         && parsed.command[0] === 'asset'
         && parsed.command[1] === 'authoring'
-        && (parsed.command[2] === 'provider' || parsed.command[2] === 'handoff')
+        && (parsed.command[2] === 'provider' || parsed.command[2] === 'handoff' || parsed.command[2] === 'intelligence')
       )
     )
   ) {

@@ -19,6 +19,8 @@ export const ASSET_AUTHORING_INTELLIGENCE_CANDIDATE_SET_SCHEMA =
   'lpc-toolkit.asset-authoring-candidate-set.v1' as const;
 export const ASSET_AUTHORING_INTELLIGENCE_RECEIPT_SCHEMA =
   'lpc-toolkit.asset-authoring-intelligence-receipt.v1' as const;
+export const ASSET_AUTHORING_INTELLIGENCE_CONSENT_SCHEMA =
+  'lpc-toolkit.asset-authoring-intelligence-consent.v1' as const;
 export const ASSET_AUTHORING_INTELLIGENCE_CATALOG_SNAPSHOT_SCHEMA =
   'lpc-toolkit.asset-authoring-intelligence-catalog-snapshot.v1' as const;
 export const SPRITE_DRAWING_CONTRACT_V2_SCHEMA =
@@ -38,6 +40,7 @@ export const ASSET_AUTHORING_INTELLIGENCE_SCHEMA_VERSIONS = [
   ASSET_AUTHORING_INTELLIGENCE_CANDIDATE_OPERATION_SCHEMA,
   ASSET_AUTHORING_INTELLIGENCE_CANDIDATE_SET_SCHEMA,
   ASSET_AUTHORING_INTELLIGENCE_RECEIPT_SCHEMA,
+  ASSET_AUTHORING_INTELLIGENCE_CONSENT_SCHEMA,
   SPRITE_DRAWING_CONTRACT_V2_SCHEMA,
 ] as const;
 
@@ -588,6 +591,16 @@ export function routeAuthoringIntelligence(
       candidates.length === 0 ? 'refresh-catalog' : 'review-route',
     );
     nextActions = [refusal.nextAction];
+  } else if (
+    (classification === 'derive-variant'
+      || classification === 'derive-recolor'
+      || classification === 'custom-geometry'
+      || classification === 'multi-layer')
+    && !candidates[0]!.hasAttribution
+  ) {
+    outcome = 'needs-user-action';
+    refusal = refusalFor('asset_authoring_intelligence_attribution_incomplete', 'confirm-attribution');
+    nextActions = [refusal.nextAction];
   } else if (classification === 'derive-variant') {
     const candidate = candidates[0]!;
     const variant = hints?.variant ?? candidate.variants.find((value) => requestText.includes(value.toLocaleLowerCase()));
@@ -604,6 +617,10 @@ export function routeAuthoringIntelligence(
       nextActions = [refusal.nextAction];
     }
   } else if (classification === 'custom-geometry' && hints?.geometryContract === undefined) {
+    outcome = 'needs-user-action';
+    refusal = refusalFor('asset_authoring_intelligence_geometry_unsupported', 'provide-explicit-geometry');
+    nextActions = [refusal.nextAction];
+  } else if (classification === 'custom-geometry' && hints?.geometryContract !== undefined && validateSpriteDrawingContractV2(hints.geometryContract).length > 0) {
     outcome = 'needs-user-action';
     refusal = refusalFor('asset_authoring_intelligence_geometry_unsupported', 'provide-explicit-geometry');
     nextActions = [refusal.nextAction];
@@ -1070,16 +1087,27 @@ export function validateAuthoringIntelligenceOperationPlan(
   if (plan.outputTargetIdentities.some((value) => !isPortableAuthoringIntelligenceId(value))) addDiagnostic(diagnostics, 'asset_authoring_intelligence_protected_path', 'Output target identity is not portable.', 'outputTargetIdentities');
   if (plan.operationKind !== plan.normalizedParameters.kind) addDiagnostic(diagnostics, 'asset_authoring_intelligence_operation_invalid', 'Operation kind and parameters must agree.', 'normalizedParameters.kind');
   if (plan.normalizedParameters.kind === 'derive-variant') {
+    if (plan.inputCandidateDigests.length !== 1 || plan.outputTargetIdentities.length !== 1) {
+      addDiagnostic(diagnostics, 'asset_authoring_intelligence_operation_invalid', 'Variant operations require exactly one input and one output target.', 'normalizedParameters');
+    }
     if (!isPortableAuthoringIntelligenceId(plan.normalizedParameters.sourceAssetIdentity) || plan.normalizedParameters.variant.trim().length === 0) addDiagnostic(diagnostics, 'asset_authoring_intelligence_operation_invalid', 'Variant parameters are incomplete.', 'normalizedParameters');
   }
   if (plan.normalizedParameters.kind === 'derive-recolor') {
     const parameters = plan.normalizedParameters;
+    if (plan.inputCandidateDigests.length !== 1 || plan.outputTargetIdentities.length !== 1) {
+      addDiagnostic(diagnostics, 'asset_authoring_intelligence_operation_invalid', 'Recolor operations require exactly one input and one output target.', 'normalizedParameters');
+    }
     if (!isPortableAuthoringIntelligenceId(parameters.material) || parameters.sourceRamp.length === 0 || parameters.sourceRamp.length !== parameters.targetRamp.length) addDiagnostic(diagnostics, 'asset_authoring_intelligence_operation_invalid', 'Recolor ramps must be non-empty and have equal lengths.', 'normalizedParameters');
     if (parameters.sourceRamp.length > ASSET_AUTHORING_INTELLIGENCE_LIMITS.paletteEntries) addDiagnostic(diagnostics, 'asset_authoring_intelligence_resource_limit', 'Recolor ramp exceeds the D5 limit.', 'normalizedParameters');
     if (parameters.sourceRamp.some((value) => !isHexColor(value)) || parameters.targetRamp.some((value) => !isHexColor(value))) addDiagnostic(diagnostics, 'asset_authoring_intelligence_operation_invalid', 'Recolor ramps must use six-digit hex colors.', 'normalizedParameters');
   }
   if (plan.normalizedParameters.kind === 'custom-geometry') {
-    diagnostics.push(...validateSpriteDrawingContractV2(plan.normalizedParameters.contract));
+    const contract = plan.normalizedParameters.contract;
+    diagnostics.push(...validateSpriteDrawingContractV2(contract));
+    const contractTargetIds = contract.targets.map((target) => target.id).sort((left, right) => left.localeCompare(right));
+    if (contractTargetIds.length !== plan.outputTargetIdentities.length || contractTargetIds.some((targetId, index) => targetId !== plan.outputTargetIdentities[index])) {
+      addDiagnostic(diagnostics, 'asset_authoring_intelligence_geometry_unsupported', 'Custom geometry targets must exactly match the operation outputs.', 'normalizedParameters.contract.targets');
+    }
   }
   if (plan.normalizedParameters.kind === 'multi-layer') {
     const layers = plan.normalizedParameters.layers;
@@ -1089,6 +1117,9 @@ export function validateAuthoringIntelligenceOperationPlan(
     if (hasDuplicate(layerIds)) addDiagnostic(diagnostics, 'asset_authoring_intelligence_layer_conflict', 'Layer operation IDs must be unique.', 'normalizedParameters.layers');
     if (layers.some((layer) => !isPortableAuthoringIntelligenceId(layer.id) || !isPortableAuthoringIntelligenceId(layer.targetIdentity))) addDiagnostic(diagnostics, 'asset_authoring_intelligence_layer_conflict', 'Layer operation identities must be portable.', 'normalizedParameters.layers');
     if (layers.some((layer) => !isAuthoringIntelligenceDigest(layer.contractDigest) || !isAuthoringIntelligenceDigest(layer.inputDigest))) addDiagnostic(diagnostics, 'asset_authoring_intelligence_input_drift', 'Layer input and contract digests are required.', 'normalizedParameters.layers');
+    const layerTargetIds = layers.map((layer) => layer.targetIdentity).sort((left, right) => left.localeCompare(right));
+    if (layerTargetIds.length !== plan.outputTargetIdentities.length || layerTargetIds.some((targetId, index) => targetId !== plan.outputTargetIdentities[index])) addDiagnostic(diagnostics, 'asset_authoring_intelligence_layer_conflict', 'Layer target identities must exactly match the operation outputs.', 'normalizedParameters.layers');
+    if (layers.some((layer) => !plan.inputCandidateDigests.includes(layer.inputDigest))) addDiagnostic(diagnostics, 'asset_authoring_intelligence_input_drift', 'Each layer input digest must be bound to an operation input.', 'normalizedParameters.layers');
     if (!layers.every((layer, index) => index === 0 || compareLayerOperation(layers[index - 1]!, layer) <= 0)) addDiagnostic(diagnostics, 'asset_authoring_intelligence_operation_invalid', 'Layer operations must use deterministic z-order and ID ordering.', 'normalizedParameters.layers');
     if (layers.reduce((count, layer) => count + layer.dependencies.length, 0) > ASSET_AUTHORING_INTELLIGENCE_LIMITS.layerEdges) addDiagnostic(diagnostics, 'asset_authoring_intelligence_resource_limit', 'Layer operation edge count exceeds the D5 limit.', 'normalizedParameters.layers');
     validateLayerGraph(layers, diagnostics);

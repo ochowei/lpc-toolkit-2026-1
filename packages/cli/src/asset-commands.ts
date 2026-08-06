@@ -24,6 +24,7 @@ import {
   scaffoldNewAssetPack,
 } from './asset-pack-scaffold.js';
 import { runAssetAuthoringCommand } from './asset-authoring-commands.js';
+import { runAssetAuthoringIntelligenceCommand } from './asset-authoring-intelligence-commands.js';
 import {
   AssetPackPreviewError,
   previewAssetPack,
@@ -106,6 +107,9 @@ export function assetCommandRequirements(
       : NO_ASSET_COMMAND_REQUIREMENTS;
   }
   if (parsed.command[1] === 'authoring') {
+    if (parsed.command[2] === 'intelligence' && parsed.command[3] === 'route') {
+      return NO_ASSET_COMMAND_REQUIREMENTS;
+    }
     return parsed.command[2] === 'contract'
       || parsed.command[2] === 'validate'
       || parsed.command[2] === 'acknowledge'
@@ -611,6 +615,13 @@ export async function runAssetCommand(
   const subcommand = parsed.command[1];
   try {
     if (subcommand === 'authoring') {
+      if (parsed.command[2] === 'intelligence') {
+        return runAssetAuthoringIntelligenceCommand({
+          parsed,
+          cwd,
+          ...(context.workspace === undefined ? {} : { workspace: context.workspace }),
+        });
+      }
       const workspaceContext = requireWorkspace(context);
       return runAssetAuthoringCommand({
         parsed,
