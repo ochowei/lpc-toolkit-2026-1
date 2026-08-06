@@ -181,6 +181,110 @@ describe('asset-pack conflict contract', () => {
     );
   });
 
+  it('canonicalizes semantic set order before computing identity input', () => {
+    const extraDigest = digest('0');
+    const canonical: AssetPackConflict = {
+      ...conflictFixture,
+      contenders: conflictFixture.contenders.map((contender) => ({
+        ...contender,
+        sourceReferenceDigests: contender.contenderId === 'alpha.pack@1.0.0'
+          ? [extraDigest, ...contender.sourceReferenceDigests]
+          : [...contender.sourceReferenceDigests],
+        creditReferenceDigests: [...contender.creditReferenceDigests].reverse(),
+        licenseReferenceDigests: [...contender.licenseReferenceDigests].reverse(),
+        provenanceReferenceDigests: [...contender.provenanceReferenceDigests].reverse(),
+        semanticPatches: [...contender.semanticPatches].reverse(),
+        pack: {
+          ...contender.pack,
+          sourceDigestSet: contender.contenderId === 'alpha.pack@1.0.0'
+            ? [extraDigest, ...contender.pack.sourceDigestSet]
+            : [...contender.pack.sourceDigestSet],
+          generatedOwnership: [...contender.pack.generatedOwnership].reverse(),
+          replacementIntentDigests: [...contender.pack.replacementIntentDigests].reverse(),
+          creditDigests: [...contender.pack.creditDigests].reverse(),
+          licenseDigests: [...contender.pack.licenseDigests].reverse(),
+          acknowledgementDigests: [...contender.pack.acknowledgementDigests].reverse(),
+          provenanceReferenceDigests: [...contender.pack.provenanceReferenceDigests].reverse(),
+          compatibility: {
+            ...contender.pack.compatibility,
+            requiredCapabilities: [...contender.pack.compatibility.requiredCapabilities].reverse(),
+          },
+        },
+        compatibility: {
+          ...contender.compatibility,
+          diagnostics: [...contender.compatibility.diagnostics].reverse(),
+        },
+        trust: {
+          ...contender.trust,
+          receiptDigests: [...contender.trust.receiptDigests].reverse(),
+        },
+        d5EvidenceDigests: [...contender.d5EvidenceDigests].reverse(),
+      })),
+      baseline: {
+        ...conflictFixture.baseline,
+        sourceReferenceDigests: [...conflictFixture.baseline.sourceReferenceDigests].reverse(),
+        creditReferenceDigests: [...conflictFixture.baseline.creditReferenceDigests].reverse(),
+        licenseReferenceDigests: [...conflictFixture.baseline.licenseReferenceDigests].reverse(),
+        provenanceReferenceDigests: [...conflictFixture.baseline.provenanceReferenceDigests].reverse(),
+      },
+      compatibility: {
+        ...conflictFixture.compatibility,
+        requiredCapabilities: [...conflictFixture.compatibility.requiredCapabilities].reverse(),
+        diagnostics: [...conflictFixture.compatibility.diagnostics].reverse(),
+      },
+      attribution: {
+        ...conflictFixture.attribution,
+        sourceReferenceDigests: [...conflictFixture.attribution.sourceReferenceDigests].reverse(),
+        creditReferenceDigests: [...conflictFixture.attribution.creditReferenceDigests].reverse(),
+        licenseReferenceDigests: [...conflictFixture.attribution.licenseReferenceDigests].reverse(),
+        acknowledgementDigests: [...conflictFixture.attribution.acknowledgementDigests].reverse(),
+        provenanceReferenceDigests: [...conflictFixture.attribution.provenanceReferenceDigests].reverse(),
+      },
+      policy: {
+        ...conflictFixture.policy,
+        allowedResolutions: [...conflictFixture.policy.allowedResolutions].reverse(),
+      },
+      diagnostics: [...conflictFixture.diagnostics].reverse(),
+    };
+    const reordered: AssetPackConflict = {
+      ...canonical,
+      contenders: [...canonical.contenders].reverse().map((contender) => ({
+        ...contender,
+        sourceReferenceDigests: [...contender.sourceReferenceDigests].reverse(),
+        creditReferenceDigests: [...contender.creditReferenceDigests].reverse(),
+        licenseReferenceDigests: [...contender.licenseReferenceDigests].reverse(),
+        provenanceReferenceDigests: [...contender.provenanceReferenceDigests].reverse(),
+        semanticPatches: [...contender.semanticPatches].reverse(),
+        pack: {
+          ...contender.pack,
+          sourceDigestSet: [...contender.pack.sourceDigestSet].reverse(),
+          generatedOwnership: [...contender.pack.generatedOwnership].reverse(),
+          replacementIntentDigests: [...contender.pack.replacementIntentDigests].reverse(),
+          creditDigests: [...contender.pack.creditDigests].reverse(),
+          licenseDigests: [...contender.pack.licenseDigests].reverse(),
+          acknowledgementDigests: [...contender.pack.acknowledgementDigests].reverse(),
+          provenanceReferenceDigests: [...contender.pack.provenanceReferenceDigests].reverse(),
+          compatibility: {
+            ...contender.pack.compatibility,
+            requiredCapabilities: [...contender.pack.compatibility.requiredCapabilities].reverse(),
+          },
+        },
+        compatibility: {
+          ...contender.compatibility,
+          diagnostics: [...contender.compatibility.diagnostics].reverse(),
+        },
+        trust: {
+          ...contender.trust,
+          receiptDigests: [...contender.trust.receiptDigests].reverse(),
+        },
+        d5EvidenceDigests: [...contender.d5EvidenceDigests].reverse(),
+      })),
+    };
+    expect(assetPackConflictDigestInput(reordered)).toBe(
+      assetPackConflictDigestInput(canonical),
+    );
+  });
+
   it('rejects unknown fields, malformed digests, and unsafe logical target keys', () => {
     const unknownField = parseAssetPackConflict({
       ...conflictFixture,
@@ -325,6 +429,11 @@ describe('asset-pack conflict contract', () => {
         })),
       })),
     };
+    expect(evaluateAssetPackConflict(sameResult)).toMatchObject({
+      status: 'equivalent',
+      nextAction: 'select-all-targets',
+      equivalentContenderIds: ['alpha.pack@1.0.0', 'bravo.pack@1.0.0'],
+    });
     const result = resolveAssetPackConflict(
       sameResult,
       {
@@ -372,6 +481,18 @@ describe('asset-pack conflict contract', () => {
       ok: false,
       code: 'conflict_incompatible_pack',
       nextAction: 'remove-incompatible-contender',
+    });
+
+    const missingAggregateEvidence = {
+      ...conflictFixture,
+      attribution: {
+        ...conflictFixture.attribution,
+        creditReferenceDigests: [],
+      },
+    };
+    expect(evaluateAssetPackConflict(missingAggregateEvidence)).toMatchObject({
+      status: 'blocked',
+      nextAction: 'review-attribution',
     });
   });
 });

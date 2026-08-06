@@ -320,7 +320,7 @@ export function assetPackConflictDigestInput(conflict: AssetPackConflict): strin
     targetKey: conflict.target.key,
     contenders: [...conflict.contenders]
       .sort((left, right) => compareUtf8(left.contenderId, right.contenderId))
-      .map((contender) => canonicalize(contender)),
+      .map((contender) => canonicalizeConflictContender(contender)),
     compatibilityDigest: conflict.compatibility.digest,
     policyDigest: conflict.policy.digest,
   }));
@@ -383,7 +383,7 @@ export function evaluateAssetPackConflict(
       }],
     };
   }
-  if (!conflict.attribution.complete) {
+  if (!conflict.attribution.complete || !hasConflictAttributionEvidence(conflict)) {
     return {
       status: 'blocked',
       eligibleContenderIds: [],
@@ -440,7 +440,7 @@ export function evaluateAssetPackConflict(
   }
   if (resultDigests.size === 1 && compatible[0]?.resultDigest !== conflict.baseline.resultDigest) {
     return {
-      status: 'selection-required',
+      status: 'equivalent',
       eligibleContenderIds,
       equivalentContenderIds,
       nextAction: 'select-all-targets',
@@ -692,6 +692,61 @@ function refusal(
   nextAction: AssetPackConflictNextAction,
 ): Extract<AssetPackConflictResolutionResult, { readonly ok: false }> {
   return { ok: false, code, message, nextAction };
+}
+
+function canonicalizeConflictContender(
+  contender: AssetPackConflictContender,
+): unknown {
+  return {
+    contenderId: contender.contenderId,
+    pack: {
+      ...contender.pack,
+      sourceDigestSet: sortStringsForDigest(contender.pack.sourceDigestSet),
+      compatibility: {
+        ...contender.pack.compatibility,
+        requiredCapabilities: sortStringsForDigest(contender.pack.compatibility.requiredCapabilities),
+      },
+      generatedOwnership: sortStringsForDigest(contender.pack.generatedOwnership),
+      replacementIntentDigests: sortStringsForDigest(contender.pack.replacementIntentDigests),
+      creditDigests: sortStringsForDigest(contender.pack.creditDigests),
+      licenseDigests: sortStringsForDigest(contender.pack.licenseDigests),
+      acknowledgementDigests: sortStringsForDigest(contender.pack.acknowledgementDigests),
+      provenanceReferenceDigests: sortStringsForDigest(contender.pack.provenanceReferenceDigests),
+    },
+    target: contender.target,
+    resultDigest: contender.resultDigest,
+    baseSnapshotDigest: contender.baseSnapshotDigest,
+    sourceReferenceDigests: sortStringsForDigest(contender.sourceReferenceDigests),
+    creditReferenceDigests: sortStringsForDigest(contender.creditReferenceDigests),
+    licenseReferenceDigests: sortStringsForDigest(contender.licenseReferenceDigests),
+    provenanceReferenceDigests: sortStringsForDigest(contender.provenanceReferenceDigests),
+    compatibility: {
+      ...contender.compatibility,
+      diagnostics: sortStringsForDigest(contender.compatibility.diagnostics),
+    },
+    trust: {
+      ...contender.trust,
+      receiptDigests: sortStringsForDigest(contender.trust.receiptDigests),
+    },
+    origin: contender.origin,
+    semanticPatches: [...contender.semanticPatches]
+      .sort((left, right) =>
+        compareUtf8(left.path, right.path)
+        || compareUtf8(left.baseDigest, right.baseDigest)
+        || compareUtf8(left.resultDigest, right.resultDigest)),
+    d5EvidenceDigests: sortStringsForDigest(contender.d5EvidenceDigests),
+  };
+}
+
+function sortStringsForDigest(values: readonly string[]): readonly string[] {
+  return [...values].sort(compareUtf8);
+}
+
+function hasConflictAttributionEvidence(conflict: AssetPackConflict): boolean {
+  return conflict.attribution.sourceReferenceDigests.length > 0
+    && conflict.attribution.creditReferenceDigests.length > 0
+    && conflict.attribution.licenseReferenceDigests.length > 0
+    && conflict.attribution.provenanceReferenceDigests.length > 0;
 }
 
 function parseConflict(

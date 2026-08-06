@@ -61,11 +61,26 @@ describe('asset conflict CLI', () => {
       ok: true,
       command: 'asset conflict inspect',
       data: {
-        status: 'selection-required',
+        status: 'equivalent',
         conflictId: fixture.conflict.conflictId,
         mutation: 'none',
         nextAction: 'select-all-targets',
       },
+    });
+  });
+
+  it('refuses conflict inputs outside the caller and workspace roots', async () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'lpc-d6-protected-'));
+    const outsideRoot = mkdtempSync(path.join(tmpdir(), 'lpc-d6-outside-'));
+    const fixture = createD6ConflictFixture();
+    const outsideConflict = writeJson(path.join(outsideRoot, 'conflict.json'), fixture.conflict);
+    const result = await invoke(cwd, [
+      'asset', 'conflict', 'inspect', '--conflict', outsideConflict, '--json',
+    ]);
+    expect(result.code).toBe(1);
+    expect(result.stdout).toMatchObject({
+      ok: false,
+      errors: [{ code: 'conflict_protected_path' }],
     });
   });
 
