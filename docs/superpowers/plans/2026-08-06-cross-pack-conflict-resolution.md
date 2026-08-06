@@ -1,6 +1,6 @@
 # D6 — Cross-pack Conflict Resolution Implementation Plan
 
-**Status:** D6 implementation in progress — independent implementation PR pending  
+**Status:** D6 implementation PR #181 open as Draft — CI and user merge confirmation pending  
 **Issue:** [#179](https://github.com/ochowei/lpc-toolkit-2026-1/issues/179)  
 **Roadmap:** [#153](https://github.com/ochowei/lpc-toolkit-2026-1/issues/153)  
 **Spec:** [D6 — Cross-pack Conflict Resolution](../specs/2026-08-06-cross-pack-conflict-resolution.md)  
@@ -284,8 +284,9 @@ checker is recorded in Task 8 after the PR body declaration is available.
   - Verification: same live checker command PASS; this is separate from the 19-test policy suite.
 - [x] Record the full hash of every implementation, documentation, plan, and
   handoff commit in this checked-in plan.
-- [ ] Create an independent D6 implementation branch and Draft PR; never merge
+- [x] Create an independent D6 implementation branch and Draft PR; never merge
   automatically and never start another roadmap track from it.
+  - PR: [#181](https://github.com/ochowei/lpc-toolkit-2026-1/pull/181), open Draft; head `5cd203e26a38d4cad55508a57ca0de632ab7636a`.
 - [ ] Wait for CI and user confirmation of the D6 implementation PR merge before
   marking D6 complete.
 
@@ -294,7 +295,7 @@ checker is recorded in Task 8 after the PR body declaration is available.
 ```text
 Implementation branch: codex/issue-179-d6-cross-pack-conflict-implementation
 Spec/plan PR: #180 merged as `327d11016391841b78d1dbfb939e774a87f69684`
-Implementation PR: pending GitHub Draft PR creation
+Implementation PR: [#181](https://github.com/ochowei/lpc-toolkit-2026-1/pull/181) open as Draft
 Implementation commits: `2334ecd73ccce8d7a15de21793d8f02251bd5ec9`,
 `e02c1b2e78a8c443fd1e1633fc8137175966dbcd`,
 `7ac145cb09f3c32b56671f601edc03c447a6e80e`,
@@ -304,8 +305,10 @@ Implementation commits: `2334ecd73ccce8d7a15de21793d8f02251bd5ec9`,
 `6406ccbf3340d7c6b69c963dccfc73e0316e6b16`,
 `bb9d7990d5a41f21265c191fc7f770c94eb030f1`.
 Spec/plan commits: `296cb4d5a71ab704d35ead3f71f8c0a78809d135` and
-`8ddfafce6eaa24cc7214f9470c84769dcd1a1591`; this checked-in implementation
-plan record is being updated on the implementation branch.
+`8ddfafce6eaa24cc7214f9470c84769dcd1a1591`.
+Checked-in implementation-plan commits: `a6410a3690233cdce124b57e0f1a44008c485bc9`
+and `5cd203e26a38d4cad55508a57ca0de632ab7636a`; this PR handoff record is the
+next plan commit.
 Verification: `rtk pnpm verify` PASS — Core 459 tests, presets 8,
 asset-pack-format 75, Web 867, CLI 1,286 passed / 1 skipped; workspace
 typecheck, boundaries, plugin 40 tests, CLI docs policy 19 tests, CLI build,
@@ -314,9 +317,8 @@ impact checker PASS. Live checker command:
 `rtk pnpm check:cli-docs-impact -- --base origin/main --head HEAD --body-file
 /private/tmp/d6-pr-body.md` → `CLI documentation impact declaration is valid.`
 Implementation PR handoff is pending.
-Handoff: D6 implementation remains open; after the live checker passes, create
-the independent Draft PR and wait for CI plus explicit user merge confirmation
-before marking D6 complete.
+Handoff: D6 implementation PR #181 is open as Draft. Wait for CI plus explicit
+user merge confirmation before marking D6 complete.
 ```
 
 ## Review questions
