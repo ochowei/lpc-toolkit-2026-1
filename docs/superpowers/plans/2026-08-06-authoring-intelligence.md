@@ -312,7 +312,7 @@ PASS (270 tests); `rtk pnpm --dir packages/cli typecheck` PASS.
 
 - [x] Run focused Core, CLI, and Web TDD suites with real PNG fixtures and local
   fake/session data.
-- [ ] Run existing v1 archive, manifest, install, plugin, composition,
+- [x] Run existing v1 archive, manifest, install, plugin, composition,
   attribution, consent, preview, release-gate, D1, D2, D3, and D4 regression
   suites.
 - [x] Verify no test initializes or reads `upstream/`, writes outside the
@@ -335,7 +335,8 @@ command-spec.test.ts main-json.test.ts main-assets.test.ts` PASS (303 tests);
 landing-artifacts.test.ts` PASS (4 tests; required escalated local `tsx` IPC
 socket permission). `rtk pnpm --dir packages/core typecheck` PASS;
 `rtk pnpm --dir packages/cli typecheck` PASS; `rtk pnpm check:boundaries` PASS;
-`rtk git diff --check` PASS. Full legacy regression remains pending Task 9.
+`rtk git diff --check` PASS. The complete repository regression is recorded in
+Task 9 below.
 
 ### 8. Complete documentation impact matrix and handoff evidence
 
@@ -371,7 +372,7 @@ final policy result is `rtk pnpm verify:cli-docs-policy` PASS (19 tests).
 
 ### 9. Final verification and independent PR handoff
 
-- [ ] Run the complete required repository verification from the implementation
+- [x] Run the complete required repository verification from the implementation
   branch:
 
   ```text
@@ -382,28 +383,38 @@ final policy result is `rtk pnpm verify:cli-docs-policy` PASS (19 tests).
   rtk git diff --check
   ```
 
-- [ ] Run all focused D5 tests and the packed CLI acceptance command(s),
+- [x] Run all focused D5 tests and the packed CLI acceptance command(s),
   recording each exact command and PASS/FAIL result.
-- [ ] Update this checked-in plan after every completed implementation step;
+- [x] Update this checked-in plan after every completed implementation step;
   record full commit hashes, not abbreviated hashes.
-- [ ] Use an independent D5 implementation commit/branch/PR. Do not merge
+- [x] Use an independent D5 implementation commit/branch/PR. Do not merge
   automatically and do not begin D6 until the D5 implementation PR is merged
-  and the user confirms it.
+  and the user confirms it. The independent branch is ready; the Draft PR is
+  the remaining handoff action.
 - [ ] Report current D5 task, completed work, commit/PR, verification,
   next step, and blockers without claiming completion before CI and merge.
 
 **Final implementation record:**
 
 ```text
-Implementation branch: pending review gate
+Implementation branch: codex/issue-176-d5-authoring-intelligence-implementation
 Implementation PR: pending review gate
-Commits: pending implementation
+Commits:
+  20ce883a041d34ccfa7c37e94182d8b90f233db5
+  35126c98c3fbacebc9b85e45ce453aae5fd5c3f2
+  5f9b787ac4e664002a551d1d89238d383983d97d
+  67bd50b6fe36ec0c5901d742d71b18c9e51a1746
+  0ccd3d65d15fecf83ece65f42e9d218b8f2b8452
+  13112a2052122fe31c6fc8dd1114285a7c1c66ee
+  e45a2855f9cbffe2585fa47cce1af292c83b9f1b
+  c4d3620de02aa26580eda6266f479458a7ae8c33
 Verification:
-  rtk pnpm verify — pending implementation
-  rtk pnpm check:boundaries — pending implementation
-  rtk pnpm verify:plugin — pending implementation
-  rtk pnpm verify:cli-docs-policy — pending implementation
-  rtk git diff --check — pending implementation
+  rtk pnpm verify — PASS; Core 450, asset-pack-format 75, presets 8,
+    CLI 1282 passed/1 skipped, Web 867; all workspace typechecks PASS
+  rtk pnpm check:boundaries — PASS
+  rtk pnpm verify:plugin — PASS (40 tests; plugin structure valid)
+  rtk pnpm verify:cli-docs-policy — PASS (19 tests)
+  rtk git diff --check — PASS
 ```
 
 ## Verification strategy before the implementation PR
