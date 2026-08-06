@@ -363,4 +363,4 @@ not be reported as passing during this spec/plan review.
 
 - `rtk git diff --check` PASS.
 - `rtk rg -n "conflict identity|precedence|selection|merge|attribution|license|compatibility|refusal|recovery|audit|D1|D2|D4|D5|upstream" docs/superpowers/specs/2026-08-06-cross-pack-conflict-resolution.md docs/superpowers/plans/2026-08-06-cross-pack-conflict-resolution.md` PASS; all required D6 contract terms are present.
-- `rtk pnpm verify:cli-docs-policy` PASS (19 tests); the D6 implementation live checker remains pending until a CLI-sensitive implementation diff and PR body exist.
+- `rtk pnpm verify:cli-docs-policy` PASS (19 tests); Task 8 later recorded the D6 implementation live checker PASS against the implementation diff and PR body.
