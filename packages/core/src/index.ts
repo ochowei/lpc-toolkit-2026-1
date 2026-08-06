@@ -293,6 +293,49 @@ export type { AssetProviderProvenanceProjectionResult } from './asset-provider-p
 export { assetProviderResultToReleaseProvenanceRecord } from './asset-provider-provenance.js';
 
 export type {
+  AssetDistributionDiagnostic,
+  AssetDistributionDiagnosticCode,
+  AssetDistributionDigestBinding,
+  AssetDistributionRelease,
+  AssetDistributionReleaseAuthorization,
+  AssetDistributionReleaseIdentity,
+  AssetDistributionReleaseParseResult,
+  AssetDistributionReleaseSignature,
+  AssetDistributionSignatureAlgorithm,
+  AssetDistributionSignedProjection,
+} from './asset-distribution-schema.js';
+export {
+  ASSET_DISTRIBUTION_RELEASE_SCHEMA,
+  ASSET_DISTRIBUTION_SIGNATURE_ALGORITHM,
+  assetDistributionSignedProjection,
+  assetDistributionSignedProjectionDigestInput,
+  parseAssetDistributionRelease,
+} from './asset-distribution-schema.js';
+export type {
+  AssetDistributionSignatureSigner,
+  AssetDistributionSignatureSigningInput,
+  AssetDistributionSignatureSigningResult,
+  AssetDistributionSignatureVerificationInput,
+  AssetDistributionSignatureVerificationResult,
+  AssetDistributionSignatureVerifier,
+  AssetDistributionTrustDecision,
+  AssetDistributionTrustEvaluationInput,
+  AssetDistributionTrustKey,
+  AssetDistributionTrustKeyStatus,
+  AssetDistributionTrustPolicy,
+  AssetDistributionTrustPolicyParseResult,
+  AssetDistributionTrustStatus,
+} from './asset-distribution-trust.js';
+export {
+  ASSET_DISTRIBUTION_TRUST_POLICY_SCHEMA,
+  assetDistributionTrustPolicyDigestInput,
+  evaluateAssetDistributionTrust,
+  parseAssetDistributionTrustPolicy,
+  signAssetDistributionRelease,
+  verifyAssetDistributionSignature,
+} from './asset-distribution-trust.js';
+
+export type {
   AssetPackCreditRecord,
   NormalizedAssetPack,
   NormalizedAssetPackAsset,

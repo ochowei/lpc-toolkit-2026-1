@@ -1599,6 +1599,10 @@ function formatHumanData(response: CliResponse<unknown>): string | undefined {
   const data = response.data;
   if (!isRecord(data)) return undefined;
 
+  if (response.command.startsWith('asset distribution ')) {
+    return formatAssetDistributionResponse(data);
+  }
+
   if (response.command === 'asset authoring handoff inspect') {
     return formatWebCliHandoffInspection(data);
   }
@@ -1691,6 +1695,42 @@ function formatHumanData(response: CliResponse<unknown>): string | undefined {
     default:
       return undefined;
   }
+}
+
+function formatAssetDistributionResponse(data: JsonRecord): string | undefined {
+  const operation = data.operation;
+  const state = data.state;
+  if (typeof operation !== 'string' || typeof state !== 'string') return undefined;
+  const lines = [`D4 distribution ${operation}: ${state}.`];
+  const identity = data.identity;
+  if (isRecord(identity)) {
+    const namespace = identity.namespace;
+    const packId = identity.packId;
+    const version = identity.version;
+    if (typeof namespace === 'string' && typeof packId === 'string' && typeof version === 'string') {
+      lines.push(`Release: ${namespace}/${packId}@${version}.`);
+    }
+  }
+  const trust = data.trust;
+  if (isRecord(trust) && typeof trust.status === 'string') {
+    lines.push(`Trust: ${trust.status}.`);
+  }
+  if (typeof data.mutation === 'string') {
+    lines.push(`Mutation: ${data.mutation}.`);
+  }
+  if (typeof data.publication === 'string') {
+    lines.push(`Publication: ${data.publication}.`);
+  }
+  lines.push('D4 local fixture boundary: no remote service, key creation, or real publication was performed.');
+  const nextActions = data.nextActions;
+  if (Array.isArray(nextActions)) {
+    const next = nextActions[0];
+    if (isRecord(next)) {
+      if (typeof next.summary === 'string') lines.push(`Next action: ${next.summary}`);
+      if (typeof next.command === 'string') lines.push(`Next command: ${next.command}`);
+    }
+  }
+  return `${lines.join('\n')}\n`;
 }
 
 export function formatHumanResponse(

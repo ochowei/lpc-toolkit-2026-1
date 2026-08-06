@@ -14,6 +14,10 @@ import {
   preflightAssetWorkspaceCommand,
   runAssetCommand,
 } from './asset-commands.js';
+import {
+  assetDistributionResponseFailed,
+  runAssetDistributionCommand,
+} from './asset-distribution-commands.js';
 import { assetCacheErrorIssue } from './asset-cache.js';
 import { AssetStoreError } from './asset-store.js';
 import {
@@ -146,8 +150,9 @@ function writeResponse(
     && response.data !== null
     && 'healthy' in response.data
     && response.data.healthy === false;
+  const distributionFailed = assetDistributionResponseFailed(response);
   const handoffStale = isStaleAssetWebCliHandoffResponse(response);
-  const exitCode = response.ok && !reportFailed && !doctorFailed && !handoffStale ? 0 : 1;
+  const exitCode = response.ok && !reportFailed && !doctorFailed && !distributionFailed && !handoffStale ? 0 : 1;
   if (flagBoolean(parsed.flags, 'json')) {
     io.stdout(formatJsonResponse(response));
   } else if (exitCode === 0) {
@@ -410,6 +415,56 @@ function preflightCommand(parsed: ParsedArgs): CliResponse<null> | undefined {
     }
   }
 
+  if (command === 'asset' && subcommand === 'distribution') {
+    const commandName = parsed.command.join(' ');
+    const distributionCommand = parsed.command[2];
+    const allowed = new Set(['inspect', 'verify', 'fetch', 'install', 'rollback', 'post-publication']);
+    if (parsed.command.length !== 3 || distributionCommand === undefined || !allowed.has(distributionCommand)) {
+      return commandError(commandName, {
+        code: 'unknown_command',
+        message: `Unknown asset distribution command: ${commandName}`,
+      });
+    }
+    const requiredStringFlag = (name: string): CliResponse<null> | undefined => {
+      if (flagString(parsed.flags, name)) return undefined;
+      return commandError(commandName, {
+        code: 'missing_argument',
+        message: `--${name} is required.`,
+        path: `--${name}`,
+      });
+    };
+    if (distributionCommand === 'rollback') {
+      for (const name of ['candidates', 'selected', 'prior-receipt-digest']) {
+        const flagIssue = requiredStringFlag(name);
+        if (flagIssue) return flagIssue;
+      }
+      return undefined;
+    }
+    if (distributionCommand === 'post-publication') {
+      for (const name of ['inspection', 'receipt', 'transport']) {
+        const flagIssue = requiredStringFlag(name);
+        if (flagIssue) return flagIssue;
+      }
+      return undefined;
+    }
+    for (const name of ['namespace', 'pack-id', 'version', 'record', 'archive']) {
+      const flagIssue = requiredStringFlag(name);
+      if (flagIssue) return flagIssue;
+    }
+    if (distributionCommand === 'verify' || distributionCommand === 'install') {
+      for (const name of ['trust-policy', 'verifier']) {
+        const flagIssue = requiredStringFlag(name);
+        if (flagIssue) return flagIssue;
+      }
+    }
+    if (distributionCommand === 'install') {
+      for (const name of ['evidence', 'workspace', 'prefix-kind']) {
+        const flagIssue = requiredStringFlag(name);
+        if (flagIssue) return flagIssue;
+      }
+    }
+  }
+
   if (
     (command === 'catalog' && subcommand === 'items')
     || (command === 'character' && subcommand === 'search')
@@ -582,6 +637,7 @@ async function runCliWithRuntime(
           parsed.command[1] === 'workspace'
           || parsed.command[1] === 'authoring'
           || parsed.command[1] === 'provenance'
+          || parsed.command[1] === 'distribution'
         )
       )
       || (
@@ -626,7 +682,8 @@ async function runCliWithRuntime(
   }
 
   const preflightResponse = preflightCommand(parsed)
-    ?? ((parsed.command[0] === 'asset' && parsed.command[1] === 'authoring')
+    ?? ((parsed.command[0] === 'asset'
+      && (parsed.command[1] === 'authoring' || parsed.command[1] === 'distribution'))
       || parsed.command[0] === 'agent'
       ? undefined
       : preflightAssetCommand(parsed));
@@ -828,12 +885,19 @@ async function runCliWithRuntime(
       }
     }
 
-    const response = await runAssetCommand({
-      parsed,
-      cwd: io.cwd,
-      ...(workspace === undefined ? {} : { workspace }),
-      ...(assetRuntime === undefined ? {} : { runtime: assetRuntime }),
-    });
+    const response = parsed.command[1] === 'distribution'
+      ? await runAssetDistributionCommand({
+        parsed,
+        cwd: io.cwd,
+        ...(workspace === undefined ? {} : { workspace }),
+        ...(assetRuntime === undefined ? {} : { runtime: assetRuntime }),
+      })
+      : await runAssetCommand({
+        parsed,
+        cwd: io.cwd,
+        ...(workspace === undefined ? {} : { workspace }),
+        ...(assetRuntime === undefined ? {} : { runtime: assetRuntime }),
+      });
     return writeResponse(response, parsed, io, 'Asset command completed.\n');
   }
 

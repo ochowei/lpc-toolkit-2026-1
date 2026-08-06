@@ -100,6 +100,11 @@ export function assetCommandRequirements(
   if (parsed.command[1] === 'provenance' && parsed.command[2] === 'verify') {
     return INSPECTION_REQUIREMENTS;
   }
+  if (parsed.command[1] === 'distribution') {
+    return parsed.command[2] === 'install'
+      ? WORKSPACE_RUNTIME_REQUIREMENTS
+      : NO_ASSET_COMMAND_REQUIREMENTS;
+  }
   if (parsed.command[1] === 'authoring') {
     return parsed.command[2] === 'contract'
       || parsed.command[2] === 'validate'

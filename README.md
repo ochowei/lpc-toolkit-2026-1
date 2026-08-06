@@ -124,6 +124,27 @@ metadata plus TXT and CSV attribution. See
 usage, cache locations, local asset precedence, output defaults, and
 troubleshooting.
 
+### Local D4 distribution verification
+
+The CLI also exposes a local-fixture-only `asset distribution` contract for
+the reviewed D4 trust boundary. It can inspect and capture an exact detached
+record/archive pair, evaluate an explicitly supplied trust policy and
+deterministic verifier fixture, require confirmation before a temporary
+consumer-prefix install, select a prior verified rollback candidate, and
+verify a fake npm or marketplace receipt:
+
+```sh
+lpc-toolkit asset distribution inspect --namespace example --pack-id example.hair --version 1.2.3 --record record.json --archive release.lpc-assets.zip --json
+lpc-toolkit asset distribution verify --namespace example --pack-id example.hair --version 1.2.3 --record record.json --archive release.lpc-assets.zip --trust-policy policy.json --verifier verifier.json --json
+lpc-toolkit asset distribution post-publication --inspection inspection.json --receipt fake-receipt.json --transport fake-npm --json
+```
+
+These commands read only caller-supplied local fixtures. They never discover
+or mutate a remote registry/marketplace, create or enroll keys, call
+`npm publish`, claim real publication, or mutate a system-wide prefix. Existing
+v1 archive inspection/install, attribution, validation, preview, release, D1,
+D2, and D3 authorities remain required.
+
 Final render output includes a standalone `<name>.viewer.html` offline animation viewer.
 
 ### Artist asset-pack lifecycle

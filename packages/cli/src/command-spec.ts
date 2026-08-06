@@ -122,6 +122,22 @@ const PROVIDER_WORKSPACE_OPTION: CommandOptionSpec = {
   description: 'Use this asset workspace for session-bound provider preflight.',
 };
 
+const DISTRIBUTION_RECORD_OPTIONS: readonly CommandOptionSpec[] = [
+  { name: 'namespace', kind: 'value', valueLabel: 'namespace', description: 'Bind the local fixture to this explicit release namespace.' },
+  { name: 'pack-id', kind: 'value', valueLabel: 'pack-id', description: 'Bind the local fixture to this explicit pack id.' },
+  { name: 'version', kind: 'value', valueLabel: 'semver', description: 'Bind the local fixture to this explicit release version.' },
+  { name: 'record', kind: 'value', valueLabel: 'record.json', description: 'Read a strict local distribution record fixture.' },
+  { name: 'archive', kind: 'value', valueLabel: 'archive', description: 'Read exact formal archive bytes from a local fixture path.' },
+  { name: 'archive-digest', kind: 'value', valueLabel: 'sha256', description: 'Optionally require this exact archive digest during capture.' },
+  { name: 'availability', kind: 'value', valueLabel: 'available|withdrawn', allowedValues: ['available', 'withdrawn'], description: 'Use the explicit local fixture availability state.' },
+  { name: 'source-id', kind: 'value', valueLabel: 'fixture-id', description: 'Record a bounded local fixture transport identifier.' },
+];
+
+const DISTRIBUTION_VERIFY_OPTIONS: readonly CommandOptionSpec[] = [
+  { name: 'trust-policy', kind: 'value', valueLabel: 'policy.json', description: 'Read an explicit local trust-policy fixture.' },
+  { name: 'verifier', kind: 'value', valueLabel: 'verifier.json', description: 'Read a deterministic local verifier result fixture; no real key or service is used.' },
+];
+
 const ASSET_PREVIEW_OPTIONS: readonly CommandOptionSpec[] = [
   ASSET_WORKSPACE_OPTION,
   { name: 'asset', kind: 'value', valueLabel: 'local-id', description: 'Preview this pack asset.' },
@@ -655,6 +671,71 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
       { name: 'provenance', kind: 'value', valueLabel: 'receipt', description: 'Read the canonical release provenance companion receipt.' },
     ],
     examples: ['lpc-toolkit asset provenance verify --archive release.lpc-assets.zip --provenance release-provenance.json --json'],
+  },
+  {
+    command: ['asset', 'distribution'],
+    usage: 'lpc-toolkit asset distribution <inspect|verify|fetch|install|rollback|post-publication>',
+    description: 'Inspect and verify local D4 distribution fixtures without remote publication or hidden network access.',
+    options: [HELP_OPTION],
+    examples: [
+      'lpc-toolkit asset distribution inspect --namespace example --pack-id example.hair --version 1.2.3 --record record.json --archive release.lpc-assets.zip --json',
+    ],
+  },
+  {
+    command: ['asset', 'distribution', 'inspect'],
+    usage: 'lpc-toolkit asset distribution inspect --namespace <namespace> --pack-id <pack-id> --version <semver> --record <record.json> --archive <archive> [--availability <available|withdrawn>] [--json]',
+    description: 'Capture and inspect an exact local distribution record/archive pair. This is read-only and does not establish trust.',
+    options: [HELP_OPTION, JSON_OPTION, ...DISTRIBUTION_RECORD_OPTIONS],
+    examples: ['lpc-toolkit asset distribution inspect --namespace example --pack-id example.hair --version 1.2.3 --record record.json --archive release.lpc-assets.zip --json'],
+  },
+  {
+    command: ['asset', 'distribution', 'verify'],
+    usage: 'lpc-toolkit asset distribution verify --namespace <namespace> --pack-id <pack-id> --version <semver> --record <record.json> --archive <archive> --trust-policy <policy.json> --verifier <verifier.json> [--json]',
+    description: 'Verify an exact local record/archive pair with an explicit trust policy and deterministic local verifier fixture.',
+    options: [HELP_OPTION, JSON_OPTION, ...DISTRIBUTION_RECORD_OPTIONS, ...DISTRIBUTION_VERIFY_OPTIONS],
+    examples: ['lpc-toolkit asset distribution verify --namespace example --pack-id example.hair --version 1.2.3 --record record.json --archive release.lpc-assets.zip --trust-policy policy.json --verifier verifier.json --json'],
+  },
+  {
+    command: ['asset', 'distribution', 'fetch'],
+    usage: 'lpc-toolkit asset distribution fetch --namespace <namespace> --pack-id <pack-id> --version <semver> --record <record.json> --archive <archive> [--source-id <fixture-id>] [--json]',
+    description: 'Fetch only from a caller-supplied local registry fixture and capture exact bytes; no network adapter is provided.',
+    options: [HELP_OPTION, JSON_OPTION, ...DISTRIBUTION_RECORD_OPTIONS],
+    examples: ['lpc-toolkit asset distribution fetch --namespace example --pack-id example.hair --version 1.2.3 --record record.json --archive release.lpc-assets.zip --source-id fixture-registry --json'],
+  },
+  {
+    command: ['asset', 'distribution', 'install'],
+    usage: 'lpc-toolkit asset distribution install --namespace <namespace> --pack-id <pack-id> --version <semver> --record <record.json> --archive <archive> --trust-policy <policy.json> --verifier <verifier.json> --evidence <evidence.json> --workspace <directory> --prefix-kind <temporary-consumer-prefix|system-wide-prefix> [--confirm] [--allow-downgrade] [--json]',
+    description: 'Install only into an explicit temporary consumer prefix after exact verification and confirmation. System-wide mutation is refused.',
+    options: [HELP_OPTION, JSON_OPTION, ...DISTRIBUTION_RECORD_OPTIONS, ...DISTRIBUTION_VERIFY_OPTIONS, ASSET_WORKSPACE_OPTION,
+      { name: 'evidence', kind: 'value', valueLabel: 'evidence.json', description: 'Read bounded release-gate/credit/license evidence for the exact record.' },
+      { name: 'prefix-kind', kind: 'value', valueLabel: 'temporary-consumer-prefix|system-wide-prefix', allowedValues: ['temporary-consumer-prefix', 'system-wide-prefix'], description: 'Name the only allowed local mutation seam or an explicitly refused system-wide target.' },
+      { name: 'confirm', kind: 'boolean', description: 'Confirm this exact verified release and temporary prefix mutation.' },
+      { name: 'allow-downgrade', kind: 'boolean', description: 'Explicitly allow a verified lower version when the existing installer permits it.' },
+    ],
+    examples: ['lpc-toolkit asset distribution install --namespace example --pack-id example.hair --version 1.2.3 --record record.json --archive release.lpc-assets.zip --trust-policy policy.json --verifier verifier.json --evidence evidence.json --workspace ./consumer-prefix --prefix-kind temporary-consumer-prefix --confirm --json'],
+  },
+  {
+    command: ['asset', 'distribution', 'rollback'],
+    usage: 'lpc-toolkit asset distribution rollback --candidates <candidates.json> --selected <identity> [--current <identity>] --prior-receipt-digest <sha256> [--json]',
+    description: 'Select one prior verified immutable release without deleting, rewriting, or mutating published evidence.',
+    options: [HELP_OPTION, JSON_OPTION,
+      { name: 'candidates', kind: 'value', valueLabel: 'candidates.json', description: 'Read a bounded local array of rollback candidates.' },
+      { name: 'selected', kind: 'value', valueLabel: 'identity', description: 'Select one exact prior release identity.' },
+      { name: 'current', kind: 'value', valueLabel: 'identity', description: 'Identify the current release so the same identity cannot be selected.' },
+      { name: 'prior-receipt-digest', kind: 'value', valueLabel: 'sha256', description: 'Bind the selection to an existing verification receipt digest.' },
+    ],
+    examples: ['lpc-toolkit asset distribution rollback --candidates candidates.json --selected example/example.hair@1.2.2#sha256:... --prior-receipt-digest sha256:... --json'],
+  },
+  {
+    command: ['asset', 'distribution', 'post-publication'],
+    usage: 'lpc-toolkit asset distribution post-publication --inspection <inspection.json> --receipt <receipt.json> --transport <fake-npm|fake-marketplace> [--json]',
+    description: 'Verify a locally supplied fake package receipt read-only; this never claims or performs real publication.',
+    options: [HELP_OPTION, JSON_OPTION,
+      { name: 'inspection', kind: 'value', valueLabel: 'inspection.json', description: 'Read the bounded local package inspection result.' },
+      { name: 'receipt', kind: 'value', valueLabel: 'receipt.json', description: 'Read a fake npm or fake marketplace receipt.' },
+      { name: 'transport', kind: 'value', valueLabel: 'fake-npm|fake-marketplace', allowedValues: ['fake-npm', 'fake-marketplace'], description: 'Require the explicitly selected fake receipt transport.' },
+    ],
+    examples: ['lpc-toolkit asset distribution post-publication --inspection inspection.json --receipt fake-receipt.json --transport fake-npm --json'],
   },
   {
     command: ['asset', 'install'],

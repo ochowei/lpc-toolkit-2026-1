@@ -162,9 +162,52 @@ Every leaf command accepts `--help`; every command below also accepts `--json`.
 | `asset inspect <archive>` | Strictly inspect and validate an archive without installing it. This command has no workspace option; it reports schema `lpc-toolkit.asset-pack-inspection.v1`, digests, entry/byte counts, diagnostics, and acknowledgement records. |
 | `asset provenance verify --archive <archive> --provenance <receipt>` | Read-only verification of an exact copied formal archive and its optional external generation-provenance receipt. This command has no workspace option and never writes a session or consumer workspace. |
 | `asset install <archive>` | Inspect the immutable archive snapshot, stage it below manager state, compile all active packs, and publish the installed source, generated output, and registry together. Optional: `--workspace`. |
+| `asset distribution inspect|verify|fetch` | Read only caller-supplied local D4 record/archive fixtures. `inspect` captures exact bytes without trust; `fetch` uses only the local fixture transport; `verify` evaluates an explicit trust policy and deterministic verifier fixture. No network adapter is available. |
+| `asset distribution install` | After the same exact record/archive/trust/evidence checks, return confirmation or delegate to the existing installer only for `--prefix-kind temporary-consumer-prefix`. `system-wide-prefix` is always refused. |
+| `asset distribution rollback` | Select one explicitly named prior verified immutable candidate with `mutation: none`; it never deletes, rewrites, or replaces published evidence. |
+| `asset distribution post-publication` | Verify a caller-supplied fake npm or fake marketplace receipt against a local package inspection. `fake-receipt-verified` is not real publication evidence. |
 | `asset list` | List active linked and installed entries in pack-ID order, including version, source kind/path, content digest, and installed archive digest. Optional: `--workspace`. It does not prepare base assets. |
 | `asset remove <pack-id>` | Deactivate one linked or installed pack and publish the remaining desired state. Optional: `--workspace`. Linked artist source is retained; an installed source is deleted only after output and registry publication. |
 | `asset doctor` | Recover only a valid interrupted manager transaction, then audit registry, linked/installed sources, generated output, ownership, compile state, and attribution. Optional: `--workspace`. There is no `--repair` mode. |
+
+### D4 local distribution and trust contract
+
+The additive D4 CLI surface is deliberately local-only during this release
+cycle. Every input is an explicit local record, archive, policy, verifier,
+evidence, candidate, inspection, or fake receipt fixture. The public response
+schema is `lpc-toolkit.asset-distribution-verification.v1` and returns a
+bounded `state`, `decision`, exact identity/digests when available, one or
+more stable `nextActions`, and explicit `mutation`/`publication` fields. It
+does not return archive bytes, private paths, credentials, private keys, raw
+provider payloads, or approval text.
+
+The advertised additive identifiers are:
+
+- `asset-pack-remote-distribution.v1`
+- `asset-pack-signature-verification.v1`
+- `asset-pack-global-install.v1`
+- `asset-pack-npm-publication.v1`
+- `lpc-toolkit.asset-distribution-release.v1`
+- `lpc-toolkit.asset-distribution-verification.v1`
+- `lpc-toolkit.asset-distribution-trust-policy.v1`
+
+Example local workflow:
+
+```sh
+lpc-toolkit asset distribution inspect --namespace example --pack-id example.hair --version 1.2.3 --record record.json --archive release.lpc-assets.zip --json
+lpc-toolkit asset distribution verify --namespace example --pack-id example.hair --version 1.2.3 --record record.json --archive release.lpc-assets.zip --trust-policy policy.json --verifier verifier.json --json
+lpc-toolkit asset distribution install --namespace example --pack-id example.hair --version 1.2.3 --record record.json --archive release.lpc-assets.zip --trust-policy policy.json --verifier verifier.json --evidence evidence.json --workspace ./consumer-prefix --prefix-kind temporary-consumer-prefix --confirm --json
+lpc-toolkit asset distribution rollback --candidates candidates.json --selected <identity> --prior-receipt-digest <sha256> --json
+lpc-toolkit asset distribution post-publication --inspection inspection.json --receipt fake-receipt.json --transport fake-npm --json
+```
+
+`inspect`, `verify`, `fetch`, `rollback`, and post-publication verification
+are read-only. Install without `--confirm` returns `needs-user-action` and
+does not mutate the prefix. Existing v1 archive inspection/install, matching
+`CREDITS.csv`, validation, preview, human release gates, D1 provenance, D2
+provider evidence, and D3 handoff remain authoritative. D4 does not create or
+enroll keys, contact a registry or marketplace, run `npm publish`, claim a
+real publication, or mutate a system-wide prefix.
 
 The Phase 2 `--json` success payloads are stable command reports:
 
