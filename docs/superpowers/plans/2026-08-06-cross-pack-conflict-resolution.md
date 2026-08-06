@@ -1,6 +1,6 @@
 # D6 — Cross-pack Conflict Resolution Implementation Plan
 
-**Status:** D6 implementation complete — PR #181 merged; plan-record closure pending
+**Status:** D6 implementation complete — PR #181 and plan closure PR #182 merged
 **Issue:** [#179](https://github.com/ochowei/lpc-toolkit-2026-1/issues/179)  
 **Roadmap:** [#153](https://github.com/ochowei/lpc-toolkit-2026-1/issues/153)  
 **Spec:** [D6 — Cross-pack Conflict Resolution](../specs/2026-08-06-cross-pack-conflict-resolution.md)  
@@ -291,6 +291,7 @@ checker PASS with the PR body declaration.
   marking D6 complete.
   - Merge: PR #181, merge commit `e92a623ea513ba90e2011ed7c6d55e2cb6a92b70`.
   - CI: workflow run #403 completed with conclusion `success`.
+  - Plan closure: PR #182, merge commit `2fac94a1cda92b129639ae39342d291db9f33a3b`.
 
 **Final implementation record:**
 
@@ -310,7 +311,8 @@ Spec/plan commits: `296cb4d5a71ab704d35ead3f71f8c0a78809d135` and
 `8ddfafce6eaa24cc7214f9470c84769dcd1a1591`.
 Checked-in implementation-plan commits: `a6410a3690233cdce124b57e0f1a44008c485bc9`
 and `5cd203e26a38d4cad55508a57ca0de632ab7636a`, with the merged PR handoff
-record at `f80c4a3300e920b603afd8671a5d6e5cd2cf8737`.
+record at `f80c4a3300e920b603afd8671a5d6e5cd2cf8737` and plan closure commit
+`e5da24c83f5aa3ffe1e2c0b1a17383eb1fe37bac`.
 Verification: `rtk pnpm verify` PASS — Core 459 tests, presets 8,
 asset-pack-format 75, Web 867, CLI 1,286 passed / 1 skipped; workspace
 typecheck, boundaries, plugin 40 tests, CLI docs policy 19 tests, CLI build,
@@ -320,8 +322,8 @@ impact checker PASS. Live checker command:
 /private/tmp/d6-pr-body.md` → `CLI documentation impact declaration is valid.`
 Implementation PR handoff is complete; CI workflow run #403 passed and the user
 confirmed the merge.
-Handoff: D6 is complete. The remaining action is to merge this docs-only
-plan-record closure PR; there is no D7 roadmap track.
+Handoff: D6 is complete. All D6 implementation and plan records are merged;
+there is no D7 roadmap track.
 ```
 
 ## Review questions
