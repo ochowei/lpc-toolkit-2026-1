@@ -243,7 +243,8 @@ the implementation is complete.
   compatibility, D1–D5 boundaries, and no external mutation.
 - [x] Record a concrete N/A reason for plugin if no plugin command/skill changes
   are made.
-- [ ] Run the live CLI documentation impact checker, not only its unit tests.
+- [x] Run the live CLI documentation impact checker, not only its unit tests.
+  - Verification: `rtk pnpm check:cli-docs-impact -- --base origin/main --head HEAD --body-file /private/tmp/d6-pr-body.md` PASS; `CLI documentation impact declaration is valid.`
 
 **Final D6 documentation impact matrix:**
 
@@ -278,8 +279,9 @@ checker is recorded in Task 8 after the PR body declaration is available.
   `rtk pnpm verify:plugin` PASS (40 tests); `rtk pnpm verify:cli-docs-policy`
   PASS (19 tests); `rtk git diff --check` PASS.
 
-- [ ] Run the live CLI impact checker with the PR event/body declaration and
+- [x] Run the live CLI impact checker with the PR event/body declaration and
   record PASS/FAIL separately from `verify:cli-docs-policy`.
+  - Verification: same live checker command PASS; this is separate from the 19-test policy suite.
 - [x] Record the full hash of every implementation, documentation, plan, and
   handoff commit in this checked-in plan.
 - [ ] Create an independent D6 implementation branch and Draft PR; never merge
@@ -292,7 +294,7 @@ checker is recorded in Task 8 after the PR body declaration is available.
 ```text
 Implementation branch: codex/issue-179-d6-cross-pack-conflict-implementation
 Spec/plan PR: #180 merged as `327d11016391841b78d1dbfb939e774a87f69684`
-Implementation PR: pending live impact declaration and GitHub Draft PR creation
+Implementation PR: pending GitHub Draft PR creation
 Implementation commits: `2334ecd73ccce8d7a15de21793d8f02251bd5ec9`,
 `e02c1b2e78a8c443fd1e1633fc8137175966dbcd`,
 `7ac145cb09f3c32b56671f601edc03c447a6e80e`,
@@ -307,8 +309,11 @@ plan record is being updated on the implementation branch.
 Verification: `rtk pnpm verify` PASS — Core 459 tests, presets 8,
 asset-pack-format 75, Web 867, CLI 1,286 passed / 1 skipped; workspace
 typecheck, boundaries, plugin 40 tests, CLI docs policy 19 tests, CLI build,
-packed CLI install smoke, and `rtk git diff --check` PASS. Live impact checker
-and implementation PR handoff are pending.
+packed CLI install smoke, `rtk git diff --check`, and live CLI documentation
+impact checker PASS. Live checker command:
+`rtk pnpm check:cli-docs-impact -- --base origin/main --head HEAD --body-file
+/private/tmp/d6-pr-body.md` → `CLI documentation impact declaration is valid.`
+Implementation PR handoff is pending.
 Handoff: D6 implementation remains open; after the live checker passes, create
 the independent Draft PR and wait for CI plus explicit user merge confirmation
 before marking D6 complete.
