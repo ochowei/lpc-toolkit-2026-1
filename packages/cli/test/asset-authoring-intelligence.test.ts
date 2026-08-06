@@ -95,6 +95,7 @@ function writeConsent(
 }
 
 interface FixtureTarget {
+  readonly path: string;
   readonly geometry: {
     readonly canvasWidth: number;
     readonly canvasHeight: number;
