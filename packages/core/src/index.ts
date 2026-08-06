@@ -183,6 +183,7 @@ export {
   materializeAuthoringIntelligenceRecolor,
   normalizeAuthoringIntelligenceRequestText,
   parseAuthoringIntelligenceCatalogSnapshot,
+  parseAuthoringIntelligenceOperationPlan,
   routeAuthoringIntelligence,
   spriteDrawingContractV2DigestInput,
   validateAuthoringIntelligenceOperationPlan,

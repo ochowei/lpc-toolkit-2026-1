@@ -1116,6 +1116,284 @@ export function createAuthoringIntelligenceOperationPlan(
   return plan;
 }
 
+function parseRequiredString(
+  record: Readonly<Record<string, unknown>>,
+  key: string,
+  path: string,
+  diagnostics: AuthoringIntelligenceParseDiagnostic[],
+): string | undefined {
+  const value = record[key];
+  if (typeof value !== 'string' || value.length === 0) {
+    diagnostics.push({ code: 'asset_authoring_intelligence_operation_invalid', message: `${path}.${key} must be a non-empty string.`, path: `${path}.${key}` });
+    return undefined;
+  }
+  return value;
+}
+
+function parseDigestArray(
+  value: unknown,
+  path: string,
+  diagnostics: AuthoringIntelligenceParseDiagnostic[],
+): readonly string[] | undefined {
+  const strings = parseStringArray(value, path, diagnostics, true);
+  if (strings === undefined) return undefined;
+  if (strings.some((entry) => !isAuthoringIntelligenceDigest(entry))) {
+    diagnostics.push({ code: 'asset_authoring_intelligence_operation_invalid', message: `${path} must contain sha256 digests.`, path });
+    return undefined;
+  }
+  return strings;
+}
+
+function parseIntegerField(
+  record: Readonly<Record<string, unknown>>,
+  key: string,
+  path: string,
+  diagnostics: AuthoringIntelligenceParseDiagnostic[],
+): number | undefined {
+  const value = record[key];
+  if (typeof value !== 'number' || !Number.isInteger(value)) {
+    diagnostics.push({ code: 'asset_authoring_intelligence_operation_invalid', message: `${path}.${key} must be an integer.`, path: `${path}.${key}` });
+    return undefined;
+  }
+  return value;
+}
+
+function parseSpriteDrawingContractV2(
+  input: unknown,
+  basePath: string,
+  diagnostics: AuthoringIntelligenceParseDiagnostic[],
+): SpriteDrawingContractV2 | undefined {
+  const record = parseRecord(input);
+  if (record === null) {
+    diagnostics.push({ code: 'asset_authoring_intelligence_geometry_unsupported', message: `${basePath} must be an object.`, path: basePath });
+    return undefined;
+  }
+  const readString = (key: string): string | undefined => parseRequiredString(record, key, basePath, diagnostics);
+  const schema = readString('schema');
+  if (schema !== SPRITE_DRAWING_CONTRACT_V2_SCHEMA) {
+    diagnostics.push({ code: 'asset_authoring_intelligence_geometry_unsupported', message: `${basePath}.schema must use sprite-drawing-contract.v2.`, path: `${basePath}.schema` });
+  }
+  const goalValue = readString('goal');
+  const goal = goalValue === 'new-item' || goalValue === 'extend-item' ? goalValue : undefined;
+  if (goal === undefined && goalValue !== undefined) {
+    diagnostics.push({ code: 'asset_authoring_intelligence_operation_invalid', message: `${basePath}.goal must be new-item or extend-item.`, path: `${basePath}.goal` });
+  }
+  const pack = parseRecord(record.pack);
+  if (pack === null) diagnostics.push({ code: 'asset_authoring_intelligence_operation_invalid', message: `${basePath}.pack must be an object.`, path: `${basePath}.pack` });
+  const packId = pack === null ? undefined : parseRequiredString(pack, 'id', `${basePath}.pack`, diagnostics);
+  const packVersion = pack === null ? undefined : parseRequiredString(pack, 'version', `${basePath}.pack`, diagnostics);
+  const assetId = readString('assetId');
+  const typeName = readString('typeName');
+
+  const transparency = parseRecord(record.transparency);
+  if (transparency === null) diagnostics.push({ code: 'asset_authoring_intelligence_geometry_unsupported', message: `${basePath}.transparency must be an object.`, path: `${basePath}.transparency` });
+  const encoding = transparency === null ? undefined : parseRequiredString(transparency, 'encoding', `${basePath}.transparency`, diagnostics);
+  const colorModel = transparency === null ? undefined : parseRequiredString(transparency, 'colorModel', `${basePath}.transparency`, diagnostics);
+  const background = transparency === null ? undefined : parseRequiredString(transparency, 'background', `${basePath}.transparency`, diagnostics);
+  if (encoding !== 'png' || colorModel !== 'rgba' || background !== 'transparent') {
+    diagnostics.push({ code: 'asset_authoring_intelligence_geometry_unsupported', message: `${basePath}.transparency must be transparent RGBA PNG.`, path: `${basePath}.transparency` });
+  }
+
+  const canvas = parseRecord(record.canvas);
+  if (canvas === null) diagnostics.push({ code: 'asset_authoring_intelligence_geometry_unsupported', message: `${basePath}.canvas must be an object.`, path: `${basePath}.canvas` });
+  const canvasWidth = canvas === null ? undefined : parseIntegerField(canvas, 'width', `${basePath}.canvas`, diagnostics);
+  const canvasHeight = canvas === null ? undefined : parseIntegerField(canvas, 'height', `${basePath}.canvas`, diagnostics);
+  const frame = parseRecord(record.frame);
+  if (frame === null) diagnostics.push({ code: 'asset_authoring_intelligence_geometry_unsupported', message: `${basePath}.frame must be an object.`, path: `${basePath}.frame` });
+  const frameWidth = frame === null ? undefined : parseIntegerField(frame, 'width', `${basePath}.frame`, diagnostics);
+  const frameHeight = frame === null ? undefined : parseIntegerField(frame, 'height', `${basePath}.frame`, diagnostics);
+  const frameCount = frame === null ? undefined : parseIntegerField(frame, 'count', `${basePath}.frame`, diagnostics);
+
+  const cells: SpriteDrawingContractV2Cell[] = [];
+  if (!Array.isArray(record.cells)) {
+    diagnostics.push({ code: 'asset_authoring_intelligence_geometry_unsupported', message: `${basePath}.cells must be an array.`, path: `${basePath}.cells` });
+  } else {
+    if (record.cells.length > ASSET_AUTHORING_INTELLIGENCE_LIMITS.cells) diagnostics.push({ code: 'asset_authoring_intelligence_resource_limit', message: `${basePath}.cells exceeds the D5 limit.`, path: `${basePath}.cells` });
+    record.cells.forEach((value, index) => {
+      const cellPath = `${basePath}.cells[${String(index)}]`;
+      const cell = parseRecord(value);
+      if (cell === null) {
+        diagnostics.push({ code: 'asset_authoring_intelligence_geometry_unsupported', message: `${cellPath} must be an object.`, path: cellPath });
+        return;
+      }
+      const id = parseRequiredString(cell, 'id', cellPath, diagnostics);
+      const row = parseIntegerField(cell, 'row', cellPath, diagnostics);
+      const frameIndex = parseIntegerField(cell, 'frame', cellPath, diagnostics);
+      const x = parseIntegerField(cell, 'x', cellPath, diagnostics);
+      const y = parseIntegerField(cell, 'y', cellPath, diagnostics);
+      const width = parseIntegerField(cell, 'width', cellPath, diagnostics);
+      const height = parseIntegerField(cell, 'height', cellPath, diagnostics);
+      const policyValue = parseRequiredString(cell, 'policy', cellPath, diagnostics);
+      const validPolicy: SpriteDrawingContractV2CellPolicy | undefined = policyValue === 'required-drawn'
+        || policyValue === 'optional-transparent'
+        || policyValue === 'required-transparent'
+        || policyValue === 'unchanged'
+        ? policyValue
+        : undefined;
+      if (validPolicy === undefined && policyValue !== undefined) diagnostics.push({ code: 'asset_authoring_intelligence_geometry_unsupported', message: `${cellPath}.policy is unsupported.`, path: `${cellPath}.policy` });
+      const baselineDigest = cell.baselineDigest === undefined
+        ? undefined
+        : typeof cell.baselineDigest === 'string' && isAuthoringIntelligenceDigest(cell.baselineDigest)
+          ? cell.baselineDigest
+          : undefined;
+      if (cell.baselineDigest !== undefined && baselineDigest === undefined) diagnostics.push({ code: 'asset_authoring_intelligence_operation_invalid', message: `${cellPath}.baselineDigest must be a sha256 digest.`, path: `${cellPath}.baselineDigest` });
+      if (id && row !== undefined && frameIndex !== undefined && x !== undefined && y !== undefined && width !== undefined && height !== undefined && validPolicy !== undefined) {
+        cells.push({ id, row, frame: frameIndex, x, y, width, height, policy: validPolicy, ...(baselineDigest === undefined ? {} : { baselineDigest }) });
+      }
+    });
+  }
+
+  const targets: SpriteDrawingContractV2Target[] = [];
+  if (!Array.isArray(record.targets)) {
+    diagnostics.push({ code: 'asset_authoring_intelligence_geometry_unsupported', message: `${basePath}.targets must be an array.`, path: `${basePath}.targets` });
+  } else {
+    record.targets.forEach((value, index) => {
+      const targetPath = `${basePath}.targets[${String(index)}]`;
+      const target = parseRecord(value);
+      if (target === null) {
+        diagnostics.push({ code: 'asset_authoring_intelligence_geometry_unsupported', message: `${targetPath} must be an object.`, path: targetPath });
+        return;
+      }
+      const id = parseRequiredString(target, 'id', targetPath, diagnostics);
+      const targetFilePath = parseRequiredString(target, 'path', targetPath, diagnostics);
+      const animation = parseRequiredString(target, 'animation', targetPath, diagnostics);
+      const bodyTypes = parseStringArray(target.bodyTypes, `${targetPath}.bodyTypes`, diagnostics);
+      const layerId = parseRequiredString(target, 'layerId', targetPath, diagnostics);
+      const cellIds = parseStringArray(target.cellIds, `${targetPath}.cellIds`, diagnostics, true);
+      const inputDigests = parseDigestArray(target.inputDigests, `${targetPath}.inputDigests`, diagnostics);
+      if (id && targetFilePath && animation && bodyTypes && layerId && cellIds && inputDigests) targets.push({ id, path: targetFilePath, animation, bodyTypes, layerId, cellIds, inputDigests });
+    });
+  }
+
+  const layers: SpriteDrawingContractV2Layer[] = [];
+  if (!Array.isArray(record.layers)) {
+    diagnostics.push({ code: 'asset_authoring_intelligence_layer_conflict', message: `${basePath}.layers must be an array.`, path: `${basePath}.layers` });
+  } else {
+    record.layers.forEach((value, index) => {
+      const layerPath = `${basePath}.layers[${String(index)}]`;
+      const layer = parseRecord(value);
+      if (layer === null) {
+        diagnostics.push({ code: 'asset_authoring_intelligence_layer_conflict', message: `${layerPath} must be an object.`, path: layerPath });
+        return;
+      }
+      const id = parseRequiredString(layer, 'id', layerPath, diagnostics);
+      const zPos = parseIntegerField(layer, 'zPos', layerPath, diagnostics);
+      const targetIds = parseStringArray(layer.targetIds, `${layerPath}.targetIds`, diagnostics, true);
+      const dependencies = parseStringArray(layer.dependencies, `${layerPath}.dependencies`, diagnostics, true);
+      if (id && zPos !== undefined && targetIds && dependencies) layers.push({ id, zPos, targetIds, dependencies });
+    });
+  }
+
+  if (schema !== SPRITE_DRAWING_CONTRACT_V2_SCHEMA || goal === undefined || packId === undefined || packVersion === undefined || assetId === undefined || typeName === undefined || canvasWidth === undefined || canvasHeight === undefined || frameWidth === undefined || frameHeight === undefined || frameCount === undefined) return undefined;
+  const contract: SpriteDrawingContractV2 = {
+    schema: SPRITE_DRAWING_CONTRACT_V2_SCHEMA,
+    goal,
+    pack: { id: packId, version: packVersion },
+    assetId,
+    typeName,
+    transparency: { encoding: 'png', colorModel: 'rgba', background: 'transparent' },
+    canvas: { width: canvasWidth, height: canvasHeight },
+    frame: { width: frameWidth, height: frameHeight, count: frameCount },
+    cells,
+    targets,
+    layers,
+  };
+  for (const diagnostic of validateSpriteDrawingContractV2(contract)) {
+    diagnostics.push({
+      code: diagnostic.code,
+      message: diagnostic.message,
+      path: diagnostic.path === undefined ? basePath : `${basePath}.${diagnostic.path}`,
+    });
+  }
+  return contract;
+}
+
+export function parseAuthoringIntelligenceOperationPlan(
+  input: unknown,
+): AuthoringIntelligenceParseResult<AuthoringIntelligenceOperationPlan> {
+  const diagnostics: AuthoringIntelligenceParseDiagnostic[] = [];
+  const record = parseRecord(input);
+  if (record === null) return { ok: false, diagnostics: [{ code: 'asset_authoring_intelligence_operation_invalid', message: 'Operation plan must be an object.', path: '$' }] };
+  if (record.schema !== ASSET_AUTHORING_INTELLIGENCE_OPERATION_PLAN_SCHEMA) diagnostics.push({ code: 'asset_authoring_intelligence_operation_invalid', message: 'Unsupported operation-plan schema.', path: '$.schema' });
+  const operationId = parseRequiredString(record, 'operationId', '$', diagnostics);
+  const operationKind = parseRequiredString(record, 'operationKind', '$', diagnostics);
+  const catalogSnapshotDigest = parseRequiredString(record, 'catalogSnapshotDigest', '$', diagnostics);
+  const operationDigest = parseRequiredString(record, 'operationDigest', '$', diagnostics);
+  const inputAssetIdentities = parseStringArray(record.inputAssetIdentities, '$.inputAssetIdentities', diagnostics, true);
+  const inputCandidateDigests = parseDigestArray(record.inputCandidateDigests, '$.inputCandidateDigests', diagnostics);
+  const contractDigests = parseDigestArray(record.contractDigests, '$.contractDigests', diagnostics);
+  const outputTargetIdentities = parseStringArray(record.outputTargetIdentities, '$.outputTargetIdentities', diagnostics, false);
+  const parametersRecord = parseRecord(record.normalizedParameters);
+  if (parametersRecord === null) diagnostics.push({ code: 'asset_authoring_intelligence_operation_invalid', message: 'normalizedParameters must be an object.', path: '$.normalizedParameters' });
+  let normalizedParameters: AuthoringIntelligenceOperationParameters | undefined;
+  const parameterKind = parametersRecord?.kind;
+  if (parametersRecord !== null && parameterKind === 'derive-variant') {
+    const sourceAssetIdentity = parseRequiredString(parametersRecord, 'sourceAssetIdentity', '$.normalizedParameters', diagnostics);
+    const variant = parseRequiredString(parametersRecord, 'variant', '$.normalizedParameters', diagnostics);
+    if (sourceAssetIdentity && variant) normalizedParameters = { kind: 'derive-variant', sourceAssetIdentity, variant };
+  } else if (parametersRecord !== null && parameterKind === 'derive-recolor') {
+    const material = parseRequiredString(parametersRecord, 'material', '$.normalizedParameters', diagnostics);
+    const sourceRamp = parseStringArray(parametersRecord.sourceRamp, '$.normalizedParameters.sourceRamp', diagnostics, false);
+    const targetRamp = parseStringArray(parametersRecord.targetRamp, '$.normalizedParameters.targetRamp', diagnostics, false);
+    if (material && sourceRamp && targetRamp) normalizedParameters = { kind: 'derive-recolor', material, sourceRamp, targetRamp };
+  } else if (parametersRecord !== null && parameterKind === 'custom-geometry') {
+    const contract = parseSpriteDrawingContractV2(parametersRecord.contract, '$.normalizedParameters.contract', diagnostics);
+    if (contract !== undefined) normalizedParameters = { kind: 'custom-geometry', contract };
+  } else if (parametersRecord !== null && parameterKind === 'multi-layer') {
+    if (!Array.isArray(parametersRecord.layers)) {
+      diagnostics.push({ code: 'asset_authoring_intelligence_layer_conflict', message: 'Multi-layer operation layers must be an array.', path: '$.normalizedParameters.layers' });
+    } else {
+      const layers: AuthoringIntelligenceLayerOperation[] = [];
+      parametersRecord.layers.forEach((value, index) => {
+        const layerPath = `$.normalizedParameters.layers[${String(index)}]`;
+        const layer = parseRecord(value);
+        if (layer === null) {
+          diagnostics.push({ code: 'asset_authoring_intelligence_layer_conflict', message: 'Layer operation must be an object.', path: layerPath });
+          return;
+        }
+        const id = parseRequiredString(layer, 'id', layerPath, diagnostics);
+        const targetIdentity = parseRequiredString(layer, 'targetIdentity', layerPath, diagnostics);
+        const contractDigest = parseRequiredString(layer, 'contractDigest', layerPath, diagnostics);
+        const inputDigest = parseRequiredString(layer, 'inputDigest', layerPath, diagnostics);
+        const dependencies = parseStringArray(layer.dependencies, `${layerPath}.dependencies`, diagnostics, true);
+        if (typeof layer.zPos !== 'number' || !Number.isInteger(layer.zPos)) diagnostics.push({ code: 'asset_authoring_intelligence_layer_conflict', message: `${layerPath}.zPos must be an integer.`, path: `${layerPath}.zPos` });
+        if (id && targetIdentity && contractDigest && inputDigest && dependencies && typeof layer.zPos === 'number' && Number.isInteger(layer.zPos)) layers.push({ id, targetIdentity, zPos: layer.zPos, contractDigest, inputDigest, dependencies });
+      });
+      normalizedParameters = { kind: 'multi-layer', layers };
+    }
+  } else if (parametersRecord !== null) {
+    diagnostics.push({ code: 'asset_authoring_intelligence_operation_invalid', message: 'The operation parameter kind is unsupported or missing.', path: '$.normalizedParameters.kind' });
+  }
+  if (operationId && operationKind && catalogSnapshotDigest && operationDigest && inputAssetIdentities && inputCandidateDigests && contractDigests && outputTargetIdentities && normalizedParameters) {
+    if (!isAuthoringIntelligenceDigest(catalogSnapshotDigest) || !isAuthoringIntelligenceDigest(operationDigest)) diagnostics.push({ code: 'asset_authoring_intelligence_operation_invalid', message: 'Operation digests must be sha256 values.', path: '$' });
+    if (operationKind !== normalizedParameters.kind) diagnostics.push({ code: 'asset_authoring_intelligence_operation_invalid', message: 'Operation kind and parameter kind must agree.', path: '$.operationKind' });
+    if (
+      operationKind === 'derive-variant'
+      || operationKind === 'derive-recolor'
+      || operationKind === 'custom-geometry'
+      || operationKind === 'multi-layer'
+    ) {
+      try {
+        const plan = createAuthoringIntelligenceOperationPlan({
+          operationId,
+          operationKind: operationKind as AuthoringIntelligenceCandidateOperationKind,
+          inputAssetIdentities,
+          inputCandidateDigests,
+          contractDigests,
+          catalogSnapshotDigest,
+          normalizedParameters,
+          outputTargetIdentities,
+          operationDigest,
+        });
+        if (diagnostics.length === 0) return { ok: true, value: plan };
+      } catch (error) {
+        diagnostics.push({ code: 'asset_authoring_intelligence_operation_invalid', message: error instanceof Error ? error.message : 'Operation plan is invalid.', path: '$' });
+      }
+    }
+  }
+  return { ok: false, diagnostics };
+}
+
 export function authoringIntelligenceOperationDigestInput(
   plan: AuthoringIntelligenceOperationPlan,
 ): string {

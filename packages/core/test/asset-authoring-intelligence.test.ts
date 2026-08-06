@@ -4,6 +4,8 @@ import {
   createAuthoringIntelligenceOperationPlan,
   createAuthoringIntelligenceRequest,
   materializeAuthoringIntelligenceRecolor,
+  parseAuthoringIntelligenceCatalogSnapshot,
+  parseAuthoringIntelligenceOperationPlan,
   routeAuthoringIntelligence,
   validateAuthoringIntelligenceOperationPlan,
   validateSpriteDrawingContractV2,
@@ -257,5 +259,61 @@ describe('authoring intelligence routing', () => {
 
     expect(Array.from(output)).toEqual([17, 34, 51, 255, 221, 238, 255, 128]);
     expect(Array.from(pixels)).toEqual([0, 0, 0, 255, 255, 255, 255, 128]);
+  });
+
+  it('parses only bounded catalog and operation records before a CLI can stage them', () => {
+    const snapshot = parseAuthoringIntelligenceCatalogSnapshot({
+      schema: 'lpc-toolkit.asset-authoring-intelligence-catalog-snapshot.v1',
+      items: [{
+        itemId: 'hair/braid',
+        typeName: 'hair',
+        name: 'braid',
+        displayName: 'Braid',
+        animations: ['walk'],
+        variants: [],
+        recolorMaterials: ['hair'],
+        hasAttribution: true,
+        licenses: ['CC-BY-SA 4.0'],
+      }],
+    });
+    expect(snapshot.ok).toBe(true);
+
+    const operation = createAuthoringIntelligenceOperationPlan({
+      operationId: 'hair-braid-variant',
+      operationKind: 'derive-variant',
+      inputAssetIdentities: ['hair/braid'],
+      inputCandidateDigests: [REQUEST_DIGEST],
+      contractDigests: [CATALOG_DIGEST],
+      catalogSnapshotDigest: CATALOG_DIGEST,
+      normalizedParameters: {
+        kind: 'derive-variant',
+        sourceAssetIdentity: 'hair/braid',
+        variant: 'long',
+      },
+      outputTargetIdentities: ['hair/braid-long'],
+      operationDigest: REQUEST_DIGEST,
+    });
+    const parsed = parseAuthoringIntelligenceOperationPlan(JSON.parse(JSON.stringify(operation)) as unknown);
+    expect(parsed).toMatchObject({ ok: true, value: { operationKind: 'derive-variant' } });
+  });
+
+  it('parses an explicit custom-geometry operation with its v2 contract', () => {
+    const operation = createAuthoringIntelligenceOperationPlan({
+      operationId: 'hair-moon-braid-geometry',
+      operationKind: 'custom-geometry',
+      inputAssetIdentities: ['hair/braid'],
+      inputCandidateDigests: [REQUEST_DIGEST],
+      contractDigests: [CATALOG_DIGEST],
+      catalogSnapshotDigest: CATALOG_DIGEST,
+      normalizedParameters: {
+        kind: 'custom-geometry',
+        contract: validGeometryContract(),
+      },
+      outputTargetIdentities: ['hair/moon-braid'],
+      operationDigest: REQUEST_DIGEST,
+    });
+
+    const parsed = parseAuthoringIntelligenceOperationPlan(JSON.parse(JSON.stringify(operation)) as unknown);
+    expect(parsed).toMatchObject({ ok: true, value: { operationKind: 'custom-geometry' } });
   });
 });
