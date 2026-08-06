@@ -447,6 +447,53 @@ export type {
 } from './asset-pack-compile.js';
 export { compileAssetPacks } from './asset-pack-compile.js';
 
+export type {
+  AssetPackConflict,
+  AssetPackConflictAttribution,
+  AssetPackConflictBaseline,
+  AssetPackConflictCompatibility,
+  AssetPackConflictCompatibilityReport,
+  AssetPackConflictContender,
+  AssetPackConflictContenderCompatibility,
+  AssetPackConflictDiagnostic,
+  AssetPackConflictDiagnosticCode,
+  AssetPackConflictEvaluation,
+  AssetPackConflictNextAction,
+  AssetPackConflictOriginKind,
+  AssetPackConflictPackSnapshot,
+  AssetPackConflictParseDiagnostic,
+  AssetPackConflictParseResult,
+  AssetPackConflictPolicy,
+  AssetPackConflictResolution,
+  AssetPackConflictResolutionKind,
+  AssetPackConflictResolutionResult,
+  AssetPackConflictResolutionTarget,
+  AssetPackConflictSelection,
+  AssetPackConflictSelectionParseResult,
+  AssetPackConflictSelectionTarget,
+  AssetPackConflictSemanticPatch,
+  AssetPackConflictStatus,
+  AssetPackConflictTarget,
+  AssetPackConflictTargetKind,
+  AssetPackConflictTrustEvidence,
+} from './asset-pack-conflict.js';
+export {
+  ASSET_PACK_CONFLICT_AUDIT_SCHEMA,
+  ASSET_PACK_CONFLICT_LIMITS,
+  ASSET_PACK_CONFLICT_POLICY_SCHEMA,
+  ASSET_PACK_CONFLICT_SCHEMA,
+  ASSET_PACK_CONFLICT_SELECTION_SCHEMA,
+  ASSET_PACK_RESOLUTION_SCHEMA,
+  assetPackConflictDigestInput,
+  assetPackConflictResolutionDigestInput,
+  assetPackConflictResolutionProjection,
+  assetPackConflictSelectionDigestInput,
+  evaluateAssetPackConflict,
+  parseAssetPackConflict,
+  parseAssetPackConflictSelection,
+  resolveAssetPackConflict,
+} from './asset-pack-conflict.js';
+
 // ==========================================
 // 5. Palette and Color Metadata Catalog
 // ==========================================
