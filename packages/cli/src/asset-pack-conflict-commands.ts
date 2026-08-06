@@ -151,6 +151,7 @@ function inspectConflict(context: AssetConflictCommandContext): CliResponse<unkn
         licenseReferenceDigests: contender.licenseReferenceDigests,
         provenanceReferenceDigests: contender.provenanceReferenceDigests,
       },
+      d2EvidenceDigests: contender.d2EvidenceDigests,
       d5EvidenceDigests: contender.d5EvidenceDigests,
     })),
     compatibility: conflict.compatibility,
@@ -523,6 +524,7 @@ function conflictEvidenceDigests(conflict: AssetPackConflict): readonly string[]
       ...contender.creditReferenceDigests,
       ...contender.licenseReferenceDigests,
       ...contender.provenanceReferenceDigests,
+      ...contender.d2EvidenceDigests,
       ...contender.d5EvidenceDigests,
     ]),
   ];

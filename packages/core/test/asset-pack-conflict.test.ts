@@ -81,6 +81,7 @@ const conflictFixture: AssetPackConflict = {
         baseDigest: digest('3'),
         resultDigest: digest('e'),
       }],
+      d2EvidenceDigests: [],
       d5EvidenceDigests: [],
     },
     {
@@ -117,6 +118,7 @@ const conflictFixture: AssetPackConflict = {
         baseDigest: digest('3'),
         resultDigest: digest('f'),
       }],
+      d2EvidenceDigests: [digest('7')],
       d5EvidenceDigests: [digest('c')],
     },
   ],
@@ -218,6 +220,7 @@ describe('asset-pack conflict contract', () => {
           ...contender.trust,
           receiptDigests: [...contender.trust.receiptDigests].reverse(),
         },
+        d2EvidenceDigests: [...contender.d2EvidenceDigests].reverse(),
         d5EvidenceDigests: [...contender.d5EvidenceDigests].reverse(),
       })),
       baseline: {
@@ -404,6 +407,7 @@ describe('asset-pack conflict contract', () => {
       resultDigest: digest('f'),
     });
     expect(result.resolution.evidenceDigests).toEqual([
+      digest('7'),
       digest('9'),
       digest('a'),
       digest('b'),

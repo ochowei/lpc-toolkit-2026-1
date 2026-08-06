@@ -75,6 +75,7 @@ export function createD6ConflictFixture(): D6ConflictFixture {
         baseDigest: d6Digest('3'),
         resultDigest: d6Digest('e'),
       }],
+      d2EvidenceDigests: [],
       d5EvidenceDigests: [],
     }],
     compatibility: {

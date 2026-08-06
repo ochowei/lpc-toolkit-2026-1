@@ -139,6 +139,7 @@ export interface AssetPackConflictContender {
   readonly trust: AssetPackConflictTrustEvidence;
   readonly origin: AssetPackConflictOriginKind;
   readonly semanticPatches: readonly AssetPackConflictSemanticPatch[];
+  readonly d2EvidenceDigests: readonly string[];
   readonly d5EvidenceDigests: readonly string[];
 }
 
@@ -667,6 +668,7 @@ function collectEvidenceDigests(
       ...contender.licenseReferenceDigests,
       ...contender.provenanceReferenceDigests,
       ...contender.trust.receiptDigests,
+      ...contender.d2EvidenceDigests,
       ...contender.d5EvidenceDigests,
     ]),
   ];
@@ -734,6 +736,7 @@ function canonicalizeConflictContender(
         compareUtf8(left.path, right.path)
         || compareUtf8(left.baseDigest, right.baseDigest)
         || compareUtf8(left.resultDigest, right.resultDigest)),
+    d2EvidenceDigests: sortStringsForDigest(contender.d2EvidenceDigests),
     d5EvidenceDigests: sortStringsForDigest(contender.d5EvidenceDigests),
   };
 }
@@ -948,6 +951,7 @@ function parseContenders(
       'trust',
       'origin',
       'semanticPatches',
+      'd2EvidenceDigests',
       'd5EvidenceDigests',
     ], diagnostics);
     const contenderId = requiredPortableId(record.contenderId, `${entryPath}.contenderId`, diagnostics);
@@ -963,9 +967,10 @@ function parseContenders(
     const trust = parseTrust(record.trust, `${entryPath}.trust`, diagnostics);
     const origin = parseEnum(record.origin, ORIGINS, `${entryPath}.origin`, diagnostics);
     const semanticPatches = parseSemanticPatches(record.semanticPatches, `${entryPath}.semanticPatches`, diagnostics);
+    const d2EvidenceDigests = sortedDigests(record.d2EvidenceDigests, `${entryPath}.d2EvidenceDigests`, diagnostics, false);
     const d5EvidenceDigests = sortedDigests(record.d5EvidenceDigests, `${entryPath}.d5EvidenceDigests`, diagnostics, false);
-    if (contenderId !== undefined && pack !== undefined && target !== undefined && resultDigest !== undefined && baseSnapshotDigest !== undefined && sourceReferenceDigests !== undefined && creditReferenceDigests !== undefined && licenseReferenceDigests !== undefined && provenanceReferenceDigests !== undefined && compatibility !== undefined && trust !== undefined && origin !== undefined && semanticPatches !== undefined && d5EvidenceDigests !== undefined) {
-      contenders.push({ contenderId, pack, target, resultDigest, baseSnapshotDigest, sourceReferenceDigests, creditReferenceDigests, licenseReferenceDigests, provenanceReferenceDigests, compatibility, trust, origin, semanticPatches, d5EvidenceDigests });
+    if (contenderId !== undefined && pack !== undefined && target !== undefined && resultDigest !== undefined && baseSnapshotDigest !== undefined && sourceReferenceDigests !== undefined && creditReferenceDigests !== undefined && licenseReferenceDigests !== undefined && provenanceReferenceDigests !== undefined && compatibility !== undefined && trust !== undefined && origin !== undefined && semanticPatches !== undefined && d2EvidenceDigests !== undefined && d5EvidenceDigests !== undefined) {
+      contenders.push({ contenderId, pack, target, resultDigest, baseSnapshotDigest, sourceReferenceDigests, creditReferenceDigests, licenseReferenceDigests, provenanceReferenceDigests, compatibility, trust, origin, semanticPatches, d2EvidenceDigests, d5EvidenceDigests });
     }
   }
   if (new Set(contenders.map((contender) => contender.contenderId)).size !== contenders.length) {
