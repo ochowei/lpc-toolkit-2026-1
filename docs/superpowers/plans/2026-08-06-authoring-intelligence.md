@@ -18,9 +18,10 @@ any product code, public capability, or public CLI command is added.
 
 ## Review gate and non-negotiable boundaries
 
-- [ ] Review D5 spec and this plan with Issue #176 as the source of scope.
-- [ ] Merge the independent spec/plan review PR.
-- [ ] Obtain explicit confirmation before creating the D5 implementation
+- [x] Review D5 spec and this plan with Issue #176 as the source of scope.
+  - Verification: PR #177 merged into `origin/main` as `505fafbeaad3366d498334fd26f60bd8f890d640`; CI run #392 PASS.
+- [x] Merge the independent spec/plan review PR.
+- [x] Obtain explicit confirmation before creating the D5 implementation
   branch or changing product code.
 - [ ] Keep all work on `codex/` branches and leave `upstream/` untouched.
 - [ ] Do not add dependencies, a model SDK/runtime, provider, backend, auth,
@@ -100,18 +101,18 @@ PASS/FAIL result here after completion.
 
 ### 1. Implement the deterministic request and routing contracts
 
-- [ ] Add strict request normalization, bounded UTF-8 input handling, and
+- [x] Add strict request normalization, bounded UTF-8 input handling, and
   canonical request digesting without persisting raw request text in public
   receipts.
-- [ ] Add the fixed vocabulary, catalog-first predicates, stable candidate
+- [x] Add the fixed vocabulary, catalog-first predicates, stable candidate
   ordering, explicit-hint validation, and route outcomes from the spec:
   `compose-existing`, `extend-existing`, `derive-variant`,
   `derive-recolor`, `custom-geometry`, `multi-layer`,
   `needs-user-action`, and `refused`.
-- [ ] Return finite choices and concrete next actions for ambiguity, stale
+- [x] Return finite choices and concrete next actions for ambiguity, stale
   catalog/contract state, unsupported capability, rights gaps, and resource
   limits.
-- [ ] Treat provider or Agent/model hints as untrusted optional input; validate
+- [x] Treat provider or Agent/model hints as untrusted optional input; validate
   them as user-visible structured input and never make them a runtime
   authority.
 
@@ -119,30 +120,45 @@ PASS/FAIL result here after completion.
 ordering, synonym handling, ambiguity, refusal, unsupported capability,
 privacy-safe projections, and exact replay.
 
+**Implementation record:** Core router and request contract are implemented in
+`20ce883a041d34ccfa7c37e94182d8b90f233db5`.
+
+**Verification:** `rtk pnpm --dir packages/core test --
+asset-authoring-intelligence.test.ts` PASS; `rtk pnpm --dir packages/core
+typecheck` PASS; `rtk git diff --check` PASS.
+
 **Plan record:** record the implementation commit, exact test commands, and
 PASS/FAIL result here after completion.
 
 ### 2. Implement deterministic candidate operation contracts
 
-- [ ] Add canonical operation records and operation digests that exclude
+- [x] Add canonical operation records and operation digests that exclude
   timestamps, random IDs, local paths, environment values, credentials, raw
   request text, and provider payloads.
-- [ ] Add sorted-DAG validation for input/output identities, duplicate targets,
+- [x] Add sorted-DAG validation for input/output identities, duplicate targets,
   cycles, traversal, unsupported operations, and fixed resource limits.
-- [ ] Add deterministic variant operations that retain asset identity,
+- [x] Add deterministic variant operations that retain asset identity,
   supported body/animation/layer semantics, source obligations, and credits.
-- [ ] Add deterministic recolor operations through existing Core palette and
+- [x] Add deterministic recolor operations through existing Core palette and
   recolor authorities, including source/target ramp validation, alpha
   preservation, and explicit user palette maps.
-- [ ] Add an explicit versioned custom-geometry extension contract (`v2`) for
+- [x] Add an explicit versioned custom-geometry extension contract (`v2`) for
   bounded frames/cells/rows/canvas/layer data while leaving v1 unchanged.
-- [ ] Add bounded multi-layer candidate-set and layer-graph operations with
+- [x] Add bounded multi-layer candidate-set and layer-graph operations with
   independent target contracts; do not flatten or resolve cross-pack
   conflicts (D6 scope).
 
 **TDD evidence:** Core tests prove byte/digest determinism, v1 compatibility,
 variant/recolor correctness, geometry bounds, layer DAG behavior, refusal on
 missing/ambiguous input, and resource-limit enforcement.
+
+**Implementation record:** Core operation contracts, deterministic recolor
+materialization, v2 geometry validation, and layer DAG validation are included
+in `20ce883a041d34ccfa7c37e94182d8b90f233db5`.
+
+**Verification:** `rtk pnpm --dir packages/core test --
+asset-authoring-intelligence.test.ts` PASS; `rtk pnpm --dir packages/core
+typecheck` PASS; `rtk git diff --check` PASS.
 
 **Plan record:** record the implementation commit, exact test commands, and
 PASS/FAIL result here after completion.
@@ -332,4 +348,3 @@ Reviewers should resolve these questions before approving implementation:
    validation, attributed preview, and release gates?
 6. Does the plan avoid persistent browser authoring state and any opaque
    model/provider dependency?
-
