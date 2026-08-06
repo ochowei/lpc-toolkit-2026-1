@@ -1,13 +1,13 @@
 # D6 — Cross-pack Conflict Resolution Implementation Plan
 
-**Status:** Spec/plan Draft PR #180 open — review, merge, and user confirmation required before product implementation  
+**Status:** D6 implementation in progress — independent implementation PR pending  
 **Issue:** [#179](https://github.com/ochowei/lpc-toolkit-2026-1/issues/179)  
 **Roadmap:** [#153](https://github.com/ochowei/lpc-toolkit-2026-1/issues/153)  
 **Spec:** [D6 — Cross-pack Conflict Resolution](../specs/2026-08-06-cross-pack-conflict-resolution.md)  
 **Base:** D5 implementation merge commit `a7442dd85cfc6ac07bf218032b7fb73e3ecf717f` ([PR #178](https://github.com/ochowei/lpc-toolkit-2026-1/pull/178))  
 **Spec/plan branch:** `codex/issue-179-d6-cross-pack-conflict-spec`  
 **Spec/plan PR:** [#180](https://github.com/ochowei/lpc-toolkit-2026-1/pull/180)  
-**Implementation branch:** to be created only after this spec/plan review PR is merged and the user confirms the review gate
+**Implementation branch:** `codex/issue-179-d6-cross-pack-conflict-implementation`
 
 This plan is limited to D6 cross-pack conflict identity, selection, merge,
 compatibility, attribution, recovery, and audit contracts. It does not combine
@@ -18,10 +18,13 @@ spec/plan is reviewed and merged.
 
 ## Review gate and non-negotiable boundaries
 
-- [ ] Review the D6 spec and this plan against Issue #179 and roadmap #153.
-- [ ] Merge the independent D6 spec/plan review PR.
-- [ ] Obtain explicit user confirmation before creating the D6 implementation
+- [x] Review the D6 spec and this plan against Issue #179 and roadmap #153.
+  - Review outcome: D6 contract and implementation plan accepted for implementation.
+- [x] Merge the independent D6 spec/plan review PR.
+  - Merge: PR #180, merge commit `327d11016391841b78d1dbfb939e774a87f69684`.
+- [x] Obtain explicit user confirmation before creating the D6 implementation
   branch or changing product code.
+  - Confirmation: user reported PR #180 merged on 2026-08-06.
 - [ ] Keep all work on `codex/` branches and leave `upstream/` untouched.
 - [ ] Use only local pack/archive/registry/credit/trust/provenance/D5 fixtures
   and deterministic fakes in tests.
@@ -227,15 +230,15 @@ plugin: N/A — D6 adds no plugin skill or plugin command contract
 **Final implementation record:**
 
 ```text
-Implementation branch: pending spec/plan review
-Spec/plan PR: #180 (Draft; review, CI, merge, and user confirmation pending)
+Implementation branch: codex/issue-179-d6-cross-pack-conflict-implementation
+Spec/plan PR: #180 merged as `327d11016391841b78d1dbfb939e774a87f69684`
 Implementation PR: pending spec/plan review
 Spec/plan commit: 296cb4d5a71ab704d35ead3f71f8c0a78809d135
-Verification: `rtk git diff --check` PASS; required-term audit PASS;
-`rtk pnpm verify:cli-docs-policy` PASS (19 tests); live PR checker pending
-PR event/body declaration and implementation changes.
-Handoff: D6 remains blocked until Draft PR #180 is reviewed, merged, and
-confirmed, then its independent implementation PR passes CI and merges.
+Verification: spec/plan `rtk git diff --check` PASS; required-term audit PASS;
+`rtk pnpm verify:cli-docs-policy` PASS (19 tests); implementation verification
+pending.
+Handoff: D6 implementation is active; the independent implementation PR must
+pass CI and merge before D6 is marked complete.
 ```
 
 ## Review questions
