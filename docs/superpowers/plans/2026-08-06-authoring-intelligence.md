@@ -363,11 +363,11 @@ releasing: update — add D5 capability/schema and pre-import release gates
 plugin: N/A — D5 does not change the installed plugin contract or skill surface
 ```
 
-**Plan record:** Documentation updates are in `README.md`,
+**Plan record:** Documentation commit is
+`e45a2855f9cbffe2585fa47cce1af292c83b9f1b`. Documentation updates are in `README.md`,
 `packages/cli/README.md`, `packages/web/src/components/landing-page.tsx`,
 `docs/ARCHITECTURE.md`, `docs/ENGINEERING.md`, and `docs/RELEASING.md`; the
-documentation commit hash and final policy result are recorded immediately
-after commit. `rtk pnpm verify:cli-docs-policy` PASS (19 tests).
+final policy result is `rtk pnpm verify:cli-docs-policy` PASS (19 tests).
 
 ### 9. Final verification and independent PR handoff
 
