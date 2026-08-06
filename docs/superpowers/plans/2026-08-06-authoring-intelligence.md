@@ -154,11 +154,13 @@ missing/ambiguous input, and resource-limit enforcement.
 
 **Implementation record:** Core operation contracts, deterministic recolor
 materialization, v2 geometry validation, and layer DAG validation are included
-in `20ce883a041d34ccfa7c37e94182d8b90f233db5`.
+in `20ce883a041d34ccfa7c37e94182d8b90f233db5`; bounded catalog and operation
+parsing, including the explicit custom-geometry contract parser, are included
+in `5f9b787ac4e664002a551d1d89238d383983d97d`.
 
 **Verification:** `rtk pnpm --dir packages/core test --
-asset-authoring-intelligence.test.ts` PASS; `rtk pnpm --dir packages/core
-typecheck` PASS; `rtk git diff --check` PASS.
+asset-authoring-intelligence.test.ts` PASS (10 tests); `rtk pnpm --dir
+packages/core typecheck` PASS; `rtk git diff --check` PASS.
 
 **Plan record:** record the implementation commit, exact test commands, and
 PASS/FAIL result here after completion.
