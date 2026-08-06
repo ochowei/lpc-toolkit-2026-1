@@ -559,7 +559,7 @@ function requireWorkspace(workspace: AssetWorkspace | undefined): AssetWorkspace
   return workspace;
 }
 
-function requireFlag(flags: ReadonlyMap<string, boolean | string | readonly (boolean | string)[]>, name: string): string {
+function requireFlag(flags: ParsedArgs['flags'], name: string): string {
   return requireValue(flagString(flags, name), `--${name}`);
 }
 
