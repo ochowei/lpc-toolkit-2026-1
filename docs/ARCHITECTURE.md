@@ -174,34 +174,34 @@ it is a Node runtime package. Those dependencies must not move into
 ### `plugins/lpc-toolkit/`
 
 `plugins/lpc-toolkit/` is a Codex distribution and workflow layer around the
-external `lpc-toolkit` executable. It owns plugin installation metadata, one
-focused character-authoring skill, compatibility checks, and command workflow
-references. It does not duplicate CLI product logic, read asset caches on its
-own, or own catalog, selection, validation, rendering, or attribution rules.
+external `lpc-toolkit` executable. It owns plugin installation metadata, three
+focused skills, one shared CLI-compatibility record and checker, and command
+workflow references. Character composition uses only existing catalog art;
+animation audit remains read-only; one asset-authoring skill coordinates the
+confirmed `extend-item` and `new-item` modes. The plugin does not duplicate CLI product logic,
+read asset caches on its own, or own catalog, selection, validation, rendering,
+or attribution rules.
 
 The plugin may invoke the public CLI and inspect returned artifact paths. It
 must not import CLI source, add Node runtime behavior to core, suppress credit
 artifacts, install the CLI silently, or introduce MCP/apps/hooks without a new
 approved design.
 
-The plugin's current character and animation skills intentionally stop before
-the newer authoring-session release capability. They do not claim or invoke
-`asset-authoring-release.v1`,
-`lpc-toolkit.asset-release-declaration.v1`,
-`lpc-toolkit.asset-authoring-release-receipt.v1`,
-`lpc-toolkit.asset-authoring-draft-receipt.v1`,
-`lpc-toolkit.asset-authoring-formal-archive-receipt.v1`, or
-`lpc-toolkit.asset-authoring-archive-inspection-receipt.v1`, or the
-`acknowledge`/`declare`/`accept-preview`/`draft`/`sync`/`pack`/`inspect`
-commands; the installed CLI remains the sole owner of those release and
-archive receipts.
+The asset-authoring skill may coordinate public authoring-session commands
+through import, validation, and attributed preview. It stops at a review-ready
+revision. Warning acknowledgement, human author/source and license declaration,
+preview acceptance, synchronization, formal pack, archive inspection, and
+consumer installation are separately named, user-confirmed boundaries; the
+installed CLI remains the sole owner of their state and receipts.
 
 The plugin also does not claim or invoke `asset-authoring-release-provenance.v1`,
 `lpc-toolkit.asset-release-provenance.v1`,
 `lpc-toolkit.asset-release-provenance-verification.v1`, or `asset provenance
-verify`. It does not publish or verify external release provenance, invoke a
-provider, or add a new skill; use the installed CLI's public command directly
-when an external consumer needs independent verification.
+verify`. It does not publish or verify external release provenance. An optional
+provider may be proposed only after compatibility checks and disclosure; the
+user must consent before the host integration invokes it. CLI D2 commands only
+preflight and persist a bounded handoff/result, and the normal import trust
+boundary remains mandatory.
 
 D3's Web-to-CLI file handoff is likewise not a plugin capability or skill. The
 plugin does not export browser state, read handoff sidecars, import packs, or

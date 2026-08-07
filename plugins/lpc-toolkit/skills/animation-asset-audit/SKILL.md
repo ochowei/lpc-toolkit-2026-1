@@ -8,8 +8,9 @@ description: Use when identifying LPC assets with incomplete animation support, 
 Use `lpc-toolkit` as the only source of catalog, animation capability, expected
 path, source geometry, runtime asset, and inspection behavior.
 
-1. Read `references/compatibility.md`, resolve this skill directory to an
-   absolute `SKILL_DIR`, and run `node "$SKILL_DIR/scripts/check-cli.mjs"`.
+1. Resolve the installed plugin directory to an absolute `PLUGIN_ROOT`, read
+   `$PLUGIN_ROOT/references/compatibility.md`, and run
+   `node "$PLUGIN_ROOT/scripts/check-cli.mjs"`.
    Continue only when its JSON result has `ok: true`.
 2. Read `references/audit-workflow.md` and treat
    `references/cli-contract.json` as the tested command inventory.
@@ -21,7 +22,10 @@ path, source geometry, runtime asset, and inspection behavior.
    worklist views.
 6. Keep unsupported, missing-file, blank-frame, and inspection-error semantics
    distinct. Preserve nested requirements and all physical-file consumers.
-7. After external asset work, rerun the same target and scope and verify the
+7. If the user wants to repair a finding, summarize the bounded evidence and
+   ask for explicit confirmation before switching to lpc-asset-authoring in
+   `extend-item` mode. The audit itself remains read-only.
+8. After external asset work, rerun the same target and scope and verify the
    intended findings, not merely the process exit code.
 
 Do not add, edit, generate, or repair sprite assets. Do not initialize or

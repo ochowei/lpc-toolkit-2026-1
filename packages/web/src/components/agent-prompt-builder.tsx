@@ -6,274 +6,176 @@ interface CreateCharacterFields {
   readonly details: string;
 }
 
-interface RefineCharacterFields {
-  readonly characterName: string;
-  readonly part: string;
-  readonly result: string;
-}
-
-interface ExportCharacterFields {
-  readonly characterName: string;
+interface AnimationExtensionFields {
+  readonly item: string;
   readonly animations: string;
-  readonly bundle: string;
+  readonly details: string;
 }
 
-interface AnimationAuditFields {
+interface NewAssetFields {
+  readonly concept: string;
   readonly assetType: string;
   readonly animations: string;
-  readonly worklistSize: string;
 }
+
+type JourneyId = 'compose' | 'extend' | 'new';
 
 export function buildCreateCharacterPrompt(fields: CreateCharacterFields): string {
-  const start = createStartingPhrase(fields.startingPoint);
-  return `Create an LPC character based on a ${fields.concept.trim()} concept. ${start}, assemble ${fields.details.trim()} from available assets, generate an attributed preview, and help me refine the result.`;
-}
-
-function createStartingPhrase(startingPoint: string): string {
-  return startingPoint === 'Let the agent choose'
+  const start = fields.startingPoint === 'Let the agent choose'
     ? 'Let the agent choose a suitable starting point'
-    : startingPoint === 'Start without a preset'
-      ? 'Start without a preset'
-      : `Start from the ${startingPoint.replace('Start from ', '')} preset`;
+    : `Start from ${fields.startingPoint}`;
+  return `Build an LPC character from existing catalog art based on a ${fields.concept.trim()} concept. ${start}, assemble ${fields.details.trim()}, generate an attributed preview, and ask what I want to refine next. Do not create or edit source asset pixels.`;
 }
 
-export function buildRefineCharacterPrompt(fields: RefineCharacterFields): string {
-  return `Refine my LPC character named ${fields.characterName.trim()} by changing its ${fields.part.trim()} to ${fields.result.trim()}. Preserve the rest of the character, validate the change, and show me an attributed preview.`;
+export function buildAnimationExtensionPrompt(fields: AnimationExtensionFields): string {
+  return `Find the existing LPC catalog item ${fields.item.trim()} and run a read-only audit for ${fields.animations.trim()}. Show me the bounded evidence and retained item identity first. If ${fields.details.trim()}, propose an animation-extension revision, explain the source files and credits that would be affected, and ask for my explicit confirmation before modifying assets or using a provider. Stop at a validated, attributed review-ready preview; do not release or install it.`;
 }
 
-export function buildExportCharacterPrompt(fields: ExportCharacterFields): string {
-  return `Preview my LPC character named ${fields.characterName.trim()} using the ${fields.animations.trim()} animations, then render an ${fields.bundle.trim()}. Validate the character first and verify the metadata and both credits files before handing off the artifacts.`;
-}
-
-export function buildAnimationAuditPrompt(fields: AnimationAuditFields): string {
-  return `Run a read-only animation audit for ${fields.assetType.trim()} assets covering ${fields.animations.trim()}. Return a bounded drawing worklist of at most ${fields.worklistSize.trim()} items, identify the missing or incomplete animation support, and do not modify source assets.`;
+export function buildNewAssetPrompt(fields: NewAssetFields): string {
+  return `Create a new attributed LPC ${fields.assetType.trim()} asset based on ${fields.concept.trim()}, covering ${fields.animations.trim()}. Check the catalog first, constrain the work to supported LPC layouts, then ask me for draft attribution before generating pixels. Explain any provider or reference disclosure and get my explicit consent before use. Import and validate the result, then stop at an attributed review-ready preview; do not release or install it.`;
 }
 
 export function buildCreateCharacterResult(concept: string): string {
-  return `Creates or updates \`./${concept.trim()}.json\`, then writes an attributed preview under \`./preview/${concept.trim()}/\` with .preview.png, .metadata.json, .credits.txt, and .credits.csv files. Codex summarizes the selected assets and asks what to refine next.`;
+  return `An attributed preview for ${concept.trim()}, its metadata, credits TXT and credits CSV, plus a conversational next step for refinement or export.`;
 }
 
-export function buildRefineCharacterResult(characterName: string): string {
-  return `Updates \`./${characterName.trim()}.json\` and writes a fresh attributed preview under \`./preview/${characterName.trim()}/\` with metadata and credit files. Codex summarizes the change and its validation result.`;
+export function buildAnimationExtensionResult(item: string): string {
+  return `First, a read-only finding for ${item.trim()}. After separate confirmation: the same item identity with the selected animation revision, current validation, and an attributed review-ready preview.`;
 }
 
-export function buildExportCharacterResult(characterName: string, bundle: string): string {
-  return `Writes an attributed ${bundle.trim()} for ${characterName.trim()} under \`./rendered/${characterName.trim()}/\`, including the spritesheet PNG, .viewer.html, .metadata.json, .credits.txt, and .credits.csv. Codex reports validation warnings and the artifact paths.`;
-}
-
-export function buildAnimationAuditResult(assetType: string, worklistSize: string): string {
-  return `Codex returns a summary of missing or incomplete animation support for ${assetType.trim()} assets and a bounded ${worklistSize.trim()}-item drawing worklist.`;
+export function buildNewAssetResult(assetType: string): string {
+  return `One new ${assetType.trim()} identity with imported source, current validation, and an attributed review-ready preview. Formal release and installation remain separate.`;
 }
 
 const fieldClassName = 'mt-1 w-full rounded-md border border-border-strong bg-surface-2 px-3 py-2 text-sm text-text outline-none focus:border-accent';
 
-function PromptCard({
+function TextField({ label, value, onChange }: { readonly label: string; readonly value: string; readonly onChange: (value: string) => void }) {
+  return <label className="text-sm text-text-2">{label}<input data-prompt-input="true" className={fieldClassName} value={value} onChange={(event) => onChange(event.target.value)} /></label>;
+}
+
+function AuthorityStages({ stages }: { readonly stages: readonly { label: string; authority: string }[] }) {
+  return (
+    <ol aria-label="Journey stages" className="mt-4 grid gap-2 sm:grid-cols-3">
+      {stages.map((stage, index) => (
+        <li key={stage.label} className="rounded-md border border-border bg-surface-2 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-text-mute">Stage {index + 1}</p>
+          <p className="mt-1 text-sm font-semibold text-text">{stage.label}</p>
+          <span className="mt-2 inline-flex rounded-full border border-border-strong px-2 py-0.5 text-xs text-text-2">{stage.authority}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function PromptPanel({
   title,
-  tag,
+  term,
   prompt,
-  expectedResult,
-  readOnlyResult = false,
-  highlights,
+  result,
   valid,
   onReset,
+  stages,
   children,
 }: {
   readonly title: string;
-  readonly tag: string;
+  readonly term: string;
   readonly prompt: string;
-  readonly expectedResult: string;
-  readonly readOnlyResult?: boolean;
-  readonly highlights: readonly string[];
+  readonly result: string;
   readonly valid: boolean;
   readonly onReset: () => void;
+  readonly stages: readonly { label: string; authority: string }[];
   readonly children: React.ReactNode;
 }) {
-  const [copied, setCopied] = useState(false);
-
+  const [copyStatus, setCopyStatus] = useState('');
   async function copyPrompt() {
     if (!valid) return;
     try {
       await navigator.clipboard.writeText(prompt);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1600);
+      setCopyStatus('Copied');
+      window.setTimeout(() => setCopyStatus(''), 1600);
     } catch {
-      setCopied(false);
+      setCopyStatus('Copy failed');
     }
   }
-
   return (
-    <article className="flex min-w-0 flex-col rounded-md border border-border bg-surface p-5">
-      <div className="flex items-start justify-between gap-3">
+    <article className="rounded-md border border-border bg-surface p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-mute">{tag}</p>
-          <div className="mt-1 flex flex-wrap items-center gap-2">
-            <h3 className="text-lg font-semibold text-text">{title}</h3>
-            <ExpectedResultPopover readOnly={readOnlyResult}>{expectedResult}</ExpectedResultPopover>
-          </div>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-mute">{term}</p>
+          <h3 className="mt-1 text-xl font-semibold text-text">{title}</h3>
         </div>
         <button type="button" onClick={onReset} className="text-sm text-text-2 underline hover:text-text">Reset</button>
       </div>
-      <div className="mt-4 grid gap-3">{children}</div>
-      <div className="mt-4 rounded-md border border-border bg-[var(--bg-deep)] p-3">
+      <AuthorityStages stages={stages} />
+      <div className="mt-5 grid gap-3 sm:grid-cols-3">{children}</div>
+      <div className="mt-4 rounded-md border border-border bg-[var(--bg-deep)] p-4">
         <p className="text-xs font-semibold uppercase tracking-wide text-text-mute">Prompt preview</p>
-        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-text">
-          <HighlightedPrompt prompt={prompt} highlights={highlights} />
-        </p>
+        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-text">{prompt}</p>
       </div>
-      <button
-        type="button"
-        disabled={!valid}
-        onClick={() => void copyPrompt()}
-        className="mt-4 rounded-md border border-border-strong bg-accent px-4 py-2 text-sm font-semibold text-[var(--accent-ink)] disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {copied ? 'Copied' : 'Copy prompt'}
-      </button>
+      <details className="mt-3 rounded-md border border-border px-3 py-2 text-sm text-text-2">
+        <summary className="cursor-pointer font-semibold text-text">Expected result and files</summary>
+        <p className="mt-2 leading-6">{result}</p>
+      </details>
+      <div className="mt-4 flex items-center gap-3">
+        <button type="button" disabled={!valid} onClick={() => void copyPrompt()} className="rounded-md border border-border-strong bg-accent px-4 py-2 text-sm font-semibold text-[var(--accent-ink)] disabled:cursor-not-allowed disabled:opacity-50">Copy kickoff prompt</button>
+        <span aria-live="polite" className="text-sm text-text-2">{copyStatus}</span>
+      </div>
       {!valid && <p className="mt-2 text-xs text-[var(--danger)]">Complete every field to copy this prompt.</p>}
     </article>
   );
 }
 
-function ExpectedResultPopover({
-  children,
-  readOnly,
-}: {
-  readonly children: React.ReactNode;
-  readonly readOnly: boolean;
-}) {
-  return (
-    <details className="group relative">
-      <summary className="flex cursor-pointer list-none items-center gap-1 rounded-full border border-border-strong bg-surface-2 px-2 py-1 text-xs font-medium text-text-2 outline-none hover:border-accent hover:text-text focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/30 [&::-webkit-details-marker]:hidden">
-        <svg aria-hidden="true" viewBox="0 0 20 20" className="size-3.5 fill-none stroke-current" strokeWidth="1.8">
-          <circle cx="10" cy="10" r="7.5" />
-          <path d="M10 9v5M10 6.25v.5" />
-        </svg>
-        What you’ll get
-      </summary>
-      <div
-        aria-label="Expected result"
-        className="invisible absolute left-0 top-full z-20 mt-2 w-72 max-w-[calc(100vw-3rem)] rounded-md border border-border bg-surface p-3 text-sm leading-5 text-text-2 opacity-0 shadow-lg transition-opacity group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 group-open:visible group-open:opacity-100"
-      >
-        {readOnly && (
-          <p role="note" className="mb-2 flex items-center gap-1.5 rounded border border-accent/40 bg-accent/10 px-2 py-1.5 font-semibold text-accent">
-            <svg aria-hidden="true" viewBox="0 0 20 20" className="size-4 shrink-0 fill-none stroke-current" strokeWidth="1.8">
-              <path d="M10 2.5 16 5v4.25c0 3.7-2.4 6.55-6 8.25-3.6-1.7-6-4.55-6-8.25V5l6-2.5Z" />
-              <path d="m7.25 10 1.75 1.75 3.75-4" />
-            </svg>
-            Read-only — no files are modified.
-          </p>
-        )}
-        <p>{renderExpectedResult(children)}</p>
-      </div>
-    </details>
-  );
-}
+const composeDefaults = { concept: 'fisher', startingPoint: 'Let the agent choose', details: 'practical clothes, boots, and fishing gear' };
+const extendDefaults = { item: 'a sword with incomplete run support', animations: 'run', details: 'the audit proves a supported missing animation' };
+const newDefaults = { concept: 'a moonlit braided hairstyle', assetType: 'hair', animations: 'walk and idle' };
 
-function renderExpectedResult(result: React.ReactNode): React.ReactNode {
-  if (typeof result !== 'string') return result;
-  const parts = result.split('`');
-  return parts.map((part, index) => index % 2 === 1
-    ? <code key={`${part}-${index}`} className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[0.9em] text-text">{part}</code>
-    : part);
-}
-
-function HighlightedPrompt({ prompt, highlights }: { readonly prompt: string; readonly highlights: readonly string[] }) {
-  const usableHighlights = [...new Set(highlights.map((value) => value.trim()).filter(Boolean))]
-    .sort((left, right) => right.length - left.length);
-  const parts: React.ReactNode[] = [];
-  let cursor = 0;
-
-  while (cursor < prompt.length) {
-    const matches = usableHighlights
-      .map((value) => ({ value, index: prompt.indexOf(value, cursor) }))
-      .filter((match) => match.index >= 0)
-      .sort((left, right) => left.index - right.index || right.value.length - left.value.length);
-    const next = matches[0];
-    if (!next) {
-      parts.push(prompt.slice(cursor));
-      break;
-    }
-    if (next.index > cursor) parts.push(prompt.slice(cursor, next.index));
-    parts.push(
-      <mark
-        key={`${next.index}-${next.value}`}
-        data-prompt-input="true"
-        className="rounded border border-accent/40 bg-accent/15 px-1 font-medium text-accent [box-decoration-break:clone] [-webkit-box-decoration-break:clone]"
-      >
-        {next.value}
-      </mark>,
-    );
-    cursor = next.index + next.value.length;
-  }
-
-  return parts;
-}
-
-function TextField({ label, value, onChange }: { readonly label: string; readonly value: string; readonly onChange: (value: string) => void }) {
-  return <label className="text-sm text-text-2">{label}<input className={fieldClassName} value={value} onChange={(event) => onChange(event.target.value)} /></label>;
-}
-
-function AnimationChoices({ selected, onChange }: { readonly selected: readonly string[]; readonly onChange: (value: readonly string[]) => void }) {
-  return (
-    <fieldset>
-      <legend className="text-sm text-text-2">Animations</legend>
-      <div className="mt-2 flex flex-wrap gap-3">
-        {['walk', 'idle', 'run'].map((animation) => (
-          <label key={animation} className="flex items-center gap-2 text-sm text-text">
-            <input
-              type="checkbox"
-              checked={selected.includes(animation)}
-              onChange={(event) => onChange(event.target.checked ? [...selected, animation] : selected.filter((value) => value !== animation))}
-            />
-            {animation}
-          </label>
-        ))}
-      </div>
-    </fieldset>
-  );
-}
-
-const createDefaults = { concept: 'fisher', startingPoint: 'Let the agent choose', details: 'practical clothes, boots, and fishing gear' };
-const refineDefaults = { characterName: 'fisher', part: 'hair', result: 'short brown hair that stays clear of the face' };
+const journeys: readonly { id: JourneyId; title: string; term: string; description: string }[] = [
+  { id: 'compose', title: 'Build a character from existing art', term: 'Sprite composition', description: 'Choose and combine catalog assets. No source pixels change.' },
+  { id: 'extend', title: 'Add a missing animation', term: 'Animation extension', description: 'Audit first, then confirm one bounded revision.' },
+  { id: 'new', title: 'Create a new asset', term: 'New asset authoring', description: 'Create one new identity for a supported LPC layout.' },
+];
 
 export function AgentPromptBuilders() {
-  const [create, setCreate] = useState<CreateCharacterFields>(createDefaults);
-  const [refine, setRefine] = useState<RefineCharacterFields>(refineDefaults);
-  const [exportName, setExportName] = useState('fisher');
-  const [exportAnimations, setExportAnimations] = useState<readonly string[]>(['walk', 'idle']);
-  const [bundle, setBundle] = useState('attributed ZIP bundle');
-  const [assetType, setAssetType] = useState('clothes');
-  const [auditAnimations, setAuditAnimations] = useState<readonly string[]>(['walk', 'run']);
-  const [worklistSize, setWorklistSize] = useState('20');
-  const joined = (values: readonly string[]) => values.join(' and ');
-  const worklistNumber = Number(worklistSize);
+  const [active, setActive] = useState<JourneyId>('compose');
+  const [compose, setCompose] = useState<CreateCharacterFields>(composeDefaults);
+  const [extend, setExtend] = useState<AnimationExtensionFields>(extendDefaults);
+  const [newAsset, setNewAsset] = useState<NewAssetFields>(newDefaults);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <PromptCard title="Create a character" tag="Create character" prompt={buildCreateCharacterPrompt(create)} expectedResult={buildCreateCharacterResult(create.concept)} highlights={[create.concept, createStartingPhrase(create.startingPoint), create.details]} valid={Object.values(create).every((value) => value.trim())} onReset={() => setCreate(createDefaults)}>
-        <TextField label="Character concept" value={create.concept} onChange={(concept) => setCreate({ ...create, concept })} />
-        <label className="text-sm text-text-2">Starting point<select className={fieldClassName} value={create.startingPoint} onChange={(event) => setCreate({ ...create, startingPoint: event.target.value })}>
-          {['Let the agent choose', 'Start without a preset', 'Start from farmer', 'Start from villager', 'Start from mage', 'Start from knight', 'Start from ranger', 'Start from noble'].map((option) => <option key={option}>{option}</option>)}
-        </select></label>
-        <TextField label="Appearance and details" value={create.details} onChange={(details) => setCreate({ ...create, details })} />
-      </PromptCard>
+    <div>
+      <div role="tablist" aria-label="Choose your goal" className="grid gap-3 lg:grid-cols-3">
+        {journeys.map((journey) => (
+          <button key={journey.id} type="button" role="tab" aria-selected={active === journey.id} onClick={() => setActive(journey.id)} className={`rounded-md border p-4 text-left ${active === journey.id ? 'border-accent bg-accent/10' : 'border-border bg-surface'}`}>
+            <span className="text-xs font-semibold uppercase tracking-wide text-text-mute">{journey.term}</span>
+            <span className="mt-1 block font-semibold text-text">{journey.title}</span>
+            <span className="mt-2 block text-sm leading-5 text-text-2">{journey.description}</span>
+          </button>
+        ))}
+      </div>
 
-      <PromptCard title="Refine a character" tag="Refine" prompt={buildRefineCharacterPrompt(refine)} expectedResult={buildRefineCharacterResult(refine.characterName)} highlights={[refine.characterName, refine.part, refine.result]} valid={Object.values(refine).every((value) => value.trim())} onReset={() => setRefine(refineDefaults)}>
-        <TextField label="Character name" value={refine.characterName} onChange={(characterName) => setRefine({ ...refine, characterName })} />
-        <TextField label="Part to change" value={refine.part} onChange={(part) => setRefine({ ...refine, part })} />
-        <TextField label="Desired result" value={refine.result} onChange={(result) => setRefine({ ...refine, result })} />
-      </PromptCard>
-
-      <PromptCard title="Preview and export" tag="Export" prompt={buildExportCharacterPrompt({ characterName: exportName, animations: joined(exportAnimations), bundle })} expectedResult={buildExportCharacterResult(exportName, bundle)} highlights={[exportName, joined(exportAnimations), bundle]} valid={Boolean(exportName.trim() && exportAnimations.length && bundle)} onReset={() => { setExportName('fisher'); setExportAnimations(['walk', 'idle']); setBundle('attributed ZIP bundle'); }}>
-        <TextField label="Character name" value={exportName} onChange={setExportName} />
-        <AnimationChoices selected={exportAnimations} onChange={setExportAnimations} />
-        <label className="text-sm text-text-2">Bundle format<select className={fieldClassName} value={bundle} onChange={(event) => setBundle(event.target.value)}><option>attributed ZIP bundle</option><option>attributed render directory</option></select></label>
-      </PromptCard>
-
-      <PromptCard title="Audit animation assets" tag="Animation audit" prompt={buildAnimationAuditPrompt({ assetType, animations: joined(auditAnimations), worklistSize })} expectedResult={buildAnimationAuditResult(assetType, worklistSize)} readOnlyResult highlights={[assetType, joined(auditAnimations), worklistSize]} valid={Boolean(assetType.trim() && auditAnimations.length && Number.isInteger(worklistNumber) && worklistNumber >= 1 && worklistNumber <= 100)} onReset={() => { setAssetType('clothes'); setAuditAnimations(['walk', 'run']); setWorklistSize('20'); }}>
-        <TextField label="Asset type" value={assetType} onChange={setAssetType} />
-        <AnimationChoices selected={auditAnimations} onChange={setAuditAnimations} />
-        <label className="text-sm text-text-2">Worklist size<input className={fieldClassName} type="number" min="1" max="100" value={worklistSize} onChange={(event) => setWorklistSize(event.target.value)} /></label>
-      </PromptCard>
+      <div className="mt-4">
+        {active === 'compose' && (
+          <PromptPanel title="Build a character from existing art" term="Sprite composition" prompt={buildCreateCharacterPrompt(compose)} result={buildCreateCharacterResult(compose.concept)} valid={Object.values(compose).every((value) => value.trim())} onReset={() => setCompose(composeDefaults)} stages={[{ label: 'Choose existing art', authority: 'Read catalog' }, { label: 'Compose and validate', authority: 'Write character file' }, { label: 'Review attributed preview', authority: 'Preview only' }]}>
+            <TextField label="Character idea" value={compose.concept} onChange={(concept) => setCompose({ ...compose, concept })} />
+            <label className="text-sm text-text-2">Starting point<select data-prompt-input="true" className={fieldClassName} value={compose.startingPoint} onChange={(event) => setCompose({ ...compose, startingPoint: event.target.value })}>{['Let the agent choose', 'farmer preset', 'villager preset', 'no preset'].map((value) => <option key={value}>{value}</option>)}</select></label>
+            <TextField label="Important details" value={compose.details} onChange={(details) => setCompose({ ...compose, details })} />
+          </PromptPanel>
+        )}
+        {active === 'extend' && (
+          <PromptPanel title="Add a missing animation" term="Animation extension" prompt={buildAnimationExtensionPrompt(extend)} result={buildAnimationExtensionResult(extend.item)} valid={Object.values(extend).every((value) => value.trim())} onReset={() => setExtend(extendDefaults)} stages={[{ label: 'Audit the gap', authority: 'Read-only' }, { label: 'Confirm revision', authority: 'User approval required' }, { label: 'Import and preview', authority: 'Write bounded source' }]}>
+            <TextField label="Existing item" value={extend.item} onChange={(item) => setExtend({ ...extend, item })} />
+            <TextField label="Missing animation" value={extend.animations} onChange={(animations) => setExtend({ ...extend, animations })} />
+            <TextField label="When to proceed" value={extend.details} onChange={(details) => setExtend({ ...extend, details })} />
+          </PromptPanel>
+        )}
+        {active === 'new' && (
+          <PromptPanel title="Create a new asset" term="New asset authoring" prompt={buildNewAssetPrompt(newAsset)} result={buildNewAssetResult(newAsset.assetType)} valid={Object.values(newAsset).every((value) => value.trim())} onReset={() => setNewAsset(newDefaults)} stages={[{ label: 'Define supported scope', authority: 'Read catalog' }, { label: 'Confirm credits and provider', authority: 'User approval required' }, { label: 'Import and preview', authority: 'Write new source' }]}>
+            <TextField label="Asset idea" value={newAsset.concept} onChange={(concept) => setNewAsset({ ...newAsset, concept })} />
+            <TextField label="Asset type" value={newAsset.assetType} onChange={(assetType) => setNewAsset({ ...newAsset, assetType })} />
+            <TextField label="Animations" value={newAsset.animations} onChange={(animations) => setNewAsset({ ...newAsset, animations })} />
+          </PromptPanel>
+        )}
+      </div>
     </div>
   );
 }

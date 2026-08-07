@@ -36,18 +36,23 @@ export function validatePluginRepository(repoRoot) {
   const pluginRelative = 'plugins/lpc-toolkit';
   const pluginRoot = path.join(repoRoot, pluginRelative);
   const manifestPath = path.join(pluginRoot, '.codex-plugin/plugin.json');
+  const compatibilityPath = path.join(pluginRoot, 'compatibility.json');
   const marketplacePath = path.join(repoRoot, '.agents/plugins/marketplace.json');
 
   requireFile(repoRoot, `${pluginRelative}/.codex-plugin/plugin.json`, errors);
+  requireFile(repoRoot, `${pluginRelative}/compatibility.json`, errors);
   requireFile(repoRoot, '.agents/plugins/marketplace.json', errors);
   if (errors.length > 0) return errors;
 
   const manifest = readJson(manifestPath, errors, 'plugin manifest');
+  const compatibility = readJson(compatibilityPath, errors, 'plugin compatibility');
   const marketplace = readJson(marketplacePath, errors, 'repository marketplace');
-  if (!manifest || !marketplace) return errors;
+  if (!manifest || !compatibility || !marketplace) return errors;
 
   if (manifest.name !== 'lpc-toolkit') errors.push('plugin manifest name must be lpc-toolkit.');
-  if (manifest.version !== '0.2.1') errors.push('plugin manifest version must be 0.2.1.');
+  if (typeof manifest.version !== 'string' || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u.test(manifest.version)) {
+    errors.push('plugin manifest version must be a semantic version.');
+  }
   if (manifest.license !== 'GPL-3.0-or-later') errors.push('plugin manifest license must be GPL-3.0-or-later.');
   if (manifest.skills !== './skills/') errors.push('plugin manifest skills must point to ./skills/.');
 
@@ -59,7 +64,15 @@ export function validatePluginRepository(repoRoot) {
       .map((entry) => entry.name)
       .sort()
     : [];
-  const expectedSkills = ['animation-asset-audit', 'character-authoring'];
+  if (compatibility.schema !== 'lpc-toolkit.plugin-compatibility.v1') {
+    errors.push('plugin compatibility schema must be lpc-toolkit.plugin-compatibility.v1.');
+  }
+  if (typeof compatibility.cliRange !== 'string'
+    || !/^>=\d+\.\d+\.\d+ <\d+\.\d+\.\d+$/u.test(compatibility.cliRange)) {
+    errors.push('plugin compatibility cliRange must be a bounded stable semantic-version range.');
+  }
+
+  const expectedSkills = ['animation-asset-audit', 'asset-authoring', 'character-authoring'];
   if (JSON.stringify(skillNames) !== JSON.stringify(expectedSkills)) {
     errors.push(`plugin skills must be exactly: ${expectedSkills.join(', ')}.`);
   }

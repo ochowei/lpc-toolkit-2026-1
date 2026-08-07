@@ -1,10 +1,16 @@
+import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+const pluginRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const compatibility = JSON.parse(readFileSync(path.join(pluginRoot, 'compatibility.json'), 'utf8'));
+const rangeMatch = /^>=(\d+\.\d+\.\d+) <(\d+\.\d+\.\d+)$/u.exec(compatibility.cliRange);
+if (!rangeMatch) throw new Error('compatibility.json cliRange must be a bounded stable semantic-version range.');
 
 export const SUPPORTED_CLI = Object.freeze({
-  min: '0.2.0',
-  maxExclusive: '0.3.0',
+  min: rangeMatch[1],
+  maxExclusive: rangeMatch[2],
 });
 
 const IDENTIFIER = '[0-9A-Za-z-]+';
@@ -15,7 +21,7 @@ const VERSION = new RegExp(
   'u',
 );
 const NUMERIC_IDENTIFIER = /^\d+$/u;
-const supportedRange = `>=${SUPPORTED_CLI.min} <${SUPPORTED_CLI.maxExclusive}`;
+const supportedRange = compatibility.cliRange;
 
 function parseSemver(input) {
   const match = VERSION.exec(input.trim());
@@ -24,15 +30,8 @@ function parseSemver(input) {
   if (prerelease.some((identifier) => (
     identifier.length === 0
       || (NUMERIC_IDENTIFIER.test(identifier) && identifier.length > 1 && identifier.startsWith('0'))
-  ))) {
-    throw new Error(`Invalid semantic version: ${input}`);
-  }
-  return {
-    major: match[1],
-    minor: match[2],
-    patch: match[3],
-    prerelease,
-  };
+  ))) throw new Error(`Invalid semantic version: ${input}`);
+  return { major: match[1], minor: match[2], patch: match[3], prerelease };
 }
 
 function compareNumericIdentifiers(left, right) {
@@ -73,12 +72,7 @@ export function compareSemver(leftInput, rightInput) {
 }
 
 function failure(code, message, installedVersion = null) {
-  return {
-    ok: false,
-    installedVersion,
-    supportedRange,
-    errors: [{ code, message }],
-  };
+  return { ok: false, installedVersion, supportedRange, errors: [{ code, message }] };
 }
 
 export function evaluateVersion(output) {
@@ -116,19 +110,14 @@ export function checkCli({
         : `Failed to run lpc-toolkit --version: ${result.error.message}`,
     );
   }
-  if (result.status !== 0) {
-    return failure('cli_check_failed', `lpc-toolkit --version exited with status ${result.status}.`);
-  }
+  if (result.status !== 0) return failure('cli_check_failed', `lpc-toolkit --version exited with status ${result.status}.`);
   return evaluateVersion(result.stdout ?? '');
 }
 
 if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) {
   const nodeEntry = process.env.LPC_TOOLKIT_NODE_ENTRY;
   const result = nodeEntry
-    ? checkCli({
-        binary: process.execPath,
-        versionArgs: [path.resolve(nodeEntry), '--version'],
-      })
+    ? checkCli({ binary: process.execPath, versionArgs: [path.resolve(nodeEntry), '--version'] })
     : checkCli();
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   if (!result.ok) process.exitCode = 1;

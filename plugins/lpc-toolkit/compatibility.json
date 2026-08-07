@@ -1,0 +1,4 @@
+{
+  "schema": "lpc-toolkit.plugin-compatibility.v1",
+  "cliRange": ">=0.2.0 <0.3.0"
+}

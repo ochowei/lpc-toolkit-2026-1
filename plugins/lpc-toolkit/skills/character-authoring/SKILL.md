@@ -1,6 +1,6 @@
 ---
 name: lpc-character-authoring
-description: Use when creating, editing, validating, previewing, or rendering LPC characters through the installed lpc-toolkit CLI. Do not use for unrelated image editing or non-LPC sprites. Use lpc-animation-asset-audit for source-asset animation audits and drawing worklists.
+description: Use when composing, editing, validating, previewing, or rendering LPC characters from existing catalog assets through the installed lpc-toolkit CLI. Do not use for creating source pixels, unrelated image editing, or non-LPC sprites. Use lpc-animation-asset-audit for read-only source-asset animation audits and lpc-asset-authoring for confirmed source-asset revisions.
 ---
 
 # LPC Character Authoring
@@ -8,11 +8,14 @@ description: Use when creating, editing, validating, previewing, or rendering LP
 Use `lpc-toolkit` as the only source of catalog, selection, validation, render,
 and attribution behavior.
 
-Use lpc-animation-asset-audit for source-asset animation audits and drawing worklists.
+This journey composes existing art; it does not create or replace source assets.
+Use lpc-animation-asset-audit for read-only source-asset animation audits. If
+the catalog cannot satisfy the character, explain the gap and ask before
+switching to lpc-asset-authoring.
 
-1. Read `references/compatibility.md`. Resolve this installed skill directory
-   to an absolute path named `SKILL_DIR`, then run
-   `node "$SKILL_DIR/scripts/check-cli.mjs"`. Continue only when its JSON result
+1. Resolve the installed plugin directory to an absolute path named
+   `PLUGIN_ROOT`. Read `$PLUGIN_ROOT/references/compatibility.md`, then run
+   `node "$PLUGIN_ROOT/scripts/check-cli.mjs"`. Continue only when its JSON result
    has `ok: true`; never install or upgrade the CLI silently.
 
 Read `references/cli-workflow.md` before authoring. Treat

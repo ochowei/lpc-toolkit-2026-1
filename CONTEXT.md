@@ -36,6 +36,24 @@ A natural-language task that a user can copy and give to an agent to invoke an
 agent integration workflow, including the intended outcome when useful.
 _Avoid_: CLI command example, implementation instruction
 
+**Journey kickoff prompt**:
+A minimally parameterized Agent prompt example that starts one Agent-guided
+journey and leaves stage-specific questions to the Agent at their relevant
+authority boundaries.
+_Avoid_: Complete authoring specification, CLI command bundle
+
+**Agent-guided journey**:
+A progressively disclosed, user-facing path for one LPC Toolkit goal, with its
+visible stages, inputs, authority transitions, expected result, and next action
+kept together.
+_Avoid_: Prompt grid, mixed workflow
+
+**Cross-journey transition**:
+An Agent-proposed change from one Agent-guided journey to another after the
+current workflow cannot satisfy the user's goal. It requires explicit user
+confirmation before the new journey gains authority.
+_Avoid_: Automatic fallback, silent generation, automatic repair
+
 **Expected result**:
 A read-only summary of the files and conversational response an agent prompt
 example is expected to produce. It is guidance, not part of the copied prompt.
@@ -56,7 +74,7 @@ _Avoid_: Asset pack, spritesheet manifest
 **Sprite composition**:
 The attributed rendering of selected existing sprite assets into character
 output. It does not create new source assets or change an asset pack.
-_Avoid_: Asset creation, character generation
+_Avoid_: Asset creation, character creation, character generation
 
 **Asset-pack manifest**:
 The canonical declaration of an attributed asset pack's identity, assets,
@@ -73,7 +91,7 @@ _Avoid_: Asset manifest, character selection
 An attributed addition that supplies missing or incomplete animation pixels
 for an existing catalog item while retaining the item's baseline identity and
 credits.
-_Avoid_: New item, character edit, audit finding
+_Avoid_: New item, replacement asset, asset redesign, character edit, audit finding
 
 **Asset validation**:
 The evaluation of an asset pack's schema, catalog compatibility, PNG geometry
@@ -104,16 +122,37 @@ geometry, cells, layers, body types, and transparency rules that drawing work
 must satisfy.
 _Avoid_: Prompt, asset-pack manifest, drawing worklist
 
+**Authoring reference**:
+An optional image or existing asset used to guide candidate sprite pixels after
+the user approves its disclosure to a generation provider. It is not evidence
+of authorship, license authority, or permission to reproduce the reference.
+_Avoid_: Credit source, license evidence, attribution author
+
 **Animation remediation handoff**:
 A read-only, digest-bound transfer of animation audit evidence and a bounded
 drawing worklist into a possible animation-extension workflow.
 _Avoid_: Asset mutation, acknowledgement, asset pack
 
+**Animation remediation journey**:
+A user-facing progression from read-only animation audit through explicit
+consent into animation-extension authoring. The audit and source mutation remain
+distinct authority boundaries even when presented as one guided experience.
+_Avoid_: Automatic repair, audit mutation
+
+**New asset authoring journey**:
+A provider-neutral progression that declares a new attributed asset, defines
+its sprite drawing contract, obtains candidate sprite pixels, validates them,
+and prepares them for human-reviewed release within supported LPC types,
+animations, geometry, and transparency rules. A generation provider is optional
+and does not change the asset's identity or governance.
+_Avoid_: Image generation, provider workflow, sprite composition
+
 **Generation provider**:
 An optional tool or delivery path that produces candidate sprite pixels from a
 sprite drawing contract, including a handoff to an external author. The role
 does not own the asset-pack manifest, validation, or release workflow; a human
-contributor may separately be an attribution author.
+contributor may separately be an attribution author. Provider availability does
+not authorize selection, invocation, or disclosure of drawing inputs.
 _Avoid_: Asset author, authoring skill
 
 **Candidate sprite**:
@@ -126,6 +165,12 @@ Traceable evidence about how candidate sprite pixels were produced, including
 the provider, inputs, references, contract, and result digests. It is distinct
 from authorship and license declarations.
 _Avoid_: Credits, author, acknowledgement
+
+**Draft attribution**:
+Human-supplied author, license, source, and note information used while
+validating and previewing an asset revision. It remains subject to explicit
+confirmation before formal release.
+_Avoid_: Release declaration, inferred credits, generation provenance
 
 **Release provenance projection**:
 A versioned, bounded, deterministic subset of generation provenance that is
@@ -144,3 +189,9 @@ _Avoid_: Generation provider, pack maintainer
 A preview whose rendered pixels remain visibly associated with the exact
 matching credit metadata used for review.
 _Avoid_: Thumbnail, unattributed mockup
+
+**Review-ready asset revision**:
+An asset-pack revision whose candidate pixels have been imported, validated,
+and rendered in a current attributed preview, but have not necessarily received
+the human declarations required for formal release.
+_Avoid_: Completed asset, released asset, generated PNG

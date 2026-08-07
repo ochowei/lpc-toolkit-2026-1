@@ -328,12 +328,19 @@ test('validates both skill frontmatter and OpenAI agent metadata contracts', () 
     shortDescription: 'Find incomplete LPC animation assets',
     defaultPrompt: 'Audit selected LPC animations and produce a bounded drawing worklist from the structured findings.',
   }, {
+    directory: 'asset-authoring',
+    name: 'lpc-asset-authoring',
+    description: 'Use when extending missing animations for an existing LPC catalog item or creating a new attributed asset for supported LPC body types, animations, geometry, and transparency. Requires explicit confirmation before source mutation or provider disclosure. Do not use for character composition, read-only audits, replacement redesigns, custom skeletons, unsupported layouts, or unrelated image editing.',
+    displayName: 'LPC Asset Authoring',
+    shortDescription: 'Extend or create attributed LPC assets',
+    defaultPrompt: 'Create or extend an LPC asset, validate it, and prepare an attributed review-ready preview.',
+  }, {
     directory: 'character-authoring',
     name: 'lpc-character-authoring',
-    description: 'Use when creating, editing, validating, previewing, or rendering LPC characters through the installed lpc-toolkit CLI. Do not use for unrelated image editing or non-LPC sprites. Use lpc-animation-asset-audit for source-asset animation audits and drawing worklists.',
+    description: 'Use when composing, editing, validating, previewing, or rendering LPC characters from existing catalog assets through the installed lpc-toolkit CLI. Do not use for creating source pixels, unrelated image editing, or non-LPC sprites. Use lpc-animation-asset-audit for read-only source-asset animation audits and lpc-asset-authoring for confirmed source-asset revisions.',
     displayName: 'LPC Character Authoring',
-    shortDescription: 'Create and render attributed LPC characters',
-    defaultPrompt: 'Create an LPC character, preview it, and render the requested attributed artifacts.',
+    shortDescription: 'Compose characters from existing LPC art',
+    defaultPrompt: 'Build an LPC character from existing catalog art and show me an attributed preview.',
   }];
 
   for (const expected of expectedSkills) {
@@ -357,14 +364,15 @@ test('validates both skill frontmatter and OpenAI agent metadata contracts', () 
   }
 });
 
-test('keeps compatibility ranges identical and checkers self-contained', async () => {
-  const audit = await import('../skills/animation-asset-audit/scripts/check-cli.mjs');
-  const character = await import('../skills/character-authoring/scripts/check-cli.mjs');
-  assert.deepEqual(audit.SUPPORTED_CLI, character.SUPPORTED_CLI);
-  assert.notEqual(
-    new URL('../skills/animation-asset-audit/scripts/check-cli.mjs', import.meta.url).href,
-    new URL('../skills/character-authoring/scripts/check-cli.mjs', import.meta.url).href,
-  );
+test('routes mutating asset work through one consent-bound skill', () => {
+  const skill = readFileSync(new URL(
+    '../skills/asset-authoring/SKILL.md', import.meta.url,
+  ), 'utf8').replace(/\s+/gu, ' ');
+  for (const required of [
+    '`extend-item`', '`new-item`', 'explicit user confirmation',
+    'Never silently select, install, switch, or invoke a provider',
+    'review-ready asset revision', 'Formal release and installation',
+  ]) assert.equal(skill.includes(required), true, `missing ${required}`);
 });
 
 test('documents safe report preservation and finding interpretation', () => {

@@ -599,12 +599,73 @@ export function AgentIntegrationsPage({ onNavigate }: ProductPageProps) {
             Agent Integrations
           </h1>
           <p className="mt-4 max-w-2xl text-base text-text-2">
-            Use platform-specific LPC Toolkit workflows while preserving the
-            same attributed CLI output and credit metadata.
+            Choose what you want to make. Codex guides the questions, shows
+            when authority changes, and preserves attributed CLI output.
           </p>
         </header>
 
-        <section className="rounded-md border border-border bg-surface p-5">
+        <section aria-labelledby="agent-prompts-heading">
+          <div className="mb-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-mute">
+              Choose your goal
+            </p>
+            <h2 id="agent-prompts-heading" className="mt-2 text-2xl font-semibold text-text">
+              Start with the outcome you need
+            </h2>
+            <p className="mt-2 max-w-3xl text-sm text-text-2">
+              Customize one short kickoff prompt. Codex asks stage-specific
+              follow-up questions instead of making you complete a technical form.
+            </p>
+          </div>
+          <AgentPromptBuilders />
+        </section>
+
+        <details className="rounded-md border border-border bg-surface p-5">
+          <summary className="cursor-pointer text-xl font-semibold text-text">
+            One-time setup for Codex
+          </summary>
+          <p className="mt-3 max-w-3xl text-sm text-text-2">
+            Returning users can skip this section. New users need Node.js 22 or
+            newer, a compatible CLI, the marketplace, and plugin <code>0.3.0</code>.
+            Start a new task after installation.
+          </p>
+          <ol className="mt-5 grid min-w-0 gap-4">
+            {[
+              "npm install -g '@lpc-toolkit/cli@>=0.2.0 <0.3.0'",
+              'codex plugin marketplace add ochowei/lpc-toolkit-2026-1',
+              'codex plugin add lpc-toolkit@lpc-toolkit',
+            ].map((command, index) => (
+              <li key={command} className="min-w-0 rounded-md border border-border bg-surface-2 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-text-mute">Step {index + 1}</p>
+                <CopyCode className="mt-3" children={command} />
+              </li>
+            ))}
+          </ol>
+          <p className="mt-4 text-sm text-text-2">
+            The plugin checks the installed CLI against <code>&gt;=0.2.0 &lt;0.3.0</code>
+            and never upgrades it silently.{' '}
+            <a className="underline hover:text-text" href={pluginReadmeUrl} target="_blank" rel="noreferrer">
+              Read the plugin details
+            </a>
+            .
+          </p>
+        </details>
+
+        <section className="rounded-md border border-accent/40 bg-accent/10 p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-mute">Safety summary</p>
+          <h2 className="mt-2 text-xl font-semibold text-text">You approve every authority change</h2>
+          <p className="mt-2 max-w-3xl text-sm text-text-2">
+            Catalog search and animation audit are read-only. Codex asks before
+            source files change, before references or prompts leave the task,
+            and before a provider is used. A review-ready preview is not a
+            release or installation.
+          </p>
+        </section>
+
+        <details className="rounded-md border border-border bg-surface p-5">
+          <summary className="cursor-pointer text-xl font-semibold text-text">
+            For integration developers: provider-neutral D2 contract
+          </summary>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-mute">
             Provider-neutral boundary
           </p>
@@ -631,84 +692,7 @@ export function AgentIntegrationsPage({ onNavigate }: ProductPageProps) {
             formal release. Provider identity is provenance evidence, not
             authorship, licensing, consent, or approval.
           </p>
-        </section>
-
-        <section className="rounded-md border border-border bg-surface p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-mute">
-            Codex
-          </p>
-          <h2 className="mt-2 text-2xl font-semibold text-text">
-            Step 1: Install the CLI prerequisite
-          </h2>
-          <p className="mt-2 max-w-3xl text-sm text-text-2">
-            The Codex plugin uses the <code>lpc-toolkit</code> CLI to perform
-            its character workflows. Install the compatible CLI before
-            installing the plugin.
-          </p>
-          <div className="mt-5 min-w-0 rounded-md border border-border bg-surface-2 p-4">
-            <CopyCode
-              children="npm install -g @lpc-toolkit/cli"
-            />
-          </div>
-        </section>
-
-        <section className="rounded-md border border-border bg-surface p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-mute">
-            Codex plugin
-          </p>
-          <h2 className="mt-2 text-2xl font-semibold text-text">
-            Steps 2–3: Install the Codex plugin
-          </h2>
-          <p className="mt-2 max-w-3xl text-sm text-text-2">
-            With the CLI installed, add the beta marketplace and enable the
-            plugin to give Codex a focused workflow for creating, editing,
-            previewing, and rendering attributed LPC characters.
-          </p>
-          <ol className="mt-5 grid min-w-0 gap-4">
-            {[
-              'codex plugin marketplace add ochowei/lpc-toolkit-2026-1',
-              'codex plugin add lpc-toolkit@lpc-toolkit',
-            ].map((command, index) => (
-              <li
-                key={command}
-                className="min-w-0 rounded-md border border-border bg-surface-2 p-4"
-              >
-                <p className="text-xs font-semibold uppercase tracking-wide text-text-mute">
-                  Step {index + 2}
-                </p>
-                <CopyCode className="mt-3" children={command} />
-              </li>
-            ))}
-          </ol>
-          <p className="mt-4 text-sm text-text-2">
-            The plugin requires Node.js 22 or newer and an installed compatible
-            CLI.{' '}
-            <a
-              className="underline hover:text-text"
-              href={pluginReadmeUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Read the plugin details
-            </a>
-            .
-          </p>
-        </section>
-
-        <section aria-labelledby="agent-prompts-heading">
-          <div className="mb-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-mute">
-              Prompt builders
-            </p>
-            <h2 id="agent-prompts-heading" className="mt-2 text-2xl font-semibold text-text">
-              Try it with Codex
-            </h2>
-            <p className="mt-2 max-w-3xl text-sm text-text-2">
-              Customize a task, then copy the generated prompt into Codex.
-            </p>
-          </div>
-          <AgentPromptBuilders />
-        </section>
+        </details>
       </div>
     </main>
   );

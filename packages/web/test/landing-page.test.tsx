@@ -152,22 +152,28 @@ describe('CLI and agent integration pages', () => {
 
     expect(html).toContain('Agent Integrations');
     expect(html).toContain('aria-current="page"');
+    expect(html).toContain('Start with the outcome you need');
+    expect(html).toContain('Build a character from existing art');
+    expect(html).toContain('Add a missing animation');
+    expect(html).toContain('Create a new asset');
+    expect(html).toContain('One-time setup for Codex');
+    expect(html).toContain("@lpc-toolkit/cli@&gt;=0.2.0 &lt;0.3.0");
+    expect(html).toContain('plugin <code>0.3.0</code>');
+    expect(html).toContain('You approve every authority change');
+    expect(html).toContain('A review-ready preview is not a');
+    expect(html).toContain('For integration developers: provider-neutral D2 contract');
     expect(html).toContain('Provider-neutral boundary');
     expect(html).toContain('Agent integrations coordinate; the CLI remains the authority');
     expect(html).toContain('There is no built-in provider');
     expect(html).toContain(
       'lpc-toolkit agent integration check --manifest manifest.json --json',
     );
-    expect(html).toContain('Codex');
-    expect(html).toContain('Step 1: Install the CLI prerequisite');
-    expect(html).toContain('Steps 2–3: Install the Codex plugin');
-    expect(html).toContain('The Codex plugin uses the');
     expect(html).toContain(
       'codex plugin marketplace add ochowei/lpc-toolkit-2026-1',
     );
     expect(html).toContain('codex plugin add lpc-toolkit@lpc-toolkit');
-    expect(html).toContain('Try it with Codex');
-    expect(html).toContain('Customize a task, then copy the generated prompt into Codex.');
+    expect(html.indexOf('Start with the outcome you need')).toBeLessThan(html.indexOf('One-time setup for Codex'));
+    expect(html.indexOf('One-time setup for Codex')).toBeLessThan(html.indexOf('provider-neutral D2 contract'));
     expect(html).toContain(
       'https://github.com/ochowei/lpc-toolkit-2026-1#codex-plugin',
     );

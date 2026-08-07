@@ -1,0 +1,6 @@
+interface:
+  display_name: "LPC Asset Authoring"
+  short_description: "Extend or create attributed LPC assets"
+  default_prompt: "Create or extend an LPC asset, validate it, and prepare an attributed review-ready preview."
+policy:
+  allow_implicit_invocation: true
