@@ -871,7 +871,7 @@ clone.
 
 ### Codex Plugin
 
-1. Install or upgrade the CLI to the range supported by plugin `0.2.1`:
+1. Install or upgrade the CLI to the range supported by plugin `0.3.0`:
 
 ```sh
 npm install -g '@lpc-toolkit/cli@>=0.2.0 <0.3.0'
@@ -895,9 +895,14 @@ automatically install the CLI. Its supported CLI range is
 task if the newly installed skill is not visible. Public Plugins Directory
 distribution can later remove the marketplace-add step.
 
-The plugin guides Codex through JSON search, edit, validate, preview, and render
-workflows. Preview, render, and export outputs preserve metadata plus TXT and
-CSV credits.
+The plugin offers three goal-based journeys: build a character from existing
+catalog art, run `catalog audit-animations` and extend one confirmed missing
+animation, or create a new asset for a supported LPC layout. Read-only audit,
+source mutation, provider disclosure, formal release, and installation remain
+distinct authority stages. The authoring journey stops at a validated,
+attributed review-ready preview; release and install require separate human
+confirmation. Preview, render, and export outputs preserve metadata plus TXT
+and CSV credits.
 
 ### Character commands and locators
 

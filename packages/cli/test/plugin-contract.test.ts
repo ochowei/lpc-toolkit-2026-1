@@ -29,6 +29,11 @@ const auditContractPath = path.resolve(
   '../../../plugins/lpc-toolkit/skills/animation-asset-audit/references/cli-contract.json',
 );
 const auditContract = JSON.parse(readFileSync(auditContractPath, 'utf8')) as PluginContract;
+const assetContractPath = path.resolve(
+  here,
+  '../../../plugins/lpc-toolkit/skills/asset-authoring/references/cli-contract.json',
+);
+const assetContract = JSON.parse(readFileSync(assetContractPath, 'utf8')) as PluginContract;
 const workflowPath = path.resolve(
   here,
   '../../../plugins/lpc-toolkit/skills/character-authoring/references/cli-workflow.md',
@@ -39,16 +44,16 @@ const auditWorkflowPath = path.resolve(
   '../../../plugins/lpc-toolkit/skills/animation-asset-audit/references/audit-workflow.md',
 );
 const auditWorkflow = readFileSync(auditWorkflowPath, 'utf8');
-const characterCompatibilityPath = path.resolve(
+const assetWorkflowPath = path.resolve(
   here,
-  '../../../plugins/lpc-toolkit/skills/character-authoring/references/compatibility.md',
+  '../../../plugins/lpc-toolkit/skills/asset-authoring/references/authoring-workflow.md',
 );
-const characterCompatibility = readFileSync(characterCompatibilityPath, 'utf8');
-const auditCompatibilityPath = path.resolve(
+const assetWorkflow = readFileSync(assetWorkflowPath, 'utf8');
+const compatibilityPath = path.resolve(
   here,
-  '../../../plugins/lpc-toolkit/skills/animation-asset-audit/references/compatibility.md',
+  '../../../plugins/lpc-toolkit/references/compatibility.md',
 );
-const auditCompatibility = readFileSync(auditCompatibilityPath, 'utf8');
+const compatibility = readFileSync(compatibilityPath, 'utf8');
 
 describe('Codex plugin CLI contract', () => {
   it('uses the versioned character contract schema', () => {
@@ -83,8 +88,27 @@ describe('Codex plugin CLI contract', () => {
     ]);
   });
 
+  it('uses one bounded asset-authoring contract through attributed preview', () => {
+    expect(assetContract.schema).toBe('lpc-toolkit.codex-plugin.cli-contract.v1');
+    expect(assetContract.commands.map(({ id }) => id)).toEqual([
+      'version',
+      'asset-init-from-audit',
+      'authoring-start',
+      'authoring-status',
+      'authoring-resume',
+      'authoring-contract',
+      'provider-discover',
+      'provider-preflight',
+      'provider-handoff',
+      'provider-result',
+      'authoring-import',
+      'authoring-validate',
+      'authoring-preview',
+    ]);
+  });
+
   it.each(
-    [...characterContract.commands, ...auditContract.commands]
+    [...characterContract.commands, ...auditContract.commands, ...assetContract.commands]
       .filter(({ id }) => id !== 'version'),
   )(
     'keeps $id aligned with generated CLI options',
@@ -120,37 +144,24 @@ describe('Codex plugin CLI contract', () => {
     expect(auditWorkflow).toContain('cannot be installed by the CLI');
   });
 
-  it('does not claim the newer asset-authoring session capability', () => {
-    const pluginCommands = [...characterContract.commands, ...auditContract.commands];
-    expect(pluginCommands.some(({ argv }) => argv.slice(0, 2).join(' ') === 'asset authoring'))
-      .toBe(false);
-    expect(pluginCommands.every(({ argv }) =>
+  it('keeps authoring out of read-only and composition skills', () => {
+    const nonAuthoringCommands = [...characterContract.commands, ...auditContract.commands];
+    expect(nonAuthoringCommands.every(({ argv }) =>
       !(argv[0] === 'asset' && argv[1] === 'authoring'))).toBe(true);
     expect(workflow).not.toContain('asset authoring');
     expect(auditWorkflow).not.toContain('asset authoring');
-
-    const unsupportedAuthoringCommand = parseArgs([
-      'asset', 'authoring', 'start', '--plan', 'plan.json', '--json',
-    ]);
-    expect(
-      pluginCommands.some(({ argv }) =>
-        argv.slice(0, unsupportedAuthoringCommand.command.length).join(' ') ===
-        unsupportedAuthoringCommand.command.join(' ')),
-    ).toBe(false);
   });
 
-  it('documents the plugin boundary for newer authoring capabilities', () => {
-    for (const compatibility of [characterCompatibility, auditCompatibility]) {
-      expect(compatibility).toContain('asset-authoring-session.v1');
-      expect(compatibility).toContain('must not claim or invoke');
-      expect(compatibility).toContain('sprite-drawing-contract.v1');
-      expect(compatibility).toContain('asset-authoring-release.v1');
-      expect(compatibility).toContain('lpc-toolkit.asset-release-declaration.v1');
-      expect(compatibility).toContain('lpc-toolkit.asset-authoring-release-receipt.v1');
-      expect(compatibility).toContain('lpc-toolkit.asset-authoring-install-receipt.v1');
-      expect(compatibility).toContain('asset-authoring-consumer-install.v1');
-      expect(compatibility).toContain('asset authoring acknowledge');
-      expect(compatibility).toContain('accept-preview');
-    }
+  it('documents the review-ready boundary and separate human release actions', () => {
+    expect(assetWorkflow).toContain('Review-ready means');
+    expect(assetWorkflow).toContain('does not mean formally released');
+    expect(assetWorkflow).toContain('explicit consent');
+    expect(compatibility).toContain('lpc-toolkit.asset-authoring-install-receipt.v1');
+    expect(compatibility).toContain('asset-authoring-consumer-install.v1');
+    expect(compatibility).toContain('human-confirmed follow-up actions');
+    for (const forbiddenId of [
+      'authoring-acknowledge', 'authoring-declare', 'authoring-accept-preview',
+      'authoring-sync', 'authoring-pack', 'authoring-inspect', 'authoring-install',
+    ]) expect(assetContract.commands.map(({ id }) => id)).not.toContain(forbiddenId);
   });
 });

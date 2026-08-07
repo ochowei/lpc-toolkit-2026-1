@@ -12,9 +12,9 @@ interface ProductNavigationProps {
 }
 
 const items = [
-  { route: 'compose', label: 'Composer' },
-  { route: 'cli', label: 'CLI' },
-  { route: 'agents', label: 'Agent Integrations' },
+  { route: 'compose', label: 'Composer', shortLabel: 'Compose' },
+  { route: 'cli', label: 'CLI', shortLabel: 'CLI' },
+  { route: 'agents', label: 'Agent Integrations', shortLabel: 'Agents' },
 ] as const;
 
 export function ProductNavigation({
@@ -32,7 +32,7 @@ export function ProductNavigation({
           onNavigate('entry');
         }}
       >
-        LPC<span className="font-medium text-text-mute">·Toolkit</span>
+        LPC<span className="hidden font-medium text-text-mute sm:inline">·Toolkit</span>
       </a>
       <nav aria-label="Product" className="min-w-0 flex-1 overflow-x-auto">
         <div className="flex w-max items-center gap-1">
@@ -47,13 +47,14 @@ export function ProductNavigation({
                   event.preventDefault();
                   onNavigate(item.route);
                 }}
-                className={`${compact ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'} rounded-md font-medium transition-colors ${
+                className={`${compact ? 'px-2 py-1 text-xs' : 'px-2 py-1.5 text-xs sm:px-3 sm:text-sm'} rounded-md font-medium transition-colors ${
                   active
                     ? 'bg-accent text-[var(--accent-ink)]'
                     : 'text-text-2 hover:bg-surface-2 hover:text-text'
                 }`}
               >
-                {item.label}
+                <span className="sm:hidden">{item.shortLabel}</span>
+                <span className="hidden sm:inline">{item.label}</span>
               </a>
             );
           })}

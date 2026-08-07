@@ -126,9 +126,13 @@ not extended by a release. No D6 release check may contact a registry or
 marketplace, create a key, call `npm publish`, use a backend/auth service, or
 write persistent browser authoring state. The plugin deliberately has no D6
 skill or command contract.
-Plugin `0.2.1` must continue to document CLI range `>=0.2.0 <0.3.0`; the plugin
-intentionally does not claim or invoke D2 provider or D3 Web-handoff
-capabilities or add a new skill.
+Plugin `0.3.0` must continue to document CLI range `>=0.2.0 <0.3.0`. Read the
+plugin version from `.codex-plugin/plugin.json` and the CLI range from
+`plugins/lpc-toolkit/compatibility.json`; the shared checker, README surfaces,
+and tests must project those values. The asset-authoring skill may coordinate
+D2 preflight and a consent-bound handoff, but it does not make the CLI a
+provider, bypass candidate import, or turn a review-ready preview into release
+approval. D3 Web handoff remains outside the plugin workflow.
 
 Phase 1's release boundary is still session evidence, not archive publication.
 The packed smoke must show `releaseGates.releaseReady: true` only after the

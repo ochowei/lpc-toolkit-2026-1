@@ -10,7 +10,7 @@ import {
   checkCli,
   compareSemver,
   evaluateVersion,
-} from '../skills/character-authoring/scripts/check-cli.mjs';
+} from '../scripts/check-cli.mjs';
 
 test('orders stable and prerelease semantic versions', () => {
   assert.equal(compareSemver('0.1.3-alpha-1', '0.1.3'), -1);
@@ -80,65 +80,52 @@ test('rejects malformed semantic versions', () => {
   }
 });
 
-test('documents the public stable CLI installation contract for both workflows', () => {
-  for (const skillName of ['animation-asset-audit', 'character-authoring']) {
-    const skillRoot = fileURLToPath(new URL(`../skills/${skillName}/`, import.meta.url));
-    const compatibility = readFileSync(path.join(skillRoot, 'references/compatibility.md'), 'utf8');
-
-    for (const required of [
-      "npm install -g '@lpc-toolkit/cli@>=0.2.0 <0.3.0'",
-      'Plugin version `0.2.1` supports `@lpc-toolkit/cli >=0.2.0 <0.3.0`',
+test('documents the public stable CLI installation contract once for all workflows', () => {
+  const manifest = JSON.parse(readFileSync(new URL('../.codex-plugin/plugin.json', import.meta.url), 'utf8'));
+  const metadata = JSON.parse(readFileSync(new URL('../compatibility.json', import.meta.url), 'utf8'));
+  const compatibility = readFileSync(new URL('../references/compatibility.md', import.meta.url), 'utf8')
+    .replace(/\s+/gu, ' ');
+  for (const required of [
+      `npm install -g '@lpc-toolkit/cli@${metadata.cliRange}'`,
+      `Plugin version \`${manifest.version}\` supports \`@lpc-toolkit/cli ${metadata.cliRange}\``,
       '`asset-authoring-draft-recovery.v1`',
       '`lpc-toolkit.asset-authoring-draft-receipt.v1`',
       '`lpc-toolkit.asset-authoring-formal-archive-receipt.v1`',
       '`lpc-toolkit.asset-authoring-archive-inspection-receipt.v1`',
       '`lpc-toolkit.asset-authoring-install-receipt.v1`',
       '`asset-authoring-consumer-install.v1`',
-      '`asset authoring acknowledge`, `declare`, `accept-preview`, `draft`, `sync`,',
-      '`pack`, and `inspect` commands',
+      '`acknowledge`, `declare`, `accept-preview`, `sync`, `pack`, `inspect`,',
+      'human-confirmed follow-up actions',
     ]) {
       assert.equal(
         compatibility.includes(required),
         true,
-        `missing ${skillName} compatibility guidance: ${required}`,
+        `missing shared compatibility guidance: ${required}`,
       );
     }
-  }
 });
 
-test('documents and runs the checker by resolved absolute skill path from another cwd', () => {
-  const skillRoots = ['animation-asset-audit', 'character-authoring'].map((skillName) => (
-    fileURLToPath(new URL(`../skills/${skillName}/`, import.meta.url))
-  ));
-  const checkerSources = skillRoots.map((skillRoot) => (
-    readFileSync(path.join(skillRoot, 'scripts/check-cli.mjs'))
-  ));
-  assert.equal(Buffer.compare(checkerSources[0], checkerSources[1]), 0);
-
+test('documents and runs one checker by resolved absolute plugin path from another cwd', () => {
+  const pluginRoot = fileURLToPath(new URL('../', import.meta.url));
   const unrelatedCwd = mkdtempSync(path.join(os.tmpdir(), 'lpc-check-cli-cwd-'));
   const fakeCli = path.join(unrelatedCwd, 'fake-cli.mjs');
   writeFileSync(fakeCli, "process.stdout.write('0.2.0\\n');\n");
   try {
-    for (const skillRoot of skillRoots) {
-      const skill = readFileSync(path.join(skillRoot, 'SKILL.md'), 'utf8');
-      const compatibility = readFileSync(path.join(skillRoot, 'references/compatibility.md'), 'utf8');
+    const compatibility = readFileSync(path.join(pluginRoot, 'references/compatibility.md'), 'utf8');
+    for (const skillName of ['animation-asset-audit', 'asset-authoring', 'character-authoring']) {
+      const skill = readFileSync(path.join(pluginRoot, 'skills', skillName, 'SKILL.md'), 'utf8');
       for (const documentation of [skill, compatibility]) {
-        assert.match(documentation, /SKILL_DIR/);
-        assert.match(documentation, /node "\$SKILL_DIR\/scripts\/check-cli\.mjs"/);
+        assert.match(documentation, /PLUGIN_ROOT/);
+        assert.match(documentation, /node "\$PLUGIN_ROOT\/scripts\/check-cli\.mjs"/);
       }
-
-      const result = spawnSync(
-        process.execPath,
-        [path.join(skillRoot, 'scripts/check-cli.mjs')],
-        {
-          cwd: unrelatedCwd,
-          encoding: 'utf8',
-          env: { ...process.env, LPC_TOOLKIT_NODE_ENTRY: fakeCli },
-        },
-      );
-      assert.equal(result.status, 0, result.stderr);
-      assert.equal(JSON.parse(result.stdout).ok, true);
     }
+    const result = spawnSync(process.execPath, [path.join(pluginRoot, 'scripts/check-cli.mjs')], {
+      cwd: unrelatedCwd,
+      encoding: 'utf8',
+      env: { ...process.env, LPC_TOOLKIT_NODE_ENTRY: fakeCli },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(JSON.parse(result.stdout).ok, true);
   } finally {
     rmSync(unrelatedCwd, { recursive: true, force: true });
   }

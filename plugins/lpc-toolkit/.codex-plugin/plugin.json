@@ -1,7 +1,7 @@
 {
   "name": "lpc-toolkit",
-  "version": "0.2.1",
-  "description": "Create attributed LPC characters and audit incomplete animation assets through the installed LPC Toolkit CLI.",
+  "version": "0.3.0",
+  "description": "Compose characters and author attributed LPC assets with the installed CLI.",
   "author": {
     "name": "LPC Toolkit maintainers",
     "url": "https://github.com/ochowei/lpc-toolkit-2026-1"
@@ -9,20 +9,20 @@
   "homepage": "https://github.com/ochowei/lpc-toolkit-2026-1#command-line-interface",
   "repository": "https://github.com/ochowei/lpc-toolkit-2026-1",
   "license": "GPL-3.0-or-later",
-  "keywords": ["lpc", "sprites", "characters", "animation-audit", "game-assets", "cli"],
+  "keywords": ["lpc", "sprites", "characters", "animation-audit", "asset-authoring", "game-assets", "cli"],
   "skills": "./skills/",
   "interface": {
     "displayName": "LPC Toolkit",
-    "shortDescription": "Author LPC characters and audit animation assets",
-    "longDescription": "Guide Codex through attributed LPC character authoring and read-only animation asset audits that produce bounded drawing worklists from structured CLI findings.",
+    "shortDescription": "Compose characters and author LPC assets",
+    "longDescription": "Guide Codex through three attributed workflows: compose a character from existing art, extend incomplete animations, or create new assets for supported LPC layouts.",
     "developerName": "LPC Toolkit maintainers",
     "category": "Developer Tools",
     "capabilities": ["Read", "Write"],
     "websiteURL": "https://github.com/ochowei/lpc-toolkit-2026-1",
     "defaultPrompt": [
-      "Create an LPC character from the farmer preset and help me refine the outfit.",
-      "Change my LPC character's hair, preview it, and render an attributed ZIP bundle.",
-      "Find weapon assets with incomplete run animation support and produce a bounded drawing worklist."
+      "Build an LPC character from existing catalog art, show an attributed preview, and help me refine it.",
+      "Find a catalog item with incomplete run animation support, show me the read-only evidence, and ask before starting an authoring revision.",
+      "Create a new attributed LPC asset for a supported layout and stop at a review-ready preview."
     ],
     "brandColor": "#315B3A",
     "composerIcon": "./assets/icon.svg",

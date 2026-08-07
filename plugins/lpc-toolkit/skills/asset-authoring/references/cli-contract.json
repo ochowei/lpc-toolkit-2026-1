@@ -1,0 +1,18 @@
+{
+  "schema": "lpc-toolkit.codex-plugin.cli-contract.v1",
+  "commands": [
+    { "id": "version", "argv": ["--version"], "machineReadable": false },
+    { "id": "asset-init-from-audit", "argv": ["asset", "init", "--from-audit", "audit.json", "--item", "hair_braid", "--pack-id", "acme.hair", "--display-name", "ACME Hair", "--author", "Alice", "--license", "CC-BY-SA 4.0", "--url", "https://example.test/acme-hair", "--json"], "machineReadable": true },
+    { "id": "authoring-start", "argv": ["asset", "authoring", "start", "--plan", "plan.json", "--workspace", "workspace", "--json"], "machineReadable": true },
+    { "id": "authoring-status", "argv": ["asset", "authoring", "status", "--session", "session-id", "--workspace", "workspace", "--json"], "machineReadable": true },
+    { "id": "authoring-resume", "argv": ["asset", "authoring", "resume", "--session", "session-id", "--workspace", "workspace", "--json"], "machineReadable": true },
+    { "id": "authoring-contract", "argv": ["asset", "authoring", "contract", "--session", "session-id", "--workspace", "workspace", "--json"], "machineReadable": true },
+    { "id": "provider-discover", "argv": ["asset", "authoring", "provider", "discover", "--session", "session-id", "--contract-digest", "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "--descriptors", "providers.json", "--json"], "machineReadable": true },
+    { "id": "provider-preflight", "argv": ["asset", "authoring", "provider", "preflight", "--session", "session-id", "--contract-digest", "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "--descriptor", "provider.json", "--json"], "machineReadable": true },
+    { "id": "provider-handoff", "argv": ["asset", "authoring", "provider", "handoff", "--session", "session-id", "--descriptor", "provider.json", "--consent", "consent.json", "--confirm", "--workspace", "workspace", "--json"], "machineReadable": true },
+    { "id": "provider-result", "argv": ["asset", "authoring", "provider", "result", "--session", "session-id", "--invocation", "invocation.json", "--result", "result.json", "--candidate", "candidate.png", "--workspace", "workspace", "--json"], "machineReadable": true },
+    { "id": "authoring-import", "argv": ["asset", "authoring", "import", "--session", "session-id", "--target", "target-id", "--candidate", "candidate.png", "--contract-digest", "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "--workspace", "workspace", "--json"], "machineReadable": true },
+    { "id": "authoring-validate", "argv": ["asset", "authoring", "validate", "--session", "session-id", "--workspace", "workspace", "--json"], "machineReadable": true },
+    { "id": "authoring-preview", "argv": ["asset", "authoring", "preview", "--session", "session-id", "--workspace", "workspace", "--json"], "machineReadable": true }
+  ]
+}
