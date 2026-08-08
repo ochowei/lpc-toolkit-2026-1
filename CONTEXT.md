@@ -31,6 +31,25 @@ A platform-specific way for an AI coding agent to use LPC Toolkit workflows.
 A plugin is one possible form of agent integration, not a synonym for it.
 _Avoid_: Agent plugin, Codex integration as the cross-platform category
 
+**Product interface**:
+A supported way for a human or AI agent to enter and carry out an LPC Toolkit
+journey. It describes a product boundary, not a source-code unit.
+_Avoid_: Module, package
+
+**Web Composer**:
+The optional, secondary human-facing product interface for interactive sprite
+composition and visual review. It is distinct from the Web application that
+also hosts guidance pages and is not required by Agent integration or CLI
+journeys.
+_Avoid_: Web site, Vercel deployment, required authoring service
+
+**Local-first artifact lifecycle**:
+An artifact lifecycle in which canonical authoring source and review or release
+evidence remain in a user-selected local workspace unless the user explicitly
+exports, installs, uploads, or publishes them. It describes storage and control,
+not copyright ownership or guaranteed offline operation.
+_Avoid_: Local-only, offline-only, user-owned artifacts
+
 **Agent prompt example**:
 A natural-language task that a user can copy and give to an agent to invoke an
 agent integration workflow, including the intended outcome when useful.

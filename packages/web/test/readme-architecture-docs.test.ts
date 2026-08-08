@@ -21,6 +21,7 @@ const contributing = readRepoFileIfExists('CONTRIBUTING.md');
 const cliReadme = readRepoFile('packages/cli/README.md');
 const coreReadme = readRepoFile('packages/core/README.md');
 const architecture = readRepoFile('docs/ARCHITECTURE.md');
+const productDirection = readRepoFile('docs/PRODUCT-DIRECTION.md');
 const agents = readRepoFile('AGENTS.md');
 const claude = readRepoFile('CLAUDE.md');
 const engineering = readRepoFile('docs/ENGINEERING.md');
@@ -36,6 +37,7 @@ const maintainedDocuments = new Map([
   ['AGENTS.md', agents],
   ['CLAUDE.md', claude],
   ['docs/ARCHITECTURE.md', architecture],
+  ['docs/PRODUCT-DIRECTION.md', productDirection],
   ['docs/ENGINEERING.md', engineering],
   ['docs/ONBOARDING.md', onboarding],
   ['docs/RELEASING.md', releasing],
@@ -80,6 +82,12 @@ describe('README architecture contract', () => {
   });
 
   it('routes contributor and maintainer workflows to focused documents', () => {
+    expect(readme).toContain(
+      '[product direction](docs/PRODUCT-DIRECTION.md)',
+    );
+    expect(agents).toContain(
+      '[Product direction](docs/PRODUCT-DIRECTION.md)',
+    );
     expect(readme).toContain('[`CONTRIBUTING.md`](CONTRIBUTING.md)');
     expect(readme).toContain(
       '[`docs/ENGINEERING.md`](docs/ENGINEERING.md)',
@@ -92,6 +100,23 @@ describe('README architecture contract', () => {
     expect(releasing).toContain('npm OIDC');
     expect(readme).not.toContain('Maintainers: RC validation');
     expect(readme).not.toContain('Trusted Publisher');
+  });
+
+  it('keeps product direction distinct, discoverable, and domain-aligned', () => {
+    for (const phrase of [
+      'Agent integration',
+      'CLI',
+      'Web Composer',
+      'Sprite composition',
+      'Animation remediation journey',
+      'New asset authoring journey',
+      'local-first',
+      'user-controlled',
+      '## Current non-goals',
+      'implementation-status dashboard',
+    ]) {
+      expect(productDirection).toContain(phrase);
+    }
   });
 
   it('keeps maintained local Markdown links relative and resolvable', () => {
