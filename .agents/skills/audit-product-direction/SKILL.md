@@ -117,6 +117,27 @@ another without dimension-specific evidence.
 
 ### Explanation readability
 
+Before scoring each user-facing surface, identify its intended reader from the
+entry point, page title, navigation, and surrounding copy. Assess whether the
+surface uses progressive disclosure appropriate to that reader:
+
+- General-user journey pages must explain the user's goal, choices, authority,
+  and next action in plain language. Do not treat internal roadmap identifiers,
+  phase labels, implementation codenames, protocol schemas, command contracts,
+  or integration jargon as useful explanation merely because they are accurate.
+- Treat such detail as a readability defect when it is not needed for the
+  intended reader to complete the current journey. A collapsed `<details>`
+  region, advanced styling, or a technically accurate heading does not by
+  itself make irrelevant detail appropriate on a general-user page.
+- Technical material for integration developers belongs in a clearly separate
+  developer surface or a plainly labelled linked reference. It may remain on a
+  shared page only when the page makes that distinct audience and its purpose
+  clear, and the general-user path remains understandable without opening it.
+- Do not penalize a surface for detail that is owned by a clearly linked,
+  audience-appropriate canonical source. Do penalize unexplained internal
+  terminology that competes with the user's task, even if an implementation
+  document elsewhere defines it.
+
 Assess whether the intended reader can understand:
 
 - the journey's purpose, audience, prerequisites, and supported scope;
@@ -124,6 +145,10 @@ Assess whether the intended reader can understand:
 - choices, consent, authority, attribution, and provider boundaries;
 - produced artifacts and how to inspect them; and
 - failure, recovery, resume, and next-step guidance.
+
+For every general-user surface that contains advanced or developer-only
+material, record the audience, the material, why it is or is not necessary to
+the journey, and the appropriate destination if it should move.
 
 Inspect the owned user-facing surfaces: CLI help and README, root README, Web
 landing or guidance, Agent skill instructions, and relevant release or
@@ -134,9 +159,9 @@ clearly linked canonical source.
 | ---: | ---: | --- |
 | 0 | 0% | Required explanation is absent or materially contradictory |
 | 1 | 25% | Terms or fragments exist, but no coherent journey can be followed |
-| 2 | 50% | The main path is described, but a material prerequisite, decision, output, or recovery step is unclear |
-| 3 | 75% | The complete path is clear and consistent, with only non-blocking ambiguity or unverified synchronization |
-| 4 | 100% | The explanation is clear, complete, cross-surface consistent, and its relevant documentation contract check passes |
+| 2 | 50% | The main path is described, but a material prerequisite, decision, output, or recovery step is unclear, or non-actionable internal detail materially obscures the path for its intended reader |
+| 3 | 75% | The complete path is clear and consistent for its intended reader, with only non-blocking ambiguity, minor unnecessary terminology, or unverified synchronization |
+| 4 | 100% | The explanation is clear, complete, audience-appropriate, progressively disclosed, cross-surface consistent, and its relevant documentation contract check passes |
 
 ### Usability
 
@@ -226,8 +251,11 @@ file. Use this order:
    raw score, confidence, and top finding; then show guardrail/evolution and
    delivery counts. Do not show a combined score.
 3. **Explanation readability analysis** — per interface and journey, identify
-   clear explanations, contradictions or ambiguity, reader impact, score,
-   confidence, and evidence.
+   clear explanations, contradictions or ambiguity, audience-fit and
+   progressive-disclosure findings, reader impact, score, confidence, and
+   evidence. For each misplaced developer-only detail, name the surface, the
+   detail, why it obstructs the intended reader, and the appropriate developer
+   documentation destination.
 4. **Usability analysis** — per interface and journey, identify entry points,
    workflow friction, verification and recovery quality, user impact, score,
    confidence, and evidence.
