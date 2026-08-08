@@ -370,7 +370,7 @@ export function CliPage({ onNavigate }: ProductPageProps) {
               ))}
             </ol>
             <h3 className="mt-5 text-lg font-semibold text-text">
-              Optionally hand off a candidate through a provider-neutral Agent integration
+              Optionally hand off a candidate through an Agent integration
             </h3>
             <p className="mt-2 text-sm text-text-2">
               The CLI has no built-in provider and does not trust or invoke one
@@ -402,8 +402,9 @@ export function CliPage({ onNavigate }: ProductPageProps) {
               and <code>--confirm</code>, writes only session-owned candidate
               evidence, and returns an explicit next action for the existing
               import, validation, attributed preview, and human review gates.
-              Refusal and stale state remain recoverable; D2 evidence is
-              optional and D3 remains a file-scoped handoff.
+              Refusal and stale state remain recoverable. Provider handoff
+              evidence is optional, and the Web-to-CLI handoff stays
+              file-scoped.
             </p>
             <ol className="mt-4 space-y-3">
               {authoringIntelligenceCommands.map((command, index) => (
@@ -442,13 +443,12 @@ export function CliPage({ onNavigate }: ProductPageProps) {
               Review cross-pack conflicts explicitly
             </h3>
             <p className="mt-2 text-sm text-text-2">
-              D6 makes competing pack or version evidence inspectable without
-              choosing an automatic winner. Inspect is read-only; resolve
-              requires a complete user selection, review evidence, and
-              <code>--confirm</code> before writing only a workspace-owned
-              staging receipt. Existing candidate import, validation,
-              attributed preview, human review, and release gates remain
-              downstream authorities.
+              Inspect competing pack or version evidence without choosing an
+              automatic winner. Inspect is read-only; resolve requires a
+              complete user selection, review evidence, and <code>--confirm</code>{' '}
+              before writing only a workspace-owned staging receipt. Existing
+              candidate import, validation, attributed preview, human review,
+              and release gates remain downstream authorities.
             </p>
             <ol className="mt-4 space-y-3">
               <li>
@@ -463,10 +463,11 @@ export function CliPage({ onNavigate }: ProductPageProps) {
             </ol>
             <p className="mt-4 text-sm text-text-2">
               Stale, tampered, incompatible, missing-attribution, and refused
-              records return one safe next action. D1/D2/D4/D5 evidence is
-              retained as evidence only; D6 adds no remote registry, signing,
-              backend, authentication, npm publication, or persistent browser
-              authoring state.
+              records return one safe next action. Provenance, provider,
+              distribution, and authoring evidence is retained as evidence
+              only; conflict review adds no remote registry, signing, backend,
+              authentication, npm publication, or persistent browser authoring
+              state.
             </p>
           </div>
           <p className="mt-4 text-sm text-text-2">
@@ -664,21 +665,21 @@ export function AgentIntegrationsPage({ onNavigate }: ProductPageProps) {
 
         <details className="rounded-md border border-border bg-surface p-5">
           <summary className="cursor-pointer text-xl font-semibold text-text">
-            For integration developers: provider-neutral D2 contract
+            For integration developers: use the public CLI workflow
           </summary>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-mute">
-            Provider-neutral boundary
+            Connect through the CLI
           </p>
           <h2 className="mt-2 text-2xl font-semibold text-text">
-            Agent integrations coordinate; the CLI remains the authority
+            Agent integrations guide the handoff; the CLI validates it
           </h2>
           <p className="mt-2 max-w-3xl text-sm text-text-2">
-            D2 exposes an optional public-CLI contract for explicitly supplied
-            provider descriptors. There is no built-in provider, remote
-            registry, credential collection, hidden network call, or persistent
-            browser authoring state. The integration checker reports required
-            capability mismatches and optional external-author fallback before
-            any authoring handoff.
+            Use the public CLI interface with a provider description you
+            explicitly supply. There is no built-in provider, remote registry,
+            credential collection, hidden network call, or persistent browser
+            authoring state. The integration checker reports missing required
+            capabilities and whether the artist can continue without an
+            external provider before any handoff.
           </p>
           <div className="mt-4 grid min-w-0 gap-3">
             <CopyCode children="lpc-toolkit agent integration check --manifest manifest.json --json" />

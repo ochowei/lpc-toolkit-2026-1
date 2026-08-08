@@ -125,11 +125,11 @@ describe('CLI and agent integration pages', () => {
     expect(html).toContain('Optionally activate the exact archive in a consumer workspace');
     expect(html).toContain('records an installation receipt');
     expect(html).toContain('Recover or synchronize the session separately');
-    expect(html).toContain('Optionally hand off a candidate through a provider-neutral Agent integration');
+    expect(html).toContain('Optionally hand off a candidate through an Agent integration');
     expect(html).toContain('result bytes are re-digested before they enter the session-owned candidate staging root');
     expect(html).toContain('Route and stage deterministic authoring candidates');
     expect(html).toContain('Authoring intelligence is catalog-first and deterministic.');
-    expect(html).toContain('D3 remains a file-scoped handoff.');
+    expect(html).toContain('the Web-to-CLI handoff stays file-scoped.');
     expect(html).toContain('Transfer one Web revision to the CLI explicitly');
     expect(html).toContain('Export for CLI');
     expect(html).toContain('web-handoff-receipt.json');
@@ -161,9 +161,9 @@ describe('CLI and agent integration pages', () => {
     expect(html).toContain('plugin <code>0.3.0</code>');
     expect(html).toContain('You approve every authority change');
     expect(html).toContain('A review-ready preview is not a');
-    expect(html).toContain('For integration developers: provider-neutral D2 contract');
-    expect(html).toContain('Provider-neutral boundary');
-    expect(html).toContain('Agent integrations coordinate; the CLI remains the authority');
+    expect(html).toContain('For integration developers: use the public CLI workflow');
+    expect(html).toContain('Connect through the CLI');
+    expect(html).toContain('Agent integrations guide the handoff; the CLI validates it');
     expect(html).toContain('There is no built-in provider');
     expect(html).toContain(
       'lpc-toolkit agent integration check --manifest manifest.json --json',
@@ -173,7 +173,7 @@ describe('CLI and agent integration pages', () => {
     );
     expect(html).toContain('codex plugin add lpc-toolkit@lpc-toolkit');
     expect(html.indexOf('Start with the outcome you need')).toBeLessThan(html.indexOf('One-time setup for Codex'));
-    expect(html.indexOf('One-time setup for Codex')).toBeLessThan(html.indexOf('provider-neutral D2 contract'));
+    expect(html.indexOf('One-time setup for Codex')).toBeLessThan(html.indexOf('public CLI workflow'));
     expect(html).toContain(
       'https://github.com/ochowei/lpc-toolkit-2026-1#codex-plugin',
     );
