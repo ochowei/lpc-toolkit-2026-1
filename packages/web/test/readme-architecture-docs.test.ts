@@ -22,6 +22,9 @@ const cliReadme = readRepoFile('packages/cli/README.md');
 const coreReadme = readRepoFile('packages/core/README.md');
 const architecture = readRepoFile('docs/ARCHITECTURE.md');
 const productDirection = readRepoFile('docs/PRODUCT-DIRECTION.md');
+const productDirectionZhTw = readRepoFile(
+  'docs/PRODUCT-DIRECTION.zh-TW.md',
+);
 const agents = readRepoFile('AGENTS.md');
 const claude = readRepoFile('CLAUDE.md');
 const engineering = readRepoFile('docs/ENGINEERING.md');
@@ -38,6 +41,7 @@ const maintainedDocuments = new Map([
   ['CLAUDE.md', claude],
   ['docs/ARCHITECTURE.md', architecture],
   ['docs/PRODUCT-DIRECTION.md', productDirection],
+  ['docs/PRODUCT-DIRECTION.zh-TW.md', productDirectionZhTw],
   ['docs/ENGINEERING.md', engineering],
   ['docs/ONBOARDING.md', onboarding],
   ['docs/RELEASING.md', releasing],
@@ -88,6 +92,9 @@ describe('README architecture contract', () => {
     expect(agents).toContain(
       '[Product direction](docs/PRODUCT-DIRECTION.md)',
     );
+    expect(agents).toContain(
+      '[Traditional Chinese product-direction translation](docs/PRODUCT-DIRECTION.zh-TW.md)',
+    );
     expect(readme).toContain('[`CONTRIBUTING.md`](CONTRIBUTING.md)');
     expect(readme).toContain(
       '[`docs/ENGINEERING.md`](docs/ENGINEERING.md)',
@@ -117,6 +124,28 @@ describe('README architecture contract', () => {
     ]) {
       expect(productDirection).toContain(phrase);
     }
+  });
+
+  it('keeps the product-direction translation split and synchronized by policy', () => {
+    expect(productDirection).toContain(
+      '[繁體中文翻譯](PRODUCT-DIRECTION.zh-TW.md)',
+    );
+    expect(productDirection).toContain(
+      'canonical normative living statement',
+    );
+    expect(productDirection).toContain(
+      'Update the maintained Traditional Chinese translation in the same change',
+    );
+    expect(productDirection).not.toContain('# 產品方向');
+
+    expect(productDirectionZhTw).toContain(
+      '[英文規範原文](PRODUCT-DIRECTION.md)',
+    );
+    expect(productDirectionZhTw).toContain('英文版是唯一規範來源');
+    expect(productDirectionZhTw).toContain(
+      '必須在同一項變更中更新維護中的繁體中文翻譯',
+    );
+    expect(productDirectionZhTw).not.toContain('# Product Direction');
   });
 
   it('keeps maintained local Markdown links relative and resolvable', () => {

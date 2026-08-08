@@ -1,6 +1,8 @@
 # Product Direction
 
-This document is the normative living statement of LPC Toolkit's product
+[繁體中文翻譯](PRODUCT-DIRECTION.zh-TW.md)
+
+This English document is the canonical normative living statement of LPC Toolkit's product
 direction, responsibility boundaries, and current scope. Its primary audience
 is maintainers, contributors, and coding agents. It is not an
 implementation-status dashboard, release roadmap, or user guide.
@@ -199,11 +201,14 @@ decision may change them through the evolution rules below.
 - Require future MCP or other transports to reuse existing domain,
   attribution, validation, consent, and release authorities rather than
   defining parallel product logic.
+- Update the maintained Traditional Chinese translation in the same change as
+  any product-direction change.
 - Record a separate architecture decision only when the choice is hard to
   reverse, surprising without context, and the result of a real trade-off.
 
 ## Related documentation
 
+- [Traditional Chinese translation](PRODUCT-DIRECTION.zh-TW.md)
 - [Domain glossary](../CONTEXT.md)
 - [Repository rules](../AGENTS.md)
 - [Architecture guide](ARCHITECTURE.md)
