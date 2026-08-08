@@ -1,13 +1,15 @@
 # lpc-toolkit
 
 A TypeScript monorepo with an environment-agnostic LPC sprite composition
-engine, shared presets, a React web editor, and a Node CLI.
+engine, shared presets, a React Web Composer, and a Node CLI.
 
 ## Start Here
 
 Use this file for non-negotiable repository rules and navigation. Read the
 focused guide that owns the work before making broad changes:
 
+- [Product direction](docs/PRODUCT-DIRECTION.md) — product interfaces, supported
+  journeys, local-first artifact lifecycle, current scope, and evolution rules.
 - [Architecture guide](docs/ARCHITECTURE.md) — package boundaries, ownership,
   assets, attribution, and stable design decisions.
 - [Engineering guide](docs/ENGINEERING.md) — commands, tests, CI mapping, and

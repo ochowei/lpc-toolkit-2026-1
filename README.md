@@ -2,7 +2,7 @@
 
 `lpc-toolkit` provides an environment-agnostic TypeScript engine for composing
 [Liberated Pixel Cup](https://lpc.opengameart.org/) character spritesheets, a
-React web editor, shared outfit presets, and an agent-first Node CLI.
+React Web Composer, shared outfit presets, and an agent-first Node CLI.
 
 LPC art is distributed as layered body, hair, clothing, weapon, expression,
 and accessory sheets. The toolkit turns those layers into one reusable,
@@ -17,7 +17,7 @@ attribution-aware composition pipeline that runs in browsers and Node.
 | `packages/web/` | **Working** | React 18, Vite, Tailwind CSS v4, and shadcn-style browser editor. |
 | `packages/cli/` | **Working** | Node CLI for named characters, catalog search, validation, tokens, presets, preview, and rendering. |
 
-The composition pipeline, presets, web editor, and CLI are working and tested.
+The composition pipeline, presets, Web Composer, and CLI are working and tested.
 
 ## What Is Included
 
@@ -42,8 +42,10 @@ The most important product invariants are:
 - The project metadata declares GPL-3.0-or-later; new dependencies must be
   compatible and require review.
 
-See [`AGENTS.md`](AGENTS.md) for the authoritative Agent rules and
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for detailed boundaries.
+See the [product direction](docs/PRODUCT-DIRECTION.md) for product interfaces,
+supported journeys, and current scope; [`AGENTS.md`](AGENTS.md) for the
+authoritative Agent rules; and
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for detailed package boundaries.
 
 ## Getting Started
 
@@ -78,7 +80,7 @@ Contributor setup, package tours, and focused checks are documented in:
 - [`docs/ENGINEERING.md`](docs/ENGINEERING.md)
 - [`docs/RELEASING.md`](docs/RELEASING.md) for authorized maintainers
 
-## Web Editor
+## Web Composer
 
 Start the local development server:
 
@@ -86,11 +88,12 @@ Start the local development server:
 pnpm --filter @lpc-toolkit/web dev
 ```
 
-The web app exposes three top-level product pages: the editor at `/compose`,
-the CLI guide at `/cli`, and agent integration guidance at `/agents`. The root
-entry `/` currently redirects to `/cli`; it can change independently without
-changing the three stable product URLs. The editor keeps attribution reachable
-while users compose, preview, and export characters.
+The web app exposes three top-level product pages:
+the Web Composer editor at `/compose`, the CLI guide at `/cli`, and
+agent integration guidance at `/agents`.
+The root entry `/` currently redirects to `/cli`; it can change independently
+without changing the three stable product URLs. The Web Composer keeps
+attribution reachable while users compose, preview, and export characters.
 
 ## Command-Line Interface
 
@@ -408,7 +411,7 @@ source, custom overlay, query filters, or character selection.
 
 ### Character JSON interchange
 
-The web editor's **Save character JSON** action and CLI selection outputs write
+The Web Composer's **Save character JSON** action and CLI selection outputs write
 the canonical `lpc-toolkit.selection.v2` format. It stores independent
 secondary colors in an asset-owned `channelRecolors` map while retaining the
 primary `recolor` field. Web import and CLI `--selection` readers accept Toolkit

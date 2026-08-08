@@ -38,17 +38,17 @@ tests.
 Normal setup, verification, build, packaging, and ordinary browser tests use the
 checked-in or pinned cache-backed asset flow. They do not need the submodule.
 
-## Start the Web Editor
+## Start the Web Composer
 
 ```sh
 pnpm --filter @lpc-toolkit/web dev
 ```
 
 Open the URL printed by Vite. `/` currently redirects to the CLI guide at
-`/cli`; `/compose` is the editor, and `/agents` documents agent integrations.
-The shared navigation switches among all three product pages. The editor loads
-the prepared local assets and keeps attribution available while composing,
-previewing, and exporting a sprite.
+`/cli`; `/compose` is the Web Composer, and `/agents` documents agent
+integrations. The shared navigation switches among all three product pages. The
+Web Composer loads the prepared local assets and keeps attribution available
+while composing, previewing, and exporting a sprite.
 
 ## Try the Local CLI
 
