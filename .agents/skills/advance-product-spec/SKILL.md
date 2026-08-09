@@ -1,11 +1,11 @@
 ---
 name: advance-product-spec
-description: Bootstrap and maintain a standalone register of stable Product Direction objective IDs, select and audit one LPC Toolkit capability against current product specs and implementation evidence, or backfill an evidence-backed current capability spec. Use when the user asks to choose one product-direction area, compare Product Direction with specs, compare specs with code/tests, measure capability coverage or conformance, or create/update docs/product-specs for already implemented behavior. Do not use for a comprehensive repository-wide product-direction audit, redefining product scope, implementing product code, or planning an unimplemented feature.
+description: Bootstrap and maintain a standalone register of stable Product Direction objective IDs, select and audit one LPC Toolkit capability against current specs, user or Agent explanation surfaces, implementation, and tests, or backfill an evidence-backed current capability spec. Use when the user asks to choose one product-direction area, compare Product Direction with specs, audit guidance or journey readability, compare visible prompts or stages with product contracts, measure capability coverage or conformance, or create/update docs/product-specs for already implemented behavior. Do not use for a comprehensive repository-wide product-direction audit, redefining product scope, implementing product code, or planning an unimplemented feature.
 ---
 
 # Advance Product Spec
 
-Build and maintain the traceable chain `Product Direction -> current capability spec -> code/tests` one capability at a time. Keep current specs limited to intentional, supported behavior; keep proposed or unimplemented intent outside them.
+Build and maintain the traceable chain `Product Direction -> current capability spec -> explanation surfaces + code/tests` one capability at a time. Keep current specs limited to intentional, supported behavior; keep proposed or unimplemented intent outside them.
 
 ## Start safely
 
@@ -53,12 +53,13 @@ Bootstrap must classify objectives as `CAP`, `GRD`, `DEL`, `EVO`, or `OPT`. Opti
 
 Read [references/audit-method.md](references/audit-method.md) completely before auditing.
 
-Require a completed standalone objective register. Compare the selected capability in two directions:
+Require a completed standalone objective register. Compare the selected capability in three directions:
 
 1. `Product Direction -> current specs`: which required objectives map to an accepted capability spec, and which are unmapped or only partly represented?
-2. `Current specs -> code/tests`: which requirements are absent, partial, implemented but not currently verified, or verified end to end?
+2. `Current specs -> explanation surfaces`: which active user or Agent guidance surfaces explain the supported journey, controls, authority transitions, outputs, and next action without a material mismatch?
+3. `Current specs -> code/tests`: which requirements are absent, partial, implemented but not currently verified, or verified end to end?
 
-Assess explanation readability, usability, and functional completeness independently. Keep guardrails/evolution and delivery claims outside the capability percentage. A mapping proves scope traceability, not implementation.
+Inventory the in-scope explanation surfaces before scoring them. Assess explanation readability, usability, and functional completeness independently. Keep guardrails/evolution and delivery claims outside the capability percentage. A mapping proves scope traceability, not implementation, and a text-presence test does not prove reader comprehension.
 
 Run at most three focused verification commands for a normal capability audit. Prefer implementation plus a focused passing check over prose. Report skipped or blocked evidence as confidence limits.
 
@@ -96,11 +97,12 @@ For either audit or backfill, report:
 1. revision and working-tree scope;
 2. selected capability and mapped `PD-*` objectives;
 3. Product Direction coverage with raw numerator/denominator;
-4. explanation readability, usability, and functional completeness separately;
-5. spec-to-code conformance with raw score, state distribution, and confidence;
-6. guardrail/evolution statuses and delivery statuses;
-7. strongest evidence and exact verification gaps;
-8. validation or verification commands with PASS/FAIL/SKIPPED;
-9. the smallest next evidence-producing action.
+4. explanation surfaces inspected and exact reader-journey or control-model mismatches;
+5. explanation readability, usability, and functional completeness separately;
+6. spec-to-code conformance with raw score, state distribution, and confidence;
+7. guardrail/evolution statuses and delivery statuses;
+8. strongest evidence and exact verification gaps;
+9. validation or verification commands with PASS/FAIL/SKIPPED;
+10. the smallest next evidence-producing action.
 
 Use fixed stages for individual capability requirements and allow one decimal place only for calculated rollups. Never emit a combined overall score.
