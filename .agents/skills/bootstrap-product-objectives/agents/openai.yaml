@@ -1,0 +1,4 @@
+interface:
+  display_name: "Bootstrap Product Objectives"
+  short_description: "Create the stable Product Direction objective register"
+  default_prompt: "Use $bootstrap-product-objectives to create the standalone Product Direction objective register."

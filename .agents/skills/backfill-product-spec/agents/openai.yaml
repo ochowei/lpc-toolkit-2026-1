@@ -1,0 +1,4 @@
+interface:
+  display_name: "Backfill Product Spec"
+  short_description: "Write one evidence-backed current capability spec"
+  default_prompt: "Use $backfill-product-spec to draft an evidence-backed current spec for one implemented capability."

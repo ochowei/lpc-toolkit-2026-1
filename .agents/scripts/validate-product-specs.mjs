@@ -276,7 +276,7 @@ function writeFixture(root, path, content) {
 }
 
 function runSelfTest() {
-  const root = mkdtempSync(join(tmpdir(), 'advance-product-spec-'));
+  const root = mkdtempSync(join(tmpdir(), 'product-specs-'));
   try {
     const id = 'PD-CAP-COMP-PRODUCT-001';
     writeFixture(root, 'docs/PRODUCT-DIRECTION.md', '# Product Direction\n\n## Sprite composition\n\nRequirement\n');

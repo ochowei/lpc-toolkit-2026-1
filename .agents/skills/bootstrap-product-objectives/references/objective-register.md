@@ -53,6 +53,6 @@ Keep entries in Product Direction order. Declare each ID exactly once. Do not pl
 2. Show each proposed ID, classification, concise English objective, and English source locator before editing.
 3. Show the complete proposed `docs/PRODUCT-OBJECTIVES.md` scope. If legacy inline IDs exist, also show their comment-only removal from both Product Direction files.
 4. After approval, create or update the register and remove only approved legacy inline comments. Preserve Product Direction prose.
-5. Run the bundled validator.
+5. Run the repository product-spec validator.
 
 Bootstrap changes identity and mapping structure, not product scope. Any semantic Product Direction change remains a separate decision and must update both languages and the standalone register under repository policy.

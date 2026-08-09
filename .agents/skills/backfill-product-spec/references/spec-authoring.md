@@ -64,4 +64,4 @@ Before writing, show:
 6. Product Direction coverage and expected spec-to-code conformance;
 7. exact files that would change.
 
-Wait for explicit approval. After approval, use `apply_patch`, run the bundled validator, run the narrowest relevant documentation checks, and summarize the resulting diff.
+Wait for explicit approval. After approval, use `apply_patch`, run the repository product-spec validator, run the narrowest relevant documentation checks, and summarize the resulting diff.

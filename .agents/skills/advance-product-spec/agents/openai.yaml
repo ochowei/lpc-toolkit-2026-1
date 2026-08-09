@@ -1,4 +1,0 @@
-interface:
-  display_name: "Advance Product Spec"
-  short_description: "Register, audit, and backfill product specs"
-  default_prompt: "Use $advance-product-spec to bootstrap objectives, audit, or backfill one product-direction capability."
