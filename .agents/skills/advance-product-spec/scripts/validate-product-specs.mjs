@@ -197,11 +197,12 @@ function validateRepository(repoRoot) {
   }
 
   const englishSections = markdownSections(englishText);
-  const chineseSections = markdownSections(chineseText);
   for (const entry of objectiveEntries) {
     const label = 'docs/PRODUCT-OBJECTIVES.md';
     validateSourceLocator(entry, 'English source', englishSections, label, errors);
-    validateSourceLocator(entry, 'zh-TW source', chineseSections, label, errors);
+    if (/^- (?!English source:)[^:\n]+ source:/m.test(entry.section)) {
+      errors.push(`${label} ${entry.id}: non-English source locators are not allowed; keep the register English-only`);
+    }
   }
 
   const allRequirementIds = [];
@@ -285,7 +286,6 @@ function runSelfTest() {
 ## ${id} — Render a character
 
 - English source: Sprite composition > Requirement
-- zh-TW source: 精靈圖合成 > 需求
 `;
     writeFixture(root, 'docs/PRODUCT-OBJECTIVES.md', register);
     writeFixture(root, 'packages/core/src/example.ts', 'export const example = true;\n');
@@ -347,6 +347,15 @@ The system MUST render.
     const missingHeading = validateRepository(root);
     if (!missingHeading.errors.some((error) => error.includes('root heading does not exist'))) {
       throw new Error(`missing source heading fixture did not fail: ${missingHeading.errors.join('; ')}`);
+    }
+
+    writeFixture(root, 'docs/PRODUCT-OBJECTIVES.md', register.replace(
+      '- English source: Sprite composition > Requirement',
+      '- English source: Sprite composition > Requirement\n- zh-TW source: 精靈圖合成 > 需求',
+    ));
+    const translatedLocator = validateRepository(root);
+    if (!translatedLocator.errors.some((error) => error.includes('keep the register English-only'))) {
+      throw new Error(`translated source locator fixture did not fail: ${translatedLocator.errors.join('; ')}`);
     }
 
     writeFixture(root, 'docs/PRODUCT-OBJECTIVES.md', register);

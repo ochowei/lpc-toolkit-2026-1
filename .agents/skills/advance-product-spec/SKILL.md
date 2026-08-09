@@ -43,11 +43,11 @@ Do not interpret a request such as `backfill sprite composition` as permission t
 
 Read [references/objective-register.md](references/objective-register.md) completely before bootstrapping and use its register entry shape exactly.
 
-Bootstrap every normative statement in the canonical English Product Direction, not only the first selected capability. Create `docs/PRODUCT-OBJECTIVES.md` as the standalone identity and bilingual-source mapping register. Keep both Product Direction files free of objective IDs and preserve their prose exactly. Stop and report a translation mismatch instead of silently repairing meaning.
+Bootstrap every normative statement in the canonical English Product Direction, not only the first selected capability. Create `docs/PRODUCT-OBJECTIVES.md` as the standalone identity and English-source mapping register. Keep both Product Direction files free of objective IDs and preserve their prose exactly.
 
 If legacy inline `PD-*` comments exist in either Product Direction file, include their exact removal in the bootstrap preview and approval scope. Migrate their identities into the standalone register without reclassifying or renumbering them unless the user separately approves an objective correction.
 
-Bootstrap must classify objectives as `CAP`, `GRD`, `DEL`, `EVO`, or `OPT`. Optional objectives remain outside required denominators. Never reuse a retired ID. The register maps each objective to one English and one Traditional Chinese source locator; Product Direction remains the semantic source of truth.
+Bootstrap must classify objectives as `CAP`, `GRD`, `DEL`, `EVO`, or `OPT`. Optional objectives remain outside required denominators. Never reuse a retired ID. The register maps each objective to exactly one English source locator; the canonical English Product Direction remains the semantic source of truth. Do not add translated source locators or translated objective text to the register.
 
 ## Audit one capability
 
