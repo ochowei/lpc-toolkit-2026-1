@@ -1,4 +1,0 @@
-interface:
-  display_name: "Audit Product Direction"
-  short_description: "Assess readability, usability, and functional coverage"
-  default_prompt: "Use $audit-product-direction to assess product direction across explanation readability, usability, and functional completeness."
