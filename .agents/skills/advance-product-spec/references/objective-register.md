@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Create stable, reviewable identifiers for every auditable statement in the current Product Direction while preserving the English document as the canonical normative source.
+Create stable, reviewable identifiers for every auditable statement in the current Product Direction while preserving the English document as the canonical normative source and keeping both Product Direction files free of registry metadata.
 
 ## Classification
 
@@ -31,24 +31,31 @@ PD-<CLASS>-<DOMAIN>-<SURFACE>-<NNN>
 
 Prefer durable meaning over matching current headings. Keep an existing ID when wording is clarified without changing the objective. Never assign a retired ID to a different objective.
 
-## Markdown placement
+## Register file
 
-Insert one unobtrusive HTML comment immediately before the statement it identifies:
+Store the complete register at `docs/PRODUCT-OBJECTIVES.md`. Product Direction owns product semantics; the register owns objective identity, classification, and bilingual source mapping. Current capability specs map only IDs declared in this register.
+
+Use this exact entry shape:
 
 ```md
-<!-- PD-CAP-COMP-CLI-001 -->
-The CLI provides direct local character discovery, editing, preview, and render operations.
+## PD-CAP-COMP-CLI-001 — Direct local character operations
+
+- English source: Interface and journey responsibilities > Provide direct local character, catalog, validation, preview, and render operations.
+- zh-TW source: 介面與流程責任 > 提供直接的本機角色、目錄、驗證、預覽與渲染操作。
 ```
 
-For a table cell, place the comment at the beginning of the relevant cell. Use the same ID on the semantically corresponding statement in `docs/PRODUCT-DIRECTION.zh-TW.md`.
+The text after `—` is a concise objective, not a second normative contract. Each source locator contains an exact Markdown heading, ` > `, and an exact prose excerpt that uniquely identifies the corresponding sentence or clause within that heading. Keep the excerpt as short as possible while remaining unique. Do not use line numbers or descriptive labels that are absent from Product Direction.
+
+Keep entries in Product Direction order. Declare each ID exactly once. Do not place `PD-*` objective IDs in either Product Direction file.
 
 ## Bootstrap workflow
 
 1. Derive the complete English objective register.
-2. Show each proposed ID, classification, concise objective, and source heading before editing.
+2. Show each proposed ID, classification, concise objective, and both source locators before editing.
 3. Match every English objective to its Traditional Chinese counterpart.
-4. Report missing, extra, or semantically divergent translation statements. Do not rewrite them during ID-only bootstrap.
-5. After approval, insert only the ID comments in both files.
-6. Run the bundled validator.
+4. Report missing, extra, or semantically divergent translation statements. Do not rewrite them during bootstrap.
+5. Show the complete proposed `docs/PRODUCT-OBJECTIVES.md` scope. If legacy inline IDs exist, also show their comment-only removal from both Product Direction files.
+6. After approval, create or update the register and remove only approved legacy inline comments. Preserve Product Direction prose.
+7. Run the bundled validator.
 
-Bootstrap changes identity and structure, not product scope. Any semantic Product Direction change remains a separate decision and must update both languages under repository policy.
+Bootstrap changes identity and mapping structure, not product scope. Any semantic Product Direction change remains a separate decision and must update both languages and the standalone register under repository policy.

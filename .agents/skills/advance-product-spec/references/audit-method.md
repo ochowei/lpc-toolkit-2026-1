@@ -14,7 +14,7 @@ Documentation alone never proves implementation or shipment. File presence alone
 
 ## Product Direction coverage
 
-Use mapped required `PD-CAP-*` objectives as the denominator for the selected capability. Report objective states rather than counting spec files:
+Resolve objectives from `docs/PRODUCT-OBJECTIVES.md`. Use mapped required `PD-CAP-*` objectives as the denominator for the selected capability. Report objective states rather than counting spec files:
 
 - `COVERED`: an accepted current capability spec represents the complete objective.
 - `PARTIAL`: current specs represent only part of an independently divisible objective.

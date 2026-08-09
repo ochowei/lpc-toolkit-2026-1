@@ -1,6 +1,6 @@
 ---
 name: advance-product-spec
-description: Bootstrap stable Product Direction objective IDs, select and audit one LPC Toolkit capability against current product specs and implementation evidence, or backfill an evidence-backed current capability spec. Use when the user asks to choose one product-direction area, compare Product Direction with specs, compare specs with code/tests, measure capability coverage or conformance, or create/update docs/product-specs for already implemented behavior. Do not use for a comprehensive repository-wide product-direction audit, redefining product scope, implementing product code, or planning an unimplemented feature.
+description: Bootstrap and maintain a standalone register of stable Product Direction objective IDs, select and audit one LPC Toolkit capability against current product specs and implementation evidence, or backfill an evidence-backed current capability spec. Use when the user asks to choose one product-direction area, compare Product Direction with specs, compare specs with code/tests, measure capability coverage or conformance, or create/update docs/product-specs for already implemented behavior. Do not use for a comprehensive repository-wide product-direction audit, redefining product scope, implementing product code, or planning an unimplemented feature.
 ---
 
 # Advance Product Spec
@@ -9,7 +9,7 @@ Build and maintain the traceable chain `Product Direction -> current capability 
 
 ## Start safely
 
-1. Resolve the repository root and read `AGENTS.md`, `docs/PRODUCT-DIRECTION.md`, and the relevant verification guidance in `docs/ENGINEERING.md`.
+1. Resolve the repository root and read `AGENTS.md`, `docs/PRODUCT-DIRECTION.md`, `docs/PRODUCT-OBJECTIVES.md` when it exists, and the relevant verification guidance in `docs/ENGINEERING.md`.
 2. Record the audited commit, branch, dirty paths, date, and whether evidence includes uncommitted state.
 3. Never initialize OpenSpec, add a dependency, modify `upstream/`, or run `pnpm verify` through this skill.
 4. Treat `audit` as read-only. Treat `bootstrap` and `backfill` as documentation writes that require the preview-and-confirm boundary below.
@@ -19,11 +19,11 @@ Build and maintain the traceable chain `Product Direction -> current capability 
 
 Infer an explicitly named mode. Otherwise ask the user to choose one mode, one question at a time.
 
-- `bootstrap` — add the complete stable objective-ID register to both Product Direction files. Run once before audit or backfill.
+- `bootstrap` — create the complete standalone stable objective-ID register. Run once before audit or backfill.
 - `audit [capability]` — assess one capability without changing files.
 - `backfill <capability>` — create or update one evidence-backed current spec without changing product code.
 
-If a capability is supplied, use it directly. Otherwise scan the bootstrapped objectives and `docs/product-specs/*.md`, then offer capability candidates grouped as uncovered, partial, or covered. Recommend a required capability with low coverage and sufficient implementation evidence, but let the user choose.
+If a capability is supplied, use it directly. Otherwise scan `docs/PRODUCT-OBJECTIVES.md` and `docs/product-specs/*.md`, then offer capability candidates grouped as uncovered, partial, or covered. Recommend a required capability with low coverage and sufficient implementation evidence, but let the user choose.
 
 Select a capability domain rather than one isolated objective. Include its related interfaces and cross-cutting guardrails in the same assessment. Narrow an oversized capability only when the slice can be verified independently and will still update the same capability spec.
 
@@ -41,17 +41,19 @@ Do not interpret a request such as `backfill sprite composition` as permission t
 
 ## Bootstrap objective IDs
 
-Read [references/objective-register.md](references/objective-register.md) completely before bootstrapping.
+Read [references/objective-register.md](references/objective-register.md) completely before bootstrapping and use its register entry shape exactly.
 
-Bootstrap every normative statement in the canonical English Product Direction, not only the first selected capability. Insert stable HTML-comment IDs without changing prose semantics. Add the identical IDs to the corresponding Traditional Chinese statements. Stop and report a translation mismatch instead of silently repairing meaning.
+Bootstrap every normative statement in the canonical English Product Direction, not only the first selected capability. Create `docs/PRODUCT-OBJECTIVES.md` as the standalone identity and bilingual-source mapping register. Keep both Product Direction files free of objective IDs and preserve their prose exactly. Stop and report a translation mismatch instead of silently repairing meaning.
 
-Bootstrap must classify objectives as `CAP`, `GRD`, `DEL`, `EVO`, or `OPT`. Optional objectives remain outside required denominators. Never reuse a retired ID.
+If legacy inline `PD-*` comments exist in either Product Direction file, include their exact removal in the bootstrap preview and approval scope. Migrate their identities into the standalone register without reclassifying or renumbering them unless the user separately approves an objective correction.
+
+Bootstrap must classify objectives as `CAP`, `GRD`, `DEL`, `EVO`, or `OPT`. Optional objectives remain outside required denominators. Never reuse a retired ID. The register maps each objective to one English and one Traditional Chinese source locator; Product Direction remains the semantic source of truth.
 
 ## Audit one capability
 
 Read [references/audit-method.md](references/audit-method.md) completely before auditing.
 
-Require a completed objective-ID bootstrap. Compare the selected capability in two directions:
+Require a completed standalone objective register. Compare the selected capability in two directions:
 
 1. `Product Direction -> current specs`: which required objectives map to an accepted capability spec, and which are unmapped or only partly represented?
 2. `Current specs -> code/tests`: which requirements are absent, partial, implemented but not currently verified, or verified end to end?
@@ -64,7 +66,7 @@ Run at most three focused verification commands for a normal capability audit. P
 
 Read [references/spec-authoring.md](references/spec-authoring.md) completely and use [assets/current-spec-template.md](assets/current-spec-template.md) as the output template.
 
-Require a completed objective-ID bootstrap. Write current specs under `docs/product-specs/<capability>.md`, one file per capability. A backfill may document only behavior that is:
+Require a completed standalone objective register. Write current specs under `docs/product-specs/<capability>.md`, one file per capability. A backfill may document only behavior that is:
 
 - externally observable by a user or Agent;
 - intentional and worth a compatibility promise;

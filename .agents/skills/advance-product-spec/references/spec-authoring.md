@@ -27,7 +27,7 @@ Split a requirement when its parts can independently pass or fail. Do not split 
 
 ## Direction mapping
 
-Declare the capability's `PD-*` objectives once in YAML frontmatter. Requirements inherit those mappings. Add an `Objective override` evidence line only when one requirement serves a cross-domain objective or exceptional guardrail.
+Declare the capability's registered `PD-*` objectives once in YAML frontmatter. Resolve every ID from `docs/PRODUCT-OBJECTIVES.md`; do not derive IDs from Product Direction prose or headings. Requirements inherit those mappings. Add an `Objective override` evidence line only when one requirement serves a cross-domain objective or exceptional guardrail.
 
 A mapping denotes scope traceability only. It does not prove implementation or completion.
 
