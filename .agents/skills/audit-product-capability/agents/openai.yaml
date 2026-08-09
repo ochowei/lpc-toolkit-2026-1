@@ -1,0 +1,4 @@
+interface:
+  display_name: "Audit Product Capability"
+  short_description: "Audit one product capability against specs and evidence"
+  default_prompt: "Use $audit-product-capability to audit one capability against direction, specs, surfaces, code, and tests."
