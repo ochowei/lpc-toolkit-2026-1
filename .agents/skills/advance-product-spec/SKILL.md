@@ -1,6 +1,6 @@
 ---
 name: advance-product-spec
-description: Bootstrap and maintain a standalone register of stable Product Direction objective IDs, select and audit one LPC Toolkit capability against current specs, user or Agent explanation surfaces, implementation, and tests, or backfill an evidence-backed current capability spec. Use when the user asks to choose one product-direction area, compare Product Direction with specs, audit guidance or journey readability, compare visible prompts or stages with product contracts, measure capability coverage or conformance, or create/update docs/product-specs for already implemented behavior. Do not use for a comprehensive repository-wide product-direction audit, redefining product scope, implementing product code, or planning an unimplemented feature.
+description: Bootstrap and maintain a standalone register of stable Product Direction objective IDs, select and audit one LPC Toolkit capability against current specs, user or Agent explanation and execution surfaces, implementation, and tests, or backfill an evidence-backed current capability spec. Use when the user asks to choose one product-direction area, compare Product Direction with specs, audit guidance or journey readability, distinguish prompts or launchers from executable Agent capabilities, trace a visible entry point to its Skill, transport, or public contract, measure capability coverage or conformance, or create/update docs/product-specs for already implemented behavior. Do not use for a comprehensive repository-wide product-direction audit, redefining product scope, implementing product code, or planning an unimplemented feature.
 ---
 
 # Advance Product Spec
@@ -56,10 +56,10 @@ Read [references/audit-method.md](references/audit-method.md) completely before 
 Require a completed standalone objective register. Compare the selected capability in three directions:
 
 1. `Product Direction -> current specs`: which required objectives map to an accepted capability spec, and which are unmapped or only partly represented?
-2. `Current specs -> explanation surfaces`: which active user or Agent guidance surfaces explain the supported journey, controls, authority transitions, outputs, and next action without a material mismatch?
+2. `Current specs -> explanation and execution surfaces`: which active user or Agent guidance and entry controls explain the supported journey and map to an available executable integration mechanism without a material responsibility, authority, output, or next-action mismatch?
 3. `Current specs -> code/tests`: which requirements are absent, partial, implemented but not currently verified, or verified end to end?
 
-Inventory the in-scope explanation surfaces before scoring them. Assess explanation readability, usability, and functional completeness independently. Keep guardrails/evolution and delivery claims outside the capability percentage. A mapping proves scope traceability, not implementation, and a text-presence test does not prove reader comprehension.
+Inventory the in-scope explanation, launcher, and executable capability surfaces before scoring them. For every intended entry point, trace the visible control through the Agent mechanism to the public product contract and resulting evidence. Do not count a prompt builder, starter prompt, copied request, manifest, or Skill file by itself as proof that an Agent journey is executable. Assess explanation readability, usability, and functional completeness independently. Keep guardrails/evolution and delivery claims outside the capability percentage. A mapping proves scope traceability, not implementation, and a text-presence test does not prove reader comprehension.
 
 Run at most three focused verification commands for a normal capability audit. Prefer implementation plus a focused passing check over prose. Report skipped or blocked evidence as confidence limits.
 
@@ -73,6 +73,14 @@ Require a completed standalone objective register. Write current specs under `do
 - intentional and worth a compatibility promise;
 - currently implemented; and
 - supported by implementation evidence.
+
+Before drafting an Agent-facing requirement, inventory its active explanation,
+launcher, and executable capability surfaces using the surface-to-execution
+method in [references/audit-method.md](references/audit-method.md). Backfill the
+supported journey only when the intended entry maps to a current executable
+mechanism and public product contract. Put an unclear or missing mapping in the
+preview as a usability gap or verification gap; do not turn a prompt-only
+surface into a capability promise.
 
 Do not promote incidental ordering, exact wording, internal file layout, known bugs, or historical design into a contract. Put uncertain candidates in the review preview, not the current spec. Record direct verification when it exists; otherwise mark a concise `verification gap`.
 
@@ -97,7 +105,7 @@ For either audit or backfill, report:
 1. revision and working-tree scope;
 2. selected capability and mapped `PD-*` objectives;
 3. Product Direction coverage with raw numerator/denominator;
-4. explanation surfaces inspected and exact reader-journey or control-model mismatches;
+4. explanation, launcher, and executable surfaces inspected, their surface-to-execution mappings, and exact reader-journey, responsibility, or control-model mismatches;
 5. explanation readability, usability, and functional completeness separately;
 6. spec-to-code conformance with raw score, state distribution, and confidence;
 7. guardrail/evolution statuses and delivery statuses;
