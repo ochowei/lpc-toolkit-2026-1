@@ -1,11 +1,13 @@
 ---
 name: audit-product-capability
-description: Audit one LPC Toolkit capability against Product Direction objectives, accepted current specs, explanation and execution surfaces, implementation, and tests. Use when the user asks for capability-level coverage, conformance, journey readability, usability, functional completeness, or a trace from a visible entry point to its executable Agent mechanism and public contract. Keep the audit read-only. Do not use for a comprehensive repository-wide product-direction snapshot, spec authoring, product changes, or unimplemented feature planning.
+description: Audit LPC Toolkit at either one-capability or repository-wide scope against Product Direction objectives, accepted current specs, explanation and execution surfaces, implementation, and tests. Use for capability-level coverage or conformance, journey readability, usability, functional completeness, traces from visible entry points to executable Agent mechanisms and public contracts, or a comprehensive Product Direction progress, alignment, readiness, delivery-claim, and prioritized-gap snapshot. Keep the audit read-only. Do not use for spec authoring, product changes, or unimplemented feature planning.
 ---
 
-# Audit Product Capability
+# Audit Product Capability and Direction
 
-Assess one capability through the traceable chain `Product Direction -> current capability spec -> explanation and execution surfaces + code/tests` without changing files.
+Assess either one capability or the complete repository through the traceable
+chain `Product Direction -> current capability specs -> explanation and
+execution surfaces + code/tests` without changing files.
 
 ## Start safely
 
@@ -13,17 +15,30 @@ Assess one capability through the traceable chain `Product Direction -> current 
 2. Record the audited commit, branch, dirty paths, date, and whether evidence includes uncommitted state.
 3. Require a completed standalone objective register.
 4. Never initialize OpenSpec, add a dependency, modify `upstream/`, change files, or run `pnpm verify` through this skill.
-5. Use `$audit-product-direction` instead for a comprehensive repository-wide snapshot.
 
-## Select one capability
+## Choose the audit scope
+
+- Use `capability` scope when the user names one capability or asks for a focused
+  trace, coverage, conformance, readability, usability, or completeness audit.
+- Use `repository` scope when the user asks for the complete repository, all
+  Product Direction objectives or journeys, overall progress, alignment,
+  readiness, delivery claims, or a prioritized product-wide gap snapshot.
+- Default an ambiguous request to `capability` scope. Select a capability with
+  the user as described below rather than silently expanding to the repository.
+
+For either scope, read [references/audit-method.md](references/audit-method.md)
+and [the shared surface-to-execution method](../../references/product-specs/surface-to-execution.md)
+completely before auditing. For `repository` scope, also read
+[references/repository-audit-method.md](references/repository-audit-method.md)
+completely and follow its target, coverage, evidence, and report requirements.
+
+## Select one capability (`capability` scope)
 
 Use a supplied capability directly. Otherwise scan `docs/PRODUCT-OBJECTIVES.md` and `docs/product-specs/*.md`, then offer candidates grouped as uncovered, partial, or covered. Recommend a required capability with low coverage and sufficient implementation evidence, but let the user choose.
 
 Select a capability domain rather than one isolated objective. Include its related interfaces and cross-cutting guardrails. Narrow an oversized capability only when the slice can be verified independently and will still map to the same capability spec.
 
-## Audit the capability
-
-Read [references/audit-method.md](references/audit-method.md) and [the shared surface-to-execution method](../../references/product-specs/surface-to-execution.md) completely before auditing.
+## Audit the capability (`capability` scope)
 
 Compare the capability in three directions:
 
@@ -35,9 +50,17 @@ Inventory explanation, launcher, and executable capability surfaces before scori
 
 Run at most three focused verification commands for a normal audit. Prefer implementation plus a focused passing check over prose. Report skipped or blocked evidence as confidence limits.
 
+## Audit the repository
+
+Follow the repository audit method and assess every required objective in the
+standalone register. Group findings by capability, interface, and journey for
+readability, but do not sample objectives or hide unassessed rows inside a
+rollup. Keep capability dimensions, guardrails and evolution, and delivery
+claims separate.
+
 ## Report results
 
-Report:
+For `capability` scope, report:
 
 1. revision and working-tree scope;
 2. selected capability and mapped `PD-*` objectives;
@@ -51,3 +74,6 @@ Report:
 10. the smallest next evidence-producing action.
 
 Use fixed stages for individual capability requirements and allow one decimal place only for calculated rollups. Never emit a combined overall score.
+
+For `repository` scope, use the report order and complete objective accounting
+defined by the repository audit method. Never emit a combined overall score.
