@@ -1,5 +1,16 @@
 # Capability Audit Method
 
+## Contents
+
+- [Evidence order](#evidence-order)
+- [Start from the real user question](#start-from-the-real-user-question)
+- [Stop when the evidence is sufficient](#stop-when-the-evidence-is-sufficient)
+- [Product Direction coverage](#product-direction-coverage)
+- [Three independent dimensions](#three-independent-dimensions)
+- [Non-capability objectives](#non-capability-objectives)
+- [Confidence](#confidence)
+- [Verification budget](#verification-budget)
+
 ## Evidence order
 
 Rank evidence from strongest to weakest:
@@ -14,13 +25,29 @@ Documentation alone never proves implementation or shipment. File presence alone
 
 Use this evidence order for functional implementation and delivery. For explanation readability, direct inspection of the intended active surface against the shared surface-to-execution method is primary evidence. Automated text or DOM tests prove that content is present; they do not by themselves prove that a reader can understand the journey or its control model. Passing implementation tests do not override ambiguous or contradictory guidance.
 
+For a cross-surface launcher, rank handoff evidence separately:
+
+1. A transport-level deterministic binding verified at the destination.
+2. The exact emitted artifact contains the platform's direct executor selector.
+3. Destination-local guidance identifies and invokes the executor.
+4. Origin-only adjacent guidance names the executor.
+5. Implicit-invocation or discovery metadata may match the request.
+
+The fourth and fifth levels can explain intent or fallback routing, but they do
+not prove that a product-owned launcher reaches a named executor after the
+artifact leaves its origin.
+
 ## Start from the real user question
 
 Before collecting broad evidence, write one sentence for each of these:
 
 - what the user is trying to accomplish;
 - where the product tells them to start;
+- where each copied, opened, exported, or forwarded handoff lands;
+- exactly what context travels and what origin context disappears;
 - which mechanism actually performs the work;
+- which emitted bytes, fields, selector, or transport metadata bind that
+  mechanism;
 - what the user must decide; and
 - what observable result proves completion.
 
@@ -45,9 +72,10 @@ objective; list those objective IDs together in the evidence appendix.
 For a capability audit, support a material surface mismatch with the smallest
 complete evidence set: one intended visible entry, the real executor or missing
 executor, the owning public contract, and one focused test or verification
-result when available. Stop collecting same-boundary examples once this set
-proves the finding. Gather another path only when it could change the finding,
-score, or confidence.
+result when available. When the entry crosses surfaces, also capture the exact
+emitted artifact and its destination context. Stop collecting same-boundary
+examples once this set proves the finding. Gather another path only when it
+could change the finding, score, or confidence.
 
 Do not read unrelated implementation areas to make the report look complete.
 Do not spend a verification command on evidence that cannot change a score or

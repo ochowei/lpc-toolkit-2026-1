@@ -1,4 +1,4 @@
 interface:
   display_name: "Audit Product Capability"
   short_description: "Audit product journeys into clear file reports"
-  default_prompt: "Use $audit-product-capability to audit this capability in plain language and produce a Markdown report."
+  default_prompt: "Use $audit-product-capability to audit this capability, including exact launcher artifacts at their destination, and produce a plain-language Markdown report."
