@@ -31,7 +31,9 @@ Use this order:
 4. **Scorecard** — separate readability, usability, and functional completeness;
    never combine them.
 5. **Journey trace** — compact visible-entry-to-executor-to-result maps for the
-   affected paths.
+   affected paths. For every cross-surface launcher, include `origin entry`,
+   `exact emitted artifact`, `destination`, `executor binding`, and `verdict`;
+   state what context travels and what origin context disappears.
 6. **Next actions** — smallest evidence-producing actions, not a speculative
    implementation plan.
 
@@ -39,7 +41,9 @@ Use this order:
 
 Put revision scope, full `PD-*` and requirement accounting, raw numerators and
 denominators, confidence, guardrail/evolution and delivery rows, exact paths and
-line numbers, commands, skipped checks, and limitations here.
+line numbers, commands, skipped checks, limitations, and the artifact-capture
+method here. When a launcher crosses surfaces, record the exact clipboard,
+request, URL, file, or structured fields inspected and the destination context.
 
 ## Remove noise
 
@@ -51,6 +55,9 @@ line numbers, commands, skipped checks, and limitations here.
   the appendix.
 - Cite one strongest implementation path and one strongest test or command when
   enough; add more only when they prove a different boundary.
+- Do not aggregate origin explanation and destination binding into one PASS.
+  Report each cross-surface arrow separately and apply the destination
+  paste-isolation verdict before rollup.
 - Do not narrate discovery commands, repeat tables in prose, or list every
   passing objective in the main report.
 - Distinguish facts, inferences, and unknowns explicitly.

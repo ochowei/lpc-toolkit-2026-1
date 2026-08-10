@@ -1,6 +1,6 @@
 ---
 name: audit-product-capability
-description: Audit LPC Toolkit at one-capability or repository-wide scope against Product Direction, accepted specs, visible guidance, executable Agent mechanisms, implementation, and tests. Use for coverage, conformance, readability, usability, functional completeness, Agent Integration launcher-versus-Skill gaps, readiness, delivery claims, or a prioritized gap report. Produce a plain-language Markdown or standalone HTML report while keeping product and source files read-only. Do not use for spec authoring, product changes, or unimplemented feature planning.
+description: Audit LPC Toolkit at one-capability or repository-wide scope against Product Direction, accepted specs, visible guidance, executable Agent mechanisms, implementation, and tests. Use for coverage, conformance, readability, usability, functional completeness, Agent Integration launcher-versus-Skill or copied-artifact binding gaps, readiness, delivery claims, or a prioritized gap report. Produce a plain-language Markdown or standalone HTML report while keeping product and source files read-only. Do not use for spec authoring, product changes, or unimplemented feature planning.
 ---
 
 # Audit Product Capability and Direction
@@ -32,8 +32,8 @@ and [the shared surface-to-execution method](../../references/product-specs/surf
 completely before auditing. Read [references/report-format.md](references/report-format.md)
 before producing the result. When Agent Integration is in scope, also read
 [references/agent-integration-audit.md](references/agent-integration-audit.md)
-completely and apply its mandatory executor-discovery gate. For `repository`
-scope, also read
+completely and apply its mandatory executor-discovery and transported-artifact
+gates. For `repository` scope, also read
 [references/repository-audit-method.md](references/repository-audit-method.md)
 completely and follow its target, coverage, evidence, and report requirements.
 
@@ -60,11 +60,22 @@ a launcher only. If an executor exists but the active surface presents the
 launcher as the integration, report a material presentation mismatch even when
 implementation tests pass.
 
-Apply the launcher-local and active-state checks in the Agent Integration gate
-to every journey-specific entry. Do not let page-wide copy, a sibling entry, or
-the default state substitute for executor and handoff guidance at the audited
-point of action. Require evidence scoped to the rendered entry; a test that
-only finds the expected words somewhere on the page is insufficient.
+When a launcher copies, exports, opens, or forwards a request, inspect the exact
+emitted artifact as a standalone destination surface. Remove the origin page
+from the available context and prove that the artifact directly invokes or
+deterministically binds the first executor. Origin-local or adjacent prose may
+explain the entry, but it cannot prove the transported edge. If a
+platform-specific launcher says that a named Skill will run, require the
+artifact to use that platform's direct selector or another deterministic
+transport binding. Treat implicit-invocation metadata as fallback routing, not
+proof of the launcher-to-executor edge.
+
+Apply the launcher-local, active-state, and transported-artifact checks in the
+Agent Integration gate to every journey-specific entry. Do not let page-wide
+copy, a sibling entry, the default state, origin-only guidance, or implicit
+routing substitute for executor and handoff guidance at the audited boundary.
+Require evidence scoped to the rendered entry and exact emitted artifact; a
+test that only finds the expected words somewhere on the page is insufficient.
 
 Run at most three focused verification commands for a normal audit. Prefer implementation plus a focused passing check over prose. Report skipped or blocked evidence as confidence limits.
 
