@@ -14,6 +14,45 @@ Documentation alone never proves implementation or shipment. File presence alone
 
 Use this evidence order for functional implementation and delivery. For explanation readability, direct inspection of the intended active surface against the shared surface-to-execution method is primary evidence. Automated text or DOM tests prove that content is present; they do not by themselves prove that a reader can understand the journey or its control model. Passing implementation tests do not override ambiguous or contradictory guidance.
 
+## Start from the real user question
+
+Before collecting broad evidence, write one sentence for each of these:
+
+- what the user is trying to accomplish;
+- where the product tells them to start;
+- which mechanism actually performs the work;
+- what the user must decide; and
+- what observable result proves completion.
+
+Use these sentences as the expected journey. Test the visible surfaces against
+that journey before scoring implementation. This prevents a large body of
+passing code evidence from hiding a broken explanation or handoff.
+
+For every material finding, state only:
+
+1. **What the user sees** — the current visible behavior or wording.
+2. **What actually happens** — the real executor, contract, or missing step.
+3. **Why it matters** — the concrete confusion, blocked action, or false claim.
+4. **Evidence** — the smallest set of paths, tests, or command results that proves it.
+5. **Next proof** — the smallest test or inspection that would prove the gap is closed.
+
+Do not report a finding when it has no user, Agent, governance, or delivery
+impact. Do not repeat the same cause as separate findings for each affected
+objective; list those objective IDs together in the evidence appendix.
+
+## Stop when the evidence is sufficient
+
+For a capability audit, support a material surface mismatch with the smallest
+complete evidence set: one intended visible entry, the real executor or missing
+executor, the owning public contract, and one focused test or verification
+result when available. Stop collecting same-boundary examples once this set
+proves the finding. Gather another path only when it could change the finding,
+score, or confidence.
+
+Do not read unrelated implementation areas to make the report look complete.
+Do not spend a verification command on evidence that cannot change a score or
+resolve an `UNKNOWN`.
+
 ## Product Direction coverage
 
 Resolve objectives from `docs/PRODUCT-OBJECTIVES.md`. Use mapped required `PD-CAP-*` objectives as the denominator for the selected capability. Report objective states rather than counting spec files:
@@ -70,6 +109,10 @@ sum(scores) / (4 * applicable units) * 100
 ```
 
 Show the raw numerator and denominator, state distribution, one decimal place, and confidence. Never average the dimensions into one score.
+
+Scores summarize evidence; they are not the headline. Explain the material
+gap in ordinary language before showing its score. Avoid restating every score
+in prose when a compact table already contains it.
 
 ## Non-capability objectives
 
