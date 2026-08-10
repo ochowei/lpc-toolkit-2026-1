@@ -21,7 +21,7 @@
     "websiteURL": "https://github.com/ochowei/lpc-toolkit-2026-1",
     "defaultPrompt": [
       "Build an LPC character from existing catalog art, show an attributed preview, and help me refine it.",
-      "Find a catalog item with incomplete run animation support, show me the read-only evidence, and ask before starting an authoring revision.",
+      "$lpc-animation-asset-audit Find a catalog item with incomplete run animation support, show me the read-only evidence, and ask before starting an authoring revision.",
       "Create a new attributed LPC asset for a supported layout and stop at a review-ready preview."
     ],
     "brandColor": "#315B3A",

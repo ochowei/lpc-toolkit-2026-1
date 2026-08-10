@@ -238,6 +238,7 @@ try {
     'package/dist/vendor/@lpc-toolkit/presets/package.json',
     'package/dist/vendor/@lpc-toolkit/asset-pack-format/dist/index.js',
     'package/dist/vendor/@lpc-toolkit/asset-pack-format/package.json',
+    'package/examples/extend-item-plan.v1.json',
     'package/README.md',
     'package/LICENSE',
     'package/package.json',
@@ -663,6 +664,29 @@ try {
   assert.deepEqual(readdirSync(emptyCwd).sort(), agentDirectoryBefore);
 
   const authoringPlanPath = path.join(emptyCwd, 'packed-authoring-plan.json');
+  const installedExtendItemTemplatePath = path.join(
+    installedPackageRoot,
+    'examples',
+    'extend-item-plan.v1.json',
+  );
+  assert.ok(
+    existsSync(installedExtendItemTemplatePath),
+    'installed package is missing its public extend-item plan template',
+  );
+  const installedExtendItemTemplate = JSON.parse(
+    readFileSync(installedExtendItemTemplatePath, 'utf8'),
+  );
+  assert.equal(installedExtendItemTemplate.schema, 'lpc-toolkit.asset-authoring-plan.v1');
+  assert.equal(installedExtendItemTemplate.goal, 'extend-item');
+  assert.equal(installedExtendItemTemplate.remediation?.selectedFinding?.category, 'blankFrames');
+  const extendItemTemplateStart = runInstalledJson([
+    'asset', 'authoring', 'start', '--plan', installedExtendItemTemplatePath,
+  ], workspaceRoot);
+  assert.equal(extendItemTemplateStart.ok, true);
+  assert.equal(extendItemTemplateStart.data?.goal, 'extend-item');
+  assert.equal(extendItemTemplateStart.data?.phase, 'planned');
+  assert.equal(extendItemTemplateStart.data?.reason, 'awaiting-contract');
+
   writeJson(authoringPlanPath, {
     schema: 'lpc-toolkit.asset-authoring-plan.v1',
     goal: 'new-item',

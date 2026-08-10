@@ -76,16 +76,18 @@ test('publishes the three-journey presentation from shared release metadata', ()
   assert.match(manifest.version, /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u);
   assert.match(manifest.description, /assets/u);
   assert.match(manifest.interface.longDescription, /new assets/u);
-  assert.equal(
-    manifest.interface.defaultPrompt.some((prompt) => /incomplete.*animation/iu.test(prompt)),
-    true,
+  const animationPrompt = manifest.interface.defaultPrompt.find(
+    (prompt) => /incomplete.*animation/iu.test(prompt),
   );
+  assert.equal(typeof animationPrompt, 'string');
+  assert.match(animationPrompt, /^\$lpc-animation-asset-audit\b/u);
+  assert.doesNotMatch(animationPrompt, /\$lpc-asset-authoring\b/u);
   for (const required of [
     `plugin \`${manifest.version}\``,
     compatibilityMetadata.cliRange,
     'catalog audit-animations',
-    '`lpc-animation-asset-audit`',
-    '`lpc-asset-authoring`',
+    '`$lpc-animation-asset-audit`',
+    '`$lpc-asset-authoring`',
     'strict authoring session',
     'review-ready',
   ]) {
@@ -105,6 +107,48 @@ test('publishes the three-journey presentation from shared release metadata', ()
     cliPluginSection.includes(`plugin \`${compatibilityVersion}\``),
     true,
     'CLI README must match the plugin compatibility metadata',
+  );
+});
+
+test('packages the deterministic animation-remediation handoff through a public plan artifact', () => {
+  const pluginRoot = new URL('../plugins/lpc-toolkit/', import.meta.url);
+  const manifest = JSON.parse(readFileSync(new URL('.codex-plugin/plugin.json', pluginRoot), 'utf8'));
+  const animationPrompt = manifest.interface.defaultPrompt.find(
+    (prompt) => /incomplete.*animation/iu.test(prompt),
+  );
+  const auditWorkflow = readFileSync(new URL(
+    'skills/animation-asset-audit/references/audit-workflow.md',
+    pluginRoot,
+  ), 'utf8');
+  const authoringSkill = readFileSync(new URL(
+    'skills/asset-authoring/SKILL.md',
+    pluginRoot,
+  ), 'utf8');
+  const pluginTemplate = readFileSync(new URL(
+    'skills/asset-authoring/references/extend-item-plan.v1.json',
+    pluginRoot,
+  ), 'utf8');
+  const cliTemplate = readFileSync(new URL(
+    '../packages/cli/examples/extend-item-plan.v1.json',
+    import.meta.url,
+  ), 'utf8');
+  const cliContract = JSON.parse(readFileSync(new URL(
+    'skills/asset-authoring/references/cli-contract.json',
+    pluginRoot,
+  ), 'utf8'));
+
+  assert.match(animationPrompt, /^\$lpc-animation-asset-audit\b/u);
+  assert.doesNotMatch(animationPrompt, /\$lpc-asset-authoring\b/u);
+  assert.match(
+    auditWorkflow.replace(/\s+/gu, ' '),
+    /user confirms one finding.*switch to `\$lpc-asset-authoring`.*`extend-item`/iu,
+  );
+  assert.match(authoringSkill, /references\/extend-item-plan\.v1\.json/u);
+  assert.equal(pluginTemplate, cliTemplate);
+  assert.equal(JSON.parse(pluginTemplate).goal, 'extend-item');
+  assert.equal(
+    cliContract.commands.some(({ id }) => id === 'authoring-start'),
+    true,
   );
 });
 

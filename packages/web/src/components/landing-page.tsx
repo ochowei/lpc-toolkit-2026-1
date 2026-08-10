@@ -288,9 +288,13 @@ export function CliPage({ onNavigate }: ProductPageProps) {
             </h3>
             <p className="mt-2 text-sm text-text-2">
               plan.json is explicit input prepared from one selected finding
-              and human-provided draft attribution. The CLI does not
-              choose the finding, invent attribution, invoke a provider, or
-              create candidate pixels. Read the{' '}
+              and human-provided draft attribution. The published npm package
+              includes <code>examples/extend-item-plan.v1.json</code> as a
+              complete post-consent field guide, and the Codex plugin carries
+              the same template. Replace every example value with reviewed
+              evidence. The CLI does not choose the finding, infer consent,
+              invent attribution, invoke a provider, or create candidate
+              pixels. Read the{' '}
               <a
                 className="underline hover:text-text"
                 href={cliReadmeUrl}
@@ -678,8 +682,8 @@ export function AgentIntegrationsPage({ onNavigate }: ProductPageProps) {
             <p className="mt-2 max-w-3xl text-sm text-text-2">
               Copy kickoff prompt only copies the request; it does not run the
               journey. After you paste it into a Codex task,{' '}
-              <code>lpc-animation-asset-audit</code> performs the read-only audit.
-              Once you confirm one bounded revision, <code>lpc-asset-authoring</code>{' '}
+              <code>$lpc-animation-asset-audit</code> performs the read-only audit.
+              Once you confirm one bounded revision, <code>$lpc-asset-authoring</code>{' '}
               continues in the same Codex task through a strict local authoring
               session. If either Skill is unavailable, use the CLI directly with
               the same confirmation boundaries.
@@ -687,7 +691,7 @@ export function AgentIntegrationsPage({ onNavigate }: ProductPageProps) {
             <p className="mt-2 max-w-3xl text-sm text-text-2">
               The default Agent-guided endpoint remains a review-ready preview.
               After a separately authorized installation succeeds, return in the
-              same Codex task to <code>lpc-animation-asset-audit</code> with the
+              same Codex task to <code>$lpc-animation-asset-audit</code> with the
               original animation, type, and body-type bounds. Inspect{' '}
               <code>unsupported</code>, <code>missingFiles</code>,{' '}
               <code>blankFrames</code>, and <code>errors</code>. Exit code zero

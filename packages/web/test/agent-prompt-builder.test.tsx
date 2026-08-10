@@ -17,11 +17,14 @@ describe('agent prompt builders', () => {
       startingPoint: 'Let the agent choose',
       details: 'practical clothes and fishing gear',
     })).toContain('from existing catalog art');
-    expect(buildAnimationExtensionPrompt({
+    const animationPrompt = buildAnimationExtensionPrompt({
       item: 'weapon_sword',
       animations: 'run',
       details: 'the audit proves a supported gap',
-    })).toContain('ask for my explicit confirmation before modifying assets');
+    });
+    expect(animationPrompt).toMatch(/^\$lpc-animation-asset-audit\b/u);
+    expect(animationPrompt).toContain('ask for my explicit confirmation before modifying assets');
+    expect(animationPrompt).not.toContain('$lpc-asset-authoring');
     expect(buildNewAssetPrompt({
       concept: 'a moon braid',
       assetType: 'hair',
@@ -54,5 +57,15 @@ describe('agent prompt builders', () => {
     expect(html).toContain('Write character file');
     expect(html).toContain('Expected result and files');
     expect(html).toContain('aria-live="polite"');
+  });
+
+  it('explains the executor and consent-bound continuation inside the active animation launcher', () => {
+    const html = renderToStaticMarkup(<AgentPromptBuilders initialJourney="extend" />);
+
+    expect(html).toContain('Copy kickoff prompt only copies this request');
+    expect(html).toContain('$lpc-animation-asset-audit');
+    expect(html).toContain('$lpc-asset-authoring');
+    expect(html).toContain('same Codex task');
+    expect(html).toContain('strict CLI workflow');
   });
 });

@@ -93,6 +93,10 @@ describe('CLI and agent integration pages', () => {
     expect(html).toContain(
       'plan.json is explicit input prepared from one selected finding and human-provided draft attribution',
     );
+    expect(html).toContain('examples/extend-item-plan.v1.json');
+    expect(html).toContain('complete post-consent field guide');
+    expect(html).toContain('Replace every example value with reviewed evidence');
+    expect(html).toContain('does not choose the finding, infer consent');
     expect(html).toContain('Limited Phase 1 scaffold alternative');
     expect(html).toContain('mutating direct CLI authoring action');
     expect(html).toContain('review one selected finding and explicitly consent');
@@ -208,8 +212,8 @@ describe('CLI and agent integration pages', () => {
     );
 
     expect(html).toContain('Copy kickoff prompt only copies the request');
-    expect(html).toContain('lpc-animation-asset-audit');
-    expect(html).toContain('lpc-asset-authoring');
+    expect(html).toContain('$lpc-animation-asset-audit');
+    expect(html).toContain('$lpc-asset-authoring');
     expect(html).toContain('continues in the same Codex task');
     expect(html).toContain('If either Skill is unavailable');
     expect(html).toContain('use the CLI directly with');

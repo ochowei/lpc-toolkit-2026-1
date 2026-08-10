@@ -43,7 +43,7 @@ same target and scope and confirm the intended findings disappear without a
 relevant inspection error.
 
 The worklist is a read-only animation remediation handoff. If the user confirms
-one finding for source revision, switch to `lpc-asset-authoring` in
+one finding for source revision, switch to `$lpc-asset-authoring` in
 `extend-item` mode and preserve the complete report, its digest, the selected
 finding, and the exact approved scope. The authoring Skill creates the strict
 plan and session, materializes the sprite drawing contract, imports only a
@@ -53,7 +53,7 @@ creates source files itself.
 
 ## Conditional closure re-entry
 
-Re-enter this workflow only after `lpc-asset-authoring` reports a successful
+Re-enter this workflow only after `$lpc-asset-authoring` reports a successful
 exact installation and a current installation receipt. Receive the preserved
 original target animation, optional type, optional body type, complete report
 identity and digest, selected finding and category, and exact installation

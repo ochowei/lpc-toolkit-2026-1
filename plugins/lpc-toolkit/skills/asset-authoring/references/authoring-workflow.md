@@ -18,7 +18,7 @@ ask for explicit consent.
 
 ## `extend-item`
 
-1. Begin in the lpc-animation-asset-audit skill. Run a read-only bounded audit
+1. Begin in the `$lpc-animation-asset-audit` Skill. Run a read-only bounded audit
    and show the selected finding, physical source, consumers, body types,
    recolors, geometry evidence, and path confidence.
 2. Ask whether to start a source-asset revision. Do not mutate anything until
@@ -30,6 +30,9 @@ ask for explicit consent.
    from the confirmed finding. Preserve the complete audit report and digest,
    physical source, consumers, body types, variants, recolors, geometry,
    confidence, exact source-cell evidence, and approved remediation bounds.
+   Use `references/extend-item-plan.v1.json` as the complete field guide. It is
+   a syntactically valid post-consent example, not evidence: replace every example value
+   with the selected report evidence and human-provided attribution, and never infer audit evidence, consent, authorship, or license.
 5. Start the authoring session and materialize its provider-neutral sprite
    drawing contract:
 
@@ -100,7 +103,7 @@ one action's authority from completion of another.
 
 Continue to closure only after a successful exact installation has produced a
 current `lpc-toolkit.asset-authoring-install-receipt.v1` receipt. Only then, the
-next executor is `lpc-animation-asset-audit` in the same Codex task. Hand back
+next executor is `$lpc-animation-asset-audit` in the same Codex task. Hand back
 the original target animation, optional type, optional body type, complete
 report identity and digest, selected finding and category, and the exact
 installation receipt identity and digest.

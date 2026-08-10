@@ -1,0 +1,186 @@
+{
+  "schema": "lpc-toolkit.asset-authoring-plan.v1",
+  "goal": "extend-item",
+  "pack": {
+    "id": "example.animation-remediation",
+    "version": "1.0.0",
+    "displayName": "Example Animation Remediation"
+  },
+  "asset": {
+    "kind": "extend-item",
+    "itemId": "hair_messy",
+    "typeName": "hair"
+  },
+  "scope": {
+    "packId": "example.animation-remediation",
+    "assetId": "hair_messy",
+    "bodyTypes": [
+      "child"
+    ],
+    "animations": [
+      "climb"
+    ],
+    "paths": [
+      "spritesheets/hair/messy/child/climb.png"
+    ]
+  },
+  "consent": {
+    "approved": true,
+    "scope": {
+      "packId": "example.animation-remediation",
+      "assetId": "hair_messy",
+      "bodyTypes": [
+        "child"
+      ],
+      "animations": [
+        "climb"
+      ],
+      "paths": [
+        "spritesheets/hair/messy/child/climb.png"
+      ]
+    }
+  },
+  "remediation": {
+    "reportDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "selectedFinding": {
+      "category": "blankFrames",
+      "path": "spritesheets/hair/messy/child/climb.png",
+      "animation": "climb",
+      "sourceAnimation": "climb",
+      "sourceRow": 0,
+      "frames": [
+        {
+          "sourceColumn": 2,
+          "logicalFrameIndices": [
+            2
+          ]
+        }
+      ],
+      "consumers": [
+        {
+          "itemId": "hair_messy",
+          "typeName": "hair",
+          "layer": "layer_1",
+          "bodyTypes": [
+            "child"
+          ],
+          "recolors": []
+        }
+      ]
+    },
+    "consumer": {
+      "itemId": "hair_messy",
+      "typeName": "hair",
+      "layer": "layer_1",
+      "bodyTypes": [
+        "child"
+      ],
+      "recolors": []
+    },
+    "pathConfidence": "exact",
+    "geometry": {
+      "kind": "standard",
+      "frameSize": 64,
+      "rows": [
+        {
+          "sourceRow": 0,
+          "cells": [
+            {
+              "sourceColumn": 0,
+              "logicalFrameIndices": [
+                0
+              ]
+            },
+            {
+              "sourceColumn": 1,
+              "logicalFrameIndices": [
+                1
+              ]
+            },
+            {
+              "sourceColumn": 2,
+              "logicalFrameIndices": [
+                2
+              ]
+            },
+            {
+              "sourceColumn": 3,
+              "logicalFrameIndices": [
+                3
+              ]
+            },
+            {
+              "sourceColumn": 4,
+              "logicalFrameIndices": [
+                4
+              ]
+            },
+            {
+              "sourceColumn": 5,
+              "logicalFrameIndices": [
+                5
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "sourceCells": [
+      {
+        "sourceRow": 0,
+        "sourceColumn": 0,
+        "logicalFrameIndices": [
+          0
+        ]
+      },
+      {
+        "sourceRow": 0,
+        "sourceColumn": 1,
+        "logicalFrameIndices": [
+          1
+        ]
+      },
+      {
+        "sourceRow": 0,
+        "sourceColumn": 2,
+        "logicalFrameIndices": [
+          2
+        ]
+      },
+      {
+        "sourceRow": 0,
+        "sourceColumn": 3,
+        "logicalFrameIndices": [
+          3
+        ]
+      },
+      {
+        "sourceRow": 0,
+        "sourceColumn": 4,
+        "logicalFrameIndices": [
+          4
+        ]
+      },
+      {
+        "sourceRow": 0,
+        "sourceColumn": 5,
+        "logicalFrameIndices": [
+          5
+        ]
+      }
+    ]
+  },
+  "draftCredits": {
+    "authors": [
+      "Replace with the human-confirmed author or source"
+    ],
+    "licenses": [
+      "CC-BY-SA 4.0"
+    ],
+    "urls": [
+      "https://example.com/replace-with-source"
+    ],
+    "notes": "Example only: replace every attribution value with human-provided evidence before starting a session."
+  }
+}
+

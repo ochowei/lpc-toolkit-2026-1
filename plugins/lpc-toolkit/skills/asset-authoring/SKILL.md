@@ -12,7 +12,8 @@ preview. Formal release and installation are separate human-confirmed actions.
    `$PLUGIN_ROOT/references/compatibility.md`, then run
    `node "$PLUGIN_ROOT/scripts/check-cli.mjs"`. Continue only when `ok` is true;
    never install or upgrade the CLI silently.
-2. Read `references/authoring-workflow.md`. Treat
+2. Read `references/authoring-workflow.md`. For `extend-item`, also read the
+   complete `references/extend-item-plan.v1.json` field guide. Treat
    `references/cli-contract.json` as the command inventory.
 3. Choose exactly one mode:
    - `extend-item`: retain one existing item identity and inherited credits;

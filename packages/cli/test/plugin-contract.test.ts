@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { parseAssetAuthoringPlan } from '@lpc-toolkit/core';
 import { parseArgs } from '../src/args.js';
 import { helpForCommand, validateCommandOptions } from '../src/command-spec.js';
 
@@ -49,6 +50,14 @@ const assetWorkflowPath = path.resolve(
   '../../../plugins/lpc-toolkit/skills/asset-authoring/references/authoring-workflow.md',
 );
 const assetWorkflow = readFileSync(assetWorkflowPath, 'utf8');
+const cliExtendItemTemplatePath = path.resolve(
+  here,
+  '../examples/extend-item-plan.v1.json',
+);
+const pluginExtendItemTemplatePath = path.resolve(
+  here,
+  '../../../plugins/lpc-toolkit/skills/asset-authoring/references/extend-item-plan.v1.json',
+);
 const compatibilityPath = path.resolve(
   here,
   '../../../plugins/lpc-toolkit/references/compatibility.md',
@@ -160,6 +169,39 @@ describe('Codex plugin CLI contract', () => {
     expect(auditWorkflow).not.toContain('asset authoring start');
   });
 
+  it('ships one complete, parseable extend-item plan template with CLI and plugin artifacts', () => {
+    const cliTemplate = readFileSync(cliExtendItemTemplatePath, 'utf8');
+    const pluginTemplate = readFileSync(pluginExtendItemTemplatePath, 'utf8');
+    const parsed = parseAssetAuthoringPlan(JSON.parse(cliTemplate) as unknown);
+
+    expect(pluginTemplate).toBe(cliTemplate);
+    expect(parsed).toMatchObject({
+      ok: true,
+      plan: {
+        schema: 'lpc-toolkit.asset-authoring-plan.v1',
+        goal: 'extend-item',
+        consent: { approved: true },
+        remediation: {
+          selectedFinding: { category: 'blankFrames' },
+          pathConfidence: 'exact',
+          sourceCells: expect.any(Array),
+        },
+        draftCredits: {
+          authors: expect.any(Array),
+          licenses: expect.any(Array),
+          urls: expect.any(Array),
+          notes: expect.any(String),
+        },
+      },
+    });
+    if (parsed.ok && parsed.plan.goal === 'extend-item') {
+      expect(parsed.plan.remediation.sourceCells).toHaveLength(6);
+    }
+    expect(assetWorkflow).toContain('references/extend-item-plan.v1.json');
+    expect(assetWorkflow).toContain('replace every example value');
+    expect(assetWorkflow).toContain('never infer audit evidence, consent, authorship, or license');
+  });
+
   it('keeps authoring out of read-only and composition skills', () => {
     const nonAuthoringCommands = [...characterContract.commands, ...auditContract.commands];
     expect(nonAuthoringCommands.every(({ argv }) =>
@@ -194,7 +236,7 @@ describe('Codex plugin CLI contract', () => {
       'separately requests and confirms',
       'successful exact installation',
       'lpc-toolkit.asset-authoring-install-receipt.v1',
-      'next executor is `lpc-animation-asset-audit`',
+      'next executor is `$lpc-animation-asset-audit`',
       'same Codex task',
       'original target animation',
       'optional type',

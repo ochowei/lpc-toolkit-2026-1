@@ -441,7 +441,7 @@ test('returns only a separately installed revision to the original bounded audit
     'inspection',
     'successful exact installation',
     'lpc-toolkit.asset-authoring-install-receipt.v1',
-    'next executor is `lpc-animation-asset-audit`',
+    'next executor is `$lpc-animation-asset-audit`',
     'same Codex task',
     'original target animation',
     'optional type',
@@ -451,7 +451,7 @@ test('returns only a separately installed revision to the original bounded audit
   ]) assert.equal(authoringClosure.includes(required), true, `missing ${required}`);
   assert.ok(
     authoringClosure.indexOf('successful exact installation')
-      < authoringClosure.indexOf('next executor is `lpc-animation-asset-audit`'),
+      < authoringClosure.indexOf('next executor is `$lpc-animation-asset-audit`'),
   );
 
   for (const required of [

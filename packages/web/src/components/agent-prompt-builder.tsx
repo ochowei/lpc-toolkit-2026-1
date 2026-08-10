@@ -28,7 +28,7 @@ export function buildCreateCharacterPrompt(fields: CreateCharacterFields): strin
 }
 
 export function buildAnimationExtensionPrompt(fields: AnimationExtensionFields): string {
-  return `Find the existing LPC catalog item ${fields.item.trim()} and run a read-only audit for ${fields.animations.trim()}. Show me the bounded evidence and retained item identity first. If ${fields.details.trim()}, propose an animation-extension revision, explain the source files and credits that would be affected, and ask for my explicit confirmation before modifying assets or using a provider. Stop at a validated, attributed review-ready preview; do not release or install it.`;
+  return `$lpc-animation-asset-audit\n\nFind the existing LPC catalog item ${fields.item.trim()} and run a read-only audit for ${fields.animations.trim()}. Show me the bounded evidence and retained item identity first. If ${fields.details.trim()}, propose an animation-extension revision, explain the source files and credits that would be affected, and ask for my explicit confirmation before modifying assets or using a provider. Stop at a validated, attributed review-ready preview; do not release or install it.`;
 }
 
 export function buildNewAssetPrompt(fields: NewAssetFields): string {
@@ -75,6 +75,7 @@ function PromptPanel({
   valid,
   onReset,
   stages,
+  executorGuidance,
   children,
 }: {
   readonly title: string;
@@ -84,6 +85,7 @@ function PromptPanel({
   readonly valid: boolean;
   readonly onReset: () => void;
   readonly stages: readonly { label: string; authority: string }[];
+  readonly executorGuidance?: React.ReactNode;
   readonly children: React.ReactNode;
 }) {
   const [copyStatus, setCopyStatus] = useState('');
@@ -107,6 +109,11 @@ function PromptPanel({
         <button type="button" onClick={onReset} className="text-sm text-text-2 underline hover:text-text">Reset</button>
       </div>
       <AuthorityStages stages={stages} />
+      {executorGuidance && (
+        <div className="mt-4 rounded-md border border-accent/40 bg-accent/10 p-3 text-sm leading-6 text-text-2">
+          {executorGuidance}
+        </div>
+      )}
       <div className="mt-5 grid gap-3 sm:grid-cols-3">{children}</div>
       <div className="mt-4 rounded-md border border-border bg-[var(--bg-deep)] p-4">
         <p className="text-xs font-semibold uppercase tracking-wide text-text-mute">Prompt preview</p>
@@ -135,8 +142,8 @@ const journeys: readonly { id: JourneyId; title: string; term: string; descripti
   { id: 'new', title: 'Create a new asset', term: 'New asset authoring', description: 'Create one new identity for a supported LPC layout.' },
 ];
 
-export function AgentPromptBuilders() {
-  const [active, setActive] = useState<JourneyId>('compose');
+export function AgentPromptBuilders({ initialJourney = 'compose' }: { readonly initialJourney?: JourneyId } = {}) {
+  const [active, setActive] = useState<JourneyId>(initialJourney);
   const [compose, setCompose] = useState<CreateCharacterFields>(composeDefaults);
   const [extend, setExtend] = useState<AnimationExtensionFields>(extendDefaults);
   const [newAsset, setNewAsset] = useState<NewAssetFields>(newDefaults);
@@ -162,7 +169,7 @@ export function AgentPromptBuilders() {
           </PromptPanel>
         )}
         {active === 'extend' && (
-          <PromptPanel title="Add a missing animation" term="Animation extension" prompt={buildAnimationExtensionPrompt(extend)} result={buildAnimationExtensionResult(extend.item)} valid={Object.values(extend).every((value) => value.trim())} onReset={() => setExtend(extendDefaults)} stages={[{ label: 'Audit the gap', authority: 'Read-only' }, { label: 'Confirm revision', authority: 'User approval required' }, { label: 'Import and preview', authority: 'Write bounded source' }]}>
+          <PromptPanel title="Add a missing animation" term="Animation extension" prompt={buildAnimationExtensionPrompt(extend)} result={buildAnimationExtensionResult(extend.item)} valid={Object.values(extend).every((value) => value.trim())} onReset={() => setExtend(extendDefaults)} stages={[{ label: 'Audit the gap', authority: 'Read-only' }, { label: 'Confirm revision', authority: 'User approval required' }, { label: 'Import and preview', authority: 'Write bounded source' }]} executorGuidance={<p>Copy kickoff prompt only copies this request. Paste it into a Codex task; <code>$lpc-animation-asset-audit</code> runs first and stays read-only. After you confirm one bounded revision, it hands off to <code>$lpc-asset-authoring</code> in the same Codex task. If either Skill is unavailable, use the strict CLI workflow.</p>}>
             <TextField label="Existing item" value={extend.item} onChange={(item) => setExtend({ ...extend, item })} />
             <TextField label="Missing animation" value={extend.animations} onChange={(animations) => setExtend({ ...extend, animations })} />
             <TextField label="When to proceed" value={extend.details} onChange={(details) => setExtend({ ...extend, details })} />
