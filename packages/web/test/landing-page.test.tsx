@@ -180,4 +180,18 @@ describe('CLI and agent integration pages', () => {
     expect(html).not.toContain('Coming soon');
     expect(html).not.toContain('Preview your first character');
   });
+
+  it('explains the kickoff launcher, Skill handoff, and CLI fallback', () => {
+    const html = renderToStaticMarkup(
+      <AgentIntegrationsPage onNavigate={() => {}} />,
+    );
+
+    expect(html).toContain('Copy kickoff prompt only copies the request');
+    expect(html).toContain('lpc-animation-asset-audit');
+    expect(html).toContain('lpc-asset-authoring');
+    expect(html).toContain('continues in the same Codex task');
+    expect(html).toContain('If either Skill is unavailable');
+    expect(html).toContain('use the CLI directly with');
+    expect(html).toContain('the same confirmation boundaries');
+  });
 });

@@ -375,6 +375,31 @@ test('routes mutating asset work through one consent-bound skill', () => {
   ]) assert.equal(skill.includes(required), true, `missing ${required}`);
 });
 
+test('hands confirmed animation remediation to one strict contract-bound authoring session', () => {
+  const auditSkill = readFileSync(new URL(
+    '../skills/animation-asset-audit/SKILL.md', import.meta.url,
+  ), 'utf8').replace(/\s+/gu, ' ');
+  const auditWorkflow = readFileSync(new URL(
+    '../skills/animation-asset-audit/references/audit-workflow.md', import.meta.url,
+  ), 'utf8').replace(/\s+/gu, ' ');
+  const authoringWorkflow = readFileSync(new URL(
+    '../skills/asset-authoring/references/authoring-workflow.md', import.meta.url,
+  ), 'utf8').replace(/\s+/gu, ' ');
+
+  assert.match(auditSkill, /switching to lpc-asset-authoring in `extend-item` mode/u);
+  for (const required of [
+    'lpc-animation-asset-audit',
+    'asset authoring start',
+    'asset authoring contract',
+    'asset authoring import',
+    'asset authoring validate',
+    'asset authoring preview',
+  ]) assert.equal(authoringWorkflow.includes(required), true, `missing ${required}`);
+  assert.doesNotMatch(auditWorkflow, /asset init --from-audit/u);
+  assert.doesNotMatch(authoringWorkflow, /asset init --from-audit/u);
+  assert.doesNotMatch(authoringWorkflow, /without a strict session/u);
+});
+
 test('documents safe report preservation and finding interpretation', () => {
   const workflow = readFileSync(new URL(
     '../skills/animation-asset-audit/references/audit-workflow.md', import.meta.url,
@@ -384,7 +409,7 @@ test('documents safe report preservation and finding interpretation', () => {
     'pathConfidence', 'manual-review', 'recolors', 'same target and scope',
     'Exit code zero', 'upstream/', 'user-supplied report path',
     'task-specific temporary directory', 'report that path while it remains available',
-    'asset init --from-audit', 'Web Asset Pack Workbench', 'status: "draft"',
-    'cannot be installed by the CLI',
+    'animation remediation handoff', 'lpc-asset-authoring', '`extend-item`',
+    'sprite drawing contract', 'contract-compatible candidate',
   ]) assert.equal(workflow.includes(required), true, `missing ${required}`);
 });

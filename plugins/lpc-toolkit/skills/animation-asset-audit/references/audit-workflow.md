@@ -42,7 +42,11 @@ generate, or repair sprite assets. After authorized external work, rerun the
 same target and scope and confirm the intended findings disappear without a
 relevant inspection error.
 
-The CLI `asset init --from-audit` workflow creates a new source pack from an
-authorized worklist. The Web Asset Pack Workbench repairs an existing archive
-in memory; it is not a replacement for CLI creation. Browser draft archives
-carry `status: "draft"` and cannot be installed by the CLI until formalized.
+The worklist is a read-only animation remediation handoff. If the user confirms
+one finding for source revision, switch to `lpc-asset-authoring` in
+`extend-item` mode and preserve the complete report, its digest, the selected
+finding, and the exact approved scope. The authoring Skill creates the strict
+plan and session, materializes the sprite drawing contract, imports only a
+contract-compatible candidate, validates it, and produces the attributed
+review-ready preview. This audit workflow never initializes a workspace or
+creates source files itself.

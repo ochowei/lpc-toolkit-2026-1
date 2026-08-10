@@ -617,6 +617,15 @@ export function AgentIntegrationsPage({ onNavigate }: ProductPageProps) {
               Customize one short kickoff prompt. Codex asks stage-specific
               follow-up questions instead of making you complete a technical form.
             </p>
+            <p className="mt-2 max-w-3xl text-sm text-text-2">
+              Copy kickoff prompt only copies the request; it does not run the
+              journey. After you paste it into a Codex task,{' '}
+              <code>lpc-animation-asset-audit</code> performs the read-only audit.
+              Once you confirm one bounded revision, <code>lpc-asset-authoring</code>{' '}
+              continues in the same Codex task through a strict local authoring
+              session. If either Skill is unavailable, use the CLI directly with
+              the same confirmation boundaries.
+            </p>
           </div>
           <AgentPromptBuilders />
         </section>

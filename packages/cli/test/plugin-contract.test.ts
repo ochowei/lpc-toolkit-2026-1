@@ -92,7 +92,6 @@ describe('Codex plugin CLI contract', () => {
     expect(assetContract.schema).toBe('lpc-toolkit.codex-plugin.cli-contract.v1');
     expect(assetContract.commands.map(({ id }) => id)).toEqual([
       'version',
-      'asset-init-from-audit',
       'authoring-start',
       'authoring-status',
       'authoring-resume',
@@ -137,11 +136,13 @@ describe('Codex plugin CLI contract', () => {
     expect(workflowCommands.every((command) => contractCommands.has(command))).toBe(true);
   });
 
-  it('documents the CLI and Web handoff for audited asset work', () => {
-    expect(auditWorkflow).toContain('asset init --from-audit');
-    expect(auditWorkflow).toContain('Web Asset Pack Workbench');
-    expect(auditWorkflow).toContain('status: "draft"');
-    expect(auditWorkflow).toContain('cannot be installed by the CLI');
+  it('documents the strict Skill handoff for audited asset work', () => {
+    expect(auditWorkflow).toContain('lpc-asset-authoring');
+    expect(auditWorkflow).toContain('`extend-item`');
+    expect(auditWorkflow).not.toContain('asset init --from-audit');
+    expect(assetWorkflow).toContain('asset authoring start');
+    expect(assetWorkflow).toContain('asset authoring contract');
+    expect(assetWorkflow).toContain('asset authoring import');
   });
 
   it('keeps authoring out of read-only and composition skills', () => {
