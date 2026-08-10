@@ -26,16 +26,17 @@ ask for explicit consent.
 3. Retain the catalog `itemId`, type, baseline credits, and all unaffected
    animations. The revision adds only the selected missing animation or blank
    cells; it is not a redesign or replacement.
-4. Prefer the audit-derived scaffold when the report is sufficient:
+4. Build one strict `lpc-toolkit.asset-authoring-plan.v1` `extend-item` plan
+   from the confirmed finding. Preserve the complete audit report and digest,
+   physical source, consumers, body types, variants, recolors, geometry,
+   confidence, exact source-cell evidence, and approved remediation bounds.
+5. Start the authoring session and materialize its provider-neutral sprite
+   drawing contract:
 
    ```sh
-   lpc-toolkit asset workspace init <workspace>
-   lpc-toolkit asset init --from-audit <report.json> --item <item-id> --pack-id <pack-id> --display-name <name> --author <author> --license <license> --url <url>
+   lpc-toolkit asset authoring start --plan <plan.json> --workspace <workspace> --json
+   lpc-toolkit asset authoring contract --session <session-id> --workspace <workspace> --json
    ```
-
-5. When a strict authoring plan with complete remediation geometry is
-   available, use `asset authoring start`, then materialize its drawing
-   contract. Preserve the complete audit report and its digest.
 
 ## `new-item`
 
@@ -79,11 +80,10 @@ lpc-toolkit asset authoring validate --session <session-id> --workspace <workspa
 lpc-toolkit asset authoring preview --session <session-id> --workspace <workspace> --json
 ```
 
-For an audit-derived pack without a strict session, use `asset validate` and
-`asset preview` on the exact pack directory. Review-ready means source is
-imported, validation is current, and the attributed preview includes matching
-metadata, `credits.txt`, and `credits.csv`. It does not mean formally released,
-installed, or accepted by a human.
+Review-ready means source is imported through the current contract boundary,
+validation is current, and the attributed preview includes matching metadata,
+`credits.txt`, and `credits.csv`. It does not mean formally released, installed,
+or accepted by a human.
 
 At handoff, report the paths, validation warnings, effective credits, retained
 identity for extensions, and the next human decision. Formal release requires

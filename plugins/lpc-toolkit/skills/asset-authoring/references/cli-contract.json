@@ -2,7 +2,6 @@
   "schema": "lpc-toolkit.codex-plugin.cli-contract.v1",
   "commands": [
     { "id": "version", "argv": ["--version"], "machineReadable": false },
-    { "id": "asset-init-from-audit", "argv": ["asset", "init", "--from-audit", "audit.json", "--item", "hair_braid", "--pack-id", "acme.hair", "--display-name", "ACME Hair", "--author", "Alice", "--license", "CC-BY-SA 4.0", "--url", "https://example.test/acme-hair", "--json"], "machineReadable": true },
     { "id": "authoring-start", "argv": ["asset", "authoring", "start", "--plan", "plan.json", "--workspace", "workspace", "--json"], "machineReadable": true },
     { "id": "authoring-status", "argv": ["asset", "authoring", "status", "--session", "session-id", "--workspace", "workspace", "--json"], "machineReadable": true },
     { "id": "authoring-resume", "argv": ["asset", "authoring", "resume", "--session", "session-id", "--workspace", "workspace", "--json"], "machineReadable": true },

@@ -72,29 +72,30 @@ destination when it should move.
 
 Return the report in the user's language and in this order:
 
-1. **Audit scope** — revision, branch, working-tree state, date, local or live
-   evidence, and snapshot or comprehensive depth.
-2. **Three-dimension dashboard** — separate readability, usability, and
+1. **Bottom line** — what is ready, what is not, and the user impact in plain
+   language. Name at most five material findings.
+2. **Most important next actions** — smallest evidence-producing actions in
+   priority order.
+3. **Three-dimension dashboard** — separate readability, usability, and
    functional-completeness percentages with raw numerators and denominators,
-   confidence, and top finding. Then show guardrail/evolution and delivery
-   status counts. Never show a combined score.
-3. **Explanation readability** — findings by interface and journey, including
+   confidence, and one top finding per dimension. Then show guardrail/evolution
+   and delivery status counts. Never show a combined score.
+4. **Explanation readability** — findings by interface and journey, including
    audience fit, progressive disclosure, reader impact, score, confidence, and
    concrete evidence.
-4. **Usability** — entry points, workflow friction, verification, recovery,
+5. **Usability** — entry points, workflow friction, verification, recovery,
    user impact, score, confidence, and concrete evidence by interface and
    journey.
-5. **Functional completeness** — every required capability objective with ID,
+6. **Functional completeness** — every required capability objective with ID,
    objective, Product Direction source, score, confidence, strongest evidence,
    and exact missing condition.
-6. **Guardrails and evolution** — every required status with evidence and any
+7. **Guardrails and evolution** — every required status with evidence and any
    violation highlighted before positive completion claims.
-7. **Delivery claims** — every delivery status and what current external
+8. **Delivery claims** — every delivery status and what current external
    evidence was or was not checked.
-8. **Optional objectives** — list them explicitly outside required rollups.
-9. **Prioritized gaps** — order guardrail violations, blocked required
-   journeys, usability blockers, material explanation ambiguity, missing
-   verification, and delivery uncertainty.
+9. **Evidence appendix** — audit scope, revision, branch, working-tree state,
+   date, local or live evidence, snapshot or comprehensive depth, full objective
+   accounting, and optional objectives outside required rollups.
 10. **Verification log and limitations** — exact `PASS`, `FAIL`, `BLOCKED`, and
     `SKIPPED` commands or checks and unresolved unknowns.
 

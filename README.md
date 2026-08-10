@@ -458,6 +458,14 @@ preview. Formal release and installation remain separate human-confirmed CLI
 steps. Preview, render, and export outputs preserve metadata plus TXT and CSV
 credits.
 
+A journey kickoff prompt only starts the installed Agent integration. For
+animation remediation, `lpc-animation-asset-audit` conducts the read-only audit
+and shows the bounded finding. After explicit confirmation,
+`lpc-asset-authoring` continues in the same task through a strict authoring session:
+plan, drawing contract, candidate import, validation, and attributed preview.
+If either Skill is unavailable, use the public CLI directly with the same
+authority boundaries.
+
 The CLI performs first-time asset preparation from a pinned release download,
 verifies checksums, and stores a platform cache. Later commands rely on
 verified cache reuse. A valid offline cache needs no network; a missing or invalid

@@ -84,6 +84,9 @@ test('publishes the three-journey presentation from shared release metadata', ()
     `plugin \`${manifest.version}\``,
     compatibilityMetadata.cliRange,
     'catalog audit-animations',
+    '`lpc-animation-asset-audit`',
+    '`lpc-asset-authoring`',
+    'strict authoring session',
     'review-ready',
   ]) {
     assert.equal(
