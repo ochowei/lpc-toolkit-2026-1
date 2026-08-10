@@ -27,6 +27,35 @@ visible entry
   -> same-task continuation, recovery, or next Skill
 ```
 
+## Prove the entry locally
+
+Evaluate every journey-specific launcher in its selected or active state at
+the point where the user acts. Count executor guidance only when it appears in
+the launcher panel or in immediately adjacent, persistent guidance that is
+clearly scoped to that launcher. Do not inherit guidance from generic page
+copy, another tab or panel, an unselected default state, or content the reader
+must search for elsewhere.
+
+For a launcher backed by Skills, require the local guidance to let the reader
+answer all of these questions without leaving the entry:
+
+1. Does this control only copy or open a request, or does it execute work?
+2. Which Skill runs first, and what work does it own?
+3. Where or how does the user invoke that Skill?
+4. Which confirmation or authority checkpoint stops automatic progress?
+5. Which Skill or mechanism continues afterward, and does it continue in the
+   same task, stop for review, or require a new invocation?
+
+Use the equivalent executor, invocation, authority, and continuation questions
+for MCP tools or other executable mechanisms. If exact Skill names are part of
+the supported product journey, require those names rather than accepting vague
+references to "the agent."
+
+Verify the actual active state. Prefer an interactive walkthrough or a
+launcher-scoped rendered test. Source inspection may supplement that evidence,
+but a default-state render or a page-wide string assertion does not prove that
+the selected launcher explains its execution model.
+
 ## Reject false substitutes
 
 - A Prompt Builder copies text. It is a launcher, not the Agent Integration.
@@ -37,10 +66,17 @@ visible entry
 - A test that only finds copy on a page proves presence, not comprehension or
   reachability.
 
+Apply a standalone-entry check before aggregating scores: if the reader cannot
+identify the executor, invocation, authority boundary, and continuation from
+the active launcher plus its clearly scoped local guidance, the entry fails
+even when the same words appear elsewhere on the page.
+
 If the executable mechanism exists but the intended entry calls a launcher the
 integration, hides the Skill, or omits a required Skill-to-Skill handoff, report
 one material **presentation mismatch**. Cap readability and usability at `2`
-for the affected units while scoring functional implementation separately.
+for the affected launcher unit while scoring functional implementation
+separately. Apply this cap before rollup so a clearer parent page or sibling
+entry cannot dilute the launcher-specific failure.
 
 If no executable mechanism or public operation exists, report an **execution
 gap** and apply the functional cap from the shared surface-to-execution method.
