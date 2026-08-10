@@ -55,6 +55,15 @@ const compatibilityPath = path.resolve(
 );
 const compatibility = readFileSync(compatibilityPath, 'utf8');
 
+function markdownSection(source: string, heading: string): string {
+  const start = source.indexOf(heading);
+  if (start < 0) return '';
+  const next = source.indexOf('\n## ', start + heading.length);
+  return source.slice(start, next < 0 ? undefined : next);
+}
+
+const semanticText = (source: string) => source.replace(/\s+/gu, ' ');
+
 describe('Codex plugin CLI contract', () => {
   it('uses the versioned character contract schema', () => {
     expect(characterContract.schema).toBe('lpc-toolkit.codex-plugin.cli-contract.v1');
@@ -143,6 +152,12 @@ describe('Codex plugin CLI contract', () => {
     expect(assetWorkflow).toContain('asset authoring start');
     expect(assetWorkflow).toContain('asset authoring contract');
     expect(assetWorkflow).toContain('asset authoring import');
+    expect(
+      [...markdownSection(assetWorkflow, '## `extend-item`')
+        .matchAll(/asset authoring start/gu)],
+    ).toHaveLength(1);
+    expect(auditWorkflow).not.toContain('asset workspace init');
+    expect(auditWorkflow).not.toContain('asset authoring start');
   });
 
   it('keeps authoring out of read-only and composition skills', () => {
@@ -164,5 +179,39 @@ describe('Codex plugin CLI contract', () => {
       'authoring-acknowledge', 'authoring-declare', 'authoring-accept-preview',
       'authoring-sync', 'authoring-pack', 'authoring-inspect', 'authoring-install',
     ]) expect(assetContract.commands.map(({ id }) => id)).not.toContain(forbiddenId);
+  });
+
+  it('packages the conditional same-scope closure handback', () => {
+    const authoringClosure = semanticText(markdownSection(
+      assetWorkflow, '## Conditional post-install closure',
+    ));
+    const auditClosure = semanticText(markdownSection(
+      auditWorkflow, '## Conditional closure re-entry',
+    ));
+
+    for (const phrase of [
+      'review-ready endpoint remains the default',
+      'separately requests and confirms',
+      'successful exact installation',
+      'lpc-toolkit.asset-authoring-install-receipt.v1',
+      'next executor is `lpc-animation-asset-audit`',
+      'same Codex task',
+      'original target animation',
+      'optional type',
+      'optional body type',
+      'complete report identity and digest',
+      'selected finding',
+    ]) expect(authoringClosure).toContain(phrase);
+
+    for (const phrase of [
+      'unsupported',
+      'missingFiles',
+      'blankFrames',
+      'errors',
+      'Exit code zero',
+      'not closure evidence',
+      'absent, remaining, or inspection-error',
+      'Do not expand scope',
+    ]) expect(auditClosure).toContain(phrase);
   });
 });

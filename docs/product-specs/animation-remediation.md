@@ -427,4 +427,4 @@ scope, not from process exit status alone.
 - Owner: `packages/cli/src/animation-audit.ts`
 - Owner: `plugins/lpc-toolkit/skills/asset-authoring/references/authoring-workflow.md`
 - Verification: `packages/cli/test/animation-audit.test.ts` — `separates missing, blank, and unreadable files and keeps findings successful`
-- Verification: `packages/cli/test/asset-authoring-e2e.test.ts` — `scaffolds, validates, previews, syncs, audits, and renders attributed packs inside one workspace`
+- Verification: `packages/cli/test/asset-lifecycle-e2e.test.ts` — `packs in one clean workspace and installs, upgrades, renders, removes, and diagnoses in another`

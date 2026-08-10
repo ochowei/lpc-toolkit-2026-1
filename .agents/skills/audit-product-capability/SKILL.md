@@ -60,6 +60,12 @@ a launcher only. If an executor exists but the active surface presents the
 launcher as the integration, report a material presentation mismatch even when
 implementation tests pass.
 
+Apply the launcher-local and active-state checks in the Agent Integration gate
+to every journey-specific entry. Do not let page-wide copy, a sibling entry, or
+the default state substitute for executor and handoff guidance at the audited
+point of action. Require evidence scoped to the rendered entry; a test that
+only finds the expected words somewhere on the page is insufficient.
+
 Run at most three focused verification commands for a normal audit. Prefer implementation plus a focused passing check over prose. Report skipped or blocked evidence as confidence limits.
 
 ## Audit the repository

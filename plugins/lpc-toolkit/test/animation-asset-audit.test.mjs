@@ -27,6 +27,15 @@ function run(argv, readFile = () => JSON.stringify(report)) {
   return { exitCode, output, result: JSON.parse(output) };
 }
 
+function markdownSection(source, heading) {
+  const start = source.indexOf(heading);
+  if (start < 0) return '';
+  const next = source.indexOf('\n## ', start + heading.length);
+  return source.slice(start, next < 0 ? undefined : next);
+}
+
+const semanticText = (source) => source.replace(/\s+/gu, ' ');
+
 test('returns the CLI summary unchanged', () => {
   const result = projectAuditReport(report, { view: 'summary' });
   assert.equal(result.ok, true);
@@ -385,8 +394,13 @@ test('hands confirmed animation remediation to one strict contract-bound authori
   const authoringWorkflow = readFileSync(new URL(
     '../skills/asset-authoring/references/authoring-workflow.md', import.meta.url,
   ), 'utf8').replace(/\s+/gu, ' ');
+  const rawAuthoringWorkflow = readFileSync(new URL(
+    '../skills/asset-authoring/references/authoring-workflow.md', import.meta.url,
+  ), 'utf8');
+  const extendItem = markdownSection(rawAuthoringWorkflow, '## `extend-item`');
 
   assert.match(auditSkill, /switching to lpc-asset-authoring in `extend-item` mode/u);
+  assert.equal([...extendItem.matchAll(/asset authoring start/gu)].length, 1);
   for (const required of [
     'lpc-animation-asset-audit',
     'asset authoring start',
@@ -396,8 +410,66 @@ test('hands confirmed animation remediation to one strict contract-bound authori
     'asset authoring preview',
   ]) assert.equal(authoringWorkflow.includes(required), true, `missing ${required}`);
   assert.doesNotMatch(auditWorkflow, /asset init --from-audit/u);
+  assert.doesNotMatch(auditWorkflow, /asset workspace init/u);
+  assert.doesNotMatch(auditWorkflow, /asset authoring start/u);
   assert.doesNotMatch(authoringWorkflow, /asset init --from-audit/u);
   assert.doesNotMatch(authoringWorkflow, /without a strict session/u);
+});
+
+test('returns only a separately installed revision to the original bounded audit', () => {
+  const authoringWorkflow = readFileSync(new URL(
+    '../skills/asset-authoring/references/authoring-workflow.md', import.meta.url,
+  ), 'utf8');
+  const auditWorkflow = readFileSync(new URL(
+    '../skills/animation-asset-audit/references/audit-workflow.md', import.meta.url,
+  ), 'utf8');
+  const authoringClosure = semanticText(markdownSection(
+    authoringWorkflow, '## Conditional post-install closure',
+  ));
+  const auditClosure = semanticText(markdownSection(
+    auditWorkflow, '## Conditional closure re-entry',
+  ));
+
+  for (const required of [
+    'review-ready endpoint remains the default',
+    'separately requests and confirms',
+    'warning acknowledgement',
+    'declaration',
+    'preview acceptance',
+    'sync',
+    'pack',
+    'inspection',
+    'successful exact installation',
+    'lpc-toolkit.asset-authoring-install-receipt.v1',
+    'next executor is `lpc-animation-asset-audit`',
+    'same Codex task',
+    'original target animation',
+    'optional type',
+    'optional body type',
+    'complete report identity and digest',
+    'selected finding',
+  ]) assert.equal(authoringClosure.includes(required), true, `missing ${required}`);
+  assert.ok(
+    authoringClosure.indexOf('successful exact installation')
+      < authoringClosure.indexOf('next executor is `lpc-animation-asset-audit`'),
+  );
+
+  for (const required of [
+    'successful exact installation',
+    'original target animation',
+    'optional type',
+    'optional body type',
+    'complete report identity and digest',
+    'selected finding',
+    'unsupported',
+    'missingFiles',
+    'blankFrames',
+    'errors',
+    'Exit code zero',
+    'not closure evidence',
+    'absent, remaining, or inspection-error',
+    'Do not expand scope',
+  ]) assert.equal(auditClosure.includes(required), true, `missing ${required}`);
 });
 
 test('documents safe report preservation and finding interpretation', () => {

@@ -74,9 +74,35 @@ describe('CLI and agent integration pages', () => {
       .replaceAll('&quot;', '"')
       .replaceAll('&lt;', '<')
       .replaceAll('&gt;', '>');
-    const commands = [
-      'npm install -g @lpc-toolkit/cli',
+    const strictRemediationCommands = [
       'lpc-toolkit catalog audit-animations --animation climb --json',
+      'lpc-toolkit asset authoring start --plan plan.json --workspace ./my-lpc-art --json',
+      'lpc-toolkit asset authoring contract --session <session-id> --workspace ./my-lpc-art --json',
+      'lpc-toolkit asset authoring import --session <session-id> --target <target-id> --candidate candidate.png --contract-digest <sha256> --workspace ./my-lpc-art --json',
+      'lpc-toolkit asset authoring validate --session <session-id> --workspace ./my-lpc-art --json',
+      'lpc-toolkit asset authoring preview --session <session-id> --workspace ./my-lpc-art --json',
+    ];
+    const strictPositions = strictRemediationCommands.map((command) => {
+      expect(html).toContain(command);
+      return html.indexOf(command);
+    });
+    expect(strictPositions).toEqual(
+      [...strictPositions].sort((left, right) => left - right),
+    );
+    expect(html).toContain('Strict animation-remediation session');
+    expect(html).toContain(
+      'plan.json is explicit input prepared from one selected finding and human-provided draft attribution',
+    );
+    expect(html).toContain('Limited Phase 1 scaffold alternative');
+    expect(html).toContain('mutating direct CLI authoring action');
+    expect(html).toContain('review one selected finding and explicitly consent');
+    expect(html).toContain('read-only audit Skill never runs it');
+    expect(html).toContain('blankFrames');
+    expect(html).toContain('audit errors never become drawing tasks');
+    expect(html).toContain('does not create a strict authoring session');
+
+    const directLifecycleCommands = [
+      'npm install -g @lpc-toolkit/cli',
       'lpc-toolkit asset workspace init ./my-lpc-art',
       'cd ./my-lpc-art',
       'lpc-toolkit asset init --from-audit audit.json --item hair_braid --pack-id acme.audit --display-name "ACME Audit" --author Alice --license "CC-BY-SA 4.0" --url https://example.com/acme/audit',
@@ -90,12 +116,7 @@ describe('CLI and agent integration pages', () => {
       'lpc-toolkit asset install ../my-lpc-art/artist-packs/<pack-id>-<version>.lpc-assets.zip',
       'lpc-toolkit asset doctor',
     ];
-    const positions = commands.map((command) => {
-      expect(html).toContain(command);
-      return html.indexOf(command);
-    });
-
-    expect(positions).toEqual([...positions].sort((left, right) => left - right));
+    for (const command of directLifecycleCommands) expect(html).toContain(command);
     expect(html).toContain('artist-packs/<pack-id>/sprites/');
     expect(html).toContain('Character composition, source asset creation, audit handoff, validation, formal archive publication, and installation are separate CLI responsibilities.');
     expect(html).toContain('Record the human release checkpoint separately');
@@ -193,5 +214,15 @@ describe('CLI and agent integration pages', () => {
     expect(html).toContain('If either Skill is unavailable');
     expect(html).toContain('use the CLI directly with');
     expect(html).toContain('the same confirmation boundaries');
+    expect(html).toContain('After a separately authorized installation');
+    expect(html).toContain('original animation, type, and body-type bounds');
+    for (const category of [
+      'unsupported',
+      'missingFiles',
+      'blankFrames',
+      'errors',
+    ]) expect(html).toContain(category);
+    expect(html).toContain('Exit code zero only means the audit ran');
+    expect(html).toContain('does not mean the remediation is closed');
   });
 });

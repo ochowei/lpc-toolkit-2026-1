@@ -107,12 +107,22 @@ const customizationSteps = [
   },
 ] as const;
 
+const strictRemediationCommands = [
+  'lpc-toolkit catalog audit-animations --animation climb --json',
+  'lpc-toolkit asset authoring start --plan plan.json --workspace ./my-lpc-art --json',
+  'lpc-toolkit asset authoring contract --session <session-id> --workspace ./my-lpc-art --json',
+  'lpc-toolkit asset authoring import --session <session-id> --target <target-id> --candidate candidate.png --contract-digest <sha256> --workspace ./my-lpc-art --json',
+  'lpc-toolkit asset authoring validate --session <session-id> --workspace ./my-lpc-art --json',
+  'lpc-toolkit asset authoring preview --session <session-id> --workspace ./my-lpc-art --json',
+] as const;
+
+const phaseOneScaffoldCommand =
+  'lpc-toolkit asset init --from-audit audit.json --item hair_braid --pack-id acme.audit --display-name "ACME Audit" --author Alice --license "CC-BY-SA 4.0" --url https://example.com/acme/audit';
+
 const artistWorkflowCommands = [
   'npm install -g @lpc-toolkit/cli',
-  'lpc-toolkit catalog audit-animations --animation climb --json',
   'lpc-toolkit asset workspace init ./my-lpc-art',
   'cd ./my-lpc-art',
-  'lpc-toolkit asset init --from-audit audit.json --item hair_braid --pack-id acme.audit --display-name "ACME Audit" --author Alice --license "CC-BY-SA 4.0" --url https://example.com/acme/audit',
   'lpc-toolkit asset init --new --pack-id acme.fantasy-hair --asset-id moon-braid --display-name "Moon Braid" --type hair --body-type male --body-type female --animation walk --animation climb --author Alice --license "CC-BY-SA 4.0" --url https://example.com/acme/fantasy-hair',
   'lpc-toolkit asset validate ./artist-packs/<pack-id>',
   'lpc-toolkit asset preview ./artist-packs/<pack-id>',
@@ -272,7 +282,55 @@ export function CliPage({ onNavigate }: ProductPageProps) {
             validation, formal archive publication, and installation are
             separate CLI responsibilities.
           </p>
-          <ol className="mt-5 space-y-3">
+          <div className="mt-6 rounded-md border border-accent/40 bg-accent/10 p-4">
+            <h3 className="text-lg font-semibold text-text">
+              Strict animation-remediation session
+            </h3>
+            <p className="mt-2 text-sm text-text-2">
+              plan.json is explicit input prepared from one selected finding
+              and human-provided draft attribution. The CLI does not
+              choose the finding, invent attribution, invoke a provider, or
+              create candidate pixels. Read the{' '}
+              <a
+                className="underline hover:text-text"
+                href={cliReadmeUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                complete CLI guide
+              </a>{' '}
+              for the plan schema and recovery paths.
+            </p>
+            <ol className="mt-4 space-y-3">
+              {strictRemediationCommands.map((command, index) => (
+                <li key={`${index}-${command}`}>
+                  <CopyCode children={command} />
+                </li>
+              ))}
+            </ol>
+          </div>
+          <div className="mt-6 rounded-md border border-border bg-surface-2 p-4">
+            <h3 className="text-lg font-semibold text-text">
+              Limited Phase 1 scaffold alternative
+            </h3>
+            <p className="mt-2 text-sm text-text-2">
+              This is a mutating direct CLI authoring action. Use it only after
+              you review one selected finding and explicitly consent to leave
+              the read-only audit; the read-only audit Skill never runs it. It
+              cannot scaffold <code>blankFrames</code>, audit errors never become
+              drawing tasks, and it does not create a strict authoring session,
+              contract, or receipt.
+            </p>
+            <CopyCode className="mt-4" children={phaseOneScaffoldCommand} />
+          </div>
+          <h3 className="mt-6 text-lg font-semibold text-text">
+            Other direct asset-pack lifecycle commands
+          </h3>
+          <p className="mt-2 text-sm text-text-2">
+            New-item scaffolding and the standalone pack lifecycle remain
+            separate from strict animation remediation.
+          </p>
+          <ol className="mt-4 space-y-3">
             {artistWorkflowCommands.map((command, index) => (
               <li key={`${index}-${command}`}>
                 <CopyCode children={command} />
@@ -625,6 +683,16 @@ export function AgentIntegrationsPage({ onNavigate }: ProductPageProps) {
               continues in the same Codex task through a strict local authoring
               session. If either Skill is unavailable, use the CLI directly with
               the same confirmation boundaries.
+            </p>
+            <p className="mt-2 max-w-3xl text-sm text-text-2">
+              The default Agent-guided endpoint remains a review-ready preview.
+              After a separately authorized installation succeeds, return in the
+              same Codex task to <code>lpc-animation-asset-audit</code> with the
+              original animation, type, and body-type bounds. Inspect{' '}
+              <code>unsupported</code>, <code>missingFiles</code>,{' '}
+              <code>blankFrames</code>, and <code>errors</code>. Exit code zero
+              only means the audit ran; it does not mean the remediation is
+              closed.
             </p>
           </div>
           <AgentPromptBuilders />
