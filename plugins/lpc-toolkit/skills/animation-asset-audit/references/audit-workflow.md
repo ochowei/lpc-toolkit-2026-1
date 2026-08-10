@@ -50,3 +50,23 @@ plan and session, materializes the sprite drawing contract, imports only a
 contract-compatible candidate, validates it, and produces the attributed
 review-ready preview. This audit workflow never initializes a workspace or
 creates source files itself.
+
+## Conditional closure re-entry
+
+Re-enter this workflow only after `lpc-asset-authoring` reports a successful
+exact installation and a current installation receipt. Receive the preserved
+original target animation, optional type, optional body type, complete report
+identity and digest, selected finding and category, and exact installation
+receipt identity and digest.
+
+Rerun `catalog audit-animations --json` once with the exact original animation
+and optional filters. Preserve the new complete report, then inspect
+`unsupported`, `missingFiles`, `blankFrames`, and `errors`. Exit code zero is
+not closure evidence: report the selected finding as absent, remaining, or
+inspection-error evidence, and identify any new regression inside the same
+scope.
+
+Do not expand scope, start another mutation, or hand off a new finding
+automatically. Close only when the selected finding is absent or has an explicit
+residual disposition, no relevant inspection error blocks evaluation, and no
+new scoped regression appeared.

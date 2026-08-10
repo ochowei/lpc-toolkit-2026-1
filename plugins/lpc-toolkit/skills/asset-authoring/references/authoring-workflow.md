@@ -89,3 +89,21 @@ At handoff, report the paths, validation warnings, effective credits, retained
 identity for extensions, and the next human decision. Formal release requires
 separate warning acknowledgement, author/source and license declaration,
 preview acceptance, synchronization, packing, inspection, and optional install.
+
+## Conditional post-install closure
+
+The review-ready endpoint remains the default. Do not enter formal lifecycle
+work unless the user separately requests and confirms each named boundary.
+The named boundaries—warning acknowledgement, declaration, preview acceptance,
+sync, pack, inspection, and installation—remain distinct actions; never infer
+one action's authority from completion of another.
+
+Continue to closure only after a successful exact installation has produced a
+current `lpc-toolkit.asset-authoring-install-receipt.v1` receipt. Only then, the
+next executor is `lpc-animation-asset-audit` in the same Codex task. Hand back
+the original target animation, optional type, optional body type, complete
+report identity and digest, selected finding and category, and the exact
+installation receipt identity and digest.
+
+The audit Skill decides closure from a fresh same-scope report. Do not expand
+the scope, start another session, or perform another mutation automatically.
