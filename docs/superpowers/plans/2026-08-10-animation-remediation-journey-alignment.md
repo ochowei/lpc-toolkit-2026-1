@@ -121,7 +121,11 @@ session before any session-dependent command, a visibly separate Phase 1
 alternative, and an Agent explanation that preserves the default review-ready
 endpoint while exposing the conditional closure handback.
 
-- [ ] **Step 1: Add failing rendered-page contract assertions**
+- [x] **Step 1: Add failing rendered-page contract assertions**
+
+  - Implementation: Added static-render assertions for the ordered strict
+    session, the bounded Phase 1 alternative, and conditional same-scope audit
+    closure. RED had not been run when this checkbox was completed.
 
   Extend the existing artist-workflow test without asserting whole paragraphs.
   Prove all of the following:
@@ -148,7 +152,15 @@ endpoint while exposing the conditional closure handback.
   Update this checkbox immediately after editing and note that RED has not yet
   been run.
 
-- [ ] **Step 2: Run the focused test and record RED**
+- [x] **Step 2: Run the focused test and record RED**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx`
+    FAIL as expected. Vitest reported 2 failed and 2 passed tests: the new
+    artist-workflow assertion first stopped at missing `asset authoring start`,
+    and the new Agent assertion stopped at missing separately authorized
+    post-install handback copy. The initial sandboxed attempt could not create
+    the `tsx` IPC socket; the same command ran successfully outside the sandbox
+    and produced the intended product-level RED result.
 
   ```sh
   rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx
@@ -160,7 +172,12 @@ endpoint while exposing the conditional closure handback.
   not expose the conditional closure handback. Record the exact failing
   assertions and passing test count.
 
-- [ ] **Step 3: Make the minimum landing-page content change**
+- [x] **Step 3: Make the minimum landing-page content change**
+
+  - Implementation: Added a prominent strict audit-to-preview command sequence,
+    linked explicit plan input to the CLI guide, isolated the consent-gated
+    Phase 1 scaffold and its limits, retained the direct pack lifecycle, and
+    added the conditional post-install same-scope audit handback to `/agents`.
 
   In `landing-page.tsx`:
 
@@ -183,7 +200,17 @@ endpoint while exposing the conditional closure handback.
   Do not change routing, components outside these content regions, command
   behavior, or prompt-builder output.
 
-- [ ] **Step 4: Verify GREEN and inspect both rendered journeys**
+- [x] **Step 4: Verify GREEN and inspect both rendered journeys**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx agent-prompt-builder.test.tsx`
+    PASS (2 files, 7 tests); `rtk pnpm --filter @lpc-toolkit/web run typecheck`
+    PASS; `rtk git diff --check` PASS. The first GREEN attempt exposed one
+    markup-split assertion around `plan.json`; making the visible sentence
+    contiguous resolved it without changing behavior. Manual source/static
+    journey review confirmed the strict session precedes dependent commands,
+    Phase 1 is visually separate and consent-gated, direct lifecycle and
+    attribution guidance remain present, and `/agents` keeps review-ready as
+    the default before the conditional same-scope closure handback.
 
   ```sh
   rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx agent-prompt-builder.test.tsx
@@ -196,7 +223,11 @@ endpoint while exposing the conditional closure handback.
   `/agents` content in journey order and record whether every design acceptance
   criterion owned by those pages is visible.
 
-- [ ] **Step 5: Commit Task 1 and record its full hash**
+- [x] **Step 5: Commit Task 1 and record its full hash**
+
+  - Commit: `2a8590a76d2ea182ec197a70b324964b230dba18`
+    (`docs(web): align animation remediation journey`). Only the two Task 1
+    Web files were staged; this plan record remains unstaged.
 
   ```sh
   rtk git add packages/web/src/components/landing-page.tsx packages/web/test/landing-page.test.tsx
@@ -209,9 +240,13 @@ endpoint while exposing the conditional closure handback.
 
 **Task 1 record:**
 
-- Implementation: Not started.
-- Commit: Not created.
-- Verification: Not run.
+- Implementation: Rendered `/cli` and `/agents` journeys now expose the strict
+  remediation path, bounded Phase 1 alternative, and conditional closure
+  handback without changing runtime behavior.
+- Commit: `2a8590a76d2ea182ec197a70b324964b230dba18`.
+- Verification: `rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx agent-prompt-builder.test.tsx`
+  PASS (2 files, 7 tests); `rtk pnpm --filter @lpc-toolkit/web run typecheck`
+  PASS; `rtk git diff --check` PASS.
 
 ---
 
@@ -228,7 +263,13 @@ endpoint while exposing the conditional closure handback.
 that agree on strict-session order, explicit plan ownership, Phase 1 limits,
 review-ready scope, and optional lifecycle closure.
 
-- [ ] **Step 1: Add failing cross-document semantic assertions**
+- [x] **Step 1: Add failing cross-document semantic assertions**
+
+  - Implementation: Added section-scoped semantic contracts for the compact
+    root journey and complete CLI journey, including ordered strict commands,
+    explicit plan ownership, Phase 1 mutation/consent limits, review-ready
+    output, receipts/recovery, lifecycle, and same-scope closure. RED had not
+    been run when this checkbox was completed.
 
   Add focused assertions for both documents that check stable phrases or
   command tokens rather than exact prose:
@@ -248,7 +289,13 @@ review-ready scope, and optional lifecycle closure.
   complete-report, audit-error, strict-plan-schema, receipt, recovery,
   review-ready, and lifecycle semantics.
 
-- [ ] **Step 2: Run the documentation contract and record RED**
+- [x] **Step 2: Run the documentation contract and record RED**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts`
+    FAIL as expected (2 failed, 25 passed). The root README lacked the compact
+    `Strict animation-remediation session` section; the CLI README lacked the
+    authoritative `Strict animation-remediation journey` section. No existing
+    documentation contract failed.
 
   ```sh
   rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts
@@ -257,7 +304,12 @@ review-ready scope, and optional lifecycle closure.
   Expected: FAIL only in the new alignment assertions. Record exactly which
   semantic contract is missing from each document.
 
-- [ ] **Step 3: Update `README.md` as the compact entry point**
+- [x] **Step 3: Update `README.md` as the compact entry point**
+
+  - Implementation: Replaced the ambiguous audit-to-scaffold walkthrough with
+    the ordered strict audit/start/contract/import/validate/preview entry point,
+    explicit human-owned plan input, review-ready stop, detailed-guide link,
+    and a separate consent-gated Phase 1 note with its limits.
 
   Replace the ambiguous remediation walkthrough with a short strict-session
   sequence. Explain plan ownership in one sentence, preserve attributed
@@ -269,7 +321,14 @@ review-ready scope, and optional lifecycle closure.
 
   Do not expand the root README into a duplicate command reference.
 
-- [ ] **Step 4: Update `packages/cli/README.md` as the complete reference**
+- [x] **Step 4: Update `packages/cli/README.md` as the complete reference**
+
+  - Implementation: Added one authoritative strict remediation journey covering
+    complete report retention, plan/schema ownership, returned session ID,
+    provider-neutral candidate creation, contract-bound import, attributed
+    review-ready output, recovery, optional formal lifecycle, and same-scope
+    category-based closure. Expanded the existing Phase 1 guidance with the
+    mutation, consent, Skill, and receipt boundaries.
 
   Make one authoritative section walk through:
 
@@ -290,7 +349,12 @@ review-ready scope, and optional lifecycle closure.
   command. Prefer links to existing schema and recovery subsections over
   duplicating them.
 
-- [ ] **Step 5: Verify GREEN and documentation policy**
+- [x] **Step 5: Verify GREEN and documentation policy**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts`
+    PASS (1 file, 27 tests); `rtk pnpm verify:cli-docs-policy` PASS (4
+    suites, 19 tests); `rtk git diff --check` PASS. The maintained-document
+    contract also confirmed that no Markdown link became absolute or unresolved.
 
   ```sh
   rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts
@@ -302,7 +366,11 @@ review-ready scope, and optional lifecycle closure.
   checks PASS. Record the exact counts and confirm that no maintained Markdown
   link became absolute or unresolved.
 
-- [ ] **Step 6: Commit Task 2 and record its full hash**
+- [x] **Step 6: Commit Task 2 and record its full hash**
+
+  - Commit: `536f981ad3e7898aa00e8758bc5aeb7b8abc5ec6`
+    (`docs(cli): align remediation workflow guidance`). Only the three Task 2
+    files were staged; this plan record remains unstaged.
 
   ```sh
   rtk git add README.md packages/cli/README.md packages/web/test/readme-architecture-docs.test.ts
@@ -314,9 +382,13 @@ review-ready scope, and optional lifecycle closure.
 
 **Task 2 record:**
 
-- Implementation: Not started.
-- Commit: Not created.
-- Verification: Not run.
+- Implementation: Root and CLI READMEs now share one strict remediation decision
+  path while preserving a separately labelled Phase 1 scaffold, review-ready
+  default, and optional lifecycle closure.
+- Commit: `536f981ad3e7898aa00e8758bc5aeb7b8abc5ec6`.
+- Verification: `rtk pnpm --filter @lpc-toolkit/web test -- readme-architecture-docs.test.ts`
+  PASS (1 file, 27 tests); `rtk pnpm verify:cli-docs-policy` PASS (4 suites,
+  19 tests); `rtk git diff --check` PASS.
 
 ---
 
@@ -337,7 +409,14 @@ default, preserves every human authority boundary, and conditionally returns a
 completed installation to the original bounded audit for category-based
 closure evaluation.
 
-- [ ] **Step 1: Add a failing plugin handback contract**
+- [x] **Step 1: Add a failing plugin handback contract**
+
+  - Implementation: Added section-scoped packaged-workflow contracts for one
+    strict `extend-item` session, the audit Skill's non-mutation boundary, the
+    default review-ready endpoint, separately confirmed lifecycle actions, the
+    exact-install receipt gate, preserved original scope/evidence, all four
+    finding categories, and exit-status-independent closure. RED had not been
+    run when this checkbox was completed.
 
   Extend the existing strict-handoff and review-ready tests to prove these
   concepts are simultaneously present:
@@ -360,7 +439,15 @@ closure evaluation.
   Keep the tests semantic: assert the required executor, boundary, scope, and
   categories without freezing whole paragraphs.
 
-- [ ] **Step 2: Run the focused plugin contracts and record RED**
+- [x] **Step 2: Run the focused plugin contracts and record RED**
+
+  - Verification: `rtk node --test plugins/lpc-toolkit/test/animation-asset-audit.test.mjs`
+    FAIL as expected (1 failed, 20 passed): only the new conditional closure
+    test lacked the default-review-ready/post-install section.
+    `rtk pnpm --filter @lpc-toolkit/cli test -- plugin-contract.test.ts` FAIL as
+    expected (1 failed, 33 passed): only the new packaged same-scope handback
+    contract lacked that section. Existing strict-session, non-mutation,
+    review-ready, and command-inventory tests passed in both runs.
 
   ```sh
   rtk node --test plugins/lpc-toolkit/test/animation-asset-audit.test.mjs
@@ -371,7 +458,14 @@ closure evaluation.
   strict-session and review-ready tests continue to pass. Record both command
   results separately.
 
-- [ ] **Step 3: Update the minimum executable Skill guidance**
+- [x] **Step 3: Update the minimum executable Skill guidance**
+
+  - Implementation: Added a conditional post-install section to the authoring
+    workflow and the matching closure re-entry to the audit workflow. The
+    transition is gated by a current exact-install receipt, preserves original
+    bounds/evidence, evaluates all four categories, and stops without automatic
+    mutation. The top-level Skills already require reading these references and
+    did not need edits; the tested command inventories remain unchanged.
 
   In the asset-authoring workflow, append a conditional lifecycle-closure
   section after the existing review-ready endpoint:
@@ -394,7 +488,14 @@ closure evaluation.
   against `asset init --from-audit`, workspace initialization, source
   scaffolding, or any other mutation inside the audit Skill.
 
-- [ ] **Step 4: Verify GREEN and the packaged plugin**
+- [x] **Step 4: Verify GREEN and the packaged plugin**
+
+  - Verification: `rtk node --test plugins/lpc-toolkit/test/animation-asset-audit.test.mjs`
+    PASS (21 tests); `rtk pnpm --filter @lpc-toolkit/cli test -- plugin-contract.test.ts`
+    PASS (1 file, 34 tests); `rtk pnpm verify:plugin` PASS (43 tests plus
+    structure validation); `rtk git diff --check` PASS. The packaged
+    asset-authoring inventory remains the same 12 version/start-through-preview
+    commands; no lifecycle command or new CLI command was added.
 
   ```sh
   rtk node --test plugins/lpc-toolkit/test/animation-asset-audit.test.mjs
@@ -407,7 +508,12 @@ closure evaluation.
   Record exact test counts and confirm no new CLI command was added to a Skill
   contract.
 
-- [ ] **Step 5: Commit Task 3 and record its full hash**
+- [x] **Step 5: Commit Task 3 and record its full hash**
+
+  - Commit: `94fc2fa911709e794201be36a990958c0b008e67`
+    (`docs(plugin): clarify remediation closure handoff`). The staged diff was
+    limited to two workflow references and two contract tests; neither optional
+    top-level `SKILL.md` nor any product/asset source was changed.
 
   ```sh
   rtk git add plugins/lpc-toolkit/test/animation-asset-audit.test.mjs packages/cli/test/plugin-contract.test.ts plugins/lpc-toolkit/skills/asset-authoring/SKILL.md plugins/lpc-toolkit/skills/asset-authoring/references/authoring-workflow.md plugins/lpc-toolkit/skills/animation-asset-audit/SKILL.md plugins/lpc-toolkit/skills/animation-asset-audit/references/audit-workflow.md
@@ -421,9 +527,12 @@ closure evaluation.
 
 **Task 3 record:**
 
-- Implementation: Not started.
-- Commit: Not created.
-- Verification: Not run.
+- Implementation: The two packaged workflow references now define a conditional
+  exact-install-to-same-scope-audit transition while preserving review-ready as
+  the default and keeping audit read-only.
+- Commit: `94fc2fa911709e794201be36a990958c0b008e67`.
+- Verification: Node Skill test PASS (21); CLI plugin contract PASS (34);
+  `rtk pnpm verify:plugin` PASS (43 plus structure validation); diff check PASS.
 
 ---
 
@@ -437,7 +546,14 @@ closure evaluation.
 **Produces:** A more accurate evidence pointer for an unchanged current
 capability requirement.
 
-- [ ] **Step 1: Reconfirm the public closure evidence**
+- [x] **Step 1: Reconfirm the public closure evidence**
+
+  - Evidence: `packages/cli/test/asset-lifecycle-e2e.test.ts:290` names
+    `packs in one clean workspace and installs, upgrades, renders, removes, and diagnoses in another`.
+    It initializes distinct `workspace-a` and `workspace-b`; lines 464-478 rerun
+    `catalog audit-animations` with `climb`, `hair`, and `male` in the consumer
+    workspace and assert `incompleteItems`, `missingFiles`, `unsupported`,
+    `blankFrames`, and `errors` are all zero.
 
   Inspect the exact test and verify that it packs in one clean workspace,
   installs into another, reruns the bounded animation/type/body-type audit, and
@@ -449,7 +565,11 @@ capability requirement.
 
   Record the exact test name and relevant assertion location in this plan.
 
-- [ ] **Step 2: Update only the REQ-REMED-013 evidence list**
+- [x] **Step 2: Update only the REQ-REMED-013 evidence list**
+
+  - Implementation: Replaced only the weaker single-workspace E2E evidence row
+    under REQ-REMED-013 with the public two-workspace lifecycle test. Requirement,
+    scenario, owners, category test, and Product Direction mappings are unchanged.
 
   Replace the weaker single-workspace authoring E2E pointer with:
 
@@ -461,7 +581,12 @@ capability requirement.
   REQ-REMED-013, its scenario, Product Direction mappings, or any other current
   capability statement.
 
-- [ ] **Step 3: Run the evidence tests**
+- [x] **Step 3: Run the evidence tests**
+
+  - Verification: `rtk pnpm --filter @lpc-toolkit/cli test -- animation-audit.test.ts asset-lifecycle-e2e.test.ts`
+    PASS (2 files, 12 tests: 11 audit plus 1 two-workspace lifecycle);
+    `rtk git diff --check` PASS. Diff inspection confirmed the capability spec
+    changed exactly one evidence row (1 insertion, 1 deletion).
 
   ```sh
   rtk pnpm --filter @lpc-toolkit/cli test -- animation-audit.test.ts asset-lifecycle-e2e.test.ts
@@ -471,7 +596,11 @@ capability requirement.
   Expected: both current behavior suites PASS; the only spec diff is the
   evidence pointer. Record exact test counts.
 
-- [ ] **Step 4: Commit Task 4 and record its full hash**
+- [x] **Step 4: Commit Task 4 and record its full hash**
+
+  - Commit: `8b3aed2df94318be5a6c3162c058ed17fc48b40d`
+    (`docs(spec): strengthen remediation closure evidence`). Only the one-line
+    capability-spec evidence replacement was staged.
 
   ```sh
   rtk git add docs/product-specs/animation-remediation.md
@@ -481,9 +610,11 @@ capability requirement.
 
 **Task 4 record:**
 
-- Implementation: Not started.
-- Commit: Not created.
-- Verification: Not run.
+- Implementation: REQ-REMED-013 now points to the public two-workspace
+  pack/install/same-scope-audit closure proof; normative text is unchanged.
+- Commit: `8b3aed2df94318be5a6c3162c058ed17fc48b40d`.
+- Verification: CLI audit plus lifecycle evidence suites PASS (2 files,
+  12 tests); diff check PASS; spec scope is one evidence-row replacement.
 
 ---
 
@@ -494,7 +625,16 @@ capability requirement.
 - Review every file changed by Tasks 1–4
 - Modify this plan with final records and the reassessed CLI matrix
 
-- [ ] **Step 1: Perform a reader-level journey walkthrough**
+- [x] **Step 1: Perform a reader-level journey walkthrough**
+
+  - Walkthrough: PASS for all ten checkpoints: launcher/executor classification;
+    audit before mutation; explicit finding selection and confirmation; human-
+    owned plan input; session introduction; import/validate/preview order;
+    metadata plus TXT/CSV attribution; review-ready versus formal lifecycle;
+    separate consent-gated Phase 1 with `blankFrames` limits; and conditional
+    same-scope category closure. The kickoff builder is consistently a launcher,
+    the two Skills are executors, and provider text remains an optional handoff.
+    No normal path requires a repository clone or initializes `upstream/`.
 
   Read `/cli`, `/agents`, the root README, the strict-session section of the
   CLI README, and both Skill workflows in this order. Record PASS/FAIL for:
@@ -515,13 +655,32 @@ capability requirement.
   the Agent integration and no normal path requires a repository clone or
   `upstream/`.
 
-- [ ] **Step 2: Reassess the CLI documentation impact matrix**
+- [x] **Step 2: Reassess the CLI documentation impact matrix**
+
+  - Final reassessment: unchanged and complete for the final diff.
+
+    ```text
+    help: N/A — no command, option, usage, example, or generated help behavior changes
+    cli-readme: update
+    root-readme: update
+    landing: update
+    architecture: N/A — no package ownership, dependency boundary, or stable design decision changes
+    engineering: N/A — no command, CI, verification, or contributor workflow changes
+    releasing: N/A — no package version, archive, publication, installation, or release process changes
+    plugin: update
+    ```
 
   Recheck all eight rows from the matrix near the top of this plan against the
   final diff. Record each as `update` or `N/A — reason`. If any row changed,
   correct the matrix and surface before continuing.
 
-- [ ] **Step 3: Run focused alignment verification**
+- [x] **Step 3: Run focused alignment verification**
+
+  - Verification: Web focused tests PASS (3 files, 34 tests); audit Skill test
+    PASS (21 tests); CLI focused tests PASS (3 files, 46 tests); plugin
+    verification PASS (43 tests plus structure validation); CLI docs policy
+    PASS (4 suites, 19 tests); Web typecheck PASS; CLI typecheck PASS; and
+    `rtk git diff --check` PASS. Exact commands matched this step's command list.
 
   ```sh
   rtk pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx agent-prompt-builder.test.tsx readme-architecture-docs.test.ts
@@ -537,7 +696,15 @@ capability requirement.
   Record every command, exact PASS/FAIL, and relevant test count. Fix only
   failures caused by this change.
 
-- [ ] **Step 4: Run repository-wide gates**
+- [x] **Step 4: Run repository-wide gates**
+
+  - Verification: `rtk pnpm verify` PASS, including architecture boundaries,
+    documentation/plugin policies, all workspace typechecks, Core 459 tests,
+    Presets 8, Asset Pack Format 10, Web 872, and CLI 1,299 passed with 1
+    skipped. Expected missing-optional-image and catalog-alias warnings remained
+    non-failing. `rtk pnpm build` PASS for Core, Presets, Asset Pack Format,
+    production Web, embedded Web, and CLI. Existing Vite mixed-import and chunk-
+    size warnings remained non-failing.
 
   ```sh
   rtk pnpm verify
@@ -547,7 +714,15 @@ capability requirement.
   Both commands must PASS before handoff. If a failure is unrelated, preserve
   its full evidence and stop for user direction rather than weakening a gate.
 
-- [ ] **Step 5: Review scope and diff quality**
+- [x] **Step 5: Review scope and diff quality**
+
+  - Scope review: PASS. `git status -sb` showed the branch ahead by the four
+    intended task commits with only this plan record modified. The Task 1–4
+    range contains 10 files and 464 insertions/37 deletions: guidance, tests,
+    two Skill workflow references, and one spec evidence row. There are no
+    changes under `packages/core/`, CLI implementation source, `assets/`, or
+    `upstream/`; `rtk git diff --check` PASS. The four task commits appear in
+    the intended order above the approved design/plan commit.
 
   ```sh
   rtk git status -sb
@@ -560,7 +735,12 @@ capability requirement.
   evidence pointer, and this plan record. Confirm there are no changes under
   `packages/core/`, CLI implementation source, `assets/`, or `upstream/`.
 
-- [ ] **Step 6: Commit the completed plan record and report handoff evidence**
+- [x] **Step 6: Commit the completed plan record and report handoff evidence**
+
+  - Commit record: This checked-in record is the payload of the resulting
+    `docs(plan): record remediation journey alignment` commit. Its full hash is
+    reported in the final handoff because a commit cannot contain its own hash.
+    No push or pull request is part of this task.
 
   ```sh
   rtk git add docs/superpowers/plans/2026-08-10-animation-remediation-journey-alignment.md
@@ -574,11 +754,15 @@ capability requirement.
 
 **Task 5 record:**
 
-- Walkthrough: Not run.
-- CLI documentation impact reassessment: Not run.
-- Focused verification: Not run.
-- Repository-wide verification: Not run.
-- Commit: Not created.
+- Walkthrough: PASS (10/10 reader-level checkpoints; launcher/executor and
+  no-clone/no-`upstream/` classifications also confirmed).
+- CLI documentation impact reassessment: PASS; final matrix unchanged with
+  updates limited to CLI README, root README, landing, and plugin.
+- Focused verification: PASS (Web 34, audit Skill 21, CLI 46, plugin 43, docs
+  policy 19, Web and CLI typechecks, and diff check).
+- Repository-wide verification: `rtk pnpm verify` PASS and `rtk pnpm build`
+  PASS.
+- Commit: Resulting plan-record commit hash is reported in handoff.
 
 ## Completion criteria
 
