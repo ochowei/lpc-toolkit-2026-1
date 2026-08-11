@@ -885,6 +885,16 @@ transaction. Neither path modifies checked-in assets, the verified base cache,
 installed snapshots, unowned output, or the dormant read-only `upstream/`
 gitlink.
 
+Core remains the authority for strict `lpc-toolkit.asset-authoring-plan.v1`
+parsing and normalization. The CLI package publishes
+`examples/extend-item-plan.v1.json` as a complete, parser-verified post-consent
+field guide, and the Codex authoring Skill carries a byte-identical copy. These
+are distribution artifacts, not a second schema authority: neither template
+selects an audit finding, converts a report, grants consent, determines
+attribution, or writes source. The Agent or direct CLI user must replace every
+example value with one reviewed finding and human-provided evidence before the
+existing `asset authoring start` boundary parses the plan.
+
 ### Web-to-CLI handoff bridge
 
 D3 is a one-way local-file bridge between the Web Asset Pack Workbench and the

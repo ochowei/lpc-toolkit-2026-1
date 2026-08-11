@@ -8,6 +8,7 @@ direction_objectives:
   - PD-CAP-AUTHOR-PRODUCT-001
   - PD-CAP-GOVERNANCE-PRODUCT-001
   - PD-CAP-GUIDANCE-AGENT-001
+  - PD-CAP-ADVISORY-AGENT-001
   - PD-CAP-OPERATIONS-CLI-001
   - PD-CAP-AUDIT-PRODUCT-001
   - PD-CAP-AUDIT-AGENT-001
@@ -195,6 +196,11 @@ change source pixels, or mutate catalog files. Before any source-authoring
 transition, an Agent MUST show the selected finding and obtain explicit human
 confirmation for the bounded remediation scope.
 
+A product-owned animation-remediation launcher MUST transport a direct binding
+to the read-only audit executor and MUST NOT preselect the source-authoring
+executor. The source-authoring executor becomes eligible only after the human
+confirms one bounded finding.
+
 #### Scenario: Stop at an actionable handoff
 
 - GIVEN a completed read-only audit with one candidate remediation finding
@@ -206,9 +212,13 @@ confirmation for the bounded remediation scope.
 
 - Owner: `plugins/lpc-toolkit/skills/animation-asset-audit/SKILL.md`
 - Owner: `plugins/lpc-toolkit/skills/asset-authoring/SKILL.md`
+- Owner: `packages/web/src/components/agent-prompt-builder.tsx`
+- Owner: `plugins/lpc-toolkit/.codex-plugin/plugin.json`
 - Verification: `plugins/lpc-toolkit/test/animation-asset-audit.test.mjs` — `routes audit requests to a focused non-mutating skill`
 - Verification: `plugins/lpc-toolkit/test/animation-asset-audit.test.mjs` — `routes mutating asset work through one consent-bound skill`
 - Verification: `packages/cli/test/plugin-contract.test.ts` — `keeps authoring out of read-only and composition skills`
+- Verification: `packages/web/test/agent-prompt-builder.test.tsx` — `builds bounded prompts with explicit consent boundaries`
+- Verification: `scripts/verify-codex-plugin.test.mjs` — `packages the deterministic animation-remediation handoff through a public plan artifact`
 
 ### REQ-REMED-005 — Bind an extension to audit evidence
 
@@ -216,6 +226,13 @@ An `extend-item` plan MUST identify one existing catalog item and MUST retain th
 selected audit finding, physical source path, affected consumers, confidence,
 source-cell evidence, and approved remediation scope. The plan MUST limit work
 to the confirmed body type, animations, cells, variants, and paths.
+
+A complete versioned `extend-item` plan example MUST ship with both the public
+CLI package and the Agent authoring artifact. It MUST parse through the same
+Core authority as caller-authored plans, and it MUST be presented as a field
+guide rather than audit evidence, consent, or attribution authority. The
+product MUST NOT automatically choose a finding or convert a report into an
+approved plan.
 
 #### Scenario: Create a bounded existing-item extension
 
@@ -227,8 +244,12 @@ to the confirmed body type, animations, cells, variants, and paths.
 ##### Evidence
 
 - Owner: `packages/core/src/asset-authoring-schema.ts`
+- Owner: `packages/cli/examples/extend-item-plan.v1.json`
+- Owner: `plugins/lpc-toolkit/skills/asset-authoring/references/extend-item-plan.v1.json`
 - Verification: `packages/core/test/asset-authoring-schema.test.ts` — `retains complete audit/remediation evidence for an extension`
 - Verification: `packages/core/test/asset-authoring-schema.test.ts` — `requires remediation evidence for an extend-item plan`
+- Verification: `packages/cli/test/plugin-contract.test.ts` — `ships one complete, parseable extend-item plan template with CLI and plugin artifacts`
+- Verification: `packages/cli/scripts/smoke-packed-cli.mjs` — packed npm artifact starts the shipped `extend-item` template through the public CLI
 
 ### REQ-REMED-006 — Preserve identity, inherited credits, and unaffected animation scope
 

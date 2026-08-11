@@ -459,7 +459,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = [
     options: [
       HELP_OPTION,
       JSON_OPTION,
-      { name: 'plan', kind: 'value', valueLabel: 'plan.json', description: 'Read the strict authoring plan.' },
+      { name: 'plan', kind: 'value', valueLabel: 'plan.json', description: 'Read the strict authoring plan. The npm package includes examples/extend-item-plan.v1.json as a complete post-consent field guide.' },
       ASSET_WORKSPACE_OPTION,
     ],
     examples: ['lpc-toolkit asset authoring start --plan plan.json --json'],

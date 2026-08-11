@@ -80,7 +80,7 @@ describe('CLI package metadata', () => {
   it('packs only runtime artifacts and required metadata', () => {
     const packageJson = readCliPackageJson();
 
-    expect(packageJson.files).toEqual(['dist', 'README.md']);
+    expect(packageJson.files).toEqual(['dist', 'examples', 'README.md']);
     expect(packageJson.files).not.toContain('src');
     expect(packageJson.files).not.toContain('test');
     expect(packageJson.files).not.toContain('tsconfig.json');
@@ -90,7 +90,7 @@ describe('CLI package metadata', () => {
   it('packs the npm readme and copied release pin', () => {
     const packageJson = readCliPackageJson();
 
-    expect(packageJson.files).toEqual(['dist', 'README.md']);
+    expect(packageJson.files).toEqual(['dist', 'examples', 'README.md']);
     expect(packageJson.scripts?.build).toContain('node scripts/copy-release-config.mjs');
   });
 

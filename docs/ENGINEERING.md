@@ -259,14 +259,17 @@ pnpm --filter @lpc-toolkit/core run typecheck
 
 CLI tests cover session persistence, command orchestration, contract artifacts,
 candidate trust/replacement, receipt invalidation, JSON/human projections, the
-public packed-argv acceptance, command help, Web-to-CLI handoff/recovery, and
-the intentionally bounded
-Codex plugin contract:
+public packed-argv acceptance, the shipped parser-valid extend-item template,
+command help, Web-to-CLI handoff/recovery, and the intentionally bounded Codex
+plugin contract. Web and repository-level tests pin the transported animation
+Skill selector and consent-bound handoff rather than relying on page-wide
+guidance alone:
 
 ```sh
 pnpm --filter @lpc-toolkit/cli test -- asset-authoring-session.test.ts asset-authoring-commands.test.ts asset-authoring-contract.test.ts asset-authoring-import.test.ts asset-authoring-receipts.test.ts asset-authoring-session-e2e.test.ts command-spec.test.ts plugin-contract.test.ts main-json.test.ts main-human.test.ts
 pnpm --filter @lpc-toolkit/cli run typecheck
-pnpm --filter @lpc-toolkit/web test -- landing-page.test.tsx landing-artifacts.test.ts
+pnpm --filter @lpc-toolkit/cli test:package
+pnpm --filter @lpc-toolkit/web test -- agent-prompt-builder.test.tsx landing-page.test.tsx landing-artifacts.test.ts
 node --test scripts/verify-codex-plugin.test.mjs
 ```
 

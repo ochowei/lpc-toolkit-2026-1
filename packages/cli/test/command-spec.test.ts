@@ -408,6 +408,9 @@ describe('helpForCommand', () => {
     expect(helpForCommand(['asset', 'authoring', 'start'])).toContain(
       'lpc-toolkit asset authoring start --plan <plan.json>',
     );
+    expect(helpForCommand(['asset', 'authoring', 'start'])).toContain(
+      'examples/extend-item-plan.v1.json',
+    );
     expect(helpForCommand(['asset', 'authoring', 'contract'])).toContain(
       '--refresh',
     );
