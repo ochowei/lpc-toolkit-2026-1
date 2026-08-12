@@ -170,6 +170,29 @@ describe('CLI and agent integration pages', () => {
     expect(html).toContain('CLI refuses to install them');
   });
 
+  it('keeps advanced asset workflows behind optional progressive disclosure', () => {
+    const html = renderToStaticMarkup(<CliPage onNavigate={() => {}} />);
+
+    const advancedStart = html.indexOf('<details');
+    const advancedEnd = html.indexOf('</details>', advancedStart);
+    expect(advancedStart).toBeGreaterThan(-1);
+    expect(advancedEnd).toBeGreaterThan(advancedStart);
+
+    const advancedOpeningTag = html.slice(
+      advancedStart,
+      html.indexOf('>', advancedStart) + 1,
+    );
+    expect(advancedOpeningTag).not.toContain('open=');
+
+    const advancedHtml = html.slice(advancedStart, advancedEnd);
+    expect(advancedHtml).toContain('Optional reference');
+    expect(advancedHtml).toContain('Advanced asset workflows');
+    expect(advancedHtml).toContain('Strict animation-remediation session');
+    expect(advancedHtml).toContain('Review cross-pack conflicts explicitly');
+    expect(html).toContain('lg:grid-cols-3');
+    expect(html).toContain('lg:grid-cols-2');
+  });
+
   it('keeps the available Codex workflow on the extensible agent integrations page', () => {
     const html = renderToStaticMarkup(
       <AgentIntegrationsPage onNavigate={() => {}} />,

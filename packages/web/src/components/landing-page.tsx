@@ -242,7 +242,7 @@ export function CliPage({ onNavigate }: ProductPageProps) {
             To inspect the CLI without installing it, run{' '}
             <code>npx @lpc-toolkit/cli --help</code>.
           </p>
-          <ol className="mt-5 grid min-w-0 gap-4">
+          <ol className="mt-5 grid min-w-0 gap-4 lg:grid-cols-3">
             {quickStartSteps.map((step, index) => (
               <li
                 key={step.command}
@@ -265,11 +265,34 @@ export function CliPage({ onNavigate }: ProductPageProps) {
           </p>
         </section>
 
-        <section className="rounded-md border border-border bg-surface p-5">
-          <h2 className="text-2xl font-semibold text-text">
-            Author your own LPC asset pack
-          </h2>
-          <p className="mt-2 max-w-3xl text-sm text-text-2">
+        <details className="group rounded-md border border-border bg-surface">
+          <summary className="cursor-pointer list-none p-5 [&::-webkit-details-marker]:hidden">
+            <span className="flex items-start justify-between gap-4">
+              <span>
+                <span className="block text-xs font-semibold uppercase tracking-[0.16em] text-text-mute">
+                  Optional reference
+                </span>
+                <span className="mt-2 block text-xl font-semibold text-text">
+                  Advanced asset workflows
+                </span>
+                <span className="mt-2 block max-w-3xl text-sm font-normal text-text-2">
+                  Create, repair, release, install, or integrate LPC asset
+                  packs. Expand this only when you need source-asset commands.
+                </span>
+              </span>
+              <span
+                aria-hidden="true"
+                className="mt-1 text-lg text-text-mute transition-transform group-open:rotate-180"
+              >
+                ↓
+              </span>
+            </span>
+          </summary>
+          <div className="border-t border-border p-5">
+            <h2 className="text-2xl font-semibold text-text">
+              Author your own LPC asset pack
+            </h2>
+            <p className="mt-2 max-w-3xl text-sm text-text-2">
             You do not need to clone this repository. The published CLI creates
             a standalone artist workspace, validates complete animation PNGs,
             renders attributed previews, packages a deterministic archive, and
@@ -544,8 +567,9 @@ export function CliPage({ onNavigate }: ProductPageProps) {
             in-memory and do not write an artist workspace. Browser drafts carry
             <code>status: "draft"</code> and the CLI refuses to install them
             until a formal release is downloaded.
-          </p>
-        </section>
+            </p>
+          </div>
+        </details>
 
         <section className="grid gap-5 lg:grid-cols-2">
           <div className="rounded-md border border-border bg-surface p-5">
@@ -582,7 +606,7 @@ export function CliPage({ onNavigate }: ProductPageProps) {
             Once the first preview works, discover a compatible item, inspect
             its exact credits, and persist the selection.
           </p>
-          <ol className="mt-5 space-y-4">
+          <ol className="mt-5 grid gap-4 lg:grid-cols-2">
             {customizationSteps.map((step, index) => (
               <li
                 key={step.command}
