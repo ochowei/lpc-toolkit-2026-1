@@ -69,6 +69,19 @@ describe('CLI and agent integration pages', () => {
     expect(html).not.toContain('lpc-toolkit token encode');
   });
 
+  it('renders Traditional Chinese CLI guidance and a switch back to English', () => {
+    const html = renderToStaticMarkup(
+      <CliPage locale="zh-TW" onToggleLocale={() => {}} onNavigate={() => {}} />,
+    );
+
+    expect(html).toContain('從命令列建立附帶署名資訊的 LPC 角色');
+    expect(html).toContain('預覽你的第一個角色');
+    expect(html).toContain('安裝 CLI');
+    expect(html).toContain('切換至 English');
+    expect(html).toContain('lang="zh-TW"');
+    expect(html).toContain('npm install -g @lpc-toolkit/cli');
+  });
+
   it('documents the public CLI artist workflow without requiring a repository clone', () => {
     const html = renderToStaticMarkup(<CliPage onNavigate={() => {}} />)
       .replaceAll('&quot;', '"')
@@ -227,6 +240,25 @@ describe('CLI and agent integration pages', () => {
     );
     expect(html).not.toContain('Coming soon');
     expect(html).not.toContain('Preview your first character');
+  });
+
+  it('renders Traditional Chinese Agent Integrations guidance', () => {
+    const html = renderToStaticMarkup(
+      <AgentIntegrationsPage
+        locale="zh-TW"
+        onToggleLocale={() => {}}
+        onNavigate={() => {}}
+      />,
+    );
+
+    expect(html).toContain('Agent 整合');
+    expect(html).toContain('從你需要的成果開始');
+    expect(html).toContain('用現有素材建立角色');
+    expect(html).toContain('使用現有 catalog 素材');
+    expect(html).toContain('複製啟動提示');
+    expect(html).toContain('每次權限變更都由你核准');
+    expect(html).toContain('切換至 English');
+    expect(html).toContain('lpc-toolkit agent integration check');
   });
 
   it('explains the kickoff launcher, Skill handoff, and CLI fallback', () => {

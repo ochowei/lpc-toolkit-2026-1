@@ -179,13 +179,16 @@ function ComposerApp({
   onNavigateHome,
   onNavigateAssetPacks,
   onNavigate,
+  locale,
+  onToggleLocale,
 }: {
   readonly onNavigateHome: () => void;
   readonly onNavigateAssetPacks: () => void;
   readonly onNavigate: (route: NavigableAppRoute) => void;
+  readonly locale: Locale;
+  readonly onToggleLocale: () => void;
 }) {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
-  const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE);
 
   const init = useMemo(() => {
     const catalog = loadCatalogFromUpstream();
@@ -215,7 +218,7 @@ function ComposerApp({
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-app text-text">
-      <ProductNavigation activeRoute="compose" onNavigate={onNavigate} compact />
+      <ProductNavigation activeRoute="compose" onNavigate={onNavigate} compact locale={locale} />
       <div className="min-h-0 flex-1">
         <LayerStackHarness
           catalog={init.catalog}
@@ -232,9 +235,7 @@ function ComposerApp({
       onNavigateHome={onNavigateHome}
       onNavigateAssetPacks={onNavigateAssetPacks}
       onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
-          onToggleLocale={() =>
-            setLocale((current) => (current === 'en' ? 'zh-TW' : 'en'))
-          }
+          onToggleLocale={onToggleLocale}
         />
       </div>
     </div>
@@ -311,6 +312,10 @@ export default function App({ confirmNavigation }: AppProps = {}) {
   const defaultConfirmNavigation = useCallback((message: string) => window.confirm(message), []);
   const activeConfirmNavigation = confirmNavigation ?? defaultConfirmNavigation;
   const [pathname, navigate, replace, registerNavigationBlocker] = useAppPathname();
+  const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE);
+  const toggleLocale = useCallback(() => {
+    setLocale((current) => (current === 'en' ? 'zh-TW' : 'en'));
+  }, []);
   const route = routeFromPathname(pathname);
 
   useEffect(() => {
@@ -347,6 +352,8 @@ export default function App({ confirmNavigation }: AppProps = {}) {
         onNavigateHome={() => navigateToRoute('entry')}
         onNavigateAssetPacks={() => navigateToRoute('asset-packs')}
         onNavigate={navigateToRoute}
+        locale={locale}
+        onToggleLocale={toggleLocale}
       />
     );
   }
@@ -364,8 +371,8 @@ export default function App({ confirmNavigation }: AppProps = {}) {
   }
 
   if (route === 'agents') {
-    return <AgentIntegrationsPage onNavigate={navigateToRoute} />;
+    return <AgentIntegrationsPage locale={locale} onToggleLocale={toggleLocale} onNavigate={navigateToRoute} />;
   }
 
-  return <CliPage onNavigate={navigateToRoute} />;
+  return <CliPage locale={locale} onToggleLocale={toggleLocale} onNavigate={navigateToRoute} />;
 }
